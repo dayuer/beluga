@@ -14,6 +14,7 @@ import { EASE_OUT, Rise, SPRING, Words } from './fx.js';
 import { Glass } from './Glass.js';
 import s from './onboarding.module.css';
 import { useT } from '../i18n/index.js';
+import { runtimeLabel } from '../lib/prefs-words.js';
 
 /** Where Settings › Agent keeps its local models (Settings.tsx), to scroll to. */
 export const LOCAL_MODELS_ID = 'settings-local-models';
@@ -135,14 +136,14 @@ export function AgentsStep() {
             const on = ready && row.id === mine;
             return (
               <motion.div key={row.id} className={cx(s.row, s.agentRow)} data-on={on ? '' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.25 + i * 0.06 }}>
-                <button type="button" role="radio" aria-checked={on} aria-label={row.label} disabled={!ready} className={s.agentPick} onClick={() => choose(row)}>
+                <button type="button" role="radio" aria-checked={on} aria-label={runtimeLabel(row.id, row.label)} disabled={!ready} className={s.agentPick} onClick={() => choose(row)}>
                   <span className={s.agentRadio} aria-hidden="true">
                     {on ? <motion.span layoutId="agent-on" className={s.agentRadioOn} transition={SPRING} /> : null}
                   </span>
                   <Icon name={runtimeMark(row.id)} size={20} className={s.agentMark} />
                   <span className={s.rowText}>
                     <span className={s.rowLabel}>
-                      {row.label}
+                      {runtimeLabel(row.id, row.label)}
                       <span className={s.grant} data-grant={ready ? 'granted' : undefined} data-testid={`agent-state-${row.id}`}>
                         {ready ? <Icon name="check" size={10} /> : null}
                         {row.words}

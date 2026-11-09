@@ -14,6 +14,7 @@ import { cx } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { t as tNow, useT } from '../i18n/index.js';
 import s from './picker.module.css';
+import { localModelDescription, localModelName } from '../lib/engine-words.js';
 
 type Api = ReturnType<typeof useApi>;
 type Prefs = AppState['prefs'];
@@ -73,7 +74,7 @@ export function agentEntries(options: readonly AgentOption[]): SelectEntry<strin
       .map((o) => {
         const name = o.model ? o.label.slice(`${o.group} · `.length) || o.label : o.group;
         const why = o.why ?? (o.model ? undefined : o.disabled ? undefined : tNow('chat.modelPicker.ownDefault'));
-        return { value: o.value, label: name, short: o.label, icon: o.mark, keywords: [o.group], ...(why ? { description: why } : {}), ...(o.disabled ? { disabled: true } : {}) };
+        return { value: o.value, label: localModelName(name), short: localModelName(o.label), icon: o.mark, keywords: [o.group], ...(why ? { description: why } : {}), ...(o.disabled ? { disabled: true } : {}) };
       }),
   }));
 }
@@ -149,7 +150,7 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
   const model = groups.find((g) => g.current)?.models.find((m) => m.on);
   // Some models take only some effort levels.
   const allowed = new Set((model?.efforts ?? EFFORTS) as readonly string[]);
-  const label = picker.label;
+  const label = localModelName(picker.label);
   const chip = `${label}${effort ? ` · ${EFFORT_INFO[effort].label}` : ''}`;
   const pick = (g: PickerGroup, value: string): void => {
     if (onDraft && !conversation) {
@@ -185,9 +186,9 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
             <span className={s.modelText}>
               <span className={s.modelName}>
                 {maker ? <Icon name={maker} size={12} className={s.maker} /> : null}
-                {m.label}
+                {localModelName(m.label)}
               </span>
-              <span className={s.modelDesc}>{m.why ?? (m.description || flavor(m.value, m.label, g.label))}</span>
+              <span className={s.modelDesc}>{m.why ?? (localModelDescription(m.description ?? '') || flavor(m.value, m.label, g.label))}</span>
             </span>
           </button>
         );

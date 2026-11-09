@@ -32,7 +32,7 @@ export function ZoomAvatar({ name, id, size = 56 }: { name: string; id: string; 
             setOpen(false);
           }}
         >
-          <Dialog.Title className="visually-hidden">{name}’s picture</Dialog.Title>
+          <Dialog.Title className="visually-hidden">{t('more.zoomAvatar.picture', { name })}</Dialog.Title>
           <img className={s.picture} src={picture} alt={name} draggable={false} />
           <div className={s.caption}>{name}</div>
         </Dialog.Content>

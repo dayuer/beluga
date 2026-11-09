@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
-import { activityOf, stateOf } from '@beluga/ui/workspace-models.js';
-import { describePr, formatBytes } from '@beluga/shared/format.js';
+import { activityOf } from '@beluga/ui/workspace-models.js';
+import { formatBytes } from '@beluga/shared/format.js';
 import { Icon } from '../../components/Icon.js';
 import { type ActionItem, ActionsContext, ActionsDropdown } from '../../components/SpecMenu.js';
 import { Button, Dot, IconButton, Tip, cx } from '../../components/ui.js';
@@ -13,6 +13,7 @@ import s from '../overview.module.css';
 import { revealLabel } from '../../lib/os-words.js';
 import { chordLabel } from '../../lib/shortcuts-model.js';
 import { t as tNow, useT } from '../../i18n/index.js';
+import { localStateOf, localDescribePr } from '../../lib/engine-words.js';
 
 const ago = (ts: number, now: number): string => {
   const m = Math.round((now - ts) / 60_000);
@@ -100,7 +101,7 @@ function WorkspaceItemRow(props: RowBase & { now: number }) {
   // What the row shows, worked out from the shared state: drawn again only when part of it changes.
   const { st, running, lastTs, unread, pr, ctx } = useApp((full) => {
     const act = activityOf(full.log, `ws:${w.id}`);
-    return { st: stateOf(full, w, 0), running: act.running, lastTs: act.lastTs, unread: full.unread[`ws:${w.id}`] ?? 0, pr: full.prs[w.id], ctx: full.context[`ws:${w.id}`] };
+    return { st: localStateOf(full, w, 0), running: act.running, lastTs: act.lastTs, unread: full.unread[`ws:${w.id}`] ?? 0, pr: full.prs[w.id], ctx: full.context[`ws:${w.id}`] };
   }, sameRow);
   return (
     <ActionsContext items={() => workspaceItems(client.store.getState(), w, actions.run, client)}>
@@ -118,7 +119,7 @@ function WorkspaceItemRow(props: RowBase & { now: number }) {
           {st.label}
         </span>
         <span className={s.extra} title={item.last}>
-          {pr ? describePr(pr) : ''}
+          {pr ? localDescribePr(pr) : ''}
           {ctx ? `${pr ? ' · ' : ''}${t('views.overview.context', { pct: Math.round((ctx.used / ctx.window) * 100) })}` : ''}
           {!pr && !ctx && item.last ? item.last : ''}
         </span>

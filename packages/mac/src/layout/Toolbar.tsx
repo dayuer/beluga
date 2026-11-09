@@ -1,11 +1,11 @@
 import { agentLabel } from '@beluga/shared/agent-label.js';
 import { agentMark } from '@beluga/shared/agent-marks.js';
 import { planForHome } from '@beluga/core/plans/model.js';
-import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { agentOfWorktree, agentTitle, isAgentWorktree } from '../claude-code/subagents-model.js';
-import { activityOf, findWorkspace, stateOf } from '@beluga/ui/workspace-models.js';
-import { describePr } from '@beluga/shared/format.js';
+import { activityOf, findWorkspace } from '@beluga/ui/workspace-models.js';
 import { Icon } from '../components/Icon.js';
 import { useContinueOn } from '../machines/continue-on.js';
 import { ActionsDropdown } from '../components/SpecMenu.js';
@@ -39,6 +39,7 @@ import { sentinelSubtitle } from '../sentinel/sentinel-model.js';
 import { CallButton } from '../call/CallStrip.js';
 import { AppMenu } from './AppMenu.js';
 import { type Key, useT } from '../i18n/index.js';
+import { localStateOf, localDescribePr, roomCallName } from '../lib/engine-words.js';
 
 /** Room the title keeps, and the window buttons on the right (search, bell, panel). */
 const TITLE_MIN = 210;
@@ -148,7 +149,7 @@ function toolbarPick(full: AppState) {
     view,
     ws,
     sub: ws && agent ? agentOfWorktree(full.claudeCode.sessions, ws) : undefined,
-    made: ws && !agent ? { st: stateOf(full, ws, 0), tools: toolbarActions(full, ws), live: Boolean(act?.running || act?.awaiting) } : undefined,
+    made: ws && !agent ? { st: localStateOf(full, ws, 0), tools: toolbarActions(full, ws), live: Boolean(act?.running || act?.awaiting) } : undefined,
     projects: full.projects,
     prs: full.prs,
     plans: full.plans,
@@ -259,9 +260,9 @@ export function Toolbar() {
               <span className={s.meta}>{ws.askOnly ? (planForHome(state.plans, `ws:${ws.id}`) ? t('layout.toolbar.planConversation') : t('layout.toolbar.questionsOnly')) : t('layout.toolbar.agentChat')}</span>
             ) : null}
             {pr && !branch ? (
-              <span className={cx(s.meta, s.metaPr, pr.state === 'MERGED' && s.metaMerged)} title={describePr(pr)} data-pr-state={pr.state}>
+              <span className={cx(s.meta, s.metaPr, pr.state === 'MERGED' && s.metaMerged)} title={localDescribePr(pr)} data-pr-state={pr.state}>
                 <Icon name={pr.state === 'MERGED' ? 'merge' : 'pr'} size={11} />
-                <span className={s.ellipsis}>{pr.state === 'MERGED' ? `PR #${pr.number}` : describePr(pr)}</span>
+                <span className={s.ellipsis}>{pr.state === 'MERGED' ? `PR #${pr.number}` : localDescribePr(pr)}</span>
               </span>
             ) : null}
           </>
@@ -346,13 +347,13 @@ export function Toolbar() {
   if (view.kind === 'conversation') return <ConversationBar id={view.id} headerRef={headerRef} />;
 
   if (view.kind === 'assistant') {
-    return <Shell headerRef={headerRef} title={<span className={s.name}>{ASSISTANT_TITLE}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.assistantMeta', { computer: THIS_COMPUTER })}</span>} />;
+    return <Shell headerRef={headerRef} title={<span className={s.name}>{assistantTitle()}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.assistantMeta', { computer: THIS_COMPUTER })}</span>} />;
   }
 
   if (view.kind === 'room') {
     const solo = state.peers.length <= 1;
     // A call in the room (BLG-716): once there's someone to call.
-    return <Shell headerRef={headerRef} title={solo ? t('layout.toolbar.chat') : state.room} subtitle={<span className={s.meta}>{solo ? t('layout.toolbar.soloMeta') : t('layout.toolbar.roomMeta', { count: state.peers.length })}</span>} right={solo ? undefined : <CallButton id="room" label="the Room" />} />;
+    return <Shell headerRef={headerRef} title={solo ? t('layout.toolbar.chat') : state.room} subtitle={<span className={s.meta}>{solo ? t('layout.toolbar.soloMeta') : t('layout.toolbar.roomMeta', { count: state.peers.length })}</span>} right={solo ? undefined : <CallButton id="room" label={roomCallName()} />} />;
   }
 
   if (view.kind === 'draft' || view.kind === 'draft_worktree') {
@@ -386,7 +387,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? (item ? ASSISTANT_TITLE : t('layout.toolbar.sentinel'))}</span>
+            <span className={s.crumb}>{project?.name ?? (item ? assistantTitle() : t('layout.toolbar.sentinel'))}</span>
             <span className={s.name}>{view.kind === 'sentinel_run' ? t('layout.toolbar.sentinelRun', { name: item?.name ?? t('layout.toolbar.sentinel') }) : (item?.name ?? t('layout.toolbar.sentinel'))}</span>
           </>
         }

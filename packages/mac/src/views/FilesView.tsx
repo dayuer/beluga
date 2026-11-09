@@ -17,6 +17,7 @@ import { revealLabel } from '../lib/os-words.js';
 import { useT } from '../i18n/index.js';
 import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
 import { ReaderContent } from './reader/reader-lazy.js';
+import { localRootLabel } from '../lib/engine-words.js';
 
 export { LANG, ext } from './reader/reader-model.js';
 
@@ -126,10 +127,10 @@ function Row({ row, selected, onOpen }: { row: BrowserRow; selected: boolean; on
   const t = useT();
   return (
     <ActionsContext items={() => items(row, onOpen)}>
-    <div role="option" aria-selected={selected} tabIndex={-1} className={cx(s.row, selected && s.rowOn)} onClick={onOpen} title={row.label}>
+    <div role="option" aria-selected={selected} tabIndex={-1} className={cx(s.row, selected && s.rowOn)} onClick={onOpen} title={row.group ? localRootLabel(row.label) : row.label}>
       <Icon name={up ? 'up' : row.dir ? 'folder' : 'file'} size={14} className={row.dir ? s.dirIcon : s.fileIcon} />
       {/* Under its owner's name, a folder goes by its own name. */}
-      <span className={s.rowName}>{up ? t('views.files.back') : row.group && row.label.startsWith(`${row.group} · `) ? row.label.slice(row.group.length + 3) : row.label}</span>
+      <span className={s.rowName}>{up ? t('views.files.back') : row.group && row.label.startsWith(`${row.group} · `) ? localRootLabel(row.label.slice(row.group.length + 3)) : row.label}</span>
       {!row.dir && row.size !== undefined ? <span className={s.size}>{row.size < 1024 ? `${row.size} B` : formatBytes(row.size)}</span> : null}
       {row.dir && !up ? <Icon name="chevronRight" size={10} className={s.chev} /> : null}
     </div>

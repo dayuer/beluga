@@ -11,9 +11,11 @@ import { ago, resetsAt } from './usage-model.js';
 import s from './usage.module.css';
 import { thisComputer } from '../../lib/os-words.js';
 import { t as tNow, useT } from '../../i18n/index.js';
+import { localWindow } from '../../lib/engine-words.js';
 
-function WindowMeter({ w, now }: { w: CardWindow; now: number }) {
+function WindowMeter({ w: shared, now }: { w: CardWindow; now: number }) {
   const t = useT();
+  const w = localWindow(shared);
   return (
     <div className={s.window}>
       <div className={s.windowHead}>
@@ -135,9 +137,10 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
   );
 }
 
-function FriendWindow({ room, w }: { room: FriendRoom; w: CardWindow | undefined }) {
+function FriendWindow({ room, w: shared }: { room: FriendRoom; w: CardWindow | undefined }) {
   const t = useT();
-  if (!w) return <span />;
+  if (!shared) return <span />;
+  const w = localWindow(shared);
   return (
     <span className={s.friendMeter}>
       <span className={s.friendLabel}>{w.short}</span>

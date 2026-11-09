@@ -8,6 +8,7 @@ import { generatedName, randomSeed } from '../../lib/sounds/generated.js';
 import { playSound } from '../../lib/sounds/player.js';
 import s from './sound.module.css';
 import { t, useT, tl } from '../../i18n/index.js';
+import { pw } from '../../lib/prefs-words.js';
 
 const FAMILIES = familiesHere(keyPlatform() === 'mac');
 
@@ -97,7 +98,7 @@ export function SoundPicker({ value, volume, made, onPick, onKeep, kindLabel }: 
   const [family, setFamily] = useState<SoundFamily>(FAMILIES.includes(value.kind) ? value.kind : 'chip');
   const current = choiceKey(value);
   const tiles = (choices: readonly SoundChoice[]) => (
-    <div className={s.tiles} role="radiogroup" aria-label={t('dialogs.sound.familySounds', { family: tl('FAMILY_LABELS', family, 'text', FAMILY_LABELS[family]) })}>
+    <div className={s.tiles} role="radiogroup" aria-label={pw('familySounds', family, t('dialogs.sound.familySounds', { family: tl('FAMILY_LABELS', family, 'text', FAMILY_LABELS[family]) }))}>
       {choices.map((c) => (
         <Tile key={choiceKey(c)} choice={c} on={choiceKey(c) === current} volume={volume} onPick={onPick} />
       ))}

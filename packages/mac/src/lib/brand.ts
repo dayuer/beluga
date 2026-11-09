@@ -1,5 +1,7 @@
 import { isUnder } from '../../../../src/shared/path-inside.js';
 import { isWindowsPath } from '../../../../src/shared/os-path.js';
+import { ASSISTANT_TITLE, COMPUTER } from '../../../../src/shared/assistant.js';
+import { late } from './late-words.js';
 
 /**
  * The product is "Beluga" in this app. Messages from the core write "beluga"
@@ -67,3 +69,6 @@ export function brandNotice<T extends { readonly title: string; readonly body: s
 export function isTestNotice(n: { readonly title: string; readonly tag?: string }): boolean {
   return n.tag === 'test' || n.title === TEST_NOTICE_TITLE;
 }
+
+/** Your own Claude's name for this computer ("Your Mac"), in the language shown (shared/assistant.ts keeps the English). */
+export const assistantTitle = (): string => late(ASSISTANT_TITLE, (w) => w.t(COMPUTER === 'windows' ? 'more.assistant.windows' : COMPUTER === 'linux' ? 'more.assistant.linux' : 'more.assistant.mac'));

@@ -359,7 +359,7 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
           {/* The video's canvas is always there (pieces can come before the first picture), shown once it draws. */}
           <div ref={boxRef} className={cx(s.screenBox, !size && s.hidden)} style={size ? ({ '--ratio': size.w / size.h } as React.CSSProperties) : undefined}>
             <canvas ref={canvasRef} className={cx(s.screen, !video && s.hidden)} aria-label={t('phone.view.screenLive')} {...touch} />
-            {video || !frame ? null : <img src={frame.url} className={s.screen} alt="Your phone's screen" {...touch} />}
+            {video || !frame ? null : <img src={frame.url} className={s.screen} alt={t('more.phone.screen')} {...touch} />}
             {size ? <Touches touches={touches} size={size} /> : null}
             {caption ? (
               <span key={caption.id} className={s.caption}>

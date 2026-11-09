@@ -21,7 +21,7 @@ import t from '../tasks/tasks.module.css';
 import s from './sentinel.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { chordLabel, primaryKey } from '../lib/shortcuts-model.js';
-import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { revealLabel } from '../lib/os-words.js';
 import { tl, useT } from '../i18n/index.js';
 
@@ -256,7 +256,7 @@ function Session({ channel, live, where, worktree, open }: { channel: string; li
     <div className={s.session} data-run-session={channel} data-live={live || undefined}>
       <div className={s.sessionBar}>
         {live ? <LiveDot /> : <Icon name="claude" size={12} />}
-        <span className={s.sessionWhere}>{where === 'worktree' ? tr('sentinel.run.inWorktree') : where === 'mac' ? tr('sentinel.cards.where.mac', { mac: ASSISTANT_TITLE }) : tr('sentinel.run.inProject')}</span>
+        <span className={s.sessionWhere}>{where === 'worktree' ? tr('sentinel.run.inWorktree') : where === 'mac' ? tr('sentinel.cards.where.mac', { mac: assistantTitle() }) : tr('sentinel.run.inProject')}</span>
         {where === 'worktree' && worktree ? <WorktreeChip id={worktree} /> : null}
         <span className={t.grow} />
         {chatPlaceOf(channel) ? (

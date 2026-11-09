@@ -56,6 +56,7 @@ export function HeatmapView({ view, data }: { view: View; data: ViewData }) {
 }
 
 function Row({ y, cells, xs, color, fmt, show, hide }: { y: string; cells: readonly (number | null)[]; xs: readonly string[]; color: (n: number | null) => string; fmt: (n: number) => string; show: (el: Element, body: React.ReactNode) => void; hide: () => void }) {
+  const t = useT();
   return (
     <>
       <span className={v.heatY} title={y}>
@@ -70,7 +71,7 @@ function Row({ y, cells, xs, color, fmt, show, hide }: { y: string; cells: reado
             </div>
             <div className={v.tipRow}>
               <span className={v.legendMark} style={{ background: color(n) }} />
-              <span className={v.tipName}>Value</span>
+              <span className={v.tipName}>{t('more.views.value')}</span>
               <span className={v.tipValue}>{n === null ? '—' : fmt(n)}</span>
             </div>
           </>

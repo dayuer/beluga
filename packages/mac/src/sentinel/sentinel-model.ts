@@ -42,10 +42,11 @@ import {
 import { agentForChoice } from '../../../../src/ui/agent-choice.js';
 import type { IconName } from '../components/Icon.js';
 import { ago } from '../tasks/tasks-model.js';
-import { ASSISTANT_TITLE } from '../../../../src/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { computerTitle, computerWord } from '../lib/os-words.js';
 import { currentLocale, t as tr, tl } from '../i18n/index.js';
 import type { Key } from '../i18n/index.js';
+import { localPausedWords, localSchedule } from '../lib/ci-sentinel-words.js';
 
 /**
  * Sentinel's window, its plain parts (docs/sentinel.md §3): the list's rows and groups, the
@@ -179,7 +180,7 @@ export function filterSentinels(items: readonly Sentinel[], opts: { readonly sco
     if (opts.show === 'watching' && s.paused) return false;
     if (opts.show === 'paused' && !s.paused) return false;
     if (!q) return true;
-    const words = [s.name, scheduleSentence(s.trigger), ...s.steps.map((st) => `${st.name} ${STEP_INFO[st.kind].label}`)].join(' ').toLowerCase();
+    const words = [s.name, localSchedule(s.trigger), ...s.steps.map((st) => `${st.name} ${STEP_INFO[st.kind].label}`)].join(' ').toLowerCase();
     return words.includes(q);
   });
 }
@@ -201,7 +202,7 @@ export function groupSentinels(items: readonly Sentinel[], projects: ReadonlyArr
   }
   const known = new Set(projects.map((p) => p.id));
   const mac = items.filter((s) => !s.projectId || !known.has(s.projectId));
-  if (mac.length) out.push({ name: ASSISTANT_TITLE, items: [...mac].sort(byName) });
+  if (mac.length) out.push({ name: assistantTitle(), items: [...mac].sort(byName) });
   return out;
 }
 
@@ -228,7 +229,7 @@ export function rowOf(state: SentinelState, s: Sentinel, now: number): Row {
   const info = last ? RUN_STATE_INFO[last.state] : undefined;
   const trouble = troubleOf(state, s);
   return {
-    sentence: scheduleSentence(s.trigger, nameOfIn(state)),
+    sentence: localSchedule(s.trigger, nameOfIn(state)),
     ...(trouble ? { trouble } : {}),
     ...(last && info ? { last: { id: last.id, state: last.state, label: runStateLabel(last.state), tone: info.tone, headline: headlineOf(last), when: ago(last.startedAt, now) } } : {}),
     ...(next !== undefined && !s.paused ? { next: tr('sentinel.model.next', { when: nextText(next, now) }) } : {}),
@@ -259,7 +260,7 @@ export function headlineOf(run: Pick<RunSummary, 'headline' | 'state' | 'why'>):
 
 /** The sidebar row's line, and whether it's a problem (paused after failures; Claude's change isn't one). */
 /** Why a sentinel stopped on its own (failures in a row, a limit hit), in words; undefined while it's on, paused by hand, or paused because your agent changed it. */
-export const brokenWords = (s: Sentinel): string | undefined => (s.paused && s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? (pausedWords(s) ?? tr('sentinel.model.pausedAfterFailures')) : undefined);
+export const brokenWords = (s: Sentinel): string | undefined => (s.paused && s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? (localPausedWords(s) ?? tr('sentinel.model.pausedAfterFailures')) : undefined);
 
 export function sidebarLine(state: SentinelState): { readonly text: string; readonly problem: boolean } {
   const broken = state.items.map(brokenWords).find((w) => w !== undefined);
@@ -709,7 +710,7 @@ export function accessSentence(access: Access, steps: readonly Step[]): string {
 // ---------------------------------------------------------------- New Sentinel
 
 /** A recipe's row in New Sentinel: when it runs, in the sentence its page will show. */
-export const recipeWhen = (r: Recipe): string => (r.sentinel.trigger ? scheduleSentence(r.sentinel.trigger) : triggerLabel('manual'));
+export const recipeWhen = (r: Recipe): string => (r.sentinel.trigger ? localSchedule(r.sentinel.trigger) : triggerLabel('manual'));
 
 // ---------------------------------------------------------------- Claude changing it (the page's box)
 
@@ -905,11 +906,11 @@ export function needsOf(state: SentinelState, scope?: string): Need[] {
   }
   for (const s of items) {
     if (s.paused && s.pausedWhy === CLAUDE_CHANGED) out.push({ kind: 'changed', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.changed', { name: s.name }), detail: tr('sentinel.model.need.changedDetail') });
-    else if (s.paused && s.pausedWhy) out.push({ kind: 'failing', key: `s:${s.id}`, sentinel: s, title: `${s.name}: ${pausedWords(s) ?? tr('sentinel.model.need.paused')}`, detail: headlineOf(lastRunOf(state, s.id) ?? { headline: '', state: 'failed' }) });
+    else if (s.paused && s.pausedWhy) out.push({ kind: 'failing', key: `s:${s.id}`, sentinel: s, title: `${s.name}: ${localPausedWords(s) ?? tr('sentinel.model.need.paused')}`, detail: headlineOf(lastRunOf(state, s.id) ?? { headline: '', state: 'failed' }) });
     else if (!s.paused && troubleOf(state, s)) out.push({ kind: 'trouble', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.cantWatch', { name: s.name }), detail: troubleOf(state, s)! });
   }
   for (const s of items) {
-    if (s.paused && !s.pausedWhy && !lastRunOf(state, s.id)) out.push({ kind: 'draft', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.draft', { name: s.name }), detail: [scheduleSentence(s.trigger, nameOf), doesLine(s)].join(' · ') });
+    if (s.paused && !s.pausedWhy && !lastRunOf(state, s.id)) out.push({ kind: 'draft', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.draft', { name: s.name }), detail: [localSchedule(s.trigger, nameOf), doesLine(s)].join(' · ') });
   }
   return out;
 }
@@ -924,7 +925,7 @@ export function scopesOf(items: readonly Sentinel[], projects: ReadonlyArray<{ r
       const count = items.filter((s) => s.projectId === p.id).length;
       return count ? [{ value: p.id, label: p.name, count }] : [];
     }),
-    ...(mac ? [{ value: MAC_SCOPE, label: ASSISTANT_TITLE, count: mac }] : []),
+    ...(mac ? [{ value: MAC_SCOPE, label: assistantTitle(), count: mac }] : []),
   ];
 }
 

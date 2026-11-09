@@ -89,7 +89,7 @@ export async function addBlobs(client: SocketClient, id: string, files: readonly
   const thumbs = files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined));
   const keys = start(
     id,
-    files.map((f) => f.name || (f.type.startsWith('image/') ? `Pasted image.${f.type.split('/')[1] ?? 'png'}` : 'Pasted file')),
+    files.map((f) => f.name || (f.type.startsWith('image/') ? t('more.network.pastedImage', { ext: f.type.split('/')[1] ?? 'png' }) : t('more.network.pastedFile'))),
     thumbs,
   );
   await Promise.all(

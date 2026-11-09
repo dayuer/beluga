@@ -1,4 +1,4 @@
-import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_NONE, CHAT_LIMIT_PRESETS } from '@beluga/shared/chat-limit.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row, Select } from './settings-controls.js';
@@ -20,7 +20,7 @@ export function ChatLimitSettings() {
     <Group title={t('settings.chatLimit.title')}>
       <Row
         label={t('settings.chatLimit.label')}
-        detail={saved === CHAT_LIMIT_NONE ? t('settings.chatLimit.noneDetail', { mac: ASSISTANT_TITLE }) : t('settings.chatLimit.detail', { mac: ASSISTANT_TITLE, n: saved })}
+        detail={saved === CHAT_LIMIT_NONE ? t('settings.chatLimit.noneDetail', { mac: assistantTitle() }) : t('settings.chatLimit.detail', { mac: assistantTitle(), n: saved })}
       >
         <Select
           label={t('settings.chatLimit.title')}

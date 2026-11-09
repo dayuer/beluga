@@ -11,6 +11,7 @@ import { STEP_ICON, TRIGGER_ICON, iconOf } from './sentinel-model.js';
 import { tl, useT } from '../i18n/index.js';
 import r from '../tasks/task-ref.module.css';
 import s from './sentinel.module.css';
+import { localSchedule } from '../lib/ci-sentinel-words.js';
 
 /** Sentinel's small marks: an icon in a tinted circle, the steps as chips, a run's state as a pill, and the inline pill. */
 
@@ -83,7 +84,7 @@ export function SentinelChip({ id }: { id: string }) {
     );
   }
   return (
-    <Tip label={item.paused ? t('sentinel.marks.chipTipPaused', { when: scheduleSentence(item.trigger) }) : t('sentinel.marks.chipTip', { when: scheduleSentence(item.trigger) })}>
+    <Tip label={item.paused ? t('sentinel.marks.chipTipPaused', { when: localSchedule(item.trigger) }) : t('sentinel.marks.chipTip', { when: localSchedule(item.trigger) })}>
       <button type="button" className={r.chip} onClick={() => actions.run({ type: 'view', view: { kind: 'sentinel_page', id } })} aria-label={item.paused ? t('sentinel.marks.chipLabelPaused', { name: item.name }) : t('sentinel.marks.chipLabel', { name: item.name })}>
         <Icon name={iconOf(item.icon)} size={12} />
         <span className={r.key}>{t('sentinel.marks.sentinel')}</span>

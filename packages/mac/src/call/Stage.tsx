@@ -336,7 +336,7 @@ export function Stage({ call }: { call: CallView }) {
               <IconButton icon="more" label={t('call.howSent')} />
             </ActionsDropdown>
             <button type="button" className={c.pillQuiet} onClick={() => void engine.stopSharing()}>
-              Stop Sharing
+              {t('more.call.stopSharing')}
             </button>
           </>
         ) : null}

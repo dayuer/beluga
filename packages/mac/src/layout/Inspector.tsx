@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { findWorkspace, stateOf } from '@beluga/ui/workspace-models.js';
+import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { formatTokens } from '@beluga/ui/work-models.js';
 import { formatBytes } from '@beluga/shared/format.js';
 import { contextPct, contextTone, formatTokenCount } from '@beluga/shared/context-usage.js';
@@ -28,6 +28,7 @@ import { fileManager } from '../lib/os-words.js';
 import { ThreadsSection } from '../threads/ThreadsSection.js';
 import { Panel } from './inspector-parts.js';
 import { useT } from '../i18n/index.js';
+import { localStateOf } from '../lib/engine-words.js';
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -167,7 +168,7 @@ function WorkspaceDetails({ id }: { id: string }) {
       const ws = findWorkspace(full.projects, id);
       return {
         ws,
-        st: ws ? stateOf(full, ws, 0) : undefined,
+        st: ws ? localStateOf(full, ws, 0) : undefined,
         pr: full.prs[id],
         ctx: full.context[`ws:${id}`],
         setup: full.setup[id],

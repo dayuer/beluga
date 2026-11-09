@@ -183,8 +183,8 @@ function ConnectForm({ project, replacing, onBack, onDone }: { project: Project;
           </button>
         </div>
         <ol className={s.steps}>
-          <li>{rich(t('dialogs.stripe.step1'), { charges: <b>Charges</b>, read: <b>Read</b> })}</li>
-          <li>{rich(t('dialogs.stripe.step2'), { accounts: <b>Accounts</b>, read: <b>Read</b> })}</li>
+          <li>{rich(t('dialogs.stripe.step1'), { charges: <b>{t('prefs.stripe.charges')}</b>, read: <b>{t('prefs.stripe.read')}</b> })}</li>
+          <li>{rich(t('dialogs.stripe.step2'), { accounts: <b>{t('prefs.stripe.accounts')}</b>, read: <b>{t('prefs.stripe.read')}</b> })}</li>
           <li>{t('dialogs.stripe.step3')}</li>
         </ol>
         <div className={s.counted}>{t('dialogs.stripe.counted')}</div>
@@ -507,8 +507,8 @@ function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Proje
           </button>
         </div>
         <ol className={s.steps}>
-          <li>{rich(t('dialogs.earnings.rcStep1'), { where: <b>Project settings › API keys</b>, v2: <b>V2</b> })}</li>
-          <li>{rich(t('dialogs.earnings.rcStep2'), { charts: <b>Charts & metrics</b>, config: <b>Project configuration</b> })}</li>
+          <li>{rich(t('dialogs.earnings.rcStep1'), { where: <b>{t('prefs.rc.apiKeys')}</b>, v2: <b>V2</b> })}</li>
+          <li>{rich(t('dialogs.earnings.rcStep2'), { charts: <b>{t('prefs.rc.charts')}</b>, config: <b>{t('prefs.rc.config')}</b> })}</li>
           <li>{t('dialogs.earnings.rcStep3')}</li>
         </ol>
         <div className={s.counted}>{t('dialogs.earnings.rcCounted')}</div>

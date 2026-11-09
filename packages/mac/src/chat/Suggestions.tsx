@@ -139,7 +139,7 @@ function TaskOption({ task, asking }: { task: NonNullable<Suggestion['task']>; a
       <span className={s.sugKey}>{task.key}</span>
       {asking ? (
         <span className={s.sugTitle}>
-          From {task.elsewhere}, not this project. Pick it again to mention it anyway.
+          {t('more.chat.fromElsewhere', { project: task.elsewhere ?? '' })}
         </span>
       ) : (
         <span className={s.sugTitle}>{task.title}</span>

@@ -1,3 +1,4 @@
+import { shownRuntimes } from '../lib/prefs-words.js';
 import { useCallback, useMemo } from 'react';
 import type { AgentRef } from '@beluga/protocol.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
@@ -24,7 +25,8 @@ export function useAgentEntries(): SelectEntry<string>[] {
   const mine = useMyAgent();
   const t = useT();
   return useMemo(() => {
-    const options = agentChoices(runtimes, models);
+    // Names in the language shown (picking still goes through the engine's own runtimes: agentForChoice).
+    const options = agentChoices(shownRuntimes(runtimes), models);
     const groups = [...new Set(options.map((o) => o.group))];
     const yours: SelectOption<string> = { value: YOUR_AGENT, label: t('chat.agentOptions.yourAgent', { agent: agentName(mine) }), icon: runtimeMark(mine.runtime), description: t('chat.agentOptions.yourAgentDetail') };
     return [

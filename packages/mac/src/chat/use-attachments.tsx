@@ -428,7 +428,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
           {pendingImages.map((n) => (
             <div key={n} className={img.pendingItem}>
               <button type="button" className={img.pendingOpen} aria-label={t('chat.attach.openImage', { name: shownOf(n) })} onClick={() => openImages(n)}>
-                <img src={previewOf(n)} alt={`image ${shownOf(n)}`} draggable={false} />
+                <img src={previewOf(n)} alt={t('more.chat.imageN', { n: shownOf(n) })} draggable={false} />
               </button>
               <span className={img.pendingLabel}>{shownOf(n)}</span>
               <button type="button" className={img.pendingRemove} aria-label={t('chat.attach.removeImage', { name: shownOf(n) })} onClick={() => removeImage(n)}>

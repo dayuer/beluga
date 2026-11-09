@@ -70,11 +70,11 @@ export function Sentinel() {
             <i />
           </span>
           <span className={s.sentinelBarName}>
-            <Icon name="sentinel" size={12} /> Ask Sentinel
+            <Icon name="sentinel" size={12} /> {tr('more.tour.sentinel.ask')}
           </span>
           {on && !reported ? (
             <span className={s.live}>
-              <span className={s.liveDot} /> Running
+              <span className={s.liveDot} /> {tr('more.tour.running')}
             </span>
           ) : null}
         </div>

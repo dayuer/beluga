@@ -1,7 +1,6 @@
 import type { AppState } from '@beluga/core/store.js';
 import type { Workspace } from '@beluga/workspaces/types.js';
-import { stateOf } from '@beluga/ui/workspace-models.js';
-import { notOnPr, notOnPrLabel } from '@beluga/core/branch-state.js';
+import { notOnPr } from '@beluga/core/branch-state.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { ActionsContext, type ActionItem } from '../components/SpecMenu.js';
 import { cx } from '../components/ui.js';
@@ -26,6 +25,7 @@ import { useNow } from '../chat/Items.js';
 import s from './Sidebar.module.css';
 import o from './other-worktrees.module.css';
 import { type Key, t, useT } from '../i18n/index.js';
+import { localStateOf, localNotOnPr } from '../lib/engine-words.js';
 
 /**
  * What a workspace's right-click menu offers: its toolbar's actions, named and drawn the same
@@ -105,7 +105,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
   const { selected, st, signal, where, archiving, gap } = useApp(
     (state) => ({
       selected: state.view.kind === 'workspace' && state.view.id === ws.id,
-      st: stateOf(state, ws, 0),
+      st: localStateOf(state, ws, 0),
       signal: workspaceSignal(state, ws),
       // Made outside Beluga: where it is, quietly after its name (the full path in the tooltip).
       where: outsideLocation(state, ws),
@@ -240,7 +240,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
                 </span>
               ) : null}
               {gap ? (
-                <span className={s.notOnPr} title={notOnPrLabel(gap)} aria-label={notOnPrLabel(gap)} data-not-on-pr={gap.count}>
+                <span className={s.notOnPr} title={localNotOnPr(gap)} aria-label={localNotOnPr(gap)} data-not-on-pr={gap.count}>
                   <Icon name="up" size={10} />
                   {gap.count}
                 </span>

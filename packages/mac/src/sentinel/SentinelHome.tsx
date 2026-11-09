@@ -25,6 +25,7 @@ import s from './home.module.css';
 import { thisComputer } from '../lib/os-words.js';
 import { useT } from '../i18n/index.js';
 import { useOpenFolderLabel } from '../lib/remote-open.js';
+import { localPausedWords } from '../lib/ci-sentinel-words.js';
 
 /**
  * Sentinel, one page (BLG-300): what needs you, your board's numbers at a glance, and every
@@ -357,7 +358,7 @@ const WatchRow = memo(function WatchRow({ item, state, now, a }: { item: Sentine
             </span>
           </span>
           <span className={s.found} data-state={row.last?.state} title={row.last?.headline}>
-            {broken ? <span className={s.problem}>{pausedWords(item)} · </span> : item.paused ? <span className={s.quiet}>{pausedWords(item) ?? t('sentinel.home.paused')} · </span> : row.trouble ? <span className={s.problem}>{t('sentinel.home.cantWatch', { why: row.trouble })} · </span> : null}
+            {broken ? <span className={s.problem}>{localPausedWords(item)} · </span> : item.paused ? <span className={s.quiet}>{localPausedWords(item) ?? t('sentinel.home.paused')} · </span> : row.trouble ? <span className={s.problem}>{t('sentinel.home.cantWatch', { why: row.trouble })} · </span> : null}
             {row.last ? (row.last.state === 'done' || row.last.state === 'skipped' ? row.last.headline : t('sentinel.home.stateHeadline', { state: row.last.label, headline: row.last.headline })) : t('sentinel.home.notRunYet')}
           </span>
         </span>

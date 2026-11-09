@@ -246,6 +246,12 @@ let open: Lightbox | undefined;
 const listeners = new Set<() => void>();
 const emit = (): void => listeners.forEach((l) => l());
 
+/** An image's name in the language shown: "image 2" (the words a message links it with), else its own. */
+export function imageLabel(label: string): string {
+  const m = /^image (\d+)$/.exec(label);
+  return m ? t('more.chat.imageN', { n: m[1]! }) : label === 'image' ? t('more.chat.image') : label;
+}
+
 export function openLightbox(images: readonly ChatImage[], index = 0): void {
   open = { images, index: Math.max(0, Math.min(index, images.length - 1)) };
   emit();

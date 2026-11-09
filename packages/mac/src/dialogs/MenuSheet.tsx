@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { ComponentType } from 'react';
 import { NATIVE_MENUS, type NativeMenuProps } from './native/index.js';
 import { useEffect, useRef, useState } from 'react';
-import { menuSpec } from '@beluga/ui/menus.js';
+import { localMenuSpec } from '../lib/engine-words.js';
 import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
@@ -23,7 +23,7 @@ export function MenuSheet() {
   const actions = useActions();
   const open = useUi((u) => u.menu);
   const state = useApp((st) => st);
-  const spec = open ? menuSpec(state, open.menu) : undefined;
+  const spec = open ? localMenuSpec(state, open.menu) : undefined;
   const options = (spec?.options ?? []).map((o, index) => ({ ...o, index })).filter((o) => o.id !== 'close');
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);

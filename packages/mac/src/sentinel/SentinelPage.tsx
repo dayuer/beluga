@@ -48,9 +48,10 @@ import t from '../tasks/tasks.module.css';
 import s from './sentinel.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
-import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { tl, useT } from '../i18n/index.js';
 import { useOpenFolderLabel } from '../lib/remote-open.js';
+import { localPausedWhy, localSchedule } from '../lib/ci-sentinel-words.js';
 
 /**
  * A sentinel's page: the editor and its history in one. The name is renamed in place, When and
@@ -114,7 +115,7 @@ function Crumbs({ item, back }: { item: Sentinel; back: () => void }) {
       </button>
       <Icon name="chevronRight" size={10} />
       <button type="button" className={t.crumb} onClick={() => a.openList(item.projectId ?? MAC_SCOPE)}>
-        {project?.name ?? ASSISTANT_TITLE}
+        {project?.name ?? assistantTitle()}
       </button>
       <span className={t.grow} />
     </nav>
@@ -156,7 +157,7 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
         />
-        <span className={s.subtitle}>{scheduleSentence(item.trigger, (id) => items.find((x) => x.id === id)?.name)}</span>
+        <span className={s.subtitle}>{localSchedule(item.trigger, (id) => items.find((x) => x.id === id)?.name)}</span>
       </div>
       <div className={s.headActions}>
         {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
@@ -264,7 +265,7 @@ function Banners({ item }: { item: Sentinel }) {
       <div className={s.banner} data-tone="error" role="status">
         <Icon name="alert" size={14} />
         <span className={s.bannerText}>
-          <strong>{item.pausedWhy}.</strong> {last?.why ? tr('sentinel.page.lastOne', { why: last.why.split('\n')[0]! }) : tr('sentinel.page.lookAtLast')}
+          <strong>{localPausedWhy(item.pausedWhy)}.</strong> {last?.why ? tr('sentinel.page.lastOne', { why: last.why.split('\n')[0]! }) : tr('sentinel.page.lookAtLast')}
         </span>
         {last ? (
           <Button size="small" variant="quiet" onClick={() => a.openRun(last.id)}>
@@ -370,7 +371,7 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
           label={tr('sentinel.event.project')}
           size="small"
           value={item.projectId ?? MAC_SCOPE}
-          options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+          options={[{ value: MAC_SCOPE, label: assistantTitle() }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
           onChange={(v) => save({ projectId: v === MAC_SCOPE ? null : v })}
         />
       </Prop>

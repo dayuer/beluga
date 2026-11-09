@@ -2,6 +2,7 @@ import { THREAD_LIMITS_DEFAULT, THREAD_LIMIT_ROWS, type ThreadLimits } from '@be
 import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import { useT } from '../i18n/index.js';
+import { threadLimitWords } from '../lib/prefs-words.js';
 
 /** Settings › Advanced › Agent threads: whether your agents' runs get the thread tools. Off, the next run has none. */
 export function AgentThreadsSettings() {
@@ -25,7 +26,9 @@ export function ThreadLimitsSettings() {
   const t = useT();
   return (
     <Group title={t('settings.threads.limits')}>
-      {THREAD_LIMIT_ROWS.map(({ key, label, detail, presets }) => {
+      {THREAD_LIMIT_ROWS.map(({ key, label: en, detail: enDetail, presets }) => {
+        const label = threadLimitWords(key, 'label', en);
+        const detail = threadLimitWords(key, 'detail', enDetail);
         // A number set in settings.json by hand still shows as itself.
         const values = presets.includes(limits[key]) ? presets : [...presets, limits[key]].sort((a, b) => a - b);
         return (

@@ -11,6 +11,7 @@ import { ago } from '../tasks/tasks-model.js';
 import { useCiActions } from './use-ci.js';
 import { NowText } from './now.js';
 import s from './ci.module.css';
+import { localEventWords, localStatusWords } from '../lib/ci-sentinel-words.js';
 
 const ICONS: Readonly<Record<Exclude<RunTone, 'running'>, IconName>> = { passed: 'check', failed: 'x', queued: 'clock', waiting: 'hand', cancelled: 'stopSign', skipped: 'minus' };
 
@@ -61,16 +62,16 @@ export const RunRow = memo(function RunRow({ projectId, run, now, compact }: { p
         className={cx(s.row, compact && s.rowCompact)}
         onClick={() => openRun(projectId, run.id)}
         onKeyDown={(e) => e.key === 'Enter' && openRun(projectId, run.id)}
-        aria-label={`${run.workflow}: ${run.title}, ${statusWords(run)}`}
+        aria-label={`${run.workflow}: ${run.title}, ${localStatusWords(run)}`}
         data-run={run.id}
       >
-        <RunMark tone={tone} label={statusWords(run)} />
+        <RunMark tone={tone} label={localStatusWords(run)} />
         <span className={s.rowMain}>
           <span className={s.rowTitle}>{run.title}</span>
           <span className={s.rowSub}>
             <span className={s.rowFlow}>{run.workflow}</span>
             <span>#{run.number}</span>
-            <span>{eventWords(run.event)}</span>
+            <span>{localEventWords(run.event)}</span>
             {where ? <span className={s.rowBranch}>{where}</span> : null}
             {!compact && run.actor ? <span>{run.actor}</span> : null}
           </span>
@@ -78,7 +79,7 @@ export const RunRow = memo(function RunRow({ projectId, run, now, compact }: { p
         <NowText at={now}>
           {(now) => (
             <>
-              <Tip label={live ? t('ci.parts.statusFor', { status: statusWords(run), time: durationWords(runDuration(run, now)) }) : t('ci.parts.took', { time: durationWords(runDuration(run, now)) })}>
+              <Tip label={live ? t('ci.parts.statusFor', { status: localStatusWords(run), time: durationWords(runDuration(run, now)) }) : t('ci.parts.took', { time: durationWords(runDuration(run, now)) })}>
                 <span className={cx(s.took, live && s.tookLive)}>
                   <Icon name="clock" size={11} />
                   {durationWords(runDuration(run, now))}

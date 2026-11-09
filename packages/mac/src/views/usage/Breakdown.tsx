@@ -1,7 +1,7 @@
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type { AppState } from '@beluga/core/store.js';
 import { formatBytes } from '@beluga/shared/format.js';
-import { activityOf, stateOf } from '@beluga/ui/workspace-models.js';
+import { activityOf } from '@beluga/ui/workspace-models.js';
 import { Icon } from '../../components/Icon.js';
 import { ProjectIcon } from '../../components/ProjectIcon.js';
 import { ActionsContext } from '../../components/SpecMenu.js';
@@ -15,6 +15,7 @@ import { type ProjectRow, type SortKey, type WsRow, ago, compact, formatCost } f
 import s from './usage.module.css';
 import { revealLabel } from '../../lib/os-words.js';
 import { type Key, useT } from '../../i18n/index.js';
+import { localStateOf } from '../../lib/engine-words.js';
 
 const SORTS: ReadonlyArray<{ value: SortKey; label: Key; hint: Key }> = [
   { value: 'size', label: 'views.overview.sortSize', hint: 'views.overview.sortSizeHint' },
@@ -74,7 +75,7 @@ function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppSt
   const actions = useActions();
   const { client } = useBeluga();
   const w = r.ws;
-  const st = stateOf(state, w, 0, now);
+  const st = localStateOf(state, w, 0, now);
   const running = activityOf(state.log, `ws:${w.id}`).running;
   const open = (): void => actions.run({ type: 'open_ws', id: w.id });
   const onKey = (e: KeyboardEvent): void => {

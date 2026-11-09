@@ -1,5 +1,14 @@
 import { globalShellDir, globalShellId, globalShellNumber, isGlobalShell, terminalLabel } from '@beluga/shared/terminal-keys.js';
 import { useApi, useApp, useBeluga, useUi } from './beluga.js';
+import { t } from '../i18n/index.js';
+
+/** A terminal tab's name in the language shown: the one you gave it, else Shell N, Setup, Run… (shared/terminal-keys.ts keeps the English). */
+export function terminalTabLabel(key: string, names: Readonly<Record<string, string>> = {}): string {
+  if (names[key]) return names[key];
+  if (isGlobalShell(key)) return t('more.terminal.shellN', { n: globalShellNumber(key) });
+  const en = terminalLabel(key, names);
+  return en === 'Shell' ? t('more.terminal.shell') : en === 'Setup' ? t('more.project.setup') : en === 'Run' ? t('more.project.run') : en === 'Agent' ? t('more.project.agent') : en;
+}
 
 /** Picked after the last shell is closed: show "no shells" instead of starting a new one. */
 const NONE = 'shell:none';
@@ -37,7 +46,7 @@ export function useGlobalShells(): GlobalShells {
   // With none open, the first one starts by itself, unless you (or another screen) closed them all.
   const key = pickable(picked) ? picked : (globals[0] ?? (picked === NONE || seen.size ? undefined : globalShellId(1)));
   const shown = key && !globals.includes(key) ? [...globals, key] : globals;
-  const tabs = shown.map((k) => ({ key: k, label: terminalLabel(k, names), running: k in terminals && !(k in termExits) }));
+  const tabs = shown.map((k) => ({ key: k, label: terminalTabLabel(k, names), running: k in terminals && !(k in termExits) }));
   return {
     key,
     tabs,

@@ -8,7 +8,7 @@ import { useDecoded } from '../components/use-decoded.js';
 import { type Size, type ZoomView, clampView, doubleClickScale, fitScale, fitView, isZoomed, panBy, transformOf, zoomAt } from '../components/zoom-model.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openWithDefaultApp } from '../lib/files.js';
-import { type ChatImage, closeLightbox, copyImage, loadImage, openLightbox, stepLightbox, useImage, useLightbox } from './images.js';
+import { type ChatImage, closeLightbox, copyImage, imageLabel, loadImage, openLightbox, stepLightbox, useImage, useLightbox } from './images.js';
 import { useT } from '../i18n/index.js';
 import s from './images.module.css';
 
@@ -19,7 +19,7 @@ export function Thumb({ image, all, index, tiled }: { image: ChatImage; all: rea
   const api = useApi();
   const state = useImage(api, image);
   const t = useT();
-  const name = `${image.label}${image.detail ? ` (${image.detail})` : ''}`;
+  const name = `${imageLabel(image.label)}${image.detail ? ` (${image.detail})` : ''}`;
   if (state.status === 'error') {
     return (
       <div className={cx(s.thumb, s.failed, tiled && s.tile)} role="img" aria-label={t('chat.images.unavailableAria', { name })} title={state.error}>
@@ -226,7 +226,7 @@ function Full({ image }: { image: ChatImage }) {
           ref={picture}
           className={s.full}
           src={pic.url}
-          alt={image.label}
+          alt={imageLabel(image.label)}
           draggable={false}
           onDoubleClick={(e) => {
             e.stopPropagation();
@@ -286,7 +286,7 @@ export function Lightbox() {
         >
           <div className={s.bar} onClick={(e) => e.stopPropagation()}>
             <Dialog.Title className={s.title}>
-              {image.label}
+              {imageLabel(image.label)}
               {image.detail ? <span className={s.detail}>{image.detail}</span> : null}
               {many ? <span className={s.detail}>{t('chat.attention.nOfTotal', { n: box.index + 1, total: box.images.length })}</span> : null}
             </Dialog.Title>
