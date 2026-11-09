@@ -1,3 +1,4 @@
+import { t, useT } from '../i18n/index.js';
 import { useMemo } from 'react';
 import { type CcSession, outsideSessions, sessionApp } from '@beluga/core/claude-code/model.js';
 import { useNow } from '../chat/Items.js';
@@ -23,6 +24,7 @@ import s from './claude-code.module.css';
  */
 
 export const OUTSIDE = 'Running in Claude Code, outside Beluga';
+const outsideIn = (app: string): string => t('claudeCode.activity.runningIn', { app });
 
 /** Open where a session lives (its folder's chat, else its transcript here), or one of its agents (openSubAgent). */
 function useOpenSession(session: CcSession): (agentId?: string) => void {
@@ -39,6 +41,7 @@ function useOpenSession(session: CcSession): (agentId?: string) => void {
 
 function SessionRow({ session }: { session: CcSession }) {
   const open = useOpenSession(session);
+  useT();
   const chat = useApp((st) => chatOf(st, session));
   const place = useApp((st) => placeLabel(st, session));
   const now = useNow(session.status === 'working', 5000);
@@ -47,7 +50,7 @@ function SessionRow({ session }: { session: CcSession }) {
   const team = new Set(teamMembers(session).map((a) => a.id));
   const others = session.agents.filter((a) => !team.has(a.id));
   return (
-    <section className={s.session} aria-label={`${sessionApp(session)} session ${session.title}`}>
+    <section className={s.session} aria-label={t('claudeCode.activity.sessionLabel', { app: sessionApp(session), title: session.title })}>
       <button type="button" className={s.sessionHead} onClick={() => open()}>
         <span className={s.sessionDot}>{st.tone === 'claude' ? <Dot tone="claude" live /> : <Dot tone={st.tone === 'ok' ? 'ok' : 'muted'} />}</span>
         <span className={s.sessionText}>
@@ -56,11 +59,11 @@ function SessionRow({ session }: { session: CcSession }) {
             <span className={s[`tone_${st.tone}`]}>{st.label}</span>
             <span>{place}</span>
             {session.agent ? <span>{sessionApp(session)}</span> : null}
-            {session.agents.length ? <span>{running ? `${running} of ${plural(session.agents.length, 'agent')} running` : plural(session.agents.length, 'agent')}</span> : null}
+            {session.agents.length ? <span>{running ? t('claudeCode.activity.nOfAgentsRunning', { running, n: session.agents.length }) : t('claudeCode.activity.nAgents', { n: session.agents.length })}</span> : null}
           </span>
         </span>
         <span className={s.sessionOpen}>
-          {chat ? 'Open Chat' : 'Open'}
+          {chat ? t('claudeCode.activity.openChat') : t('claudeCode.activity.open')}
           <Icon name="chevronRight" size={10} />
         </span>
       </button>
@@ -78,6 +81,7 @@ function SessionRow({ session }: { session: CcSession }) {
 }
 
 function ActivityList() {
+  useT();
   const raw = useApp((st) => st.claudeCode.sessions);
   const sessions = useMemo(() => outsideSessions(raw), [raw]);
   const projects = useApp((st) => st.projects);
@@ -86,7 +90,7 @@ function ActivityList() {
   if (!sessions.length) {
     return (
       <div className={s.page}>
-        <Empty icon="claude" title="No Claude Code sessions right now" detail="When you run Claude Code in a terminal or another app, its sessions and their agents show here live." />
+        <Empty icon="claude" title={t('claudeCode.activity.noneTitle')} detail={t('claudeCode.activity.noneDetail')} />
       </div>
     );
   }
@@ -95,14 +99,14 @@ function ActivityList() {
       <div className={s.inner}>
         <header className={s.summary}>
           <h1 className={s.summaryTitle}>{activitySummary(sessions)}</h1>
-          <p className={s.summaryText}>Claude Code sessions running outside Beluga, and the agents they started. Open one to follow it where it lives; they keep running where they are.</p>
+          <p className={s.summaryText}>{t('claudeCode.activity.summary')}</p>
         </header>
         {groups.map((g) => (
           <section key={g.key} className={s.group} aria-label={g.name}>
             <h2 className={s.groupTitle}>
               {g.projectId ? <ProjectIcon id={g.projectId} name={g.name} size={18} /> : <Icon name="folder" size={16} />}
               <span>{g.name}</span>
-              <span className={s.groupCount}>{g.running ? `${g.running} running` : plural(g.sessions.length, 'session')}</span>
+              <span className={s.groupCount}>{g.running ? t('claudeCode.activity.nRunning', { n: g.running }) : t('claudeCode.activity.nSessions', { n: g.sessions.length })}</span>
             </h2>
             {g.sessions.map((x) => (
               <SessionRow key={x.id} session={x} />
@@ -121,6 +125,7 @@ function ActivityList() {
  */
 export function SessionPage({ session, agentId }: { session: CcSession; agentId?: string }) {
   const { client } = useBeluga();
+  useT();
   const open = useOpenSession(session);
   const actions = useActions();
   const chat = useApp((st) => chatOf(st, session));
@@ -131,7 +136,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
     <div className={s.sessionPage}>
       <header className={s.focusHead}>
         <Button size="small" variant="quiet" icon="back" onClick={() => openActivity(client)}>
-          Activity
+          {t('claudeCode.activity.activity')}
         </Button>
         <div className={s.focusTitles}>
           <h1 className={s.focusTitle}>{place}</h1>
@@ -143,17 +148,17 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
         </div>
         {chat ? (
           <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: chat })}>
-            Open Chat
+            {t('claudeCode.activity.openChat')}
           </Button>
         ) : (
-          <span className={s.readOnly} title="It runs in a terminal or another app; Beluga shows it live">
+          <span className={s.readOnly} title={t('claudeCode.activity.readOnly')}>
             <Icon name="eye" size={12} />
-            {session.agent ? `Running in ${sessionApp(session)}, outside Beluga` : OUTSIDE}
+            {outsideIn(session.agent ? sessionApp(session) : 'Claude Code')}
           </span>
         )}
       </header>
       {session.agents.length ? (
-        <div className={s.strip} role="group" aria-label="Agents in this session">
+        <div className={s.strip} role="group" aria-label={t('claudeCode.activity.agentsInSession')}>
           <SessionChip session={session} selected={!agentId} onOpen={() => openActivity(client, session.id)} />
           {session.agents.map((a) => (
             <AgentCard key={a.id} agent={a} compact onOpen={() => open(a.id)} />
@@ -161,11 +166,11 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
         </div>
       ) : null}
       {agentId ? (
-        <Empty icon="clock" title="This agent went quiet" detail="Beluga stops watching agents a while after they finish." action={<Button onClick={() => openActivity(client, session.id)}>Show the Conversation</Button>} />
+        <Empty icon="clock" title={t('claudeCode.activity.agentQuiet')} detail={t('claudeCode.activity.agentQuietDetail')} action={<Button onClick={() => openActivity(client, session.id)}>{t('claudeCode.activity.showConversation')}</Button>} />
       ) : session.agent === 'codex' ? (
-        <Empty icon="eye" title={session.step ?? 'Working in Codex'} detail="Beluga shows what this Codex session is doing now; its whole conversation is in Codex." />
+        <Empty icon="eye" title={session.step ?? t('claudeCode.activity.workingCodex')} detail={t('claudeCode.activity.codexDetail')} />
       ) : (
-        <LiveTranscript key={session.id} sessionId={session.id} version={`${session.lastAt}:${session.steps}:${session.status}`} live={session.status === 'working'} label={`Claude Code session ${session.title}`} />
+        <LiveTranscript key={session.id} sessionId={session.id} version={`${session.lastAt}:${session.steps}:${session.status}`} live={session.status === 'working'} label={t('claudeCode.activity.ccSession', { title: session.title })} />
       )}
     </div>
   );
@@ -173,6 +178,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
 
 export function ActivityView() {
   const { client } = useBeluga();
+  useT();
   const view = useApp((st) => st.view);
   const sessionId = view.kind === 'claude_code' ? view.session : undefined;
   const agentId = view.kind === 'claude_code' ? view.agent : undefined;
@@ -181,7 +187,7 @@ export function ActivityView() {
   if (!session) {
     return (
       <div className={s.page}>
-        <Empty icon="clock" title="This session went quiet" detail="Beluga shows Claude Code sessions while they work, and for a while after." action={<Button onClick={() => openActivity(client)}>Show All Activity</Button>} />
+        <Empty icon="clock" title={t('claudeCode.activity.sessionQuiet')} detail={t('claudeCode.activity.sessionQuietDetail')} action={<Button onClick={() => openActivity(client)}>{t('claudeCode.activity.showAll')}</Button>} />
       </div>
     );
   }

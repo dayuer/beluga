@@ -11,6 +11,7 @@ import type { UiStore } from './beluga.js';
 import { convoModeOf, terminalCapable, toggledMode, withConvoMode } from './convo-mode.js';
 import { getPrefs, setPrefs } from './prefs.js';
 import { SETTINGS_FIND_EVENT } from './settings-search.js';
+import { t } from '../i18n/index.js';
 
 /**
  * The window's commands that the menu bar, the keyboard and the buttons share: what each does,
@@ -113,38 +114,38 @@ export function commandState(state: AppState, id: CommandId): CommandState {
   const ws = currentWorkspace(state);
   switch (id) {
     case 'conv-stop':
-      if (!channel || channel === 'draft') return OFF('Open a conversation where your agent is working');
-      return claudeWorkingIn(state, channel) ? ON : OFF("Your agent isn't working here");
+      if (!channel || channel === 'draft') return OFF(t('common.commands.openWorking'));
+      return claudeWorkingIn(state, channel) ? ON : OFF(t('common.commands.notWorking'));
     case 'conv-plan':
-      if (!channel || channel === 'draft' || state.view.kind === 'shared') return OFF('Plan mode is for your own conversations');
-      if (isPlanHome(state.plans, channel)) return OFF('A plan’s own conversation has no plan mode: the plan is its plan');
+      if (!channel || channel === 'draft' || state.view.kind === 'shared') return OFF(t('common.commands.planOwn'));
+      if (isPlanHome(state.plans, channel)) return OFF(t('common.commands.planHome'));
       return { enabled: true, checked: state.planMode[channel] === true };
     case 'conv-find':
     case 'conv-find-next':
     case 'conv-find-prev':
-      return chatShowing(state) && state.view.kind !== 'draft' && state.view.kind !== 'draft_worktree' ? ON : OFF('Open a conversation to find in it');
+      return chatShowing(state) && state.view.kind !== 'draft' && state.view.kind !== 'draft_worktree' ? ON : OFF(t('common.commands.openToFind'));
     case 'conv-terminal': {
       const w = currentWorkspace(state);
-      if (!getPrefs().termView) return OFF('Turn on the terminal view in Settings › Terminal');
-      return w && terminalCapable(state, w.id) ? { enabled: true, checked: convoModeOf(getPrefs().convoModes, getPrefs().convoDefault, w.id) !== 'chat' } : OFF('Open a worktree or a chat on Claude Code to see it as a terminal');
+      if (!getPrefs().termView) return OFF(t('common.commands.turnOnTermView'));
+      return w && terminalCapable(state, w.id) ? { enabled: true, checked: convoModeOf(getPrefs().convoModes, getPrefs().convoDefault, w.id) !== 'chat' } : OFF(t('common.commands.openForTerminal'));
     }
     case 'conv-copy':
-      return state.log.some((l) => l.type === 'agent' && l.status === 'done') ? ON : OFF('No answer to copy yet');
+      return state.log.some((l) => l.type === 'agent' && l.status === 'done') ? ON : OFF(t('common.commands.noAnswer'));
     case 'conv-clear':
-      return channel && channel !== 'draft' && state.view.kind !== 'shared' ? ON : OFF('Open a conversation to clear it');
+      return channel && channel !== 'draft' && state.view.kind !== 'shared' ? ON : OFF(t('common.commands.openToClear'));
     case 'ws-next':
     case 'ws-prev':
-      return workspaceOrder(state).length ? ON : OFF('No workspaces yet');
+      return workspaceOrder(state).length ? ON : OFF(t('common.commands.noWorkspaces'));
     default: {
       const action = WS_ACTION[id];
-      if (!ws || !action) return OFF('Open a workspace first');
+      if (!ws || !action) return OFF(t('common.commands.openWorkspace'));
       const button = workspaceButtons(state, ws).find((b) => b.action === action || (action === 'merge' && b.action === 'merge_claude'));
       if (id === 'ws-run') {
-        if (runRunning(state, ws.id)) return { enabled: true, label: 'Stop Running' };
-        if (!button) return { ...OFF(`${ws.name} has no run script yet (Terminal tab › Run)`), label: 'Run' };
-        return { enabled: true, label: 'Run' };
+        if (runRunning(state, ws.id)) return { enabled: true, label: t('common.commands.stopRunning') };
+        if (!button) return { ...OFF(t('common.commands.noRunScript', { name: ws.name })), label: t('common.commands.run') };
+        return { enabled: true, label: t('common.commands.run') };
       }
-      if (!button) return OFF(ws.kind === 'chat' ? `Not for a chat` : ws.kind === 'main' ? 'Not for the main folder' : 'Not available here');
+      if (!button) return OFF(ws.kind === 'chat' ? t('common.commands.notForChat') : ws.kind === 'main' ? t('common.commands.notForMain') : t('common.commands.notHere'));
       return button.disabled ? OFF(button.hint) : ON;
     }
   }
@@ -181,7 +182,7 @@ export function cancelSteer(ctx: Pick<CommandCtx, 'client' | 'ui'>, request: str
     ({ cancelled, prompt }) => {
       if (cancelled && prompt) backInTheBox(ctx, channel, [prompt]);
     },
-    (err: unknown) => ctx.client.store.dispatch({ type: 'toast', text: `Couldn't take it back: ${errorText(err)}`, level: 'error' }),
+    (err: unknown) => ctx.client.store.dispatch({ type: 'toast', text: t('common.commands.cantTakeBack', { error: errorText(err) }), level: 'error' }),
   );
 }
 
@@ -192,7 +193,7 @@ export function cancelSteer(ctx: Pick<CommandCtx, 'client' | 'ui'>, request: str
 export function stopClaude(ctx: CommandCtx, channel: string): void {
   ctx.client.api.host.stopRun(channel).then(
     ({ returned }) => backInTheBox(ctx, channel, returned),
-    (err: unknown) => ctx.client.store.dispatch({ type: 'toast', text: `Couldn't stop the agent: ${errorText(err)}`, level: 'error' }),
+    (err: unknown) => ctx.client.store.dispatch({ type: 'toast', text: t('common.commands.cantStop', { error: errorText(err) }), level: 'error' }),
   );
 }
 
@@ -224,7 +225,7 @@ export function runCommand(ctx: CommandCtx, id: CommandId): void {
   const state = client.store.getState();
   const st = commandState(state, id);
   if (!st.enabled) {
-    client.store.dispatch({ type: 'toast', text: st.why ?? 'Not available right now', level: 'info' });
+    client.store.dispatch({ type: 'toast', text: st.why ?? t('common.commands.notNow'), level: 'info' });
     return;
   }
   const channel = currentChannel(state);

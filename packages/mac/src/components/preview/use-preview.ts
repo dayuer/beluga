@@ -4,6 +4,7 @@ import { type PreviewRef, previewTitle } from '@beluga/shared/preview/ref.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import { useClock } from '../../lib/window-active.js';
 import { keptKey, readKept, withKept, writeKept } from './kept-props.js';
+import { t as tNow } from '../../i18n/index.js';
 import { type FiredEvent, RETRYING, RETRY_MS, addEvent, mergeProps, variantField } from './preview-model.js';
 
 /**
@@ -143,7 +144,7 @@ export function usePreview({ wsId, ref, pick, seen, framed }: { wsId: string; re
       });
       keptReady.current = kept;
     } catch {
-      setResult({ ok: false, kind: 'build', title: 'The preview couldn’t start', detail: 'Try again in a moment.' });
+      setResult({ ok: false, kind: 'build', title: tNow('common.usePreview.cantStart'), detail: tNow('common.usePreview.tryAgain') });
     } finally {
       asking.current = false;
       if (again.current) {
@@ -274,8 +275,8 @@ export function usePreview({ wsId, ref, pick, seen, framed }: { wsId: string; re
   const shoot = useCallback(
     () =>
       new Promise<Shot>((resolve) => {
-        if (!post({ beluga: 'snapshot' })) return resolve({ failed: 'It isn’t drawn yet' });
-        const timer = setTimeout(() => resolve({ failed: 'It took too long' }), SHOT_MS);
+        if (!post({ beluga: 'snapshot' })) return resolve({ failed: tNow('common.usePreview.notDrawn') });
+        const timer = setTimeout(() => resolve({ failed: tNow('common.usePreview.tooLong') }), SHOT_MS);
         shots.current.push((s) => {
           clearTimeout(timer);
           resolve(s);
@@ -286,12 +287,12 @@ export function usePreview({ wsId, ref, pick, seen, framed }: { wsId: string; re
 
   const picture = useCallback(async () => {
     const shot = await shoot();
-    if (!shot.png) return { failed: shot.failed ?? 'It couldn’t be drawn as a picture' };
+    if (!shot.png) return { failed: shot.failed ?? tNow('common.usePreview.noPicture') };
     try {
       const out = (await api.preview.snapshot(wsId, { target: spec.target, name: ok?.component?.name ?? title, png: shot.png })) as { ok: boolean; path?: string; title?: string };
-      return out.ok && out.path ? { path: out.path } : { failed: out.title ?? 'it couldn’t be saved' };
+      return out.ok && out.path ? { path: out.path } : { failed: out.title ?? tNow('common.usePreview.notSaved') };
     } catch {
-      return { failed: 'it’s too big to save' };
+      return { failed: tNow('common.usePreview.tooBig') };
     }
   }, [shoot, api, wsId, spec, ok, title]);
 

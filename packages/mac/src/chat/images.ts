@@ -100,6 +100,13 @@ export type ChatImage = LinkedImage & {
 
 type Loadable = Pick<ChatImage, 'href' | 'owner' | 'file' | 'local'>;
 
+/** A picture whose file isn't on this Mac: its thumbnail says so, nothing else does. */
+export class MissingImage extends Error {
+  constructor(readonly path: string) {
+    super(`No picture at ${path}`);
+  }
+}
+
 /** Where a file on this Mac is, as Beluga reads it (asked once per path). */
 const located = new Map<string, Promise<Location>>();
 
@@ -119,6 +126,10 @@ function locate(api: Api, local: string): Promise<Location> {
  */
 async function keyOf(api: Api, image: Loadable): Promise<{ key: string; at?: Location }> {
   if (!image.local) return { key: image.href };
+  // A path to nothing (an agent's mistyped `/.beluga/scratch/…`) shows as missing on its own picture, asked
+  // with a stat that can't fail: reading it would fail, and every failed call is a "Something went wrong" toast.
+  const [info] = await api.local.statFiles([image.local]);
+  if (info?.kind !== 'file') throw new MissingImage(image.local);
   const at = await locate(api, image.local);
   try {
     const { size, mtime } = await api.files.version(at);

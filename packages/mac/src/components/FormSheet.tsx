@@ -5,6 +5,7 @@ import { copyText } from '../lib/copy.js';
 import { canPickFolders } from '../lib/boot.js';
 import { Icon, type IconName } from './Icon.js';
 import { Select, type SelectEntry } from './Select.js';
+import { t as tNow, useT } from '../i18n/index.js';
 import { cx } from './ui.js';
 import s from './form.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
@@ -38,7 +39,8 @@ export interface FormSheetProps {
  * A Mac sheet with a form: the title, a short intro, labelled fields, then Cancel and the default
  * button on the right. Return in a field (⌘Return in a text area) presses the default button.
  */
-export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel, canSubmit = true, destructive, footer, width = 520, cancelLabel = 'Cancel', hideSubmit, children }: FormSheetProps) {
+export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel, canSubmit = true, destructive, footer, width = 520, cancelLabel, hideSubmit, children }: FormSheetProps) {
+  const t = useT();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const submit = async (): Promise<void> => {
@@ -110,7 +112,7 @@ export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel,
             <div className={s.buttons}>
               {footer ? <div className={s.footer}>{footer}</div> : <span className={s.flex} />}
               <button type="button" className={s.button} onClick={onCancel}>
-                {hideSubmit ? (cancelLabel === 'Cancel' ? 'Done' : cancelLabel) : cancelLabel}
+                {hideSubmit ? (cancelLabel ?? t('common.ui.done')) : (cancelLabel ?? t('common.ui.cancel'))}
               </button>
               {hideSubmit ? null : (
                 <button type="submit" className={cx(s.button, s.default, destructive && s.destructive)} disabled={!canSubmit || busy}>
@@ -161,22 +163,23 @@ export function Popup<T extends string>({ value, options, onChange, label, id }:
 }
 
 /** A folder path you can type, or choose with the Open panel. */
-export function FolderInput({ value, onChange, title = 'Choose a folder', placeholder = '~/code/app' }: { value: string; onChange: (v: string) => void; title?: string; placeholder?: string }) {
+export function FolderInput({ value, onChange, title, placeholder = '~/code/app' }: { value: string; onChange: (v: string) => void; title?: string; placeholder?: string }) {
+  const t = useT();
   const id = useId();
   return (
     <div className={s.folder}>
-      <TextInput id={id} value={value} onChange={onChange} mono placeholder={placeholder} aria-label="Folder" />
+      <TextInput id={id} value={value} onChange={onChange} mono placeholder={placeholder} aria-label={t('common.formSheet.folder')} />
       {canPickFolders() ? (
         <button
           type="button"
           className={s.button}
           onClick={() =>
-            void pickFolders(title).then((p) => {
+            void pickFolders(title ?? tNow('common.formSheet.chooseFolder')).then((p) => {
               if (p?.[0]) onChange(p[0]);
             })
           }
         >
-          Choose…
+          {t('common.formSheet.choose')}
         </button>
       ) : null}
     </div>
@@ -190,6 +193,7 @@ export function SourceTag({ children, tone }: { children: ReactNode; tone?: 'tea
 
 /** A command to type in Terminal, with a Copy button. */
 export function CommandLine({ command, onCopy = (c) => void copyText(c) }: { command: string; onCopy?: (command: string) => void }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   return (
     <div className={s.commandLine}>
@@ -197,7 +201,7 @@ export function CommandLine({ command, onCopy = (c) => void copyText(c) }: { com
       <button
         type="button"
         className={s.copy}
-        aria-label={`Copy ${command}`}
+        aria-label={t('common.formSheet.copyCommand', { command })}
         onClick={() => {
           onCopy(command);
           setCopied(true);
@@ -205,7 +209,7 @@ export function CommandLine({ command, onCopy = (c) => void copyText(c) }: { com
         }}
       >
         <Icon name={copied ? 'check' : 'copy'} size={12} />
-        {copied ? 'Copied' : 'Copy'}
+        {copied ? t('common.ui.copied') : t('common.ui.copy')}
       </button>
     </div>
   );

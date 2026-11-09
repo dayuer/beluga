@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { BelugaClient } from '@beluga/ipc/client.js';
 import { inApp, webServed } from './boot.js';
 import { useBeluga } from './beluga.js';
+import { t } from '../i18n/index.js';
 
 /** A project's icon as an image URL, or null when it has none (it gets its initial instead). */
 type Icon = string | null;
@@ -77,6 +78,6 @@ export async function pickImage(title: string): Promise<string | undefined> {
     return file ? (await uploadFile(file)).path : undefined;
   }
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ multiple: false, title, filters: [{ name: 'Images', extensions: ['png', 'svg', 'jpg', 'jpeg', 'webp', 'ico'] }] });
+  const picked = await open({ multiple: false, title, filters: [{ name: t('common.projects.images'), extensions: ['png', 'svg', 'jpg', 'jpeg', 'webp', 'ico'] }] });
   return typeof picked === 'string' ? picked : undefined;
 }

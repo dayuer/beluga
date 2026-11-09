@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 /**
  * Settings search (BLG-740): find a setting by typing, without knowing its pane. Pure: the index
  * lives in dialogs/settings-index.ts, the field and the jump in dialogs/SettingsSearch.tsx.
@@ -130,7 +131,7 @@ export function searchSettings<P extends string>(query: string, entries: readonl
   const groups = panes.map((pane, order) => {
     const hits: SettingHit<P>[] = [];
     const paneScore = scorePane(pane, query);
-    if (paneScore) hits.push({ key: `pane:${pane.id}`, pane: pane.id, label: pane.label, detail: 'Open the pane', entry: null, score: paneScore });
+    if (paneScore) hits.push({ key: `pane:${pane.id}`, pane: pane.id, label: pane.label, detail: t('common.settingsSearch.openPane'), entry: null, score: paneScore });
     entries.forEach((entry, i) => {
       if (entry.pane !== pane.id) return;
       const score = scoreEntry(entry, pane, query);

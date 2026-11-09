@@ -1,3 +1,4 @@
+import { t, useLocale } from '../i18n/index.js';
 import { useMemo, useSyncExternalStore } from 'react';
 import type { CallView } from '@beluga/shared/calls.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
@@ -51,12 +52,13 @@ export const useSecond = (): number => useClock(true);
 
 /** A conversation's name for a call: the friend's, or the channel's with its #. */
 export function useCallPlace(conversation: string | undefined): string {
+  useLocale();
   return useApp((st) => {
     if (!conversation) return '';
-    if (conversation === 'room') return 'the room';
-    if (conversation.startsWith('dm:')) return st.network.friends.find((f) => f.peerId === conversation.slice(3))?.name ?? 'a friend';
+    if (conversation === 'room') return t('call.theRoom');
+    if (conversation.startsWith('dm:')) return st.network.friends.find((f) => f.peerId === conversation.slice(3))?.name ?? t('call.aFriend');
     const g = st.network.groups.find((x) => x.id === conversation.slice(6));
-    return g ? `#${g.name}` : 'a channel';
+    return g ? `#${g.name}` : t('call.aChannel');
   });
 }
 
@@ -65,14 +67,15 @@ export function useCallPlace(conversation: string | undefined): string {
  * can: the Call button waits until then, as the daemon would refuse it anyway.
  */
 export function useCallUnreachable(conversation: string): string | undefined {
+  useLocale();
   return useApp((st) => {
-    if (conversation === 'room') return st.status === 'connected' && st.peers.some((p) => p.peerId !== st.selfId && !p.guest) ? undefined : 'Nobody else is in the room';
+    if (conversation === 'room') return st.status === 'connected' && st.peers.some((p) => p.peerId !== st.selfId && !p.guest) ? undefined : t('call.nobodyInRoom');
     if (conversation.startsWith('dm:')) {
       const f = st.network.friends.find((x) => x.peerId === conversation.slice(3));
-      return f?.online ? undefined : `${f?.name ?? 'They'} can’t be reached right now`;
+      return f?.online ? undefined : t('call.cantBeReached', { name: f?.name ?? t('call.they') });
     }
     const g = st.network.groups.find((x) => x.id === conversation.slice(6));
-    return g?.members.some((m) => !m.self && m.online) ? undefined : 'Nobody here can be reached right now';
+    return g?.members.some((m) => !m.self && m.online) ? undefined : t('call.nobodyReachable');
   });
 }
 

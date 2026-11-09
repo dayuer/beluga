@@ -29,7 +29,7 @@ export function runInstructions(input: AgentRunInput, ownerName: string, agent?:
     (input.sentinelBrief ?? '') +
     (input.dialogue?.brief ?? '') +
     (input.setup && !askOnly ? input.setup.brief : '') +
-    (input.scratchDir ? buildScratchAppend(input.scratchDir) : '') +
+    (input.scratchDir ? buildScratchAppend(input.scratchDir, place?.cwd) : '') +
     (worktree ? buildKeepAppend(agent) : '') +
     (worktree && !input.planBrief && !askOnly ? buildCommitAppend(place?.openPr) : '') +
     (place?.shipped && !askOnly ? buildShippedAppend(place.shipped) : '') +

@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { memo } from 'react';
 import type { GhRun, RunTone } from '@beluga/core/ci/model.js';
 import { durationWords, eventWords, isLive, runDuration, runTone, statusWords } from '@beluga/core/ci/model.js';
@@ -26,16 +27,17 @@ export function RunMark({ tone, size = 16, label }: { tone: RunTone; size?: numb
 export function useRunMenu(projectId: string): (run: GhRun, opts?: { readonly open?: boolean; readonly then?: () => void }) => ActionItem[] {
   const a = useCiActions();
   const { client } = useBeluga();
+  const t = useT();
   return (run, opts = {}) => {
     const tone = runTone(run);
     const done = !isLive(run);
     return [
-      ...(opts.open === false ? [] : [{ label: 'Open', icon: 'pulse' as const, onSelect: () => a.openRun(projectId, run.id) }]),
-      ...(done && (tone === 'failed' || tone === 'cancelled') ? [{ label: 'Re-run Failed Jobs', icon: 'refresh' as const, separate: opts.open !== false, onSelect: () => void a.rerun(projectId, run.id, true).then((ok) => ok && opts.then?.()) }] : []),
-      ...(done ? [{ label: 'Re-run All Jobs', icon: 'refresh' as const, separate: opts.open !== false && tone !== 'failed' && tone !== 'cancelled', onSelect: () => void a.rerun(projectId, run.id, false).then((ok) => ok && opts.then?.()) }] : []),
-      ...(!done ? [{ label: 'Cancel Run…', icon: 'stop' as const, separate: opts.open !== false, onSelect: () => a.cancel(projectId, run.id, run.title, opts.then) }] : []),
-      { label: 'Open on GitHub', icon: 'external', separate: true, onSelect: () => a.openOnGitHub(run.url) },
-      { label: 'Copy Link', icon: 'copy', onSelect: () => void copyText(run.url).then(() => toast(client, 'Copied the link to the run', 'success')) },
+      ...(opts.open === false ? [] : [{ label: t('issues.parts.open'), icon: 'pulse' as const, onSelect: () => a.openRun(projectId, run.id) }]),
+      ...(done && (tone === 'failed' || tone === 'cancelled') ? [{ label: t('ci.parts.rerunFailed'), icon: 'refresh' as const, separate: opts.open !== false, onSelect: () => void a.rerun(projectId, run.id, true).then((ok) => ok && opts.then?.()) }] : []),
+      ...(done ? [{ label: t('ci.parts.rerunAll'), icon: 'refresh' as const, separate: opts.open !== false && tone !== 'failed' && tone !== 'cancelled', onSelect: () => void a.rerun(projectId, run.id, false).then((ok) => ok && opts.then?.()) }] : []),
+      ...(!done ? [{ label: t('ci.parts.cancelRun'), icon: 'stop' as const, separate: opts.open !== false, onSelect: () => a.cancel(projectId, run.id, run.title, opts.then) }] : []),
+      { label: t('issues.parts.openOnGitHub'), icon: 'external', separate: true, onSelect: () => a.openOnGitHub(run.url) },
+      { label: t('issues.parts.copyLink'), icon: 'copy', onSelect: () => void copyText(run.url).then(() => toast(client, t('ci.parts.copiedLink'), 'success')) },
     ];
   };
 }
@@ -46,6 +48,7 @@ export function useRunMenu(projectId: string): (run: GhRun, opts?: { readonly op
  */
 export const RunRow = memo(function RunRow({ projectId, run, now, compact }: { projectId: string; run: GhRun; /** Its own clock; else the page's (Ticking). */ now?: number; compact?: boolean }) {
   const { openRun } = useCiActions();
+  const t = useT();
   const menu = useRunMenu(projectId);
   const tone = runTone(run);
   const live = isLive(run);
@@ -75,7 +78,7 @@ export const RunRow = memo(function RunRow({ projectId, run, now, compact }: { p
         <NowText at={now}>
           {(now) => (
             <>
-              <Tip label={live ? `${statusWords(run)} for ${durationWords(runDuration(run, now))}` : `Took ${durationWords(runDuration(run, now))}`}>
+              <Tip label={live ? t('ci.parts.statusFor', { status: statusWords(run), time: durationWords(runDuration(run, now)) }) : t('ci.parts.took', { time: durationWords(runDuration(run, now)) })}>
                 <span className={cx(s.took, live && s.tookLive)}>
                   <Icon name="clock" size={11} />
                   {durationWords(runDuration(run, now))}
@@ -87,7 +90,7 @@ export const RunRow = memo(function RunRow({ projectId, run, now, compact }: { p
         </NowText>
         <span className={s.rowMore} onClick={(e) => e.stopPropagation()}>
           <ActionsDropdown items={menu(run)}>
-            <IconButton icon="more" label={`What to do with run #${run.number}`} />
+            <IconButton icon="more" label={t('ci.parts.whatToDo', { n: run.number })} />
           </ActionsDropdown>
         </span>
       </div>

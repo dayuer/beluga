@@ -6,6 +6,7 @@ import { Icon } from '../Icon.js';
 import { cx } from '../ui.js';
 import { fromJson, resizeGrid, toJson } from './preview-model.js';
 import s from './preview.module.css';
+import { t as tNow } from '../../i18n/index.js';
 
 /**
  * The bigger editors a prop may get (PropControls.tsx): a grid of numbers (a matrix), rows of a
@@ -26,7 +27,7 @@ export function GridEditor({ value, onChange, label }: { value: unknown; onChang
       <div className={s.gridCells} style={{ gridTemplateColumns: `repeat(${cols}, minmax(38px, 56px))` }}>
         {grid.flatMap((r, i) =>
           Array.from({ length: cols }, (_, j) => (
-            <input key={`${i}:${j}`} className={s.cell} type="number" value={r[j] ?? 0} aria-label={`${label} row ${i + 1} column ${j + 1}`} onChange={(e) => set(i, j, Number(e.target.value))} />
+            <input key={`${i}:${j}`} className={s.cell} type="number" value={r[j] ?? 0} aria-label={tNow('common.propEditors.cell', { label, row: i + 1, col: j + 1 })} onChange={(e) => set(i, j, Number(e.target.value))} />
           )),
         )}
       </div>
@@ -34,17 +35,17 @@ export function GridEditor({ value, onChange, label }: { value: unknown; onChang
         <span>
           {rows} × {cols}
         </span>
-        <button type="button" className={s.mini} aria-label="One row fewer" disabled={rows <= 1} onClick={() => onChange(resizeGrid(grid, rows - 1, cols))}>
-          <Icon name="minus" size={10} /> Row
+        <button type="button" className={s.mini} aria-label={tNow('common.propEditors.rowFewer')} disabled={rows <= 1} onClick={() => onChange(resizeGrid(grid, rows - 1, cols))}>
+          <Icon name="minus" size={10} /> {tNow('common.propEditors.row')}
         </button>
-        <button type="button" className={s.mini} aria-label="One more row" onClick={() => onChange(resizeGrid(grid, rows + 1, cols))}>
-          <Icon name="plus" size={10} /> Row
+        <button type="button" className={s.mini} aria-label={tNow('common.propEditors.rowMore')} onClick={() => onChange(resizeGrid(grid, rows + 1, cols))}>
+          <Icon name="plus" size={10} /> {tNow('common.propEditors.row')}
         </button>
-        <button type="button" className={s.mini} aria-label="One column fewer" disabled={cols <= 1} onClick={() => onChange(resizeGrid(grid, rows, cols - 1))}>
-          <Icon name="minus" size={10} /> Column
+        <button type="button" className={s.mini} aria-label={tNow('common.propEditors.colFewer')} disabled={cols <= 1} onClick={() => onChange(resizeGrid(grid, rows, cols - 1))}>
+          <Icon name="minus" size={10} /> {tNow('common.propEditors.column')}
         </button>
-        <button type="button" className={s.mini} aria-label="One more column" onClick={() => onChange(resizeGrid(grid, rows, cols + 1))}>
-          <Icon name="plus" size={10} /> Column
+        <button type="button" className={s.mini} aria-label={tNow('common.propEditors.colMore')} onClick={() => onChange(resizeGrid(grid, rows, cols + 1))}>
+          <Icon name="plus" size={10} /> {tNow('common.propEditors.column')}
         </button>
       </div>
     </div>
@@ -69,7 +70,7 @@ export function RowsEditor({ field, value, onChange }: { field: Field; value: un
               {columns.map((c) => (
                 <th key={c.name}>{c.name}</th>
               ))}
-              <th aria-label="Remove" />
+              <th aria-label={tNow('common.propEditors.remove')} />
             </tr>
           </thead>
           <tbody>
@@ -78,26 +79,26 @@ export function RowsEditor({ field, value, onChange }: { field: Field; value: un
                 {columns.map((c) => (
                   <td key={c.name}>
                     {kindOf(c) === 'boolean' ? (
-                      <input type="checkbox" checked={Boolean(r[c.name])} aria-label={`${c.name}, row ${i + 1}`} onChange={(e) => setCell(i, c.name, e.target.checked)} />
+                      <input type="checkbox" checked={Boolean(r[c.name])} aria-label={tNow('common.propEditors.rowCell', { name: c.name, row: i + 1 })} onChange={(e) => setCell(i, c.name, e.target.checked)} />
                     ) : pictureOf(r[c.name]) ? (
                       // A sample picture: shown, not spelled out; a link pasted replaces it.
                       <span className={s.pictureCell}>
                         <img src={pictureOf(r[c.name])} alt="" />
-                        <input className={s.cell} placeholder="Paste a link" aria-label={`${c.name}, row ${i + 1}`} onChange={(e) => e.target.value && setCell(i, c.name, e.target.value)} />
+                        <input className={s.cell} placeholder={tNow('common.propEditors.paste')} aria-label={tNow('common.propEditors.rowCell', { name: c.name, row: i + 1 })} onChange={(e) => e.target.value && setCell(i, c.name, e.target.value)} />
                       </span>
                     ) : (
                       <input
                         className={s.cell}
                         type={kindOf(c) === 'number' ? 'number' : 'text'}
                         value={r[c.name] === undefined || r[c.name] === null ? '' : typeof r[c.name] === 'object' ? '' : String(r[c.name])}
-                        aria-label={`${c.name}, row ${i + 1}`}
+                        aria-label={tNow('common.propEditors.rowCell', { name: c.name, row: i + 1 })}
                         onChange={(e) => setCell(i, c.name, kindOf(c) === 'number' ? Number(e.target.value) : e.target.value)}
                       />
                     )}
                   </td>
                 ))}
                 <td>
-                  <button type="button" className={s.iconMini} aria-label={`Remove row ${i + 1}`} onClick={() => onChange(rows.filter((_, ri) => ri !== i))}>
+                  <button type="button" className={s.iconMini} aria-label={tNow('common.propEditors.removeRow', { row: i + 1 })} onClick={() => onChange(rows.filter((_, ri) => ri !== i))}>
                     <Icon name="x" size={10} />
                   </button>
                 </td>
@@ -107,7 +108,7 @@ export function RowsEditor({ field, value, onChange }: { field: Field; value: un
         </table>
       </div>
       <button type="button" className={s.mini} onClick={() => onChange([...rows, { ...(rows.at(-1) ?? {}) }])}>
-        <Icon name="plus" size={10} /> Row
+        <Icon name="plus" size={10} /> {tNow('common.propEditors.row')}
       </button>
     </div>
   );
@@ -128,7 +129,7 @@ export function JsonEditor({ value, onChange, label }: { value: unknown; onChang
       spellCheck={false}
       aria-label={label}
       aria-invalid={bad}
-      placeholder="Not set"
+      placeholder={tNow('common.ui.notSet')}
       rows={Math.min(8, Math.max(2, text.split('\n').length))}
       onChange={(e) => {
         setText(e.target.value);

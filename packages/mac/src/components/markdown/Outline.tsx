@@ -2,6 +2,7 @@ import { type RefObject, useEffect, useLayoutEffect, useState } from 'react';
 import { cx } from '../ui.js';
 import { scrollParent, scrollToElement } from './md-dom.js';
 import m from './markdown.module.css';
+import { useT } from '../../i18n/index.js';
 
 interface Heading {
   readonly id: string;
@@ -19,6 +20,7 @@ const READING_LINE = 96;
  * each a click away.
  */
 export function Outline({ article, version }: { article: RefObject<HTMLElement | null>; version: string }) {
+  const t = useT();
   const [heads, setHeads] = useState<readonly Heading[]>([]);
   const [active, setActive] = useState<string>();
 
@@ -62,8 +64,8 @@ export function Outline({ article, version }: { article: RefObject<HTMLElement |
     scrollToElement(target, { smooth: true });
   };
   return (
-    <nav className={m.outline} aria-label="Outline">
-      <div className={m.outlineTitle}>On this page</div>
+    <nav className={m.outline} aria-label={t('common.outline.label')}>
+      <div className={m.outlineTitle}>{t('common.outline.title')}</div>
       <ul className={m.outlineList}>
         {heads.map((h) => (
           <li key={h.id}>

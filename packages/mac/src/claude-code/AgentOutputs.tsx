@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { CcOutput, CcOutputFile, CcOutputs } from '@beluga/core/claude-code/model.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -87,6 +88,7 @@ function Contents({ file, fallback }: { file: CcOutputFile; fallback: ReactNode 
 
 function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: string; agentId: string; item: CcOutput; places: Places; onClose: () => void }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const now = useNow();
   const [file, setFile] = useState<CcOutputFile | null>();
@@ -104,7 +106,7 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
   const { name, dir } = placeOf(item.path, places);
   const openIt = (
     <Button icon="external" onClick={() => void openWithDefaultApp(client, item.path)}>
-      Open With Its App
+      {t('claudeCode.outputs.openWith')}
     </Button>
   );
   const shown = file && (file.data || file.text !== undefined) ? <Contents file={file} fallback={openIt} /> : null;
@@ -119,28 +121,28 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
           {howLabel(item.how)} · {timeAgo(item.mtime, Math.max(now, Date.now()))}
         </span>
         <span className={s.flex} />
-        <IconButton icon="external" label="Open With Its App" onClick={() => void openWithDefaultApp(client, item.path)} />
+        <IconButton icon="external" label={t('claudeCode.outputs.openWith')} onClick={() => void openWithDefaultApp(client, item.path)} />
         <IconButton icon="folder" label={revealLabel()} onClick={() => void revealInFinder(client, item.path)} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+        <IconButton icon="x" label={t('claudeCode.outputs.close')} keys="Esc" onClick={onClose} />
       </div>
       {dir ? <div className={cx(s.previewPath, 'selectable')} title={item.path}>{dir}</div> : null}
       <div className={cx(s.previewBody, 'selectable')} tabIndex={0}>
         {file === undefined ? (
-          <div className={s.dimPad}>Opening…</div>
+          <div className={s.dimPad}>{t('claudeCode.outputs.opening')}</div>
         ) : shown ? (
           <>
             {shown}
-            {file?.truncated ? <div className={s.dimPad}>Only the start is shown: open it with its app for the rest.</div> : null}
+            {file?.truncated ? <div className={s.dimPad}>{t('claudeCode.outputs.onlyStart')}</div> : null}
           </>
         ) : (
           <Empty
             icon={ICONS[item.kind]}
-            title={item.kind === 'image' || item.kind === 'video' ? 'Too big to show here' : 'Not shown here'}
-            detail={`${formatBytes(item.size)}. Open it with its app to look at it.`}
+            title={item.kind === 'image' || item.kind === 'video' ? t('claudeCode.outputs.tooBig') : t('claudeCode.outputs.notShown')}
+            detail={t('claudeCode.outputs.sizeOpen', { size: formatBytes(item.size) })}
             action={
               <EmptyActions>
                 <Button icon="external" onClick={() => void openWithDefaultApp(client, item.path)}>
-                  Open With Its App
+                  {t('claudeCode.outputs.openWith')}
                 </Button>
               </EmptyActions>
             }
@@ -154,6 +156,7 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
 /** The Outputs of one sub-agent (its page's second tab). */
 export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: string; agentId: string; list: CcOutputs | undefined; cwd?: string }) {
   const { client } = useBeluga();
+  const t = useT();
   const now = useNow();
   const [follow, setFollow] = useState(true);
   const [picked, setPicked] = useState<string>();
@@ -191,21 +194,21 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
     }
   };
 
-  if (!list) return <div className={s.dimPad}>Looking for what it made…</div>;
-  if (list.missing) return <Empty icon="bot" title="Not watched any more" detail="Claude Code no longer has this agent’s transcript open." />;
+  if (!list) return <div className={s.dimPad}>{t('claudeCode.outputs.looking')}</div>;
+  if (list.missing) return <Empty icon="bot" title={t('claudeCode.outputs.notWatched')} detail={t('claudeCode.outputs.notWatchedDetail')} />;
   if (!files.length) {
     return (
       <div className={s.empty}>
         <Empty
           icon="image"
-          title="Nothing yet"
-          detail={`Screenshots, test output, logs and notes this agent saves or looks at show here as it works, wherever it puts them.${list.scratch ? ' It was given its own folder for them.' : ''}`}
+          title={t('claudeCode.outputs.nothingYet')}
+          detail={t('claudeCode.outputs.nothingYetDetail') + (list.scratch ? t('claudeCode.outputs.ownFolder') : '')}
           {...(list.scratch
             ? {
                 action: (
                   <EmptyActions>
                     <Button icon="folder" title={list.scratch} onClick={() => void revealInFinder(client, list.scratch!)}>
-                      Show Its Folder
+                      {t('claudeCode.outputs.showFolder')}
                     </Button>
                   </EmptyActions>
                 ),
@@ -220,24 +223,24 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
       <div className={s.side}>
         <div className={s.summary}>
           <span className={s.summaryTitle}>
-            {files.length} file{files.length === 1 ? '' : 's'}
+            {t('claudeCode.sub.file', { n: files.length })}
           </span>
           <span className={s.flex} />
           <Segmented
-            label="Preview"
+            label={t('claudeCode.outputs.preview')}
             value={follow ? 'follow' : 'pinned'}
             onChange={(v) => {
               setFollow(v === 'follow');
               setClosed(false);
             }}
             options={[
-              { value: 'follow', label: 'Latest', hint: 'Show each new file as it lands' },
-              { value: 'pinned', label: 'Picked', hint: 'Stay on the file you picked' },
+              { value: 'follow', label: t('claudeCode.outputs.latest'), hint: t('claudeCode.outputs.latestHint') },
+              { value: 'pinned', label: t('claudeCode.outputs.picked'), hint: t('claudeCode.outputs.pickedHint') },
             ]}
           />
           {list.scratch ? <IconButton icon="folder" label={revealLabel('Its Folder')} onClick={() => void revealInFinder(client, list.scratch!)} /> : null}
         </div>
-        <div ref={listRef} className={s.list} role="listbox" aria-label="Outputs" tabIndex={0} onKeyDown={onKey}>
+        <div ref={listRef} className={s.list} role="listbox" aria-label={t('claudeCode.monitor.outputs')} tabIndex={0} onKeyDown={onKey}>
           {files.map((f) => {
             const { name, dir } = placeOf(f.path, places);
             const sel = f.path === shown;
@@ -248,7 +251,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
                   {name}
                   {dir ? <span className={s.rowDir}>{dir}</span> : null}
                 </span>
-                {isFresh(f.mtime, Math.max(now, Date.now())) ? <span className={s.freshDot} aria-label="new" /> : null}
+                {isFresh(f.mtime, Math.max(now, Date.now())) ? <span className={s.freshDot} aria-label={t('claudeCode.outputs.new')} /> : null}
                 <span className={s.ago}>{timeAgo(f.mtime, Math.max(now, Date.now()))}</span>
               </div>
             );
@@ -259,7 +262,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
         <Preview sessionId={sessionId} agentId={agentId} item={item} places={places} onClose={() => setClosed(true)} />
       ) : (
         <div className={s.previewNone}>
-          <Empty icon="eye" title="Pick a file to look at it" />
+          <Empty icon="eye" title={t('claudeCode.outputs.pick')} />
         </div>
       )}
     </div>

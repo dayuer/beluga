@@ -12,6 +12,7 @@
  */
 
 import { fileManagerFor } from '../../../../src/shared/assistant.js';
+import { late, say } from './late-words.js';
 
 export type KeyPlatform = 'mac' | 'windows' | 'linux';
 
@@ -85,6 +86,7 @@ const def = (id: string, label: string, section: ShortcutSection, keys: readonly
 
 const PANEL = ['changes', 'files', 'terminal', 'info', 'history', 'scratch', 'background', 'phone'] as const;
 const PANEL_NAMES: Record<(typeof PANEL)[number], string> = { changes: 'Changes', files: 'Files', terminal: 'Terminal', info: 'Info', history: 'History', scratch: 'Scratch', background: 'Background', phone: 'Phone' };
+
 
 /** The talk shortcut (Settings › Voice) shows and clashes here too; it's kept in its own setting. */
 export const TALK_ID = 'voice-talk';
@@ -165,19 +167,45 @@ const MAC_SHORTCUTS: readonly ShortcutDef[] = [
   { id: 'project-down', label: 'Move Project Down', section: 'Sidebar', keys: ['Ctrl+Cmd+Down'], scope: 'sidebar' },
 ];
 
+type Words = typeof import('../i18n/index.js');
+
+/** Its name and hint in the language shown, read each time (the English is the table's). */
+function shown(d: ShortcutDef, keys: readonly string[]): ShortcutDef {
+  const { label, hint, ...rest } = d;
+  const out = { ...rest, keys } as ShortcutDef;
+  const panel = PANEL.find((tab) => d.id === `panel-${tab}`);
+  const name = ({ t, tl }: Words): string =>
+    panel ? t('common.shortcutsModel.showPanel', { tab: tl('PANEL_LABELS', panel, 'text', PANEL_NAMES[panel]) }) : d.id === 'ws-finder' ? (platform === 'linux' ? t('common.osWords.showInFolder') : t('common.osWords.showIn', { app: t(platform === 'windows' ? 'common.osWords.fileExplorer' : 'common.osWords.finder') })) : tl('shortcutsModel', d.id, 'label', label);
+  Object.defineProperty(out, 'label', { enumerable: true, get: () => late(label, name) });
+  if (hint !== undefined) Object.defineProperty(out, 'hint', { enumerable: true, get: () => late(hint, ({ t, tl }) => (panel ? t('common.shortcutsModel.inRightPanel') : tl('shortcutsModel', d.id, 'hint', hint))) });
+  return out;
+}
+
 /** Every shortcut with a Mac's keys (tests check the other keyboards' with keysOn). */
-export const MAC_SHORTCUTS_FOR_TESTS = MAC_SHORTCUTS;
+export const MAC_SHORTCUTS_FOR_TESTS: readonly ShortcutDef[] = MAC_SHORTCUTS.map((d) => shown(d, d.keys));
 
 /** Every shortcut, with this keyboard's keys out of the box. */
-export const SHORTCUTS: readonly ShortcutDef[] = MAC_SHORTCUTS.map((d) => ({ ...d, keys: keysOn(d.id, d.keys) }));
+export const SHORTCUTS: readonly ShortcutDef[] = MAC_SHORTCUTS.map((d) => shown(d, keysOn(d.id, d.keys)));
 
 export const SECTIONS: readonly ShortcutSection[] = ['General', 'View', 'Go', 'Conversation', 'Workspace', 'Message box', 'Pages', 'Requests', 'Sidebar'];
+
+const SECTION_KEYS = { General: 'general', View: 'view', Go: 'go', Conversation: 'conversation', Workspace: 'workspace', 'Message box': 'messageBox', Pages: 'pages', Requests: 'requests', Sidebar: 'sidebar' } as const satisfies Record<ShortcutSection, string>;
+/** A section's title in the language shown (the section itself stays its English id). */
+export const sectionLabel = (section: ShortcutSection): string => say(`common.shortcutsModel.section.${SECTION_KEYS[section]}`);
 
 const BY_ID = new Map(SHORTCUTS.map((d) => [d.id, d]));
 export const shortcutDef = (id: string): ShortcutDef | undefined => BY_ID.get(id);
 
+const BUILT_IN_KEYS: Readonly<Record<string, string>> = { 'Quit Beluga': 'quit', 'Close Window': 'closeWindow', 'Hide Beluga': 'hide', 'Hide Others': 'hideOthers', Minimize: 'minimize', Undo: 'undo', Redo: 'redo', Cut: 'cut', Copy: 'copy', Paste: 'paste', 'Select All': 'selectAll', 'Full Screen': 'fullScreen', 'Switch Apps': 'switchApps', Spotlight: 'spotlight', 'Switch Windows': 'switchWindows', 'Lock Screen': 'lockScreen', Screenshot: 'screenshot', 'Show Desktop': 'showDesktop', Files: 'files', 'Security Options': 'securityOptions' };
+/** [chord, what the system keeps it for], the words read in the language shown. */
+function builtIn([chord, en]: readonly [string, string]): readonly [string, string] {
+  const row: [string, string] = [chord, en];
+  Object.defineProperty(row, 1, { enumerable: true, get: () => late(en, ({ tl }) => tl('shortcutsModel', 'builtIn', BUILT_IN_KEYS[en] ?? en, en)) });
+  return row;
+}
+
 /** What macOS (or every Mac app) keeps for itself: never given to a shortcut. */
-const MAC_BUILT_IN: ReadonlyArray<readonly [string, string]> = [
+const MAC_BUILT_IN: ReadonlyArray<readonly [string, string]> = ([
   ['Cmd+Q', 'Quit Beluga'],
   ['Cmd+W', 'Close Window'],
   ['Cmd+H', 'Hide Beluga'],
@@ -197,10 +225,10 @@ const MAC_BUILT_IN: ReadonlyArray<readonly [string, string]> = [
   ['Shift+Cmd+3', 'Screenshot'],
   ['Shift+Cmd+4', 'Screenshot'],
   ['Shift+Cmd+5', 'Screenshot'],
-];
+] as const).map(builtIn);
 
 /** The same on Linux and Windows ("Cmd" is Ctrl there, "Ctrl" the Windows key). */
-const OTHER_BUILT_IN: ReadonlyArray<readonly [string, string]> = [
+const OTHER_BUILT_IN: ReadonlyArray<readonly [string, string]> = ([
   ['Cmd+Q', 'Quit Beluga'],
   ['Cmd+W', 'Close Window'],
   ['Alt+F4', 'Close Window'],
@@ -218,7 +246,7 @@ const OTHER_BUILT_IN: ReadonlyArray<readonly [string, string]> = [
   ['Ctrl+E', 'Files'],
   ['Shift+Ctrl+S', 'Screenshot'],
   ['Alt+Cmd+Delete', 'Security Options'],
-];
+] as const).map(builtIn);
 
 export const BUILT_IN: ReadonlyArray<readonly [string, string]> = onMac() ? MAC_BUILT_IN : OTHER_BUILT_IN;
 
@@ -440,20 +468,20 @@ export const builtInFor = (chord: string): string | undefined => BUILT_IN.find((
 export function refusal(id: string, chord: string): string | undefined {
   const c = parseChord(chord);
   const d = BY_ID.get(id);
-  if (!c || !d) return 'That isn’t a key';
+  if (!c || !d) return say('common.shortcutsModel.notAKey');
   const taken = builtInFor(chord);
-  if (taken) return `${chordLabel(chord)} is ${taken}: ${onMac() ? 'macOS' : platform === 'windows' ? 'Windows' : 'the system'} keeps it`;
-  if (c.key === 'Escape' && !c.cmd && !c.ctrl && !c.alt) return 'esc closes things: pick another key';
+  if (taken) return onMac() || platform === 'windows' ? say('common.shortcutsModel.takenBy', { keys: chordLabel(chord), what: taken, os: onMac() ? 'macOS' : 'Windows' }) : say('common.shortcutsModel.takenBySystem', { keys: chordLabel(chord), what: taken });
+  if (c.key === 'Escape' && !c.cmd && !c.ctrl && !c.alt) return say('common.shortcutsModel.escCloses');
   // The talk shortcut is held down: ↩ and esc are what you press while it listens.
-  if (id === TALK_ID && (c.key === 'Enter' || c.key === 'Escape')) return `${chordLabel(chord)} sends while you talk: pick another key`;
+  if (id === TALK_ID && (c.key === 'Enter' || c.key === 'Escape')) return say('common.shortcutsModel.sendsWhileTalking', { keys: chordLabel(chord) });
   const fn = /^F\d{1,2}$/.test(c.key);
   // ⌥ alone over a letter, digit or sign types a character on many keyboards (⌥3 is # on a British
   // or Turkish Mac, ⌥L is @ on a German one), and the menu bar would take it from every text box.
-  if (c.alt && !c.cmd && !c.ctrl && [...c.key].length === 1) return `${chordLabel(chord)} types a character on some keyboards: add ${onMac() ? '⌘ or ⌃' : 'Ctrl'}`;
+  if (c.alt && !c.cmd && !c.ctrl && [...c.key].length === 1) return say('common.shortcutsModel.typesCharacter', { keys: chordLabel(chord), add: onMac() ? say('common.shortcutsModel.cmdOrCtrlMac') : 'Ctrl' });
   if (c.cmd || c.ctrl || c.alt || fn) return undefined;
   if (d.scope === 'composer' && c.shift && (c.key === 'Enter' || c.key === 'Tab')) return undefined;
   if (d.bare && !c.shift) return undefined;
-  return `${chordLabel(chord)} would type: add ${onMac() ? '⌘, ⌃ or ⌥' : 'Ctrl or Alt'}`;
+  return say('common.shortcutsModel.wouldType', { keys: chordLabel(chord), add: onMac() ? say('common.shortcutsModel.anyModMac') : say('common.shortcutsModel.ctrlOrAlt') });
 }
 
 /** A gentle word about a chord that works, but not everywhere. */
@@ -462,8 +490,8 @@ export function caveat(id: string, chord: string): string | undefined {
   const d = BY_ID.get(id);
   if (!c || !d) return undefined;
   // In a terminal, keys without ⌘ are the shell's (App.tsx); only ⌃Tab still moves places.
-  if (!c.cmd && d.scope === 'app' && !(c.ctrl && c.key === 'Tab')) return `In a terminal, ${chordLabel(chord)} goes to the shell`;
-  if (d.menu && !menuAccel(chord)) return 'The menu bar can’t show this key, but it works';
+  if (!c.cmd && d.scope === 'app' && !(c.ctrl && c.key === 'Tab')) return say('common.shortcutsModel.goesToShell', { keys: chordLabel(chord) });
+  if (d.menu && !menuAccel(chord)) return say('common.shortcutsModel.menuCantShow');
   return undefined;
 }
 

@@ -6,6 +6,7 @@ import type { ViewData } from './use-view-data.js';
 import { formatCell, formatNumber } from './format.js';
 import { useHoverTip } from './HoverTip.js';
 import v from './views.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * A heatmap: x across, y down, each cell colored by its value along a soft scale (Claude can give
@@ -14,10 +15,11 @@ import v from './views.module.css';
  */
 
 export function HeatmapView({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const dark = useDocTheme() === 'dark';
   const plan = useMemo(() => planHeatmap(view, data.rows, data.columns), [view, data.rows, data.columns]);
   const { show, hide, tip } = useHoverTip();
-  if (!plan) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to draw as a heatmap'}</div>;
+  if (!plan) return <div className={v.empty}>{data.loading ? t('common.table.loading') : t('common.views.noHeatmap')}</div>;
   const scale = scaleOf(view, dark);
   const fmt = (n: number): string => (plan.valueColumn ? formatCell(n, plan.valueColumn) : formatNumber(n));
   const labelCh = Math.min(18, Math.max(3, ...plan.ys.map((y) => y.length)));

@@ -3,6 +3,7 @@ import { type FxRates, type MoneyTotal, type ProjectEarnings, type RecentPayment
 import type { Project } from '@beluga/workspaces/types.js';
 import { type ConvertedSummary, convertSummary, currencyName } from './money.js';
 import { useApi, useApp } from './beluga.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Earnings from Stripe in this window: the currency they're shown in (yours, or the one most was
@@ -49,7 +50,7 @@ export function useCurrencyChoice(): { value: string; options: Array<{ value: st
   const auto = mainCurrency(earnings, fx);
   const options = useMemo(
     () => [
-      { value: AUTOMATIC, label: `Automatic (${auto.toUpperCase()})`, short: `Automatic (${auto.toUpperCase()})` },
+      { value: AUTOMATIC, label: t('common.earnings.automatic', { currency: auto.toUpperCase() }), short: t('common.earnings.automatic', { currency: auto.toUpperCase() }) },
       ...currencyChoices(fx, chosen).map((c) => ({ value: c, label: currencyName(c), short: c.toUpperCase() })),
     ],
     [auto, fx, chosen],
@@ -59,14 +60,14 @@ export function useCurrencyChoice(): { value: string; options: Array<{ value: st
 
 /** "just now", "12 min ago", "3h ago", "2 days ago". */
 export function updatedAgo(ts: number | undefined, now: number = Date.now()): string {
-  if (!ts) return 'not counted yet';
+  if (!ts) return t('common.earnings.notCounted');
   const m = Math.round((now - ts) / 60_000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
+  if (m < 1) return t('common.earnings.justNow');
+  if (m < 60) return t('common.earnings.minAgo', { m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('common.earnings.hoursAgo', { h });
   const d = Math.round(h / 24);
-  return d === 1 ? 'yesterday' : `${d} days ago`;
+  return d === 1 ? t('common.earnings.yesterday') : t('common.earnings.daysAgo', { d });
 }
 
 /** One project's Stripe connection (undefined: not connected). */
@@ -190,7 +191,7 @@ export const useStripeSheet = (): StripeSheetState | undefined =>
 
 /** "Connect Stripe…" for a project's right-click and ⋯ menus ("Stripe Earnings…" once connected). */
 export function stripeMenuItem(project: Project, connected: boolean): { label: string; onSelect: () => void; separate: boolean } {
-  return { label: connected ? 'Stripe Earnings…' : 'Connect Stripe…', onSelect: () => openStripe(project.id), separate: true };
+  return { label: connected ? t('common.earnings.stripeEarnings') : t('common.earnings.connectStripe'), onSelect: () => openStripe(project.id), separate: true };
 }
 
 // ---- the one-time hint ("Track this project's earnings")

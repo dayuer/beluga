@@ -7,6 +7,7 @@ import { useIssueActions } from './use-issues.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * A comment from you, under the issue's thread: Markdown, sent with your send key, posted on
@@ -15,6 +16,7 @@ import s from './issues.module.css';
  */
 export function IssueReply({ projectId, number, posted }: { projectId: string; number: number; posted: () => void }) {
   const a = useIssueActions();
+  const t = useT();
   const prefs = usePrefs();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,13 +42,13 @@ export function IssueReply({ projectId, number, posted }: { projectId: string; n
   };
 
   return (
-    <section className={s.reply} aria-label={`Comment on #${number}`}>
+    <section className={s.reply} aria-label={t('issues.reply.commentOn', { n: number })}>
       <div className={cx(h.box, busy && h.busy)}>
         <textarea
           ref={box}
           className={cx(h.input, s.composerInput, 'selectable')}
-          aria-label="Your comment"
-          placeholder={`Comment on #${number}…`}
+          aria-label={t('issues.reply.yourComment')}
+          placeholder={t('issues.reply.placeholder', { n: number })}
           value={body}
           rows={2}
           spellCheck
@@ -63,13 +65,13 @@ export function IssueReply({ projectId, number, posted }: { projectId: string; n
         <div className={h.bar}>
           <span className={h.note}>
             <Icon name="globe" size={12} />
-            On GitHub as you, for everyone who can see the issue. Markdown works.
+            {t('issues.reply.note')}
           </span>
           <span className={h.flex} />
-          <Tip label={`Post your comment on #${number}`} keys={sendKeys}>
+          <Tip label={t('issues.reply.post', { n: number })} keys={sendKeys}>
             <button type="button" className={cx(d.create, ready && d.createReady)} aria-disabled={!ready} onClick={() => void go()} data-testid="issue-comment">
               <Icon name="send" size={12} />
-              {busy ? 'Posting…' : 'Comment'}
+              {busy ? t('issues.reply.posting') : t('issues.reply.comment')}
               <span className={d.createKey}>{sendKeys}</span>
             </button>
           </Tip>

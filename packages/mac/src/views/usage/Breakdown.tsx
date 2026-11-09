@@ -14,11 +14,12 @@ import { projectAnchor } from './StorageCard.js';
 import { type ProjectRow, type SortKey, type WsRow, ago, compact, formatCost } from './usage-model.js';
 import s from './usage.module.css';
 import { revealLabel } from '../../lib/os-words.js';
+import { type Key, useT } from '../../i18n/index.js';
 
-const SORTS: ReadonlyArray<{ value: SortKey; label: string; hint: string }> = [
-  { value: 'size', label: 'Size', hint: 'Biggest on disk first' },
-  { value: 'tokens', label: 'Tokens', hint: 'Most agent tokens first' },
-  { value: 'recent', label: 'Recent', hint: 'Most recently active first' },
+const SORTS: ReadonlyArray<{ value: SortKey; label: Key; hint: Key }> = [
+  { value: 'size', label: 'views.overview.sortSize', hint: 'views.overview.sortSizeHint' },
+  { value: 'tokens', label: 'views.stats.m.tokens', hint: 'views.breakdown.tokensHint' },
+  { value: 'recent', label: 'views.overview.sortRecent', hint: 'views.breakdown.recentHint' },
 ];
 
 interface Scale {
@@ -29,7 +30,6 @@ interface Scale {
 }
 
 const CLAUDE = 'var(--claude)';
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 const stop = (e: MouseEvent): void => e.stopPropagation();
 
 function Tokens({ tokens, cost, max }: { tokens: number; cost: number; max: number }) {
@@ -70,6 +70,7 @@ function Trailing({ when, children }: { when: string; children: ReactNode }) {
 }
 
 function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppState; scale: Scale; color: string; measured: boolean; now: number }) {
+  const t = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const w = r.ws;
@@ -82,13 +83,13 @@ function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppSt
   const main = w.kind === 'main';
   return (
     <ActionsContext items={() => workspaceItems(client.store.getState(), w, actions.run, client)}>
-      <div role="row" tabIndex={0} aria-label={main ? 'Main folder' : w.name} className={s.row} onClick={open} onKeyDown={onKey}>
+      <div role="row" tabIndex={0} aria-label={main ? t('views.home.mainFolder') : w.name} className={s.row} onClick={open} onKeyDown={onKey}>
         <span role="cell" className={s.nameCell}>
           <span className={s.kind}>
             <Icon name={w.kind === 'chat' ? 'chat' : main ? 'folder' : 'branch'} size={14} />
           </span>
           <span className={s.nameText}>
-            <span className={s.wsName}>{main ? 'Main folder' : w.name}</span>
+            <span className={s.wsName}>{main ? t('views.home.mainFolder') : w.name}</span>
             <span className={cx(s.sub, s[`tone_${st.tone}`])}>
               <Dot tone={st.tone === 'muted' ? 'muted' : st.tone} live={running} />
               <span className={s.subText}>
@@ -100,13 +101,13 @@ function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppSt
         </span>
         <span role="cell">
           {main ? (
-            <span className={s.metric} title="The project itself: not counted with its worktrees">
-              <span className={s.mainNote}>Project</span>
+            <span className={s.metric} title={t('views.breakdown.projectTip')}>
+              <span className={s.mainNote}>{t('views.breakdown.project')}</span>
               <span className={cx(s.metricValue, s.muted)}>{r.disk ? formatBytes(r.disk) : '–'}</span>
             </span>
           ) : w.kind === 'chat' && w.projectRoot ? (
             <span className={s.metric}>
-              <span className={s.mainNote}>In the main folder</span>
+              <span className={s.mainNote}>{t('views.breakdown.inMain')}</span>
             </span>
           ) : (
             <Disk bytes={r.disk} max={scale.disk} color={color} measured={measured} />
@@ -116,9 +117,9 @@ function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppSt
           <Tokens tokens={r.tokens} cost={r.cost} max={scale.tokens} />
         </span>
         <Trailing when={r.lastActive ? ago(r.lastActive, now) : ''}>
-          {r.archivable ? <IconButton icon="archive" label={`Archive ${w.name}…`} onClick={() => actions.run({ type: 'ws', id: w.id, action: 'archive' })} /> : null}
+          {r.archivable ? <IconButton icon="archive" label={t('views.breakdown.archive', { name: w.name })} onClick={() => actions.run({ type: 'ws', id: w.id, action: 'archive' })} /> : null}
           <IconButton icon="folder" label={revealLabel()} onClick={() => actions.run({ type: 'ws', id: w.id, action: 'finder' })} />
-          <IconButton icon="forward" label={`Open ${w.name}`} onClick={open} />
+          <IconButton icon="forward" label={t('views.breakdown.open', { name: w.name })} onClick={open} />
         </Trailing>
       </div>
     </ActionsContext>
@@ -126,20 +127,21 @@ function Row({ r, state, scale, color, measured, now }: { r: WsRow; state: AppSt
 }
 
 function AgentsRow({ p, scale, color }: { p: ProjectRow; scale: Scale; color: string }) {
+  const t = useT();
   const { ui } = useBeluga();
   const agents = p.agents!;
   const clean = (): void => ui.openMenu({ kind: 'agents', projectId: p.project.id });
   return (
-    <div role="row" tabIndex={0} aria-label="Sub-agent worktrees" className={s.row} onClick={clean} onKeyDown={(e) => e.key === 'Enter' && clean()}>
+    <div role="row" tabIndex={0} aria-label={t('views.breakdown.agentWorktrees')} className={s.row} onClick={clean} onKeyDown={(e) => e.key === 'Enter' && clean()}>
       <span role="cell" className={s.nameCell}>
         <span className={s.kind}>
           <Icon name="claude" size={14} />
         </span>
         <span className={s.nameText}>
-          <span className={s.wsName}>Sub-agent worktrees</span>
+          <span className={s.wsName}>{t('views.breakdown.agentWorktrees')}</span>
           <span className={cx(s.sub, s.tone_muted)}>
             <span className={s.subText}>
-              {agents.count} left by Claude Code · {agents.clean === agents.count ? 'all' : agents.clean} safe to remove
+              {t('views.breakdown.leftBy', { n: agents.count })} · {t('views.breakdown.safe', { n: agents.clean === agents.count ? t('views.breakdown.all') : agents.clean })}
             </span>
           </span>
         </span>
@@ -149,24 +151,25 @@ function AgentsRow({ p, scale, color }: { p: ProjectRow; scale: Scale; color: st
       </span>
       <span role="cell" />
       <Trailing when="">
-        <IconButton icon="archive" label="Clean Up Sub-agent Worktrees…" onClick={clean} />
+        <IconButton icon="archive" label={t('views.breakdown.cleanAgents')} onClick={clean} />
       </Trailing>
     </div>
   );
 }
 
 function ProjectHead({ p, scale, color, now }: { p: ProjectRow; scale: Scale; color: string; now: number }) {
+  const t = useT();
   const actions = useActions();
   const main = p.rows.find((r) => r.ws.kind === 'main')?.ws;
   const worktrees = p.rows.filter((r) => r.ws.kind === 'worktree').length + (p.agents?.count ?? 0);
   const chats = p.rows.filter((r) => r.ws.kind === 'chat').length;
-  const what = [worktrees ? plural(worktrees, 'worktree') : '', chats ? plural(chats, 'chat') : ''].filter(Boolean).join(' · ') || 'Main folder only';
+  const what = [worktrees ? t('views.wt.navCount', { n: worktrees }) : '', chats ? t('views.stats.chats', { n: chats, shown: chats }) : ''].filter(Boolean).join(' · ') || t('views.breakdown.mainOnly');
   return (
     <div role="row" className={s.projectRow}>
       <span role="rowheader" className={s.nameCell}>
         {p.project.root ? <ProjectIcon id={p.project.id} name={p.project.name} size={22} /> : <span className={s.chatsIcon}><Icon name="chat" size={14} /></span>}
         <span className={s.nameText}>
-          <span className={s.projectName}>{p.project.root ? p.project.name : 'Chats'}</span>
+          <span className={s.projectName}>{p.project.root ? p.project.name : t('views.overview.chats')}</span>
           <span className={s.sub}>
             <span className={s.swatch} style={{ background: color }} />
             {what}
@@ -194,6 +197,7 @@ function ProjectHead({ p, scale, color, now }: { p: ProjectRow; scale: Scale; co
 
 /** Every project and its worktrees and chats: disk and Claude side by side, sortable, with actions on each row. */
 export function Breakdown({ state, rows, sort, onSort, measured, now }: { state: AppState; rows: readonly ProjectRow[]; sort: SortKey; onSort: (s: SortKey) => void; measured: boolean; now: number }) {
+  const t = useT();
   const all = rows.flatMap((p) => p.rows);
   const scale: Scale = {
     projectDisk: Math.max(1, ...rows.map((p) => p.disk)),
@@ -202,18 +206,18 @@ export function Breakdown({ state, rows, sort, onSort, measured, now }: { state:
     tokens: Math.max(1, ...all.map((r) => r.tokens)),
   };
   return (
-    <section className={s.breakdown} aria-label="By project">
+    <section className={s.breakdown} aria-label={t('views.breakdown.byProject')}>
       <header className={s.breakdownHead}>
-        <h2 className={s.sectionTitle}>By project</h2>
-        <Segmented label="Sort by" value={sort} options={SORTS} onChange={onSort} />
+        <h2 className={s.sectionTitle}>{t('views.breakdown.byProject')}</h2>
+        <Segmented label={t('views.breakdown.sortBy')} value={sort} options={SORTS.map((o) => ({ value: o.value, label: t(o.label), hint: t(o.hint) }))} onChange={onSort} />
       </header>
-      <div role="table" aria-label="Disk and agent usage by workspace" className={s.table}>
+      <div role="table" aria-label={t('views.breakdown.tableAria')} className={s.table}>
         <div role="row" className={s.columnsHead}>
-          <span role="columnheader">Name</span>
-          <span role="columnheader">Disk</span>
-          <span role="columnheader">Agent</span>
+          <span role="columnheader">{t('views.home.name')}</span>
+          <span role="columnheader">{t('views.breakdown.disk')}</span>
+          <span role="columnheader">{t('views.breakdown.agent')}</span>
           <span role="columnheader" className={s.when}>
-            Last active
+            {t('views.breakdown.lastActive')}
           </span>
         </div>
         {rows.map((p) => {

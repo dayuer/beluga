@@ -1,5 +1,6 @@
 import type { Location } from '@beluga/core/store.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Files between this browser and the computer Beluga runs on, when the page came from its web
@@ -18,7 +19,7 @@ export interface Uploaded {
 export async function uploadFile(file: File): Promise<Uploaded> {
   const res = await fetch(`/upload?name=${encodeURIComponent(file.name || 'file')}`, { method: 'POST', body: file, credentials: 'same-origin', headers: { 'content-type': 'application/octet-stream' } });
   const body = (await res.json().catch(() => ({}))) as Partial<Uploaded> & { error?: string };
-  if (!res.ok || !body.path) throw new Error(body.error ?? `The upload of ${file.name} didn’t work`);
+  if (!res.ok || !body.path) throw new Error(body.error ?? t('common.webFiles.uploadFailed', { name: file.name }));
   return { path: body.path, name: body.name ?? file.name, size: body.size ?? file.size };
 }
 

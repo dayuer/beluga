@@ -4,7 +4,7 @@ import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import x from './experimental.module.css';
-import { useT } from '../i18n/index.js';
+import { tl, useT } from '../i18n/index.js';
 
 /**
  * Settings › Experimental: early features, each off until you turn it on, each saying what it
@@ -25,21 +25,22 @@ export function ExperimentalSettings() {
       </div>
       {EXPERIMENTS.map((id) => {
         const info = EXPERIMENT_INFO[id];
+        const title = tl('EXPERIMENT_INFO', id, 'title', info.title);
         const on = experimentOn(enabled, id);
         return (
-          <Group key={id} title={info.title}>
-            <Row label={info.title} detail={info.summary}>
-              <Switch label={info.title} on={on} onChange={(v) => set(id, v)} />
+          <Group key={id} title={title}>
+            <Row label={title} detail={tl('EXPERIMENT_INFO', id, 'summary', info.summary)}>
+              <Switch label={title} on={on} onChange={(v) => set(id, v)} />
             </Row>
             <div className={x.about}>
               <div className={x.heading}>{t('settings.experimental.changes')}</div>
               <ul className={x.changes}>
-                {info.changes.map((c) => (
-                  <li key={c}>{c}</li>
+                {info.changes.map((c, i) => (
+                  <li key={c}>{tl('EXPERIMENT_INFO', id, `changes.${i}`, c)}</li>
                 ))}
               </ul>
               <div className={x.heading}>{t('settings.experimental.cost')}</div>
-              <p className={x.cost}>{info.cost}</p>
+              <p className={x.cost}>{tl('EXPERIMENT_INFO', id, 'cost', info.cost)}</p>
             </div>
           </Group>
         );

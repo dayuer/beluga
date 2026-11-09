@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { Empty, EmptyActions } from './ui.js';
 import v from './video-player.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * A video, inline (BLG-100): the web view's own player (play, pause, seek, volume, full screen),
@@ -8,9 +9,10 @@ import v from './video-player.module.css';
  * web view can't decode (ProRes, say) says so, with the way out the place showing it offers.
  */
 export function VideoPlayer({ url, name, fallback }: { readonly url: string; readonly name: string; readonly fallback?: ReactNode }) {
+  const t = useT();
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
-  if (failed) return <Empty icon="play" title="Can’t play this video here" detail="Its format or codec isn’t one the app plays. Open it with its app." action={fallback ? <EmptyActions>{fallback}</EmptyActions> : undefined} />;
+  if (failed) return <Empty icon="play" title={t('common.videoPlayer.cantPlay')} detail={t('common.videoPlayer.detail')} action={fallback ? <EmptyActions>{fallback}</EmptyActions> : undefined} />;
   return (
     <div className={v.wrap}>
       <video className={v.video} src={url} controls playsInline preload="metadata" aria-label={name} onError={() => setFailed(true)} />

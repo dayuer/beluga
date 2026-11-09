@@ -9,6 +9,7 @@ import { useHistoryVersion, useLog } from './use-history.js';
 import h from '../project-home.module.css';
 import s from './history.module.css';
 import a from '../../lib/arrive.module.css';
+import { useT } from '../../i18n/index.js';
 
 const LATEST = 15;
 const QUERY = { branch: 'default' } as const;
@@ -19,6 +20,7 @@ const QUERY = { branch: 'default' } as const;
  */
 export function HomeHistory({ projectId }: { projectId: string }) {
   const actions = useActions();
+  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId && p.root));
   const version = useHistoryVersion(project);
   const log = useLog(projectId, QUERY, LATEST, version);
@@ -32,21 +34,21 @@ export function HomeHistory({ projectId }: { projectId: string }) {
   if (!log.commits.length && !log.loading) return null;
   const incoming = log.commits.filter((c) => c.incoming).length;
   return (
-    <section className={h.section} aria-label="History">
+    <section className={h.section} aria-label={t('views.history.title')}>
       <div className={h.sectionHead}>
-        <h3 className={h.sectionTitle}>History</h3>
-        {incoming ? <span className={h.sectionHint}>{incoming} incoming from {project?.sync?.upstream ?? 'the remote'}: Update main brings them in</span> : <span className={h.sectionHint}>{project?.sync?.branch ?? 'main'}{project?.sync?.upstream ? ` and ${project.sync.upstream}` : ''}</span>}
+        <h3 className={h.sectionTitle}>{t('views.history.title')}</h3>
+        {incoming ? <span className={h.sectionHint}>{t('views.history.incoming', { n: incoming, from: project?.sync?.upstream ?? t('views.history.theRemote') })}</span> : <span className={h.sectionHint}>{project?.sync?.branch ?? 'main'}{project?.sync?.upstream ? t('views.history.andUpstream', { upstream: project.sync.upstream }) : ''}</span>}
         <span className={h.flex} />
         <Button size="small" variant="quiet" icon="clock" onClick={() => open()}>
-          Show All
+          {t('views.overview.showAll')}
         </Button>
       </div>
       {log.commits.length ? (
         <div className={cx(s.homeList, late && a.arrive)}>
-          <HistoryList commits={log.commits} variant="full" onSelect={(hash) => open(hash)} refs={refs} label="Latest commits" />
+          <HistoryList commits={log.commits} variant="full" onSelect={(hash) => open(hash)} refs={refs} label={t('views.history.latest')} />
         </div>
       ) : (
-        <p className={h.none}>Reading the history…</p>
+        <p className={h.none}>{t('views.history.reading')}</p>
       )}
     </section>
   );

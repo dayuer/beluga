@@ -19,7 +19,7 @@ import { sameDeep } from '../lib/stable.js';
 import { Row } from './sidebar-parts.js';
 import { WorkspaceRow, type WorkspaceFold } from './workspace-row.js';
 import s from './subagents.module.css';
-import { useT } from '../i18n/index.js';
+import { useT, tl } from '../i18n/index.js';
 
 /**
  * Sub-agents in the sidebar: Claude's helpers, not your work. They sit under the conversation
@@ -102,7 +102,7 @@ function FamilyAgentRow({ sub, parent, indent, worktree }: { sub: SubAgent; pare
   const row = useApp((st) => agentFamilyRow(st, parent, sub), sameDeep);
   const now = useNow(row.state === 'running');
   const on = selected.agent === sub.agent.id || (worktree !== undefined && selected.ws === worktree.id);
-  const word = THREAD_WORDS[row.state];
+  const word = tl('THREAD_WORDS', row.state, 'text', THREAD_WORDS[row.state]);
   return (
     <Row
       data-subagent={sub.agent.id}

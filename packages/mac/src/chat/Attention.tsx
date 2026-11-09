@@ -15,7 +15,7 @@ import { hostToBefriend } from '../network/net-model.js';
 import { befriend } from '../network/use-net.js';
 import { Markdown } from './Markdown.js';
 import { useNow } from './Items.js';
-import { useT } from '../i18n/index.js';
+import { useT, tl } from '../i18n/index.js';
 import s from './attention.module.css';
 
 /**
@@ -306,9 +306,9 @@ function TrustPrompt() {
       </div>
       <div className={s.trustRow}>
         {(['ask', 'trusted', 'full', 'blocked'] as const).map((level) => (
-          <Tip key={level} label={TRUST_INFO[level].detail}>
+          <Tip key={level} label={tl('TRUST_INFO', level, 'detail', TRUST_INFO[level].detail)}>
             <button type="button" className={s.trust} onClick={() => actions.run({ type: 'trust', peerId, level })}>
-              <span className={s.optionLabel}>{TRUST_INFO[level].label}</span>
+              <span className={s.optionLabel}>{tl('TRUST_INFO', level, 'label', TRUST_INFO[level].label)}</span>
             </button>
           </Tip>
         ))}

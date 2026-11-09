@@ -24,7 +24,7 @@ const MAC_SCRATCH: ScratchOf = { assistant: true };
 import { BackgroundTab, useBackgroundRunning } from './panel/BackgroundTab.js';
 import s from './panel/panel.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { useT } from '../i18n/index.js';
+import { useT, tl } from '../i18n/index.js';
 
 const PhonePanel = lazyView('phone/PhonePanel', () => import('../phone/PhoneView.js').then((m) => m.PhonePanel), false);
 
@@ -185,8 +185,8 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
               id={`panel-tab-${t}`}
               aria-controls={`panel-body-${pane}`}
               aria-selected={on}
-              aria-label={PANEL_LABELS[t]}
-              title={`${PANEL_LABELS[t]}${shortcutKeys(`panel-${t}`) ? ` (${shortcutKeys(`panel-${t}`)})` : ''}${tr('layout.rightPanel.tabTip')}`}
+              aria-label={tl('PANEL_LABELS', t, 'text', PANEL_LABELS[t])}
+              title={`${tl('PANEL_LABELS', t, 'text', PANEL_LABELS[t])}${shortcutKeys(`panel-${t}`) ? ` (${shortcutKeys(`panel-${t}`)})` : ''}${tr('layout.rightPanel.tabTip')}`}
               tabIndex={slotOf(t) === shown ? 0 : -1}
               draggable
               className={cx(s.tab, on && s.tabOn, drop === i && s.dropBefore)}
@@ -203,7 +203,7 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
             >
               {dock ? null : <Icon name={ICONS[t]} size={13} />}
               <span className={s.tabName}>
-                <span>{PANEL_LABELS[t]}</span>
+                <span>{tl('PANEL_LABELS', t, 'text', PANEL_LABELS[t])}</span>
               </span>
               {b?.count ? <span className={cx(s.count, b.tone === 'accent' && s.countFresh)}>{b.count > 99 ? '99+' : b.count}</span> : b?.tone ? <span className={cx(s.tabDot, s[`tabDot_${b.tone}`])} /> : null}
             </button>
@@ -224,7 +224,7 @@ function ViewSwitch({ views, tab, pane }: { views: readonly PanelTab[]; tab: Pan
     <div className={s.views}>
       <Segmented
         radio
-        label={t('layout.rightPanel.views', { tab: PANEL_LABELS[views[0]!] })}
+        label={t('layout.rightPanel.views', { tab: tl('PANEL_LABELS', views[0]!, 'text', PANEL_LABELS[views[0]!]) })}
         value={tab}
         onChange={(v) => {
           changesView.set(paneKey(view, pane), v);
@@ -232,7 +232,7 @@ function ViewSwitch({ views, tab, pane }: { views: readonly PanelTab[]; tab: Pan
         }}
         options={views.map((v) => ({
           value: v,
-          label: PANEL_LABELS[v],
+          label: tl('PANEL_LABELS', v, 'text', PANEL_LABELS[v]),
           keys: shortcutKeys(`panel-${v}`),
         }))}
       />

@@ -27,6 +27,7 @@ import {
   refusal,
   resetOne,
   searchShortcuts,
+  sectionLabel,
   shortcutDef,
   unassign,
 } from '../lib/shortcuts-model.js';
@@ -377,7 +378,7 @@ export function KeyboardSettings() {
       {!keyQuery && !shown.length && !builtInRows.length ? <div className={k.free}>{t('settings.keyboard.noneCalled')}</div> : null}
 
       {shown.map(([section, list]) => (
-        <Group key={section} title={section}>
+        <Group key={section} title={sectionLabel(section)}>
           {list.map(row)}
         </Group>
       ))}

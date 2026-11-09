@@ -2,6 +2,7 @@ import type { AppState } from '@beluga/core/store.js';
 import { type StatRange, type StatsSnapshot, totalsBy } from '@beluga/shared/stats.js';
 import { type Bucket, bucketsOf } from '@beluga/shared/stats-trend.js';
 import { type GroupBy, type MetricDef, groupOf } from './stats-model.js';
+import { t } from '../../i18n/index.js';
 
 export interface Series {
   readonly key: string;
@@ -35,6 +36,6 @@ export function trendOf(stats: StatsSnapshot, projects: AppState['projects'], by
   const all = [...values.entries()].map(([key, vals]) => ({ key, values: vals, total: vals.reduce((a, b) => a + b, 0), ...groupOf(key, by, projects) })).sort((a, b) => b.total - a.total);
   if (all.length <= SHOWN + 1) return { buckets, series: all };
   const rest = all.slice(SHOWN);
-  const other: Series = { key: '\u0000other', name: `${rest.length} more`, color: 'var(--series-other)', values: buckets.map((_, i) => rest.reduce((n, r) => n + r.values[i]!, 0)), total: rest.reduce((n, r) => n + r.total, 0) };
+  const other: Series = { key: '\u0000other', name: t('views.usage.nMore', { n: rest.length }), color: 'var(--series-other)', values: buckets.map((_, i) => rest.reduce((n, r) => n + r.values[i]!, 0)), total: rest.reduce((n, r) => n + r.total, 0) };
   return { buckets, series: [...all.slice(0, SHOWN), other] };
 }

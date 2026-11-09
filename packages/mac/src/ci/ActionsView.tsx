@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import type { GhRun, GhWorkflow } from '@beluga/core/ci/model.js';
 import { fileName, isLive, runTone, sortRuns, statusWords } from '@beluga/core/ci/model.js';
@@ -24,9 +25,9 @@ import { NoProjects } from '../work/NoProjects.js';
 
 type Page = 'runs' | 'workflows';
 
-const PAGES: ReadonlyArray<{ readonly value: Page; readonly label: string; readonly hint: string; readonly icon: 'pulse' | 'graph' }> = [
-  { value: 'runs', label: 'Runs', hint: 'The latest workflow runs, live while they run', icon: 'pulse' },
-  { value: 'workflows', label: 'Workflows', hint: 'Each workflow file as a graph: what starts it, its jobs, what needs what', icon: 'graph' },
+const PAGES = (tr: ReturnType<typeof useT>): ReadonlyArray<{ readonly value: Page; readonly label: string; readonly hint: string; readonly icon: 'pulse' | 'graph' }> => [
+  { value: 'runs', label: tr('ci.actions.runs'), hint: tr('ci.actions.runsHint'), icon: 'pulse' },
+  { value: 'workflows', label: tr('ci.actions.workflows'), hint: tr('ci.actions.workflowsHint'), icon: 'graph' },
 ];
 
 /**
@@ -36,6 +37,7 @@ const PAGES: ReadonlyArray<{ readonly value: Page; readonly label: string; reado
  */
 export function ActionsView() {
   const view = useApp((st) => st.view);
+  const tr = useT();
   const allProjects = useApp((st) => st.projects);
   const projects = useMemo(() => allProjects.filter((p) => p.root && !p.error), [allProjects]);
   const tasksPrefs = useTasksPrefs();
@@ -59,7 +61,7 @@ export function ActionsView() {
   if (!projects.length || !here || !projectId)
     return (
       <Ticking live={live}>
-        <NoProjects icon="pulse" detail="Actions come from a project’s GitHub repository. Add a project to see them here." />
+        <NoProjects icon="pulse" detail={tr('ci.actions.noProjects')} />
       </Ticking>
     );
 
@@ -72,28 +74,28 @@ export function ActionsView() {
         <div className={t.bar}>
           <div className={t.barGroup}>
             <PickMenu<string>
-              label="Project"
+              label={tr('issues.view.project')}
               choices={projects.map((p) => ({ value: p.id, label: p.name, mark: <ProjectIcon id={p.id} name={p.name} size={16} /> }))}
               chosen={[here.id]}
               onPick={(id) => openList(id, page === 'workflows' ? 'workflows' : undefined)}
             >
-              <button type="button" className={t.projectSwitch} aria-label={`Project: ${here.name}`}>
+              <button type="button" className={t.projectSwitch} aria-label={tr('issues.view.projectIs', { name: here.name })}>
                 <ProjectIcon id={here.id} name={here.name} size={18} />
                 <span className={t.projectName}>{here.name}</span>
                 <Icon name="chevronDown" size={11} />
               </button>
             </PickMenu>
-            <Segmented<Page> label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
+            <Segmented<Page> label={tr('issues.view.show')} value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES(tr)} />
             {page === 'runs' && known.length + (workflow ? 1 : 0) > 1 ? (
               <PickMenu<string>
-                label="Workflow"
-                choices={[{ value: '', label: 'All Workflows' }, ...known.filter((f) => f.id).map((f) => ({ value: f.path, label: f.name, hint: fileName(f.path) }))]}
+                label={tr('ci.actions.workflow')}
+                choices={[{ value: '', label: tr('ci.actions.allWorkflows') }, ...known.filter((f) => f.id).map((f) => ({ value: f.path, label: f.name, hint: fileName(f.path) }))]}
                 chosen={[workflow]}
                 onPick={setWorkflow}
               >
-                <button type="button" className={s.filter} aria-label="Workflow">
+                <button type="button" className={s.filter} aria-label={tr('ci.actions.workflow')}>
                   <Icon name="graph" size={12} />
-                  {workflow ? named(workflow) : 'All Workflows'}
+                  {workflow ? named(workflow) : tr('ci.actions.allWorkflows')}
                   <Icon name="chevronDown" size={10} />
                 </button>
               </PickMenu>
@@ -103,10 +105,10 @@ export function ActionsView() {
             {live ? (
               <span className={s.liveTag}>
                 <span className={s.liveDot} aria-hidden="true" />
-                Live
+                {tr('ci.actions.live')}
               </span>
             ) : null}
-            <IconButton icon="refresh" label={loading || flows.loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
+            <IconButton icon="refresh" label={loading || flows.loading ? tr('issues.view.asking') : tr('issues.view.askAgain')} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
             {repo ? (
               <Tip label={`${repo.url}/actions`}>
                 <Button size="small" icon="external" onClick={() => openOnGitHub(`${repo.url}/actions`)}>
@@ -118,32 +120,32 @@ export function ActionsView() {
         </div>
         <div className={t.body}>
           {error && !list ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title={tr('ci.actions.cantRead')} detail={error} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
           ) : !list ? (
-            <Empty icon="pulse" title="Asking GitHub…" detail={`For ${here.name}’s workflow runs`} />
+            <Empty icon="pulse" title={tr('issues.view.asking')} detail={tr('ci.actions.forRuns', { name: here.name })} />
           ) : list.kind === 'none' ? (
-            <Empty icon="pulse" title="This project isn’t on GitHub" detail="Actions come from the GitHub repository a project’s origin remote points to. Push it to GitHub, or pick another project." />
+            <Empty icon="pulse" title={tr('issues.view.notOnGitHub')} detail={tr('ci.actions.notOnGitHubDetail')} />
           ) : list.kind === 'no_gh' ? (
             <Empty
               icon="pulse"
-              title="Connect GitHub"
-              detail={`Beluga reads ${repoSlug(list.repo)}’s Actions with GitHub’s command-line tool, signed in as you. Set it up once, then check again.`}
+              title={tr('issues.view.connect')}
+              detail={tr('ci.actions.connectDetail', { repo: repoSlug(list.repo) })}
               action={
                 <EmptyActions>
                   <Button variant="primary" onClick={() => setConnect(true)}>
-                    Connect GitHub…
+                    {tr('issues.view.connectButton')}
                   </Button>
                 </EmptyActions>
               }
             />
           ) : list.kind === 'error' ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title={tr('ci.actions.cantRead')} detail={list.message} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
           ) : page === 'workflows' ? (
             <Workflows projectId={projectId} flows={flows} runs={runs} />
           ) : !runs.length ? (
-            <Empty icon="pulse" title={workflow ? 'No runs of this workflow yet' : 'No runs yet'} detail={workflow ? 'Pick another workflow, or All Workflows.' : `Nothing has run in ${repoSlug(list.repo)}. Add a workflow under .github/workflows and push it.`} />
+            <Empty icon="pulse" title={workflow ? tr('ci.actions.noRunsOf') : tr('ci.actions.noRuns')} detail={workflow ? tr('ci.actions.pickAnother') : tr('ci.actions.nothingRan', { repo: repoSlug(list.repo) })} />
           ) : (
-            <div className={cx(s.list, late && arr.arrive)} role="table" aria-label={`${here.name}’s workflow runs`}>
+            <div className={cx(s.list, late && arr.arrive)} role="table" aria-label={tr('ci.actions.listLabel', { name: here.name })}>
               {runs.map((run) => (
                 <RunRow key={run.id} projectId={projectId} run={run} />
               ))}
@@ -152,10 +154,9 @@ export function ActionsView() {
         </div>
         {list?.kind === 'github' && runs.length && page === 'runs' ? (
           <div className={t.foot}>
-            {runs.filter(isLive).length ? `${runs.filter(isLive).length} running · ` : ''}
-            {runs.length}
-            {list.more ? '+' : ''} runs · {repoSlug(list.repo)} · from GitHub <NowText>{(now) => ago(list.fetchedAt, now)}</NowText>
-            {live ? ' · watching, every few seconds' : ''}
+            {runs.filter(isLive).length ? tr('ci.actions.footRunning', { n: runs.filter(isLive).length }) : ''}
+            {tr('ci.actions.footRuns', { count: `${runs.length}${list.more ? '+' : ''}`, repo: repoSlug(list.repo) })}<NowText>{(now) => ago(list.fetchedAt, now)}</NowText>
+            {live ? tr('ci.actions.watching') : ''}
           </div>
         ) : null}
         {connect ? (
@@ -176,10 +177,11 @@ export function ActionsView() {
 /** Each workflow as a card: its name and file, how its last run went, and its graph (or its YAML). */
 function Workflows({ projectId, flows, runs }: { projectId: string; flows: ReturnType<typeof useWorkflows>; runs: readonly GhRun[] }) {
   const late = useLateArrival(projectId, flows.data !== undefined);
-  if (flows.error && !flows.data) return <Empty icon="alert" title="Couldn’t read the workflows" detail={flows.error} action={<Button onClick={flows.refresh}>Try Again</Button>} />;
-  if (!flows.data) return <Empty icon="graph" title="Reading the workflows…" detail="From the project’s folder, and GitHub" />;
+  const tr = useT();
+  if (flows.error && !flows.data) return <Empty icon="alert" title={tr('ci.actions.cantReadFlows')} detail={flows.error} action={<Button onClick={flows.refresh}>{tr('issues.view.tryAgain')}</Button>} />;
+  if (!flows.data) return <Empty icon="graph" title={tr('ci.actions.readingFlows')} detail={tr('ci.actions.readingFlowsDetail')} />;
   const list = flows.data.workflows;
-  if (!list.length) return <Empty icon="graph" title="No workflows yet" detail="Workflows live in .github/workflows. Ask your agent to set one up, then push it." />;
+  if (!list.length) return <Empty icon="graph" title={tr('ci.actions.noFlows')} detail={tr('ci.actions.noFlowsDetail')} />;
   return (
     <div className={cx(s.flows, late && arr.arrive)}>
       {list.map((f) => (
@@ -191,6 +193,7 @@ function Workflows({ projectId, flows, runs }: { projectId: string; flows: Retur
 
 function WorkflowCard({ projectId, flow, last }: { projectId: string; flow: GhWorkflow; last?: GhRun }) {
   const { openRun, openOnGitHub } = useCiActions();
+  const tr = useT();
   const [yamlShown, setYamlShown] = useState(false);
   const off = flow.state !== 'active' && flow.state !== 'not_pushed';
   return (
@@ -198,10 +201,10 @@ function WorkflowCard({ projectId, flow, last }: { projectId: string; flow: GhWo
       <header className={s.flowHead}>
         <span className={s.flowName}>{flow.name}</span>
         <span className={s.flowPath}>{flow.path}</span>
-        {flow.state === 'not_pushed' ? <span className={s.badge}>Not pushed yet</span> : off ? <span className={s.badge}>Turned off</span> : null}
+        {flow.state === 'not_pushed' ? <span className={s.badge}>{tr('ci.actions.notPushed')}</span> : off ? <span className={s.badge}>{tr('ci.actions.turnedOff')}</span> : null}
         <span className={t.grow} />
         {last ? (
-          <Tip label={`Last run: ${statusWords(last)}, ${ago(last.createdAt)}`}>
+          <Tip label={tr('ci.actions.lastRun', { status: statusWords(last), when: ago(last.createdAt) })}>
             <button type="button" className={s.flowLast} onClick={() => openRun(projectId, last.id)}>
               <RunMark tone={runTone(last)} size={14} />
               <span className={s.flowLastTitle}>{last.title}</span>
@@ -210,19 +213,19 @@ function WorkflowCard({ projectId, flow, last }: { projectId: string; flow: GhWo
           </Tip>
         ) : null}
         <Segmented<'graph' | 'yaml'>
-          label="Show as"
+          label={tr('ci.actions.showAs')}
           iconOnly
           value={yamlShown ? 'yaml' : 'graph'}
           onChange={(v) => setYamlShown(v === 'yaml')}
           options={[
-            { value: 'graph', label: 'Graph', icon: 'graph' },
+            { value: 'graph', label: tr('ci.actions.graph'), icon: 'graph' },
             { value: 'yaml', label: 'YAML', icon: 'file' },
           ]}
         />
-        {flow.url ? <IconButton icon="external" label="Open on GitHub" onClick={() => openOnGitHub(flow.url)} /> : null}
+        {flow.url ? <IconButton icon="external" label={tr('issues.parts.openOnGitHub')} onClick={() => openOnGitHub(flow.url)} /> : null}
       </header>
       {flow.file === undefined ? (
-        <p className={s.graphNote}>GitHub didn’t give Beluga this file.</p>
+        <p className={s.graphNote}>{tr('ci.actions.noFile')}</p>
       ) : yamlShown ? (
         <div className={s.yaml}>
           <CodeLines text={flow.file} lang="yaml" />

@@ -8,7 +8,7 @@ import { MCP_FROM, MCP_STATUS, checkMcp, mcpRuntimeOf, setMcpEnabled, signInMcp,
 import { openExternal } from '../lib/system.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
-import { type Key, useT } from '../i18n/index.js';
+import { type Key, useT, tl } from '../i18n/index.js';
 
 type McpRuntime = 'claude' | 'codex';
 
@@ -62,7 +62,7 @@ export function McpSettings() {
           const why = row.status === 'failed' && row.error ? `: ${row.error}` : '';
           const tools = row.tools !== undefined ? t('settings.mcp.tools', { n: row.tools }) : '';
           return (
-            <Row key={row.name} label={row.label} detail={`${MCP_FROM[row.from](row.where)} · ${status.words}${tools}${why}`}>
+            <Row key={row.name} label={row.label} detail={`${MCP_FROM[row.from](row.where)} · ${tl('MCP_STATUS', row.status, 'words', status.words)}${tools}${why}`}>
               {row.canSignIn ? (
                 <Button disabled={signingIn !== undefined} onClick={() => void signInMcp(client, row, runtime)}>
                   {signingIn === row.name ? t('settings.mcp.waiting') : t('settings.mcp.signIn')}

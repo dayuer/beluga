@@ -6,6 +6,7 @@
  */
 
 import { keyPlatform } from './shortcuts-model.js';
+import { t } from '../i18n/index.js';
 
 const isMacKeys = (): boolean => keyPlatform() === 'mac';
 
@@ -155,7 +156,7 @@ export interface Microphone {
 export function microphonesOf(all: readonly { readonly kind: string; readonly deviceId: string; readonly label: string }[]): Microphone[] {
   return all
     .filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications')
-    .map((d, i) => ({ id: d.deviceId, label: d.label || `Microphone ${i + 1}` }));
+    .map((d, i) => ({ id: d.deviceId, label: d.label || t('common.dictationModel.microphone', { n: i + 1 }) }));
 }
 
 /** What dictation asks the microphone for: the one picked ('' : macOS's own), or macOS's own when it's unplugged. */

@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CcTaskOutput } from '@beluga/core/claude-code/model.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -72,6 +73,7 @@ function Mark({ item }: { item: TaskItem }) {
 
 function Output({ item, now }: { item: TaskItem; now: number }) {
   const { client } = useBeluga();
+  const tr = useT();
   const out = useTaskOutput(item);
   const body = useRef<HTMLPreElement>(null);
   const atEnd = useRef(true);
@@ -83,15 +85,15 @@ function Output({ item, now }: { item: TaskItem; now: number }) {
     if (el && atEnd.current) el.scrollTop = el.scrollHeight;
   }, [out?.text]);
   return (
-    <section className={s.output} aria-label={`Output of ${t.description}`}>
+    <section className={s.output} aria-label={tr('claudeCode.bgTasks.outputOf', { name: t.description })}>
       <div className={s.outputHead}>
         <span className={s.outputTitle} title={t.description}>
           {t.description}
         </span>
         <span className={cx(s.state, s[`tone_${tone}`])}>{label}</span>
         <span className={s.flex} />
-        <IconButton icon="copy" label="Copy Command" onClick={() => void copyText(t.command)} />
-        {out?.file ? <IconButton icon="external" label="Open Log With Its App" onClick={() => void openWithDefaultApp(client, out.file)} /> : null}
+        <IconButton icon="copy" label={tr('claudeCode.bgTasks.copyCommand')} onClick={() => void copyText(t.command)} />
+        {out?.file ? <IconButton icon="external" label={tr('claudeCode.bgTasks.openLog')} onClick={() => void openWithDefaultApp(client, out.file)} /> : null}
         {out?.file ? <IconButton icon="folder" label={revealLabel('Log')} onClick={() => void revealInFinder(client, out.file)} /> : null}
       </div>
       <div className={cx(s.command, 'selectable')} title={t.command}>
@@ -99,9 +101,9 @@ function Output({ item, now }: { item: TaskItem; now: number }) {
       </div>
       {t.summary && t.status !== 'running' ? <div className={s.summary}>{t.summary}</div> : null}
       {out === undefined ? (
-        <div className={s.dimPad}>Reading its output…</div>
+        <div className={s.dimPad}>{tr('claudeCode.bgTasks.reading')}</div>
       ) : out === null || !out.text.trim() ? (
-        <div className={s.dimPad}>{t.status === 'running' ? 'Nothing written yet. It shows here as it comes.' : 'It wrote nothing.'}</div>
+        <div className={s.dimPad}>{t.status === 'running' ? tr('claudeCode.bgTasks.nothingYet') : tr('claudeCode.bgTasks.wroteNothing')}</div>
       ) : (
         <pre
           ref={body}
@@ -113,7 +115,7 @@ function Output({ item, now }: { item: TaskItem; now: number }) {
             atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
           }}
         >
-          {out.truncated ? <span className={s.cut}>… only the last {formatBytes(64 * 1024)} of {formatBytes(out.size)} shown{'\n'}</span> : null}
+          {out.truncated ? <span className={s.cut}>{tr('claudeCode.bgTasks.onlyLast', { last: formatBytes(64 * 1024), size: formatBytes(out.size) })}{'\n'}</span> : null}
           {out.text}
         </pre>
       )}
@@ -124,6 +126,7 @@ function Output({ item, now }: { item: TaskItem; now: number }) {
 /** The list and the one you follow: side by side (`split`, a page) or one above the other (`stack`, the panel). */
 export function BackgroundTasks({ items, layout, empty }: { items: readonly TaskItem[]; layout: 'split' | 'stack'; empty: string }) {
   const now = useNow();
+  const tr = useT();
   const [picked, setPicked] = useState<string>();
   const key = (it: TaskItem): string => `${it.sessionId}/${it.task.id}`;
   const item = items.find((it) => key(it) === picked) ?? items[0];
@@ -137,7 +140,7 @@ export function BackgroundTasks({ items, layout, empty }: { items: readonly Task
   if (!items.length) {
     return (
       <div className={s.empty}>
-        <Empty icon="play" title="No background commands" detail={empty} />
+        <Empty icon="play" title={tr('claudeCode.bgTasks.none')} detail={empty} />
       </div>
     );
   }
@@ -146,10 +149,10 @@ export function BackgroundTasks({ items, layout, empty }: { items: readonly Task
     <div className={cx(s.root, layout === 'split' ? s.split : s.stack)}>
       <div className={s.side}>
         <div className={s.head}>
-          <span className={s.headTitle}>{running ? `${running} running` : 'None running'}</span>
-          {items.length > running ? <span className={s.dim}>{running ? `of ${items.length}` : `${items.length} ended lately`}</span> : null}
+          <span className={s.headTitle}>{running ? tr('claudeCode.activity.nRunning', { n: running }) : tr('claudeCode.bgTasks.noneRunning')}</span>
+          {items.length > running ? <span className={s.dim}>{running ? tr('claudeCode.bgTasks.ofN', { n: items.length }) : tr('claudeCode.bgTasks.ended', { n: items.length })}</span> : null}
         </div>
-        <div className={s.list} role="listbox" aria-label="Background commands" tabIndex={0} onKeyDown={onKey}>
+        <div className={s.list} role="listbox" aria-label={tr('claudeCode.bgTasks.commands')} tabIndex={0} onKeyDown={onKey}>
           {items.map((it) => {
             const on = item === it;
             const { label } = taskLabel(it.task, now);

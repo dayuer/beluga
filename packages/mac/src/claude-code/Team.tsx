@@ -1,3 +1,4 @@
+import { t, useT } from '../i18n/index.js';
 import type { CcAgent, CcMessage, CcSession } from '@beluga/core/claude-code/model.js';
 import { useNow } from '../chat/Items.js';
 import { Icon } from '../components/Icon.js';
@@ -13,7 +14,7 @@ import s from './claude-code.module.css';
 
 /** Who sent or got a message, in words. */
 export function memberLabel(session: Pick<CcSession, 'agents'>, who: string): string {
-  if (who === 'lead') return 'Lead session';
+  if (who === 'lead') return t('claudeCode.team.lead');
   const a = session.agents.find((x) => x.id === who);
   return a ? (a.name ?? a.description) : who;
 }
@@ -33,27 +34,28 @@ function MessageLine({ session, message, now }: { session: CcSession; message: C
       <span className={s.timelineText} title={message.summary}>
         {message.summary}
       </span>
-      <span className={s.timelineWhen}>{since(now - message.ts)} ago</span>
+      <span className={s.timelineWhen}>{t('claudeCode.bg.ago', { time: since(now - message.ts) })}</span>
     </li>
   );
 }
 
 export function TeamBlock({ session, onOpen }: { session: CcSession; onOpen: (agentId: string) => void }) {
   const now = useNow(true, 15_000);
+  useT();
   const team = session.team;
   const members = teamMembers(session);
   if (!team || !members.length) return null;
   const working = members.filter((a) => a.status === 'running').length;
   const recent = team.messages.slice(-5);
   return (
-    <section className={s.team} aria-label="Team">
+    <section className={s.team} aria-label={t('claudeCode.team.team')}>
       <header className={s.teamHead}>
         <Icon name="people" size={13} />
-        <strong>Team</strong>
+        <strong>{t('claudeCode.team.team')}</strong>
         <span>
-          {plural(members.length, 'member')}
-          {working ? ` · ${working} working` : ''}
-          {team.messages.length ? ` · ${plural(team.messages.length, 'message')}` : ''}
+          {t('claudeCode.team.members', { n: members.length })}
+          {working ? t('claudeCode.team.working', { n: working }) : ''}
+          {team.messages.length ? t('claudeCode.team.messages', { n: team.messages.length }) : ''}
         </span>
       </header>
       <div className={s.grid}>
@@ -62,7 +64,7 @@ export function TeamBlock({ session, onOpen }: { session: CcSession; onOpen: (ag
         ))}
       </div>
       {recent.length ? (
-        <ol className={s.timeline} aria-label="Messages in the team">
+        <ol className={s.timeline} aria-label={t('claudeCode.team.messagesIn')}>
           {recent.map((m, i) => (
             <MessageLine key={`${m.ts}:${i}`} session={session} message={m} now={now} />
           ))}

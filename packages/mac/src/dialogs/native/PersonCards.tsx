@@ -27,7 +27,7 @@ import { befriend, openFriendCard } from '../../network/use-net.js';
 import m from '../../components/SpecMenu.module.css';
 import p from './person.module.css';
 import { thisComputer } from '../../lib/os-words.js';
-import { t, useT } from '../../i18n/index.js';
+import { t, useT, tl } from '../../i18n/index.js';
 
 interface CardProps {
   readonly peer: PeerInfo;
@@ -213,7 +213,7 @@ export function RoomPeerCard({ peer, menu, close, confirm, onRun }: CardProps & 
       <div className={p.block}>
         <div className={p.blockLabel}>{t('dialogs.person.trust')}</div>
         <div className={p.blockDetail}>
-          <strong>{TRUST_INFO[trust].label}.</strong> {TRUST_INFO[trust].detail}
+          <strong>{tl('TRUST_INFO', trust, 'label', TRUST_INFO[trust].label)}{t('common.punct.period')}</strong> {tl('TRUST_INFO', trust, 'detail', TRUST_INFO[trust].detail)}
         </div>
         <div className={p.blockDetail}>
           {friend ? (
@@ -301,8 +301,8 @@ export function GuestCard({ peer, guest, close, confirm }: CardProps & { guest: 
       </div>
       <div className={p.block}>
         <div className={p.blockLabel}>{t('dialogs.person.can', { name: peer.name })}</div>
-        <Choice<GuestCan> wide label={t('dialogs.person.can', { name: peer.name })} value={guest.can} options={CAN_ORDER.map((c) => ({ value: c, label: CAN_INFO[c].label }))} onChange={(can) => void api.invites.change(peer.peerId, { can })} />
-        <div className={p.blockDetail}>{CAN_INFO[guest.can].detail.charAt(0).toUpperCase() + CAN_INFO[guest.can].detail.slice(1)}.</div>
+        <Choice<GuestCan> wide label={t('dialogs.person.can', { name: peer.name })} value={guest.can} options={CAN_ORDER.map((c) => ({ value: c, label: tl('CAN_INFO', c, 'label', CAN_INFO[c].label) }))} onChange={(can) => void api.invites.change(peer.peerId, { can })} />
+        <div className={p.blockDetail}>{((d) => d.charAt(0).toUpperCase() + d.slice(1))(tl('CAN_INFO', guest.can, 'detail', CAN_INFO[guest.can].detail))}{t('common.punct.period')}</div>
       </div>
       <div className={p.rows}>
         <Row

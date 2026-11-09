@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import type { SearchAddon } from '@xterm/addon-search';
 import type { Terminal } from '@xterm/xterm';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -65,6 +66,7 @@ const BUSY_RETRY_MS = 1500;
 /** Find in the terminal (⌘F): as you type, Return for the next, ⇧Return the one before. */
 function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly onClose: () => void }) {
   const [query, setQuery] = useState('');
+  const tr = useT();
   const [count, setCount] = useState<{ index: number; total: number } | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -88,8 +90,8 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
         ref={input}
         className={s.findInput}
         value={query}
-        placeholder="Find in terminal"
-        aria-label="Find in terminal"
+        placeholder={tr('agentTerm.find')}
+        aria-label={tr('agentTerm.find')}
         spellCheck={false}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -109,10 +111,10 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
           }
         }}
       />
-      <span className={s.findCount}>{count ? (count.total ? `${count.index + 1} of ${count.total}` : 'None') : ''}</span>
-      <IconButton icon="chevronUp" label="Previous" onClick={() => go(true)} />
-      <IconButton icon="chevronDown" label="Next" onClick={() => go(false)} />
-      <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+      <span className={s.findCount}>{count ? (count.total ? tr('call.nOf', { at: count.index + 1, of: count.total }) : tr('call.none')) : ''}</span>
+      <IconButton icon="chevronUp" label={tr('call.previous')} onClick={() => go(true)} />
+      <IconButton icon="chevronDown" label={tr('call.next')} onClick={() => go(false)} />
+      <IconButton icon="x" label={tr('call.close')} keys="Esc" onClick={onClose} />
     </div>
   );
 }
@@ -139,7 +141,8 @@ export function TermPane({ wsId, termKey, kind, cwd, split, focusOnMount, onSpli
   const exited = useApp((st) => (termKey in st.termExits ? st.termExits[termKey] : undefined));
   const ended = exited !== undefined;
   const driving = useApp((st) => st.agentTerms[wsId]);
-  const label = useApp((st) => st.agentTerms[wsId]?.label ?? (st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? 'Your agent'));
+  const tr = useT();
+  const label = useApp((st) => st.agentTerms[wsId]?.label ?? (st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? tr('call.yourAgent')));
   const visuals = useApp((st) => st.termVisuals[wsId]);
   // Links take the terminal's own colours (a theme's blue, its background), else Beluga's pastel.
   const prefs = usePrefs();
@@ -286,23 +289,23 @@ export function TermPane({ wsId, termKey, kind, cwd, split, focusOnMount, onSpli
         />
       ) : null}
       <div className={s.paneTools}>
-        <IconButton icon="panelRight" label="Split Right" keys={keyFor(keys, 'split_right')} onClick={() => onSplit('right')} />
-        <IconButton icon="panelBottom" label="Split Down" keys={keyFor(keys, 'split_down')} onClick={() => onSplit('down')} />
-        {onClose ? <IconButton icon="x" label="Close This Shell" onClick={onClose} /> : null}
+        <IconButton icon="panelRight" label={tr('agentTerm.splitRight')} keys={keyFor(keys, 'split_right')} onClick={() => onSplit('right')} />
+        <IconButton icon="panelBottom" label={tr('agentTerm.splitDown')} keys={keyFor(keys, 'split_down')} onClick={() => onSplit('down')} />
+        {onClose ? <IconButton icon="x" label={tr('agentTerm.closeShell')} onClick={onClose} /> : null}
       </div>
       {busy && !error ? (
         <div className={s.over} role="status" data-term-busy="">
           <Icon name="terminal" size={18} />
-          <p className={s.overTitle}>{label} is finishing a turn in the chat</p>
-          <p className={s.overDetail}>The terminal opens here as soon as it’s done.</p>
+          <p className={s.overTitle}>{tr('agentTerm.finishing', { name: label })}</p>
+          <p className={s.overDetail}>{tr('agentTerm.opensSoon')}</p>
         </div>
       ) : error || (ended && !driving && kind === 'agent') || (ended && kind === 'shell') ? (
         <div className={s.over} role="status">
           <Icon name={error ? 'alert' : 'terminal'} size={18} />
-          <p className={s.overTitle}>{error ? (kind === 'agent' ? `${label} couldn’t start here` : 'The shell couldn’t start') : kind === 'agent' ? `${label}’s terminal ended` : 'The shell ended'}</p>
-          {error ? <p className={s.overDetail}>{error}</p> : kind === 'agent' ? <p className={s.overDetail}>The conversation is the chat’s again. Start it here to go on in the terminal.</p> : null}
+          <p className={s.overTitle}>{error ? (kind === 'agent' ? tr('agentTerm.cantStart', { name: label }) : tr('agentTerm.shellCantStart')) : kind === 'agent' ? tr('agentTerm.ended', { name: label }) : tr('agentTerm.shellEnded')}</p>
+          {error ? <p className={s.overDetail}>{error}</p> : kind === 'agent' ? <p className={s.overDetail}>{tr('agentTerm.chatAgain')}</p> : null}
           <Button variant="primary" icon="play" disabled={starting} onClick={() => void again()}>
-            {error ? 'Try Again' : 'Start Again'}
+            {error ? tr('issues.view.tryAgain') : tr('agentTerm.startAgain')}
           </Button>
         </div>
       ) : null}

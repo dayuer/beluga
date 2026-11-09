@@ -11,6 +11,7 @@ import { jsonFence } from './numbers-model.js';
 import { useSentinelActions } from './use-sentinel.js';
 import n from './numbers.module.css';
 import { fileManager, revealLabel } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 type Read = DocumentRead & { readonly bucket?: string; readonly path?: string };
 
@@ -25,6 +26,7 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
   const api = useApi();
   const a = useSentinelActions();
   const actions = useActions();
+  const tr = useT();
   const [doc, setDoc] = useState<Read>();
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -54,7 +56,7 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
   const buttons = (
     <>
       <Button size="small" icon="external" onClick={() => open('open')}>
-        Open in Default App
+        {tr('sentinel.doc.openDefault')}
       </Button>
       <Button size="small" icon="folder" onClick={() => open('reveal')}>
         {revealLabel()}
@@ -62,7 +64,7 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
     </>
   );
   return (
-    <FormSheet title={title} icon="file" submitLabel="Close" hideSubmit cancelLabel="Close" width={820} onSubmit={close} onCancel={close} footer={shown && doc ? <span className={n.docButtons}>{buttons}</span> : null}>
+    <FormSheet title={title} icon="file" submitLabel={tr('sentinel.data.close')} hideSubmit cancelLabel={tr('sentinel.data.close')} width={820} onSubmit={close} onCancel={close} footer={shown && doc ? <span className={n.docButtons}>{buttons}</span> : null}>
       <div className={n.docView} data-look={look ?? (doc ? 'info' : 'wait')}>
         {error ? (
           <div className={n.docInfo}>
@@ -70,13 +72,13 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
             {source === 'storage' ? (
               <span className={n.docButtons}>
                 <Button size="small" icon="globe" onClick={inBrowser}>
-                  Open Link in Browser
+                  {tr('sentinel.doc.openInBrowser')}
                 </Button>
               </span>
             ) : null}
           </div>
         ) : !doc ? (
-          <p className={n.docNote}>{source === 'storage' ? 'Fetching it from Storage…' : 'Loading…'}</p>
+          <p className={n.docNote}>{source === 'storage' ? tr('sentinel.doc.fetching') : tr('sentinel.doc.loading')}</p>
         ) : (
           (shown ?? (
             <div className={n.docInfo}>
@@ -84,13 +86,13 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
                 <Icon name="file" size={22} />
               </span>
               <dl className={n.docMeta}>
-                <dt>Kind</dt>
+                <dt>{tr('sentinel.doc.kind')}</dt>
                 <dd>{kindWords(doc.name, doc.mime)}</dd>
-                <dt>Size</dt>
+                <dt>{tr('sentinel.doc.size')}</dt>
                 <dd>{sizeWords(doc.size)}</dd>
                 {doc.bucket ? (
                   <>
-                    <dt>In Storage</dt>
+                    <dt>{tr('sentinel.doc.inStorage')}</dt>
                     <dd className={n.docPath}>
                       {doc.bucket}/{doc.path}
                     </dd>
@@ -98,17 +100,17 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
                 ) : null}
                 {doc.at ? (
                   <>
-                    <dt>{doc.bucket ? 'Listed' : 'Kept'}</dt>
+                    <dt>{doc.bucket ? tr('sentinel.doc.listed') : tr('sentinel.data.keptColumn')}</dt>
                     <dd>{ago(doc.at)}</dd>
                   </>
                 ) : null}
               </dl>
-              <p className={n.docNote}>{doc.tooBig ? `It’s too big to show here: open it in its app, or find it in ${fileManager()}.` : `Beluga can’t show a ${kindWords(doc.name, doc.mime).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} here: open it in its app, or find it in ${fileManager()}.`}</p>
+              <p className={n.docNote}>{doc.tooBig ? tr('sentinel.doc.tooBig', { app: fileManager() }) : tr('sentinel.doc.cantShow', { kind: kindWords(doc.name, doc.mime).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase()), app: fileManager() })}</p>
               <span className={n.docButtons}>{buttons}</span>
             </div>
           ))
         )}
-        {doc?.cut ? <p className={n.docNote}>Only the start is shown here: open it to see the rest.</p> : null}
+        {doc?.cut ? <p className={n.docNote}>{tr('sentinel.doc.cut')}</p> : null}
       </div>
     </FormSheet>
   );

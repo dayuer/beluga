@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import type { CcOutput } from '../../../../src/core/claude-code/model.js';
 import { baseName, dirName, sepOf } from '../../../../src/shared/os-path.js';
 import { isUnder, underPart } from '../../../../src/shared/path-inside.js';
@@ -35,7 +36,7 @@ export function placeOf(p: string, places: Places): { name: string; dir: string 
   return { name, dir: parent || '/' };
 }
 
-export const howLabel = (how: CcOutput['how']): string => (how === 'wrote' ? 'Saved' : how === 'ran' ? 'From a command' : 'Looked at');
+export const howLabel = (how: CcOutput['how']): string => (how === 'wrote' ? t('claudeCode.outputs.saved') : how === 'ran' ? t('claudeCode.outputs.fromCommand') : t('claudeCode.outputs.lookedAt'));
 
 /** Changes only when a file does (a new one, rewritten, or gone). */
 export const outputsKey = (list: ReadonlyArray<Pick<CcOutput, 'path' | 'mtime' | 'size'>>): string => list.map((o) => `${o.path}:${o.mtime}:${o.size}`).join('|');

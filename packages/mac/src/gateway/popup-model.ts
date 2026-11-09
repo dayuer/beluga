@@ -6,6 +6,7 @@ import { isDecisionQid } from '../../../../src/core/plans/decisions.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
 import { planView } from '../../../../src/core/plans/progress.js';
 import type { RequestAction } from './request-actions.js';
+import { t, tl } from '../i18n/index.js';
 
 /**
  * The floating card a friend's request gets on top of whatever you're doing (the app shell's
@@ -42,17 +43,18 @@ export interface PopupRequest {
 export const POPUP_MAX = 3;
 
 /** Where a request would run or read, in words (the request sheet says the same). */
-export const whereLine = (t: TaskView): string =>
-  t.kind === 'file' ? (t.path ?? 'a file') : t.project ? `In your project ${t.project}` : t.kind === 'run' ? (t.folder ?? t.cwd ?? 'Your shared folder (or home, with full trust)') : 'A new scratch folder, just for this request';
+export const whereLine = (task: TaskView): string =>
+  task.kind === 'file' ? (task.path ?? t('gateway.popup.aFile')) : task.project ? t('gateway.popup.inProject', { project: task.project }) : task.kind === 'run' ? (task.folder ?? task.cwd ?? t('gateway.popup.sharedFolder')) : t('gateway.popup.scratch');
 
 /** What goes back to them, in words. */
-export const backLine = (t: TaskView): string => (t.kind === 'run' ? 'The output and exit code' : t.kind === 'file' ? 'The file' : t.expects === 'files' ? 'Files' : t.expects ? 'Structured data (JSON)' : 'A summary of what your agent did');
+export const backLine = (task: TaskView): string =>
+  task.kind === 'run' ? t('gateway.popup.backRun') : task.kind === 'file' ? t('gateway.popup.backFile') : task.expects === 'files' ? t('gateway.popup.backFiles') : task.expects ? t('gateway.popup.backData') : t('gateway.popup.backSummary');
 
 /** The sender chooses the summary, so a command or a file is named as it is, never by their words alone. */
-const gistOf = (t: TaskView): string => {
-  if (t.kind === 'run') return `run ${oneLine(t.command ?? '', 80)}`;
-  if (t.kind === 'file') return `get ${t.path ?? 'a file'}`;
-  return requestGist(t, 90);
+const gistOf = (task: TaskView): string => {
+  if (task.kind === 'run') return t('gateway.popup.run', { command: oneLine(task.command ?? '', 80) });
+  if (task.kind === 'file') return t('gateway.popup.get', { path: task.path ?? t('gateway.popup.aFile') });
+  return requestGist(task, 90);
 };
 
 /** The sender's words beside a command or a file ("why"), or the real start of an ask they summarised. */
@@ -61,10 +63,10 @@ const saidOf = (t: TaskView): string | undefined => {
   return t.summary ? oneLine(t.ask, 140) : undefined;
 };
 
-const fullOf = (t: TaskView): string => {
-  if (t.kind === 'run') return `$ ${t.command ?? ''}${t.ask && t.ask !== t.command ? `\n\nWhy: ${t.ask}` : ''}`;
-  if (t.kind === 'file') return `${t.path ?? ''}${t.ask && !t.ask.startsWith('Send me ') ? `\n\nWhy: ${t.ask}` : ''}`;
-  return t.ask;
+const fullOf = (task: TaskView): string => {
+  if (task.kind === 'run') return `$ ${task.command ?? ''}${task.ask && task.ask !== task.command ? `\n\n${t('gateway.popup.why', { why: task.ask })}` : ''}`;
+  if (task.kind === 'file') return `${task.path ?? ''}${task.ask && !task.ask.startsWith('Send me ') ? `\n\n${t('gateway.popup.why', { why: task.ask })}` : ''}`;
+  return task.ask;
 };
 
 /**
@@ -76,23 +78,23 @@ export function popupRequests(approvals: readonly Approval[], tasks: readonly Ta
   const byId = new Map(tasks.map((t) => [t.id, t]));
   return approvals
     .flatMap((a) => {
-      const t = a.kind === 'request' && a.peer && a.task ? byId.get(a.task) : undefined;
-      if (!t || t.direction !== 'received' || t.state !== 'awaiting_approval') return [];
+      const task = a.kind === 'request' && a.peer && a.task ? byId.get(a.task) : undefined;
+      if (!task || task.direction !== 'received' || task.state !== 'awaiting_approval') return [];
       const item: PopupRequest = {
         approval: a.id,
-        task: t.id,
-        peerId: t.peerId,
-        peerName: t.peerName,
-        claude: t.by === 'agent',
-        kind: t.kind,
-        gist: gistOf(t),
-        ...(saidOf(t) ? { said: saidOf(t)! } : {}),
-        full: fullOf(t),
-        needs: t.needs.map((n) => CAP_INFO[n].label),
-        where: whereLine(t),
-        back: backLine(t),
-        askedAt: a.askedAt ?? t.createdAt,
-        ...(t.secret ? { secret: t.secret.label } : {}),
+        task: task.id,
+        peerId: task.peerId,
+        peerName: task.peerName,
+        claude: task.by === 'agent',
+        kind: task.kind,
+        gist: gistOf(task),
+        ...(saidOf(task) ? { said: saidOf(task)! } : {}),
+        full: fullOf(task),
+        needs: task.needs.map((n) => tl('CAP_INFO', n, 'label', CAP_INFO[n].label)),
+        where: whereLine(task),
+        back: backLine(task),
+        askedAt: a.askedAt ?? task.createdAt,
+        ...(task.secret ? { secret: task.secret.label } : {}),
       };
       return [item];
     })
@@ -100,18 +102,34 @@ export function popupRequests(approvals: readonly Approval[], tasks: readonly Ta
 }
 
 /** "Mia's Claude wants to" / "Mia wants to" (the card's first line). */
-export const popupWho = (r: Pick<PopupRequest, 'peerName' | 'claude'>): string => `${r.peerName}${r.claude ? '’s agent' : ''}`;
+export const popupWho = (r: Pick<PopupRequest, 'peerName' | 'claude'>): string => (r.claude ? t('gateway.popup.theirAgent', { name: r.peerName }) : r.peerName);
 
 /** What a button on the card does (answered by the main window, like a notification's). */
 export const POPUP_BUTTONS: ReadonlyArray<{ readonly action: RequestAction; readonly label: string }> = [
-  { action: 'decline', label: 'Decline' },
-  { action: 'allow_always', label: 'Allow Always' },
-  { action: 'approve', label: 'Allow' },
+  // Read when shown, so they follow the language.
+  {
+    action: 'decline',
+    get label() {
+      return t('gateway.popup.decline');
+    },
+  },
+  {
+    action: 'allow_always',
+    get label() {
+      return t('gateway.popup.allowAlways');
+    },
+  },
+  {
+    action: 'approve',
+    get label() {
+      return t('gateway.popup.allow');
+    },
+  },
 ];
 
 /** The buttons one request gets: a file is allowed one at a time here (Always for files, with its folder spelled out, is on the request sheet; a secret never has one). */
 export const popupButtons = (r: Pick<PopupRequest, 'kind'> & { readonly secret?: string }): typeof POPUP_BUTTONS =>
-  r.secret ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always').map((b) => (b.action === 'approve' ? { ...b, label: 'Allow Once' } : b)) : r.kind === 'file' ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always') : POPUP_BUTTONS;
+  r.secret ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always').map((b) => (b.action === 'approve' ? { ...b, label: t('gateway.popup.allowOnce') } : b)) : r.kind === 'file' ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always') : POPUP_BUTTONS;
 
 // ------------------------------------------------------------------ when your own Claude needs you
 
@@ -173,7 +191,7 @@ export function popupNeeds(state: NeedState, opts: { readonly quiet: boolean; re
     if (showing(q.channel)) continue;
     const where = placeOf(state, q.channel);
     if (q.question.kind === 'plan') {
-      out.push({ need: true, approval: `${NEED}q:${q.qid}`, task: '', tag: 'plan', title: where, body: 'Approve it, or say what to change', channel: q.channel });
+      out.push({ need: true, approval: `${NEED}q:${q.qid}`, task: '', tag: 'plan', title: where, body: t('gateway.popup.approvePlan'), channel: q.channel });
       continue;
     }
     const first = q.question.questions[0];
@@ -205,7 +223,7 @@ export function popupNeeds(state: NeedState, opts: { readonly quiet: boolean; re
       task: '',
       tag: 'milestone',
       title: `${planTitle(plan)}: “${oneLine(m.milestone.title, 60)}”`,
-      body: m.run.check?.verdict === 'pass' ? 'The agent checked it: pass it to go on' : 'Its tasks are finished: pass it to go on',
+      body: m.run.check?.verdict === 'pass' ? t('gateway.popup.checked') : t('gateway.popup.finished'),
       channel: plan.home,
       plan: plan.id,
     });
@@ -231,8 +249,8 @@ export function previewItems(now: number): PopupItem[] {
       said: 'A preview: nothing is asked, and nothing is sent.',
       full: 'This is how a friend’s request looks. Allow, Allow Always and Decline do nothing here.',
       needs: ['See the screen'],
-      where: 'A new scratch folder, just for this request',
-      back: 'Files',
+      where: t('gateway.popup.scratch'),
+      back: t('gateway.popup.backFiles'),
       askedAt: now,
     },
     {

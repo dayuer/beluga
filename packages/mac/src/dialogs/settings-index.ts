@@ -1,5 +1,5 @@
 import type { IconName } from '../components/Icon.js';
-import { t } from '../i18n/index.js';
+import { t, tl } from '../i18n/index.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
 import type { PaneInfo, SettingEntry, SettingsPane } from '../lib/settings-search.js';
 // Relative, not @beluga/ui: the root's tests and typecheck read this file too.
@@ -292,7 +292,7 @@ export const settingsIndex = (): readonly Entry[] => [
   ...rows('advanced', t('settings.threads.title'), [[t('settings.threads.let'), t('settings.find.threads'), 'threads child sub-agent family orchestrate 线程 子聊天']]),
 
   // Experimental: one group per experiment, its switch the row (made from shared/experiments.ts).
-  ...EXPERIMENTS.flatMap((id) => rows('experimental', EXPERIMENT_INFO[id].title, [[EXPERIMENT_INFO[id].title, EXPERIMENT_INFO[id].summary, `${id} experimental early ${EXPERIMENT_INFO[id].keywords} 实验`]])),
+  ...EXPERIMENTS.flatMap((id) => rows('experimental', tl('EXPERIMENT_INFO', id, 'title', EXPERIMENT_INFO[id].title), [[tl('EXPERIMENT_INFO', id, 'title', EXPERIMENT_INFO[id].title), tl('EXPERIMENT_INFO', id, 'summary', EXPERIMENT_INFO[id].summary), `${id} experimental early ${EXPERIMENT_INFO[id].keywords} 实验`]])),
 
   // About
   ...rows('about', undefined, [

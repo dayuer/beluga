@@ -17,6 +17,7 @@ import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { ChangedFileView, canShowFile, fileLookLabel, onlyAsFile, useChangeLocation } from './ChangedFile.js';
 import s from './diff.module.css';
 import { revealLabel } from '../lib/os-words.js';
+import { t as tNow, useT } from '../i18n/index.js';
 
 /** Side by side: deletions on the left, additions on the right, aligned within each change. */
 function splitRows(lines: Line[]): Array<{ left?: Line; right?: Line; full?: Line }> {
@@ -52,11 +53,11 @@ export const STATE: Record<ChangedFile['state'], { letter: string; tone: string 
 
 /** Git's notes about a file, in words ("new file mode 100644" says it's a new file). */
 export function noteOf(text: string): string {
-  if (text.startsWith('new file')) return 'New file';
-  if (text.startsWith('deleted file')) return 'File deleted';
-  if (text.startsWith('rename from ')) return `Renamed from ${text.slice('rename from '.length)}`;
-  if (text.startsWith('rename to ')) return `Renamed to ${text.slice('rename to '.length)}`;
-  if (/^No newline at end of file/i.test(text)) return 'No newline at the end of the file';
+  if (text.startsWith('new file')) return tNow('views.diff.newFile');
+  if (text.startsWith('deleted file')) return tNow('views.diff.fileDeleted');
+  if (text.startsWith('rename from ')) return tNow('views.diff.renamedFrom', { path: text.slice('rename from '.length) });
+  if (text.startsWith('rename to ')) return tNow('views.diff.renamedTo', { path: text.slice('rename to '.length) });
+  if (/^No newline at end of file/i.test(text)) return tNow('views.diff.noNewline');
   return text;
 }
 
@@ -67,6 +68,7 @@ export function useCommitItems(): (c: Commit) => ActionItem[] {
   const agent = useMyAgentName();
   const { client, ui } = useBeluga();
   const actions = useActions();
+  const t = useT();
   const say = (text: string): void => client.store.dispatch({ type: 'toast', text, level: 'success' });
   return (c) => {
     const view = client.store.getState().view;
@@ -76,9 +78,9 @@ export function useCommitItems(): (c: Commit) => ActionItem[] {
       setTimeout(() => quoteInBox(ui, `${c.hash} ${c.subject}`), 60);
     };
     return [
-      { label: 'Copy Hash', icon: 'copy', onSelect: () => void copyText(c.hash).then(() => say(`Copied ${c.hash}`)) },
-      { label: 'Copy Message', onSelect: () => void copyText(c.subject).then(() => say('Copied the commit message')) },
-      { label: `Ask ${agent} About This Commit`, icon: 'claude', separate: true, onSelect: ask },
+      { label: t('views.diff.copyHash'), icon: 'copy', onSelect: () => void copyText(c.hash).then(() => say(t('views.diff.copiedHash', { hash: c.hash }))) },
+      { label: t('views.search.copy'), onSelect: () => void copyText(c.subject).then(() => say(t('views.diff.copiedMessage'))) },
+      { label: t('views.diff.askAboutCommit', { agent }), icon: 'claude', separate: true, onSelect: ask },
     ];
   };
 }
@@ -87,6 +89,7 @@ export function useCommitItems(): (c: Commit) => ActionItem[] {
 export function useFileItems(): (f: ChangedFile, index: number) => ActionItem[] {
   const { client, ui } = useBeluga();
   const actions = useActions();
+  const t = useT();
   const say = (text: string): void => client.store.dispatch({ type: 'toast', text, level: 'success' });
   return (f, index) => {
     const state = client.store.getState();
@@ -114,11 +117,11 @@ export function useFileItems(): (f: ChangedFile, index: number) => ActionItem[] 
       }, 60);
     };
     return [
-      { label: 'Show Changes', icon: 'diff', onSelect: () => actions.run({ type: 'review_file', index }) },
-      ...(at && f.state !== 'deleted' ? [{ label: 'Open File', icon: 'file' as const, onSelect: open }] : []),
+      { label: t('views.diff.showChanges'), icon: 'diff', onSelect: () => actions.run({ type: 'review_file', index }) },
+      ...(at && f.state !== 'deleted' ? [{ label: t('views.diff.openFile'), icon: 'file' as const, onSelect: open }] : []),
       ...(local ? [{ label: revealLabel(), icon: 'folder' as const, onSelect: () => void revealInFinder(client, local) }] : []),
-      { label: 'Copy Path', icon: 'copy', separate: true, onSelect: () => void copyText(local ?? f.path).then(() => say('Copied the path')) },
-      { label: 'Mention in Chat', icon: 'chat', onSelect: ask },
+      { label: t('views.diff.copyPath'), icon: 'copy', separate: true, onSelect: () => void copyText(local ?? f.path).then(() => say(t('views.diff.copiedPath'))) },
+      { label: t('views.diff.mention'), icon: 'chat', onSelect: ask },
     ];
   };
 }
@@ -169,6 +172,7 @@ export function UnifiedDiff({ lines, compact }: { lines: readonly Line[]; compac
 /** What changed in a workspace (or one shared with you): the files, then the selected file's diff. */
 export function DiffView() {
   const agent = useMyAgentName();
+  const t = useT();
   const actions = useActions();
   const review = useApp((st) => st.review);
   const view = useApp((st) => st.view);
@@ -177,13 +181,13 @@ export function DiffView() {
   const located = useChangeLocation(review?.data?.files[review.selected]?.path);
   const lines = useMemo(() => (review?.diff ? parseDiff(review.diff) : []), [review?.diff]);
   const files = review?.data?.files ?? [];
-  const totals = files.reduce((t, f) => ({ add: t.add + f.added, del: t.del + f.removed }), { add: 0, del: 0 });
+  const totals = files.reduce((sum, f) => ({ add: sum.add + f.added, del: sum.del + f.removed }), { add: 0, del: 0 });
   const mine = view.kind === 'workspace';
   const fileItems = useFileItems();
   const commitItems = useCommitItems();
-  if (!review || (review.loading && !review.data)) return <Empty icon="diff" title="Looking at what changed…" />;
-  if (review.error) return <Empty icon="alert" title="Couldn't read the changes" detail={review.error} />;
-  if (!files.length) return <Empty icon="check" title="Nothing has changed yet" detail={review.data ? `Everything matches ${review.data.base}.` : undefined} />;
+  if (!review || (review.loading && !review.data)) return <Empty icon="diff" title={t('views.diff.looking')} />;
+  if (review.error) return <Empty icon="alert" title={t('views.diff.cantRead')} detail={review.error} />;
+  if (!files.length) return <Empty icon="check" title={t('views.diff.nothing')} detail={review.data ? t('views.diff.matches', { base: review.data.base }) : undefined} />;
   const file = files[review.selected];
   const at = file && canShowFile(file) ? located : undefined;
   // A picture or a PDF as itself; anything else its diff (Unified or Split) or the file (Markdown formatted).
@@ -196,10 +200,10 @@ export function DiffView() {
   };
   return (
     <div className={s.diff}>
-      <aside className={s.files} aria-label="Changed files">
+      <aside className={s.files} aria-label={t('views.diff.changedFiles')}>
         <div className={s.filesHead}>
           <span>
-            {files.length} file{files.length === 1 ? '' : 's'}
+            {t('views.diff.files', { n: files.length })}
           </span>
           <span className={s.add}>+{totals.add}</span>
           <span className={s.del}>−{totals.del}</span>
@@ -217,10 +221,10 @@ export function DiffView() {
                 </span>
               </ActionsContext>
             ))}
-            {review.data.commits.length > 6 ? <div className={s.moreCommits}>and {review.data.commits.length - 6} earlier</div> : null}
+            {review.data.commits.length > 6 ? <div className={s.moreCommits}>{t('views.diff.earlier', { n: review.data.commits.length - 6 })}</div> : null}
           </div>
         ) : null}
-        <div className={s.fileList} role="listbox" aria-label="Files">
+        <div className={s.fileList} role="listbox" aria-label={t('views.diff.filesAria')}>
           {files.map((f, i) => {
             const st = STATE[f.state];
             const name = f.path.split('/').pop();
@@ -243,34 +247,34 @@ export function DiffView() {
         {mine ? (
           <div className={s.filesFoot}>
             <Button icon="claude" onClick={() => actions.run({ type: 'ws', id: view.id, action: 'review_claude' })}>
-              Ask {agent} to review
+              {t('views.diff.askReview', { agent })}
             </Button>
           </div>
         ) : null}
       </aside>
-      <section className={s.body} aria-label={file?.path ?? 'Diff'}>
+      <section className={s.body} aria-label={file?.path ?? t('views.diff.diff')}>
         <div className={s.bodyHead}>
           <Icon name="file" size={13} />
           <span className={s.path}>{file?.path}</span>
           <span className={s.flex} />
           {file && onlyAsFile(file.path) ? null : (
             <Segmented
-              label="Layout"
+              label={t('views.diff.layout')}
               value={mode}
               onChange={setMode}
               options={[
-                { value: 'unified', label: 'Unified' },
-                { value: 'split', label: 'Split' },
-                ...(at && file ? [{ value: 'file' as const, label: fileLookLabel(file.path), hint: 'The file as it is now' }] : []),
+                { value: 'unified', label: t('views.diff.unified') },
+                { value: 'split', label: t('views.diff.split') },
+                ...(at && file ? [{ value: 'file' as const, label: fileLookLabel(file.path), hint: t('views.diff.asItIs') }] : []),
               ]}
             />
           )}
         </div>
-        <div className={cx(s.code, mode === 'file' && s.asFile, 'selectable')} tabIndex={0} aria-label={mode === 'file' ? 'The file' : 'The changes'}>
+        <div className={cx(s.code, mode === 'file' && s.asFile, 'selectable')} tabIndex={0} aria-label={mode === 'file' ? t('views.diff.theFile') : t('views.diff.theChanges')}>
           {mode === 'file' && at ? (
             <ChangedFileView at={at} variant="focus" wrap={false} />
           ) : !review.diff ? (
-            <div className={s.loadingDiff}>Loading the diff…</div>
+            <div className={s.loadingDiff}>{t('views.diff.loading')}</div>
           ) : mode === 'unified' ? (
             <UnifiedDiff lines={lines} />
           ) : (

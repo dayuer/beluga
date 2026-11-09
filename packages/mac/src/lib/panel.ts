@@ -8,6 +8,7 @@ import type { Workspace } from '@beluga/workspaces/types.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { DEFAULT_LAYOUT, PANES_DEFAULT, type PaneId, type PanelTab, drawerFits, moveTab, panelFits, paneKey, paneOf, paneTabs, panelTabsFor, pickPanelTab, rememberTab, viewsOf } from './panel-model.js';
 import { type UiPrefs, getPrefs, setPrefs } from './prefs.js';
+import { t } from '../i18n/index.js';
 
 /**
  * The right panel and the terminal drawer, as the window uses them: which tab shows, showing a
@@ -233,7 +234,7 @@ export function toggleTerminal(state: PanelState): string | undefined {
   }
   if (state.view.kind === 'shared') return 'A shared workspace’s terminal is its owner’s';
   if (state.view.kind === 'terminal') return undefined;
-  return revealTerminal(state, true) ? undefined : 'No terminal here';
+  return revealTerminal(state, true) ? undefined : t('common.panel.noTerminal');
 }
 
 /** Move the terminal to the other place (and keep it there for ⌘J). */

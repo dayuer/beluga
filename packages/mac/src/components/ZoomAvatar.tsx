@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAvatarUrl } from '../lib/avatars.js';
 import { Avatar } from './ui.js';
 import s from './zoom-avatar.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Someone's avatar on their profile card: with a picture, a click opens it large over the window
@@ -10,12 +11,13 @@ import s from './zoom-avatar.module.css';
  */
 export function ZoomAvatar({ name, id, size = 56 }: { name: string; id: string; size?: number }) {
   const picture = useAvatarUrl(id);
+  const t = useT();
   const [open, setOpen] = useState(false);
   if (!picture) return <Avatar name={name} id={id} size={size} />;
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button type="button" className={s.trigger} onClick={(e) => e.stopPropagation()} style={{ width: size, height: size }} aria-label={`See ${name}’s picture`}>
+        <button type="button" className={s.trigger} onClick={(e) => e.stopPropagation()} style={{ width: size, height: size }} aria-label={t('common.zoomAvatar.see', { name })}>
           <Avatar name={name} id={id} size={size} />
         </button>
       </Dialog.Trigger>

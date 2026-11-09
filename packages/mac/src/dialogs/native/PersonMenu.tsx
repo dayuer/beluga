@@ -12,7 +12,7 @@ import { RunCommandSheet, addressTo } from './PeerSheets.js';
 import { presetShareWith } from './ShareFolderSheet.js';
 import m from '../../components/SpecMenu.module.css';
 import p from './person.module.css';
-import { useT } from '../../i18n/index.js';
+import { useT, tl } from '../../i18n/index.js';
 
 interface Item {
   readonly label: string;
@@ -101,7 +101,7 @@ function Items({ index, onRemove, onRun }: { index: number; onRemove: (r: { name
           {/* Trust is set in one place, their friend card (BLG-202): here it's only said. */}
           <Context.Item className={cx(m.item, p.subTrigger)} disabled>
             <span className={m.label}>{t('dialogs.personMenu.trust')}</span>
-            <span className={p.subValue}>{TRUST_INFO[trust].label}</span>
+            <span className={p.subValue}>{tl('TRUST_INFO', trust, 'label', TRUST_INFO[trust].label)}</span>
           </Context.Item>
           {friend ? (
             <Context.Item className={m.item} onSelect={() => openFriendCard(client, peer.peerId)}>

@@ -9,19 +9,20 @@ import menu from '../../components/SpecMenu.module.css';
 import { FILTERS, FILTER_LABELS, type OverviewFilter, type OverviewSort, SORTS, SORT_LABELS } from './overview-model.js';
 import s from './filter-bar.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
+import { type Key, useT } from '../../i18n/index.js';
 
-const FILTER_HINTS: Record<OverviewFilter, string> = {
-  all: 'Everything, archived included',
-  active: 'Worktrees and chats you can work in',
-  needs: 'Approvals, merge conflicts and failing checks',
-  ready: 'Committed work that isn’t in main yet',
-  archived: 'Put away: the branch and conversation are kept, ready to restore',
+const FILTER_HINTS: Record<OverviewFilter, Key> = {
+  all: 'views.overview.hintAll',
+  active: 'views.overview.hintActive',
+  needs: 'views.overview.hintNeeds',
+  ready: 'views.overview.hintReady',
+  archived: 'views.overview.hintArchived',
 };
 
-const SORT_HINTS: Record<OverviewSort, string> = {
-  recent: 'What needs you first, then the latest',
-  name: 'A to Z',
-  size: 'Biggest on disk first',
+const SORT_HINTS: Record<OverviewSort, Key> = {
+  recent: 'views.overview.sortRecentHint',
+  name: 'views.overview.sortNameHint',
+  size: 'views.overview.sortSizeHint',
 };
 
 export interface FilterBarProps {
@@ -55,6 +56,7 @@ export function FilterBar(props: FilterBarProps) {
 
 /** Like NSSegmentedControl, each segment with its count; ← → move between them. */
 function Segments({ filter, counts, onFilter }: Pick<FilterBarProps, 'filter' | 'counts' | 'onFilter'>) {
+  const t = useT();
   const onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
@@ -64,11 +66,11 @@ function Segments({ filter, counts, onFilter }: Pick<FilterBarProps, 'filter' | 
     (e.currentTarget.querySelector(`[data-filter="${next}"]`) as HTMLElement | null)?.focus();
   };
   return (
-    <div className={s.segmented} role="tablist" aria-label="Show" onKeyDown={onKey}>
+    <div className={s.segmented} role="tablist" aria-label={t('views.earnings.show')} onKeyDown={onKey}>
       {FILTERS.map((f) => {
         const on = f === filter;
         return (
-          <Tip key={f} label={FILTER_HINTS[f]}>
+          <Tip key={f} label={t(FILTER_HINTS[f])}>
             <button
               type="button"
               role="tab"
@@ -90,11 +92,12 @@ function Segments({ filter, counts, onFilter }: Pick<FilterBarProps, 'filter' | 
 }
 
 function SortPopup({ sort, onSort }: Pick<FilterBarProps, 'sort' | 'onSort'>) {
-  const items = SORTS.map((x) => ({ label: SORT_LABELS[x], hint: SORT_HINTS[x], checked: x === sort, onSelect: () => onSort(x) }));
+  const t = useT();
+  const items = SORTS.map((x) => ({ label: SORT_LABELS[x], hint: t(SORT_HINTS[x]), checked: x === sort, onSelect: () => onSort(x) }));
   return (
     <ActionsDropdown items={items}>
-      <button type="button" className={s.popup} aria-label={`Sort by ${SORT_LABELS[sort]}`}>
-        <span className={s.popupDim}>Sort:</span> {SORT_LABELS[sort]}
+      <button type="button" className={s.popup} aria-label={t('views.overview.sortBy', { sort: SORT_LABELS[sort] })}>
+        <span className={s.popupDim}>{t('views.overview.sort')}</span> {SORT_LABELS[sort]}
         <Icon name="chevronDown" size={10} className={s.chevron} />
       </button>
     </ActionsDropdown>
@@ -103,6 +106,7 @@ function SortPopup({ sort, onSort }: Pick<FilterBarProps, 'sort' | 'onSort'>) {
 
 /** Which project: all of them, or one (by its icon, like apps in the Dock). */
 function ProjectPopup({ projects, project, onProject }: Pick<FilterBarProps, 'projects' | 'project' | 'onProject'>) {
+  const t = useT();
   const row = (key: string, checked: boolean, icon: ReactNode, label: string, pick: () => void) => (
     <Dropdown.Item key={key} className={menu.item} onSelect={pick}>
       <span className={menu.line}>
@@ -112,20 +116,20 @@ function ProjectPopup({ projects, project, onProject }: Pick<FilterBarProps, 'pr
       </span>
     </Dropdown.Item>
   );
-  const name = (p: Project): string => (p.root ? p.name : 'Chats');
+  const name = (p: Project): string => (p.root ? p.name : t('views.overview.chats'));
   const iconOf = (p: Project, size: number) => (p.root ? <ProjectIcon id={p.id} name={p.name} size={size} /> : <Icon name="chat" size={size - 2} />);
   return (
     <Dropdown.Root modal={false}>
       <Dropdown.Trigger asChild>
-        <button type="button" className={s.popup} aria-label={`Project: ${project ? name(project) : 'All Projects'}`}>
+        <button type="button" className={s.popup} aria-label={t('views.overview.projectAria', { project: project ? name(project) : t('views.overview.allProjects') })}>
           {project ? iconOf(project, 14) : <Icon name="grid" size={12} />}
-          <span className={s.popupText}>{project ? name(project) : 'All Projects'}</span>
+          <span className={s.popupText}>{project ? name(project) : t('views.overview.allProjects')}</span>
           <Icon name="chevronDown" size={10} className={s.chevron} />
         </button>
       </Dropdown.Trigger>
       <Dropdown.Portal>
         <Dropdown.Content className={menu.menu} align="end" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => e.preventDefault()}>
-          {row('all', !project, <Icon name="grid" size={13} />, 'All Projects', () => onProject(undefined))}
+          {row('all', !project, <Icon name="grid" size={13} />, t('views.overview.allProjects'), () => onProject(undefined))}
           {projects.length ? <Dropdown.Separator className={menu.separator} /> : null}
           {projects.map((p) => row(p.id, project?.id === p.id, iconOf(p, 16), name(p), () => onProject(p.id)))}
         </Dropdown.Content>
@@ -136,16 +140,17 @@ function ProjectPopup({ projects, project, onProject }: Pick<FilterBarProps, 'pr
 
 /** A Mac search field: Esc clears it (then leaves it), ↓ goes to the first row. */
 function SearchField({ search, onSearch, searchRef, onLeave }: { search: string; onSearch: (t: string) => void; searchRef: Ref<HTMLInputElement>; onLeave: () => void }) {
+  const t = useT();
   return (
-    <label className={s.field} title={`Search names, branches, projects and last messages (${chordLabel('Cmd+F')})`}>
+    <label className={s.field} title={t('views.overview.searchTip', { keys: chordLabel('Cmd+F') })}>
       <Icon name="search" size={12} />
       <input
         ref={searchRef}
         className={s.input}
         type="text"
         role="searchbox"
-        aria-label="Search workspaces"
-        placeholder="Search"
+        aria-label={t('views.overview.searchAria')}
+        placeholder={t('views.overview.search')}
         spellCheck={false}
         autoComplete="off"
         value={search}
@@ -163,7 +168,7 @@ function SearchField({ search, onSearch, searchRef, onLeave }: { search: string;
         }}
       />
       {search ? (
-        <button type="button" className={s.clear} aria-label="Clear search" onClick={() => onSearch('')}>
+        <button type="button" className={s.clear} aria-label={t('views.overview.clearSearch')} onClick={() => onSearch('')}>
           <Icon name="x" size={8} strokeWidth={2.4} />
         </button>
       ) : null}

@@ -7,6 +7,7 @@ import { openLightbox, useImage } from '../../chat/images.js';
 import type { Side } from './graph-model.js';
 import { KindIcon, StatusMark, StatusPill } from './marks.js';
 import g from './graph.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * The pieces a graph is drawn with. Every kind is a quiet card in the window's greys; what sets
@@ -60,6 +61,7 @@ const ITEMS_SHOWN = 10;
  * The one going now stands out; what's left fades.
  */
 function Items({ items }: { items: NonNullable<GraphNode['items']> }) {
+  const t = useT();
   const shown = items.slice(0, ITEMS_SHOWN);
   return (
     <ol className={g.items}>
@@ -70,7 +72,7 @@ function Items({ items }: { items: NonNullable<GraphNode['items']> }) {
           {it.note ? <span className={g.itemNote}>{it.note}</span> : null}
         </li>
       ))}
-      {items.length > shown.length ? <li className={g.itemMore}>+{items.length - shown.length} more</li> : null}
+      {items.length > shown.length ? <li className={g.itemMore}>{t('common.graph.more', { n: items.length - shown.length })}</li> : null}
     </ol>
   );
 }
@@ -140,10 +142,11 @@ export const ImageNode = memo(function ImageNode({ data }: NodeProps<FlowNode>) 
   // The same rule as a picture in a message: an absolute path to an image file on this Mac.
   const source = imageSource(path);
   const local = source.kind === 'local' && data.localImages;
+  const t = useT();
   return (
     <div className={cx(g.card, g.imageCard, node.emphasis && g.emphasis)} data-kind="image">
       <Ends sides={data.sides} />
-      {local ? <Picture path={source.path} label={node.label} /> : <div className={g.noPicture}>{path ? 'Pictures from other computers show as a name' : 'No picture'}</div>}
+      {local ? <Picture path={source.path} label={node.label} /> : <div className={g.noPicture}>{path ? t('common.graph.otherPicture') : t('common.graph.noPicture')}</div>}
       <div className={g.imageCaption}>
         <span className={g.label}>{node.label}</span>
         {node.sublabel ? <span className={g.sublabel}>{node.sublabel}</span> : null}
@@ -156,9 +159,10 @@ function Picture({ path, label }: { path: string; label: string }) {
   const { client } = useBeluga();
   const image = localImage(path, label);
   const state = useImage(client.api, image);
-  if (state.status !== 'ready') return <div className={g.noPicture}>{state.status === 'loading' ? 'Loading…' : 'Can’t open this picture'}</div>;
+  const t = useT();
+  if (state.status !== 'ready') return <div className={g.noPicture}>{state.status === 'loading' ? t('common.table.loading') : t('common.graph.cantOpenPicture')}</div>;
   return (
-    <button type="button" className={cx(g.picture, 'nodrag')} onClick={() => openLightbox([image])} aria-label={`Open ${label}`}>
+    <button type="button" className={cx(g.picture, 'nodrag')} onClick={() => openLightbox([image])} aria-label={t('common.graph.openPicture', { name: label })}>
       <img src={state.url} alt={label} draggable={false} />
     </button>
   );

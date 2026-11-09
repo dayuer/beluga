@@ -27,6 +27,7 @@ import { TaskCards } from '../../tasks/TaskRef.js';
 import { prepareMath } from '@beluga/shared/render/math.js';
 import { RichBlock, useRichFence } from '../blocks/RichBlock.js';
 import m from './markdown.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 /**
  * The Markdown reader: GitHub-flavored Markdown (tables, task lists, footnotes, alerts, autolinks),
@@ -79,7 +80,7 @@ function FrontMatter({ yaml }: { yaml: string }) {
   }, [yaml]);
   if (!rows?.length) return null;
   return (
-    <dl className={m.meta} aria-label="Front matter">
+    <dl className={m.meta} aria-label={tNow('common.markdownDoc.frontMatter')}>
       {rows.map((r, i) => (
         <div key={`${r.key}:${i}`} className={m.metaRow}>
           <dt>{r.key}</dt>
@@ -107,8 +108,8 @@ function heading(Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', ctx: { current: C
           <a
             className={m.anchor}
             href={`#${id}`}
-            aria-label="Copy a link to this section"
-            title="Copy a link to this section"
+            aria-label={tNow('common.markdownDoc.copyLink')}
+            title={tNow('common.markdownDoc.copyLink')}
             onClick={(e) => {
               e.preventDefault();
               ctx.current.anchor(id);
@@ -184,14 +185,15 @@ function makeComponents(ctx: { current: Ctx }): Components {
         }
       />
     ),
-    input: ({ type, checked }) => (type === 'checkbox' ? <input type="checkbox" className={m.check} checked={!!checked} readOnly disabled aria-label={checked ? 'Done' : 'Not done'} /> : null),
+    input: ({ type, checked }) => (type === 'checkbox' ? <input type="checkbox" className={m.check} checked={!!checked} readOnly disabled aria-label={checked ? tNow('common.markdownDoc.done') : tNow('common.markdownDoc.notDone')} /> : null),
     p: ({ className, children }) => {
       if (className !== 'markdown-alert-title') return <p>{children}</p>;
-      const kind = KIND_BY_TITLE.get(String(children)) ?? 'note';
+      const found = KIND_BY_TITLE.get(String(children));
+      const kind = found ?? 'note';
       return (
         <p className="markdown-alert-title">
           <Icon name={ALERT_ICONS[kind]} size={15} />
-          {children}
+          {found ? tNow(`common.markdownDoc.alert.${found}` as const) : children}
         </p>
       );
     },
@@ -215,6 +217,7 @@ export interface MarkdownDocProps {
 
 export const MarkdownDoc = memo(function MarkdownDoc({ text, at, variant, nav }: MarkdownDocProps) {
   const { client } = useBeluga();
+  useT(); // shows again in a new language: the renderers read their words when drawn
   const article = useRef<HTMLElement>(null);
   const { yaml, body } = useMemo(() => splitFrontMatter(text), [text]);
   // A big file re-renders behind whatever you're doing, not in its way.
@@ -241,7 +244,7 @@ export const MarkdownDoc = memo(function MarkdownDoc({ text, at, variant, nav }:
     },
     copyLink: (id) => {
       const name = at.path.split('/').pop() ?? at.path;
-      void copyText(`${at.path}#${id}`).then(() => client.store.dispatch({ type: 'toast', text: `Copied a link to ${name}#${id}`, level: 'success' }));
+      void copyText(`${at.path}#${id}`).then(() => client.store.dispatch({ type: 'toast', text: tNow('common.markdownDoc.copiedLink', { link: `${name}#${id}` }), level: 'success' }));
     },
   };
   const components = useMemo(() => makeComponents(ctx), []);
