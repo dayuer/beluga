@@ -952,6 +952,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
 
     // 1.35 (BLG-498): who works its milestones and tasks (none: your default), and the list to change it from.
     ...(plan.agent ? { agent: agentRefView(plan.agent) } : {}),
+    ...(plan.checkAgent ? { checkAgent: agentRefView(plan.checkAgent) } : {}),
     ...(plan.status !== 'done' ? { agents: workPicker(state, plan.agent) } : {}),
     // 1.45 (BLG-772): its decisions, and its draft's review.
     ...decisionsAndReview(state, plan),

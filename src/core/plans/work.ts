@@ -12,7 +12,7 @@ import { coherenceWarnings, warningsText } from './coherence.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerAgentOf, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
 import { type PlanGit, planGitOf } from './plan-git.js';
@@ -72,16 +72,18 @@ export class PlansWork {
       store: deps.store,
       plans: deps.plans,
       askClaude: deps.askClaude,
-      // On the plan's agent, like its checkers; a conversation of its own, folded into the plan.
+      // On the plan's check agent (else its work agent), like its checkers; a conversation of its own, folded into the plan.
       ...(deps.controller
         ? {
             reviewChat: async (plan: Plan) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Review: ${planTitle(plan)}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              const agent = checkerAgentOf(plan);
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             chatAgent: (chat: string, plan: Plan) => {
-              if (plan.agent) deps.controller!.manager.setAgent(chat, plan.agent);
+              const agent = checkerAgentOf(plan);
+              if (agent) deps.controller!.manager.setAgent(chat, agent);
             },
           }
         : {}),
@@ -105,10 +107,11 @@ export class PlansWork {
       // Each milestone's check: a conversation of its own in the project (folded into the plan), archived once it passed.
       ...(deps.controller
         ? {
-            // On the plan's agent (BLG-503), like its workers; none picked: the project's.
+            // On the plan's check agent, else its work agent (BLG-503); none picked: the project's.
             checkerChat: async (plan, milestone) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Check: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              const agent = checkerAgentOf(plan);
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             retireChat: (id) => void deps.controller!.archive(id, false, { quiet: true }).catch(() => undefined),
@@ -320,6 +323,15 @@ export class PlansWork {
     const who = agent ? agentName(agent, { model: true }) : 'your default agent';
     const busy = Object.values(plan.runs).filter((r) => r?.agent && !r.passedAt).length;
     return busy ? `${who} works what starts next; the ${busy === 1 ? 'milestone' : `${busy} milestones`} already at work keep${busy === 1 ? 's' : ''} ${busy === 1 ? 'its' : 'their'} agent` : `${who} works this plan’s milestones and tasks`;
+  }
+
+  /**
+   * Who checks the plan's milestones and reviews its drafts: `agent` (a stronger model than the
+   * work's, say), or the agent for its work (null). Checks that start from now on get it. → in words.
+   */
+  setCheckAgent(id: string, agent: AgentRef | null): string {
+    this.plans.setCheckAgent(id, agent ?? undefined, this.me());
+    return agent ? `${agentName(agent, { model: true })} checks this plan’s milestones and reviews its drafts` : 'The agent for its work checks this plan’s milestones';
   }
 
   pass(id: string, milestone: string): Plan {
