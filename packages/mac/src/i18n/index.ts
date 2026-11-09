@@ -36,9 +36,11 @@ import { x_prefs as enPrefsWords } from './en/x-prefs.js';
 import { x_prefs as zhPrefsWords } from './zh-CN/x-prefs.js';
 import { x_more as enMore } from './en/x-more.js';
 import { x_more as zhMore } from './zh-CN/x-more.js';
+import { autoRoute as enAutoRoute } from './en/auto-route.js';
+import { autoRoute as zhAutoRoute } from './zh-CN/auto-route.js';
 
-const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines, ...enEngine, ...enPrefsWords, ...enMore } as const;
-const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines, ...zhEngine, ...zhPrefsWords, ...zhMore };
+const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines, ...enEngine, ...enPrefsWords, ...enMore, ...enAutoRoute } as const;
+const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines, ...zhEngine, ...zhPrefsWords, ...zhMore, ...zhAutoRoute };
 
 export type Key = keyof typeof EN & string;
 const tOf = makeT(EN, { 'zh-CN': ZH });

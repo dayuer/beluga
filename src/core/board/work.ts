@@ -12,6 +12,7 @@ import type { IssuePr } from './model.js';
 import { agentLabel, agentName } from '../../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../../protocol.js';
 import { chosenAgent } from '../settings.js';
+import { routedAgent } from '../../shared/auto-route.js';
 import { needsChecksText, unexplained } from './criteria.js';
 import { inSet, labelsFor } from './labels.js';
 import { aboutPrompt, alongPrompt, briefPrompt, boardNote, definePrompt, describeIssue, describeList, friendNote, gitHubLine, ownTaskPrompt, reposPrompt } from './prompt.js';
@@ -194,6 +195,11 @@ export class BoardWork {
     return project && st.prefs.projectAgents?.[project] ? chosenAgent(st.prefs, project) : defaultAgentOf(st.self);
   }
 
+  /** Who works a task nobody picked an agent for (fork, shared/auto-route.ts): undefined, your default. */
+  autoAgent(issue: Issue): AgentRef | undefined {
+    return routedAgent(issue, this.deps.store.getState());
+  }
+
   /**
    * A task from a description: on the board at once under its first line, while your Claude writes
    * its title, goal, criteria and labels (from the project's set); they fill in when it's done.
@@ -364,10 +370,11 @@ export class BoardWork {
     if (live) throw new Error(`${issue.key} is already being worked on in ${live.name}: open it there`);
     const name = slugify(`${issue.key} ${issue.title}`).slice(0, 48) || issue.key.toLowerCase();
     const ticket = { projectId: issue.projectId, name, issueId: issue.id };
+    // Nobody picked one: auto route's (fork, shared/auto-route.ts), else your default.
+    const agent = opts.agent ?? issue.agent ?? this.autoAgent(issue);
     this.expecting.push(ticket);
     let ws: Workspace | undefined;
     try {
-      const agent = opts.agent ?? issue.agent;
       ws = await controller.newWorktree(issue.projectId, name, { ...(opts.base ? { base: opts.base } : {}), ...(opts.quiet ? { quiet: true } : {}), ...(agent ? { agent } : {}) });
     } finally {
       const at = this.expecting.indexOf(ticket);
@@ -385,7 +392,7 @@ export class BoardWork {
     };
     if (Object.keys(patch).length) this.board.update(issue.id, patch, this.me());
     // An epic whose sub-tasks run in other repos: a worktree in each, and this one's Claude works in all of them.
-    const along = await this.startAlong(this.board.need(issue.id), name, opts.agent ?? issue.agent);
+    const along = await this.startAlong(this.board.need(issue.id), name, agent);
     if (opts.prompt) this.deps.askClaude(opts.prompt(this.board.need(issue.id), ws), `${WS}${ws.id}`, opts.shown);
     else if (opts.claude) this.deps.askClaude(startPrompt(this.board.need(issue.id), along.map((w) => this.repoName(w.projectId) ?? w.name)), `${WS}${ws.id}`);
     return ws.id;

@@ -96,6 +96,11 @@ export const settingsIndex = (): readonly Entry[] => [
   ]),
   group('claude', t('settings.agent.agents'), t('settings.find.agents'), 'sign in install login claude code codex 登录 安装'),
   ...rows('claude', t('settings.agent.agents'), [[t('settings.agent.justNow'), t('settings.find.justNow'), 'check again refresh 重新检查 刷新']]),
+  group('claude', t('autoRoute.title'), t('autoRoute.findDetail'), 'auto route model glm deepseek haiku opus hard 自动 路由 模型 疑难'),
+  ...rows('claude', t('autoRoute.title'), [
+    [t('autoRoute.on'), t('autoRoute.findDetail'), 'auto route autopilot model pick 自动 路由 自动驾驶 选模型'],
+    [t('autoRoute.urgent'), undefined, 'urgent high priority hard opus 紧急 高优先级 疑难'],
+  ]),
   group('claude', t('settings.flags.title'), t('settings.find.flags'), 'args arguments cli flags dangerously skip permissions 启动参数 参数'),
   ...rows('claude', t('settings.flags.title'), [
     ['Claude Code', t('settings.find.flagsClaude'), 'flags arguments cli 参数'],

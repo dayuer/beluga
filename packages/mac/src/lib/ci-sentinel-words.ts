@@ -4,8 +4,8 @@
  * src/core/ci/model.ts); in English these return exactly that, in Chinese they're rebuilt here
  * from the same fields. A kind of trigger not worded here keeps the engine's sentence.
  */
-import { type Sentinel, type Trigger, clockText, hostOf, pausedWords, scheduleSentence } from '@beluga/core/sentinel/model.js';
-import { type RunTone, eventWords, runTone, statusWords } from '@beluga/core/ci/model.js';
+import { type Sentinel, type Trigger, clockText, hostOf, pausedWords, scheduleSentence } from '../../../../src/core/sentinel/model.js';
+import { type RunTone, eventWords, runTone, statusWords } from '../../../../src/core/ci/model.js';
 import type { Locale } from '../../../../src/shared/i18n.js';
 import { type Key, currentLocale, tIn } from '../i18n/index.js';
 

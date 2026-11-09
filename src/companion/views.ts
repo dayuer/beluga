@@ -6,6 +6,7 @@ import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
+import { routedAgent } from '../shared/auto-route.js';
 import { waitingNote } from '../core/friend-share-people.js';
 import { criteria, tally } from '../core/board/criteria.js';
 import { OFFER_DETAIL, offerWords, waitingOn, waitingWords, workingOn, workingWords } from '../core/team/model.js';
@@ -1076,6 +1077,12 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
 /** Where a task may be moved from the phone (board.move): the open statuses and Done, not where it is. */
 const MOVES = ['todo', 'in_progress', 'in_review', 'done', 'backlog', 'canceled'] as const;
 
+/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.51). */
+const autoOf = (state: DomainState, i: Issue): Pick<TaskPageView, 'agent' | 'autoAgent'> => {
+  const routed = isStartable(i) ? routedAgent(i, state) : undefined;
+  return routed ? { agent: agentRefView(routed), autoAgent: true } : {};
+};
+
 export function taskPageView(state: DomainState, id: string, ctx?: ViewContext): TaskPageView | undefined {
   const i = boardIssues(state).find((x) => x.id === id);
   const summary = i ? taskSummary(state, i) : undefined;
@@ -1112,7 +1119,7 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: STATUS_INFO[s].label })),
     // Who works it (BLG-498), shown only (BLG-569): with a worktree on it, the agent and model running
     // there (changed in its conversation); else its own (none: your default). The list is for Start with….
-    ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),
+    ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : autoOf(state, i)),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
   };
 }

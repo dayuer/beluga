@@ -62,7 +62,8 @@ export default function Task() {
   // Who works it (BLG-498), shown only (BLG-569): with a worktree on it (conv), what runs there (changed
   // in its conversation); else its own agent, or your default.
   const defaultLabel = t?.agents?.groups.find((g) => g.isDefault)?.label;
-  const agentWords = t?.agent ? agentName(t.agent, { model: true }) : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
+  // Nobody picked one (1.51, fork): the one auto route gives it, said as such.
+  const agentWords = t?.agent ? `${t.autoAgent ? 'Auto · ' : ''}${agentName(t.agent, { model: true })}` : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
   const agentRuntime = t?.agent?.runtime ?? t?.agents?.groups.find((g) => g.isDefault)?.runtime;
   // The main Start is its own agent's (else yours); Start with… lists every agent, from ⋯.
   const startLabel = t?.agent ? `Start with ${agentName(t.agent)}` : 'Start with your agent';
