@@ -24,6 +24,7 @@
 - **[看得见的回答](#看得见的回答)**：实时表格、图表、示意图和任务卡片，直接出现在对话里。
 - **[你的 agent，和朋友的 agent](#你的-agent和朋友的-agent)**：@ 一位朋友，你的 agent 会请他的 agent 在他的 Mac 上把事办了，前提是他点了允许。
 - **[哨兵](#哨兵)**：一句话描述的工作，按时间或在某件事发生时自动运行，并留下一份报告。
+- **[使用你的其他电脑](#使用你的其他电脑)**：Beluga 应用留在你的 Mac 上，工作在你的 Mac mini、服务器或 Linux 机器上运行。
 - **[在服务器上运行](#在服务器上运行)**：放在一台常开的电脑上，用手机或任意浏览器来使用。
 
 ## 安装
@@ -208,7 +209,7 @@ agent 一边干活，步骤一边出现：它读了哪些文件、跑了哪些�
     <img src="assets/scenes/archive-dark-still.png" alt="归档 fix/safari-scroll：文件夹被删掉，磁盘占用降到 0.6 MB，分支和对话都还在" width="420">
   </picture>
 </p>
-<p align="center"><sub><b>收入</b>：连接 Stripe 后，每个项目都会在工作旁边显示它挣了多少。<b>归档</b>：删掉文件夹，让磁盘保持轻盈；分支和对话都会保留。</sub></p>
+<p align="center"><sub><b>收入</b>：连接 Stripe、RevenueCat 或两者，每个项目都会在工作旁边显示它挣了多少（[怎么算的](docs/earnings.md)，英文）。<b>归档</b>：删掉文件夹，让磁盘保持轻盈；分支和对话都会保留。</sub></p>
 
 <p align="center">
   <img src="assets/mac/hero.png" alt="Mac 版 Beluga：中间是一个工作树里 agent 已完成的运行，右侧面板是它的改动和 diff，侧栏里是项目和好友" width="900">
@@ -237,9 +238,46 @@ agent 一边干活，步骤一边出现：它读了哪些文件、跑了哪些�
 <p align="center"><img src="assets/mac/model.png" alt="模型和思考强度选择器" width="900"><br><sub>每个对话的<b>模型和思考强度</b>，用大白话说明。</sub></p>
 </details>
 
+## 使用你的其他电脑
+
+<p align="center">
+  <picture>
+    <source media="(min-width: 700px)" srcset="assets/scenes/machines-dark.gif">
+    <img src="assets/scenes/machines-dark-still.png" alt="这台 Mac 和你的手机连着你的三台电脑：一台作为 Always On 的 Mac mini、AWS 上的 build-box 和一台 Ubuntu 机器，各有自己的标记。一个任务的“运行于”从这台 Mac 切到 build-box，任务转到那里，步骤实时传回对话和手机；随后 Mac 合上盖子，手机继续跟进直到完成" width="720">
+  </picture>
+</p>
+<p align="center"><sub>Beluga 应用留在你的 Mac 上，工作在你选的电脑上运行。</sub></p>
+
+Beluga 应用留在你面前这台 Mac 上，用它自己的窗口和快捷键。你的其他电脑（一台 Mac mini、一台 AWS 或 Azure 服务器、一台 Linux 机器）负责干活：工作树、Claude Code 运行、计划、哨兵和开发服务器都在那里运行，你的 Mac 和手机实时显示。一个设置就能把所有新工作发到某台电脑（**设置 › 你的电脑 › 新工作运行于**，或选“最合适的”，让最空闲的那台来做），也可以在每个任务的模式和模型旁边，用**运行于**单独选择。
+
+### 添加一台
+
+只要你能 `ssh` 到它，两步就好：
+
+1. 在 Beluga 里，**设置 › 你的电脑 › 添加电脑… › 通过 SSH**：从你的 ssh 配置里选主机（或输入 `you@host`），然后点**添加**。Beluga 会在那里安装自己并启动。
+2. 确认四张图片一致，然后点**加入**。
+
+没有 SSH 的话，在那台电脑上运行 `beluga pair --computer`，改用**链接或代码**。如果那里的 Claude 还没登录，它那一行会提示：[登录一次就好](docs/headless.md#signing-claude-in-on-a-server)（英文）。
+
+那台电脑还没有的项目，会在你第一次把工作发过去时克隆并设置好。项目里的 `.env` 文件会先按名字问过你才会发过去；它的开发服务器会在你 Mac 的 `localhost` 打开；一台从不休眠的电脑可以作为你的 **Always On**，在你的 Mac 合上时替你回应好友。
+
+### 电脑、浏览器还是手机
+
+这不是浏览器里的 Beluga：应用本身的任何东西都不来自那台电脑。只有你做的操作和它显示的内容，通过一条端到端的连接传输，所以应用仍然是你自己的 Mac 应用，这台 Mac 的工作和每台电脑的工作并排显示。
+
+| | 你的电脑 | 浏览器（[见下文](#在服务器上运行)） | 手机 |
+| --- | --- | --- | --- |
+| 什么时候用 | 你在一台装有 Beluga 的 Mac 前 | 设备上没有 Beluga（借来的笔记本、平板） | 你不在电脑旁 |
+| 应用 | 你自己的原生应用 | 由服务器提供 | 手机应用 |
+| 工作在哪里运行 | 你选的电脑，按任务或按默认 | 服务器 | 你的 Mac 或你的电脑 |
+| 开发服务器 | 在你 Mac 的 `localhost` | 在服务器上 | — |
+| 设置 | 通过 SSH 添加，两步 | `beluga web …` 加一个加入链接 | 扫一个二维码 |
+
+了解更多（英文）：[你的电脑](docs/machines.md) · [什么会经过这条连接](docs/security.md#machines-your-computers)
+
 ## 在服务器上运行
 
-Beluga 也能在没有窗口的情况下，运行在一台常开的电脑上：一台 Linux 服务器、一台家用电脑，或者一台 Mac mini。你的项目和 agent 都在那里，你用手机来使用，或者在任意浏览器里打开完整的 Beluga 应用。
+Beluga 也能在没有窗口的情况下，运行在一台常开的电脑上：一台 Linux 服务器、一台家用电脑，或者一台 Mac mini。你的项目和 agent 都在那里，你用手机来使用，或者在任意浏览器里打开完整的 Beluga 应用。如果你的 Mac 上也装了 Beluga，不如把它[添加为你的电脑](#使用你的其他电脑)。
 
 ### 安装和设置
 
@@ -321,6 +359,7 @@ beluga web --off
 | `beluga status` | 是否在运行、版本、项目和手机 |
 | `beluga project add <folder or git URL>` | 添加一个项目（URL 会先被克隆） |
 | `beluga phones` | 列出已配对的手机，或移除一台 |
+| `beluga pair --computer` · `beluga computers` | 让你的 Beluga 应用添加这台服务器；列出你的设备，或在所有地方移除一台 |
 | `beluga logs -f` | 跟踪日志 |
 | `beluga up` · `beluga stop` | 启动、停止 |
 | `beluga update` | 原地更新到最新版本 |
@@ -335,7 +374,7 @@ beluga web --off
 
 引擎（项目、agent、终端、好友）在你电脑的后台运行，应用是通往它的窗口。Claude 通过 [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview) 运行。
 
-了解更多（英文）：[工作原理](docs/how-it-works.md) · [安全](docs/security.md) · [点对点连接](docs/p2p.md) · [更新](docs/updates.md) · [每个操作及其位置](docs/parity.md)
+了解更多（英文）：[工作原理](docs/how-it-works.md) · [安全](docs/security.md) · [点对点连接](docs/p2p.md) · [更新](docs/updates.md) · [每个操作及其位置](docs/parity.md) · [收入](docs/earnings.md)
 
 ## 开发
 

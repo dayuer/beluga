@@ -9,6 +9,7 @@ import { copyText } from '../lib/copy.js';
 import { openSheet } from '../lib/sheets.js';
 import { type ChatPlace, chatPlaceOf, runsFolderOf } from './sentinel-model.js';
 import { t } from '../i18n/index.js';
+import { openFolderThere } from '../lib/remote-open.js';
 
 /** What Sentinel's screens share: the slice, and acting on sentinels with errors as toasts. */
 
@@ -73,7 +74,8 @@ export function useSentinelActions() {
           run: () => void act(async () => (await api.sentinel.runDelete(run.id, what), true), what === 'chat' ? t('sentinel.use.deletedChat') : t('sentinel.use.deletedRun')).then((done) => done && what === 'run' && after?.()),
         }),
       copyJson: (s: Sentinel): void => void copyText(JSON.stringify(s, null, 2)).then(() => toast(client, t('sentinel.use.copiedJson', { name: s.name }), 'success')),
-      openFolder: (path: string): void => void act(() => client.api.local.openFolder(path)),
+      // A sentinel on a computer: its runs folder over Remote-SSH, else its path copied; never opened over there (BLG-852).
+      openFolder: (path: string): void => void act(() => openFolderThere(client, path)),
     };
     return self;
   }, [api, client, actions]);

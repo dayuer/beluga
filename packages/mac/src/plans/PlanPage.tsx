@@ -15,6 +15,7 @@ import { taskChatsItem } from '../layout/plan-task-chats.js';
 import { Button, Empty, IconButton, Segmented, Tip, Working, cx } from '../components/ui.js';
 import { copyText } from '../lib/copy.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
+import { RunsOnLabel } from '../chat/RunsOn.js';
 import { YOUR_AGENT, agentMenuItems, useAgentEntries, useStartWith } from '../components/agent-options.js';
 import { SplitButton } from '../components/SplitButton.js';
 import { agentName, useMyAgent } from '../lib/agent-words.js';
@@ -36,6 +37,9 @@ import p from './plans.module.css';
 import { TeamReviews, usePlanTeamItems } from '../team/SharedPlans.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { revealLabel } from '../lib/os-words.js';
+import { useActions } from '../lib/actions.js';
+import { onMachine } from '../machines/pane-model.js';
+import { useMoveTo } from './move-to.js';
 
 const PlanCanvas = lazy(() => import('./PlanCanvas.js'));
 
@@ -80,6 +84,26 @@ export function PlanPage({ id, task }: { id: string; task?: string }) {
   }, [view, picked]);
   if (!plan || !view) return <Empty icon="flag" title={t('plans.page.gone')} detail={t('plans.page.goneDetail')} action={<Button onClick={() => openList()}>{t('plans.page.backToPlans')}</Button>} />;
   return <Page view={view} prefs={prefs} setPrefs={setPrefs} picked={picked} setPicked={setPicked} />;
+}
+
+/** It moved to another computer (BLG-806): this is its record here; it runs there. */
+function MovedAway({ plan }: { plan: Plan }) {
+  const t = useT();
+  const actions = useActions();
+  const to = plan.movedTo;
+  if (!to) return null;
+  const page = { kind: 'plan' as const, id: to.planId ?? plan.id };
+  return (
+    <div className={p.changes} role="status">
+      <Icon name="send" size={13} />
+      <strong>{t('plans.page.movedTo', { name: to.name })}</strong>
+      <span>{t('plans.page.movedBody')}</span>
+      <span className={p.grow} />
+      <Button size="small" onClick={() => actions.run({ type: 'view', view: to.id ? onMachine(to.id, page) : page })}>
+        {t('plans.page.openThere')}
+      </Button>
+    </div>
+  );
 }
 
 /**
@@ -289,6 +313,8 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
   })();
 
   const teamItems = usePlanTeamItems(plan.id, plan.projectId);
+  // Move To ▸ another computer of yours (BLG-806): Pause and Move To while something runs in it.
+  const moveTo = useMoveTo(plan, view, step);
   // Agent for Its Work ▸ (BLG-498): who works what starts from now on; milestones at work keep theirs (the toast says so).
   const workAgent = (v: string): void =>
     void act(() => api.setWorkAgent(plan.id, v === YOUR_AGENT ? null : agentForChoice(v, runtimes))).then((said) => {
@@ -331,6 +357,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     ...(conflictHere ? [{ label: revealLabel('Conflict'), onSelect: () => void act(() => api.showConflict(plan.id)) }] : []),
     ...(plan.status === 'active' ? [taskChatsItem(plan.id, uiPrefs)] : []),
     ...teamItems,
+    ...(moveTo ? [moveTo] : []),
     { label: t('plans.page.copyMarkdown'), separate: true, onSelect: () => void copyText(markdownOf(view)) },
     { label: t('plans.page.planningStyle'), onSelect: () => openSheet({ kind: 'plan_style' }) },
     ...(plan.draft ? [{ label: plan.body ? t('plans.page.discardChanges') : t('plans.page.discardDraft'), danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: plan.body ? t('plans.page.discardChangesTitle') : t('plans.page.discardDraftTitle'), message: plan.body ? t('plans.page.discardChangesMessage') : t('plans.page.discardDraftMessage'), confirm: t('plans.page.discard'), destructive: true, run: () => void act(() => api.discard(plan.id)) }) }] : []),
@@ -355,6 +382,8 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           )}
         </div>
         <div className={p.headActions}>
+          {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
+          <RunsOnLabel tip={t('plans.page.runsOnTip')} />
           {/* The plan's pull request, always one click from GitHub, with what stands in its way. */}
           {pr ? <PlanPrChip pr={pr} /> : null}
           {/* How it runs: nothing to run while Claude writes it. A real decision: its sheet says what changes. */}
@@ -403,6 +432,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           ) : null}
         </div>
       ) : null}
+      <MovedAway plan={plan} />
       <ConflictLine view={view} onShow={setPicked} />
       <MergeFailed view={view} onPass={(id, title) => void step.run(t('plans.page.step.pass', { title }), t('plans.page.step.passing'), () => api.pass(plan.id, id))} />
       <LimitPause view={view} />

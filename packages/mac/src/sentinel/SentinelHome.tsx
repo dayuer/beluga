@@ -1,3 +1,6 @@
+import { RemoteList } from '../machines/RemoteList.js';
+import { remoteDashboards, remoteSentinels } from '../machines/remote-work.js';
+import { useRemoteSources } from '../machines/use-remote.js';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { CLAUDE_CHANGED, FIRST_SENTINEL_CHAT, MAX_RUN_AT_ONCE, RUN_STATE_INFO, type RunSummary, type Sentinel, type SentinelState, lastRunOf, pausedWords, sentinelChatChannel } from '@beluga/core/sentinel/model.js';
 import { Icon } from '../components/Icon.js';
@@ -21,6 +24,7 @@ import { sentinelMenu, useRunsFolder, useSentinelActions, useSentinelState, type
 import s from './home.module.css';
 import { thisComputer } from '../lib/os-words.js';
 import { useT } from '../i18n/index.js';
+import { useOpenFolderLabel } from '../lib/remote-open.js';
 
 /**
  * Sentinel, one page (BLG-300): what needs you, your board's numbers at a glance, and every
@@ -169,6 +173,8 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
   const needs = needsOf(state, scoped);
   const shown = filterSentinels(state.items, { ...(scoped ? { scope: scoped } : {}), show: 'all', query });
   const groups = groupSentinels(shown, projects);
+  // A sentinel on a computer: its runs folder in your editor over Remote-SSH, else its path copied (BLG-852).
+  const runsFolder = useOpenFolderLabel(t('sentinel.home.runsFolder'), t('sentinel.home.copyRunsFolder'));
   const more: ActionItem[] = [
     {
       label: t('sentinel.home.runAtOnce'),
@@ -176,7 +182,7 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
       submenu: Array.from({ length: MAX_RUN_AT_ONCE }, (_, i) => i + 1).map((n) => ({ label: t('sentinel.home.atOnce', { n }), checked: state.runAtOnce === n, onSelect: () => void a.act(() => a.api.setRunAtOnce(n)) })),
       onSelect: () => undefined,
     },
-    ...(folder ? [{ label: t('sentinel.home.runsFolder'), icon: 'folder' as const, hint: t('sentinel.home.runsFolderHint'), onSelect: () => a.openFolder(folder) }] : []),
+    ...(folder ? [{ label: runsFolder, icon: 'folder' as const, hint: t('sentinel.home.runsFolderHint'), onSelect: () => a.openFolder(folder) }] : []),
   ];
   const projectOf = (id: string | undefined) => projects.find((p) => p.id === id);
   return (
@@ -261,6 +267,22 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
           </div>
         )}
       </section>
+      {/* Sentinels and dashboards on your computers (BLG-785). */}
+      <RemoteSentinels />
+    </>
+  );
+}
+
+/** Your computers' sentinels and dashboards, tagged. */
+function RemoteSentinels() {
+  const tr = useT();
+  const sources = useRemoteSources();
+  const sentinels = useMemo(() => remoteSentinels(sources).map((t) => ({ ...t, item: { id: t.item.id, title: t.item.name, sub: [t.item.project, t.item.paused ? tr('sentinel.home.remotePaused') : undefined].filter(Boolean).join(' · '), page: { kind: 'sentinel_page' as const, id: t.item.id } } })), [sources, tr]);
+  const dashboards = useMemo(() => remoteDashboards(sources).map((t) => ({ ...t, item: { id: t.item.id, title: t.item.name, page: { kind: 'dashboard' as const, id: t.item.id } } })), [sources]);
+  return (
+    <>
+      <RemoteList title={tr('sentinel.home.remoteSentinels')} rows={sentinels} />
+      <RemoteList title={tr('sentinel.home.remoteDashboards')} rows={dashboards} />
     </>
   );
 }

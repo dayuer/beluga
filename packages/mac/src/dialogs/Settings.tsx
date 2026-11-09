@@ -48,6 +48,7 @@ import { MenuBarSettings } from './MenuBarSettings.js';
 import { NetworkSettings } from '../network/NetworkSettings.js';
 import { befriend, openFriendCard } from '../network/use-net.js';
 import { PhoneSettings } from '../phone/Phone.js';
+import { MachinesSettings } from './MachinesSettings.js';
 import { AccessSettings } from '../gateway/AccessSettings.js';
 import { UpdateAboutRow, UpdateSettingsGroup } from './UpdateSettings.js';
 import { GITHUB_URL, openSupport } from '../lib/support.js';
@@ -691,6 +692,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
   environment: EnvironmentSettings,
   people: People,
   phone: PhoneSettings,
+  computers: MachinesSettings,
   voice: VoiceSettings,
   keyboard: KeyboardSettings,
   advanced: Advanced,

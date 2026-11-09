@@ -59,7 +59,7 @@ export default function Plan() {
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  // Who checks its milestones and reviews its drafts (1.48): its own pick, else the agent for its work.
+  // Who checks its milestones and reviews its drafts (1.50): its own pick, else the agent for its work.
   const checkWords = p?.checkAgent ? agentName(p.checkAgent, { model: true }) : 'Same as its work';
   const setCheckAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanCheckAgent(id ?? '', agent, label)).then(

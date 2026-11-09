@@ -7,7 +7,7 @@ import type { UiStore } from '../lib/beluga.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { openSettings } from '../lib/native-routes.js';
 import { openSheet } from '../lib/sheets.js';
-import { openStripe } from '../lib/earnings.js';
+import { openEarnings } from '../lib/earnings.js';
 import { openSupport } from '../lib/support.js';
 import { SHOW_WELCOME } from '../onboarding/onboarding-model.js';
 import { previewRequestPopup } from '../gateway/request-native.js';
@@ -107,7 +107,7 @@ export function paletteCommands(ctx: Ctx): PaletteCommand[] {
     ...(state.myShares.length ? [cmd('unshare', 'unshare', t('dialogs.cmd.unshare'), 'share', () => ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: state.myShares }))] : []),
     cmd('name', 'name', t('dialogs.cmd.name'), 'person', () => openSettings(ui, 'general', 'settings-name'), state.self?.name ? t('dialogs.cmd.nameNow', { name: state.self.name }) : undefined),
     cmd('people', 'people', t('dialogs.cmd.people'), 'people', () => openSettings(ui, 'people'), t('dialogs.cmd.peopleHint')),
-    stripeCommand(state),
+    earningsCommand(state),
     { id: 'cmd:support', label: t('dialogs.cmd.support'), icon: 'cup', hint: t('dialogs.cmd.supportHint'), keywords: ['support', 'coffee', 'donate', 'tip', 'sponsor', 'star', 'github'], run: () => openSupport('coffee') },
     cmd('env', 'env', t('dialogs.cmd.env'), 'lock', () => openSettings(ui, 'environment'), t('dialogs.cmd.envHint')),
     cmd('shell', 'shell', t('dialogs.cmd.shell'), 'terminal', () => openSettings(ui, 'terminal'), t('dialogs.cmd.shellHint')),
@@ -131,17 +131,17 @@ export function paletteCommands(ctx: Ctx): PaletteCommand[] {
   ];
 }
 
-/** Connect Stripe (or see the earnings) for the project on screen, or pick one in the sheet. */
-function stripeCommand(state: AppState): PaletteCommand {
+/** Connect earnings (or see them) for the project on screen, or pick one in the sheet. */
+function earningsCommand(state: AppState): PaletteCommand {
   const ws = state.view.kind === 'workspace' ? findWorkspace(state.projects, state.view.id) : undefined;
   const project = state.projects.find((p) => p.root && p.id === ws?.projectId);
-  const connected = project ? Boolean(state.earnings[project.root]) : false;
+  const connected = project ? Boolean(state.earnings[project.root] || state.revenuecat[project.root]) : false;
   return {
-    id: 'cmd:stripe',
-    label: project ? (connected ? t('dialogs.cmd.earnings', { name: project.name }) : t('dialogs.cmd.connectStripeTo', { name: project.name })) : t('dialogs.cmd.connectStripe'),
+    id: 'cmd:earnings',
+    label: project ? (connected ? t('dialogs.cmd.earnings', { name: project.name }) : t('dialogs.cmd.connectEarningsTo', { name: project.name })) : t('dialogs.cmd.connectEarnings'),
     hint: t('dialogs.cmd.stripeHint'),
     icon: 'coin',
-    keywords: ['stripe', 'earnings', 'revenue', 'money', 'sales'],
-    run: () => openStripe(project?.id),
+    keywords: ['stripe', 'revenuecat', 'earnings', 'revenue', 'money', 'sales'],
+    run: () => openEarnings(project?.id),
   };
 }

@@ -338,7 +338,7 @@ export const common_components: Translation<typeof en> = {
   'common.controls.label': '控件',
   'common.updatePill.idleTip': '你离开时自动安装',
   'common.updatePill.idle': '空闲时',
-  'common.earningsPill.counting': '正在从 Stripe 统计总收入…',
+  'common.earningsPill.counting': '正在从 {sources} 统计总收入…',
   'common.earningsPill.head': '总收入 · {when}',
   'common.earningsPill.updating': '更新中…',
   'common.earningsPill.updated': '{ago}更新',
@@ -347,7 +347,7 @@ export const common_components: Translation<typeof en> = {
   'common.earningsPill.test': '测试模式',
   'common.earningsPill.aria': '总收入 {amount}',
   'common.earningsPill.ariaAbout': '总收入约 {amount}',
-  'common.earningsPill.problem': 'Stripe 收入：出了问题',
+  'common.earningsPill.problem': '收入：出了问题',
   'common.earningsPill.countingShort': '正在统计收入',
   'common.formSheet.folder': '文件夹',
   'common.formSheet.chooseFolder': '选择文件夹',
@@ -360,4 +360,5 @@ export const common_components: Translation<typeof en> = {
   'common.videoPlayer.detail': '应用不支持它的格式或编码。请用对应的应用打开。',
   'common.zoomAvatar.see': '查看 {name} 的头像',
   'common.ui.working': '处理中',
+  'common.earningsPill.countingPart': '统计中…',
 };

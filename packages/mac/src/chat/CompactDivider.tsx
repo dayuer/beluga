@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
-import { useApp } from '../lib/beluga.js';
+import { useApp, useScopedKey } from '../lib/beluga.js';
 import { type CompactItem, dividerText } from './context-model.js';
 import { Markdown } from './Markdown.js';
 import { useT } from '../i18n/index.js';
@@ -16,7 +16,8 @@ const opened = new Set<string>();
  */
 export const CompactDivider = memo(function CompactDivider({ item }: { item: CompactItem }) {
   const t = useT();
-  const [open, setOpen] = useState(() => opened.has(item.id));
+  const key = useScopedKey(item.id);
+  const [open, setOpen] = useState(() => opened.has(key));
   // "Compacting…" only while Claude still is (a daemon that quit mid-way leaves it unfinished).
   const live = useApp((st) => Boolean(st.context[item.channel]?.compacting));
   const m = item.compact;
@@ -25,8 +26,8 @@ export const CompactDivider = memo(function CompactDivider({ item }: { item: Com
   const text = dividerText(item, !live);
   const toggle = (): void => {
     const next = !open;
-    if (next) opened.add(item.id);
-    else opened.delete(item.id);
+    if (next) opened.add(key);
+    else opened.delete(key);
     setOpen(next);
   };
   return (

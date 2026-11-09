@@ -70,7 +70,7 @@ const runsKey = (id: string): string => `sentinel-runs:${id}`;
 /**
  * Under the Sentinel row (BLG-570), as running plans are under Work: the sentinels, each opening its
  * page and unfolding to its runs (BLG-576), newest first. `all`: every one that's on; else only
- * those running, waiting for you, or whose last run failed.
+ * those running, waiting for you, whose last run failed, or that stopped on their own.
  */
 export function SentinelSideRows({ all }: { all: boolean }) {
   const enabled = useApp((st) => st.sentinel.enabled);
@@ -88,12 +88,12 @@ export function SentinelSideRows({ all }: { all: boolean }) {
 function SentinelSideRow({ item }: { item: SideSentinel }) {
   const actions = useActions();
   const a = useSentinelActions();
-  const { sentinel, live, needs, failed, runs } = item;
+  const { sentinel, live, needs, failed, broken, runs } = item;
   const open = useUi((u) => u.collapsed.includes(runsKey(sentinel.id)));
   const selected = useApp((st) => st.view.kind === 'sentinel_page' && st.view.id === sentinel.id);
   const toggle = (): void => actions.run({ type: 'toggle_fold', key: runsKey(sentinel.id) });
   const t = useT();
-  const tip = needs ? t('sentinel.model.need.waits', { name: sentinel.name }) : live ? t('sentinel.use.running', { name: sentinel.name }) : failed ? t('sentinel.nav.lastFailed', { name: sentinel.name }) : t('sentinel.nav.runs', { name: sentinel.name, n: runs.length });
+  const tip = needs ? t('sentinel.model.need.waits', { name: sentinel.name }) : live ? t('sentinel.use.running', { name: sentinel.name }) : broken ? t('sentinel.nav.broken', { name: sentinel.name, why: broken }) : failed ? t('sentinel.nav.lastFailed', { name: sentinel.name }) : t('sentinel.nav.runs', { name: sentinel.name, n: runs.length });
   return (
     <>
       <Row
@@ -125,7 +125,7 @@ function SentinelSideRow({ item }: { item: SideSentinel }) {
             toggle();
           }
         }}
-        trailing={live ? <DotMark tone="claude" live signal="working" /> : needs ? <DotMark tone="warn" signal="needs" /> : failed ? <Icon name="alert" size={12} className={s.alert} /> : null}
+        trailing={live ? <DotMark tone="claude" live signal="working" /> : needs ? <DotMark tone="warn" signal="needs" /> : failed || broken ? <Icon name="alert" size={12} className={s.alert} /> : null}
       />
       {open ? <SideRuns sentinelId={sentinel.id} runs={runs} /> : null}
     </>

@@ -851,4 +851,7 @@ export const network = {
   'gateway.native.declined': 'Declined',
   'gateway.native.approved': 'Approved',
   'gateway.native.couldnt': 'Couldn\'t answer it: {error}',
+  'network.view.seen': 'Seen',
+  'network.settings.seen': 'Say when you’ve seen a message',
+  'network.settings.seenDetail': 'Friends see Seen under their message once it was on your screen here or on your phone. Off, they only see Delivered.',
 } as const satisfies Record<string, string | ((v: Vars) => string)>;

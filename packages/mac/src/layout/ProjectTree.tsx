@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon.js';
 import { ActionsContext, ActionsDropdown, SpecContext, SpecDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { ProjectIcon } from '../components/ProjectIcon.js';
 import { EarningsPill } from '../components/EarningsPill.js';
-import { stripeMenuItem } from '../lib/earnings.js';
+import { earningsMenuItem } from '../lib/earnings.js';
 import { Badge, Dot, IconButton, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { inApp, webServed } from '../lib/boot.js';
@@ -32,6 +32,9 @@ import { type Tally, groupTally, groupWorking, projectPlans, projectTally, proje
 import { TallyMark } from './signal-marks.js';
 import { Row } from './sidebar-parts.js';
 import { WorkspaceRow } from './workspace-row.js';
+import { RemoteProjects, RemoteWorkRows } from '../machines/RemoteRows.js';
+import { useRemoteSources } from '../machines/use-remote.js';
+import { remoteWorkIn } from '../machines/remote-work.js';
 import { PlanRow } from './plan-row.js';
 import { LaterRows, laterOf, notLater, useLater } from './later-rows.js';
 import { useGitHubMenuItems } from '../views/project/GitHubRow.js';
@@ -156,7 +159,7 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
   const board = useApp((st) => st.board);
   const state = useMemo(() => ({ plans: plansState, board }), [plansState, board]);
   const putOff = useLater();
-  const earning = useApp((st) => Boolean(st.earnings[p.root]));
+  const earning = useApp((st) => Boolean(st.earnings[p.root] || st.revenuecat[p.root]));
   const busy = useApp((st) => projectWorking(st, p));
   // What's inside: how many conversations have news, and whether one needs you (folded, it's how you notice).
   const tallyKey = useApp((st) => {
@@ -206,12 +209,14 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
   const importItem: ActionItem[] = p.root ? [{ label: t('layout.projectTree.import'), icon: 'claude', onSelect: () => openSheet({ kind: 'import_conversation', projectId: p.id }) }] : [];
   // Its variables and its main folder's .env, without going through Settings (BLG-369).
   const envItem: ActionItem[] = p.root ? [{ label: t('layout.projectTree.environment'), icon: 'lock', onSelect: () => openSheet({ kind: 'project_env', projectId: p.id }) }] : [];
-  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), stripeMenuItem(p, earning), ...githubItems, ...iconItems, { label: t('layout.projectTree.hide'), danger: true, separate: true, onSelect: () => hide(p) }, { label: t('layout.projectTree.delete'), danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
+  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), earningsMenuItem(p, earning), ...githubItems, ...iconItems, { label: t('layout.projectTree.hide'), danger: true, separate: true, onSelect: () => hide(p) }, { label: t('layout.projectTree.delete'), danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
   const kids = depth + 2;
   // Nothing to unfold: no arrow (its place kept, so the icons stay in line).
   const sessions = useCcSessions();
   const origins = useAgentOrigins();
-  const foldable = useMemo(() => plans.length > 0 || hasRowsInside(p, sessions, origins), [plans.length, p, sessions, origins]);
+  const remote = useRemoteSources();
+  const elsewhere = useMemo(() => remoteWorkIn(p.name, remote).length > 0, [p.name, remote]);
+  const foldable = useMemo(() => plans.length > 0 || elsewhere || hasRowsInside(p, sessions, origins), [plans.length, elsewhere, p, sessions, origins]);
   return (
     <div data-chats-folded={fold.folded || undefined}>
       <SpecContext menu={{ kind: 'project', id: p.id }} extra={extra} hide={ownWay}>
@@ -287,6 +292,7 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
         <>
           {plans.filter((x) => x.id === inPlan).map((x) => <PlanRow key={x.id} plan={x} indent={kids} />)}
           {live.filter((w) => w.id === here && w.kind !== 'main' && !isPlanOwned(state, w.id)).map((w) => <WorkspaceRow key={w.id} ws={w} indent={kids} />)}
+          <RemoteWorkRows name={p.name} indent={kids} onlyHere />
         </>
       ) : (
         <>
@@ -303,6 +309,8 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
           ))}
           {/* Worktrees made outside Beluga: after Beluga's own, most recent first, each with where it is. */}
           <OutsideWorktrees p={p} indent={kids} />
+          {/* The same project's worktrees and chats on your computers, each with its computer (BLG-785). */}
+          <RemoteWorkRows name={p.name} indent={kids} />
           {/* Sub-agents the main folder's conversations started (Claude's helpers, none of your worktrees or chats): behind one row. */}
           {main ? <ProjectAgents p={p} ws={main} indent={kids} /> : null}
           <LaterRows list={later} indent={kids} foldKey={`later:${p.id}`} />
@@ -371,6 +379,7 @@ export function ProjectsAddMenu() {
   const items: ActionItem[] = [
     { label: t('layout.projectTree.addProjects'), keys: shortcutKeys('add-project'), onSelect: () => actions.run({ type: 'add_project' }) },
     { label: t('layout.projectTree.newProject'), onSelect: () => ui.patch({ addProject: 'new' }) },
+    { label: t('layout.projectTree.clone'), onSelect: () => ui.patch({ addProject: 'clone' }) },
     { label: t('layout.projectTree.newGroup'), onSelect: () => newEmptyGroup() },
   ];
   return (
@@ -393,6 +402,8 @@ function useSpringLoad(group: string | undefined, folded: boolean): void {
 export function Projects() {
   const actions = useActions();
   const t = useT();
+  const names = useApp((st) => st.projects.map((p) => p.name).join('\n'));
+  const localNames = useMemo(() => new Set(names.split('\n')), [names]);
   const { ui } = useBeluga();
   const { entries } = useLayout();
   const arrange = useArrange();
@@ -468,6 +479,8 @@ export function Projects() {
           {entries.length || creating ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label={t('layout.projectTree.addProject')} onClick={() => actions.run({ type: 'add_project' })} />}
         </div>
       </ActionsContext>
+      {/* Your computers' projects this Mac doesn't have (BLG-785). */}
+      <RemoteProjects local={localNames} />
       <HiddenProjects />
     </>
   );

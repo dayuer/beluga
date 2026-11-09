@@ -1,3 +1,6 @@
+import { RemoteList } from '../machines/RemoteList.js';
+import { remotePlans } from '../machines/remote-work.js';
+import { useRemoteSources } from '../machines/use-remote.js';
 import { useEffect, useMemo } from 'react';
 import type { Plan } from '@beluga/core/plans/model.js';
 import { Icon } from '../components/Icon.js';
@@ -96,6 +99,8 @@ export function PlansView() {
         />
       )}
       <SharedPlansList projectId={here.id} />
+      {/* The same project's plans on your computers (BLG-785). */}
+      <RemotePlans project={here.name} />
     </div>
   );
 }
@@ -122,3 +127,12 @@ function PlanRow({ plan }: { plan: Plan }) {
     </li>
   );
 }
+
+/** The plans of the project of this name on your computers, tagged. */
+function RemotePlans({ project }: { project: string }) {
+  const t = useT();
+  const sources = useRemoteSources();
+  const rows = useMemo(() => remotePlans(sources).filter((t) => t.item.project === project).map((t) => ({ ...t, item: { id: t.item.id, title: t.item.title, sub: t.item.status, page: { kind: 'plan' as const, id: t.item.id } } })), [sources, project]);
+  return <RemoteList title={t('plans.view.onComputers')} rows={rows} />;
+}
+

@@ -849,4 +849,7 @@ export const network: Translation<typeof en> = {
   'gateway.native.declined': '已拒绝',
   'gateway.native.approved': '已批准',
   'gateway.native.couldnt': '无法答复：{error}',
+  'network.view.seen': '已读',
+  'network.settings.seen': '告诉对方你已读消息',
+  'network.settings.seenDetail': '消息显示在你这里或手机屏幕上后，好友会在消息下看到“已读”。关闭后，他们只会看到“已送达”。',
 };

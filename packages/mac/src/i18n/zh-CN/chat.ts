@@ -628,4 +628,23 @@ export const chat: Translation<typeof en> = {
   'chat.stepRow.showWhat': '显示运行了什么、返回了什么',
   'chat.stepRow.loading': '正在加载…',
   'chat.stepRow.gone': 'Beluga 已经没有这一步的详情了。',
+  // RunsOn
+  'chat.runsOn.words': '运行于',
+  'chat.runsOn.named': '运行于 {name}',
+  'chat.runsOn.namedWhy': '运行于 {name}：{why}',
+  'chat.runsOn.waits': '能运行之前什么都不会开始：{why}',
+  'chat.runsOn.folderHere': '这个文件夹在{here}上',
+  'chat.runsOn.tip': '新工作可以在别的电脑上运行。',
+  // attachments, use-attachments
+  'chat.attach.stopped': '上传停住了，请重新发送',
+  'chat.attach.notChecked': '无法检查',
+  'chat.attach.envTitle': '把 {names} 发送到 {machine}？',
+  'chat.attach.envMessage': '其中含有机密。它们会通过你的加密链接发送，仅用于这条消息。',
+  'chat.attach.sendOnce': '只发送这一次',
+  'chat.attach.dontSend': '不发送',
+  'chat.attach.staysHere': '{name} 留在这台 Mac 上：{reason}',
+  'chat.attach.sendFailed': '无法发送 {name}：{error}',
+  'chat.attach.thatComputer': '那台电脑',
+  'chat.attach.sending': '正在发送 {name}',
+  'chat.attach.sendingTo': '正在把 {name} 发送到这个聊天运行的电脑',
 };

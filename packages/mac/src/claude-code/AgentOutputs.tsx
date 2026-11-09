@@ -12,7 +12,8 @@ import { followed, isFresh, timeAgo } from '../layout/panel/scratch-model.js';
 import { type Places, howLabel, outputsKey, placeOf } from './outputs-model.js';
 import s from './agent-outputs.module.css';
 import { everyWhileShown } from '../lib/window-active.js';
-import { revealLabel } from '../lib/os-words.js';
+import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
+import { useMachine } from '../lib/beluga.js';
 
 /**
  * A sub-agent's Outputs: what it made or looked at while it worked (screenshots, test output,
@@ -90,6 +91,8 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
   const api = useApi();
   const t = useT();
   const { client } = useBeluga();
+  // On a computer's page: Download for a file, Copy Path for a folder (BLG-852).
+  const revealFile = useRevealFileLabel();
   const now = useNow();
   const [file, setFile] = useState<CcOutputFile | null>();
   useEffect(() => {
@@ -122,7 +125,7 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
         </span>
         <span className={s.flex} />
         <IconButton icon="external" label={t('claudeCode.outputs.openWith')} onClick={() => void openWithDefaultApp(client, item.path)} />
-        <IconButton icon="folder" label={revealLabel()} onClick={() => void revealInFinder(client, item.path)} />
+        <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, item.path)} />
         <IconButton icon="x" label={t('claudeCode.outputs.close')} keys="Esc" onClick={onClose} />
       </div>
       {dir ? <div className={cx(s.previewPath, 'selectable')} title={item.path}>{dir}</div> : null}
@@ -157,6 +160,8 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
 export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: string; agentId: string; list: CcOutputs | undefined; cwd?: string }) {
   const { client } = useBeluga();
   const t = useT();
+  const revealFolder = useRevealLabel(t('claudeCode.outputs.itsFolder'));
+  const machine = useMachine();
   const now = useNow();
   const [follow, setFollow] = useState(true);
   const [picked, setPicked] = useState<string>();
@@ -208,7 +213,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
                 action: (
                   <EmptyActions>
                     <Button icon="folder" title={list.scratch} onClick={() => void revealInFinder(client, list.scratch!)}>
-                      {t('claudeCode.outputs.showFolder')}
+                      {machine ? t('common.blocks.copyPath') : t('claudeCode.outputs.showFolder')}
                     </Button>
                   </EmptyActions>
                 ),
@@ -238,7 +243,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
               { value: 'pinned', label: t('claudeCode.outputs.picked'), hint: t('claudeCode.outputs.pickedHint') },
             ]}
           />
-          {list.scratch ? <IconButton icon="folder" label={revealLabel('Its Folder')} onClick={() => void revealInFinder(client, list.scratch!)} /> : null}
+          {list.scratch ? <IconButton icon="folder" label={revealFolder} onClick={() => void revealInFinder(client, list.scratch!)} /> : null}
         </div>
         <div ref={listRef} className={s.list} role="listbox" aria-label={t('claudeCode.monitor.outputs')} tabIndex={0} onKeyDown={onKey}>
           {files.map((f) => {
