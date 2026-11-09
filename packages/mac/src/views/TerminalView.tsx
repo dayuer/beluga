@@ -1,4 +1,5 @@
-import { githubId, runId, setupId, shellId, terminalLabel } from '@beluga/shared/terminal-keys.js';
+import { githubId, runId, setupId, shellId } from '@beluga/shared/terminal-keys.js';
+import { terminalTabLabel } from '../lib/shells.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { Icon } from '../components/Icon.js';
 import { Button, Dot, Empty, IconButton, Tip } from '../components/ui.js';
@@ -42,7 +43,7 @@ export function TerminalView() {
             <TerminalTab
               key={k}
               termKey={k}
-              label={terminalLabel(k, termNames)}
+              label={terminalTabLabel(k, termNames)}
               on={k === key}
               className={s.tab}
               onClassName={s.tabOn}

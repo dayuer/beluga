@@ -1,0 +1,4 @@
+/* 系统权限提示的中文（Info.plist 里的英文原文对应）。 */
+NSAppleEventsUsageDescription = "你让 Claude 帮忙时，它可以替你操作其他应用，比如访达或 Safari。";
+NSMicrophoneUsageDescription = "Beluga 会在这台 Mac 上把你说的话转成文字，让你用说话代替打字和 Claude 交流；和好友通话时也会传送你的声音。录音只在这里转写，从不离开你的 Mac。";
+NSCameraUsageDescription = "和好友通话时，Beluga 会把你的摄像头画面从这台 Mac 直接传给对方。";

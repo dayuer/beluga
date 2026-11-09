@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Icon } from '../components/Icon.js';
 import s from './undo-toast.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * "Hidden api — Undo": something you did that's easy to take back says so for a few
@@ -29,6 +30,7 @@ export function showUndo(text: string, undo: () => void): void {
 const editing = (el: Element | null): boolean => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
 
 export function UndoToast() {
+  const tr = useT();
   const toast = useSyncExternalStore(
     (l) => {
       listeners.add(l);
@@ -65,7 +67,7 @@ export function UndoToast() {
             toast.undo();
           }}
         >
-          Undo
+          {tr('more.undo')}
         </button>
       </div>
     </div>

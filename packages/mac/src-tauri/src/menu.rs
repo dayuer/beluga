@@ -214,7 +214,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item(app, "zoom-out", "Smaller Text", Some("CmdOrCtrl+-"))?,
             &item(app, "zoom-reset", "Actual Size", Some("CmdOrCtrl+0"))?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::fullscreen(app, None)?,
+            &pre("predefined.fullscreen", PredefinedMenuItem::fullscreen(app, None)?),
         ],
     )?;
     let go = Submenu::with_id_and_items(

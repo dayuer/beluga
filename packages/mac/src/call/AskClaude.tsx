@@ -1,4 +1,4 @@
-import { useT } from '../i18n/index.js';
+import { t as tNow, useT } from '../i18n/index.js';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { CallView } from '@beluga/shared/calls.js';
 import type { MessageView } from '@beluga/net/mesh/views.js';
@@ -26,7 +26,7 @@ const MAX_SIDE = 1800;
 export async function capture(video: HTMLVideoElement, region: Region, ink: Ink, colorOf: (peerId: string) => string): Promise<Blob> {
   const W = video.videoWidth;
   const H = video.videoHeight;
-  if (!W || !H) throw new Error('The screen isn’t showing yet');
+  if (!W || !H) throw new Error(tNow('more.call.screenNotShowing'));
   const full = document.createElement('canvas');
   full.width = W;
   full.height = H;
@@ -47,7 +47,7 @@ export async function capture(video: HTMLVideoElement, region: Region, ink: Ink,
   out.width = Math.round(sw * scale);
   out.height = Math.round(sh * scale);
   out.getContext('2d')!.drawImage(full, sx, sy, sw, sh, 0, 0, out.width, out.height);
-  return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Couldn’t take the picture'))), 'image/png'));
+  return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error(tNow('more.call.couldntTakePicture')))), 'image/png'));
 }
 
 const base64 = async (blob: Blob): Promise<string> => {
@@ -74,9 +74,11 @@ export function AskBox({ call, region, anchor, video, ink, sharer, done }: { cal
     setBusy(true);
     try {
       const blob = await capture(video, region, ink, personColor);
-      const file = await client.api.network['files.addData'](`${sharer === 'your' ? 'Your' : sharer.replace(/’s$/, '')} screen.png`, await base64(blob));
-      const words = text.trim() || (whole ? 'What’s on this screen? Anything that looks wrong?' : 'What’s this part of the screen? Anything that looks wrong?');
-      const sent = (await client.api.network.post(call.conversation, { text: `${words}\n\n_About ${sharer} shared screen, in the call._`, files: [file as never], ask: [me] })) as MessageView;
+      const who = sharer.replace(/’s$/, '');
+      const file = await client.api.network['files.addData'](sharer === 'your' ? t('more.call.yourScreenFile') : t('more.call.theirScreenFile', { name: who }), await base64(blob));
+      const words = text.trim() || (whole ? t('more.call.askWhole') : t('more.call.askPart'));
+      const about = sharer === 'your' ? t('more.call.aboutYourScreen') : t('more.call.aboutTheirScreen', { name: who });
+      const sent = (await client.api.network.post(call.conversation, { text: `${words}\n\n${about}`, files: [file as never], ask: [me] })) as MessageView;
       engine.stageSend({ k: 'asked', by: me, ask: sent.id, box: [region.x, region.y, region.w, region.h] });
       done();
     } catch (err) {

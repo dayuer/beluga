@@ -7,18 +7,21 @@ import { Checkbox, Field, FormSheet, Popup, SourceTag, TextInput } from '../../c
 import { agentName, useMyAgent } from '../../lib/agent-words.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import type { NativeMenuProps } from './index.js';
+import { type Key, t as tNow, useT } from '../../i18n/index.js';
 
 type Kind = 'setup' | 'run';
 type Source = NonNullable<ResolvedScripts['setup']>['source'];
 
-const SOURCE: Record<Source, { label: string; tone: 'team' | 'mine' | 'guess'; detail: string }> = {
-  yours: { label: 'Your settings', tone: 'mine', detail: 'Only you have it' },
-  claude: { label: 'By your agent', tone: 'guess', detail: 'Your agent worked it out from the project (only you have it). Change it if it’s wrong' },
-  'beluga.json': { label: 'beluga.json', tone: 'team', detail: 'Shared with everyone on the project' },
-  'klaud.json': { label: 'klaud.json', tone: 'team', detail: 'Shared with everyone on the project' },
-  'conductor.json': { label: 'conductor.json', tone: 'team', detail: 'A setup file in the project, shared with everyone on it' },
-  detected: { label: 'Guessed', tone: 'guess', detail: 'Beluga guessed it from the project. Change it if it’s wrong' },
+const SOURCE: Record<Source, { label: Key | string; tone: 'team' | 'mine' | 'guess'; detail: Key }> = {
+  yours: { label: 'more.project.source.yours', tone: 'mine', detail: 'more.project.source.yoursDetail' },
+  claude: { label: 'more.project.source.claude', tone: 'guess', detail: 'more.project.source.claudeDetail' },
+  'beluga.json': { label: 'beluga.json', tone: 'team', detail: 'more.project.source.shared' },
+  'klaud.json': { label: 'klaud.json', tone: 'team', detail: 'more.project.source.shared' },
+  'conductor.json': { label: 'conductor.json', tone: 'team', detail: 'more.project.source.conductor' },
+  detected: { label: 'more.project.source.detected', tone: 'guess', detail: 'more.project.source.detectedDetail' },
 };
+/** A source's words in the language shown (a file's name stays as it is). */
+const sourceLabel = (source: Source): string => (SOURCE[source].label.startsWith('more.') ? tNow(SOURCE[source].label as Key) : SOURCE[source].label);
 
 /**
  * A project's Setup and Run commands, as a form: where each one comes from now, and whether to
@@ -26,6 +29,7 @@ const SOURCE: Record<Source, { label: string; tone: 'team' | 'mine' | 'guess'; d
  */
 export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>) {
   const api = useApi();
+  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === menu.projectId));
   const autoSetup = useApp((st) => st.prefs.autoSetup);
   const projectAgents = useApp((st) => st.prefs.projectAgents);
@@ -52,17 +56,17 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
   const edited = (kind: Kind): boolean => values[kind].trim() !== saved(kind);
   const tag = (kind: Kind) => {
     const s = scripts[kind];
-    if (edited(kind)) return <SourceTag tone={team ? 'team' : 'mine'}>{team ? 'Will go in beluga.json' : 'Will be yours'}</SourceTag>;
+    if (edited(kind)) return <SourceTag tone={team ? 'team' : 'mine'}>{team ? t('more.project.willGoTeam') : t('more.project.willBeYours')}</SourceTag>;
     return s ? (
-      <span title={SOURCE[s.source].detail}>
-        <SourceTag tone={SOURCE[s.source].tone}>{SOURCE[s.source].label}</SourceTag>
+      <span title={t(SOURCE[s.source].detail)}>
+        <SourceTag tone={SOURCE[s.source].tone}>{sourceLabel(s.source)}</SourceTag>
       </span>
     ) : (
-      <SourceTag tone="guess">None</SourceTag>
+      <SourceTag tone="guess">{t('more.project.none')}</SourceTag>
     );
   };
   // Guessed values say so (once), so you check them.
-  const hint = (kind: Kind, what: string) => (!edited(kind) && scripts[kind]?.source === 'detected' ? `${what} Guessed from the project: check it.` : !edited(kind) && scripts[kind]?.source === 'claude' ? `${what} Your agent worked it out from the project: check it.` : what);
+  const hint = (kind: Kind, what: string) => (!edited(kind) && scripts[kind]?.source === 'detected' ? t('more.project.hintGuessed', { what }) : !edited(kind) && scripts[kind]?.source === 'claude' ? t('more.project.hintAgent', { what }) : what);
   const changed = edited('setup') || edited('run') || team || auto !== autoSetup || agent !== agentNow;
 
   const save = (): void => {
@@ -82,27 +86,27 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
 
   return (
     <FormSheet
-      title={`${project.name} Settings`}
+      title={t('more.project.title', { name: project.name })}
       icon="terminal"
-      intro="The commands every workspace of this project uses. Leave one empty for none."
-      submitLabel="Save"
+      intro={t('more.project.intro')}
+      submitLabel={t('more.project.save')}
       canSubmit={changed}
       onSubmit={save}
       onCancel={close}
       width={560}
-      footer={<Checkbox checked={team} onChange={setTeam} label="Save to beluga.json" detail="Everyone on the project gets them (commit the file)" />}
+      footer={<Checkbox checked={team} onChange={setTeam} label={t('more.project.saveTeam')} detail={t('more.project.saveTeamDetail')} />}
     >
-      <Field label="Setup" htmlFor="script-setup" hint={hint('setup', 'Runs in each new worktree, e.g. to install dependencies.')} aside={tag('setup')}>
+      <Field label={t('more.project.setup')} htmlFor="script-setup" hint={hint('setup', t('more.project.setupHint'))} aside={tag('setup')}>
         <TextInput id="script-setup" value={values.setup} onChange={(v) => (setTouched(true), setValues({ ...values, setup: v }))} mono placeholder="npm install" />
       </Field>
-      <Field label="Run" htmlFor="script-run" hint={hint('run', 'Starts the project when you click Run.')} aside={tag('run')}>
+      <Field label={t('more.project.run')} htmlFor="script-run" hint={hint('run', t('more.project.runHint'))} aside={tag('run')}>
         <TextInput id="script-run" value={values.run} onChange={(v) => (setTouched(true), setValues({ ...values, run: v }))} mono placeholder="npm run dev" />
       </Field>
-      <Field label="Agent" htmlFor="project-agent" hint="Runs this project's new conversations and answers when friends write @you about it.">
-        <Popup id="project-agent" value={agent} onChange={setAgent} options={[{ value: '~', label: `Same as yours (${agentName(mine)})`, icon: agentMark(mine) }, ...agentEntries(agentChoices(runtimes, models))]} />
+      <Field label={t('more.project.agent')} htmlFor="project-agent" hint={t('more.project.agentHint')}>
+        <Popup id="project-agent" value={agent} onChange={setAgent} options={[{ value: '~', label: t('more.project.sameAsYours', { agent: agentName(mine) }), icon: agentMark(mine) }, ...agentEntries(agentChoices(runtimes, models))]} />
       </Field>
       <Field label="">
-        <Checkbox checked={auto} onChange={setAuto} label="Run setup in new worktrees" detail="For every project; in its Terminal tab" />
+        <Checkbox checked={auto} onChange={setAuto} label={t('more.project.autoSetup')} detail={t('more.project.autoSetupDetail')} />
       </Field>
     </FormSheet>
   );

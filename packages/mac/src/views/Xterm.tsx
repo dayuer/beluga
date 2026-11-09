@@ -13,6 +13,7 @@ import { copyText } from '../lib/copy.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
 import { openExternal } from '../lib/system.js';
 import s from '../views/terminal.module.css';
+import { t } from '../i18n/index.js';
 
 /** ⌘← start of line (^A), ⌘→ end of line (^E), ⌘⌫ delete to the start (^U). */
 const MAC_LINE_KEYS: Readonly<Record<string, string>> = { ArrowLeft: '\x01', ArrowRight: '\x05', Backspace: '\x15' };
@@ -79,6 +80,8 @@ export function Xterm({ termKey, start, focus = true, gpu = false, extend, onKey
   }, [termKey]);
   /** Make the terminal in `el` and connect it to its program → how to take it down. */
   function mount(el: HTMLDivElement): () => void {
+    // What a screen reader calls a terminal's input, in the language shown (xterm reads it as it opens).
+    Terminal.strings.promptLabel = t('more.terminal.input');
     const term = new Terminal({
       ...terminalOptions(getPrefs()),
       allowProposedApi: true,

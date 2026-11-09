@@ -10,7 +10,8 @@ import { Icon } from '../components/Icon.js';
 import { MAC_SCOPE, describedName, iconOf, recipeWhen } from './sentinel-model.js';
 import { useSentinelActions } from './use-sentinel.js';
 import s from './sentinel.module.css';
-import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { useT } from '../i18n/index.js';
 
 type Way = 'describe' | 'recipe' | 'build';
@@ -90,7 +91,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
     a.open(made.id);
   };
 
-  const projectName = project === MAC_SCOPE ? ASSISTANT_TITLE : projects.find((p) => p.id === project)?.name;
+  const projectName = project === MAC_SCOPE ? assistantTitle() : projects.find((p) => p.id === project)?.name;
   return (
     <FormSheet
       title={tr('sentinel.new.title')}
@@ -112,13 +113,13 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
             label={tr('sentinel.new.whereItWorks')}
             value={project}
             onChange={setProject}
-            options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE, description: tr('sentinel.new.macDetail', { computer: THIS_COMPUTER }) }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+            options={[{ value: MAC_SCOPE, label: assistantTitle(), description: tr('sentinel.new.macDetail', { computer: THIS_COMPUTER }) }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
           />
         </div>
         {/* Which computer it runs on (BLG-786). Only with a computer paired. */}
         <RunsOnRow project={project === MAC_SCOPE ? undefined : project} className={s.row2} labelClassName={s.label} />
         {way === 'describe' ? (
-          <Field label={tr('sentinel.new.whatShouldItDo')} htmlFor="sentinel-words" hint={tr('sentinel.new.describeFieldHint', { where: projectName ?? ASSISTANT_TITLE })}>
+          <Field label={tr('sentinel.new.whatShouldItDo')} htmlFor="sentinel-words" hint={tr('sentinel.new.describeFieldHint', { where: projectName ?? assistantTitle() })}>
             <TextArea
               id="sentinel-words"
               value={words}
@@ -162,7 +163,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
             </div>
           )
         ) : (
-          <Field label={tr('sentinel.new.name')} htmlFor="sentinel-name" hint={tr('sentinel.new.nameHint', { where: projectName ?? ASSISTANT_TITLE })}>
+          <Field label={tr('sentinel.new.name')} htmlFor="sentinel-name" hint={tr('sentinel.new.nameHint', { where: projectName ?? assistantTitle() })}>
             <TextInput id="sentinel-name" value={name} onChange={setName} maxLength={80} placeholder={tr('sentinel.new.namePlaceholder')} data-autofocus />
           </Field>
         )}

@@ -202,7 +202,7 @@ function Donut({ plan, kind, colorOf, legend }: { plan: ChartPlan; kind: 'pie' |
         {kind === 'donut' ? (
           <div className={v.donutCenter}>
             <span className={v.donutValue}>{plan.yColumn ? formatCell(sum, plan.yColumn) : formatNumber(sum, { compact: true })}</span>
-            <span className={v.donutLabel}>Total</span>
+            <span className={v.donutLabel}>{tNow('more.views.total')}</span>
           </div>
         ) : null}
       </div>

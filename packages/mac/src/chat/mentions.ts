@@ -1,6 +1,7 @@
 import type { FsEntry } from '../../../../src/protocol.js';
 import { friendMention } from '../../../../src/ui/suggest.js';
 import { type TaskMention, taskByKey } from '../../../../src/shared/task-refs.js';
+import { t as tr } from '../i18n/index.js';
 
 /**
  * "@mia", "@bob-api", "@add-auth", "@src/", "@src/auth.ts", "@BLG-24": who or what a mention in a message
@@ -64,7 +65,7 @@ export function resolveMention(token: string, world: MentionWorld): MentionRef |
   if (theirs) {
     const who = lower(theirs[1]!);
     const peer = world.peers.find((p) => lower(p.name) === who) ?? world.friends.find((f) => lower(friendMention(f.name).slice(1)) === who);
-    return peer ? { kind: 'claude', label: `${peer.name}’s agent`, id: peer.peerId } : undefined;
+    return peer ? { kind: 'claude', label: tr('tasks.menu.theirAgent', { name: peer.name }), id: peer.peerId } : undefined;
   }
   const friend = world.friends.find((f) => lower(friendMention(f.name).slice(1)) === t);
   if (friend) return { kind: 'friend', label: friend.name, id: friend.peerId };

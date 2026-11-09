@@ -3,6 +3,7 @@ import { CHIP_LABELS, chipSpec } from './chip.js';
 import { generatedName, generatedSpec } from './generated.js';
 import { render, SAMPLE_RATE } from './synth.js';
 import { t, tl } from '../../i18n/index.js';
+import { macSoundName } from '../prefs-words.js';
 
 /** Everything you can pick, with names, for Settings › Notifications. */
 
@@ -16,7 +17,7 @@ export function soundName(choice: SoundChoice): string {
     case 'none':
       return t('common.catalog.none');
     case 'mac':
-      return choice.id;
+      return macSoundName(choice.id);
     case 'chip':
       return CHIP_LABELS[choice.id];
     case 'gen':

@@ -2,6 +2,7 @@
 import type { RuntimeChoice, RuntimeState } from '../../../../src/shared/agent-runtimes.js';
 import { thisComputer } from '../lib/os-words.js';
 import { t } from '../i18n/index.js';
+import { runtimeLabel, shownRuntimes } from '../lib/prefs-words.js';
 
 /**
  * Your agents, found (BLG-507): each runtime Beluga knows with where it stands on this Mac (ready,
@@ -24,7 +25,7 @@ export type AgentFix = 'sign_in' | 'install' | 'set_up';
 
 export interface AgentRow {
   readonly id: string;
-  /** Its name for people ("Claude", "Codex", "Local model"). */
+  /** Its name for people ("Claude", "Codex", "Local model"), as the engine has it (what's saved). */
   readonly label: string;
   /** Undefined while it hasn't been asked yet. */
   readonly state: RuntimeState | undefined;
@@ -49,7 +50,7 @@ export const FIX_LABEL: Readonly<Record<AgentFix, string>> = {
 };
 
 /** A row's button: "Sign In", "Get Codex", "Get OpenCode", "Set Up…". */
-export const fixLabel = (row: Pick<AgentRow, 'label' | 'fix'>): string => (row.fix === 'install' ? t('onboarding.agents.get', { name: row.label }) : row.fix ? FIX_LABEL[row.fix] : '');
+export const fixLabel = (row: Pick<AgentRow, 'id' | 'label' | 'fix'>): string => (row.fix === 'install' ? t('onboarding.agents.get', { name: runtimeLabel(row.id, row.label) }) : row.fix ? FIX_LABEL[row.fix] : '');
 
 /** Where a runtime stands: what it said once asked, else ready when it runs here; undefined: not asked yet. */
 export function stateOf(r: RuntimeChoice, checked: boolean): RuntimeState | undefined {
@@ -92,7 +93,7 @@ export function agentRows(runtimes: readonly RuntimeChoice[], checked: boolean):
   return runtimes.map((r) => {
     const state = stateOf(r, checked);
     const known = DETAIL[r.id];
-    const detail = (state && known?.[state]) ?? (state === 'ready' || !state ? (known?.ready ?? '') : (r.fix ?? r.why ?? ''));
+    const detail = (state && known?.[state]) ?? (state === 'ready' || !state ? (known?.ready ?? '') : (r.fix ?? shownRuntimes([r])[0]!.why ?? ''));
     const fix = fixOf(r.id, state);
     return { id: r.id, label: r.label, state, words: state ? STATE_WORDS[state] : t('onboarding.agents.checking'), detail, ...(fix ? { fix } : {}) };
   });

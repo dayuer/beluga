@@ -4,7 +4,7 @@ import type { NeedsYou } from '../../../../src/companion/protocol.js';
 import { allNeeds, needMatches } from '../../../../src/companion/needs-you.js';
 import { macViewFor, needView } from '../../../../src/companion/open-on-mac.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
-import { ASSISTANT_TITLE } from '../../../../src/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { findWorkspace } from '../../../../src/ui/workspace-models.js';
 import { type Key, t } from '../i18n/index.js';
 
@@ -43,7 +43,7 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
     case 'room':
       return t('layout.waiting.room');
     case 'assistant':
-      return ASSISTANT_TITLE;
+      return assistantTitle();
     case 'requests':
       return t('layout.waiting.requests');
     case 'workspace': {

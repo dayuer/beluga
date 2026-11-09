@@ -17,6 +17,7 @@ import { revealInFinder } from '../lib/files.js';
 import { type SettingsPane, useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { ACCENTS, type Accent, setPrefs, useChosenPrefs, usePrefs } from '../lib/prefs.js';
 import { themeFor } from '../lib/themes.js';
+import { accentName, buttonLabel, runtimeLabel, shownRuntimes, themeName } from '../lib/prefs-words.js';
 import { useDocTheme } from '../components/markdown/use-doc-theme.js';
 import { ThemeGroups } from './ThemePicker.js';
 import { foldsForCategories } from '../layout/attention-model.js';
@@ -263,10 +264,10 @@ function Appearance() {
             ]}
           />
         </Row>
-        <Row label={t('settings.appearance.accent')} detail={t('settings.appearance.accentDetail', { computer: yourComputer(), themeOwn: themeAccent ? t('settings.appearance.accentThemeOwn', { theme: theme.name }) : '' })}>
+        <Row label={t('settings.appearance.accent')} detail={t('settings.appearance.accentDetail', { computer: yourComputer(), themeOwn: themeAccent ? t('settings.appearance.accentThemeOwn', { theme: themeName(theme) }) : '' })}>
           <div className={s.swatches}>
             {(Object.keys(ACCENTS) as Accent[]).filter((a) => a !== 'theme' || themeAccent || prefs.accent === 'theme').map((a) => (
-              <button key={a} type="button" aria-label={a === 'theme' ? t('settings.appearance.themeOwn', { theme: theme.name }) : a} {...(a === 'theme' ? { title: t('settings.appearance.themeOwn', { theme: theme.name }) } : {})} aria-pressed={prefs.accent === a} className={cx(s.swatch, prefs.accent === a && s.swatchOn)} style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }} onClick={() => setPrefs({ accent: a })} />
+              <button key={a} type="button" aria-label={a === 'theme' ? t('settings.appearance.themeOwn', { theme: themeName(theme) }) : accentName(a)} {...(a === 'theme' ? { title: t('settings.appearance.themeOwn', { theme: themeName(theme) }) } : {})} aria-pressed={prefs.accent === a} className={cx(s.swatch, prefs.accent === a && s.swatchOn)} style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }} onClick={() => setPrefs({ accent: a })} />
             ))}
           </div>
         </Row>
@@ -356,7 +357,7 @@ function AgentsGroup({ mine }: { mine: string }) {
           <Icon name={runtimeMark(row.id)} size={18} />
           <div className={s.rowText}>
             <div className={s.rowLabel}>
-              {row.label}
+              {runtimeLabel(row.id, row.label)}
               {row.id === mine && row.state === 'ready' ? <span className={s.agentYours}>{t('settings.agent.yours')}</span> : null}
             </div>
             <div className={s.rowDetail}>
@@ -402,7 +403,8 @@ function AgentPane() {
   const p = state.prefs;
   const runtime = myRuntime(p);
   const model = myModel(p);
-  const choices = agentChoices(state.runtimes, state.models);
+  // Listed in the language shown; what's saved keeps the engine's label (agentForChoice reads state.runtimes).
+  const choices = agentChoices(shownRuntimes(state.runtimes), state.models);
   // A model its runtime doesn't list (yet) takes every level.
   const efforts = new Set<string>(modelInfo(state, runtime, model)?.efforts ?? EFFORTS);
   const effortOptions = EFFORTS.filter((e) => efforts.has(e) || e === p.effort);
@@ -548,7 +550,7 @@ function Workspaces() {
       </Group>
       <HiddenProjectsGroup />
       <Group title={t('settings.workspaces.toolbar')}>
-        {HIDEABLE_BUTTONS.map(([id, label]) => (
+        {HIDEABLE_BUTTONS.map(([id, en]) => [id, buttonLabel(id, en)] as const).map(([id, label]) => (
           <Row key={id} label={label}>
             <Switch label={label} on={!p.hiddenButtons.includes(id)} onChange={(v) => void api.session.setPrefs({ hiddenButtons: v ? p.hiddenButtons.filter((b) => b !== id) : [...p.hiddenButtons, id] })} />
           </Row>

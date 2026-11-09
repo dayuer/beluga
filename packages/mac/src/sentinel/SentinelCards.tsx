@@ -72,9 +72,11 @@ import { useDraft } from './use-draft.js';
 import { sentinelGraph } from '@beluga/core/sentinel/workflow.js';
 import { GraphBlock } from '../components/graph/GraphBlock.js';
 import s from './sentinel.module.css';
-import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { computerWord } from '../lib/os-words.js';
 import { tl, useT } from '../i18n/index.js';
+import { localSchedule } from '../lib/ci-sentinel-words.js';
 
 /** The sentinel page's editor: When it runs, and its Steps. Everything saves as you change it. */
 
@@ -96,7 +98,7 @@ export function WhenCard({ item, save }: { item: Sentinel; save: Save }) {
         <h3 className={s.cardTitle}>{tr('sentinel.cards.when')}</h3>
       </header>
       <p className={s.sentence} data-testid="sentinel-sentence">
-        {scheduleSentence(t, nameOf(items))}
+        {localSchedule(t, nameOf(items))}
       </p>
       <div className={s.controls}>
         <div className={s.controlRow}>
@@ -396,7 +398,7 @@ type Tr = ReturnType<typeof useT>;
 const whereInfo = (tr: Tr): ReadonlyArray<{ readonly value: ClaudeStep['where']; readonly label: string; readonly description: string }> => [
   { value: 'project', label: tr('sentinel.cards.where.project'), description: tr('sentinel.cards.where.projectDetail') },
   { value: 'worktree', label: tr('sentinel.cards.where.worktree'), description: tr('sentinel.cards.where.worktreeDetail') },
-  { value: 'mac', label: tr('sentinel.cards.where.mac', { mac: ASSISTANT_TITLE }), description: tr('sentinel.cards.where.macDetail', { mac: ASSISTANT_TITLE, computer: THIS_COMPUTER }) },
+  { value: 'mac', label: tr('sentinel.cards.where.mac', { mac: assistantTitle() }), description: tr('sentinel.cards.where.macDetail', { mac: assistantTitle(), computer: THIS_COMPUTER }) },
 ];
 
 function ClaudeFields({ step, item, change }: { step: ClaudeStep; item: Sentinel; change: (patch: Partial<ClaudeStep>) => void }) {
@@ -438,7 +440,7 @@ function ClaudeFields({ step, item, change }: { step: ClaudeStep; item: Sentinel
         {/* Which agent and model does it (BLG-497): the run's chat or worktree runs it for this step. */}
         <Select label={tr('sentinel.cards.agentAndModel')} size="small" value={stepAgentChoice(step)} options={agents} onChange={(v) => change(agentFields(v))} />
       </div>
-      {step.where === 'mac' && stepAgentChoice(step) ? <p className={s.hint}>{tr('sentinel.cards.macDefaultAgent', { mac: ASSISTANT_TITLE })}</p> : null}
+      {step.where === 'mac' && stepAgentChoice(step) ? <p className={s.hint}>{tr('sentinel.cards.macDefaultAgent', { mac: assistantTitle() })}</p> : null}
     </>
   );
 }

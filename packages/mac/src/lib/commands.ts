@@ -12,6 +12,7 @@ import { convoModeOf, terminalCapable, toggledMode, withConvoMode } from './conv
 import { getPrefs, setPrefs } from './prefs.js';
 import { SETTINGS_FIND_EVENT } from './settings-search.js';
 import { t } from '../i18n/index.js';
+import { localButtonHint } from './engine-words.js';
 
 /**
  * The window's commands that the menu bar, the keyboard and the buttons share: what each does,
@@ -146,7 +147,7 @@ export function commandState(state: AppState, id: CommandId): CommandState {
         return { enabled: true, label: t('common.commands.run') };
       }
       if (!button) return OFF(ws.kind === 'chat' ? t('common.commands.notForChat') : ws.kind === 'main' ? t('common.commands.notForMain') : t('common.commands.notHere'));
-      return button.disabled ? OFF(button.hint) : ON;
+      return button.disabled ? OFF(localButtonHint(button.hint)) : ON;
     }
   }
 }

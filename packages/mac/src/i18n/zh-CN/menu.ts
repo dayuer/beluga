@@ -25,6 +25,7 @@ export const menu: Translation<typeof en> = {
   'menu.predefined.select-all': '全选',
   'menu.predefined.minimize': '最小化',
   'menu.predefined.maximize': '缩放',
+  'menu.predefined.fullscreen': '进入全屏幕',
 
   'menu.check-updates': '检查更新…',
   'menu.settings': '设置…',
@@ -61,7 +62,7 @@ export const menu: Translation<typeof en> = {
   'menu.zoom-reset': '实际大小',
   'menu.go-overview': '概览',
   'menu.go-tasks': '任务',
-  'menu.go-issues': 'Issues',
+  'menu.go-issues': '议题',
   'menu.go-actions': 'Actions',
   'menu.go-sentinel': '哨兵',
   'menu.go-dashboard': '仪表盘',

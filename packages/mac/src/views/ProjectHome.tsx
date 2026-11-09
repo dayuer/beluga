@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PullRequest } from "@beluga/core/work-store.js";
-import { describePr } from "@beluga/shared/format.js";
 import { isPlanOwned } from "@beluga/core/plans/owner.js";
-import { activityOf, stateOf } from "@beluga/ui/workspace-models.js";
+import { activityOf } from "@beluga/ui/workspace-models.js";
 import type { Project, Workspace } from "@beluga/workspaces/types.js";
 import {
   AUTONOMIES,
@@ -73,6 +72,7 @@ import s from "./project-home.module.css";
 import a from "../lib/arrive.module.css";
 import { TeamOffers } from "../team/Team.js";
 import { tl, useT } from "../i18n/index.js";
+import { localStateOf, localDescribePr } from "../lib/engine-words.js";
 
 /**
  * A project's home: what you see when you click a project. Its main folder is never worked in,
@@ -1013,7 +1013,7 @@ function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
         ? {
             type: "button" as const,
             onClick: onOpen,
-            "aria-label": t("views.home.prChipAria", { pr: describePr(pr) }),
+            "aria-label": t("views.home.prChipAria", { pr: localDescribePr(pr) }),
           }
         : {})}
       className={cx(s.rowPr, s[`pr_${tone}`])}
@@ -1022,8 +1022,8 @@ function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
       data-pr-checks={pr.checks}
       title={
         onOpen
-          ? t("views.home.prChipTip", { pr: describePr(pr) })
-          : describePr(pr)
+          ? t("views.home.prChipTip", { pr: localDescribePr(pr) })
+          : localDescribePr(pr)
       }
     >
       <Icon name={pr.state === "MERGED" ? "merge" : "pr"} size={11} />
@@ -1052,7 +1052,7 @@ function Row({ ws, ask }: { ws: Workspace; ask?: boolean }) {
   // drawn again only when some of it reads differently.
   const { st, last, pr, when } = useApp(
     (full) => ({
-      st: stateOf(full, ws, 0),
+      st: localStateOf(full, ws, 0),
       last: activityOf(full.log, `ws:${ws.id}`).last,
       pr: ws.kind === "worktree" && !ask ? full.prs[ws.id] : undefined,
       when: agoText(lastActive(full, ws)),
@@ -1077,7 +1077,7 @@ function Row({ ws, ask }: { ws: Workspace; ask?: boolean }) {
           })}
     />
   ) : null;
-  const label = `${title}: ${st.label}${pr ? `, ${describePr(pr)}` : ""}`;
+  const label = `${title}: ${st.label}${pr ? `, ${localDescribePr(pr)}` : ""}`;
   const parts = (
     <>
       <span className={s.rowIcon}>

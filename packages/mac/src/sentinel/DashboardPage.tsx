@@ -24,7 +24,7 @@ import { TINTS, setTintChoice, tintChoiceOf, useProjectTint } from './tint.js';
 import { SHOW_TILE } from '../lib/widget-links.js';
 import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import n from './numbers.module.css';
-import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
 import { tl, useT } from '../i18n/index.js';
 
@@ -72,7 +72,7 @@ function tileProject(state: SentinelState, tile: Tile, projects: ReadonlyArray<{
   const item = sid ? state.items.find((i) => i.id === sid) : undefined;
   if (!item) return undefined;
   const p = item.projectId ? projects.find((x) => x.id === item.projectId) : undefined;
-  return p ? { id: p.id, name: p.name, sentinel: item.name } : { name: ASSISTANT_TITLE, sentinel: item.name };
+  return p ? { id: p.id, name: p.name, sentinel: item.name } : { name: assistantTitle(), sentinel: item.name };
 }
 
 /** No board yet: a quiet strip that says what goes here, and Add (the first board is made for it). */

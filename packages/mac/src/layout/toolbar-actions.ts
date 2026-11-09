@@ -1,4 +1,4 @@
-import { type BranchState, branchState, notOnPr, notOnPrLabel, onGitHub, prBlocker } from '@beluga/core/branch-state.js';
+import { type BranchState, branchState, notOnPr, onGitHub, prBlocker } from '@beluga/core/branch-state.js';
 import type { AppState } from '@beluga/core/store.js';
 import { type PlanOwner, planOwnerOf } from '@beluga/core/plans/owner.js';
 import { planTitle } from '@beluga/core/plans/model.js';
@@ -12,6 +12,7 @@ import type { PlanAction } from '../lib/plan-task.js';
 import { asksBeforeWork } from '../lib/work-confirm.js';
 import { revealLabel, thisComputer } from '../lib/os-words.js';
 import { type Key, t } from '../i18n/index.js';
+import { localButton, localNotOnPr } from '../lib/engine-words.js';
 
 /**
  * A workspace's toolbar, the Mac way: one prominent button for what this workspace needs next
@@ -140,7 +141,9 @@ function tipOf(b: WorkspaceButton): string | undefined {
   return asksBeforeWork(b.action) && !b.disabled ? `${b.hint}…` : undefined;
 }
 
-const toAction = (b: WorkspaceButton, pr: boolean): ToolAction => ({
+const toAction = (shared: WorkspaceButton, pr: boolean): ToolAction => toLocalAction(localButton(shared), pr);
+
+const toLocalAction = (b: WorkspaceButton, pr: boolean): ToolAction => ({
   id: b.action,
   label: labelOf(b, pr),
   hint: b.hint,
@@ -182,7 +185,7 @@ export function pickPrimary(state: AppState, ws: Workspace, all: readonly ToolAc
     const open = by('pr');
     // Never a bare "PR #n" while commits here aren't on it (BLG-840): merging it would leave them out.
     const gap = notOnPr(pr, ws);
-    if (open && gap) return { ...open, label: t('layout.toolbarActions.notPushed', { number: pr.number, count: gap.count }), hint: t('layout.toolbarActions.notPushedHint', { gap: notOnPrLabel(gap) }), tone: 'info' };
+    if (open && gap) return { ...open, label: t('layout.toolbarActions.notPushed', { number: pr.number, count: gap.count }), hint: t('layout.toolbarActions.notPushedHint', { gap: localNotOnPr(gap) }), tone: 'info' };
     if (open) return { ...open, label: `PR #${pr.number}` };
   }
   if (pr?.state === 'MERGED') {

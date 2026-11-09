@@ -10,7 +10,7 @@ import { LOOK_WORDS, NEW_SOURCES, type NewSourceId, TILE_SIZES, type TileLook, t
 import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import n from './numbers.module.css';
 import x from './add-tile.module.css';
-import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { useT } from '../i18n/index.js';
 
 /**
@@ -42,7 +42,7 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
   const [size, setSize] = useState<TileSizeId>('small');
   const [title, setTitle] = useState('');
   const [what, setWhat] = useState('');
-  const projectName = (id: string | undefined): string => projects.find((p) => p.id === id)?.name ?? ASSISTANT_TITLE;
+  const projectName = (id: string | undefined): string => projects.find((p) => p.id === id)?.name ?? assistantTitle();
   const metrics = useMemo(() => metricChoices(state, projectName, d), [state, projects, d]);
   const steps = useMemo(() => stepChoices(state, projectName), [state.items, projects]);
   // Everything kept, by project and sentinel, as the list shows them.

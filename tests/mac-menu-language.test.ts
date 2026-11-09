@@ -15,7 +15,7 @@ describe('the native menus’ words', () => {
     const submenus = all(/with_id_and_items\(\s*app,\s*"(submenu\.[a-z]+)",\s*"([^"]+)"/g);
     const standard = all(/pre\(\s*"(predefined\.[a-z-]+)",\s*PredefinedMenuItem::(\w+)/g);
     expect(submenus.length).toBe(9);
-    expect(standard.length).toBe(13);
+    expect(standard.length).toBe(14);
     const words: Record<string, string> = menu;
     for (const [id, english] of [...items, ...submenus]) expect([id, words[`menu.${id}`]]).toEqual([id, english]);
     for (const [id] of standard) expect(words[`menu.${id}`]).toBeTruthy();

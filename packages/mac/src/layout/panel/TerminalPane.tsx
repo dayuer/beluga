@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { githubId, runId, setupId, shellId, terminalLabel } from '@beluga/shared/terminal-keys.js';
+import { Terminal } from '@xterm/xterm';
+import { githubId, runId, setupId, shellId } from '@beluga/shared/terminal-keys.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { ActionsDropdown, type ActionItem } from '../../components/SpecMenu.js';
 import { Button, Dot, Empty, IconButton } from '../../components/ui.js';
@@ -7,7 +8,7 @@ import { useActions } from '../../lib/actions.js';
 import { useApi, useApp, useBeluga, useUi } from '../../lib/beluga.js';
 import { closeFocus, moveTerminal, openFocus, usePanelRuntime } from '../../lib/panel.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
-import { useGlobalShells } from '../../lib/shells.js';
+import { terminalTabLabel, useGlobalShells } from '../../lib/shells.js';
 import { chordLabel } from '../../lib/shortcuts-model.js';
 import { claimShell, extraShells, pruneShells, releaseShell, useShellOwners } from '../../lib/ws-shells.js';
 import { EnvStale, NoShells, ShellTabs, useEnvStale } from '../../views/TerminalView.js';
@@ -49,7 +50,7 @@ function useWorkspaceTerminals(wsId: string): Tabbed {
   const isExtra = (k: string): boolean => extra.includes(k);
   return {
     key,
-    tabs: keys.map((k) => ({ key: k, label: terminalLabel(k, names), running: k in terminals && !(k in exits), ...(k in exits ? { exit: exits[k] } : {}), closable: isExtra(k), renamable: k === shellId(wsId) || isExtra(k) })),
+    tabs: keys.map((k) => ({ key: k, label: terminalTabLabel(k, names), running: k in terminals && !(k in exits), ...(k in exits ? { exit: exits[k] } : {}), closable: isExtra(k), renamable: k === shellId(wsId) || isExtra(k) })),
     start: (size) => {
       if (key === shellId(wsId)) void api.terminals.shell(wsId, size);
       else if (isExtra(key) && ws) void api.terminals.global(key, ws.path, size);
@@ -130,6 +131,8 @@ function useTabbed(wsId: string | undefined): Tabbed {
  */
 export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; onClose?: () => void }) {
   const tr = useT();
+  // What a screen reader calls a terminal's input (xterm reads it as each terminal opens, after this).
+  Terminal.strings.promptLabel = tr('more.terminal.input');
   const view = useApp((st) => st.view);
   const exits = useApp((st) => st.termExits);
   const prefs = usePrefs();

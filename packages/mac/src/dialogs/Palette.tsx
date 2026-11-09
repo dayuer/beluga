@@ -9,6 +9,8 @@ import { asksBeforeWork } from '../lib/work-confirm.js';
 import { useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { pickTheme, setPrefs, usePrefs, zoom } from '../lib/prefs.js';
 import { THEMES } from '../lib/themes.js';
+import { themeName } from '../lib/prefs-words.js';
+import { localButton } from '../lib/engine-words.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { showPanelTab, tabsOf, togglePanel, toggleTerminal } from '../lib/panel.js';
 import { PANEL_LABELS, panelFits } from '../lib/panel-model.js';
@@ -73,6 +75,7 @@ export function Palette() {
         ...tabsOf(state).map((tab) => ({ id: `panel:${tab}`, label: t('dialogs.palette.show', { tab: tl('PANEL_LABELS', tab, 'text', PANEL_LABELS[tab]) }), hint: t('dialogs.palette.inPanel'), ...keysOf(`panel-${tab}`), icon: (tab === 'changes' ? 'diff' : tab === 'files' ? 'folder' : tab === 'terminal' ? 'terminal' : tab === 'history' ? 'clock' : tab === 'scratch' ? 'pulse' : tab === 'background' ? 'play' : tab === 'phone' ? 'phone' : 'inspector') as IconName, run: () => void showPanelTab(state, tab) })),
         ...workspaceButtons(state, ws)
           .filter((b) => !b.disabled)
+          .map((b) => localButton(b))
           .map((b) => ({ id: `ws-action:${b.action}`, label: asksBeforeWork(b.action) ? `${b.label}…` : b.label, hint: b.hint, icon: (b.action === 'merge' ? 'merge' : b.action === 'pr' ? 'pr' : b.action === 'run' ? 'play' : b.action === 'archive' ? 'archive' : b.action === 'share' ? 'share' : b.action === 'handoff' ? 'hand' : b.action === 'review_claude' ? 'review' : b.action === 'commit' ? 'commit' : 'claude') as IconName, run: () => actions.run({ type: 'ws', id: ws.id, action: b.action }) })),
       ]
     : [];
@@ -104,7 +107,7 @@ export function Palette() {
     { id: 'shortcuts', label: t('dialogs.palette.shortcuts'), hint: t('dialogs.palette.shortcutsHint'), keywords: ['keys', 'shortcuts', 'remap', 'hotkeys', 'keyboard'], ...keysOf('help-keys'), icon: 'command', run: () => ui.patch({ settings: 'keyboard' }) },
     { id: 'inbox', label: t('dialogs.palette.notifications'), hint: t('dialogs.palette.notificationsHint'), ...keysOf('inbox'), icon: 'bell', run: () => ui.patch({ notices: true }) },
     { id: 'appearance', label: prefs.appearance === 'dark' ? t('dialogs.palette.appearanceLight') : prefs.appearance === 'light' ? t('dialogs.palette.appearanceSystem') : t('dialogs.palette.appearanceDark'), icon: 'eye', run: () => setPrefs({ appearance: prefs.appearance === 'dark' ? 'light' : prefs.appearance === 'light' ? 'system' : 'dark' }) },
-    ...THEMES.map((th) => ({ id: `theme:${th.id}`, label: t('dialogs.palette.theme', { name: th.name }), hint: th.base === 'dark' ? t('dialogs.palette.darkTheme') : t('dialogs.palette.lightTheme'), keywords: ['theme', 'colours', 'colors', 'appearance'], icon: 'eye' as IconName, run: () => pickTheme(th.id) })),
+    ...THEMES.map((th) => ({ id: `theme:${th.id}`, label: t('dialogs.palette.theme', { name: themeName(th) }), hint: th.base === 'dark' ? t('dialogs.palette.darkTheme') : t('dialogs.palette.lightTheme'), keywords: ['theme', 'colours', 'colors', 'appearance'], icon: 'eye' as IconName, run: () => pickTheme(th.id) })),
     { id: 'sidebar', label: prefs.sidebar ? t('dialogs.palette.hideSidebar') : t('dialogs.palette.showSidebar'), ...keysOf('toggle-sidebar'), icon: 'sidebar', run: () => setPrefs({ sidebar: !prefs.sidebar }) },
     ...(panelFits(state.view)
       ? [{ id: 'inspector', label: prefs.inspector ? t('dialogs.palette.hidePanel') : t('dialogs.palette.showPanel'), hint: t('dialogs.palette.panelHint'), ...keysOf('toggle-inspector'), icon: 'panelRight' as IconName, run: () => togglePanel(state.view) }]

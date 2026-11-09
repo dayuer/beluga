@@ -84,7 +84,7 @@ function Status({ machine, beat, still }: { readonly machine: Machine; readonly 
   if (machine.id === 'mini') {
     return (
       <span className={m.always}>
-        <Icon name="power" size={10} /> Always On
+        <Icon name="power" size={10} /> {t('more.tour.machines.alwaysOn')}
       </span>
     );
   }

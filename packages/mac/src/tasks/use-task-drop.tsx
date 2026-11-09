@@ -136,7 +136,7 @@ export function useTaskFileDrop(): ReactNode {
     <div className={cx(t.fileDrop, small && t.fileDropSmall)} style={{ left: box.left, top: box.top, width: box.right - box.left, height: box.bottom - box.top }} aria-hidden>
       <div className={t.fileDropLabel}>
         <Icon name="file" size={small ? 12 : 16} />
-        Add to {over.key}
+        {tr('more.tasks.addTo', { key: over.key })}
       </div>
     </div>,
     document.body,

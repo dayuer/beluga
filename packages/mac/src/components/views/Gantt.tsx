@@ -58,19 +58,19 @@ export function GanttView({ view, data, full }: { view: View; data: ViewData; fu
               const tone = barTone(bar.status);
               const body = (
                 <>
-                  <div className={v.tipHead}>{bar.label || 'Untitled'}</div>
+                  <div className={v.tipHead}>{bar.label || t('more.views.untitled')}</div>
                   <div className={v.tipRow}>
                     <span className={v.tipName}>{when(bar, plan.hours)}</span>
                   </div>
                   {bar.progress !== undefined ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>Progress</span>
+                      <span className={v.tipName}>{t('more.views.progress')}</span>
                       <span className={v.tipValue}>{formatNumber(bar.progress * 100, { decimals: 0 })}%</span>
                     </div>
                   ) : null}
                   {bar.status ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>Status</span>
+                      <span className={v.tipName}>{t('more.views.status')}</span>
                       <span className={v.tipValue}>{bar.status}</span>
                     </div>
                   ) : null}

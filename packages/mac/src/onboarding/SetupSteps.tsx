@@ -10,6 +10,7 @@ import { useApi, useApp } from '../lib/beluga.js';
 import { askNotificationPermission, openNotificationSettings, useNotificationAccess } from '../lib/sounds/access.js';
 import { ACCENTS, type Accent, type UiPrefs, baseNow, getPrefs, pickTheme, setPrefs, usePrefs } from '../lib/prefs.js';
 import { type AppTheme, THEMES, themeFor } from '../lib/themes.js';
+import { accentName, fireBlurb, fireName, themeName } from '../lib/prefs-words.js';
 import { useDocTheme } from '../components/markdown/use-doc-theme.js';
 import { EASE_OUT, Rise, SPRING, Words } from './fx.js';
 import { Glass } from './Glass.js';
@@ -60,7 +61,7 @@ function ThemeRow({ prefs }: { readonly prefs: UiPrefs }) {
             key={th.id}
             type="button"
             role="radio"
-            aria-label={th.name}
+            aria-label={themeName(th)}
             aria-checked={picked.id === th.id}
             className={cx(s.swatch, s.themeSwatch)}
             style={{ background: th.colors.bg, '--t-dot': th.accent ?? th.colors.text2, '--t-edge': th.colors.sidebar } as CSSProperties}
@@ -75,7 +76,7 @@ function ThemeRow({ prefs }: { readonly prefs: UiPrefs }) {
         ))}
       </div>
       <span className={s.themeName} aria-live="polite">
-        {(hover ?? picked).name}
+        {themeName(hover ?? picked)}
       </span>
     </Rise>
   );
@@ -140,7 +141,7 @@ export function Look() {
               key={a}
               type="button"
               role="radio"
-              aria-label={a === 'system' ? t('onboarding.setup.systemAccent') : a === 'theme' ? t('onboarding.setup.themeAccent', { name: themeFor(baseNow(prefs), prefs).name }) : a}
+              aria-label={a === 'system' ? t('onboarding.setup.systemAccent') : a === 'theme' ? t('onboarding.setup.themeAccent', { name: themeName(themeFor(baseNow(prefs), prefs)) }) : accentName(a)}
               aria-checked={prefs.accent === a}
               className={s.swatch}
               style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }}
@@ -213,8 +214,8 @@ export function Fire() {
         <Preview look={look} className={s.fireStage} />
       </Rise>
       <Glass radius={16} width="100%" className={s.fireRows}>
-        <SetupRow index={0} label={starter?.name ?? t('onboarding.setup.yourOwn')} detail={starter?.blurb ?? t('onboarding.setup.tuned')}>
-          <Choice label={t('onboarding.setup.fire')} value={picked ?? ''} onChange={(id) => set(STARTERS.find((x) => x.id === id)!.set)} options={STARTERS.map((x) => ({ value: x.id, label: x.name }))} />
+        <SetupRow index={0} label={starter ? fireName('fireStarter', starter) : t('onboarding.setup.yourOwn')} detail={starter ? fireBlurb('fireStarter', starter) : t('onboarding.setup.tuned')}>
+          <Choice label={t('onboarding.setup.fire')} value={picked ?? ''} onChange={(id) => set(STARTERS.find((x) => x.id === id)!.set)} options={STARTERS.map((x) => ({ value: x.id, label: fireName('fireStarter', x) }))} />
         </SetupRow>
         {picked !== 'none' ? (
           <SetupRow index={1} label={t('onboarding.setup.whereBurns')} detail={look.where === 'max' ? t('onboarding.setup.onlyMax') : t('onboarding.setup.everyModel')}>

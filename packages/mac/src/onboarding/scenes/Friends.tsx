@@ -5,6 +5,7 @@ import { SPRING } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
 import { upFirst, yourComputer } from '../../lib/os-words.js';
+import { t, useT } from '../../i18n/index.js';
 
 /**
  * Claudes that work together: yours is in the middle of something and needs a hand from a
@@ -26,39 +27,40 @@ interface Errand {
   readonly result: { icon: IconName; label: string; detail: string };
 }
 
-const ERRANDS: readonly Errand[] = [
+/** The errands, in the language shown (the file names and commands stay as they are). */
+const errands = (): readonly Errand[] => [
   {
-    before: 'Drafting the Q3 investor update',
-    ask: 'Find the Q3 balance sheet on Ada’s computer and send me a summary',
+    before: t('more.tour.friends.e1.before'),
+    ask: t('more.tour.friends.e1.ask'),
     steps: [
-      { icon: 'search', text: 'Searched', code: '~/Desktop' },
-      { icon: 'file', text: 'Found', code: 'Balance-Sheet-Q3.xlsx' },
-      { icon: 'pencil', text: 'Summarised 3 sheets' },
+      { icon: 'search', text: t('more.tour.friends.searched'), code: '~/Desktop' },
+      { icon: 'file', text: t('more.tour.found'), code: 'Balance-Sheet-Q3.xlsx' },
+      { icon: 'pencil', text: t('more.tour.friends.e1.summarised') },
     ],
-    result: { icon: 'file', label: 'q3-summary.md', detail: 'Revenue +18%, runway 22 months' },
-    after: 'Adding the numbers to the update',
+    result: { icon: 'file', label: 'q3-summary.md', detail: t('more.tour.friends.e1.detail') },
+    after: t('more.tour.friends.e1.after'),
   },
   {
-    before: 'Setting up CI for acme/web',
-    ask: 'Make me an admin on acme/web, I need to set branch rules',
+    before: t('more.tour.friends.e2.before'),
+    ask: t('more.tour.friends.e2.ask'),
     steps: [
-      { icon: 'person', text: 'Ada is an owner of', code: 'acme' },
-      { icon: 'terminal', text: 'Ran', code: 'gh api …/memberships' },
-      { icon: 'check', text: 'Role changed to admin' },
+      { icon: 'person', text: t('more.tour.friends.e2.owner'), code: 'acme' },
+      { icon: 'terminal', text: t('more.tour.ran'), code: 'gh api …/memberships' },
+      { icon: 'check', text: t('more.tour.friends.e2.changed') },
     ],
-    result: { icon: 'check', label: 'Admin on acme/web', detail: 'Granted by Ada’s agent' },
-    after: 'Turning on branch protection',
+    result: { icon: 'check', label: t('more.tour.friends.e2.label'), detail: t('more.tour.friends.e2.detail') },
+    after: t('more.tour.friends.e2.after'),
   },
   {
-    before: 'Debugging the revenue chart',
-    ask: 'Screenshot the staging dashboard while you’re signed in',
+    before: t('more.tour.friends.e3.before'),
+    ask: t('more.tour.friends.e3.ask'),
     steps: [
-      { icon: 'globe', text: 'Opened', code: 'staging.acme.dev' },
-      { icon: 'eye', text: 'Waited for the charts to load' },
-      { icon: 'image', text: 'Took a screenshot' },
+      { icon: 'globe', text: t('more.tour.friends.e3.opened'), code: 'staging.acme.dev' },
+      { icon: 'eye', text: t('more.tour.friends.e3.waited') },
+      { icon: 'image', text: t('more.tour.friends.e3.shot') },
     ],
     result: { icon: 'image', label: 'staging-dashboard.png', detail: '1440 × 900' },
-    after: 'Comparing it with production',
+    after: t('more.tour.friends.e3.after'),
   },
 ];
 
@@ -73,6 +75,7 @@ const RETURNING = 7;
 const DONE = 8;
 
 function Window({ who, hue, you, children }: { readonly who: string; readonly hue: number; readonly you?: boolean; readonly children: ReactNode }) {
+  const tr = useT();
   return (
     <div className={s.mac}>
       <div className={s.macHead}>
@@ -80,9 +83,9 @@ function Window({ who, hue, you, children }: { readonly who: string; readonly hu
           {who[0]}
         </span>
         <div>
-          <strong>{you ? upFirst(yourComputer()) : `${who}’s computer`}</strong>
+          <strong>{you ? upFirst(yourComputer()) : tr('more.tour.friends.theirComputer', { name: who })}</strong>
           <span className={s.macClaude}>
-            <Icon name="claude" size={10} /> {you ? 'your agent' : `${who}’s agent`}
+            <Icon name="claude" size={10} /> {you ? tr('more.tour.yourAgent') : tr('tasks.menu.theirAgent', { name: who })}
           </span>
         </div>
       </div>
@@ -100,25 +103,27 @@ const Line = ({ icon, text, code, live }: { readonly icon: IconName; readonly te
 );
 
 export function Friends() {
+  const tr = useT();
   const [round, setRound] = useState(0);
   const beat = useBeats(BEATS, DONE, () => setRound((r) => r + 1));
-  const errand = ERRANDS[round % ERRANDS.length]!;
+  const all = errands();
+  const errand = all[round % all.length]!;
   const shown = beat >= WORKING ? Math.min(errand.steps.length, beat - WORKING + 1) : 0;
   return (
     <div className={s.stage}>
       <div className={s.friends}>
-        <Window who="You" hue={40} you>
+        <Window who={tr('more.tour.you')} hue={40} you>
           <AnimatePresence mode="popLayout">
             <motion.div key={`${round}-${beat >= DONE}`} className={s.task} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={SPRING}>
               <Icon name={beat >= ASKING && beat < DONE ? 'clock' : 'refresh'} size={12} className={beat >= ASKING && beat < DONE ? s.waitIcon : s.spin} />
-              {beat >= DONE ? errand.after : beat >= ASKING ? 'Waiting on Ada’s agent…' : errand.before}
+              {beat >= DONE ? errand.after : beat >= ASKING ? tr('more.tour.friends.waiting') : errand.before}
             </motion.div>
           </AnimatePresence>
           <AnimatePresence>
             {beat >= ASKING ? (
               <motion.div key={`ask-${round}`} className={s.errandAsk} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
                 <span className={s.askTag}>
-                  <Icon name="share" size={10} /> To Ada’s agent
+                  <Icon name="share" size={10} /> {tr('more.tour.friends.toAda')}
                 </span>
                 {errand.ask}
               </motion.div>
@@ -175,7 +180,7 @@ export function Friends() {
             ) : null}
           </AnimatePresence>
           <span className={s.lock}>
-            <Icon name="lock" size={10} /> Computer to computer, encrypted
+            <Icon name="lock" size={10} /> {tr('more.tour.friends.encrypted')}
           </span>
         </div>
 
@@ -183,12 +188,12 @@ export function Friends() {
           <AnimatePresence mode="popLayout">
             {beat === WAITING || beat === ALLOWED ? (
               <motion.div key={`req-${round}`} className={s.request} initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={SPRING}>
-                <span className={s.dim}>Your friend’s agent asks</span>
+                <span className={s.dim}>{tr('more.tour.friends.asks')}</span>
                 <span className={s.requestText}>{errand.ask}</span>
                 <div className={s.requestButtons}>
-                  <span className={s.btn}>Decline</span>
+                  <span className={s.btn}>{tr('more.tour.decline')}</span>
                   <motion.span className={s.btnPrimary} animate={beat === ALLOWED ? { scale: [1, 0.9, 1] } : {}} transition={{ duration: 0.3 }}>
-                    {beat === ALLOWED ? <Icon name="check" size={11} /> : null} Allow
+                    {beat === ALLOWED ? <Icon name="check" size={11} /> : null} {tr('more.tour.allow')}
                   </motion.span>
                 </div>
               </motion.div>
@@ -200,7 +205,7 @@ export function Friends() {
               </motion.div>
             ) : (
               <motion.div key="idle" className={s.idle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Icon name="claude" size={12} /> Ready to help
+                <Icon name="claude" size={12} /> {tr('more.tour.friends.ready')}
               </motion.div>
             )}
           </AnimatePresence>

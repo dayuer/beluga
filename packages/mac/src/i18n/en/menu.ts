@@ -30,6 +30,7 @@ export const menu = {
   'menu.predefined.select-all': 'Select All',
   'menu.predefined.minimize': 'Minimize',
   'menu.predefined.maximize': 'Zoom',
+  'menu.predefined.fullscreen': 'Toggle Full Screen',
 
   'menu.check-updates': 'Check for Updates…',
   'menu.settings': 'Settings…',
