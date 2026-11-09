@@ -175,6 +175,7 @@ function Node({ name, value, depth, steps, last, isOpen, toggle, onPick }: NodeP
 }
 
 function Children({ entries, array, depth, steps, isOpen, toggle, onPick }: { entries: readonly [string | number, Json][]; array: boolean; depth: number; steps: readonly (string | number)[] } & Pick<NodeProps, 'isOpen' | 'toggle' | 'onPick'>) {
+  const t = useT();
   const [shown, setShown] = useState(FIRST);
   const cut = array && entries.length > shown;
   const list = cut ? entries.slice(0, shown) : entries;
@@ -187,7 +188,7 @@ function Children({ entries, array, depth, steps, isOpen, toggle, onPick }: { en
         <div className={b.jsonRow}>
           <Indent depth={depth + 1} />
           <button type="button" className={b.jMore} onClick={() => setShown(entries.length)}>
-            Show {entries.length - shown} more
+            {t('more.json.showMore', { n: entries.length - shown })}
           </button>
         </div>
       ) : null}

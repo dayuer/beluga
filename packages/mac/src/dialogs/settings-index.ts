@@ -1,6 +1,7 @@
 import type { IconName } from '../components/Icon.js';
 import { t, tl } from '../i18n/index.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
+import { buttonLabel } from '../lib/prefs-words.js';
 import type { PaneInfo, SettingEntry, SettingsPane } from '../lib/settings-search.js';
 // Relative, not @beluga/ui: the root's tests and typecheck read this file too.
 import { HIDEABLE_BUTTONS } from '../../../../src/ui/settings-menus.js';
@@ -117,10 +118,10 @@ export const settingsIndex = (): readonly Entry[] => [
   ...rows('claude', t('settings.chatLimit.title'), [[t('settings.chatLimit.label'), t('settings.find.chatLimit'), 'chat limit tabs sentinel 聊天 上限 标签页 哨兵']]),
   // Their rows' words come from shared/threads.ts, as the pane shows them.
   ...rows('claude', threadLimitsGroup(), [
-    ['Levels of threads', 'How deep a chat’s threads go.', 'thread depth child sub-agent limit 线程 层级'],
-    ['Working at once in one chat’s tree', 'Threads working under one chat.', 'thread running tree limit 线程 同时'],
-    ['Kept in one chat’s tree', 'Threads under one chat that are not archived.', 'thread archived tree limit 线程 归档'],
-    ['Working at once on this computer', 'Threads working in all your chats.', 'thread running mac computer limit 线程 电脑'],
+    [t('prefs.threadLimit.depth.label'), t('prefs.threadLimit.depth.find'), 'thread depth child sub-agent limit 线程 层级'],
+    [t('prefs.threadLimit.treeRunning.label'), t('prefs.threadLimit.treeRunning.find'), 'thread running tree limit 线程 同时'],
+    [t('prefs.threadLimit.treeLive.label'), t('prefs.threadLimit.treeLive.find'), 'thread archived tree limit 线程 归档'],
+    [t('prefs.threadLimit.macRunning.label'), t('prefs.threadLimit.macRunning.find'), 'thread running mac computer limit 线程 电脑'],
   ]),
   ...rows('claude', t('settings.agent.scratch'), [
     [t('settings.agent.scratchGive'), t('settings.find.scratch'), 'scratch screenshots logs notes 草稿 截图 日志 笔记'],
@@ -171,7 +172,7 @@ export const settingsIndex = (): readonly Entry[] => [
   ...rows(
     'workspaces',
     t('settings.workspaces.toolbar'),
-    HIDEABLE_BUTTONS.map(([, label]) => [label, t('settings.find.toolbarButton'), 'toolbar button hide show 工具栏 按钮'] as const),
+    HIDEABLE_BUTTONS.map(([id, label]) => [buttonLabel(id, label), t('settings.find.toolbarButton'), 'toolbar button hide show 工具栏 按钮'] as const),
   ),
 
   // Terminal

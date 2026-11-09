@@ -7,6 +7,7 @@ import { type AppTheme, type ThemeBase, THEMES, themeFor } from '../lib/themes.j
 import { Group } from './settings-controls.js';
 import t from './themes.module.css';
 import { useT } from '../i18n/index.js';
+import { themeName } from '../lib/prefs-words.js';
 
 /** The accent a theme shows with your Accent: its own while that's System or Theme, else yours. */
 const accentFor = (theme: AppTheme, accent: UiPrefs['accent']): string => (accent === 'system' || accent === 'theme' ? (theme.accent ?? 'AccentColor') : ACCENTS[accent]);
@@ -16,7 +17,7 @@ function ThemeCard({ theme, on, accent }: { readonly theme: AppTheme; readonly o
   const k = theme.colors;
   const vars = { '--p-bg': k.bg, '--p-side': k.sidebar, '--p-raised': k.raised, '--p-text': k.text, '--p-text2': k.text2, '--p-text3': k.text3, '--p-accent': accent, '--p-claude': k.claude, '--p-line': theme.base === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } as CSSProperties;
   return (
-    <button type="button" role="radio" aria-checked={on} aria-label={theme.name} className={cx(t.card, on && t.cardOn)} onClick={() => pickTheme(theme.id)}>
+    <button type="button" role="radio" aria-checked={on} aria-label={themeName(theme)} className={cx(t.card, on && t.cardOn)} onClick={() => pickTheme(theme.id)}>
       <span className={cx(t.window, theme.lit && t.lit)} style={vars} aria-hidden>
         <span className={t.side}>
           <i className={t.sideRow} />
@@ -44,7 +45,7 @@ function ThemeCard({ theme, on, accent }: { readonly theme: AppTheme; readonly o
         </span>
       </span>
       <span className={t.name}>
-        {theme.name}
+        {themeName(theme)}
         {on ? <Icon name="check" size={12} /> : null}
       </span>
     </button>

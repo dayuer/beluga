@@ -23,6 +23,7 @@ import s from './ci.module.css';
 import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
+import { localEventWords, localStatusWords } from '../lib/ci-sentinel-words.js';
 
 /**
  * One workflow run, to watch: its workflow drawn as a graph with each job coloured by how it's
@@ -99,7 +100,7 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
               <div className={s.byline}>
                 <span className={cx(s.statePill, s[`tone_${tone}`])}>
                   <RunMark tone={tone} size={14} />
-                  {statusWords(run)}
+                  {localStatusWords(run)}
                 </span>
                 <span>
                   <NowText>{(now) => durationWords(runDuration(run, now))}</NowText> · {jobsSummary(run.jobs)}
@@ -152,14 +153,14 @@ function JobCard({ projectId, job }: { projectId: string; job: GhJob }) {
     <div className={cx(s.job, open && s.jobOpen)} data-job={job.name}>
       <button type="button" className={s.jobHead} aria-expanded={open} onClick={() => setOpen(!open)}>
         <Icon name={open ? 'chevronDown' : 'chevronRight'} size={10} className={s.jobChevron} />
-        <RunMark tone={tone} size={15} label={statusWords(job)} />
+        <RunMark tone={tone} size={15} label={localStatusWords(job)} />
         <span className={s.jobName}>{job.name}</span>
         {job.runner ? <span className={s.jobRunner}>{job.runner}</span> : null}
         <span className={t.grow} />
         <NowText>
           {(now) => {
             const took = spanOf(job, now);
-            return took !== undefined ? <span className={cx(s.took, isLive(job) && s.tookLive)}>{durationWords(took)}</span> : <span className={s.took}>{statusWords(job)}</span>;
+            return took !== undefined ? <span className={cx(s.took, isLive(job) && s.tookLive)}>{durationWords(took)}</span> : <span className={s.took}>{localStatusWords(job)}</span>;
           }}
         </NowText>
       </button>
@@ -171,7 +172,7 @@ function JobCard({ projectId, job }: { projectId: string; job: GhJob }) {
                 const st = runTone(step);
                 return (
                   <li key={step.number} className={cx(s.step, s[`step_${st}`])}>
-                    <RunMark tone={st} size={13} label={statusWords(step)} />
+                    <RunMark tone={st} size={13} label={localStatusWords(step)} />
                     <span className={s.stepNo}>{step.number}</span>
                     <span className={s.stepName}>{step.name}</span>
                     <span className={s.took}>
@@ -242,7 +243,7 @@ function Properties({ repo, run }: { repo: GitHubRepo; run: GhRunFull }) {
   return (
     <aside className={t.props} aria-label={tr('issues.page.properties')}>
       <Prop label={tr('ci.run.status')}>
-        <span className={t.propStatic}>{statusWords(run)}</span>
+        <span className={t.propStatic}>{localStatusWords(run)}</span>
       </Prop>
       <Prop label={tr('ci.actions.workflow')}>
         <span className={t.propStatic}>
@@ -252,7 +253,7 @@ function Properties({ repo, run }: { repo: GitHubRepo; run: GhRunFull }) {
       </Prop>
       <Prop label={tr('ci.run.startedBy')}>
         <span className={t.propStatic}>
-          {eventWords(run.event)}
+          {localEventWords(run.event)}
           {run.actor ? ` · ${run.actor}` : ''}
         </span>
       </Prop>

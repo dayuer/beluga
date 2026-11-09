@@ -5,6 +5,7 @@ import { ViewBlock } from '../../components/views/ViewBlock.js';
 import { usePrefs } from '../../lib/prefs.js';
 import { SPRING } from '../fx.js';
 import s from './scenes.module.css';
+import { t, useT } from '../../i18n/index.js';
 
 /**
  * The table weave: asked about a database, Claude finds how to reach it, picks the protocol
@@ -19,15 +20,16 @@ const PROTOCOLS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'mysql', label: 'MySQL' },
 ];
 
-const VIEW = JSON.stringify({
+/** The table the tour answers with, its words in the language shown. */
+const demoView = (): string => JSON.stringify({
   type: 'table',
-  title: 'Churned last month',
-  summary: 'subscriptions · 5 rows',
+  title: t('more.tour.tables.title'),
+  summary: t('more.tour.tables.summary'),
   columns: [
-    { key: 'customer', label: 'Customer' },
-    { key: 'plan', label: 'Plan', type: 'badge' },
+    { key: 'customer', label: t('more.tour.tables.customer') },
+    { key: 'plan', label: t('more.tour.tables.plan'), type: 'badge' },
     { key: 'mrr', label: 'MRR', type: 'currency', currency: 'USD' },
-    { key: 'left', label: 'Left on', type: 'date' },
+    { key: 'left', label: t('more.tour.tables.leftOn'), type: 'date' },
   ],
   data: [
     { customer: 'Northwind', plan: 'Team', mrr: 480, left: '2026-09-04' },
@@ -44,10 +46,10 @@ interface Line {
   readonly code: string;
 }
 
-const LINES: readonly Line[] = [
-  { icon: 'file', text: 'Found', code: 'DATABASE_URL in .env' },
-  { icon: 'link', text: 'Connected to', code: 'localhost:5432/shop' },
-  { icon: 'terminal', text: 'Queried', code: 'SELECT … FROM subscriptions' },
+const stepLines = (): readonly Line[] => [
+  { icon: 'file', text: t('more.tour.found'), code: 'DATABASE_URL in .env' },
+  { icon: 'link', text: t('more.tour.tables.connectedTo'), code: 'localhost:5432/shop' },
+  { icon: 'terminal', text: t('more.tour.tables.queried'), code: 'SELECT … FROM subscriptions' },
 ];
 
 // Beats (ms each): the question, finding the database, picking the protocol, connecting,
@@ -72,7 +74,9 @@ function useOnce(): number {
  * `view`: another table to answer with (the README's has more rows, a filter and pages);
  * `extra`: drawn over the window (the README's pointer trying the table out); `tip`: the line under it.
  */
-export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; readonly extra?: ReactNode; readonly tip?: ReactNode } = {}) {
+export function Tables({ view, extra, tip }: { readonly view?: string; readonly extra?: ReactNode; readonly tip?: ReactNode } = {}) {
+  const tr = useT();
+  const LINES = stepLines();
   const beat = useOnce();
   const picking = beat >= 1;
   const picked = beat >= 2;
@@ -92,18 +96,18 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
           <span className={s.mono}>shop · main</span>
           {working ? (
             <span className={s.live}>
-              <span className={s.liveDot} /> Working
+              <span className={s.liveDot} /> {tr('more.tour.working')}
             </span>
           ) : null}
         </div>
         <div className={s.tablesChat}>
-          <div className={s.ask}>Which customers churned last month?</div>
+          <div className={s.ask}>{tr('more.tour.tables.ask')}</div>
           <AnimatePresence mode="wait" initial={false}>
             {table ? (
               // Once Claude answers, its steps fold away (as they do in a conversation).
               <motion.div key="folded" className={s.folded} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
                 <Icon name="check" size={12} className={s.done} />
-                <span>3 steps</span>
+                <span>{tr('more.tour.tables.steps')}</span>
                 <span className={s.protocol} data-on>
                   <Icon name="grid" size={10} /> Postgres
                 </span>
@@ -126,7 +130,7 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
                 <AnimatePresence initial={false}>
                   {picking ? (
                     <motion.div key="protocols" className={s.protocols} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={SPRING}>
-                      <span className={s.dim}>{picked ? 'Protocol' : 'Picking a protocol'}</span>
+                      <span className={s.dim}>{picked ? tr('more.tour.tables.protocol') : tr('more.tour.tables.picking')}</span>
                       {PROTOCOLS.map((p, i) => {
                         const chosen = picked && p.id === 'postgres';
                         return (
@@ -145,11 +149,11 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
           <AnimatePresence>
             {table ? (
               <motion.div key="table" className={s.weave} initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 22 }}>
-                <ViewBlock code={view} type="table" />
+                <ViewBlock code={view ?? demoView()} type="table" />
                 <div className={s.weaveTry}>
                   {tip ?? (
                     <>
-                      <Icon name="hand" size={11} /> It’s the real table: click a heading to sort, or turn it into a chart.
+                      <Icon name="hand" size={11} /> {tr('more.tour.tables.tip')}
                     </>
                   )}
                 </div>

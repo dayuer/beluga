@@ -9,6 +9,7 @@ import f from './fire-settings.module.css';
 import m from '../chat/max.module.css';
 import s from './settings.module.css';
 import { useT } from '../i18n/index.js';
+import { fireBlurb, fireName, paletteName } from '../lib/prefs-words.js';
 
 /** The dials, in plain words at each end. */
 const DIALS = [
@@ -89,8 +90,8 @@ export function FireSettings() {
         <div className={f.presets} role="radiogroup" aria-label={t('settings.fire.whatsOn')}>
           {SETUPS.map((x) => (
             <button key={x.id} type="button" role="radio" aria-checked={setupOf(look) === x.id} className={cx(f.preset, setupOf(look) === x.id && f.on)} onClick={() => set(x.set)}>
-              <span className={f.presetName}>{x.name}</span>
-              <span className={f.presetBlurb}>{x.blurb}</span>
+              <span className={f.presetName}>{fireName('fireSetup', x)}</span>
+              <span className={f.presetBlurb}>{fireBlurb('fireSetup', x)}</span>
             </button>
           ))}
         </div>
@@ -112,8 +113,8 @@ export function FireSettings() {
           {PRESETS.map((p) => (
             <button key={p.id} type="button" role="radio" aria-checked={look.preset === p.id} className={cx(f.preset, look.preset === p.id && f.on)} onClick={() => set(p.look)}>
               <Swatch colors={paletteOf({ palette: p.look.palette, palettes: look.palettes }).colors} />
-              <span className={f.presetName}>{p.name}</span>
-              <span className={f.presetBlurb}>{p.blurb}</span>
+              <span className={f.presetName}>{fireName('firePreset', p)}</span>
+              <span className={f.presetBlurb}>{fireBlurb('firePreset', p)}</span>
             </button>
           ))}
           {look.preset === 'custom' ? (
@@ -249,7 +250,7 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
               title={own ? t('settings.fire.doubleClick') : undefined}
             >
               <Dots colors={p.colors} />
-              {p.name}
+              {paletteName(p, own)}
               {own && look.palette === p.id ? (
                 <span
                   className={f.edit}

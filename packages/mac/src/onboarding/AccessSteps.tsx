@@ -60,7 +60,7 @@ function MiniPane({ step, grant }: { readonly step: AccessStep; readonly grant: 
         <div className={s.paneList}>
           <div className={s.paneRow} data-faint>
             <span className={s.paneApp} style={{ background: '#d7dbe2' }} />
-            <span className={s.paneName}>Terminal</span>
+            <span className={s.paneName}>{t('more.tour.access.terminal')}</span>
             <span className={s.paneSwitch} data-on />
           </div>
           <motion.div className={s.paneRow} data-ours animate={on ? { scale: [1, 1.02, 1] } : { scale: 1 }} transition={{ duration: 0.5, ease: EASE_OUT }}>

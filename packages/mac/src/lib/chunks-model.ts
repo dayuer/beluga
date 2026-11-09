@@ -6,6 +6,7 @@
  * the view shows what happened, with a way back), the views are fetched early while the origin
  * still answers, and each stall is noted in the daemon's black box. No React here: tests load it.
  */
+import { late as inLanguage } from './late-words.js';
 
 /** How long a chunk may take before the view says it didn't load. */
 export const CHUNK_TIMEOUT_MS = 20_000;
@@ -107,7 +108,7 @@ export function chunk<T>(name: string, importer: () => Promise<T>, opts: ChunkOp
       // A load that threw can be tried again (a stalled one is still pending, and stays shared).
       if (pending === p) pending = undefined;
       note({ kind: 'failed', chunk: name, ms: now() - began, message: errorText(err) });
-      throw new ChunkLoadError(name, false, `This part of Beluga didn’t load (${errorText(err)})`);
+      throw new ChunkLoadError(name, false, inLanguage(`This part of Beluga didn’t load (${errorText(err)})`, (w) => w.t('more.chunks.didntLoad', { error: errorText(err) })));
     });
     pending = p;
     return p;
@@ -121,7 +122,7 @@ export function chunk<T>(name: string, importer: () => Promise<T>, opts: ChunkOp
         timer = setTimeout(() => {
           const ms = now() - began;
           note({ kind: 'stalled', chunk: name, ms, message: `no answer after ${Math.round(ms / 1000)} s` });
-          reject(new ChunkLoadError(name, true, 'This part of Beluga didn’t finish loading'));
+          reject(new ChunkLoadError(name, true, inLanguage('This part of Beluga didn’t finish loading', (w) => w.t('more.chunks.didntFinish'))));
         }, timeoutMs);
       });
       return Promise.race([loading, late]).finally(() => clearTimeout(timer));

@@ -22,6 +22,7 @@ import s from './ci.module.css';
 import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { NoProjects } from '../work/NoProjects.js';
+import { localStatusWords } from '../lib/ci-sentinel-words.js';
 
 type Page = 'runs' | 'workflows';
 
@@ -204,7 +205,7 @@ function WorkflowCard({ projectId, flow, last }: { projectId: string; flow: GhWo
         {flow.state === 'not_pushed' ? <span className={s.badge}>{tr('ci.actions.notPushed')}</span> : off ? <span className={s.badge}>{tr('ci.actions.turnedOff')}</span> : null}
         <span className={t.grow} />
         {last ? (
-          <Tip label={tr('ci.actions.lastRun', { status: statusWords(last), when: ago(last.createdAt) })}>
+          <Tip label={tr('ci.actions.lastRun', { status: localStatusWords(last), when: ago(last.createdAt) })}>
             <button type="button" className={s.flowLast} onClick={() => openRun(projectId, last.id)}>
               <RunMark tone={runTone(last)} size={14} />
               <span className={s.flowLastTitle}>{last.title}</span>

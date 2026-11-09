@@ -234,7 +234,7 @@ function Matches({ text, base }: { text: string; base?: string }) {
           </div>
         );
       })}
-      {lines.length > 500 ? <div className={s.quiet}>…and {lines.length - 500} more</div> : null}
+      {lines.length > 500 ? <div className={s.quiet}>{tr('more.chat.andMore', { n: lines.length - 500 })}</div> : null}
     </div>
   );
 }

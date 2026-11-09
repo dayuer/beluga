@@ -22,6 +22,7 @@ import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { everyWhileShown } from '../lib/window-active.js';
 import { useT } from '../i18n/index.js';
+import { placementWhy } from '../lib/prefs-words.js';
 
 /**
  * Settings › Your Computers (BLG-780): where new work runs, adding a computer (over SSH, or with
@@ -58,7 +59,7 @@ export function MachinesSettings() {
   return (
     <>
       <Group title={t('settings.computers.whereTitle')}>
-        <Row label={t('settings.computers.runOn')} detail={placement?.why ?? t('settings.computers.runOnDetail')}>
+        <Row label={t('settings.computers.runOn')} detail={placement ? placementWhy(placement.why) : t('settings.computers.runOnDetail')}>
           <Select label={t('settings.computers.runOn')} value={runOn} onChange={(v) => void client.api.session.setPrefs({ runOn: v })} options={runOnOptions(here, machines ?? [])} />
         </Row>
       </Group>
@@ -155,7 +156,7 @@ function YouOnTheNetwork({ you, here, onChange }: { you: AlwaysOnView | undefine
       <Row label={you.here ? here : (you.name ?? t('settings.computers.yourAlwaysOn'))} detail={detail}>
         {you.here || you.busy ? (
           <span className={c.kind} data-testid={you.standIn ? 'standing-in' : undefined}>
-            {you.standIn ? t('settings.computers.standingIn') : you.here ? 'Always On' : ''}
+            {you.standIn ? t('settings.computers.standingIn') : you.here ? t('prefs.alwaysOn') : ''}
           </span>
         ) : (
           <Button size="small" onClick={() => setAsking(true)}>
@@ -390,7 +391,7 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
           <span className={c.kind}>{kindLine(machine)}</span>
           {machine.alwaysOn ? (
             <span className={c.kind} data-testid="always-on-tag">
-              <Icon name="power" size={11} /> Always On
+              <Icon name="power" size={11} /> {t('prefs.alwaysOn')}
             </span>
           ) : null}
         </div>

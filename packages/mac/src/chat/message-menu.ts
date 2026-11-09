@@ -4,6 +4,7 @@ import { copyText } from '../lib/copy.js';
 import type { UiStore } from '../lib/beluga.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { t } from '../i18n/index.js';
+import { imageLabel } from './images.js';
 
 /**
  * What right-clicking a message offers: copy it (as you read it, or as Markdown), quote it in
@@ -84,6 +85,6 @@ export function messageItems(o: MessageMenuOptions): ActionItem[] {
           ...(o.askPrefix !== undefined ? [{ label: t('chat.messageMenu.askAbout'), icon: 'claude' as const, onSelect: () => quoteInBox(o.ui, picked || o.text, o.askPrefix) }] : []),
         ]
       : []),
-    ...(o.images ?? []).map((img, i) => ({ label: o.images!.length > 1 ? t('chat.messageMenu.open', { name: img.label }) : t('chat.messageMenu.openImage'), icon: 'image' as const, separate: i === 0 && hasText, onSelect: () => o.openImage?.(img) })),
+    ...(o.images ?? []).map((img, i) => ({ label: o.images!.length > 1 ? t('chat.messageMenu.open', { name: imageLabel(img.label) }) : t('chat.messageMenu.openImage'), icon: 'image' as const, separate: i === 0 && hasText, onSelect: () => o.openImage?.(img) })),
   ];
 }

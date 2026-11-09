@@ -1,5 +1,5 @@
 import type { Capabilities } from '@beluga/ipc/socket-client.js';
-import { say } from './late-words.js';
+import { late, say } from './late-words.js';
 import { SocketClient } from '@beluga/ipc/socket-client.js';
 import { brandNotice, isTestNotice } from './brand.js';
 import type { SoundChoice } from '@beluga/shared/notify-sound.js';
@@ -32,6 +32,9 @@ export const WEB_HELLO_TOKEN = 'browser-session-cookie';
 /** The socket of the page's own origin (the daemon's web port, src/daemon/web.ts). */
 export const webSocketUrl = (loc: Pick<Location, 'protocol' | 'host'>): string => `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${loc.host}/ws`;
 
+/** The daemon isn't there (in the language shown once it's loaded). */
+const notRunning = (): string => late('Beluga is not running', (w) => w.t('more.boot.notRunning'));
+
 /**
  * Where the daemon is: the app's own sidecar (asked through Tauri), the daemon's web port that
  * served this page (`beluga web`: same origin, its session cookie), or the dev server's bridge.
@@ -46,15 +49,15 @@ export async function endpoint(): Promise<Endpoint> {
   // This browser was revoked (or never let in): the page itself becomes the Ask for a link page.
   if (res.status === 401 && body.signedOut) {
     location.reload();
-    throw new Error('This browser is signed out of Beluga');
+    throw new Error(late('This browser is signed out of Beluga', (w) => w.t('more.boot.signedOut')));
   }
-  if (!res.ok || body.error) throw new Error(body.error ?? 'Beluga is not running');
+  if (!res.ok || body.error) throw new Error(body.error ?? notRunning());
   if (body.web) {
     served = true;
     document.documentElement.dataset.web = 'true';
     return { url: webSocketUrl(location), token: WEB_HELLO_TOKEN };
   }
-  if (!body.url || !body.token) throw new Error('Beluga is not running');
+  if (!body.url || !body.token) throw new Error(notRunning());
   return { url: body.url, token: body.token };
 }
 

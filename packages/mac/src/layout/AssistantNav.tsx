@@ -1,4 +1,5 @@
-import { ASSISTANT_CHANNEL, ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { ASSISTANT_CHANNEL } from '@beluga/shared/assistant.js';
+import { assistantTitle } from '../lib/brand.js';
 import { Icon } from '../components/Icon.js';
 import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
@@ -30,7 +31,7 @@ export function AssistantNav() {
   return (
     <Row
       icon={<Icon name="laptop" size={14} />}
-      label={ASSISTANT_TITLE}
+      label={assistantTitle()}
       detail={signal.tip || t('layout.assistantNav.detail', { computer: yourComputer() })}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'assistant' } })}

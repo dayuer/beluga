@@ -1,7 +1,8 @@
 import * as Context from '@radix-ui/react-context-menu';
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
 import type { MouseEvent, ReactNode } from 'react';
-import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
+import type { MenuKind } from '@beluga/ui/menus.js';
+import { localMenuSpec } from '../lib/engine-words.js';
 import { useActions } from '../lib/actions.js';
 import { useBeluga } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
@@ -15,7 +16,7 @@ import { t as tNow } from '../i18n/index.js';
  */
 function useItems(menu: MenuKind, hide?: (id: string) => boolean) {
   const { client } = useBeluga();
-  const spec = menuSpec(client.store.getState(), menu);
+  const spec = localMenuSpec(client.store.getState(), menu);
   return (spec?.options ?? []).map((o, index) => ({ ...o, index })).filter((o) => o.id !== 'close' && !hide?.(o.id));
 }
 

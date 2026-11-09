@@ -7,7 +7,7 @@ import { ATTACHMENT_SCHEME } from '@beluga/core/attachment-share.js';
 import type { LinkTarget } from '@beluga/shared/link-target.js';
 import { parseAttachmentHref } from '@beluga/shared/attachment-links.js';
 import { Icon } from '../components/Icon.js';
-import { type ChatImage, openLightbox } from './images.js';
+import { type ChatImage, imageLabel, openLightbox } from './images.js';
 import { Thumb } from './ChatImages.js';
 import { ImageChip } from './ImageChip.js';
 import { imageSource, localImage, messageImages } from './md-images.js';
@@ -282,7 +282,7 @@ export const Markdown = memo(function Markdown({ text, paths = false, localImage
       const image = parseAttachmentHref(href);
       if (image) {
         const label = /image \d+/.exec(String(children))?.[0] ?? 'image';
-        return <ImageChip href={href} label={label} title={tNow('chat.messageMenu.open', { name: label })} onClick={(e) => (e.preventDefault(), openLightbox([{ href, ...image, label }]))} />;
+        return <ImageChip href={href} label={imageLabel(label)} title={tNow('chat.messageMenu.open', { name: imageLabel(label) })} onClick={(e) => (e.preventDefault(), openLightbox([{ href, ...image, label }]))} />;
       }
       // A file or folder named in the words (shared/render/path-refs.ts): opens it, right-click for more.
       const path = parsePathHref(href);

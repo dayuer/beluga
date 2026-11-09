@@ -47,7 +47,7 @@ export function Earnings() {
             </strong>
           </div>
           <span className={s.stripe}>
-            <span className={s.stripeDot} /> Stripe connected
+            <span className={s.stripeDot} /> {t('more.tour.earnings.stripe')}
           </span>
         </div>
         {PROJECTS.map((p, i) => {

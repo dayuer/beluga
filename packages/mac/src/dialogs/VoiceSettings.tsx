@@ -12,6 +12,7 @@ import s from './settings.module.css';
 import { chordLabel, keyPlatform } from '../lib/shortcuts-model.js';
 import { microphoneSettings, osName, systemSettingsName, thisComputer, yourComputer } from '../lib/os-words.js';
 import { useT } from '../i18n/index.js';
+import { voiceLanguageName } from '../lib/prefs-words.js';
 
 /**
  * Settings › Voice (BLG-146): speaking instead of typing. The microphone it listens to (BLG-766),
@@ -99,7 +100,7 @@ export function VoiceSettings() {
           />
         </Row>
         <Row label={tr('settings.voice.language')} detail={prefs.voiceLanguage === 'auto' ? tr('settings.voice.languageAuto') : tr('settings.voice.languageOne')}>
-          <Select label={tr('settings.voice.language')} value={prefs.voiceLanguage} onChange={(v) => setPrefs({ voiceLanguage: v })} options={VOICE_LANGUAGES.map((l) => ({ value: l.code, label: l.label }))} />
+          <Select label={tr('settings.voice.language')} value={prefs.voiceLanguage} onChange={(v) => setPrefs({ voiceLanguage: v })} options={VOICE_LANGUAGES.map((l) => ({ value: l.code, label: voiceLanguageName(l.code, l.label) }))} />
         </Row>
         {(models?.models ?? []).map((m) => (
           <Row
@@ -159,7 +160,7 @@ export function VoiceSettings() {
           <Switch label={tr('settings.voice.sendNow')} on={prefs.voiceSend} onChange={(v) => setPrefs({ voiceSend: v })} />
         </Row>
       </Group>
-      <p className={s.note}>{tr('settings.voice.note', { here: thisComputer(), yours: yourComputer() })}</p>
+      <p className={s.note}>{tr('prefs.voice.note', { here: thisComputer(), yours: yourComputer() })}</p>
     </>
   );
 }

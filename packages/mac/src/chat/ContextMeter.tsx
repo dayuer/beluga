@@ -8,6 +8,7 @@ import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { type MeterModel, breakdownRows, meterModel, usageLine, whenText } from './context-model.js';
 import { useT } from '../i18n/index.js';
 import s from './context.module.css';
+import { localModelName } from '../lib/engine-words.js';
 
 const OPEN_DELAY_MS = 220;
 const CLOSE_DELAY_MS = 180;
@@ -110,7 +111,7 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
   const { client } = useBeluga();
   const prefs = useApp((st) => st.prefs);
   const picked = useApp((st) => modelOf(st, channel));
-  const modelName = useApp((st) => modelLabel(st, picked));
+  const modelName = localModelName(useApp((st) => modelLabel(st, picked)));
   // A workspace someone shared with you: their Claude, so only they can compact it.
   const theirs = useApp((st) => st.view.kind === 'shared');
   const local = useLocalRun(channel);

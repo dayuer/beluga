@@ -30,9 +30,15 @@ import { menu as enMenu } from './en/menu.js';
 import { menu as zhMenu } from './zh-CN/menu.js';
 import { machines as enMachines } from './en/machines.js';
 import { machines as zhMachines } from './zh-CN/machines.js';
+import { x_engine as enEngine } from './en/x-engine.js';
+import { x_engine as zhEngine } from './zh-CN/x-engine.js';
+import { x_prefs as enPrefsWords } from './en/x-prefs.js';
+import { x_prefs as zhPrefsWords } from './zh-CN/x-prefs.js';
+import { x_more as enMore } from './en/x-more.js';
+import { x_more as zhMore } from './zh-CN/x-more.js';
 
-const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines } as const;
-const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines };
+const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines, ...enEngine, ...enPrefsWords, ...enMore } as const;
+const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines, ...zhEngine, ...zhPrefsWords, ...zhMore };
 
 export type Key = keyof typeof EN & string;
 const tOf = makeT(EN, { 'zh-CN': ZH });
@@ -42,6 +48,9 @@ const systemLanguages = (): readonly string[] => (typeof window === 'undefined' 
 
 /** The language the window shows now. */
 export const currentLocale = (): Locale => resolveLocale(getPrefs().language, systemLanguages());
+
+/** Words in one given language (tests, and helpers that take a `lang`). */
+export const tIn = (locale: Locale): ((key: Key, vars?: Vars) => string) => tOf(locale);
 
 /** Words in the language shown now (outside React: read at the call). */
 export const t = (key: Key, vars?: Vars): string => tOf(currentLocale())(key, vars);
