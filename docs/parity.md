@@ -592,6 +592,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `plans.setPaused` | ✓ Pause / Resume on a plan's page |
 | `plans.setParallel` | ✓ a plan's ⋯ › Run at Once ▸ |
 | `plans.setWorkAgent` | ✓ a plan's ⋯ › Agent for Its Work ▸ (BLG-498): who works the milestones and tasks that start from now on (ones at work keep theirs, the toast says so); the phone's plan page › ⋯ › Agent for its work (1.35) |
+| `plans.setCheckAgent` | ✓ a plan's ⋯ › Agent for Its Checks ▸: who runs its milestone checkers and Verify the Plan from now on, say a stronger model than the work's (Same as Its Work: the work's agent); the phone's plan page › ⋯ › Agent for its checks (1.48) |
 | `plans.setTestsAt` | ✓ a plan's ⋯ › When to Run Tests ▸ (each milestone, or once at the end) |
 | `plans.pass` | ✓ Pass Milestone on a plan's page |
 | `plans.recheck` | ✓ Check Again on a milestone the agent is checking or that failed its check |

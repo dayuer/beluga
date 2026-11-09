@@ -37,7 +37,7 @@ export const agentOfRow = (g: Pick<Group, 'runtime' | 'label'>, value: string): 
  * adds "Your agent" on top (null: whatever your default is when the work starts), on when nothing
  * else is picked.
  */
-export function AgentChoiceSheet({ title, caption, picker, visible, onClose, onPick, yours }: { readonly title: string; readonly caption: string; readonly picker: AgentPickerView | undefined; readonly visible: boolean; readonly onClose: () => void; readonly onPick: (g: Group, value: string, label: string) => void; readonly yours?: { readonly on: boolean; readonly onPick: () => void } }) {
+export function AgentChoiceSheet({ title, caption, picker, visible, onClose, onPick, yours }: { readonly title: string; readonly caption: string; readonly picker: AgentPickerView | undefined; readonly visible: boolean; readonly onClose: () => void; readonly onPick: (g: Group, value: string, label: string) => void; readonly yours?: { readonly on: boolean; readonly onPick: () => void; readonly label?: string; readonly caption?: string } }) {
   const pick = (g: Group, value: string, label: string): void => {
     if (!picker) return;
     haptic.commit();
@@ -73,8 +73,8 @@ export function AgentChoiceSheet({ title, caption, picker, visible, onClose, onP
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: yours.on ? color.card : 'transparent' }}>
               <AgentMarkIcon mark={runtimeMark(def?.runtime)} size={18} color={color.text2} />
               <View style={{ flex: 1 }}>
-                <T v="body">{def ? `Your agent (${def.label})` : 'Your agent'}</T>
-                <T v="caption">Whatever your default agent is when the work starts</T>
+                <T v="body">{yours.label ?? (def ? `Your agent (${def.label})` : 'Your agent')}</T>
+                <T v="caption">{yours.caption ?? 'Whatever your default agent is when the work starts'}</T>
               </View>
               {yours.on ? <Check size={18} color={color.text} /> : null}
             </View>
