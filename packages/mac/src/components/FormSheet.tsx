@@ -3,6 +3,7 @@ import { type ReactNode, type Ref, type TextareaHTMLAttributes, type InputHTMLAt
 import { pickFolders } from '../lib/projects.js';
 import { copyText } from '../lib/copy.js';
 import { canPickFolders } from '../lib/boot.js';
+import { useMachine } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
 import { Select, type SelectEntry } from './Select.js';
 import { t as tNow, useT } from '../i18n/index.js';
@@ -166,6 +167,8 @@ export function Popup<T extends string>({ value, options, onChange, label, id }:
 export function FolderInput({ value, onChange, title, placeholder = '~/code/app' }: { value: string; onChange: (v: string) => void; title?: string; placeholder?: string }) {
   const t = useT();
   const id = useId();
+  // On a computer's page, its folders (BLG-793).
+  const machine = useMachine();
   return (
     <div className={s.folder}>
       <TextInput id={id} value={value} onChange={onChange} mono placeholder={placeholder} aria-label={t('common.formSheet.folder')} />
@@ -174,7 +177,7 @@ export function FolderInput({ value, onChange, title, placeholder = '~/code/app'
           type="button"
           className={s.button}
           onClick={() =>
-            void pickFolders(title ?? tNow('common.formSheet.chooseFolder')).then((p) => {
+            void pickFolders(title ?? tNow('common.formSheet.chooseFolder'), { machine }).then((p) => {
               if (p?.[0]) onChange(p[0]);
             })
           }

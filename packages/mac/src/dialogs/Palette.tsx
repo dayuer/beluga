@@ -85,6 +85,7 @@ export function Palette() {
     ]),
     { id: 'add-project', label: t('dialogs.palette.addProject'), icon: 'plus', run: () => actions.run({ type: 'add_project' }) },
     { id: 'new-project', label: t('dialogs.palette.newProject'), hint: t('dialogs.palette.newProjectHint'), icon: 'folder', keywords: ['create project', 'start project', 'git init'], run: () => ui.patch({ addProject: 'new' }) },
+    { id: 'clone-project', label: t('dialogs.palette.cloneProject'), hint: t('dialogs.palette.cloneProjectHint'), icon: 'download', keywords: ['git clone', 'git url', 'github', 'repository'], run: () => ui.patch({ addProject: 'clone' }) },
     { id: 'share-folder', label: t('dialogs.palette.shareFolder'), icon: 'share', run: () => ui.openMenu({ kind: 'share_folder', launchDir: state.home, mine: state.myShares }) },
     // One entry for inviting and adding a friend (BLG-203): /invite does the same.
     { id: 'invite', label: t('dialogs.palette.addFriend'), hint: t('dialogs.palette.addFriendHint'), icon: 'people', keywords: ['invite', 'invite someone', 'friend', 'code', 'link'], run: () => document.dispatchEvent(new CustomEvent('beluga:invite')) },

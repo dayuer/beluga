@@ -19,7 +19,7 @@ import { type SubAgent, agentIdOfPath, agentOfWorktree, agentTitle, effortLabel,
 import s from './claude-code.module.css';
 import m from './agent-monitor.module.css';
 import o from './agent-outputs.module.css';
-import { revealLabel } from '../lib/os-words.js';
+import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
 
 /**
  * One sub-agent, followed live: what it was asked, who started it (and a way back there), its
@@ -94,6 +94,7 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
 export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Workspace }) {
   const { client } = useBeluga();
   const tr = useT();
+  const revealWords = useRevealLabel();
   const actions = useActions();
   const a = sub.agent;
   // Only Beluga's own conversations are a chat to go back to (a session outside Beluga isn't).
@@ -174,8 +175,8 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
             </Button>
           ) : null}
           {worktree ? (
-            <Button size="small" icon="folder" onClick={() => void client.api.workspaces.openInFinder(worktree.id)}>
-              {revealLabel()}
+            <Button size="small" icon="folder" onClick={() => void showWorktreeFolder(client, worktree.id)}>
+              {revealWords}
             </Button>
           ) : null}
           {worktree && !live ? (

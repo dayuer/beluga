@@ -29,6 +29,7 @@ export function NetworkSettings() {
   const groups = net.groups.filter((g) => g.active).length;
   const chatClaude = useApp((st) => st.prefs.chatClaude);
   const shareUsage = useApp((st) => st.prefs.shareUsage);
+  const readReceipts = useApp((st) => st.prefs.readReceipts);
   return (
     <Group title={t('network.settings.friends')}>
       <Row
@@ -85,6 +86,11 @@ export function NetworkSettings() {
             ]}
             onChange={(v) => void client.api.session.setPrefs({ shareUsage: v })}
           />
+        </Row>
+      ) : null}
+      {net.enabled ? (
+        <Row label={t('network.settings.seen')} detail={t('network.settings.seenDetail')}>
+          <Switch label={t('network.settings.seen')} on={readReceipts} onChange={(v) => void client.api.session.setPrefs({ readReceipts: v })} />
         </Row>
       ) : null}
     </Group>

@@ -5,7 +5,6 @@ import { formatBytes } from '@beluga/shared/format.js';
 import { Icon } from '../components/Icon.js';
 import { Avatar, Button, Empty, IconButton, Segmented, cx } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
-import { lazyView } from '../lib/lazy-view.js';
 import { ActionsContext, type ActionItem } from '../components/SpecMenu.js';
 import { useActions } from '../lib/actions.js';
 import { copyText } from '../lib/copy.js';
@@ -16,11 +15,14 @@ import { SearchField, SearchResults } from './SharedSearch.js';
 import s from './files.module.css';
 import { revealLabel } from '../lib/os-words.js';
 import { useT } from '../i18n/index.js';
+import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
+import { ReaderContent } from './reader/reader-lazy.js';
 
 export { LANG, ext } from './reader/reader-model.js';
 
 /** The reader comes in its own chunk, the first time a file is opened. */
-const FileContent = lazyView('views/reader/FileReader', () => import('./reader/FileReader.js').then((m) => m.FileContent), false);
+/** The reader in its own chunk (views/reader/reader-lazy.tsx): fetched early, drawn at once once it's here (BLG-853), giving up on a stalled fetch instead of waiting (#370). */
+const FileContent = ReaderContent;
 
 /** A decoded image (RGBA pixels) drawn at its size, scaled down to fit. */
 export function Bitmap({ image }: { image: NonNullable<ViewerState['image']> }) {
@@ -83,6 +85,9 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
 /** Right-click on a file or folder: open it, find it in Finder, copy its path, mention it, save it. */
 export function useRowItems(): (row: BrowserRow, onOpen: () => void) => ActionItem[] {
   const { client, ui } = useBeluga();
+  // On a computer's page: a file is downloaded, a folder's path copied (BLG-852).
+  const revealFile = useRevealFileLabel();
+  const revealFolder = useRevealLabel();
   const actions = useActions();
   const t = useT();
   return (row, onOpen) => {
@@ -107,7 +112,7 @@ export function useRowItems(): (row: BrowserRow, onOpen: () => void) => ActionIt
     };
     return [
       { label: row.dir ? t('views.files.openFolder') : t('views.sync.open'), icon: row.dir ? 'folder' : 'file', onSelect: onOpen },
-      ...(local ? [{ label: revealLabel(), icon: 'folder' as const, onSelect: () => void revealInFinder(client, local) }] : []),
+      ...(local ? [{ label: row.dir ? revealFolder : revealFile, icon: 'folder' as const, onSelect: () => void revealInFinder(client, local) }] : []),
       { label: t('views.diff.copyPath'), icon: 'copy', separate: true, onSelect: () => void copyText(local ?? mentionOf(state, at)).then(() => say(t('views.diff.copiedPath'))) },
       { label: t('views.diff.mention'), icon: 'chat', onSelect: mention },
       ...(row.dir ? [] : [{ label: t('views.files.saveCopy'), icon: 'download' as const, separate: true, onSelect: () => void saveFile(client, at) }]),

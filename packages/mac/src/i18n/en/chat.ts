@@ -624,4 +624,23 @@ export const chat = {
   'chat.stepRow.showWhat': 'Show what ran and what came back',
   'chat.stepRow.loading': 'Loading…',
   'chat.stepRow.gone': 'Beluga no longer has the details of this step.',
+  // RunsOn
+  'chat.runsOn.words': 'Runs on',
+  'chat.runsOn.named': 'Runs on {name}',
+  'chat.runsOn.namedWhy': 'Runs on {name}: {why}',
+  'chat.runsOn.waits': 'Nothing starts until it can: {why}',
+  'chat.runsOn.folderHere': 'this folder is on {here}',
+  'chat.runsOn.tip': 'New work can run elsewhere.',
+  // attachments, use-attachments (a chat on one of your computers)
+  'chat.attach.stopped': 'The upload stopped moving; send it again',
+  'chat.attach.notChecked': 'it couldn’t be checked',
+  'chat.attach.envTitle': 'Send {names} to {machine}?',
+  'chat.attach.envMessage': (v: Vars) => `${v.n === 1 ? 'It holds' : 'They hold'} secrets. ${v.n === 1 ? 'It goes' : 'They go'} over your encrypted link, for this message only.`,
+  'chat.attach.sendOnce': 'Send Once',
+  'chat.attach.dontSend': 'Don’t Send',
+  'chat.attach.staysHere': '{name} stays on this Mac: {reason}',
+  'chat.attach.sendFailed': "Couldn't send {name}: {error}",
+  'chat.attach.thatComputer': 'that computer',
+  'chat.attach.sending': 'Sending {name}',
+  'chat.attach.sendingTo': 'Sending {name} to the computer this chat runs on',
 } as const;

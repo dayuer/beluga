@@ -338,7 +338,7 @@ export const common_components = {
   'common.controls.label': 'Controls',
   'common.updatePill.idleTip': 'Installs when you step away',
   'common.updatePill.idle': 'when idle',
-  'common.earningsPill.counting': 'Counting all-time earnings from Stripe…',
+  'common.earningsPill.counting': 'Counting all-time earnings from {sources}…',
   'common.earningsPill.head': 'All-time earnings · {when}',
   'common.earningsPill.updating': 'updating…',
   'common.earningsPill.updated': 'updated {ago}',
@@ -347,7 +347,7 @@ export const common_components = {
   'common.earningsPill.test': 'Test mode',
   'common.earningsPill.aria': 'All-time earnings {amount}',
   'common.earningsPill.ariaAbout': 'All-time earnings about {amount}',
-  'common.earningsPill.problem': 'Stripe earnings: a problem',
+  'common.earningsPill.problem': 'Earnings: a problem',
   'common.earningsPill.countingShort': 'Counting earnings',
   'common.formSheet.folder': 'Folder',
   'common.formSheet.chooseFolder': 'Choose a folder',
@@ -360,4 +360,5 @@ export const common_components = {
   'common.videoPlayer.detail': 'Its format or codec isn’t one the app plays. Open it with its app.',
   'common.zoomAvatar.see': 'See {name}’s picture',
   'common.ui.working': 'working',
+  'common.earningsPill.countingPart': 'counting…',
 } as const satisfies Record<string, string | ((v: Vars) => string)>;

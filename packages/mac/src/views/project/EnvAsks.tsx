@@ -1,16 +1,57 @@
 import { useEffect, useState } from 'react';
 import type { EnvChange } from '@beluga/workspaces/env.js';
+import type { EnvSendAsk, EnvSendChoice } from '@beluga/shared/env-send.js';
 import { EnvKeys } from '../../dialogs/native/ConfirmAlert.js';
 import { Icon } from '../../components/Icon.js';
 import { ActionsDropdown } from '../../components/SpecMenu.js';
 import { Button, IconButton, Tip } from '../../components/ui.js';
-import { useApi, useApp } from '../../lib/beluga.js';
+import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { openSheet } from '../../lib/sheets.js';
 import { sameDeep } from '../../lib/stable.js';
 import s from './env-asks.module.css';
 import { useT } from '../../i18n/index.js';
 
 const NONE: readonly EnvChange[] = [];
+const NO_SENDS: readonly EnvSendAsk[] = [];
+
+/**
+ * A worktree made on one of your computers whose project folder there lacks .env files this Mac has
+ * (BLG-800): their names only, then Send Once, Don't Send, or behind ••• Always for This Project
+ * (Settings › Your Computers takes it back). Sent over the encrypted link, written 0600 there.
+ */
+function EnvSendRow({ ask }: { ask: EnvSendAsk }) {
+  const { client } = useBeluga();
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const decide = (choice: EnvSendChoice): void => {
+    setBusy(true);
+    void client.call('machines.env.decide', ask.id, choice).finally(() => setBusy(false));
+  };
+  return (
+    <div className={s.ask} role="status" aria-label={t('views.envSend.aria', { machine: ask.machineName })}>
+      <Icon name="lock" size={13} className={s.icon} />
+      <span className={s.text}>
+        <strong>{ask.machineName}</strong>{t('views.envSend.hasNo')}
+        {ask.files.map((f) => (
+          <code key={f}>{f}</code>
+        ))}
+        {t('views.envSend.forProject', { project: ask.projectName })}
+        <span className={s.detail}>{t('views.envSend.sendMine')}</span>
+      </span>
+      <Tip label={t('views.envSend.onceTip')}>
+        <Button size="small" disabled={busy} onClick={() => decide('once')}>
+          {t('views.envSend.once')}
+        </Button>
+      </Tip>
+      <Button size="small" variant="quiet" disabled={busy} onClick={() => decide('never')}>
+        {t('views.envSend.never')}
+      </Button>
+      <ActionsDropdown items={[{ label: t('views.envSend.always'), hint: t('views.envSend.alwaysHint'), onSelect: () => decide('always') }]}>
+        <IconButton icon="more" label={t('views.envSend.more')} disabled={busy} />
+      </ActionsDropdown>
+    </div>
+  );
+}
 
 /**
  * A worktree changed a .env value the main folder doesn't have (BLG-369; brand-new keys went there
@@ -60,16 +101,20 @@ function EnvAsk({ wsId, changes, name }: { wsId: string; changes: readonly EnvCh
 /** In a worktree's conversation, under its other strips. */
 export function EnvStrip({ workspaceId }: { workspaceId: string }) {
   const changes = useApp((st) => st.envAsks[workspaceId] ?? NONE);
+  const sends = useApp((st) => (st.envSends ?? NO_SENDS).filter((a) => a.workspaceIds.includes(workspaceId)), sameDeep);
   const projectId = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === workspaceId))?.id);
   const api = useApi();
   // Opening it looks again (an edit made outside Beluga since).
   useEffect(() => {
     if (projectId) void api.workspaces.checkEnv(projectId).catch(() => undefined);
   }, [workspaceId, projectId]);
-  if (!changes.length) return null;
+  if (!changes.length && !sends.length) return null;
   return (
     <div className={s.strip}>
-      <EnvAsk wsId={workspaceId} changes={changes} />
+      {sends.map((a) => (
+        <EnvSendRow key={a.id} ask={a} />
+      ))}
+      {changes.length ? <EnvAsk wsId={workspaceId} changes={changes} /> : null}
     </div>
   );
 }
@@ -81,12 +126,16 @@ export function ProjectEnvAsks({ projectId }: { projectId: string }) {
     const ws = st.projects.find((p) => p.id === projectId)?.workspaces ?? [];
     return ws.filter((w) => st.envAsks[w.id]?.length).map((w) => ({ id: w.id, name: w.name, changes: st.envAsks[w.id]! }));
   }, sameDeep);
+  const sends = useApp((st) => (st.envSends ?? NO_SENDS).filter((a) => a.projectId === projectId), sameDeep);
   useEffect(() => {
     void api.workspaces.checkEnv(projectId).catch(() => undefined);
   }, [projectId]);
-  if (!asks.length) return null;
+  if (!asks.length && !sends.length) return null;
   return (
     <div className={s.list}>
+      {sends.map((a) => (
+        <EnvSendRow key={a.id} ask={a} />
+      ))}
       {asks.map((a) => (
         <EnvAsk key={a.id} wsId={a.id} name={a.name} changes={a.changes} />
       ))}

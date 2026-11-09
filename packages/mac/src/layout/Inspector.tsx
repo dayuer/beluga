@@ -10,7 +10,8 @@ import { noticeAgo, noticeLook } from '@beluga/ui/notice-models.js';
 import { Icon } from '../components/Icon.js';
 import { Avatar, Button, Dot, Tip } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
-import { useApi, useApp, useBeluga } from '../lib/beluga.js';
+import { useApi, useApp, useBeluga, useMachine } from '../lib/beluga.js';
+import { showWorktreeFolder } from '../lib/remote-open.js';
 import { openExternal } from '../lib/system.js';
 import { Switch } from '../dialogs/settings-controls.js';
 import { openPerson } from '../dialogs/native/PersonPopover.js';
@@ -157,7 +158,9 @@ function WorkspaceDetails({ id }: { id: string }) {
   const api = useApi();
   const t = useT();
   const actions = useActions();
-  const { ui } = useBeluga();
+  const { ui, client } = useBeluga();
+  // On a computer's page, its folder's path is copied instead (BLG-794).
+  const machine = useMachine();
   // What this panel shows, worked out from the shared state: drawn again only when part of it changes.
   const state = useApp(
     (full) => {
@@ -211,10 +214,12 @@ function WorkspaceDetails({ id }: { id: string }) {
         {state.disk !== undefined ? <Field label={t('layout.inspector.disk')}>{formatBytes(state.disk)}</Field> : null}
         {setup ? <Field label={t('layout.inspector.setup')}>{setup.status === 'running' ? t('layout.inspector.running') : setup.status === 'done' ? t('layout.inspector.done') : `${t('layout.inspector.failed')}${setup.detail ? ` (${setup.detail})` : ''}`}</Field> : null}
         {ws.handedTo ? <Field label={t('layout.inspector.handedTo')}>{ws.handedTo}</Field> : null}
+        {ws.continuedOn ? <Field label={t('layout.inspector.continuedOn')}>{ws.continuedOn}</Field> : null}
+        {ws.continuedFrom ? <Field label={t('layout.inspector.continuedFrom')}>{ws.continuedFrom}</Field> : null}
         {ws.handedFrom ? <Field label={t('layout.inspector.from')}>{ws.handedFrom}</Field> : null}
         <div className={s.buttons}>
-          <Button size="small" icon="folder" onClick={() => void api.workspaces.openInFinder(ws.id)}>
-            {fileManager()}
+          <Button size="small" icon="folder" onClick={() => void showWorktreeFolder(client, ws.id)}>
+            {machine ? t('common.blocks.copyPath') : fileManager()}
           </Button>
           {project?.root ? (
             <Button size="small" icon="terminal" onClick={() => ui.openMenu({ kind: 'scripts', projectId: ws.projectId })}>

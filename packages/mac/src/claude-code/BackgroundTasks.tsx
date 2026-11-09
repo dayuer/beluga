@@ -10,7 +10,7 @@ import { useApi, useBeluga } from '../lib/beluga.js';
 import { type TaskItem, taskLabel } from './background-model.js';
 import s from './background.module.css';
 import { everyWhileShown } from '../lib/window-active.js';
-import { revealLabel } from '../lib/os-words.js';
+import { useRevealFileLabel } from '../lib/remote-open.js';
 
 /**
  * Background commands and watches Claude or its agents started (a dev server, the full tests, a
@@ -74,6 +74,8 @@ function Mark({ item }: { item: TaskItem }) {
 function Output({ item, now }: { item: TaskItem; now: number }) {
   const { client } = useBeluga();
   const tr = useT();
+  // On a computer's page the log is downloaded instead (BLG-852).
+  const revealLog = useRevealFileLabel(tr('claudeCode.bgTasks.log'));
   const out = useTaskOutput(item);
   const body = useRef<HTMLPreElement>(null);
   const atEnd = useRef(true);
@@ -94,7 +96,7 @@ function Output({ item, now }: { item: TaskItem; now: number }) {
         <span className={s.flex} />
         <IconButton icon="copy" label={tr('claudeCode.bgTasks.copyCommand')} onClick={() => void copyText(t.command)} />
         {out?.file ? <IconButton icon="external" label={tr('claudeCode.bgTasks.openLog')} onClick={() => void openWithDefaultApp(client, out.file)} /> : null}
-        {out?.file ? <IconButton icon="folder" label={revealLabel('Log')} onClick={() => void revealInFinder(client, out.file)} /> : null}
+        {out?.file ? <IconButton icon="folder" label={revealLog} onClick={() => void revealInFinder(client, out.file)} /> : null}
       </div>
       <div className={cx(s.command, 'selectable')} title={t.command}>
         <span className={s.prompt}>$</span> {t.command}

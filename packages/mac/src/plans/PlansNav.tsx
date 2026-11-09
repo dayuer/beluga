@@ -14,7 +14,7 @@ import { useT } from '../i18n/index.js';
  */
 export function PlanSideRows() {
   const plans = useApp((s) => s.plans.plans);
-  const running = plans.filter((x) => x.status === 'active').sort((a, b) => (b.approvedAt ?? b.createdAt) - (a.approvedAt ?? a.createdAt));
+  const running = plans.filter((x) => x.status === 'active' && !x.movedTo).sort((a, b) => (b.approvedAt ?? b.createdAt) - (a.approvedAt ?? a.createdAt));
   return (
     <>
       {running.map((plan) => (

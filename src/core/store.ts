@@ -7,10 +7,13 @@ import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS
 import type { Review } from '../workspaces/git.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
+import type { EnvSendAsk } from '../shared/env-send.js';
+import type { PortForward, PortShare } from '../shared/forwards.js';
 import type { Bitmap } from '../image/bitmap.js';
 import { type CollabAction, type CollabState, initialCollab, reduceCollab } from './collab-store.js';
 import { type SearchState, type WorkAction, type WorkState, initialWork, reduceWork } from './work-store.js';
 import { type NetworkAction, type NetworkSlice, initialNetwork, reduceNetwork } from './network-store.js';
+import { type RevenueCatAction, type RevenueCatSlice, initialRevenueCat, reduceRevenueCat } from './revenuecat-store.js';
 import { type EarningsAction, type EarningsSlice, initialEarnings, reduceEarnings } from './earnings-store.js';
 import { type SupportAction, type SupportSlice, initialSupport } from './support-store.js';
 import { type ClaudeCodeAction, type ClaudeCodeSlice, initialClaudeCode, reduceClaudeCode } from './claude-code/model.js';
@@ -259,6 +262,9 @@ export interface ViewerDomain extends Location {
   /** Decoded pixels when the file is an image. */
   readonly image?: Bitmap;
   readonly truncated: boolean;
+  /** A big file opened by its first piece (BLG-791): where the rest starts, and its size; the reader streams the rest as you scroll. */
+  readonly next?: number;
+  readonly total?: number;
   readonly loading: boolean;
   readonly error?: string;
   readonly by?: string;
@@ -297,6 +303,8 @@ export interface Prefs {
   readonly tunnel: Settings['tunnel'];
   /** Keep the Mac awake while a phone is paired (companion/awake.ts). */
   readonly keepAwake: Settings['keepAwake'];
+  /** Run New Work On (BLG-780): `here`, `best`, or one of your computers by id (src/machines/placement.ts). */
+  readonly runOn: Settings['runOn'];
   /** Low Power mode: when Beluga saves power (core/power-saver.ts). */
   readonly lowPower: Settings['lowPower'];
   /** 'never': your own Claude just works; 'ask': it asks before risky actions. */
@@ -347,6 +355,8 @@ export interface Prefs {
   readonly chatClaude: Settings['chatClaude'];
   /** Who sees your plan usage on your profile (core/gateway: it rides on your card). */
   readonly shareUsage: Settings['shareUsage'];
+  /** Friends see Seen under their direct messages once one was on your screen (BLG-798). */
+  readonly readReceipts: boolean;
   readonly shell?: string;
   /** Start the terminal's shell as a login shell. */
   readonly shellLogin: boolean;
@@ -426,7 +436,13 @@ export type View =
   /** Sentinel › Dashboard (docs/sentinel.md §10): your dashboards, one open (none: the first). */
   | { readonly kind: 'dashboard'; readonly id?: string }
   /** The Sentinel chat (docs/sentinel.md §12), one of its conversations (none: the first), docked beside Sentinel's page, or beside a sentinel's own page (`about`, its id) when you asked from there. */
-  | { readonly kind: 'sentinel_chat'; readonly chat?: string; readonly about?: string };
+  | { readonly kind: 'sentinel_chat'; readonly chat?: string; readonly about?: string }
+  /**
+   * A page on one of your computers (BLG-784, Mac app): the app draws `view` itself, with that
+   * computer's state and calls (its screen over /machine/<id>). Only this window's screen has it;
+   * the computer's own screen shows `view`.
+   */
+  | { readonly kind: 'machine'; readonly machine: string; readonly view: View };
 
 /** Tabs of a workspace someone shared with you: the chat, its files, a read-only shell over them, and what changed. */
 export type SharedTab = 'chat' | 'files' | 'terminal' | 'diff';
@@ -513,7 +529,7 @@ export interface MyShare {
  * Everything Beluga knows that isn't about a screen: the room, people, projects, conversations,
  * approvals… The core (the daemon) owns it and every client sees the same.
  */
-export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, SupportSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
+export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
   readonly room: string;
   readonly projects: readonly Project[];
   readonly projectGroups: readonly ProjectGroup[];
@@ -539,6 +555,13 @@ export interface DomainState extends CollabState, WorkState, NetworkSlice, Earni
   readonly envChanges: Readonly<Record<string, readonly EnvChange[]>>;
   /** Worktrees whose env files changed and the main folder doesn't have it: copy it there, or keep it here (BLG-369). */
   readonly envAsks: Readonly<Record<string, readonly EnvChange[]>>;
+  /** Worktrees made on your computers whose project lacks .env files this Mac has: send them? Names only, never on the phone (BLG-800). */
+  readonly envSends: readonly EnvSendAsk[];
+  /** Your computers' dev servers open on this Mac at localhost (BLG-802). */
+  readonly forwards: readonly PortForward[];
+  /** Ports of this Mac shared with worktrees on your computers, and which worktrees are on which computer (BLG-804). */
+  readonly portShares: readonly PortShare[];
+  readonly onComputers: Readonly<Record<string, string>>;
   readonly hosting?: Hosting;
   readonly invite?: string;
   /** Your peer id on this computer (known before the room answers). */
@@ -650,6 +673,9 @@ export type Action =
   | { type: 'runs_interrupted'; owner: string }
   | { type: 'env_changes'; id: string; changes: readonly EnvChange[] }
   | { type: 'env_asks'; asks: Readonly<Record<string, readonly EnvChange[]>> }
+  | { type: 'env_sends'; asks: readonly EnvSendAsk[] }
+  | { type: 'forwards'; forwards: readonly PortForward[] }
+  | { type: 'port_shares'; shares: readonly PortShare[]; onComputers: Readonly<Record<string, string>> }
   | { type: 'approval_add'; approval: Approval }
   | { type: 'approval_remove'; id: string }
   | { type: 'browser_root' }
@@ -657,7 +683,7 @@ export type Action =
   | { type: 'browser_entries'; at: Location; entries: readonly FsEntry[] }
   | { type: 'browser_error'; error: string }
   | { type: 'viewer_open'; at: Location; by?: string }
-  | { type: 'viewer_content'; at: Location; content: string; truncated: boolean }
+  | { type: 'viewer_content'; at: Location; content: string; truncated: boolean; next?: number; total?: number }
   | { type: 'viewer_image'; at: Location; image: Bitmap }
   | { type: 'viewer_error'; at: Location; error: string }
   | { type: 'viewer_close' }
@@ -694,6 +720,7 @@ export type Action =
   | WorkAction
   | NetworkAction
   | EarningsAction
+  | RevenueCatAction
   | ClaudeCodeAction
   | GatewayAction
   | FriendShareAction
@@ -720,6 +747,7 @@ export const DEFAULT_PREFS: Prefs = {
   mouse: true,
   tunnel: 'auto',
   keepAwake: 'off',
+  runOn: 'here',
   lowPower: 'off',
   selfApproval: 'never',
   notify: NotifySchema.parse({}),
@@ -746,6 +774,7 @@ export const DEFAULT_PREFS: Prefs = {
   friendWorktrees: 'ask',
   chatClaude: 'everyone',
   shareUsage: 'trusted',
+  readReceipts: true,
   shellLogin: true,
   shellArgs: [],
   claudeArgs: [],
@@ -774,6 +803,10 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     btw: {},
     envChanges: {},
     envAsks: {},
+    envSends: [],
+    forwards: [],
+    portShares: [],
+    onComputers: {},
     status: 'connecting',
     peers: [],
     log: [],
@@ -797,6 +830,7 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     ...initialWork,
     ...initialNetwork,
     ...initialEarnings,
+    ...initialRevenueCat,
     ...initialSupport,
     ...initialClaudeCode,
     ...initialGateway,
@@ -1120,6 +1154,12 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return { ...state, envChanges: { ...state.envChanges, [action.id]: action.changes } };
     case 'env_asks':
       return { ...state, envAsks: action.asks };
+    case 'env_sends':
+      return { ...state, envSends: action.asks };
+    case 'forwards':
+      return { ...state, forwards: action.forwards };
+    case 'port_shares':
+      return { ...state, portShares: action.shares, onComputers: action.onComputers };
     case 'runs_interrupted': {
       const log = state.log.map((l) => (l.type === 'agent' && l.owner === action.owner ? settleRun(l) : l));
       return log.every((l, i) => l === state.log[i]) ? state : { ...state, log };
@@ -1186,7 +1226,7 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return { ...state, viewer: { ...state.viewer, image: action.image, content: '', truncated: false, loading: false, error: undefined } };
     case 'viewer_content':
       if (!state.viewer || !sameLoc(state.viewer, action.at)) return state;
-      return { ...state, viewer: { ...state.viewer, content: clean(action.content), truncated: action.truncated, loading: false, error: undefined } };
+      return { ...state, viewer: { ...state.viewer, content: clean(action.content), truncated: action.truncated, next: action.next, total: action.total, loading: false, error: undefined } };
     case 'viewer_error':
       if (!state.viewer || !sameLoc(state.viewer, action.at)) return state;
       return { ...state, viewer: { ...state.viewer, loading: false, error: action.error } };
@@ -1295,6 +1335,7 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
     case 'net_call_notes':
     case 'net_missed_calls':
     case 'net_off':
+    case 'net_mirror':
       return { ...state, ...reduceNetwork(state, action) };
     case 'support':
       return { ...state, support: action.support };
@@ -1311,6 +1352,8 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
     case 'earnings':
     case 'fx_rates':
       return { ...state, ...reduceEarnings(state, action) };
+    case 'revenuecat':
+      return { ...state, ...reduceRevenueCat(state, action) };
     case 'claude_code':
     case 'codex_sessions':
       return ccFinished(state, { ...state, ...reduceClaudeCode(state, action) });

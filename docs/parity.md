@@ -222,6 +222,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `files.version` | ✓ (no surface of its own) a picture in a chat answer or the Markdown reader is read again when its file was rewritten since it was kept, so a screenshot re-taken to the same name shows the new one |
 | `workspaces.scratch` | ✓ the panel's Scratch tab: the workspace's `.beluga/scratch/` and `.context/` folders, newest first, live, with how many files there are and how much they hold; the preview shows the newest until you pick one, and a file scrolled to its end (or Follow the End) follows what's written to it; drawn in outline (moving while the agent works) until something lands; the sort menu puts what can be looked at first (pictures, videos, PDFs, web pages; BLG-111), web pages are drawn in a sandboxed frame (no scripts), and full size ← → steps through the viewable files in that order, stopping at the ends; the images and files you sent the agent are copied into `.beluga/scratch/sent/` as it gets the message, and listed apart under From Your Agent · Sent by You (BLG-771; never on the new-file dot or the phone's outputs; an archive throws them away, deleting a chat its own `sent/<chat>/`) |
 | `files.read` | ✓ a changed file as itself in Changes (Markdown formatted), without moving the Files tab's open file |
+| `files.readRange` | ✓ (no surface of its own) a file read in pieces: a changed file's first screen, the rest of a big file as you scroll the reader, and the file under the pointer read ahead (on a computer, answered from this Mac's cache) |
 | `files.searchContent` | ✓ the Files tab's search box on Contents: lines by file (ripgrep, else Node), Match Case / Whole Word / Regular Expression; a line opens the file there |
 | `files.searchNames` | ✓ the Files tab's search box on Names: every file in the folder whose path matches (ripgrep's list, else git's), Match Case / Whole Word / Regular Expression; shown as a tree, a file opens |
 | `files.save` | ✓ Edit in a file's header (files open read-only), then Save or ⌘S; asks before overwriting a change made since |
@@ -231,6 +232,44 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `companion.pair.approve` | ✓ the Phone popover's “Pair Kayra's Pixel 9?” with the four-picture fingerprint › Pair |
 | `companion.pair.cancel` | ✓ the Phone popover's Cancel while a pairing is open (a waiting phone hears no) |
 | `companion.devices.remove` | ✓ the Phone popover › a phone › Remove (its link drops at once, its key is refused from then on) |
+| `machines.pair.start` | – on the computer: `beluga pair --computer` prints its link, code and QR (one app, 10 minutes, BLG-774) |
+| `machines.pair.status` | – on the computer: `beluga pair --computer` follows it (the app waiting, its four pictures, joined) |
+| `machines.pair.cancel` | – on the computer: Ctrl+C in `beluga pair --computer` |
+| `machines.join.start` | ✓ Settings › Your Computers › Add a Computer… › Link or Code › Add (also `beluga computers add <link or code>`) |
+| `machines.join.approve` | ✓ Settings › Your Computers › Add a Computer… › Join, after the four pictures (also `beluga computers add`'s Add? [y/N]) |
+| `machines.join.cancel` | ✓ Settings › Your Computers › Add a Computer… › Cancel (also `beluga computers add`'s no or Ctrl+C) |
+| `machines.ssh.hosts` | ✓ Settings › Your Computers › Add a Computer… › Over SSH: your hosts to pick from |
+| `machines.ssh.pair` | ✓ Settings › Your Computers › Add a Computer… › Over SSH › Add: Beluga installed and started there when missing, the pictures checked over SSH and here (also `beluga connect you@host --pair`) |
+| `machines.update` | ✓ Settings › Your Computers › a computer on an older version › Update It, and the update sheet's Update … First |
+| `machines.leftBehind` | ✓ the update sheet (Beluga … is ready) warns which computers that update would leave unable to connect |
+| `machines.look` | ✓ Settings › Your Computers › a computer › its name (rename in place) and its icon |
+| `machines.placement` | ✓ Settings › Your Computers › Run New Work On: where new work goes now, and why |
+| `machines.list` | ✓ Settings › Your Computers: each computer's icon, name, kind and region, online or offline, its load and health with fixes (also `beluga computers`) |
+| `machines.devices` | – `beluga computers` on a computer: the apps and phones that may drive it (docs/machines.md) |
+| `machines.secrets` | ✓ Settings › Your Computers › a computer › ••• › Keep My Secrets in Sync With… (asked once for it) / Stop Syncing My Secrets |
+| `machines.settingsSync` | ✓ Settings › Your Computers › Your Settings: they follow you to every computer, and a conflict is said |
+| `machines.settingsSync.clear` | ✓ Settings › Your Computers › Your Settings › a conflict's Got It |
+| `machines.alwaysOn` | ✓ Settings › Your Computers › a computer › ••• › Make Always On… (one confirmation, and Run New Work On There Too), and Make This Mac Always On under You on the Network |
+| `machines.alwaysOn.status` | ✓ Settings › Your Computers › You on the Network: this Mac or your Always On, and a move under way; the Always On tag on its computer |
+| `machines.forget` | ✓ Settings › Your Computers › a computer › ••• › Forget (also `beluga computers forget <name>` on any of your devices) |
+| `machines.ready.start` | ✓ a new worktree, plan or sentinel sent to a computer that doesn't have the project: Getting … ready, on the new worktree (BLG-787, BLG-788) |
+| `machines.ready.status` | ✓ the same, each step as it goes (folder, clone, tools, setup) and any error in plain words |
+| `machines.ready.install` | ✓ the same: Install Them, after what's missing there is named |
+| `machines.ports` | – asked by your app over a computer's link every few seconds (BLG-802): each worktree's dev servers there |
+| `machines.forwards` | ✓ a worktree on a computer › the panel's Background tab › Ports: each server with Open at localhost:<port>, and which port when the same was taken |
+| `machines.share` | ✓ a worktree on a computer › the panel's Background tab › Share a Port from This Mac: a port and Share |
+| `machines.unshare` | ✓ a worktree on a computer › Background › a port shared from this Mac › Unshare |
+| `machines.upload.put` | – asked by your app over a computer's link (BLG-793): one piece of a file you dropped on a chat there, written into its uploads |
+| `machines.upload.send` | ✓ a file dropped from Finder on a chat that runs on a computer: sent there a piece at a time, its progress in the box (BLG-793) |
+| `machines.upload.check` | ✓ (no surface of its own) files dropped on a chat on a computer, checked first: an env file asks (Send Once or Don't Send, its name only), a key or a credential folder's file is refused with why (BLG-854) |
+| `machines.download.piece` | – asked by your app over a computer's link (BLG-794): a piece of a file there for Download |
+| `machines.download.fetch` | ✓ Download on a computer's page: Show in Finder for a file there brings it to ~/Downloads/Beluga and shows it in Finder (BLG-794) |
+| `machines.editor` | ✓ (no surface of its own) which editor Open in Editor uses for a computer's folder over Remote-SSH: VS Code or Cursor (BLG-794) |
+| `machines.env.here` | – asked by your app over a computer's link when a worktree is made there (BLG-800): the project and the env file names its folder has |
+| `machines.env.receive` | – your app sends the env files you said to send over the computer's link; written 0600 there |
+| `machines.env.decide` | ✓ a worktree made on a computer, in its conversation and on the project's page: the env file names, Send Once, Don't Send, ••• › Always for This Project |
+| `machines.env.always` | ✓ Settings › Your Computers › Env files sent without asking |
+| `machines.env.forget` | ✓ Settings › Your Computers › Env files sent without asking › Ask Again |
 | `companion.phone.use` | ✓ Settings › Phone › Let your agent use this phone: Off · Ask each time · Use · Full (BLG-150) |
 | `companion.phone.pairAdb` | ✓ Settings › Phone › Connect, once the phone shows a Wireless-debugging pairing code (runs `adb pair`) |
 | `companion.phone.wifi` | ✓ Settings › Phone › Over Wi‑Fi: Use over Wi‑Fi while the phone is on a cable (turns on its Wireless debugging, reached through the link), or Turn Off (BLG-187) |
@@ -294,6 +333,13 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `workspaces.editPrompt` | Edit on your own message (hover, or right-click › Edit Message) › the message opens in place: Rewind Here or New Fork, then ↩ |
 | `workspaces.continueInWorktree` | Continue in New Worktree… (toolbar and the ask banner) › sheet: Task, Based on, Agent (BLG-506: one that can't resume the conversation starts fresh, handed it, and the sheet says so), Name (the chat becomes the worktree) |
 | `workspaces.archive` | ✓ |
+| `workspaces.moveCheck` | ✓ a worktree's ⋯ › Continue On ▸ (a computer): it asks first about changes not committed (Commit Them and Continue) and waits for its agent's turn to end |
+| `workspaces.movePack` | ✓ a worktree's ⋯ › Continue On ▸, on the computer it's on (its branch pushed, or bundled over the link) |
+| `workspaces.moveChunk` | ✓ a worktree's ⋯ › Continue On ▸ (your app fetches it in pieces) |
+| `workspaces.moveReceive` | ✓ a worktree's ⋯ › Continue On ▸, on the computer it goes to |
+| `workspaces.moveLand` | ✓ a worktree's ⋯ › Continue On ▸: a worktree there on its branch with its conversation (the .env ask follows, as for any new one) |
+| `workspaces.moveDone` | ✓ a worktree's ⋯ › Continue On ▸: the old one archived once the new one is there (Continued on … in its details) |
+| `workspaces.moveUndo` | ✓ a worktree's ⋯ › Continue On ▸: a new one whose move didn't finish is archived again |
 | `workspaces.restore` | ✓ |
 | `workspaces.archivePlan` | ✓ the Archive dialog says how much space it frees |
 | `workspaces.deletePlan` | ✓ the Delete dialog says how many commits were never pushed or merged, and leads with Archive (the phone's Delete step says it too) |
@@ -306,6 +352,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `workspaces.keepEnvHere` | ✓ a worktree's env bar ••• › Keep in This Worktree Only (project page, worktree) |
 | `workspaces.saveEnvInBeluga` | ✓ Save in Beluga on a worktree's env bar, and Archive/Delete's “Save them in Beluga” |
 | `workspaces.checkEnv` | ✓ when a project's page or a worktree opens |
+| `workspaces.ports` | – the ports a worktree's servers listen on, for forwarding a computer's to this Mac (the Ports tab is BLG-802) |
 | `workspaces.askClaudeToReview` | ✓ |
 | `workspaces.askClaudeToMerge` | ✓ |
 | `workspaces.compact` | ✓ |
@@ -333,6 +380,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `workspaces.removeProject` | a project's ⋯ / right-click menu › Delete Project… (out of Beluga; its folder goes to the Trash only if ticked) |
 | `workspaces.addFolder` | ✓ |
 | `workspaces.selectFile` | ✓ |
+| `workspaces.diffAhead` | ✓ (no surface of its own) the changed file under the pointer in Changes: its diff worked out ahead, so the click shows it at once (BLG-853) |
 | `workspaces.review` | the right panel's Changes tab (loads and refreshes the changes while you stay in the chat) |
 | `workbench.run` | ✓ |
 | `workbench.stopRun` | ✓ |
@@ -400,10 +448,12 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `local.openFolder` | ✓ |
 | `local.statFiles` | ✓ ⌘V of file paths attaches the files (⌘⇧V keeps the words) |
 | `projects.add` | ✓ Add projects sheet, Choose Folders…, drop folders on the sidebar |
+| `projects.origin` | ✓ new work sent to one of your computers: its project found there by origin, or cloned from it (BLG-788) |
 | `projects.addFolder` | ✓ (a dropped folder of projects is watched) |
 | `projects.initGit` | ✓ Add projects sheet: a plain folder’s row offers Set Up Git |
 | `projects.suggest` | ✓ "On this Mac" in the Add projects sheet |
 | `projects.create` | ✓ Add projects sheet › Start new, New Project… in the Projects + menu and the palette |
+| `projects.clone` | ✓ Add projects sheet › Clone, Clone from Git… in the Projects + menu, Clone a project… in the palette: paste a git address (https or ssh); a repository you have already opens instead |
 | `projects.newHome` | ✓ the location a new project goes in, in Add projects › Start new |
 | `projects.icon` | ✓ project icons in the sidebar |
 | `projects.iconAt` | ✓ icons of suggested folders |
@@ -452,9 +502,13 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `network.files.saveTo` | ✓ right-click a file › Save As… (the Save panel) |
 | `network.files.preview` | ✓ pictures shown in the chat |
 | `network.channels.main` | ✓ All Friends (the first chat tab, the top of sidebar Channels): made the first time it's opened |
-| `stripe.connect` | ✓ Connect Stripe… (a project's right-click and ⋯ menus, the Overview's hint and Earnings card): the Connect Stripe sheet checks the key with Stripe and shows the account |
-| `stripe.disconnect` | ✓ the Connect Stripe sheet › Disconnect |
+| `stripe.connect` | ✓ Connect Earnings… (a project's right-click and ⋯ menus, the Overview's hint and Earnings card), then Connect Stripe in the sheet: it checks the key with Stripe and shows the account |
+| `stripe.disconnect` | ✓ the Earnings sheet › Stripe › Disconnect |
 | `stripe.refresh` | ✓ Refresh in the sheet and the Overview's Earnings card (the daemon also looks for new payments every 10 minutes by itself) |
+| `revenuecat.connect` | Mac only (like `stripe.*`; nothing on the phone): the Earnings sheet's RevenueCat section checks the V2 secret key with RevenueCat, asks which project when the key sees several, and shows the apps |
+| `revenuecat.disconnect` | Mac only: the Earnings sheet's RevenueCat section › Disconnect |
+| `revenuecat.refresh` | Mac only: Refresh Now in the Earnings sheet (the daemon also looks again every 10 minutes by itself) |
+| `revenuecat.setApps` | Mac only: the Earnings sheet's RevenueCat section › Choose apps… (Count revenue from) |
 | `diagnostics.report` | ✓ Settings › About › Report a Problem: makes the report, shows it in Finder and opens a GitHub issue to attach it to |
 | `diagnostics.windowProblem` | ✓ by itself: a part of the window that stalled or failed to load (a view, the file reader) is noted in the black box, so Report a Problem shows which and when |
 | `support.answer` | ✓ the Star sheet after your first merge (Star on GitHub / Maybe Later) and the coffee sheet after your fifth (an amount, Not Now, Don't Ask Again) |
@@ -518,6 +572,12 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `sentinel.test` | not in the window yet (the Sentinel page rework gives it a Test button); Run Now already runs a paused sentinel without turning it on · the agent's `sentinel_test` (its sources only, paused or not; what they find is kept), and `sentinel_create` / `sentinel_update` run a source they add or change once before saving, answering with its preview; `sentinel_try_source` runs one alone to read the schema (BLG-302, BLG-304) |
 | `sentinel.stop` | ✓ a running run's page › ⋯ › Stop |
 | `sentinel.pause` | ✓ Turn On and Pause on a sentinel's page and its row's ⋯ and right-click; Resume on the paused-after-failures banner; Turn On on the agent's banner; the phone's sentinel page (••• › Pause / Turn On) · the agent's `sentinel_pause` (pause only) |
+| `sentinel.moveCheck` | ✓ a sentinel's ⋯ › Move To ▸ (a computer): Move To, or Pause and Move To while it runs |
+| `sentinel.movePack` | ✓ a sentinel's ⋯ › Move To ▸, on the computer it runs on (its steps, runs, kept numbers and tiles) |
+| `sentinel.moveChunk` | ✓ a sentinel's ⋯ › Move To ▸ (your app fetches it in pieces) |
+| `sentinel.moveReceive` | ✓ a sentinel's ⋯ › Move To ▸, on the computer it goes to |
+| `sentinel.moveLand` | ✓ a sentinel's ⋯ › Move To ▸: it lands paused there, its sources checked, what it lacks there said |
+| `sentinel.moveDrop` | ✓ a sentinel's ⋯ › Move To ▸: gone from where it was once the copy is in (or the copy, when the move didn't finish) |
 | `sentinel.runs` | ✓ a sentinel's page › History (the dot strip, then the runs as rows); the phone's sentinel page draws the same runs from its `sentinel:<id>` topic |
 | `sentinel.runGet` | ✓ a run's page: the steps' outputs (Show output) and the report; the phone opens a run's report |
 | `sentinel.ask` | ✓ a sentinel's page › the box under its header, "Ask Your Agent to change this sentinel…" (⌘↩; the agent's last line while it works, its answer and Open Chat after) · New Sentinel › Describe It (an empty paused sentinel, then this) |
@@ -592,7 +652,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `plans.setPaused` | ✓ Pause / Resume on a plan's page |
 | `plans.setParallel` | ✓ a plan's ⋯ › Run at Once ▸ |
 | `plans.setWorkAgent` | ✓ a plan's ⋯ › Agent for Its Work ▸ (BLG-498): who works the milestones and tasks that start from now on (ones at work keep theirs, the toast says so); the phone's plan page › ⋯ › Agent for its work (1.35) |
-| `plans.setCheckAgent` | ✓ a plan's ⋯ › Agent for Its Checks ▸: who runs its milestone checkers and Verify the Plan from now on, say a stronger model than the work's (Same as Its Work: the work's agent); the phone's plan page › ⋯ › Agent for its checks (1.48) |
+| `plans.setCheckAgent` | ✓ a plan's ⋯ › Agent for Its Checks ▸: who runs its milestone checkers and Verify the Plan from now on, say a stronger model than the work's (Same as Its Work: the work's agent); the phone's plan page › ⋯ › Agent for its checks (1.50) |
 | `plans.setTestsAt` | ✓ a plan's ⋯ › When to Run Tests ▸ (each milestone, or once at the end) |
 | `plans.pass` | ✓ Pass Milestone on a plan's page |
 | `plans.recheck` | ✓ Check Again on a milestone the agent is checking or that failed its check |
@@ -608,6 +668,13 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `plans.remove` | ✓ a plan's ⋯ › Delete Plan… (its tasks stay on the board) |
 | `plans.tidyUp` | ✓ Tidy Up / No on a plan's leftover task worktrees (merged into its branch, then archived) |
 | `plans.setStyle` | ✓ Plans › ⋯ › Planning Style… |
+| `plans.moveCheck` | ✓ a plan's ⋯ › Move To ▸ (a computer): Move To when nothing runs in it, Pause and Move when something does |
+| `plans.movePack` | ✓ a plan's ⋯ › Move To ▸, on the computer it runs on (Commit Them and Move when its worktrees have changes not committed) |
+| `plans.moveChunk` | ✓ a plan's ⋯ › Move To ▸ (your app fetches the packed plan in pieces) |
+| `plans.moveReceive` | ✓ a plan's ⋯ › Move To ▸, on the computer it goes to |
+| `plans.moveLand` | ✓ a plan's ⋯ › Move To ▸, on the computer it goes to (it opens there once it's in) |
+| `plans.moveDone` | ✓ a plan's ⋯ › Move To ▸: the old copy becomes its record once the new one is in (Moved to … on its page) |
+| `plans.moveUndo` | ✓ a plan's ⋯ › Move To ▸: a copy whose move didn't finish is taken back off |
 | `dialogues.start` | ✓ the composer: `@my:claude @my:codex talk about X, 6 turns` or `/dialogue claude codex …` (`session.submit` proposes it; the API starts one too) |
 | `dialogues.confirm` | ✓ the dialogue's card in the chat › Start (Turns and Budget set on the card first) |
 | `dialogues.continue` | ✓ the dialogue's card › Continue (when it paused at its cap) · the phone's card |
@@ -762,7 +829,7 @@ The same scenarios run on every runtime (`tests/runtime-conformance.ts`, `npx vi
 | A new worktree's form: Based on (`workspaces.branches`), Name, Create Worktree (`workspaces.startWorktree` with `base` / `name`) | Mac |
 | No standing main conversation per project (BLG-70): a project's conversations are the chats and worktrees you start; the main checkout is the project's home (Update main, Fetch, Merge into main, its terminal), not a conversation. Nothing lists or opens it as one (sidebar, Overview, ⌘K, @mentions, the project menu, notifications, the phone's Work and Open on your Mac go to its home or the chat it became), and the agent never runs in it on its own. Once, at startup, a main conversation from before becomes an ordinary chat in its project with its history, agent session, model and usage, named after its first message (`workspaces/main-migration.ts`; an empty one goes) | both (core: `workspaces/main-migration.ts`, `client/screen.ts` `viewFor`, `core/workspace-controller.ts`; Mac: `lib/project-home.ts` `newChatProject`) |
 | Never change main: every agent run in a project's main folder (the main checkout, or a chat there) is questions only. Edits, writes and shell commands that aren't clearly read-only are denied (`agent/policy.ts` `askOnly`, `agent/read-only.ts`), the agent is told so, and a change request makes it call `continue_in_worktree`: a new worktree from the latest origin, named after the task, and the chat itself becomes that worktree (same conversation and agent session, now in the worktree's folder), and the work goes on there (your own requests move right away; someone else's ask you first) | both (core) |
-| A project's home (`project` view): icon, name, main's branch and how it compares with origin, counts (active / ready to merge / archived, earnings), “What do you want to do in …?” with New Worktree (Based on, Name) or Just Ask, then its worktrees, questions and recently archived (Show All in Overview), and last (with Stripe connected) its Earnings as one folded row: earned in the last 7 / 30 / 90 days, payments and paying customers, each against the span before, and the last payment; unfolded (both kept), the range, a bar per day and the latest payments (All / Refunds / Failed, New for what arrived while shown, Show All, Open Stripe; Stripe Earnings… for the sheet). Clicking a project opens it | Mac (`views/ProjectHome.tsx`, `lib/project-home.ts`) |
+| A project's home (`project` view): icon, name, main's branch and how it compares with origin, counts (active / ready to merge / archived, earnings), “What do you want to do in …?” with New Worktree (Based on, Name) or Just Ask, then its worktrees, questions and recently archived (Show All in Overview), and last (with Stripe or RevenueCat connected) its Earnings as one folded row: earned in the last 7 / 30 / 90 days, payments and paying customers (Stripe's), each against the span before, and the last payment; unfolded (both kept), the range, a bar per day, each source's part of it (with both), RevenueCat's MRR, active subscriptions, active trials, new customers and "You keep" with Open RevenueCat, and Stripe's latest payments (All / Refunds / Failed, New for what arrived while shown, Show All, Open Stripe; Earnings… for the sheet). Clicking a project opens it | Mac (`views/ProjectHome.tsx`, `lib/project-home.ts`) |
 | Keeping main current and seeing history: the project home is about the default branch (main or master, “3 behind origin/main”, and “The main folder is on feat/…” with Switch to main), Update main and Fetch with when it last fetched, a quiet fetch of every project every ~15 min (never a password prompt: GIT_TERMINAL_PROMPT=0), uncommitted changes in the way (stash and put back, or move to a worktree), anything else to the agent in a run whose only permission beyond reading is syncing git (`agent/sync-main.ts`; never push, never discard), the GitHub row, and History (a commit graph with lanes and merges, authors as initials, refs as pills, filters, a commit's diffs; `views/history/*`) | Mac (`views/project/MainSyncBar.tsx`, `views/project/GitHubRow.tsx`, `views/history/*`, `layout/panel/HistoryTab.tsx`; core: `core/main-sync.ts`, `workspaces/sync.ts`, `workspaces/history.ts`, `workspaces/github.ts`) |
 | A questions-only chat: “Questions only — your agent won’t change anything in main.” above the box, Continue in New Worktree… as the toolbar's main button, “Ask about <project>…” in the box | Mac (`chat/AskBanner.tsx`, `dialogs/native/ContinueSheet.tsx`) |
 | Sub-agents: under the conversation that started them in the sidebar (a robot, running first, “N more”), their own worktrees as the agent (never as your worktrees; old ones no conversation here started aren’t listed, Clean Up Worktrees… has them), the sub-agent page (who started it, type, model, effort, time, steps, context; its live transcript with thinking and tools; its worktree's Changes, Files and Scratch beside it; Send to Main Agent to steer it through its lead), Watch on a sub-agent in the chat | Mac (`src/layout/SubAgents.tsx`, `src/claude-code/AgentMonitor.tsx`) |
@@ -771,7 +838,7 @@ The same scenarios run on every runtime (`tests/runtime-conformance.ts`, `npx vi
 | Empty states with one-click starters (New Worktree, New Chat, Add Projects…, first tasks for the agent) | Mac |
 | The palette's commands as named actions (“Create Pull Request…”, “Fork This Workspace…”), never `/cmd <arg>` | Mac (`dialogs/palette-commands.ts`) |
 | The Beluga network: friends added once by a one-time link or a short code, direct messages that wait for offline friends, groups that live on their members' Macs (no host, end-to-end encrypted, admins add and remove people, join by link), and your status (online, away, do not disturb, appear offline) — the `network.*` API and the shared state's `network` | Mac (the daemon runs it when `network: true` is in settings or `BELUGA_NETWORK=1`; `src/net/mesh/`, `src/core/network.ts`) |
-| Earnings from Stripe per project: a key per project (kept in ~/.beluga/stripe.json, 0600; screens only get `earnings`: connected, the account's name, all-time totals per currency, what it did lately (`activity`: the last 180 days' earnings per day, distinct paying customers per 7 / 30 / 90 days and the span before, the latest 25 payments with a first name and initial or a masked email, never more), when they were counted, what went wrong), counted in the background (a quick look for new payments every 10 minutes, the last months read again when something came in or once a day, a full recount weekly), shown as a pill beside each project in the sidebar (a new payment: it hops, and pixel-art confetti bursts from it; none with reduced motion), as the Earnings section of the project's home, and as a card in the Overview and the Usage view, every total in one currency (`prefs.earningsCurrency`, "Show earnings in" in Settings › General and the Stripe sheet; unset: the one most was earned in), other currencies converted at the ECB's daily rates (`src/core/fx-rates.ts`, `fx` in the shared state, fetched alongside the daily Stripe count) — the `stripe.*` API and the shared state's `earnings` | Mac (`src/core/stripe-earnings.ts` and `stripe-activity.ts`, the daemon runs them; `components/EarningsPill.tsx`, `components/PixelBurst.tsx` and `pixel-burst-model.ts`, `views/project/EarningsSection.tsx`, `dialogs/StripeSheet.tsx`, `lib/earnings.ts`) |
+| Earnings from Stripe and RevenueCat per project, added into one total (the Earnings… sheet connects either; RevenueCat apps billed through a connected Stripe account are left to Stripe so nothing counts twice; RevenueCat's own keys live in ~/.beluga/revenuecat.json, 0600, and its `revenuecat` state carries the apps, totals, proceeds and subscription figures, never the key). Stripe's part: a key per project (kept in ~/.beluga/stripe.json, 0600; screens only get `earnings`: connected, the account's name, all-time totals per currency, what it did lately (`activity`: the last 180 days' earnings per day, distinct paying customers per 7 / 30 / 90 days and the span before, the latest 25 payments with a first name and initial or a masked email, never more), when they were counted, what went wrong), counted in the background (a quick look for new payments every 10 minutes, the last months read again when something came in or once a day, a full recount weekly), shown as a pill beside each project in the sidebar (a new Stripe payment: it hops, and pixel-art confetti bursts from it; a rise in RevenueCat's total: it hops without confetti; none with reduced motion), as the Earnings section of the project's home, and as a card in the Overview and the Usage view, every total in one currency (`prefs.earningsCurrency`, "Show earnings in" in Settings › General and the Stripe sheet; unset: the one most was earned in), other currencies converted at the ECB's daily rates (`src/core/fx-rates.ts`, `fx` in the shared state, fetched alongside the daily Stripe count) — the `stripe.*` and `revenuecat.*` APIs and the shared state's `earnings` and `revenuecat` | Mac (`src/core/stripe-earnings.ts` and `stripe-activity.ts`, `src/core/revenuecat-earnings.ts` and `earnings-combined.ts`, the daemon runs them; `components/EarningsPill.tsx`, `components/PixelBurst.tsx` and `pixel-burst-model.ts`, `views/project/EarningsSection.tsx`, `dialogs/EarningsSheet.tsx`, `lib/earnings.ts`) |
 | Supporting Beluga: worktrees Beluga made that end up merged (Merge into main, a pull request merged on GitHub, or git finding the branch's own commits in the default branch: archived worktrees too, and a deleted one just before its branch goes) count once per branch, kept in ~/.beluga/support.json; the first merge brings a Star sheet with pastel confetti (none with reduced motion) asking for a star on GitHub, the fifth a coffee sheet with the maker as a GitHub chip (5 / 10 / 20 / 50 USD or another amount, each a Stripe Payment Link; Not Now asks once more five merges later, Don't Ask Again never), both once; Settings › About › Support Beluga has them any time — the `support.*` API and the shared state's `support`. The phone never asks | Mac (`src/core/merge-counter.ts`, `src/core/support-store.ts`, the daemon runs it; `dialogs/SupportSheets.tsx`, `components/Confetti.tsx`, `lib/support.ts`) |
 | Your stats (Usage tab): the daemon counts prompts (where you typed them), characters, your agent's run time for you, worktrees and chats made and archived, tokens per day, project and agent, and how far each plan window (5-hour session, week) got before it reset, as they happen (pastes and dictation time come from the Mac's composer, lengths only), kept in ~/.beluga/stats.json; the first start backfills from workspace records and chat histories, and pull requests (opened, merged, lines) come from `gh pr list` for Beluga's branches every few hours; the Usage tab asks for them with `stats.get` while it's open. The phone keeps its plan meters | Mac (`src/core/stats/`, `src/shared/stats.ts`, `src/shared/stats-trend.ts`; `views/usage/StatsSection.tsx`, `views/usage/SessionsCard.tsx`, `views/usage/TrendChart.tsx`, `views/usage/stats-model.ts`) |
 | Claude Code running outside Beluga, live and read-only: sessions you run through Conductor or a terminal, and their sub-agents (description, type, running / finished / failed / stopped / idle, the current step, steps, context), found by watching the transcripts Claude Code writes in ~/.claude/projects (never written to; tailed from the end, at most the last 200 steps per agent kept), in Activity (every live session by project, “6 agents running”), a strip above a workspace's chat and the Inspector's Claude Code panel (the session's folder is the workspace's, Conductor worktrees included), and a read-only transcript per session or agent; a background agent finishing notifies (`background`) — the `claudeCode.steps` API and the shared state's `claudeCode` (screens on this computer only, never sent to the room) | Mac (`src/core/claude-code/`, the daemon runs it; `src/claude-code/*` in the app) |
@@ -796,6 +863,9 @@ The same scenarios run on every runtime (`tests/runtime-conformance.ts`, `npx vi
 | Agent threads (BLG-171): Settings › Advanced › Agent threads turns the thread tools on (`session.setPrefs` `agentThreads`, off by default; the next run has them or not), and Settings › Agent › Thread limits sets `threadLimits` (depth, working in one tree, kept in one tree, working on this computer; the next `thread_start` reads them). No agent tool writes them | Mac (`dialogs/AgentThreadsSettings.tsx`); settings stay Mac-only, so the phone has neither |
 | A chat with threads (BLG-170): its archive and delete dialogs ask once whether its threads go too (`workspaces.archive` / `workspaces.remove` `children: 'with' \| 'keep'`; archive's default is with, delete's is keep; with `with`, a picked row under another picked row gets no call of its own, `lib/thread-family.ts` `batchCalls`). The usage card's Archive, typed `/archive` and `/delete`, and the sidebar's chat selection keep the threads and ask nothing | Mac (`dialogs/native/ThreadsChoice.tsx`, in the confirm alert, Overview's delete and the Worktrees view's `BatchAlert`); the phone's Archive and Delete sheets ask the same question with the same defaults (`companion.branchStep`'s third argument, `BranchView.threads`) |
 | Continuing after a usage limit (BLG-757): a run that stopped on your plan's usage limit is told “Continue where you left off.” a minute after the limit resets (30 minutes after it stopped when the reset isn't known), on by default, in worktrees, project chats, Your Mac's chats and the Sentinel chat, never in the room, DMs or groups, nor a sentinel run's chat (the sentinel runs again itself), nor into an archived worktree or hours late (`core/auto-continue.ts`; plans resume their own with the same switches, `core/plans/watchdog.ts`). The limit card says when it sends and offers Don't Send › For This Session / Never in This Chat / Everywhere; turned off, it shows Continue and Send at HH:MM to undo (`session.setPrefs` `autoContinue` / `autoContinueOff` / `autoContinueSkip`, rules in `shared/auto-continue.ts`) | Mac (`chat/Items.tsx` LimitResume, Settings › Agent › Usage limits in `dialogs/UsageLimitSettings.tsx`); the phone says “Continues on its own at HH:MM” under the card (`TurnView.resumesAt`, 1.42), read-only |
+| Your computers (docs/machines.md): the Runs on chip beside the mode and model wherever work is made (the chat's box, a project's home, New Plan, New Sentinel), This Mac, each computer with its line or why it can't take the work, and Best Available; the last pick remembered per project; shown only once a computer is paired | both (Mac: `chat/RunsOn.tsx`, rows from `machines/runs-on-model.ts`; phone: New Task › Runs on, the same lines from `src/machines/words.ts`) |
+| A computer's work in this app: its worktrees in the sidebar with its mark (On your computers), its name in the toolbar with Slow or Reconnecting, its notices in the one bell and the Dock, each saying which computer | Mac (`machines/MachineTag.tsx`, `machines/RemoteRows.tsx`, `src/machines/attention.ts`); the phone lists them under Work › Your Computers and Needs You |
+| An offline computer: its last state and the files you read, kept on this Mac (capped), open read-only until it's back; calls that need it say so at once | Mac (`src/machines/cache.ts`, `src/machines/files.ts`); the phone reads its own copy, greyed |
 
 ## Adding a feature
 

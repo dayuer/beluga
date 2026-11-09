@@ -23,6 +23,7 @@ import { type ReaderMode, hasRenderedLook, hasText, initialMode } from './reader
 import r from './reader.module.css';
 import { useT } from '../../i18n/index.js';
 import { revealLabel } from '../../lib/os-words.js';
+import { useRevealFileLabel } from '../../lib/remote-open.js';
 
 /** Space, Page Up/Down, Home and End scroll the page even when nothing has the keyboard. */
 const PAGE_KEYS = new Set([' ', 'PageDown', 'PageUp', 'Home', 'End']);
@@ -99,6 +100,8 @@ function useScratchArrows(viewer: ViewerState, wsId: string, editing: boolean): 
 export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string }) {
   const t = useT();
   const { client } = useBeluga();
+  // On a computer's page the file is downloaded instead (BLG-852).
+  const revealFile = useRevealFileLabel();
   const prefs = usePrefs();
   const wsName = useApp((st) => findWorkspace(st.projects, wsId)?.name);
   const selfId = useApp((st) => st.selfId);
@@ -195,7 +198,7 @@ export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string 
         <span className={r.tools}>
           {isText ? <IconButton icon={copied ? 'check' : 'copy'} label={copied ? t('views.reader.copied') : t('views.reader.copyText')} onClick={() => copy(viewer.content)} /> : null}
           {local ? <IconButton icon="external" label={t('views.reader.openInEditor')} onClick={() => void openWithDefaultApp(client, local)} /> : null}
-          {local ? <IconButton icon="folder" label={revealLabel()} onClick={() => void revealInFinder(client, local)} /> : null}
+          {local ? <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, local)} /> : null}
           {!local ? <IconButton icon="download" label={t('views.files.saveCopyAria')} onClick={() => void saveFile(client, viewer)} /> : null}
         </span>
       </header>

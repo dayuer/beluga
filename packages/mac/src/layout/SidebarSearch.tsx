@@ -6,7 +6,11 @@ import { useActions } from '../lib/actions.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { sameDeep } from '../lib/stable.js';
-import { type ChatTarget, FOCUS_SIDEBAR_SEARCH, MESSAGE_SEARCH_DEBOUNCE_MS, type SidebarResult, matchChats, moveSelection, searchesMessages, sidebarResults } from './sidebar-search-model.js';
+import { type ChatTarget, FOCUS_SIDEBAR_SEARCH, MESSAGE_SEARCH_DEBOUNCE_MS, type RemoteMatch, type SidebarResult, matchChats, matchRemoteChats, moveSelection, searchesMessages, sidebarResults } from './sidebar-search-model.js';
+import { onMachine } from '../machines/pane-model.js';
+import { machineClientOf } from '../machines/pane-clients.js';
+import type { RemoteSource } from '../machines/remote-work.js';
+import { useRemoteSources } from '../machines/use-remote.js';
 import s from './SidebarSearch.module.css';
 import { useT } from '../i18n/index.js';
 
@@ -27,7 +31,11 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
   const q = query.trim();
   const sources = useApp((st) => (q ? { projects: st.projects, plans: st.plans, shared: st.shared, prs: st.prs } : undefined), sameDeep);
   const search = useApp((st) => (q ? st.search : undefined));
-  const results = useMemo(() => (sources && search ? sidebarResults(q, matchChats(q, sources), search) : []), [q, sources, search]);
+  // Your computers too (BLG-785): their chats by name from what they have, their messages asked of each.
+  const remote = useRemoteSources();
+  const remoteChats = useMemo(() => (q ? matchRemoteChats(q, remote) : []), [q, remote]);
+  const remoteMessages = useRemoteMessages(q, remote);
+  const results = useMemo(() => (sources && search ? sidebarResults(q, matchChats(q, sources), search, { chats: remoteChats, messages: remoteMessages }) : []), [q, sources, search, remoteChats, remoteMessages]);
   const looking = searchesMessages(q) && search?.query !== q;
 
   useEffect(() => {
@@ -61,6 +69,7 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
   const open = (result: SidebarResult): void => {
     if (result.type === 'chat') openChat(result.chat.target);
     else if (result.type === 'message') actions.run({ type: 'search_hit', index: result.index });
+    else if (result.type === 'remote') actions.run({ type: 'view', view: onMachine(result.match.machine.id, { kind: 'workspace', id: result.match.id, tab: 'chat' }) });
     else seeAll();
   };
 
@@ -102,16 +111,17 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
 function Results({ list, results, selected, looking, open }: { list: React.RefObject<HTMLDivElement | null>; results: readonly SidebarResult[]; selected: number; looking: boolean; open: (result: SidebarResult) => void }) {
   const t = useT();
   const firstMessage = results.findIndex((r) => r.type === 'message');
+  const firstRemoteMessage = results.findIndex((r) => r.type === 'remote' && r.match.hit);
   const onlyAll = results.length === 1;
   return (
     <div ref={list} className={s.results} role="listbox" aria-label={t('layout.sidebarSearch.results')}>
       {onlyAll && !looking ? <div className={s.note}>{t('layout.sidebarSearch.none')}</div> : null}
       {results.map((r, i) => (
         <div key={r.key}>
-          {i === firstMessage ? <div className={s.heading}>{t('layout.sidebarSearch.messages')}</div> : null}
+          {i === firstMessage || (firstMessage < 0 && i === firstRemoteMessage) ? <div className={s.heading}>{t('layout.sidebarSearch.messages')}</div> : null}
           {r.type === 'all' && looking ? <div className={s.note}>{t('layout.sidebarSearch.searching')}</div> : null}
           <div role="option" aria-selected={i === selected} className={cx(s.result, i === selected && s.resultOn)} onClick={() => open(r)}>
-            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : <span className={s.all}>{t('layout.sidebarSearch.seeAll')}</span>}
+            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : r.type === 'remote' ? <RemoteResult match={r.match} /> : <span className={s.all}>{t('layout.sidebarSearch.seeAll')}</span>}
           </div>
         </div>
       ))}
@@ -140,4 +150,68 @@ function MessageResult({ result }: { result: Extract<SidebarResult, { type: 'mes
       </span>
     </>
   );
+}
+
+/** A chat or a message on one of your computers: as this Mac's, with where it is. */
+function RemoteResult({ match }: { match: RemoteMatch }) {
+  if (!match.hit) return <ChatResult label={match.label} detail={match.detail} />;
+  const { before, match: found, after } = snippet(match.hit, 80);
+  return (
+    <>
+      <span className={s.detail}>
+        {match.hit.place} · {match.machine.name}
+      </span>
+      <span className={s.excerpt}>
+        {before}
+        <mark>{found}</mark>
+        {after}
+      </span>
+    </>
+  );
+}
+
+/** How long a computer has to answer a message search. */
+const REMOTE_SEARCH_MS = 6000;
+const REMOTE_HITS = 10;
+
+/**
+ * The query's messages on each of your computers that's there now: asked of each (the same search
+ * as this Mac's), the first few of each kept, each opening its worktree there.
+ */
+function useRemoteMessages(q: string, sources: readonly RemoteSource[]): readonly RemoteMatch[] {
+  const [found, setFound] = useState<readonly RemoteMatch[]>([]);
+  const live = sources.filter((x) => x.live).map((x) => x.machine.id).join(',');
+  useEffect(() => {
+    setFound([]);
+    if (!searchesMessages(q)) return;
+    let alive = true;
+    const offs: Array<() => void> = [];
+    const t = setTimeout(() => {
+      for (const src of sources) {
+        const client = src.live ? machineClientOf(src.machine.id) : undefined;
+        if (!client) continue;
+        const take = (): boolean => {
+          const st = client.store.getState().search;
+          if (st.query !== q) return false;
+          // Only what's in a worktree or chat it lists (a demo computer is this daemon: only its own work).
+          const ids = new Set(src.snapshot?.projects.flatMap((p) => p.workspaces.map((w) => `ws:${w.id}`)) ?? []);
+          const hits = st.hits.filter((h) => ids.has(h.channel)).slice(0, REMOTE_HITS);
+          if (alive) setFound((had) => [...had.filter((m) => m.machine.id !== src.machine.id), ...hits.map((hit) => ({ machine: { id: src.machine.id, name: src.machine.name }, id: hit.channel.slice(3), label: hit.place, detail: src.machine.name, hit }))]);
+          return true;
+        };
+        void client.api.workbench.search(q).catch(() => undefined);
+        const off = client.store.subscribe(() => {
+          if (take()) off();
+        });
+        const stop = setTimeout(off, REMOTE_SEARCH_MS);
+        offs.push(() => (off(), clearTimeout(stop)));
+      }
+    }, MESSAGE_SEARCH_DEBOUNCE_MS);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      for (const off of offs) off();
+    };
+  }, [q, live]);
+  return found;
 }

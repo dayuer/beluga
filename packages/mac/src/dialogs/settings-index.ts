@@ -19,6 +19,7 @@ export const panes = (): ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName
   { id: 'environment', label: t('settings.pane.environment'), icon: 'lock', keywords: 'env .env variables secrets api keys 环境变量 密钥' },
   { id: 'people', label: t('settings.pane.people'), icon: 'people', keywords: 'friends trust network permissions 好友 信任 网络 权限' },
   { id: 'phone', label: t('settings.pane.phone'), icon: 'phone', keywords: 'android iphone mobile companion 手机 安卓' },
+  { id: 'computers', label: t('settings.pane.computers'), icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair 电脑 服务器 云 远程 配对' },
   { id: 'voice', label: t('settings.pane.voice'), icon: 'mic', keywords: 'dictation speech microphone talk transcribe 语音 听写 麦克风' },
   { id: 'keyboard', label: t('settings.pane.keyboard'), icon: 'command', keywords: 'shortcuts keys hotkeys bindings 键盘 快捷键' },
   { id: 'advanced', label: t('settings.pane.advanced'), icon: 'wrench', keywords: 'web access browser agent threads 高级 浏览器 线程' },
@@ -62,7 +63,7 @@ export const settingsIndex = (): readonly Entry[] => [
     [t('settings.writing.times'), undefined, 'timestamps time clock 时间 时间戳'],
     [t('settings.writing.steps'), t('settings.find.steps'), 'fold steps tools collapse expand show steps 折叠 展开 步骤'],
   ]),
-  ...rows('general', t('settings.earnings.title'), [[t('settings.earnings.showIn'), t('settings.find.earnings'), 'currency money stripe usd eur dollars 货币 收入 美元']]),
+  ...rows('general', t('settings.earnings.title'), [[t('settings.earnings.showIn'), t('settings.find.earnings'), 'currency money stripe revenuecat usd eur dollars 货币 收入 美元']]),
 
   // Appearance
   ...rows('appearance', undefined, [
@@ -242,6 +243,7 @@ export const settingsIndex = (): readonly Entry[] => [
     [t('settings.people.addAFriend'), undefined, 'friend invite code link qr 好友 邀请 二维码'],
     [t('settings.people.whoCanAsk'), undefined, 'chats ask agent permission 聊天 权限'],
     [t('settings.people.whoSeesUsage'), undefined, 'usage limits privacy share 用量 隐私 共享'],
+    [t('network.settings.seen'), t('settings.find.seen'), 'seen read receipts delivered privacy 已读 回执 送达 隐私'],
   ]),
   group('people', t('settings.people.capabilities'), t('settings.find.capabilities'), 'trust capabilities permissions access folders ask me for 信任 权限 文件夹'),
   group('people', t('settings.people.rules'), t('settings.find.rules'), 'rules allow always decline 规则 允许 拒绝'),
@@ -254,6 +256,12 @@ export const settingsIndex = (): readonly Entry[] => [
   ]),
 
   // Phone
+  group('computers', t('settings.computers.whereTitle'), t('settings.find.whereRuns'), 'run new work machine best available 运行 新工作 电脑 最合适的'),
+  ...rows('computers', t('settings.computers.whereTitle'), [[t('settings.computers.runOn'), t('settings.find.runOn'), 'here best available machine computer 这里 最合适的 电脑']]),
+  group('computers', t('settings.computers.you'), t('settings.find.youOnNetwork'), 'always on identity network friends move stand in standing in mac mini server 身份 网络 好友 迁移 暂代 服务器'),
+  group('computers', t('settings.computers.envAlways'), t('settings.find.envAlways'), 'env dotenv secrets ask again always 密钥 重新询问 始终'),
+  ...rows('computers', t('settings.computers.settings'), [[t('settings.computers.settingsEvery'), t('settings.find.settingsEvery'), 'sync settings conflicts same everywhere secrets keep in sync 同步 设置 冲突 密钥']]),
+  group('computers', t('settings.computers.yours'), t('settings.find.yourComputers'), 'add ssh link code fingerprint rename icon forget update health 添加 链接 代码 指纹 重命名 图标 忘掉 更新'),
   group('phone', t('settings.phone.cable'), t('settings.find.cable'), 'usb cable adb plugged 数据线'),
   group('phone', t('settings.phone.yourPhones'), t('settings.find.yourPhones'), 'devices paired remove 设备 配对 移除'),
   ...rows('phone', undefined, [

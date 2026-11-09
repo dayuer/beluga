@@ -103,7 +103,7 @@ export const calls = {
   setTaskAgent: (key: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('board.setAgent', [key, agent], `${key}: ${label}`),
   /** 1.35 (BLG-498): who works a plan's milestones and tasks from here on (null: your default) → in words. */
   setPlanAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setWorkAgent', [planId, agent], `Plan's agent: ${label}`),
-  /** 1.48: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words. Only to a Mac with SINCE.checkAgent. */
+  /** 1.50: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words. Only to a Mac with SINCE.checkAgent. */
   setPlanCheckAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setCheckAgent', [planId, agent], `Plan's checks: ${label}`),
   /** A task described in words: Claude's draft first, then it's added. */
   // 1.24 (BLG-322) `several`: only to a Mac that has it (SINCE.severalTasks); an older one drafts one task.

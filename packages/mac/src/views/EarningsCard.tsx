@@ -2,13 +2,13 @@ import { Icon } from '../components/Icon.js';
 import { ProjectIcon } from '../components/ProjectIcon.js';
 import { Button, IconButton, Tip, cx } from '../components/ui.js';
 import { EarningsTipBody } from '../components/EarningsPill.js';
-import { dismissEarningsHint, formatMoney, missingNote, openStripe, updatedAgo, useConvertedEarnings, useEarningsHintDismissed } from '../lib/earnings.js';
+import { dismissEarningsHint, formatMoney, missingNote, openEarnings, refreshEarnings, sourcesOf, updatedAgo, useConvertedEarnings, useEarningsHintDismissed } from '../lib/earnings.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import s from './earnings-card.module.css';
 import { useT } from '../i18n/index.js';
 
 /**
- * The Overview's Earnings: every project with Stripe connected and what it earned, all-time.
+ * The Overview's Earnings: every project with Stripe or RevenueCat connected and what it earned, all-time.
  * Before any is connected, a one-time hint says it exists (dismissed for good with ✕).
  */
 export function EarningsCard() {
@@ -28,7 +28,7 @@ export function EarningsCard() {
           <span className={s.hintTitle}>{t('views.earningsCard.trackTitle')}</span>
           <span className={s.hintDetail}>{t('views.earningsCard.trackDetail')}</span>
         </span>
-        <Button size="small" variant="primary" onClick={() => openStripe()}>
+        <Button size="small" variant="primary" onClick={() => openEarnings()}>
           {t('views.earningsCard.connect')}
         </Button>
         <IconButton icon="x" label={t('views.earningsCard.dontShow')} className={s.dismiss} onClick={dismissEarningsHint} />
@@ -42,13 +42,13 @@ export function EarningsCard() {
     <section className={s.card} aria-label={t('views.earnings.title')}>
       <div className={s.head}>
         <h2 className={s.title}>{t('views.earnings.title')}</h2>
-        <span className={s.sub}>{t('views.earningsCard.allTime')}{summary.updatedAt && !summary.refreshing ? ` · ${t('views.earnings.updated', { ago: updatedAgo(summary.updatedAt) })}` : summary.refreshing ? t('views.earningsCard.counting') : ''}</span>
+        <span className={s.sub}>{t('views.earningsCard.allTime', { sources: sourcesOf(summary.projects.map((c) => c.earnings)) })}{summary.updatedAt && !summary.refreshing ? ` · ${t('views.earnings.updated', { ago: updatedAgo(summary.updatedAt) })}` : summary.refreshing ? t('views.earningsCard.counting') : ''}</span>
         <span className={s.actions}>
-          <Button size="small" variant="quiet" icon="plus" onClick={() => openStripe()}>
+          <Button size="small" variant="quiet" icon="plus" onClick={() => openEarnings()}>
             {t('views.earningsCard.another')}
           </Button>
           <Tip label={t('views.earningsCard.countAgain')}>
-            <Button size="small" variant="quiet" icon="refresh" aria-label={t('views.earningsCard.refreshAll')} disabled={summary.refreshing} onClick={() => void api.stripe.refresh()} />
+            <Button size="small" variant="quiet" icon="refresh" aria-label={t('views.earningsCard.refreshAll')} disabled={summary.refreshing} onClick={() => refreshEarnings(api)} />
           </Tip>
         </span>
       </div>
@@ -62,11 +62,11 @@ export function EarningsCard() {
         ) : null}
         {rows.map(({ item: { project, earnings }, money, share }) => (
           <Tip key={project.id} label={<EarningsTipBody earnings={earnings} />}>
-            <button type="button" className={cx(s.tile, earnings.refreshing && s.counting)} onClick={() => openStripe(project.id)}>
+            <button type="button" className={cx(s.tile, earnings.refreshing && s.counting)} onClick={() => openEarnings(project.id)}>
               <span className={s.tileName}>
                 <ProjectIcon id={project.id} name={project.name} size={14} />
                 {project.name}
-                {earnings.mode === 'test' ? <span className={s.test}>{t('views.earningsCard.test')}</span> : null}
+                {earnings.mode === 'test' && !earnings.revenuecat ? <span className={s.test}>{t('views.earningsCard.test')}</span> : null}
                 {earnings.error ? <Icon name="alert" size={11} className={s.warn} /> : null}
               </span>
               <span className={s.amount}>{earnings.totals ? formatMoney(money.amount, currency) : t('views.earningsCard.countingTile')}</span>

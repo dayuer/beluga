@@ -12,11 +12,14 @@ import { ConversationPeek, DeleteArchivedAlert } from './overview/ConversationPe
 import type { ThreadChildren } from '@beluga/shared/threads.js';
 import { FilterBar } from './overview/FilterBar.js';
 import { ActiveRow, type ArchivedActions, ArchivedRow } from './overview/OverviewRows.js';
-import { type OverviewGroup, type OverviewItem, emptyText, filterCounts, groupItems, inFilter, narrow, overviewItems, rowOrder, stepRow } from './overview/overview-model.js';
+import { type OverviewGroup, type OverviewItem, emptyText, filterCounts, groupItems, inFilter, narrow, narrowThere, overviewItems, rowOrder, stepRow } from './overview/overview-model.js';
+import { RemoteList } from '../machines/RemoteList.js';
+import { useRemoteAttention } from '../machines/remote-attention.js';
 import { useOverviewPrefs } from './overview/use-overview-prefs.js';
 import s from './overview.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
 import { t as tNow, useT } from '../i18n/index.js';
+import { openFolderThere } from '../lib/remote-open.js';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const sameRows = (a: readonly OverviewItem[], b: readonly OverviewItem[]): boolean => sameDeep(a, b, 3);
@@ -27,6 +30,7 @@ const sameRows = (a: readonly OverviewItem[], b: readonly OverviewItem[]): boole
  * reads an archived conversation, ⌘⌫ deletes one (after asking).
  */
 export function OverviewView() {
+  const t = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const api = client.api;
@@ -45,7 +49,11 @@ export function OverviewView() {
   // A project that's gone (removed, hidden) means all of them again.
   const project = projects.find((p) => p.id === prefs.project);
   const narrowed = narrow(all, project?.id, search);
-  const counts = filterCounts(narrowed);
+  // Every computer's too (BLG-843): what needs you there, from the same source as the bell, tagged.
+  const remote = useRemoteAttention();
+  const there = useMemo(() => remote.flatMap((r) => narrowThere(r.needs, project?.name, search).map((item) => ({ machine: r.machine, item: { id: item.id, title: item.title, sub: `${item.project} · ${item.why}`, page: item.page }, offline: false }))), [remote, project?.name, search]);
+  const here = filterCounts(narrowed);
+  const counts = { ...here, needs: here.needs + there.length };
   const groups = groupItems(
     narrowed.filter((i) => inFilter(i, prefs.filter)),
     prefs.sort,
@@ -87,7 +95,7 @@ export function OverviewView() {
         .finally(() => setRestoring(undefined));
     },
     read: (item) => setPeek(item.ws.id),
-    finder: (item) => void api.local.openFolder(item.project.root).catch((err: unknown) => toast(client, tNow('views.overview.folderFailed', { error: errorText(err) }), 'error')),
+    finder: (item) => void openFolderThere(client, item.project.root).catch((err: unknown) => toast(client, tNow('views.overview.folderFailed', { error: errorText(err) }), 'error')),
     remove: (item) => setDeleting(item.ws.id),
   };
   const open = (item: OverviewItem): void => (item.archived ? act.read(item) : item.plan ? actions.run({ type: 'view', view: { kind: 'plan', id: item.plan.plan.id } }) : actions.run({ type: 'open_ws', id: item.ws.id }));
@@ -135,7 +143,8 @@ export function OverviewView() {
       />
       {!searching && !project && (prefs.filter === 'all' || prefs.filter === 'active') ? <EarningsCard /> : null}
       <div ref={listRef} onKeyDown={onListKey}>
-        {groups.length ? (
+        {prefs.filter === 'needs' && there.length ? <RemoteList title={t('views.overview.remoteNeeds')} rows={there} /> : null}
+        {groups.length || (prefs.filter === 'needs' && there.length) ? (
           groups.map((g) => <Group key={g.project.id} group={g} filter={prefs.filter} current={current} onSelect={setSelected} onOpen={open} act={act} />)
         ) : (
           <NothingHere
