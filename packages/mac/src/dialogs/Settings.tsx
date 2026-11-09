@@ -28,6 +28,7 @@ import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
+import { t, useT, useLocale } from '../i18n/index.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
@@ -37,7 +38,7 @@ import { KeyboardSettings } from './KeyboardSettings.js';
 import { ExperimentalSettings } from './ExperimentalSettings.js';
 import { WebAccessSettings } from './WebAccessSettings.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
-import { PANES } from './settings-index.js';
+import { panes as settingsPanes } from './settings-index.js';
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './SettingsSearch.js';
 import { MaintainerChip } from './SupportSheets.js';
 import s from './settings.module.css';
@@ -61,6 +62,7 @@ function PictureRow() {
   const me = useApp((st) => st.network.self);
   const on = useApp((st) => st.network.enabled);
   const fallbackName = useApp((st) => st.self?.name ?? '');
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
@@ -83,18 +85,18 @@ function PictureRow() {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const detail = !on ? 'Turn on the Beluga network to share a picture.' : (error ?? 'Friends and people in your groups see it, and keep a copy.');
+  const detail = !on ? t('settings.general.pictureOff') : (error ?? t('settings.general.pictureDetail'));
   return (
-    <Row label="Your picture" detail={detail}>
+    <Row label={t('settings.general.picture')} detail={detail}>
       <span className={s.pictureRow}>
         {me ? <Avatar name={me.name || fallbackName} id={me.peerId} size={32} /> : null}
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
         <Button size="small" icon="image" disabled={!on || busy} onClick={() => input.current?.click()}>
-          {me?.avatar ? 'Change…' : 'Choose…'}
+          {me?.avatar ? t('settings.general.pictureChange') : t('settings.general.pictureChoose')}
         </Button>
         {me?.avatar ? (
           <Button size="small" variant="quiet" disabled={busy} onClick={() => run(null)}>
-            Remove
+            {t('settings.common.remove')}
           </Button>
         ) : null}
       </span>
@@ -105,13 +107,13 @@ function PictureRow() {
 /** A picture cropped to its middle square and shrunk to 256 px, small enough to send (base64). */
 async function squarePicture(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("That picture couldn't be opened. Try a PNG or JPEG.");
+    throw new Error(t('settings.general.pictureCantOpen'));
   });
   const side = Math.min(bitmap.width, bitmap.height);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = Math.min(256, side);
   const g = canvas.getContext('2d');
-  if (!g) throw new Error("That picture couldn't be drawn");
+  if (!g) throw new Error(t('settings.general.pictureCantDraw'));
   g.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   const encode = (type: string, quality: number): Promise<Blob | null> => new Promise((done) => canvas.toBlob(done, type, quality));
@@ -126,47 +128,48 @@ async function squarePicture(file: File): Promise<string> {
       return btoa(bin);
     }
   }
-  throw new Error('That picture is too big to send, even shrunk');
+  throw new Error(t('settings.general.pictureTooBig'));
 }
 
 function General() {
   const api = useApi();
   const state = useApp((st) => st);
   const prefs = usePrefs();
+  const t = useT();
   const [name, setName] = useState(state.self?.name ?? '');
   return (
     <>
       <Group>
-        <Row label="Your name" detail="What friends see in the room.">
+        <Row label={t('settings.general.name')} detail={t('settings.general.nameDetail')}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               void api.session.rename(name);
             }}
           >
-            <input id="settings-name" aria-label="Your name" className={s.text} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== state.self?.name && void api.session.rename(name)} />
+            <input id="settings-name" aria-label={t('settings.general.name')} className={s.text} value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== state.self?.name && void api.session.rename(name)} />
           </form>
         </Row>
         <PictureRow />
-        <Row label="Friends' requests for your agent" detail="For people you haven't picked a trust level for.">
+        <Row label={t('settings.general.requests')} detail={t('settings.general.requestsDetail')}>
           <Select
-            label="Default policy"
+            label={t('settings.general.defaultPolicy')}
             value={state.policy}
             onChange={(v) => void api.session.setClaudeSharing(v)}
             options={[
-              { value: 'ask', label: 'Ask me each time' },
-              { value: 'auto', label: 'Allow everyone' },
-              { value: 'deny', label: 'Keep it private' },
+              { value: 'ask', label: t('settings.general.askEachTime') },
+              { value: 'auto', label: t('settings.general.allowEveryone') },
+              { value: 'deny', label: t('settings.general.keepPrivate') },
             ]}
           />
         </Row>
       </Group>
       {/* A browser runs the build its server serves: the server's Beluga updates, not the page. */}
       {webServed() ? null : <UpdateSettingsGroup />}
-      <Group title="Writing">
-        <Row label="Send with" detail={prefs.sendWith === 'enter' ? 'Shift+Return makes a new line.' : 'Return makes a new line.'}>
+      <Group title={t('settings.writing.title')}>
+        <Row label={t('settings.writing.sendWith')} detail={prefs.sendWith === 'enter' ? t('settings.writing.shiftReturnNewLine') : t('settings.writing.returnNewLine')}>
           <Select
-            label="Send with"
+            label={t('settings.writing.sendWith')}
             value={prefs.sendWith}
             onChange={(v) => setPrefs({ sendWith: v })}
             options={[
@@ -175,28 +178,28 @@ function General() {
             ]}
           />
         </Row>
-        <Row label="Send during a turn" detail="Queue waits for the turn to finish. Steer sends to the current turn. The secondary action uses the other choice. Agents that cannot steer always queue.">
+        <Row label={t('settings.writing.duringTurn')} detail={t('settings.writing.duringTurnDetail')}>
           <Select
-            label="Send during a turn"
+            label={t('settings.writing.duringTurn')}
             value={prefs.sendDuringTurn}
             onChange={(v) => setPrefs({ sendDuringTurn: v })}
             options={[
-              { value: 'queue', label: 'Queue' },
-              { value: 'steer', label: 'Steer' },
+              { value: 'queue', label: t('settings.writing.queue') },
+              { value: 'steer', label: t('settings.writing.steer') },
             ]}
           />
         </Row>
-        <Row label="Show times next to messages">
-          <Switch label="Times" on={prefs.timestamps} onChange={(v) => setPrefs({ timestamps: v })} />
+        <Row label={t('settings.writing.times')}>
+          <Switch label={t('settings.writing.timesSwitch')} on={prefs.timestamps} onChange={(v) => setPrefs({ timestamps: v })} />
         </Row>
-        <Row label="The agent's steps once it answers" detail="Folded, the answer stands on its own; Show Steps on the answer opens them again.">
+        <Row label={t('settings.writing.steps')} detail={t('settings.writing.stepsDetail')}>
           <Select
-            label="Steps"
+            label={t('settings.writing.stepsSwitch')}
             value={prefs.doneSteps}
             onChange={(v) => setPrefs({ doneSteps: v })}
             options={[
-              { value: 'fold', label: 'Fold them away' },
-              { value: 'show', label: 'Keep them showing' },
+              { value: 'fold', label: t('settings.writing.fold') },
+              { value: 'show', label: t('settings.writing.show') },
             ]}
           />
         </Row>
@@ -206,21 +209,22 @@ function General() {
   );
 }
 
-const LOW_POWER_OPTIONS: ReadonlyArray<{ value: LowPower; label: string }> = [
-  { value: 'off', label: 'Off' },
-  { value: 'battery', label: 'On battery' },
-  { value: 'always', label: 'Always' },
+const lowPowerOptions = (): ReadonlyArray<{ value: LowPower; label: string }> => [
+  { value: 'off', label: t('settings.common.off') },
+  { value: 'battery', label: t('settings.lowPower.battery') },
+  { value: 'always', label: t('settings.common.always') },
 ];
 
 const IDLE_DAYS: readonly number[] = [0, 1, 3, 7, 14, 30];
-const idleWords = (days: number): string => (days === 0 ? 'Never' : `After ${days} day${days === 1 ? '' : 's'}`);
+const idleWords = (days: number): string => (days === 0 ? t('settings.common.never') : t('settings.layout.afterDays', { days }));
 
 function Appearance() {
   const prefs = useChosenPrefs();
+  const t = useT();
   const api = useApi();
   const lowPower = useApp((st) => st.prefs.lowPower ?? 'off');
   const saving = useApp((st) => st.powerSaving);
-  const savingNote = saving ? 'Off while Low Power mode saves power.' : undefined;
+  const savingNote = saving ? t('settings.appearance.savingOff') : undefined;
   const theme = themeFor(useDocTheme(), prefs);
   const themeAccent = theme.accent !== undefined;
   const daemonPrefs = useApp((st) => st.prefs);
@@ -233,88 +237,100 @@ function Appearance() {
   return (
     <>
       <Group>
-        <Row label="Appearance" {...(prefs.appearance === 'system' ? { detail: `Your light theme by day and your dark theme at night, as ${yourComputer()} switches.` } : {})}>
+        <Row label={t('settings.appearance.language')} detail={t('settings.appearance.languageDetail')}>
           <Select
-            label="Appearance"
-            value={prefs.appearance}
-            onChange={(v) => setPrefs({ appearance: v })}
+            label={t('settings.appearance.language')}
+            value={prefs.language}
+            onChange={(v) => setPrefs({ language: v })}
             options={[
-              { value: 'system', label: 'Match the system' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: t('settings.appearance.languageSystem') },
+              { value: 'en', label: 'English' },
+              { value: 'zh-CN', label: '简体中文' },
             ]}
           />
         </Row>
-        <Row label="Accent" detail={`Selection, focus and buttons. “System” follows ${yourComputer()}${themeAccent ? `; the one beside it is ${theme.name}’s own` : ''}.`}>
+        <Row label={t('settings.appearance.appearance')} {...(prefs.appearance === 'system' ? { detail: t('settings.appearance.appearanceDetail', { computer: yourComputer() }) } : {})}>
+          <Select
+            label={t('settings.appearance.appearance')}
+            value={prefs.appearance}
+            onChange={(v) => setPrefs({ appearance: v })}
+            options={[
+              { value: 'system', label: t('settings.appearance.matchSystem') },
+              { value: 'light', label: t('settings.appearance.light') },
+              { value: 'dark', label: t('settings.appearance.dark') },
+            ]}
+          />
+        </Row>
+        <Row label={t('settings.appearance.accent')} detail={t('settings.appearance.accentDetail', { computer: yourComputer(), themeOwn: themeAccent ? t('settings.appearance.accentThemeOwn', { theme: theme.name }) : '' })}>
           <div className={s.swatches}>
             {(Object.keys(ACCENTS) as Accent[]).filter((a) => a !== 'theme' || themeAccent || prefs.accent === 'theme').map((a) => (
-              <button key={a} type="button" aria-label={a === 'theme' ? `${theme.name}’s own` : a} {...(a === 'theme' ? { title: `${theme.name}’s own` } : {})} aria-pressed={prefs.accent === a} className={cx(s.swatch, prefs.accent === a && s.swatchOn)} style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }} onClick={() => setPrefs({ accent: a })} />
+              <button key={a} type="button" aria-label={a === 'theme' ? t('settings.appearance.themeOwn', { theme: theme.name }) : a} {...(a === 'theme' ? { title: t('settings.appearance.themeOwn', { theme: theme.name }) } : {})} aria-pressed={prefs.accent === a} className={cx(s.swatch, prefs.accent === a && s.swatchOn)} style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }} onClick={() => setPrefs({ accent: a })} />
             ))}
           </div>
         </Row>
       </Group>
       <ThemeGroups />
-      <Group title="Low Power">
+      <Group title={t('settings.lowPower.title')}>
         <Row
-          label="Low Power mode"
-          detail={`Beluga does less and shows less to save the battery: no motion or blur, the window redraws a few times a second, terminals skip the GPU, background checks come less often, and idle terminals rest sooner. On battery counts macOS Low Power Mode too.${saving ? ' Saving power now.' : ''}`}
+          label={t('settings.lowPower.mode')}
+          detail={t('settings.lowPower.detail', { now: saving ? t('settings.lowPower.savingNow') : '' })}
         >
-          <Select label="Low Power mode" value={lowPower} onChange={(v) => void api.session.setPrefs({ lowPower: v })} options={LOW_POWER_OPTIONS.map((o) => ({ ...o }))} />
+          <Select label={t('settings.lowPower.mode')} value={lowPower} onChange={(v) => void api.session.setPrefs({ lowPower: v })} options={lowPowerOptions().map((o) => ({ ...o }))} />
         </Row>
       </Group>
-      <Group title="Layout">
-        <Row label="Text size" detail={`${prefs.textSize} pt · ${[shortcutKeys('zoom-in'), shortcutKeys('zoom-out')].filter(Boolean).join(' and ') || 'Bigger and Smaller Text in the View menu'} work anywhere`}>
+      <Group title={t('settings.layout.title')}>
+        <Row label={t('settings.layout.textSize')} detail={t('settings.layout.textSizeDetail', { size: prefs.textSize, keys: [shortcutKeys('zoom-in'), shortcutKeys('zoom-out')].filter(Boolean).join(t('settings.layout.and')) || t('settings.layout.zoomMenu') })}>
           <input className={s.slider} type="range" min={11} max={17} step={1} value={prefs.textSize} onChange={(e) => setPrefs({ textSize: Number(e.target.value) })} />
         </Row>
-        <Row label="Density">
+        <Row label={t('settings.layout.density')}>
           <Select
-            label="Density"
+            label={t('settings.layout.density')}
             value={prefs.density}
             onChange={(v) => setPrefs({ density: v })}
             options={[
-              { value: 'comfortable', label: 'Comfortable' },
-              { value: 'compact', label: 'Compact' },
+              { value: 'comfortable', label: t('settings.layout.comfortable') },
+              { value: 'compact', label: t('settings.layout.compact') },
             ]}
           />
         </Row>
-        <Row label="Conversation width">
+        <Row label={t('settings.layout.width')}>
           <Select
-            label="Width"
+            label={t('settings.layout.widthShort')}
             value={prefs.chatWidth}
             onChange={(v) => setPrefs({ chatWidth: v, chatWidthPicked: true })}
             options={[
-              { value: 'narrow', label: 'Narrow' },
-              { value: 'wide', label: 'Wide' },
-              { value: 'full', label: 'Full window' },
+              { value: 'narrow', label: t('settings.layout.narrow') },
+              { value: 'wide', label: t('settings.layout.wide') },
+              { value: 'full', label: t('settings.layout.full') },
             ]}
           />
         </Row>
-        <Row label="Sidebar categories" detail="Sort chats into Inbox, Working, Later and Settled, in place of Unread and Chats.">
-          <Switch label="Sidebar categories" on={daemonPrefs.chatCategories} onChange={turnCategories} />
+        <Row label={t('settings.layout.categories')} detail={t('settings.layout.categoriesDetail')}>
+          <Switch label={t('settings.layout.categories')} on={daemonPrefs.chatCategories} onChange={turnCategories} />
         </Row>
         {daemonPrefs.chatCategories ? (
           <>
-            <Row label="Settle when a pull request merges" detail="The chat moves to Settled when its pull request merges.">
-              <Switch label="Settle when a pull request merges" on={daemonPrefs.settleOnMerge} onChange={(v) => void api.session.setPrefs({ settleOnMerge: v })} />
+            <Row label={t('settings.layout.settleMerge')} detail={t('settings.layout.settleMergeDetail')}>
+              <Switch label={t('settings.layout.settleMerge')} on={daemonPrefs.settleOnMerge} onChange={(v) => void api.session.setPrefs({ settleOnMerge: v })} />
             </Row>
-            <Row label="Settle idle chats" detail="A chat with no activity for this long moves to Settled. An open pull request stops it.">
-              <Select label="Settle idle chats" value={String(daemonPrefs.settleIdleDays)} onChange={(v) => void api.session.setPrefs({ settleIdleDays: Number(v) })} options={idleChoices.map((d) => ({ value: String(d), label: idleWords(d) }))} />
+            <Row label={t('settings.layout.settleIdle')} detail={t('settings.layout.settleIdleDetail')}>
+              <Select label={t('settings.layout.settleIdle')} value={String(daemonPrefs.settleIdleDays)} onChange={(v) => void api.session.setPrefs({ settleIdleDays: Number(v) })} options={idleChoices.map((d) => ({ value: String(d), label: idleWords(d) }))} />
             </Row>
           </>
         ) : (
-          <Row label="Unread in the sidebar" detail="Conversations that finished or need you, listed at the top while there are any.">
-            <Switch label="Unread in the sidebar" on={prefs.unreadSection} onChange={(v) => setPrefs({ unreadSection: v })} />
+          <Row label={t('settings.layout.unread')} detail={t('settings.layout.unreadDetail')}>
+            <Switch label={t('settings.layout.unread')} on={prefs.unreadSection} onChange={(v) => setPrefs({ unreadSection: v })} />
           </Row>
         )}
-        <Row label="Sidebar width">
+        <Row label={t('settings.layout.sidebarWidth')}>
           <input className={s.slider} type="range" min={200} max={360} step={4} value={prefs.sidebarWidth} onChange={(e) => setPrefs({ sidebarWidth: Number(e.target.value) })} />
         </Row>
-        <Row label="Reduce motion" {...(savingNote ? { detail: savingNote } : {})}>
-          <Switch label="Reduce motion" on={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
+        <Row label={t('settings.layout.reduceMotion')} {...(savingNote ? { detail: savingNote } : {})}>
+          <Switch label={t('settings.layout.reduceMotion')} on={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
         </Row>
         {keyPlatform() === 'mac' && !webServed() && (
-          <Row label="Reduce transparency" detail={savingNote ?? 'A solid sidebar, with no blur behind the window. Lighter on slower Macs.'}>
-            <Switch label="Reduce transparency" on={prefs.reduceTransparency} onChange={(v) => setPrefs({ reduceTransparency: v })} />
+          <Row label={t('settings.layout.reduceTransparency')} detail={savingNote ?? t('settings.layout.reduceTransparencyDetail')}>
+            <Switch label={t('settings.layout.reduceTransparency')} on={prefs.reduceTransparency} onChange={(v) => setPrefs({ reduceTransparency: v })} />
           </Row>
         )}
       </Group>
@@ -330,15 +346,16 @@ const TONE: Record<RuntimeState, 'ok' | 'warn' | 'muted'> = { ready: 'ok', signe
  */
 function AgentsGroup({ mine }: { mine: string }) {
   const { rows, checking, check, act } = useAgents();
+  const t = useT();
   return (
-    <Group title="Your agents">
+    <Group title={t('settings.agent.agents')}>
       {rows.map((row) => (
         <div key={row.id} className={s.row} data-testid={`settings-agent-${row.id}`}>
           <Icon name={runtimeMark(row.id)} size={18} />
           <div className={s.rowText}>
             <div className={s.rowLabel}>
               {row.label}
-              {row.id === mine && row.state === 'ready' ? <span className={s.agentYours}> · yours</span> : null}
+              {row.id === mine && row.state === 'ready' ? <span className={s.agentYours}>{t('settings.agent.yours')}</span> : null}
             </div>
             <div className={s.rowDetail}>
               {row.detail}
@@ -361,9 +378,9 @@ function AgentsGroup({ mine }: { mine: string }) {
           </div>
         </div>
       ))}
-      <Row label="Signed in or installed one just now?" detail="Beluga looks again by itself when you come back to the window.">
+      <Row label={t('settings.agent.justNow')} detail={t('settings.agent.justNowDetail')}>
         <Button variant="quiet" icon="refresh" disabled={checking} onClick={() => void check()}>
-          {checking ? 'Checking…' : 'Check Again'}
+          {checking ? t('settings.common.checking') : t('settings.common.checkAgain')}
         </Button>
       </Row>
     </Group>
@@ -378,6 +395,7 @@ function AgentPane() {
   const api = useApi();
   const macPrefs = usePrefs();
   const { ui } = useBeluga();
+  const t = useT();
   const state = useApp((st) => st);
   const p = state.prefs;
   const runtime = myRuntime(p);
@@ -389,9 +407,9 @@ function AgentPane() {
   return (
     <>
       <Group>
-        <Row label="Your agent" detail="Runs every new conversation and answers when friends write @you. A conversation can pick another in the box you type in; a project, in its settings.">
+        <Row label={t('settings.agent.yourAgent')} detail={t('settings.agent.yourAgentDetail')}>
           <Select
-            label="Your agent"
+            label={t('settings.agent.yourAgent')}
             value={choiceForAgent({ runtime, label: '', ...(model ? { model } : {}) })}
             onChange={(v) => {
               const ref = agentForChoice(v, state.runtimes);
@@ -401,11 +419,11 @@ function AgentPane() {
             placeholder={choices.find((c) => c.runtime === runtime)?.group ?? runtime}
           />
         </Row>
-        <Row label="Thinking effort" detail={efforts.size < EFFORTS.length ? 'Only the levels this model takes.' : undefined}>
-          <Select label="Effort" value={p.effort ?? ''} onChange={(v) => void api.session.setPrefs({ effort: (v || null) as (typeof EFFORTS)[number] | null })} options={[{ value: '', label: 'Auto', description: 'Your agent decides, case by case' }, ...effortOptions.map((e) => ({ value: e, label: EFFORT_INFO[e].label, description: EFFORT_INFO[e].detail, ...(efforts.has(e) ? {} : { disabled: true }) }))]} />
+        <Row label={t('settings.agent.effort')} detail={efforts.size < EFFORTS.length ? t('settings.agent.effortLevels') : undefined}>
+          <Select label={t('settings.agent.effortShort')} value={p.effort ?? ''} onChange={(v) => void api.session.setPrefs({ effort: (v || null) as (typeof EFFORTS)[number] | null })} options={[{ value: '', label: t('settings.agent.auto'), description: t('settings.agent.autoDetail') }, ...effortOptions.map((e) => ({ value: e, label: EFFORT_INFO[e].label, description: EFFORT_INFO[e].detail, ...(efforts.has(e) ? {} : { disabled: true }) }))]} />
         </Row>
-        <Row label="Ask before running commands" detail="Your own agent. Secrets stay blocked either way.">
-          <Switch label="Self approval" on={p.selfApproval === 'ask'} onChange={(v) => void api.session.setPrefs({ selfApproval: v ? 'ask' : 'never' })} />
+        <Row label={t('settings.agent.askFirst')} detail={t('settings.agent.askFirstDetail')}>
+          <Switch label={t('settings.agent.selfApproval')} on={p.selfApproval === 'ask'} onChange={(v) => void api.session.setPrefs({ selfApproval: v ? 'ask' : 'never' })} />
         </Row>
       </Group>
       <AgentsGroup mine={runtime} />
@@ -414,16 +432,16 @@ function AgentPane() {
       <div id={LOCAL_MODELS_ID}>
         <LocalModelsSettings />
       </div>
-      <Group title="In the chat">
-        <Row label="Sub-agents">
+      <Group title={t('settings.agent.inChat')}>
+        <Row label={t('settings.agent.subagents')}>
           <Select
-            label="Sub-agents"
+            label={t('settings.agent.subagents')}
             value={p.subagents}
             onChange={(v) => void api.session.setPrefs({ subagents: v })}
             options={[
-              { value: 'full', label: 'Every step' },
-              { value: 'compact', label: 'One line each' },
-              { value: 'hidden', label: 'Just a count' },
+              { value: 'full', label: t('settings.agent.everyStep') },
+              { value: 'compact', label: t('settings.agent.oneLine') },
+              { value: 'hidden', label: t('settings.agent.justCount') },
             ]}
           />
         </Row>
@@ -433,25 +451,25 @@ function AgentPane() {
       <ParallelSettings />
       <ChatLimitSettings />
       {p.agentThreads ? <ThreadLimitsSettings /> : null}
-      <Group title="Scratch folder">
-        <Row label="Give your agent a scratch folder" detail="Screenshots, JSON, logs and notes your agent makes while it works go to the workspace’s .beluga/scratch/ folder (kept out of git; never touches other tools’ .context/).">
-          <Switch label="Scratch folder" on={p.scratchFolder} onChange={(v) => void api.session.setPrefs({ scratchFolder: v })} />
+      <Group title={t('settings.agent.scratch')}>
+        <Row label={t('settings.agent.scratchGive')} detail={t('settings.agent.scratchGiveDetail')}>
+          <Switch label={t('settings.agent.scratch')} on={p.scratchFolder} onChange={(v) => void api.session.setPrefs({ scratchFolder: v })} />
         </Row>
-        <Row label="Show the Scratch tab" detail={`Watch that folder live in the right panel, newest first${shortcutKeys('panel-scratch') ? ` (${shortcutKeys('panel-scratch')})` : ''}.`}>
-          <Switch label="Scratch tab" on={macPrefs.scratchTab} onChange={(v) => setPrefs({ scratchTab: v })} />
+        <Row label={t('settings.agent.scratchTab')} detail={t('settings.agent.scratchTabDetail', { keys: shortcutKeys('panel-scratch') ? ` (${shortcutKeys('panel-scratch')})` : '' })}>
+          <Switch label={t('settings.agent.scratchTabShort')} on={macPrefs.scratchTab} onChange={(v) => setPrefs({ scratchTab: v })} />
         </Row>
       </Group>
-      <Group title="Pull requests and templates">
-        <Row label="Pull request instructions" detail={state.prCustom ? 'Customized' : 'Built-in'}>
-          <Button onClick={() => void api.workbench.editPrPrompt()}>Edit…</Button>
+      <Group title={t('settings.agent.prTemplates')}>
+        <Row label={t('settings.agent.prInstructions')} detail={state.prCustom ? t('settings.agent.customized') : t('settings.agent.builtIn')}>
+          <Button onClick={() => void api.workbench.editPrPrompt()}>{t('settings.common.edit')}</Button>
           {state.prCustom ? (
             <Button variant="quiet" onClick={() => void api.workbench.resetPrPrompt()}>
-              Reset
+              {t('settings.common.reset')}
             </Button>
           ) : null}
         </Row>
-        <Row label="Templates" detail={`${state.templates.length} ways to start a task`}>
-          <Button onClick={() => ui.patch({ settings: undefined, menu: { menu: { kind: 'templates', manage: true }, selected: 0 } })}>Manage…</Button>
+        <Row label={t('settings.agent.templates')} detail={t('settings.agent.templatesDetail', { n: state.templates.length })}>
+          <Button onClick={() => ui.patch({ settings: undefined, menu: { menu: { kind: 'templates', manage: true }, selected: 0 } })}>{t('settings.agent.manage')}</Button>
         </Row>
       </Group>
     </>
@@ -462,18 +480,19 @@ function AgentPane() {
 function HiddenProjectsGroup() {
   const api = useApi();
   const hidden = useApp((st) => st.hiddenProjects);
+  const t = useT();
   return (
-    <Group title="Hidden projects">
+    <Group title={t('settings.workspaces.hidden')}>
       {hidden.length ? (
         hidden.map((root) => (
           <Row key={root} label={baseName(root) || root} detail={root}>
-            <Button onClick={() => void api.workspaces.showProject(root)} aria-label={`Show ${baseName(root) || root}`}>
-              Show
+            <Button onClick={() => void api.workspaces.showProject(root)} aria-label={t('settings.workspaces.showProject', { name: baseName(root) || root })}>
+              {t('settings.workspaces.show')}
             </Button>
           </Row>
         ))
       ) : (
-        <Row label="None" detail="Hide a project from its menu in the sidebar; it waits here (and under Hidden Projects) until you show it again.">
+        <Row label={t('settings.workspaces.none')} detail={t('settings.workspaces.hiddenNone')}>
           {null}
         </Row>
       )}
@@ -485,6 +504,7 @@ function HiddenProjectsGroup() {
 function BranchPrefixRow() {
   const api = useApi();
   const saved = useApp((st) => st.prefs.branchPrefix);
+  const t = useT();
   const [value, setValue] = useState(saved);
   useEffect(() => setValue(saved), [saved]);
   const ok = BRANCH_PREFIX_RE.test(value);
@@ -492,14 +512,14 @@ function BranchPrefixRow() {
     if (ok && value !== saved) void api.session.setPrefs({ branchPrefix: value });
   };
   return (
-    <Row label="Branch prefix" detail={ok ? `New worktrees get branches like ${value}fix-login. Leave it empty for no prefix.` : 'Use letters, digits and . _ - / only.'}>
+    <Row label={t('settings.workspaces.branchPrefix')} detail={ok ? t('settings.workspaces.branchPrefixDetail', { value }) : t('settings.workspaces.branchPrefixBad')}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        <input aria-label="Branch prefix" className={s.text} value={value} placeholder="none" spellCheck={false} onChange={(e) => setValue(e.target.value.trim())} onBlur={save} />
+        <input aria-label={t('settings.workspaces.branchPrefix')} className={s.text} value={value} placeholder={t('settings.common.none')} spellCheck={false} onChange={(e) => setValue(e.target.value.trim())} onBlur={save} />
       </form>
     </Row>
   );
@@ -508,22 +528,23 @@ function BranchPrefixRow() {
 function Workspaces() {
   const api = useApi();
   const p = useApp((st) => st.prefs);
+  const t = useT();
   return (
     <>
       <Group>
-        <Row label="Run setup in new worktrees" detail="The project's setup command (npm install, …) runs in each new worktree.">
-          <Switch label="Auto setup" on={p.autoSetup} onChange={(v) => void api.session.setPrefs({ autoSetup: v })} />
+        <Row label={t('settings.workspaces.setup')} detail={t('settings.workspaces.setupDetail')}>
+          <Switch label={t('settings.workspaces.autoSetup')} on={p.autoSetup} onChange={(v) => void api.session.setPrefs({ autoSetup: v })} />
         </Row>
         <BranchPrefixRow />
-        <Row label="Keep open pull requests current" detail="When your agent commits in a worktree whose pull request is open, it pushes there as its turn ends. Off: it commits here, and you push from the toolbar.">
-          <Switch label="Keep open pull requests current" on={p.pushToPr} onChange={(v) => void api.session.setPrefs({ pushToPr: v })} />
+        <Row label={t('settings.workspaces.pushToPr')} detail={t('settings.workspaces.pushToPrDetail')}>
+          <Switch label={t('settings.workspaces.pushToPr')} on={p.pushToPr} onChange={(v) => void api.session.setPrefs({ pushToPr: v })} />
         </Row>
-        <Row label="Friends may start work here" detail="They ask to start a worktree or hand work to you; you approve each one.">
-          <Switch label="Friend worktrees" on={p.friendWorktrees === 'ask'} onChange={(v) => void api.session.setFriendWorktrees(v ? 'ask' : 'off')} />
+        <Row label={t('settings.workspaces.friends')} detail={t('settings.workspaces.friendsDetail')}>
+          <Switch label={t('settings.workspaces.friendWorktrees')} on={p.friendWorktrees === 'ask'} onChange={(v) => void api.session.setFriendWorktrees(v ? 'ask' : 'off')} />
         </Row>
       </Group>
       <HiddenProjectsGroup />
-      <Group title="Toolbar buttons">
+      <Group title={t('settings.workspaces.toolbar')}>
         {HIDEABLE_BUTTONS.map(([id, label]) => (
           <Row key={id} label={label}>
             <Switch label={label} on={!p.hiddenButtons.includes(id)} onChange={(v) => void api.session.setPrefs({ hiddenButtons: v ? p.hiddenButtons.filter((b) => b !== id) : [...p.hiddenButtons, id] })} />
@@ -540,17 +561,18 @@ function People() {
   const state = useApp((st) => st);
   const others = state.peers.filter((p) => p.peerId !== state.selfId);
   const remembered = Object.entries(state.remembered).filter(([id]) => !others.some((p) => p.peerId === id));
+  const t = useT();
   return (
     <>
       <NetworkSettings />
       <AccessSettings />
       {/* Trust is shown here and set on each friend's card (BLG-202). */}
-      <Group title="In the room">
+      <Group title={t('settings.people.room')}>
         {others.length ? (
           others.map((p) => {
             const friend = state.network.friends.some((f) => f.peerId === p.peerId);
             return (
-              <Row key={p.peerId} label={p.name} detail={`${TRUST_INFO[trustOf(state, p.peerId)].label}. ${friend ? 'Change it on their card.' : 'Add them as a friend to set it.'}`}>
+              <Row key={p.peerId} label={p.name} detail={t('settings.people.trustDetail', { trust: TRUST_INFO[trustOf(state, p.peerId)].label, how: friend ? t('settings.people.changeOnCard') : t('settings.people.befriendToSet') })}>
                 <Avatar name={p.name} id={p.peerId} size={20} />
                 {friend ? (
                   <Button
@@ -560,45 +582,45 @@ function People() {
                       openFriendCard(client, p.peerId);
                     }}
                   >
-                    Their Card…
+                    {t('settings.people.theirCard')}
                   </Button>
                 ) : p.guest || state.guests[p.peerId] ? null : (
                   <Button variant="quiet" onClick={() => void befriend(client, p.peerId, p.name)}>
-                    Add as Friend
+                    {t('settings.people.addFriend')}
                   </Button>
                 )}
               </Row>
             );
           })
         ) : (
-          <div className={s.note}>Nobody else is here yet.</div>
+          <div className={s.note}>{t('settings.people.nobody')}</div>
         )}
       </Group>
       {remembered.length ? (
-        <Group title="Remembered from before">
+        <Group title={t('settings.people.remembered')}>
           {remembered.map(([id, r]) => (
             <Row key={id} label={r.name} detail={TRUST_INFO[r.trust].label}>
               <Button variant="quiet" onClick={() => void api.people.forget(id)}>
-                Forget
+                {t('settings.people.forget')}
               </Button>
             </Row>
           ))}
         </Group>
       ) : null}
-      <Group title="Remote access">
-        <Row label="How friends reach you" detail="Takes effect for the next invite.">
-          <Select label="Tunnel" value={state.prefs.tunnel} onChange={(v) => void api.session.setPrefs({ tunnel: v })} options={TUNNEL_ORDER.map((t) => ({ value: t, label: TUNNEL_LABELS[t] }))} />
+      <Group title={t('settings.people.remote')}>
+        <Row label={t('settings.people.reach')} detail={t('settings.people.reachDetail')}>
+          <Select label={t('settings.people.tunnel')} value={state.prefs.tunnel} onChange={(v) => void api.session.setPrefs({ tunnel: v })} options={TUNNEL_ORDER.map((id) => ({ value: id, label: TUNNEL_LABELS[id] }))} />
         </Row>
         {state.isHost ? (
-          <Row label="Take new people" detail={state.roomOpen ? 'Anyone with the link can come in (or knock).' : 'Closed: nobody new can join, even with the link.'}>
-            <Switch label="Room open" on={state.roomOpen} onChange={(v) => void api.session.setRoomOpen(v)} />
+          <Row label={t('settings.people.takeNew')} detail={state.roomOpen ? t('settings.people.roomOpenDetail') : t('settings.people.roomClosedDetail')}>
+            <Switch label={t('settings.people.roomOpen')} on={state.roomOpen} onChange={(v) => void api.session.setRoomOpen(v)} />
           </Row>
         ) : null}
-        <Row label="Invite link">
-          <Button onClick={() => void api.session.copyInvite()}>Copy</Button>
+        <Row label={t('settings.people.invite')}>
+          <Button onClick={() => void api.session.copyInvite()}>{t('settings.common.copy')}</Button>
           {state.isHost ? (
             <Button variant="quiet" onClick={() => void api.session.newInviteLink()}>
-              New link
+              {t('settings.people.newLink')}
             </Button>
           ) : null}
         </Row>
@@ -611,18 +633,19 @@ function About() {
   const { client, ui } = useBeluga();
   const home = useApp((st) => st.home);
   const logPath = `${home}/.beluga/logs/daemon.log`;
+  const t = useT();
   return (
     <>
       <Group>
-        <Row label="The Beluga app">{APP_VERSION}</Row>
+        <Row label={t('settings.about.app')}>{APP_VERSION}</Row>
         {webServed() ? null : <UpdateAboutRow />}
-        <Row label="Beluga (the part that runs your room)">{client.daemonVersion}</Row>
-        <Row label="Windows attached" detail="Beluga windows connected to the room right now.">
+        <Row label={t('settings.about.daemon')}>{client.daemonVersion}</Row>
+        <Row label={t('settings.about.windows')} detail={t('settings.about.windowsDetail')}>
           {client.clients}
         </Row>
-        <Row label="Log" detail="~/.beluga/logs/daemon.log">
+        <Row label={t('settings.about.log')} detail="~/.beluga/logs/daemon.log">
           <Button size="small" onClick={() => void client.api.local.openFolder(logPath)}>
-            Open in Console
+            {t('settings.about.openConsole')}
           </Button>
           <Button size="small" variant="quiet" onClick={() => void revealInFinder(client, logPath)}>
             {revealLabel()}
@@ -630,14 +653,14 @@ function About() {
         </Row>
         <ReportProblemRow />
       </Group>
-      <Group title="Support Beluga">
-        <Row label="Beluga is free, and a passion project" detail={
+      <Group title={t('settings.about.support')}>
+        <Row label={t('settings.about.free')} detail={
             <>
-              Built and maintained by <MaintainerChip />. A star helps others find it; a coffee keeps it going.
+              {t('settings.about.builtBy')}<MaintainerChip />{t('settings.about.builtByEnd')}
             </>
           }>
           <Button size="small" icon="star" onClick={() => void openExternal(GITHUB_URL)}>
-            Star on GitHub
+            {t('settings.about.star')}
           </Button>
           <Button
             size="small"
@@ -648,7 +671,7 @@ function About() {
               openSupport('coffee');
             }}
           >
-            Buy a Coffee…
+            {t('settings.about.coffee')}
           </Button>
         </Row>
       </Group>
@@ -699,7 +722,10 @@ export function Settings() {
  */
 function SettingsWindow({ pane }: { pane: SettingsPane }) {
   const { ui } = useBeluga();
-  const panes = useMemo(() => (webServed() ? PANES.filter((p) => !APP_ONLY.has(p.id)) : PANES), []);
+  const t = useT();
+  const locale = useLocale();
+  const all = useMemo(() => settingsPanes(), [locale]);
+  const panes = useMemo(() => (webServed() ? all.filter((p) => !APP_ONLY.has(p.id)) : all), [all]);
   const scroll = useRef<HTMLDivElement>(null);
   const search = useSettingsSearch(panes, pane, (id) => ui.patch({ settings: id }), scroll);
   const Body = BODY[pane];
@@ -724,7 +750,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
           }}
         >
           <nav className={s.nav}>
-            <Dialog.Title className={s.title}>Settings</Dialog.Title>
+            <Dialog.Title className={s.title}>{t('settings.window.title')}</Dialog.Title>
             <SettingsSearchField search={search} />
             {panes.map((p) => (
               <button
@@ -743,8 +769,8 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
           </nav>
           <div className={s.body}>
             <div className={s.bodyHead}>
-              <h2 className={s.paneTitle}>{search.showing ? 'Search' : PANES.find((p) => p.id === pane)?.label}</h2>
-              <Dialog.Close className={s.close} aria-label="Close">
+              <h2 className={s.paneTitle}>{search.showing ? t('settings.window.search') : all.find((p) => p.id === pane)?.label}</h2>
+              <Dialog.Close className={s.close} aria-label={t('settings.window.close')}>
                 <Icon name="x" size={12} />
               </Dialog.Close>
             </div>

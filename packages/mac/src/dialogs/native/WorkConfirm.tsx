@@ -11,6 +11,8 @@ import type { AskedWork } from '../../lib/work-confirm.js';
 import { MergeReview } from './MergeReview.js';
 import s from './work-confirm.module.css';
 import { primaryKey } from '../../lib/shortcuts-model.js';
+import { rich } from './pick.js';
+import { t, useT } from '../../i18n/index.js';
 
 /**
  * Before a workspace action that starts Claude working or changes git: what will happen, in a
@@ -25,8 +27,6 @@ interface Words {
   readonly icon: IconName;
 }
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
-
 /** What each action does, in this workspace's terms. */
 export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Words {
   const project = state.projects.find((p) => p.id === ws.projectId);
@@ -36,88 +36,84 @@ export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Wor
   switch (action) {
     case 'review_claude':
       return {
-        title: 'Ask your agent to review this worktree?',
+        title: t('dialogs.work.reviewTitle'),
         message: (
           <>
-            <p>Your agent’s sub-agents check correctness, security, tests and quality, then give a verdict in the chat: what changed, what they found, and whether it’s ready to merge.</p>
-            <p className={s.quiet}>It may add a missing test or fix something small along the way; anything it changes shows in Changes for you to look over.</p>
+            <p>{t('dialogs.work.reviewMessage')}</p>
+            <p className={s.quiet}>{t('dialogs.work.reviewQuiet')}</p>
           </>
         ),
-        confirm: 'Start Review',
+        confirm: t('dialogs.work.reviewConfirm'),
         icon: 'review',
       };
     case 'commit':
       return {
-        title: 'Commit all changes?',
+        title: t('dialogs.work.commitTitle'),
         message: (
-          <p>
-            Commits {plural(changed, 'changed file')} on <strong>{branch}</strong> with the message “Work from Beluga”. Nothing is pushed.
-          </p>
+          <p>{rich(t('dialogs.work.commitMessage', { count: t('dialogs.n.changedFile', { n: changed }) }), { branch: <strong>{branch}</strong> })}</p>
         ),
-        confirm: 'Commit',
+        confirm: t('dialogs.work.commitConfirm'),
         icon: 'commit',
       };
     case 'merge':
       return {
-        title: `Merge into ${project?.name ?? 'the project'}’s main folder?`,
+        title: t('dialogs.work.mergeTitle', { project: project?.name ?? t('dialogs.work.theProject') }),
         message: (
-          <p>
-            Merges {plural(ahead, 'commit')} from <strong>{branch}</strong> into the main folder, so its files change. Nothing is pushed.
-          </p>
+          <p>{rich(t('dialogs.work.mergeMessage', { count: t('dialogs.n.commit', { n: ahead }) }), { branch: <strong>{branch}</strong> })}</p>
         ),
-        confirm: 'Merge',
+        confirm: t('dialogs.work.mergeConfirm'),
         icon: 'merge',
       };
     case 'merge_claude': {
       const files = state.conflicts[ws.id]?.length ?? 0;
       return {
-        title: 'Ask your agent to solve the conflict?',
-        message: <p>Your agent merges {branch} into the main folder, resolves the conflict{files ? ` in ${plural(files, 'file')}` : ''} keeping both sides’ intent, runs the tests and commits the merge.</p>,
-        confirm: 'Solve Conflict',
+        title: t('dialogs.work.solveTitle'),
+        message: <p>{t('dialogs.work.solveMessage', { branch, files: files ? t('dialogs.work.solveIn', { count: t('dialogs.n.file', { n: files }) }) : '' })}</p>,
+        confirm: t('dialogs.work.solveConfirm'),
         icon: 'merge',
       };
     }
     case 'compact':
       return {
-        title: 'Compact this conversation?',
-        message: <p>Your agent summarizes what matters so far and carries on from that summary, so it has room to keep going.</p>,
-        confirm: 'Compact',
+        title: t('dialogs.work.compactTitle'),
+        message: <p>{t('dialogs.work.compactMessage')}</p>,
+        confirm: t('dialogs.work.compactConfirm'),
         icon: 'gauge',
       };
     case 'fix_checks': {
       const pr = state.prs[ws.id];
       return {
-        title: 'Ask your agent to fix the failing checks?',
-        message: <p>Your agent reads why {pr ? `pull request #${pr.number}’s` : 'the pull request’s'} checks failed, fixes the code, runs the tests, then commits and pushes to the pull request.</p>,
-        confirm: 'Fix Checks',
+        title: t('dialogs.work.fixTitle'),
+        message: <p>{t('dialogs.work.fixMessage', { pr: pr ? t('dialogs.work.prChecks', { number: pr.number }) : t('dialogs.work.thePrChecks') })}</p>,
+        confirm: t('dialogs.work.fixConfirm'),
         icon: 'wand',
       };
     }
     case 'resolve_pr': {
       const pr = state.prs[ws.id];
       return {
-        title: 'Ask your agent to resolve the merge conflicts?',
+        title: t('dialogs.work.resolveTitle'),
         message: (
           <>
-            <p>{pr ? `Pull request #${pr.number}` : 'The pull request'} conflicts with its base, so GitHub can’t merge it. In this chat, your agent merges the latest base into <strong>{branch}</strong>, resolves each conflict keeping both sides’ intent, runs the tests, then commits and pushes.</p>
-            <p className={s.quiet}>Once it’s pushed, the checks run again and you can merge.</p>
+            <p>{rich(t('dialogs.work.resolveMessage', { pr: pr ? t('dialogs.work.prNumber', { number: pr.number }) : t('dialogs.work.thePr') }), { branch: <strong>{branch}</strong> })}</p>
+            <p className={s.quiet}>{t('dialogs.work.resolveQuiet')}</p>
           </>
         ),
-        confirm: 'Resolve Conflicts',
+        confirm: t('dialogs.work.resolveConfirm'),
         icon: 'merge',
       };
     }
     case 'continue_after_merge': {
       const pr = state.prs[ws.id];
       return {
-        title: 'Continue working after the merge?',
+        title: t('dialogs.work.continueTitle'),
         message: (
           <>
-            <p>{pr ? `Pull request #${pr.number}` : 'The pull request'} is done. <strong>{branch}</strong> starts again from the latest base, and the conversation stays, so the next change gets a new pull request.</p>
-            <p className={s.quiet}>If the branch has work that isn’t merged yet, nothing is lost: your agent brings the base in instead.</p>
+            <p>{rich(t('dialogs.work.continueMessage', { pr: pr ? t('dialogs.work.prNumber', { number: pr.number }) : t('dialogs.work.thePr') }), { branch: <strong>{branch}</strong> })}</p>
+            <p className={s.quiet}>{t('dialogs.work.continueQuiet')}</p>
           </>
         ),
-        confirm: 'Continue',
+        confirm: t('dialogs.work.continueConfirm'),
         icon: 'branch',
       };
     }
@@ -157,6 +153,7 @@ function toolbarButton(wsId: string, action: AskedWork): HTMLElement | null {
 }
 
 export function WorkConfirm({ wsId, action, close }: { wsId: string; action: AskedWork; close: () => void }) {
+  const t = useT();
   const api = useApi();
   const state = useApp((st) => st);
   const ws = findWorkspace(state.projects, wsId);
@@ -203,7 +200,7 @@ export function WorkConfirm({ wsId, action, close }: { wsId: string; action: Ask
           </Popover.Description>
           <div className={s.buttons}>
             <Button size="small" onClick={close}>
-              Cancel
+              {t('dialogs.work.cancel')}
             </Button>
             <Button ref={start} size="small" variant="primary" onClick={go}>
               {words.confirm}

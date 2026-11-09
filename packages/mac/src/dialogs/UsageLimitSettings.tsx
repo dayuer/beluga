@@ -2,6 +2,7 @@ import { resetWords } from '@beluga/shared/run-failure.js';
 import { Button } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { Group, Row, Switch } from './settings-controls.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * Settings › Agent › Usage limits (BLG-757): an agent that stopped on your plan's usage limit is
@@ -13,29 +14,30 @@ export function UsageLimitSettings() {
   const api = useApi();
   const { client } = useBeluga();
   const p = useApp((st) => st.prefs);
+  const t = useT();
   const set = (patch: Parameters<typeof api.session.setPrefs>[0]): void => void api.session.setPrefs(patch).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'));
   const now = Date.now();
   const skipping = p.autoContinue && p.autoContinueSkip > now;
   const chats = p.autoContinueOff.length;
   return (
-    <Group title="Usage limits">
+    <Group title={t('settings.usage.title')}>
       <Row
-        label="Continue when your usage limit resets"
-        detail={p.autoContinue ? 'Beluga sends “Continue where you left off.” to an agent that stopped on your limit, a minute after it resets. Never in chats with people.' : 'An agent that stops on your limit waits for you to press Continue.'}
+        label={t('settings.usage.continue')}
+        detail={p.autoContinue ? t('settings.usage.continueOn') : t('settings.usage.continueOff')}
       >
-        <Switch label="Continue when your usage limit resets" on={p.autoContinue} onChange={(v) => set(v ? { autoContinue: true, autoContinueSkip: Date.now() } : { autoContinue: false })} />
+        <Switch label={t('settings.usage.continue')} on={p.autoContinue} onChange={(v) => set(v ? { autoContinue: true, autoContinueSkip: Date.now() } : { autoContinue: false })} />
       </Row>
       {skipping ? (
-        <Row label="Skipped this session" detail={`Nothing continues on its own until ${resetWords(p.autoContinueSkip, now)}.`}>
+        <Row label={t('settings.usage.skipped')} detail={t('settings.usage.skippedDetail', { when: resetWords(p.autoContinueSkip, now) })}>
           <Button size="small" onClick={() => set({ autoContinueSkip: 0 })}>
-            Turn Back On
+            {t('settings.usage.turnBackOn')}
           </Button>
         </Row>
       ) : null}
       {p.autoContinue && chats > 0 ? (
-        <Row label="Chats it’s off in" detail={`${chats} ${chats === 1 ? 'chat waits' : 'chats wait'} for you to press Continue.`}>
+        <Row label={t('settings.usage.chatsOff')} detail={t('settings.usage.chatsOffDetail', { chats })}>
           <Button size="small" onClick={() => set({ autoContinueOff: [] })}>
-            Turn On in All
+            {t('settings.usage.turnOnAll')}
           </Button>
         </Row>
       ) : null}

@@ -14,15 +14,17 @@ import { Check, Choice, Field, Section, Sheet, Tag, useFlash } from './parts.js'
 import s from './sharing.module.css';
 import v from './invite.module.css';
 import { thisComputer } from '../../lib/os-words.js';
+import { rich } from './pick.js';
+import { t, useT } from '../../i18n/index.js';
 
-const sentence = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** What remote access is doing, when there's no link to copy yet. */
 function hostingNote(phase: string | undefined, detail: string | undefined): string {
-  if (phase === 'failed') return detail ?? 'Couldn’t open remote access. Try again, or pick another way in Settings › People & access.';
-  if (phase === 'local') return 'Only people on this network can join right now.';
-  if (phase) return 'Opening a secure link… it’s copied as soon as it’s ready.';
-  return 'Beluga opens a secure link the first time you copy one.';
+  if (phase === 'failed') return detail ?? t('dialogs.invite.failed');
+  if (phase === 'local') return t('dialogs.invite.local');
+  if (phase) return t('dialogs.invite.opening');
+  return t('dialogs.invite.firstTime');
 }
 
 /**
@@ -37,6 +39,7 @@ export function InviteSheet({ menu, close }: NativeMenuProps<'invite_link'>) {
 }
 
 function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
+  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   const projects = useApp((st) => st.projects);
@@ -50,7 +53,7 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
   // Your agent is Codex: guests who prompt it are turned away, so the sheet says so before you share (BLG-461).
   const noGuests = fallbackFor(useMyAgent().runtime, 'guests');
   const invitable = projects.filter((p) => p.root);
-  const scopes = [{ value: 'room', label: 'Everything (the whole room)' }, ...invitable.map((p) => ({ value: p.id, label: p.id === c.from ? `This project · ${p.name}` : p.name }))];
+  const scopes = [{ value: 'room', label: t('dialogs.invite.everything') }, ...invitable.map((p) => ({ value: p.id, label: p.id === c.from ? t('dialogs.invite.thisProject', { name: p.name }) : p.name }))];
   const fail = (err: unknown): void => toast(client, err instanceof Error ? err.message : String(err), 'error');
 
   const copy = async (): Promise<void> => {
@@ -70,8 +73,8 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
 
   return (
     <Sheet
-      title="Invite People"
-      subtitle="Send a link. They see only what you invite them to."
+      title={t('dialogs.invite.title')}
+      subtitle={t('dialogs.invite.subtitle')}
       icon="link"
       wide
       close={close}
@@ -79,65 +82,65 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
       footer={
         <>
           {invite ? (
-            <Tip label="Anyone with the room’s link joins everything, without knocking">
+            <Tip label={t('dialogs.invite.roomTip')}>
               <Button variant="quiet" icon={copied === 'room' ? 'check' : 'copy'} className={cx(copied === 'room' && s.copied)} onClick={copyRoom}>
-                {copied === 'room' ? 'Copied' : 'Copy Room Link'}
+                {copied === 'room' ? t('dialogs.invite.copied') : t('dialogs.invite.copyRoom')}
               </Button>
             </Tip>
           ) : (
             <span />
           )}
-          <Button onClick={close}>Done</Button>
+          <Button onClick={close}>{t('dialogs.invite.done')}</Button>
           <Button variant="primary" icon={copied === 'new' ? 'check' : 'link'} disabled={busy} onClick={() => void copy()} aria-keyshortcuts="Enter">
-            {copied === 'new' ? 'Copied' : 'Copy Invite Link'}
+            {copied === 'new' ? t('dialogs.invite.copied') : t('dialogs.invite.copyInvite')}
           </Button>
         </>
       }
     >
-      <Field label="Invite to">
-        <Select label="Invite to" value={c.scope} options={scopes} onChange={(scope) => set({ scope })} />
-        <span className={s.hint}>{c.scope === 'room' ? 'The room chat and everything you share.' : 'All its worktrees and chats, nothing else.'}</span>
+      <Field label={t('dialogs.invite.inviteTo')}>
+        <Select label={t('dialogs.invite.inviteTo')} value={c.scope} options={scopes} onChange={(scope) => set({ scope })} />
+        <span className={s.hint}>{c.scope === 'room' ? t('dialogs.invite.roomHint') : t('dialogs.invite.projectHint')}</span>
       </Field>
-      <Field label="They can">
-        <Choice<GuestCan> label="They can" value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: CAN_INFO[can].label, icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
+      <Field label={t('dialogs.invite.theyCan')}>
+        <Choice<GuestCan> label={t('dialogs.invite.theyCan')} value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: CAN_INFO[can].label, icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
         <span className={s.hint}>
           {sentence(CAN_INFO[c.can].detail)}.{noGuests && c.can !== 'watch' ? ` ${noGuests}` : ''}
         </span>
       </Field>
-      <Field label="The link">
-        <Check checked={c.knock} onChange={(knock) => set({ knock })} label="Knock first" detail={c.knock ? 'You let them in from a card in the chat.' : 'They come straight in.'} />
-        <Check checked={c.singleUse} onChange={(singleUse) => set({ singleUse })} label="One person only" detail={c.singleUse ? 'It stops working after the first person.' : 'Anyone with the link can come.'} />
-        <Check checked={c.expires} onChange={(expires) => set({ expires })} label="Expires in 24 hours" detail={c.expires ? undefined : 'Works until you revoke it or quit Beluga.'} />
+      <Field label={t('dialogs.invite.theLink')}>
+        <Check checked={c.knock} onChange={(knock) => set({ knock })} label={t('dialogs.invite.knock')} detail={c.knock ? t('dialogs.invite.knockOn') : t('dialogs.invite.knockOff')} />
+        <Check checked={c.singleUse} onChange={(singleUse) => set({ singleUse })} label={t('dialogs.invite.single')} detail={c.singleUse ? t('dialogs.invite.singleOn') : t('dialogs.invite.singleOff')} />
+        <Check checked={c.expires} onChange={(expires) => set({ expires })} label={t('dialogs.invite.expires')} detail={c.expires ? undefined : t('dialogs.invite.expiresOff')} />
       </Field>
       {!invite ? <div className={v.status}>{hostingNote(hosting?.phase, hosting?.detail)}</div> : null}
       <HowTheyJoin knock={c.knock} />
       <Waiting />
-      <Section title="Active links">
-        <div className={s.list} role="list" aria-label="Active links">
+      <Section title={t('dialogs.invite.active')}>
+        <div className={s.list} role="list" aria-label={t('dialogs.invite.active')}>
           {links.length ? (
             [...links]
               .sort((a, b) => b.createdAt - a.createdAt)
               .map((l) => (
-                <div key={l.id} role="listitem" className={s.item} aria-label={`Link to ${l.label}`}>
+                <div key={l.id} role="listitem" className={s.item} aria-label={t('dialogs.invite.linkTo', { label: l.label })}>
                   <Icon name="link" size={14} className={s.itemIcon} />
                   <div className={s.itemText}>
                     <span className={s.itemTitle}>
-                      {l.label === 'everything' ? 'Everything' : l.label} <Tag tone="accent">{CAN_INFO[l.can].short}</Tag>
+                      {l.label === 'everything' ? t('dialogs.invite.everythingLabel') : l.label} <Tag tone="accent">{CAN_INFO[l.can].short}</Tag>
                     </span>
-                    <span className={s.itemDetail}>{[sentence(expiresIn(l.expiresAt, Date.now())), l.used ? `used by ${l.used}` : 'not used yet', l.singleUse ? 'one person' : 'anyone', l.knock ? 'knocks first' : 'no knock'].join(' · ')}</span>
+                    <span className={s.itemDetail}>{[sentence(expiresIn(l.expiresAt, Date.now())), l.used ? t('dialogs.invite.usedBy', { name: l.used }) : t('dialogs.invite.notUsed'), l.singleUse ? t('dialogs.invite.onePerson') : t('dialogs.invite.anyone'), l.knock ? t('dialogs.invite.knocksFirst') : t('dialogs.invite.noKnock')].join(' · ')}</span>
                   </div>
                   <div className={s.itemButtons}>
-                    <Button size="small" variant="quiet" icon={copied === l.id ? 'check' : 'copy'} className={cx(copied === l.id && s.copied)} onClick={() => copyAgain(l.id)} aria-label={`Copy the link to ${l.label}`}>
-                      {copied === l.id ? 'Copied' : 'Copy'}
+                    <Button size="small" variant="quiet" icon={copied === l.id ? 'check' : 'copy'} className={cx(copied === l.id && s.copied)} onClick={() => copyAgain(l.id)} aria-label={t('dialogs.invite.copyTo', { label: l.label })}>
+                      {copied === l.id ? t('dialogs.invite.copied') : t('dialogs.invite.copy')}
                     </Button>
-                    <Button size="small" variant="danger" onClick={() => void api.invites.revoke(l.id).catch(fail)} aria-label={`Revoke the link to ${l.label}`}>
-                      Revoke
+                    <Button size="small" variant="danger" onClick={() => void api.invites.revoke(l.id).catch(fail)} aria-label={t('dialogs.invite.revokeTo', { label: l.label })}>
+                      {t('dialogs.invite.revoke')}
                     </Button>
                   </div>
                 </div>
               ))
           ) : (
-            <div className={s.empty}>No links yet. Links you copy show up here until they expire or you revoke them.</div>
+            <div className={s.empty}>{t('dialogs.invite.noLinks')}</div>
           )}
         </div>
       </Section>
@@ -147,24 +150,23 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
 
 /** The three steps, for you to pass on. */
 function HowTheyJoin({ knock }: { knock: boolean }) {
+  const t = useT();
   return (
-    <ol className={v.steps} aria-label="How they join">
+    <ol className={v.steps} aria-label={t('dialogs.invite.how')}>
       <li>
         <span className={v.stepIcon}><Icon name="send" size={13} /></span>
-        <span><strong>Send the link</strong> any way you like: Messages, Slack, email.</span>
+        <span>{rich(t('dialogs.invite.step1'), { strong: <strong>{t('dialogs.invite.step1Strong')}</strong> })}</span>
       </li>
       <li>
         <span className={v.stepIcon}>
           {/* The app's beluga: this step is about the app, not Claude. */}
           <svg width="15" height="12" viewBox="56 147 912 730" aria-hidden="true"><path d={BELUGA} fill="currentColor" fillRule="evenodd" /></svg>
         </span>
-        <span>
-          <strong>They open it in Beluga.</strong> A click on the link is enough.
-        </span>
+        <span>{rich(t('dialogs.invite.step2'), { strong: <strong>{t('dialogs.invite.step2Strong')}</strong> })}</span>
       </li>
       <li>
         <span className={v.stepIcon}><Icon name={knock ? 'hand' : 'check'} size={13} /></span>
-        <span>{knock ? <><strong>They knock</strong> and you let them in from the card in your chat.</> : <><strong>They come straight in.</strong> Secrets like .env files and keys never leave {thisComputer()}.</>}</span>
+        <span>{knock ? rich(t('dialogs.invite.step3Knock'), { strong: <strong>{t('dialogs.invite.step3KnockStrong')}</strong> }) : rich(t('dialogs.invite.step3In', { computer: thisComputer() }), { strong: <strong>{t('dialogs.invite.step3InStrong')}</strong> })}</span>
       </li>
     </ol>
   );
@@ -172,30 +174,31 @@ function HowTheyJoin({ knock }: { knock: boolean }) {
 
 /** People at the door with one of your links. */
 function Waiting() {
+  const t = useT();
   const api = useApi();
   const knocks = useApp((st) => st.knocks);
   const peers = useApp((st) => st.peers);
   const links = useApp((st) => st.links);
   if (!knocks.length) return null;
   return (
-    <Section title="Waiting to come in">
-      <div className={s.list} role="list" aria-label="Waiting to come in">
+    <Section title={t('dialogs.invite.waiting')}>
+      <div className={s.list} role="list" aria-label={t('dialogs.invite.waiting')}>
         {knocks.map((k) => {
-          const name = peers.find((p) => p.peerId === k.peerId)?.name ?? 'Someone';
+          const name = peers.find((p) => p.peerId === k.peerId)?.name ?? t('dialogs.invite.someone');
           const link = links.find((l) => l.id === k.linkId);
           return (
             <div key={k.peerId} role="listitem" className={s.item}>
               <Avatar name={name} id={k.peerId} size={24} />
               <div className={s.itemText}>
                 <span className={s.itemTitle}>{name}</span>
-                <span className={s.itemDetail}>{link ? `wants to join ${link.label} · ${CAN_INFO[link.can].short}` : 'is at the door'}</span>
+                <span className={s.itemDetail}>{link ? t('dialogs.invite.wants', { label: link.label, can: CAN_INFO[link.can].short }) : t('dialogs.invite.atDoor')}</span>
               </div>
               <div className={s.itemButtons}>
                 <Button size="small" variant="quiet" onClick={() => void api.invites.decline(k.peerId)}>
-                  Decline
+                  {t('dialogs.invite.decline')}
                 </Button>
                 <Button size="small" variant="primary" onClick={() => void api.invites.letIn(k.peerId)}>
-                  Let In
+                  {t('dialogs.invite.letIn')}
                 </Button>
               </div>
             </div>
@@ -208,6 +211,7 @@ function Waiting() {
 
 /** In someone else's room you can pass on its invite, not make links of your own. */
 function GuestInvite({ close }: { close: () => void }) {
+  const t = useT();
   const api = useApi();
   const invite = useApp((st) => st.invite);
   const room = useApp((st) => st.room);
@@ -215,18 +219,18 @@ function GuestInvite({ close }: { close: () => void }) {
   const copy = (): void => void api.session.copyInvite().then(() => flash('room'));
   return (
     <Sheet
-      title="Invite People"
-      subtitle={`To ${room}`}
+      title={t('dialogs.invite.title')}
+      subtitle={t('dialogs.invite.to', { room: String(room) })}
       icon="link"
       close={close}
       onReturn={invite ? copy : undefined}
       footer={
         <>
           <span />
-          <Button onClick={close}>Done</Button>
+          <Button onClick={close}>{t('dialogs.invite.done')}</Button>
           {invite ? (
             <Button variant="primary" icon={copied ? 'check' : 'copy'} onClick={copy}>
-              {copied ? 'Copied' : 'Copy Room Invite'}
+              {copied ? t('dialogs.invite.copied') : t('dialogs.invite.copyRoomInvite')}
             </Button>
           ) : null}
         </>
@@ -234,8 +238,8 @@ function GuestInvite({ close }: { close: () => void }) {
     >
       <p className={v.lead}>
         {invite
-          ? 'You joined someone else’s room, so you can pass on its invite: whoever you send it to joins the whole room.'
-          : 'You joined someone else’s room. Ask its host for an invite to pass on; links for one project only work in rooms you host.'}
+          ? t('dialogs.invite.guestHas')
+          : t('dialogs.invite.guestNone')}
       </p>
       {invite ? <HowTheyJoin knock={false} /> : null}
     </Sheet>

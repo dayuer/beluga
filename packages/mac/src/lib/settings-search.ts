@@ -61,7 +61,8 @@ export function foldText(text: string): string {
 /** The anchor a row or group carries (data-setting) and the search looks for: its label, folded to a slug. */
 export function settingAnchor(label: string): string {
   return foldText(label)
-    .replace(/[^a-z0-9]+/g, '-')
+    // Letters and digits of any script: a Chinese label keeps its own anchor.
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-|-$/g, '');
 }
 

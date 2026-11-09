@@ -7,7 +7,8 @@ import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { Alert, Checkbox } from '../../components/Alert.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import type { NativeMenuProps } from './index.js';
-import { count, usePick } from './pick.js';
+import { rich, usePick } from './pick.js';
+import { useT } from '../../i18n/index.js';
 import { useThreadsChoice } from './ThreadsChoice.js';
 import s from './menus.module.css';
 
@@ -15,21 +16,22 @@ const NO_ENV: readonly EnvChange[] = [];
 
 /** The keys that differ in one env file, as small tags: +NEW, ~CHANGED, −REMOVED. */
 export function EnvKeys({ change }: { change: EnvChange }) {
-  if (change.binary) return <span className={s.muted}>the file differs</span>;
+  const t = useT();
+  if (change.binary) return <span className={s.muted}>{t('dialogs.confirm.fileDiffers')}</span>;
   return (
     <span className={s.keys}>
       {change.added.map((k) => (
-        <span key={`+${k}`} className={s.keyAdded} title="Added in this worktree">
+        <span key={`+${k}`} className={s.keyAdded} title={t('dialogs.confirm.added')}>
           +{k}
         </span>
       ))}
       {change.changed.map((k) => (
-        <span key={`~${k}`} className={s.keyChanged} title="Changed in this worktree">
+        <span key={`~${k}`} className={s.keyChanged} title={t('dialogs.confirm.changed')}>
           ~{k}
         </span>
       ))}
       {change.removed.map((k) => (
-        <span key={`-${k}`} className={s.keyRemoved} title="Removed in this worktree">
+        <span key={`-${k}`} className={s.keyRemoved} title={t('dialogs.confirm.removed')}>
           −{k}
         </span>
       ))}
@@ -79,6 +81,7 @@ function useDeletePlan(id: string, worktree: boolean): DeletePlan | null | undef
  * doesn't have are listed and copied back if you like.
  */
 export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
+  const t = useT();
   const api = useApi();
   const threads = useThreadsChoice(menu.id, menu.action);
   const pick = usePick(threads.children ? { ...menu, children: threads.children } : menu);
@@ -92,16 +95,16 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
   const changed = ws.status?.changed ?? 0;
   const table = env.length
     ? {
-        caption: 'Env changes the main folder doesn’t have',
-        columns: ['File', 'Keys'],
+        caption: t('dialogs.confirm.envCaption'),
+        columns: [t('dialogs.confirm.colFile'), t('dialogs.confirm.colKeys')],
         rows: env.map((c) => [<code key="f">{c.file}</code>, <EnvKeys key="k" change={c} />]),
       }
     : undefined;
   // Where its env changes go before it does: the main folder's file, Beluga, both, or nowhere (BLG-369).
   const envBox = env.length ? (
     <>
-      <Checkbox checked={copyEnv} onChange={setCopyEnv} label="Copy them into the main folder’s .env" detail="Every new worktree starts with them" />
-      <Checkbox checked={saveEnv} onChange={setSaveEnv} label="Save them in Beluga" detail="The project’s own variables: every run gets them, and the file stays as it is" />
+      <Checkbox checked={copyEnv} onChange={setCopyEnv} label={t('dialogs.confirm.copyEnv')} detail={t('dialogs.confirm.copyEnvDetail')} />
+      <Checkbox checked={saveEnv} onChange={setSaveEnv} label={t('dialogs.confirm.saveEnv')} detail={t('dialogs.confirm.saveEnvDetail')} />
     </>
   ) : null;
   const boxes =
@@ -125,16 +128,15 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
     const asking = lose === undefined;
     // Commits pushed nowhere (BLG-617): say how many, and Archive (which keeps them) is the main button.
     if (lose) {
-      const it = lose.unpushed === 1 ? 'it' : 'them';
       return (
         <Alert
           icon="alert"
           tone="danger"
-          title={`Delete “${ws.name}” and its unpushed work?`}
+          title={t('dialogs.confirm.deleteUnpushedTitle', { name: ws.name })}
           message={
             <>
               <p>
-                <strong>{count(lose.unpushed, 'commit')}</strong> on <code>{lose.branch}</code> {lose.unpushed === 1 ? 'was' : 'were'} never pushed or merged into <code>{lose.into}</code>. Deleting loses {it}, with the folder and the conversation, and you can’t undo it.
+                {rich(t('dialogs.confirm.deleteUnpushed', { n: lose.unpushed }), { count: <strong>{t('dialogs.n.commit', { n: lose.unpushed })}</strong>, branch: <code>{lose.branch}</code>, into: <code>{lose.into}</code> })}
               </p>
               {lose.subjects.length ? (
                 <ul className={s.subjects}>
@@ -143,12 +145,12 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
                   ))}
                 </ul>
               ) : null}
-              <p>{ws.archived ? `It’s archived: the branch and the conversation are kept as long as it stays that way.` : `Archive keeps the branch and the conversation, and still frees the space.`}</p>
+              <p>{ws.archived ? t('dialogs.confirm.archivedKept') : t('dialogs.confirm.archiveKeeps')}</p>
             </>
           }
           table={table}
-          confirm={ws.archived ? { label: 'Keep It', onClick: close } : { label: 'Archive Instead', onClick: () => go(withEnv ? 'confirm-archive-env' : 'confirm-archive') }}
-          alternative={{ label: 'Delete Anyway', destructive: true, onClick: remove }}
+          confirm={ws.archived ? { label: t('dialogs.confirm.keepIt'), onClick: close } : { label: t('dialogs.confirm.archiveInstead'), onClick: () => go(withEnv ? 'confirm-archive-env' : 'confirm-archive') }}
+          alternative={{ label: t('dialogs.confirm.deleteAnyway'), destructive: true, onClick: remove }}
           onCancel={close}
         >
           {boxes}
@@ -159,23 +161,21 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
       <Alert
         icon="alert"
         tone="danger"
-        title={`Delete “${ws.name}”?`}
+        title={t('dialogs.confirm.deleteTitle', { name: ws.name })}
         message={
           <>
             <p>
               {worktree ? (
-                <>
-                  This deletes the worktree folder, its branch <code>{ws.branch ?? ''}</code> and the conversation.
-                </>
+                rich(t('dialogs.confirm.deleteWorktree'), { branch: <code>{ws.branch ?? ''}</code> })
               ) : (
-                'This removes it from Beluga and deletes the conversation.'
+                t('dialogs.confirm.deleteChat')
               )}
             </p>
-            <p>You can’t undo this.</p>
+            <p>{t('dialogs.confirm.noUndo')}</p>
           </>
         }
         table={table}
-        confirm={{ label: 'Delete', destructive: true, disabled: asking, onClick: remove }}
+        confirm={{ label: t('dialogs.confirm.delete'), destructive: true, disabled: asking, onClick: remove }}
         onCancel={close}
       >
         {boxes}
@@ -184,21 +184,19 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
   }
 
   const worktree = ws.kind === 'worktree';
-  const freed = plan?.dropBytes ? ` (${formatBytes(plan.dropBytes)} here)` : '';
+  const freed = plan?.dropBytes ? t('dialogs.confirm.freed', { size: formatBytes(plan.dropBytes) }) : '';
   const message = (
     <>
       <p>
         {worktree ? (
-          <>
-            Everything of yours is kept: {changed ? <strong>{count(changed, 'uncommitted file')}</strong> : 'uncommitted changes'}, new files, and ignored files like <code>.env</code>. Its dependencies, builds and caches are cleared to save space{freed}, and the folder goes.
-          </>
+          rich(t('dialogs.confirm.archiveWorktree', { freed }), { changed: changed ? <strong>{t('dialogs.n.uncommittedFile', { n: changed })}</strong> : t('dialogs.confirm.uncommittedChanges'), env: <code>.env</code> })
         ) : (
-          'The chat leaves the sidebar. You can restore it from Overview.'
+          t('dialogs.confirm.archiveChat')
         )}
       </p>
       {worktree ? (
         <p>
-          Its branch <code>{ws.branch ?? ''}</code> and the conversation stay. Restoring brings the folder back as it was{plan?.remake.length ? <> and runs the project’s setup to make the rest again</> : null}.
+          {rich(t('dialogs.confirm.archiveBranch', { remake: plan?.remake.length ? t('dialogs.confirm.remake') : '' }), { branch: <code>{ws.branch ?? ''}</code> })}
         </p>
       ) : null}
     </>
@@ -213,11 +211,11 @@ export function ConfirmAlert({ menu, close }: NativeMenuProps<'confirm'>) {
     <Alert
       icon="archive"
       tone="info"
-      title={`Archive “${ws.name}”?`}
+      title={t('dialogs.confirm.archiveTitle', { name: ws.name })}
       message={message}
       table={table}
-      confirm={{ label: 'Archive', onClick: archive }}
-      {...(changed ? { alternative: { label: 'Commit & Archive', onClick: commitAndArchive } } : {})}
+      confirm={{ label: t('dialogs.confirm.archive'), onClick: archive }}
+      {...(changed ? { alternative: { label: t('dialogs.confirm.commitArchive'), onClick: commitAndArchive } } : {})}
       onCancel={close}
     >
       {boxes}

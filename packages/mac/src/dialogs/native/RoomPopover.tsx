@@ -6,6 +6,7 @@ import { openPerson } from './PersonPopover.js';
 import { useFlash } from './parts.js';
 import p from './person.module.css';
 import r from './room.module.css';
+import { t, useT } from '../../i18n/index.js';
 
 type Tone = 'ok' | 'warn' | 'error';
 
@@ -13,11 +14,11 @@ const invite = (): void => void document.dispatchEvent(new CustomEvent('beluga:i
 
 /** What remote access is doing, in words. */
 function reach(phase: string | undefined, detail: string | undefined, hasLink: boolean): string {
-  if (phase === 'ready' || hasLink) return 'Friends anywhere can join with a link';
-  if (phase === 'local') return 'Only people on this network can join';
-  if (phase === 'failed') return detail ?? 'Couldn’t open remote access';
-  if (phase) return 'Opening a secure link…';
-  return 'Remote access opens when you invite someone';
+  if (phase === 'ready' || hasLink) return t('dialogs.room.reachReady');
+  if (phase === 'local') return t('dialogs.room.reachLocal');
+  if (phase === 'failed') return detail ?? t('dialogs.room.reachFailed');
+  if (phase) return t('dialogs.room.reachOpening');
+  return t('dialogs.room.reachLater');
 }
 
 /**
@@ -25,6 +26,7 @@ function reach(phase: string | undefined, detail: string | undefined, hasLink: b
  * opens the room's card with who's here, whether new people can join, and its link.
  */
 export function RoomStatus({ label, tone }: { label: string; tone: Tone }) {
+  const t = useT();
   const api = useApi();
   const { ui } = useBeluga();
   const room = useApp((st) => st.room);
@@ -39,22 +41,22 @@ export function RoomStatus({ label, tone }: { label: string; tone: Tone }) {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className={r.status} title={room} aria-label={`${label}: room details`}>
+        <button type="button" className={r.status} title={room} aria-label={t('dialogs.room.details', { label })}>
           <Dot tone={tone} />
           <span className={r.statusLabel}>{label}</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={`${p.card} ${r.card}`} side="top" align="start" sideOffset={8} collisionPadding={10} aria-label="Room">
+        <Popover.Content className={`${p.card} ${r.card}`} side="top" align="start" sideOffset={8} collisionPadding={10} aria-label={t('dialogs.room.room')}>
           <div className={r.head}>
             <div className={r.room}>{room}</div>
             <div className={r.line}>
               <Dot tone={tone} />
-              {status === 'connected' ? (host ? 'You host this room' : 'Connected') : status === 'connecting' ? 'Connecting…' : 'Offline'}
+              {status === 'connected' ? (host ? t('dialogs.room.youHost') : t('dialogs.room.connected')) : status === 'connecting' ? t('dialogs.room.connecting') : t('dialogs.room.offline')}
             </div>
             {host ? <div className={r.dim}>{reach(hosting?.phase, hosting?.detail, Boolean(link))}</div> : null}
           </div>
-          <div className={r.people} role="list" aria-label="People here">
+          <div className={r.people} role="list" aria-label={t('dialogs.room.people')}>
             {peers.map((x, index) => (
               <Popover.Close asChild key={x.peerId}>
                 <button
@@ -62,10 +64,10 @@ export function RoomStatus({ label, tone }: { label: string; tone: Tone }) {
                   role="listitem"
                   className={r.person}
                   onClick={() => setTimeout(() => openPerson(ui, index, document.querySelector<HTMLElement>(`[data-person-row="${CSS.escape(x.peerId)}"]`)), 0)}
-                  title={`${x.name}${x.peerId === selfId ? ' (you)' : ''}`}
+                  title={`${x.name}${x.peerId === selfId ? t('dialogs.room.youSuffix') : ''}`}
                 >
                   <Avatar name={x.name} id={x.peerId} size={28} />
-                  <span>{x.peerId === selfId ? 'You' : x.name}</span>
+                  <span>{x.peerId === selfId ? t('dialogs.room.you') : x.name}</span>
                 </button>
               </Popover.Close>
             ))}
@@ -73,21 +75,21 @@ export function RoomStatus({ label, tone }: { label: string; tone: Tone }) {
           {host ? (
             <div className={r.row}>
               <div>
-                <div>New people can join</div>
-                <div className={r.dim}>{roomOpen ? 'Anyone with a link can come in (or knock).' : 'Closed: even with a link, nobody new gets in.'}</div>
+                <div>{t('dialogs.room.canJoin')}</div>
+                <div className={r.dim}>{roomOpen ? t('dialogs.room.open') : t('dialogs.room.closed')}</div>
               </div>
-              <Switch label="New people can join" on={roomOpen} onChange={(v) => void api.session.setRoomOpen(v)} />
+              <Switch label={t('dialogs.room.canJoin')} on={roomOpen} onChange={(v) => void api.session.setRoomOpen(v)} />
             </div>
           ) : null}
           <div className={r.buttons}>
             {link ? (
               <Button icon={copied ? 'check' : 'copy'} onClick={() => void api.session.copyInvite().then(() => flash('room'))}>
-                {copied ? 'Copied' : 'Copy Room Link'}
+                {copied ? t('dialogs.room.copied') : t('dialogs.room.copyLink')}
               </Button>
             ) : null}
             <Popover.Close asChild>
               <Button variant="primary" icon="link" onClick={invite}>
-                Invite People…
+                {t('dialogs.room.invite')}
               </Button>
             </Popover.Close>
           </div>

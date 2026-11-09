@@ -6,6 +6,7 @@ import type { ActionItem } from '../components/SpecMenu.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import { useApp } from '../lib/beluga.js';
 import { useTaskActions } from './use-tasks.js';
+import { t } from '../i18n/index.js';
 
 /** Who starts a task, and how (see useTaskStart). */
 export interface TaskStart {
@@ -33,5 +34,5 @@ export function useTaskStart(issue: Issue): TaskStart {
   };
   // "Your agent" picked over a task (or plan) with its own: yours, by name (none would mean its own again).
   const items = (pick: (agent: AgentRef | undefined) => void): ActionItem[] => startWith(own, (a) => pick(a ?? (own ? mine : undefined)));
-  return { who: own ? agentName(own) : 'your agent', start, items };
+  return { who: own ? agentName(own) : t('tasks.start.yourAgent'), start, items };
 }

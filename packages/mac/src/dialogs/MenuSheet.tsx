@@ -9,6 +9,7 @@ import { useActions } from '../lib/actions.js';
 import { useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { guiHint, paragraphs } from '../lib/gui-copy.js';
 import s from './sheet.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Every choice the shared menus ask (settings sections, a person, a pull request, invites,
@@ -17,6 +18,7 @@ import s from './sheet.module.css';
  * instead (dialogs/native); this is for the rest.
  */
 export function MenuSheet() {
+  const t = useT();
   const { ui } = useBeluga();
   const actions = useActions();
   const open = useUi((u) => u.menu);
@@ -60,7 +62,7 @@ export function MenuSheet() {
         >
           <div className={s.head}>
             <Dialog.Title className={s.title}>{spec.title}</Dialog.Title>
-            <Dialog.Close className={s.close} aria-label="Close">
+            <Dialog.Close className={s.close} aria-label={t('dialogs.menuSheet.close')}>
               <Icon name="x" size={12} />
             </Dialog.Close>
           </div>
@@ -97,7 +99,7 @@ export function MenuSheet() {
             ))}
           </div>
           <div className={s.footer}>
-            <Button onClick={close}>Cancel</Button>
+            <Button onClick={close}>{t('dialogs.menuSheet.cancel')}</Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

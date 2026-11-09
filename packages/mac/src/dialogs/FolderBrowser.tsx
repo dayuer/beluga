@@ -5,6 +5,7 @@ import { Button, cx } from '../components/ui.js';
 import { useApi } from '../lib/beluga.js';
 import s from './sheet.module.css';
 import f from './folder-browser.module.css';
+import { t, useT } from '../i18n/index.js';
 
 /**
  * A browser's folder picker (BLG-651, docs/web.md): the browser can't see the folders of
@@ -30,7 +31,7 @@ const set = (next: Ask | undefined): void => {
 /** Ask for a folder of the computer Beluga runs on; undefined when you cancel. */
 export function browseFolder(title: string, opts: { action?: string; start?: string } = {}): Promise<string | undefined> {
   asking?.done(undefined);
-  return new Promise((resolve) => set({ title, action: opts.action ?? 'Choose', ...(opts.start ? { start: opts.start } : {}), done: resolve }));
+  return new Promise((resolve) => set({ title, action: opts.action ?? t('dialogs.folder.choose'), ...(opts.start ? { start: opts.start } : {}), done: resolve }));
 }
 
 type Browsed = Awaited<ReturnType<ReturnType<typeof useApi>['local']['browse']>>;
@@ -50,6 +51,7 @@ export function FolderBrowserHost() {
 }
 
 function FolderBrowser({ ask, onDone }: { ask: Ask; onDone: (path: string | undefined) => void }) {
+  const t = useT();
   const api = useApi();
   const [at, setAt] = useState<Browsed>();
   const [error, setError] = useState<string>();
@@ -66,23 +68,23 @@ function FolderBrowser({ ask, onDone }: { ask: Ask; onDone: (path: string | unde
         <Dialog.Content className={cx(s.sheet, f.sheet)} style={{ zIndex: 61 }} aria-describedby={undefined}>
           <div className={s.head}>
             <Dialog.Title className={s.title}>{ask.title}</Dialog.Title>
-            <Dialog.Close className={s.close} aria-label="Cancel">
+            <Dialog.Close className={s.close} aria-label={t('dialogs.folder.cancel')}>
               <Icon name="x" size={12} />
             </Dialog.Close>
           </div>
           <div className={f.where}>
-            <button type="button" className={f.up} aria-label="Up one folder" disabled={!at?.parent} onClick={() => go(at?.parent)}>
+            <button type="button" className={f.up} aria-label={t('dialogs.folder.up')} disabled={!at?.parent} onClick={() => go(at?.parent)}>
               <Icon name="chevronUp" size={13} />
             </button>
             <span className={f.path} title={at?.path}>
               {at ? short(at.path) : '…'}
             </span>
-            <button type="button" className={f.up} aria-label="Home" disabled={!at || at.path === at.home} onClick={() => go(at?.home)}>
+            <button type="button" className={f.up} aria-label={t('dialogs.folder.home')} disabled={!at || at.path === at.home} onClick={() => go(at?.home)}>
               <Icon name="person" size={13} />
             </button>
           </div>
-          <div className={f.list} role="list" aria-label="Folders">
-            {error ? <div className={f.note}>{error}</div> : !at ? <div className={f.note}>Looking…</div> : at.dirs.length === 0 ? <div className={f.note}>No folders in here.</div> : null}
+          <div className={f.list} role="list" aria-label={t('dialogs.folder.folders')}>
+            {error ? <div className={f.note}>{error}</div> : !at ? <div className={f.note}>{t('dialogs.folder.looking')}</div> : at.dirs.length === 0 ? <div className={f.note}>{t('dialogs.folder.empty')}</div> : null}
             {at?.dirs.map((d) => (
               <button key={d.name} type="button" role="listitem" className={f.row} onClick={() => go(`${at.path.replace(/[\\/]+$/, '')}/${d.name}`)}>
                 <Icon name={d.git ? 'branch' : 'folder'} size={14} />
@@ -93,12 +95,12 @@ function FolderBrowser({ ask, onDone }: { ask: Ask; onDone: (path: string | unde
             ))}
           </div>
           <div className={f.footer}>
-            <span className={f.hint}>On the computer Beluga runs on</span>
+            <span className={f.hint}>{t('dialogs.folder.where')}</span>
             <Button variant="quiet" onClick={() => onDone(undefined)}>
-              Cancel
+              {t('dialogs.folder.cancel')}
             </Button>
             <Button variant="primary" disabled={!at} onClick={() => at && onDone(at.path)}>
-              {ask.action} “{at ? (at.path.split(/[\\/]/).filter(Boolean).pop() ?? at.path) : '…'}”
+              {t('dialogs.folder.action', { action: ask.action, name: at ? (at.path.split(/[\\/]/).filter(Boolean).pop() ?? at.path) : '…' })}
             </Button>
           </div>
         </Dialog.Content>

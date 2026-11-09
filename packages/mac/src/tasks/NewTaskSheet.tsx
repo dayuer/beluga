@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
-import { type IssueStatus, PRIORITY_INFO, type Priority, STATUS_INFO, asksPrivate, boardOf, issueById, reposOf } from '@beluga/core/board/model.js';
+import { type IssueStatus, type Priority, asksPrivate, boardOf, issueById, reposOf } from '@beluga/core/board/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
 import { Checkbox, Field, FormSheet, Popup, TextArea, TextInput } from '../components/FormSheet.js';
@@ -11,12 +11,13 @@ import { cx } from '../components/ui.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
 import { PriorityIcon } from './marks.js';
 import { useSharedWith } from './parts.js';
-import { assigneeChoices, boardChoices } from './tasks-model.js';
+import { assigneeChoices, boardChoices, statusLabel, priorityLabel } from './tasks-model.js';
 import { useTaggable } from './use-taggable.js';
 import { useBoard, usePeople, useSelf, useSolo, useTaskActions, useTasksPrefs } from './use-tasks.js';
 import n from './NewTaskSheet.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
+import { useT } from '../i18n/index.js';
 
 /** The priority scale, left to right: its keys are 0 to 4. */
 const SCALE: readonly Priority[] = ['none', 'low', 'medium', 'high', 'urgent'];
@@ -77,28 +78,29 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
   const tagged = useTaggable(project, self.id, projects.find((p) => p.id === project)?.name);
   const box = useRef<HTMLTextAreaElement>(null);
   const tags = useBoxSuggestions({ text: describe, setText: setDescribe, people: tagged.people, className: n.suggestions });
+  const tr = useT();
   if (!projects.length) {
     // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
     const addProject = (): void => {
       close();
       actions.run({ type: 'add_project' });
     };
-    return <FormSheet title="New Task" intro="Tasks belong to a project: a folder with your code. Add one first." submitLabel="Add a Project…" onSubmit={addProject} onCancel={close} />;
+    return <FormSheet title={tr('tasks.view.newTask')} intro={tr('tasks.newTask.noProject')} submitLabel={tr('plans.sheets.addProject')} onSubmit={addProject} onCancel={close} />;
   }
   // Where it goes, quietly: the board (unless you pick it below) and the column; the repo when the board has several.
   const pickBoard = !known(boardId) && !parentIssue && boards.length > 1;
   const pickRepo = repos.length > 1;
-  const where = [pickBoard ? '' : boards.find((b) => b.id === onBoard)?.name, STATUS_INFO[start ? 'todo' : column].label].filter(Boolean).join(' · ');
+  const where = [pickBoard ? '' : boards.find((b) => b.id === onBoard)?.name, statusLabel(start ? 'todo' : column)].filter(Boolean).join(' · ');
   return (
     <FormSheet
-      title={parentIssue ? `New Sub-task of ${parentIssue.key}` : 'New Task'}
+      title={parentIssue ? tr('tasks.newTask.subTaskOf', { key: parentIssue.key }) : tr('tasks.view.newTask')}
       icon="task"
-      intro={parentIssue ? `Under “${parentIssue.title}” · ${where}` : where}
-      submitLabel={start ? 'Create and Start' : 'Create Task'}
+      intro={parentIssue ? tr('tasks.newTask.under', { title: parentIssue.title, where }) : where}
+      submitLabel={start ? tr('tasks.newTask.createStart') : tr('tasks.newTask.create')}
       canSubmit={Boolean((mine ? title.trim() : describe.trim()) && project)}
       width={560}
       onCancel={close}
-      footer={<Checkbox checked={start} onChange={setStart} label="Start with your agent" detail="A new worktree, with your agent working on it" />}
+      footer={<Checkbox checked={start} onChange={setStart} label={tr('tasks.newTask.startWithAgent')} detail={tr('tasks.newTask.startWithAgentDetail')} />}
       onSubmit={async () => {
         const who = choices.find((c) => c.key === assignee)?.assignee;
         const created = await api.create({
@@ -116,18 +118,18 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
         // (The sheet is gone: a problem starting shows as a toast, and the task is there to start again.)
         if (start) await act(() => api.start(created.id, { claude: true }));
         else {
-          toast(client, `Created ${created.key}${created.private ? ', private' : ''}`, 'success');
+          toast(client, created.private ? tr('tasks.newTask.toast.createdPrivate', { key: created.key }) : tr('tasks.newTask.toast.created', { key: created.key }), 'success');
           if (parentIssue) open(parentIssue);
         }
       }}
     >
       {mine ? (
         <>
-          <Field label="Title" htmlFor="task-title">
-            <TextInput id="task-title" value={title} onChange={setTitle} maxLength={200} placeholder="Rate-limit the login endpoint" data-autofocus />
+          <Field label={tr('tasks.page.title')} htmlFor="task-title">
+            <TextInput id="task-title" value={title} onChange={setTitle} maxLength={200} placeholder={tr('tasks.newTask.titlePlaceholder')} data-autofocus />
           </Field>
-          <Field label="Goal" htmlFor="task-goal" hint={`What it’s for and what done looks like. Markdown; ${chordLabel('Cmd+Enter')} creates it.`}>
-            <TextArea id="task-goal" value={goal} onChange={setGoal} rows={4} placeholder="10 tries a minute per IP, then 429. Logins from the app keep working." />
+          <Field label={tr('plans.details.goal')} htmlFor="task-goal" hint={tr('tasks.newTask.goalHint', { keys: chordLabel('Cmd+Enter') })}>
+            <TextArea id="task-goal" value={goal} onChange={setGoal} rows={4} placeholder={tr('tasks.newTask.goalPlaceholder')} />
           </Field>
         </>
       ) : (
@@ -136,7 +138,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
             <MentionHighlighter text={describe} world={tagged.world} input={box} className={cx(f.input, f.area, n.box, n.layer)} />
             <TextArea
               ref={box}
-              aria-label="Describe the task"
+              aria-label={tr('tasks.newTask.describeAria')}
               aria-haspopup="listbox"
               aria-expanded={tags.open}
               className={cx(n.box, n.overLayer)}
@@ -144,7 +146,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
               onChange={setDescribe}
               rows={4}
               maxLength={8000}
-              placeholder={solo ? 'Say what you want done: one task, or a few. Your agent writes them.' : 'Say what you want done: one task, or a few and who each is for. Your agent writes them.'}
+              placeholder={solo ? tr('tasks.newTask.describeSolo') : tr('tasks.newTask.describeTeam')}
               onInput={(e) => grow(e.currentTarget)}
               onKeyDown={(e) => {
                 if (e.nativeEvent.isComposing) return;
@@ -156,52 +158,52 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
           </div>
           <div className={n.hint}>
             {solo
-              ? `Ask for several tasks, or an epic with its parts, and Create makes them all. @ names a friend. ${chordLabel('Cmd+Enter')} creates it.`
-              : `Ask for several tasks, or an epic with its parts, and name who each is for (@ picks them): Create makes and assigns them all. ${chordLabel('Cmd+Enter')} creates it.`}
+              ? tr('tasks.newTask.hintSolo', { keys: chordLabel('Cmd+Enter') })
+              : tr('tasks.newTask.hintTeam', { keys: chordLabel('Cmd+Enter') })}
           </div>
         </div>
       )}
       <button type="button" className={n.disclosure} aria-expanded={mine} onClick={() => setMine(!mine)}>
         <Icon name={mine ? 'chevronDown' : 'chevronRight'} size={10} />
-        {mine ? 'Let your agent write the title and goal' : 'Write title and goal myself'}
+        {mine ? tr('tasks.newTask.agentWrites') : tr('tasks.newTask.iWrite')}
       </button>
       {pickBoard ? (
-        <Field label="Board">
-          <Popup label="Board" value={onBoard} options={boards.map((b) => ({ value: b.id, label: b.name }))} onChange={setOnBoard} />
+        <Field label={tr('tasks.view.board')}>
+          <Popup label={tr('tasks.view.board')} value={onBoard} options={boards.map((b) => ({ value: b.id, label: b.name }))} onChange={setOnBoard} />
         </Field>
       ) : null}
       {/* A board of several repos: which one it runs in (its worktree is made there). */}
       {pickRepo ? (
-        <Field label="Repo">
-          <Popup label="Repo" value={project} options={repos.map((r) => ({ value: r, label: projects.find((p) => p.id === r)?.name ?? r }))} onChange={setProject} />
+        <Field label={tr('tasks.prop.repo')}>
+          <Popup label={tr('tasks.prop.repo')} value={project} options={repos.map((r) => ({ value: r, label: projects.find((p) => p.id === r)?.name ?? r }))} onChange={setProject} />
         </Field>
       ) : null}
-      <Field label="Priority">
+      <Field label={tr('tasks.prop.priority')}>
         <PriorityScale value={priority} onChange={setPriority} />
       </Field>
       {/* Only worth asking when someone else would see it (teammates, Linear), or it's under a private task. */}
       {sharedWith || forced ? (
-        <Field label="Who Sees It" hint={forced ? 'Its parent is private, so it is too' : isPrivate ? (only === undefined ? 'Your words asked to keep it to yourself' : undefined) : sharedWith ? `Everyone on the team: ${sharedWith}, and whoever they team up with` : undefined}>
-          <div className={n.scale} role="radiogroup" aria-label="Who sees it">
+        <Field label={tr('tasks.newTask.whoSees')} hint={forced ? tr('tasks.newTask.parentPrivate') : isPrivate ? (only === undefined ? tr('tasks.newTask.wordsAsked') : undefined) : sharedWith ? tr('tasks.newTask.everyoneOnTeam', { names: sharedWith }) : undefined}>
+          <div className={n.scale} role="radiogroup" aria-label={tr('tasks.newTask.whoSeesAria')}>
             <button type="button" role="radio" aria-checked={!isPrivate} disabled={forced} className={cx(n.step, !isPrivate && n.stepOn)} onClick={() => setOnly(false)}>
               <Icon name="people" size={12} />
-              Your Team
+              {tr('tasks.newTask.yourTeam')}
             </button>
             <button type="button" role="radio" aria-checked={isPrivate} className={cx(n.step, isPrivate && n.stepOn)} onClick={() => setOnly(true)}>
               <Icon name="lock" size={12} />
-              Only You
+              {tr('tasks.newTask.onlyYou')}
             </button>
           </div>
         </Field>
       ) : null}
       {/* Alone on a project, every task is yours and your Claude's: nothing to choose. */}
       {solo ? null : (
-        <Field label="Assignee">
-          <Popup label="Assignee" value={assignee} options={[{ value: '', label: 'No one' }, ...choices.map((c) => ({ value: c.key, label: c.label }))]} onChange={setAssignee} />
+        <Field label={tr('tasks.prop.assignee')}>
+          <Popup label={tr('tasks.prop.assignee')} value={assignee} options={[{ value: '', label: tr('tasks.newTask.noOne') }, ...choices.map((c) => ({ value: c.key, label: c.label }))]} onChange={setAssignee} />
         </Field>
       )}
-      <Field label="Agent" hint="Who works on it when it starts: its worktree runs this agent and model.">
-        <Popup label="Agent" value={agent} options={agents} onChange={setAgent} />
+      <Field label={tr('plans.sheets.agent')} hint={tr('tasks.newTask.agentHint')}>
+        <Popup label={tr('plans.sheets.agent')} value={agent} options={agents} onChange={setAgent} />
       </Field>
     </FormSheet>
   );
@@ -216,6 +218,7 @@ function grow(el: HTMLTextAreaElement): void {
 /** None · Low · Medium · High · Urgent in one click; on the scale, 0 to 4 and the arrows pick. */
 function PriorityScale({ value, onChange }: { value: Priority; onChange: (p: Priority) => void }) {
   const at = SCALE.indexOf(value);
+  const tr = useT();
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     const digit = /^[0-4]$/.test(e.key) ? Number(e.key) : undefined;
     const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
@@ -226,11 +229,11 @@ function PriorityScale({ value, onChange }: { value: Priority; onChange: (p: Pri
     (e.currentTarget.children[next] as HTMLElement | undefined)?.focus();
   };
   return (
-    <div className={n.scale} role="radiogroup" aria-label="Priority" onKeyDown={onKeyDown}>
+    <div className={n.scale} role="radiogroup" aria-label={tr('tasks.prop.priority')} onKeyDown={onKeyDown}>
       {SCALE.map((p, i) => (
-        <button key={p} type="button" role="radio" aria-checked={p === value} tabIndex={p === value ? 0 : -1} className={cx(n.step, p === value && n.stepOn)} title={`${PRIORITY_INFO[p].label} (${i})`} onClick={() => onChange(p)}>
+        <button key={p} type="button" role="radio" aria-checked={p === value} tabIndex={p === value ? 0 : -1} className={cx(n.step, p === value && n.stepOn)} title={`${priorityLabel(p)} (${i})`} onClick={() => onChange(p)}>
           <PriorityIcon priority={p} size={12} />
-          {p === 'none' ? 'None' : PRIORITY_INFO[p].label}
+          {p === 'none' ? tr('tasks.newTask.none') : priorityLabel(p)}
         </button>
       ))}
     </div>

@@ -1,11 +1,13 @@
 import type { CSSProperties } from 'react';
 import { LABEL_COLOR_INFO, type LabelDef, labelDef, labelTitle } from '@beluga/core/board/labels.js';
-import { type Assignee, type IssueStatus, PRIORITY_INFO, type Priority, STATUS_INFO, labelHue } from '@beluga/core/board/model.js';
+import { type Assignee, type IssueStatus, type Priority, labelHue } from '@beluga/core/board/model.js';
 import type { IssuePr } from '@beluga/core/board/model.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { useApp } from '../lib/beluga.js';
 import { Avatar, Tip, cx } from '../components/ui.js';
 import t from './tasks.module.css';
+import { t as tNow, useT } from '../i18n/index.js';
+import { statusLabel, priorityLabel } from './tasks-model.js';
 
 /**
  * The small marks tasks are read by, the same everywhere (lists, cards, pages, menus): a status
@@ -23,7 +25,7 @@ export function StatusIcon({ status, size = 14, labelled }: { status: IssueStatu
     return `M7 7 L7 4 A3 3 0 ${fraction > 0.5 ? 1 : 0} 1 ${x.toFixed(3)} ${y.toFixed(3)} Z`;
   };
   return (
-    <svg className={cx(t.status, t[`status_${status}`])} width={size} height={size} viewBox="0 0 14 14" {...(labelled ? { role: 'img', 'aria-label': STATUS_INFO[status].label } : { 'aria-hidden': true })}>
+    <svg className={cx(t.status, t[`status_${status}`])} width={size} height={size} viewBox="0 0 14 14" {...(labelled ? { role: 'img', 'aria-label': statusLabel(status) } : { 'aria-hidden': true })}>
       {status === 'done' || status === 'canceled' ? (
         <>
           <circle cx="7" cy="7" r="6" className={t.statusFill} />
@@ -43,7 +45,7 @@ export function StatusIcon({ status, size = 14, labelled }: { status: IssueStatu
 
 /** Bars like signal strength (urgent: a filled square with "!"); no priority: three faint dots. */
 export function PriorityIcon({ priority, size = 14, labelled }: { priority: Priority; size?: number; labelled?: boolean }) {
-  const a11y = labelled ? { role: 'img', 'aria-label': PRIORITY_INFO[priority].label } : { 'aria-hidden': true as const };
+  const a11y = labelled ? { role: 'img', 'aria-label': priorityLabel(priority) } : { 'aria-hidden': true as const };
   if (priority === 'urgent') {
     return (
       <svg className={cx(t.priority, t.priority_urgent)} width={size} height={size} viewBox="0 0 14 14" {...a11y}>
@@ -80,12 +82,13 @@ function labelLook(def: LabelDef | undefined, label: string): { readonly icon: I
 export function LabelChip({ label, projectId, onRemove, iconOnly }: { label: string; projectId: string; onRemove?: () => void; iconOnly?: boolean }) {
   const def = useApp((s) => labelDef(s.board, projectId, label));
   const look = labelLook(def, label);
+  const tr = useT();
   const chip = (
     <span className={cx(t.label, def ? t.labelKnown : t.labelOther, iconOnly && t.labelIconOnly)} style={look.style} aria-label={iconOnly ? labelTitle(label) : undefined}>
       <Icon name={look.icon} size={11} className={t.labelIcon} />
       {iconOnly ? null : labelTitle(label)}
       {onRemove ? (
-        <button type="button" className={t.labelRemove} aria-label={`Remove ${labelTitle(label)}`} onClick={onRemove}>
+        <button type="button" className={t.labelRemove} aria-label={tr('tasks.sections.removeItem', { title: labelTitle(label) })} onClick={onRemove}>
           <Icon name="x" size={9} />
         </button>
       ) : null}
@@ -106,8 +109,8 @@ export function LabelMark({ def, label }: { def: LabelDef | undefined; label: st
 
 /** Who a task is for, in words: "For you", "For Mia", "For no one yet". */
 export function assigneeWords(assignee: Assignee | undefined, selfId: string): string {
-  if (!assignee) return 'For no one yet';
-  return assignee.id === selfId ? 'For you' : `For ${assignee.name}`;
+  if (!assignee) return tNow('tasks.marks.forNoOne');
+  return assignee.id === selfId ? tNow('tasks.marks.forYou') : tNow('tasks.marks.forName', { name: assignee.name });
 }
 
 /**
@@ -115,8 +118,9 @@ export function assigneeWords(assignee: Assignee | undefined, selfId: string): s
  * `changeable`: a click on it picks someone else, and its hover says so.
  */
 export function AssigneeMark({ assignee, selfId, size = 18, changeable }: { assignee: Assignee | undefined; selfId: string; size?: number; changeable?: boolean }) {
+  const tr = useT();
   const words = assigneeWords(assignee, selfId);
-  const tip = changeable ? `${words} · Click to change` : words;
+  const tip = changeable ? tr('tasks.marks.clickToChange', { words }) : words;
   if (!assignee) {
     return (
       <Tip label={tip}>
@@ -138,9 +142,10 @@ export function AssigneeMark({ assignee, selfId, size = 18, changeable }: { assi
 /** A pull request: its number, colored by where it is (merged, failing checks, changes asked…). */
 export function PrChip({ pr }: { pr: IssuePr }) {
   const tone = pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.checks === 'failing' || pr.review === 'CHANGES_REQUESTED' ? 'attention' : pr.review === 'APPROVED' ? 'approved' : 'open';
-  const words = pr.state === 'MERGED' ? 'Merged' : pr.state === 'CLOSED' ? 'Closed' : pr.draft ? 'Draft' : pr.review === 'CHANGES_REQUESTED' ? 'Changes requested' : pr.review === 'APPROVED' ? 'Approved' : pr.checks === 'failing' ? 'Checks failing' : pr.checks === 'pending' ? 'Checks running' : 'Open';
+  const tr = useT();
+  const words = tr(pr.state === 'MERGED' ? 'plans.marks.merged' : pr.state === 'CLOSED' ? 'plans.marks.closed' : pr.draft ? 'tasks.marks.pr.draft' : pr.review === 'CHANGES_REQUESTED' ? 'tasks.marks.pr.changes' : pr.review === 'APPROVED' ? 'tasks.marks.pr.approved' : pr.checks === 'failing' ? 'tasks.marks.pr.failing' : pr.checks === 'pending' ? 'tasks.marks.pr.running' : 'tasks.marks.pr.open');
   return (
-    <Tip label={`Pull request #${pr.number}: ${words}`}>
+    <Tip label={tr('tasks.marks.prTip', { n: pr.number, words })}>
       <span className={cx(t.pr, t[`pr_${tone}`])}>
         <Icon name={pr.state === 'MERGED' ? 'merge' : 'pr'} size={11} />#{pr.number}
       </span>

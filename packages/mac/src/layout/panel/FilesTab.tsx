@@ -29,6 +29,7 @@ import { type TreeRow, ancestorsOf, foundRows, treeRows } from './tree.js';
 import s from './panel.module.css';
 import k from './content-search.module.css';
 import { revealLabel } from '../../lib/os-words.js';
+import { useT } from '../../i18n/index.js';
 
 /** The reader comes in its own chunk, fetched early so opening a file never waits on it (#370). */
 const FileContent = lazyView('views/reader/FileReader', () => import('../../views/reader/FileReader.js').then((m) => m.FileContent), 'first');
@@ -64,6 +65,7 @@ function Marked({ name, marks }: { name: string; marks: TreeRow['marks'] }): Rea
 /** The open file under the tree: Markdown formatted (or as source), code in color, images as they are. */
 function Preview({ viewer, wsId, local, changed }: { viewer: ViewerState; wsId: string; local: string | undefined; changed: boolean }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const selfId = useApp((st) => st.selfId);
   const [mode, setMode] = useState<ReaderMode>(() => (pendingLine(viewer) ? 'source' : initialMode(viewer)));
@@ -93,24 +95,24 @@ function Preview({ viewer, wsId, local, changed }: { viewer: ViewerState; wsId: 
         <EditTools viewer={viewer} wsId={wsId} selfId={selfId} compact />
         {markdown ? (
           <Segmented
-            label="Show as"
+            label={t('layout.filesTab.showAs')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'rendered', label: 'Preview' },
-              { value: 'source', label: 'Source' },
+              { value: 'rendered', label: t('layout.filesTab.preview') },
+              { value: 'source', label: t('layout.filesTab.source') },
             ]}
           />
         ) : null}
         {component && !editing ? <PreviewToggle previewing={previewing} onChange={setPreviewing} /> : null}
-        {changed ? <IconButton icon="diff" label="Show Changes" onClick={() => showChange(client.store.getState(), viewer.path)} /> : null}
-        {local ? <IconButton icon="external" label={isPdfFile(viewer.path) ? 'Open in Preview' : 'Open in Editor'} onClick={() => void openWithDefaultApp(client, local)} /> : null}
-        <IconButton icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('file', wsId)} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={() => void api.files.closeViewer()} />
+        {changed ? <IconButton icon="diff" label={t('layout.filesTab.showChanges')} onClick={() => showChange(client.store.getState(), viewer.path)} /> : null}
+        {local ? <IconButton icon="external" label={isPdfFile(viewer.path) ? t('layout.filesTab.openPreview') : t('layout.filesTab.openEditor')} onClick={() => void openWithDefaultApp(client, local)} /> : null}
+        <IconButton icon="expand" label={t('layout.scratch.openFull')} keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('file', wsId)} />
+        <IconButton icon="x" label={t('layout.scratch.close')} keys="Esc" onClick={() => void api.files.closeViewer()} />
       </div>
       <div ref={body} className={cx(s.previewBody, s.previewFile, 'selectable')} tabIndex={0} {...{ [SCROLL_ROOT]: '' }}>
         <ViewBoundary at={viewer.path}>
-          <Suspense fallback={<div className={s.dimPad}>Opening…</div>}>
+          <Suspense fallback={<div className={s.dimPad}>{t('layout.inspector.opening')}</div>}>
             {drawing && component ? <ComponentPreview previewRef={component} wsId={wsId} /> : <FileContent viewer={viewer} variant="panel" mode={mode} onMode={setMode} wrap editable onOpenInEditor={local ? () => void openWithDefaultApp(client, local) : undefined} />}
           </Suspense>
         </ViewBoundary>
@@ -127,6 +129,7 @@ function Preview({ viewer, wsId, local, changed }: { viewer: ViewerState; wsId: 
  */
 export function FilesTab({ wsId, project = false }: { wsId: string; project?: boolean }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const prefs = usePrefs();
   const selfId = useApp((st) => st.selfId);
@@ -243,9 +246,9 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
     if (row.dir) return base;
     return [
       base[0]!,
-      ...(canShowChange(row.path) ? [{ label: 'Show Changes', icon: 'diff' as const, onSelect: () => void showChange(client.store.getState(), row.path) }] : []),
-      { label: 'Open in Full', icon: 'expand', keys: chordLabel('Cmd+Enter'), onSelect: () => void api.files.open(at(row.path)).then(() => openFocus('file', wsId)) },
-      ...(local ? [{ label: 'Open With Its App', icon: 'external' as const, onSelect: () => void openWithDefaultApp(client, local) }] : []),
+      ...(canShowChange(row.path) ? [{ label: t('layout.filesTab.showChanges'), icon: 'diff' as const, onSelect: () => void showChange(client.store.getState(), row.path) }] : []),
+      { label: t('layout.filesTab.openInFull'), icon: 'expand', keys: chordLabel('Cmd+Enter'), onSelect: () => void api.files.open(at(row.path)).then(() => openFocus('file', wsId)) },
+      ...(local ? [{ label: t('layout.scratch.openWith'), icon: 'external' as const, onSelect: () => void openWithDefaultApp(client, local) }] : []),
       ...base.slice(1),
     ];
   };
@@ -297,8 +300,8 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
             <input
               ref={field}
               value={query}
-              placeholder={contents ? 'Search in files' : 'Search file names'}
-              aria-label={contents ? 'Search in the files’ contents' : 'Search file names'}
+              placeholder={contents ? t('layout.filesTab.searchIn') : t('layout.filesTab.searchNames')}
+              aria-label={contents ? t('layout.filesTab.searchContents') : t('layout.filesTab.searchNames')}
               spellCheck={false}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -309,12 +312,12 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
             />
             <FlagToggles flags={flags} onChange={setFlags} />
           </label>
-          {contents ? null : <IconButton icon="chevronUp" label="Collapse all folders" onClick={() => expand(new Set())} disabled={!expanded.size} />}
+          {contents ? null : <IconButton icon="chevronUp" label={t('layout.filesTab.collapse')} onClick={() => expand(new Set())} disabled={!expanded.size} />}
           <IconButton icon="folder" label={revealLabel()} onClick={() => void api.workspaces.openInFinder(wsId)} />
         </div>
         <div className={k.modeRow}>
           <Segmented
-            label="Search"
+            label={t('layout.toolbar.search')}
             radio
             value={searchIn}
             onChange={(v) => {
@@ -322,22 +325,22 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
               field.current?.focus();
             }}
             options={[
-              { value: 'names', label: 'Names', hint: 'Find files by name or path, anywhere in the folder' },
-              { value: 'contents', label: 'Contents', hint: 'Search inside the files (ripgrep)' },
+              { value: 'names', label: t('layout.filesTab.names'), hint: t('layout.filesTab.namesHint') },
+              { value: 'contents', label: t('layout.filesTab.contents'), hint: t('layout.filesTab.contentsHint') },
             ]}
           />
         </div>
         {contents ? (
           <ContentResultsList state={found} query={query} listRef={hitList} onOpen={openAt} onEscape={() => field.current?.focus()} />
         ) : (
-          <div ref={list} className={cx(s.list, s.tree)} role="tree" aria-label="Files" tabIndex={0} onKeyDown={onKey}>
+          <div ref={list} className={cx(s.list, s.tree)} role="tree" aria-label={t('layout.sidebar.files')} tabIndex={0} onKeyDown={onKey}>
             {rows.map((row) => {
               const state = changes.files.get(row.path);
               const look = state ? STATE[state] : undefined;
               const on = row.path === cursor;
               return row.kind === 'loading' ? (
                 <div key={`${row.path}…`} className={s.treeNote} style={{ paddingLeft: 10 + row.depth * 14 + 18 }}>
-                  Loading…
+                  {t('layout.filesTab.loading')}
                 </div>
               ) : (
                 <ActionsContext key={row.path} items={() => itemsFor(row)}>
@@ -362,7 +365,7 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
                     <span className={cx(s.rowName, look?.tone)}>
                       <Marked name={row.name} marks={row.marks} />
                     </span>
-                    {look ? <span className={cx(d.letter, look.tone)}>{look.letter}</span> : row.dir && changes.dirs.has(row.path) ? <span className={s.changedDot} title="Has changes" /> : null}
+                    {look ? <span className={cx(d.letter, look.tone)}>{look.letter}</span> : row.dir && changes.dirs.has(row.path) ? <span className={s.changedDot} title={t('layout.filesTab.hasChanges')} /> : null}
                     {!row.dir && !look && row.size !== undefined && on ? <span className={s.size}>{row.size < 1024 ? `${row.size} B` : formatBytes(row.size)}</span> : null}
                   </div>
                 </ActionsContext>
@@ -376,7 +379,7 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
         <>
           <ResizeHandle
             axis="y"
-            label="Resize the tree"
+            label={t('layout.filesTab.resize')}
             onMove={(y) => {
               const r = box.current?.getBoundingClientRect();
               if (r) setPrefs({ panelSplit: clampShare((y - r.top) / r.height, SPLIT_MIN, SPLIT_MAX) });
@@ -393,9 +396,10 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
 
 /** Under the names found: still looking, a pattern that didn't parse, none, or only the first ones. */
 function NameNote({ state, count }: { state: ReturnType<typeof useNameSearch>; count: number }) {
+  const t = useT();
   if (state.error) return <div className={cx(s.treeNote, k.error)}>{state.error}</div>;
-  if (state.searching && !state.results) return <div className={s.treeNote}>Searching…</div>;
+  if (state.searching && !state.results) return <div className={s.treeNote}>{t('layout.contentSearch.searching')}</div>;
   if (!state.results) return null;
-  if (!count) return <div className={s.treeNote}>No file names with “{state.query?.trim()}”</div>;
-  return state.results.truncated ? <div className={s.treeNote}>The first {count.toLocaleString()} files shown; type more to narrow it</div> : null;
+  if (!count) return <div className={s.treeNote}>{t('layout.filesTab.noNames', { query: state.query?.trim() ?? '' })}</div>;
+  return state.results.truncated ? <div className={s.treeNote}>{t('layout.filesTab.truncated', { count: count.toLocaleString() })}</div> : null;
 }

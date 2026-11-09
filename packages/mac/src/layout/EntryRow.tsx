@@ -13,6 +13,7 @@ import { IDLE_SIGNAL, type Signal, type UnreadEntry, planSignal, workspaceSignal
 import { SignalMark, nameClass, signalClass } from './signal-marks.js';
 import { Row, type RowProps } from './sidebar-parts.js';
 import m from './signal.module.css';
+import { t, useT } from '../i18n/index.js';
 
 /** One conversation in a sidebar list, and opening it from there: the seam the Unread section and the categories share. */
 
@@ -38,6 +39,7 @@ type EntryRowProps = Omit<RowProps, 'icon' | 'label' | 'selected' | 'onClick' | 
 
 /** It passes its ref and other props to its Row, so a right-click menu wrapped around it can attach. */
 export const EntryRow = forwardRef<HTMLDivElement, EntryRowProps>(function EntryRow({ e, list, at, trailing, nameBold, ...rest }, ref) {
+  useT();
   const selected = e.channel === list.here;
   const where = whereOf(e, list.ownerName);
   return (
@@ -48,7 +50,7 @@ export const EntryRow = forwardRef<HTMLDivElement, EntryRowProps>(function Entry
       className={signalClass(e.signal, selected)}
       data-signal-row={e.signal.level}
       // With what's waiting, so it reads (and is found) apart from the same conversation further down.
-      aria-label={`${e.name} · ${e.signal.tip || 'read'}`}
+      aria-label={`${e.name} · ${e.signal.tip || t('layout.entryRow.read')}`}
       icon={
         <span className={m.unreadIcon}>
           <EntryIcon e={e} />
@@ -94,7 +96,7 @@ export function useEntryList<E extends UnreadEntry>(entriesOf: (state: AppState)
     setKept({ entry: e, at, arrived: e.channel === here });
     openEntry(e, actions.run, client);
   };
-  return { here, entries, ...(stay && kept ? { kept: { entry: stay, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? 'Shared', open };
+  return { here, entries, ...(stay && kept ? { kept: { entry: stay, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? t('layout.entryRow.shared'), open };
 }
 
 /** Where you are, as a channel: a plan counts as one place (its page, its conversation and its tasks' worktrees). */
@@ -139,17 +141,17 @@ function EntryIcon({ e }: { e: UnreadEntry }) {
 function whereOf(e: UnreadEntry, ownerName: (id: string) => string): string {
   switch (e.kind) {
     case 'workspace':
-      return e.project?.name ?? 'Chats';
+      return e.project?.name ?? t('layout.entryRow.chats');
     case 'shared':
       return ownerName(e.owner);
     case 'dm':
-      return 'Message';
+      return t('layout.entryRow.message');
     case 'group':
-      return 'Group';
+      return t('layout.entryRow.group');
     case 'plan':
-      return e.project?.name ?? 'Plan';
+      return e.project?.name ?? t('layout.entryRow.plan');
     case 'sentinel':
-      return 'Sentinel';
+      return t('layout.entryRow.sentinel');
   }
 }
 

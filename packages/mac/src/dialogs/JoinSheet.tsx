@@ -3,9 +3,11 @@ import { Button } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
 import s from './sheet.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 /** Someone sent you a beluga:// link: join their room (and leave the one you're in)? */
 export function JoinSheet({ invite, onJoin, onCancel }: { invite: string; onJoin: () => void; onCancel: () => void }) {
+  const t = useT();
   const room = useApp((st) => st.room);
   const others = useApp((st) => st.peers.length - 1);
   const host = (() => {
@@ -21,17 +23,17 @@ export function JoinSheet({ invite, onJoin, onCancel }: { invite: string; onJoin
         <Dialog.Overlay className={s.overlay} />
         <Dialog.Content className={s.sheet} aria-describedby={undefined}>
           <div className={s.head}>
-            <Dialog.Title className={s.title}>Join {host === 'a friend' ? 'their room' : `the room at ${host}`}?</Dialog.Title>
+            <Dialog.Title className={s.title}>{host === 'a friend' ? t('dialogs.join.titleTheir') : t('dialogs.join.titleAt', { host })}</Dialog.Title>
           </div>
           <div className={s.intro}>
-            <p>You'll leave {room}{others > 0 ? ` and the ${others} ${others === 1 ? 'person' : 'people'} in it` : ''}. Your projects, chats and worktrees stay on {thisComputer()}.</p>
+            <p>{t('dialogs.join.leave', { room: String(room), n: others, computer: thisComputer() })}</p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 16px 16px' }}>
             <Button variant="quiet" onClick={onCancel}>
-              Stay here
+              {t('dialogs.join.stay')}
             </Button>
             <Button variant="primary" onClick={onJoin} autoFocus>
-              Join
+              {t('dialogs.join.join')}
             </Button>
           </div>
         </Dialog.Content>

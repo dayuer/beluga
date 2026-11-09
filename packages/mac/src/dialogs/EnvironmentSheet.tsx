@@ -4,6 +4,7 @@ import { openSettings } from '../lib/native-routes.js';
 import { EnvEditor } from './EnvironmentSettings.js';
 import e from './env-settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * A project's Environment… (BLG-369): its variables beside its main folder's .env, from the
@@ -11,17 +12,18 @@ import { thisComputer } from '../lib/os-words.js';
  * Settings › Environment's, for this project.
  */
 export function EnvironmentSheet({ projectId, close }: { projectId: string; close: () => void }) {
+  const t = useT();
   const { ui } = useBeluga();
   const name = useApp((st) => st.projects.find((p) => p.id === projectId)?.name);
   if (!name) return null;
   return (
     <FormSheet
-      title={`Environment for ${name}`}
+      title={t('dialogs.env.title', { name })}
       icon="lock"
-      intro={`Given to shells, setup and run commands in its workspaces, and your agent. They stay on ${thisComputer()}.`}
-      submitLabel="Done"
+      intro={t('dialogs.env.intro', { computer: thisComputer() })}
+      submitLabel={t('dialogs.env.done')}
       hideSubmit
-      cancelLabel="Done"
+      cancelLabel={t('dialogs.env.done')}
       width={640}
       onSubmit={close}
       onCancel={close}
@@ -34,7 +36,7 @@ export function EnvironmentSheet({ projectId, close }: { projectId: string; clos
             openSettings(ui, 'environment');
           }}
         >
-          Your variables for every project…
+          {t('dialogs.env.yours')}
         </button>
       }
     >

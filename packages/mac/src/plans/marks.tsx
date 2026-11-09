@@ -12,6 +12,7 @@ import { type Need, type Signal, signalOf } from '../layout/attention-model.js';
 import { SignalMark } from '../layout/signal-marks.js';
 import { type Headline, type Tone, type Who, TASK_STATE, prWords } from './plans-model.js';
 import p from './plans.module.css';
+import { useT } from '../i18n/index.js';
 
 /** Small marks shared by the plan's graph, outline and lists: a task's state, a tone pill, progress. */
 
@@ -145,11 +146,12 @@ export function ActorMark({ by, size = 18 }: { by: Actor; size?: number }) {
 
 /** The plan's sentence: who, then what (“You: pass “API” — Claude checked all 4 criteria”). */
 export function Said({ line, className }: { line: Headline; className?: string }) {
+  const t = useT();
   return (
     <span className={cx(p.said, className)} data-who={line.who}>
       <WhoMark who={line.who} />
       <span className={p.saidText}>
-        {line.who === 'you' ? <strong className={p.saidYou}>You: </strong> : null}
+        {line.who === 'you' ? <strong className={p.saidYou}>{t('plans.page.you')}</strong> : null}
         {line.who === 'you' ? line.text.charAt(0).toLowerCase() + line.text.slice(1) : line.text}
       </span>
     </span>
@@ -189,9 +191,10 @@ export function TaskChatMark({ worktree }: { worktree?: string }) {
 
 /** The plan's pull request, one click from GitHub, with what stands in its way (the page's header, and above its conversation). */
 export function PlanPrChip({ pr }: { pr: PlanPr }) {
+  const t = useT();
   return (
-    <Button size="small" variant="quiet" icon="pr" title={`#${pr.number} ${pr.title}: ${prWords(pr)}. Open on GitHub`} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
-      #{pr.number} · {pr.state === 'OPEN' ? prWords(pr) : pr.state === 'MERGED' ? 'Merged' : 'Closed'}
+    <Button size="small" variant="quiet" icon="pr" title={t('plans.marks.prTip', { n: pr.number, title: pr.title, state: prWords(pr) })} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
+      #{pr.number} · {pr.state === 'OPEN' ? prWords(pr) : pr.state === 'MERGED' ? t('plans.marks.merged') : t('plans.marks.closed')}
     </Button>
   );
 }

@@ -8,13 +8,14 @@ import { MCP_FROM, MCP_STATUS, checkMcp, mcpRuntimeOf, setMcpEnabled, signInMcp,
 import { openExternal } from '../lib/system.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
+import { type Key, useT } from '../i18n/index.js';
 
 type McpRuntime = 'claude' | 'codex';
 
 /** What each agent's list says, in its own words. */
-const WORDS: Record<McpRuntime, { readonly name: string; readonly app: string; readonly where: string; readonly none: string }> = {
-  claude: { name: 'Claude', app: 'Claude Code', where: 'Yours, your projects’ and your plugins’, as Claude Code has them.', none: 'None yet. Add one in Claude Code (claude mcp add) or turn on a plugin that has one.' },
-  codex: { name: 'Codex', app: 'Codex', where: 'Yours and your plugins’, from Codex’s own settings (~/.codex/config.toml).', none: 'None yet. Add one in Codex (codex mcp add) or turn on a plugin that has one.' },
+const WORDS: Record<McpRuntime, { readonly name: string; readonly app: string; readonly where: Key; readonly none: Key }> = {
+  claude: { name: 'Claude', app: 'Claude Code', where: 'settings.mcp.claudeWhere', none: 'settings.mcp.claudeNone' },
+  codex: { name: 'Codex', app: 'Codex', where: 'settings.mcp.codexWhere', none: 'settings.mcp.codexNone' },
 };
 
 /**
@@ -25,6 +26,7 @@ const WORDS: Record<McpRuntime, { readonly name: string; readonly app: string; r
  */
 export function McpSettings() {
   const { client } = useBeluga();
+  const t = useT();
   // Your agent as Settings sets it (Settings › Agent › Your agent).
   const mine = mcpRuntimeOf(useApp((st) => myRuntime(st.prefs)));
   // Both agents set up on this Mac: one tab each.
@@ -39,40 +41,40 @@ export function McpSettings() {
   const { rows, checking, signingIn, turning } = useMcp(client, runtime);
 
   return (
-    <Group title="MCP servers">
+    <Group title={t('settings.mcp.title')}>
       {tabs.length > 1 ? (
         <div className={s.row}>
-          <Segmented label="Whose MCP servers" value={runtime} onChange={pick} options={tabs.map((id) => ({ value: id, label: id === mine ? `${WORDS[id].name} · yours` : WORDS[id].name, icon: runtimeMark(id) }))} />
+          <Segmented label={t('settings.mcp.whose')} value={runtime} onChange={pick} options={tabs.map((id) => ({ value: id, label: id === mine ? t('settings.mcp.yours', { name: WORDS[id].name }) : WORDS[id].name, icon: runtimeMark(id) }))} />
         </div>
       ) : null}
-      <Row label={`Servers your ${words.name} uses`} detail={`${words.where} Only runs you start get them, never a friend’s.`}>
+      <Row label={t('settings.mcp.servers', { name: words.name })} detail={t('settings.mcp.serversDetail', { where: t(words.where) })}>
         <Button variant="quiet" icon="refresh" disabled={checking} onClick={() => void checkMcp(client, runtime)}>
-          {checking ? 'Checking…' : 'Check Again'}
+          {checking ? t('settings.common.checking') : t('settings.common.checkAgain')}
         </Button>
       </Row>
       {rows === undefined ? (
-        <div className={s.note}>Asking {words.app}…</div>
+        <div className={s.note}>{t('settings.mcp.asking', { app: words.app })}</div>
       ) : rows.length === 0 ? (
-        <div className={s.note}>{words.none}</div>
+        <div className={s.note}>{t(words.none)}</div>
       ) : (
         rows.map((row) => {
           const status = MCP_STATUS[row.status];
           const why = row.status === 'failed' && row.error ? `: ${row.error}` : '';
-          const tools = row.tools !== undefined ? ` · ${row.tools} ${row.tools === 1 ? 'tool' : 'tools'}` : '';
+          const tools = row.tools !== undefined ? t('settings.mcp.tools', { n: row.tools }) : '';
           return (
             <Row key={row.name} label={row.label} detail={`${MCP_FROM[row.from](row.where)} · ${status.words}${tools}${why}`}>
               {row.canSignIn ? (
                 <Button disabled={signingIn !== undefined} onClick={() => void signInMcp(client, row, runtime)}>
-                  {signingIn === row.name ? 'Waiting for Browser…' : 'Sign In…'}
+                  {signingIn === row.name ? t('settings.mcp.waiting') : t('settings.mcp.signIn')}
                 </Button>
               ) : row.from === 'claude.ai' && row.status === 'needs-auth' ? (
                 <Button variant="quiet" onClick={() => void openExternal(CLAUDE_AI_CONNECTORS_URL)}>
-                  Open claude.ai
+                  {t('settings.mcp.openClaudeAi')}
                 </Button>
               ) : row.canTurnOff ? null : (
                 <Dot tone={status.tone} />
               )}
-              {row.canTurnOff ? <Switch label={`${row.label} on`} on={row.status !== 'disabled'} onChange={(on) => turning === undefined && void setMcpEnabled(client, row, on, runtime)} /> : null}
+              {row.canTurnOff ? <Switch label={t('settings.mcp.on', { label: row.label })} on={row.status !== 'disabled'} onChange={(on) => turning === undefined && void setMcpEnabled(client, row, on, runtime)} /> : null}
             </Row>
           );
         })

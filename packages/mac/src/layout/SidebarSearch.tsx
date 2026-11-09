@@ -8,6 +8,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { sameDeep } from '../lib/stable.js';
 import { type ChatTarget, FOCUS_SIDEBAR_SEARCH, MESSAGE_SEARCH_DEBOUNCE_MS, type SidebarResult, matchChats, moveSelection, searchesMessages, sidebarResults } from './sidebar-search-model.js';
 import s from './SidebarSearch.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * The field at the top of the sidebar: finds a conversation by name, branch, PR or project at once,
@@ -15,6 +16,7 @@ import s from './SidebarSearch.module.css';
  * the place of `children`, which stay mounted, so their folds and scroll come back as they were.
  */
 export function SidebarSearch({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { ui } = useBeluga();
@@ -70,8 +72,8 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
           ref={input}
           className={cx(s.input, 'selectable')}
           value={query}
-          placeholder="Search chats and messages"
-          aria-label="Search chats and messages"
+          placeholder={t('layout.sidebarSearch.placeholder')}
+          aria-label={t('layout.sidebarSearch.placeholder')}
           title={shortcutKeys('sidebar-search')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -89,7 +91,7 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
             }
           }}
         />
-        {query ? <IconButton icon="x" label="Clear search" className={s.clear} onClick={clear} /> : null}
+        {query ? <IconButton icon="x" label={t('layout.sidebarSearch.clear')} className={s.clear} onClick={clear} /> : null}
       </div>
       {q ? <Results list={list} results={results} selected={selected} looking={looking} open={open} /> : null}
       <div className={q ? s.kept : s.shown}>{children}</div>
@@ -98,17 +100,18 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
 }
 
 function Results({ list, results, selected, looking, open }: { list: React.RefObject<HTMLDivElement | null>; results: readonly SidebarResult[]; selected: number; looking: boolean; open: (result: SidebarResult) => void }) {
+  const t = useT();
   const firstMessage = results.findIndex((r) => r.type === 'message');
   const onlyAll = results.length === 1;
   return (
-    <div ref={list} className={s.results} role="listbox" aria-label="Search results">
-      {onlyAll && !looking ? <div className={s.note}>No chats match.</div> : null}
+    <div ref={list} className={s.results} role="listbox" aria-label={t('layout.sidebarSearch.results')}>
+      {onlyAll && !looking ? <div className={s.note}>{t('layout.sidebarSearch.none')}</div> : null}
       {results.map((r, i) => (
         <div key={r.key}>
-          {i === firstMessage ? <div className={s.heading}>Messages</div> : null}
-          {r.type === 'all' && looking ? <div className={s.note}>Searching messages…</div> : null}
+          {i === firstMessage ? <div className={s.heading}>{t('layout.sidebarSearch.messages')}</div> : null}
+          {r.type === 'all' && looking ? <div className={s.note}>{t('layout.sidebarSearch.searching')}</div> : null}
           <div role="option" aria-selected={i === selected} className={cx(s.result, i === selected && s.resultOn)} onClick={() => open(r)}>
-            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : <span className={s.all}>See All in Search</span>}
+            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : <span className={s.all}>{t('layout.sidebarSearch.seeAll')}</span>}
           </div>
         </div>
       ))}

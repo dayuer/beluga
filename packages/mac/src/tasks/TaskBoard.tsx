@@ -14,11 +14,12 @@ import { AssigneeMark, PriorityIcon, StatusIcon, assigneeWords } from './marks.j
 import { AssigneePicker } from './pickers.js';
 import { ArchiveDoneButton, EpicBar, IssueMeta, OnItLine, PrivateMark, useIssueMenu } from './parts.js';
 import { WaitingMark } from '../team/Team.js';
-import { isSolo } from './tasks-model.js';
+import { isSolo, statusLabel } from './tasks-model.js';
 import { useVisitingFrom } from './boards.js';
 import { taskDropProps } from './use-task-drop.js';
 import { revealing, tuckOrder, useBoard, useSelf, useSelfId, useTaskActions, useTucking } from './use-tasks.js';
 import t from './tasks.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Tasks as a board: a column per status. Pick a card up and it lifts, leaning with the way you
@@ -87,6 +88,7 @@ const order = (a: Issue, b: Issue): number => byRank(a, b) || PRIORITY_INFO[a.pr
 /** `projectId`: the board shown; `repo`: the one repo you're looking at on a board of several (new tasks run there). */
 export function TaskBoard({ issues, statuses, projectId, repo }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string }) {
   const { api, act } = useTaskActions();
+  const tr = useT();
   const reduce = useReducedMotion() ?? false;
   const [lift, setLift] = useState<Lift>();
   const [over, setOver] = useState<Spot>();
@@ -387,7 +389,7 @@ export function TaskBoard({ issues, statuses, projectId, repo }: { issues: reado
     </AnimatePresence>
   );
   return (
-    <div ref={boardRef} className={cx(t.board, lift && t.boardDragging)} role="list" aria-label="Board">
+    <div ref={boardRef} className={cx(t.board, lift && t.boardDragging)} role="list" aria-label={tr('tasks.view.board')}>
       {fold('before', folded.before)}
       {columns.map(({ status, items }) => {
         const target = lift && over?.status === status;
@@ -525,7 +527,8 @@ const Column = memo(function Column({
 }) {
   const solo = soloIn.split('\n');
   const shown = withGap(items, liftedId, gapAt);
-  const label = STATUS_INFO[status].label;
+  const label = statusLabel(status);
+  const tr = useT();
   let index = 0;
   let pop = popFrom;
   return (
@@ -539,7 +542,7 @@ const Column = memo(function Column({
             <span className={t.grow} />
             {status === 'in_plan' ? <PlanPrs issues={items} /> : null}
             {status === 'done' ? <ArchiveDoneButton projectId={projectId} /> : null}
-            <IconButton icon="plus" label={`New Task in ${label}`} onClick={() => openSheet({ kind: 'new_task', status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />
+            <IconButton icon="plus" label={tr('tasks.board.newIn', { status: label })} onClick={() => openSheet({ kind: 'new_task', status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />
           </>
         )}
       </header>
@@ -563,7 +566,7 @@ const Column = memo(function Column({
             </motion.div>
           ),
         )}
-        {!shown.length ? <div className={t.columnEmpty}>{folded ? 'Drop here' : 'No tasks'}</div> : null}
+        {!shown.length ? <div className={t.columnEmpty}>{folded ? tr('tasks.board.dropHere') : tr('tasks.board.noTasks')}</div> : null}
       </div>
     </section>
   );
@@ -576,10 +579,11 @@ const Column = memo(function Column({
 function CardAssignee({ issue, selfId }: { issue: Issue; selfId: string }) {
   const { api, act } = useTaskActions();
   const stop = (e: { stopPropagation: () => void }): void => e.stopPropagation();
+  const tr = useT();
   return (
     <span className={t.cardAssignee} onPointerDown={stop} onClick={stop} onKeyDown={stop}>
       <AssigneePicker projectId={issue.projectId} value={issue.assignee} onChange={(a) => void act(() => api.update(issue.id, { assignee: a }))} align="end">
-        <button type="button" className={t.iconHit} aria-label={`${assigneeWords(issue.assignee, selfId)}. Change who it's for`}>
+        <button type="button" className={t.iconHit} aria-label={tr('tasks.board.changeWho', { who: assigneeWords(issue.assignee, selfId) })}>
           <AssigneeMark assignee={issue.assignee} selfId={selfId} size={16} changeable />
         </button>
       </AssigneePicker>
@@ -591,6 +595,7 @@ function CardAssignee({ issue, selfId }: { issue: Issue; selfId: string }) {
 const CardFace = memo(function CardFace({ issue, selfId, solo, lifted }: { issue: Issue; selfId: string; solo: boolean; lifted?: boolean }) {
   const self = useSelf();
   const epic = useApp((s) => isEpic(s.board, issue));
+  const tr = useT();
   return (
     <>
       <div className={t.cardTop}>
@@ -599,7 +604,7 @@ const CardFace = memo(function CardFace({ issue, selfId, solo, lifted }: { issue
         {epic ? (
           <span className={t.epicTag}>
             <Icon name="epic" size={11} />
-            Epic
+            {tr('tasks.page.epic')}
           </span>
         ) : null}
         <span className={t.grow} />
@@ -644,6 +649,7 @@ const Card = memo(function Card({
   const { open } = useTaskActions();
   const epic = useApp((s) => isEpic(s.board, issue));
   const visiting = Boolean(useVisitingFrom(issue));
+  const tr = useT();
   return (
     <ActionsContext items={() => menu(issue)}>
       <article
@@ -651,7 +657,7 @@ const Card = memo(function Card({
         style={(out ?? pop) !== undefined ? ({ '--pop': out ?? pop } as CSSProperties) : undefined}
         role="button"
         tabIndex={0}
-        aria-label={`${issue.key} ${issue.title}${issue.private ? ', private' : ''}`}
+        aria-label={`${issue.key} ${issue.title}${issue.private ? tr('tasks.board.privateSuffix') : ''}`}
         {...taskDropProps(issue)}
         onPointerDown={(e) => onPress(e, issue, index)}
         onClick={() => {

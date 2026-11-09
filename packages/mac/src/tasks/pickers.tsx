@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { labelTitle, labelsFor } from '@beluga/core/board/labels.js';
-import { type Assignee, type Issue, type IssueStatus, ISSUE_STATUSES, PRIORITIES, PRIORITY_INFO, type Priority, STATUS_INFO, boardOf } from '@beluga/core/board/model.js';
+import { type Assignee, type Issue, type IssueStatus, ISSUE_STATUSES, PRIORITIES, type Priority, boardOf } from '@beluga/core/board/model.js';
 import { Avatar } from '../components/ui.js';
 import { Icon } from '../components/Icon.js';
 import { openSheet } from '../lib/sheets.js';
 import { PickMenu } from './PickMenu.js';
 import { LabelMark, PriorityIcon, StatusIcon } from './marks.js';
-import { assigneeChoices, assigneeKey } from './tasks-model.js';
+import { assigneeChoices, assigneeKey, statusLabel, priorityLabel } from './tasks-model.js';
 import { useBoard, usePeople, useSelf, useTaskActions } from './use-tasks.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * Pickers for a task's properties: the same menus from a row, a card and a task's page. The
@@ -16,11 +17,12 @@ import { useBoard, usePeople, useSelf, useTaskActions } from './use-tasks.js';
 
 export function StatusPicker({ issue, children, align }: { issue: Issue; children: ReactNode; align?: 'start' | 'end' }) {
   const { api, act } = useTaskActions();
+  const t = useT();
   return (
     <PickMenu<IssueStatus>
-      label="Status"
+      label={t('tasks.prop.status')}
       align={align}
-      choices={ISSUE_STATUSES.map((s) => ({ value: s, label: STATUS_INFO[s].label, mark: <StatusIcon status={s} /> }))}
+      choices={ISSUE_STATUSES.map((s) => ({ value: s, label: statusLabel(s), mark: <StatusIcon status={s} /> }))}
       chosen={[issue.status]}
       onPick={(status) => void act(() => api.update(issue.id, { status }))}
     >
@@ -31,11 +33,12 @@ export function StatusPicker({ issue, children, align }: { issue: Issue; childre
 
 export function PriorityPicker({ issue, children, align }: { issue: Issue; children: ReactNode; align?: 'start' | 'end' }) {
   const { api, act } = useTaskActions();
+  const t = useT();
   return (
     <PickMenu<Priority>
-      label="Priority"
+      label={t('tasks.prop.priority')}
       align={align}
-      choices={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_INFO[p].label, mark: <PriorityIcon priority={p} /> }))}
+      choices={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p), mark: <PriorityIcon priority={p} /> }))}
       chosen={[issue.priority]}
       onPick={(priority) => void act(() => api.update(issue.id, { priority }))}
     >
@@ -49,18 +52,19 @@ export function AssigneePicker({ projectId, value, onChange, children, align }: 
   const self = useSelf();
   const people = usePeople(projectId);
   const choices = assigneeChoices(self, people, value);
+  const t = useT();
   return (
     <PickMenu<string>
-      label="Assignee"
+      label={t('tasks.prop.assignee')}
       align={align}
       search={choices.length > 6}
-      placeholder="Assign to…"
+      placeholder={t('tasks.pick.assignTo')}
       choices={[
-        { value: '', label: 'No one', mark: <Icon name="person" size={13} /> },
+        { value: '', label: t('tasks.newTask.noOne'), mark: <Icon name="person" size={13} /> },
         ...choices.map((c) => ({
           value: c.key,
           label: c.label,
-          section: c.assignee.id === self.id ? undefined : 'Team',
+          section: c.assignee.id === self.id ? undefined : t('tasks.sync.team'),
           mark: <Avatar name={c.assignee.name} id={c.assignee.id} size={16} />,
         })),
       ]}
@@ -83,19 +87,20 @@ export function LabelsPicker({ issue, children, align }: { issue: Issue; childre
   const set = labelsFor(board, boardOf(issue));
   const others = issue.labels.filter((l) => !set.some((d) => d.name === l));
   const save = (labels: readonly string[]): void => void act(() => api.update(issue.id, { labels: [...labels] }));
+  const t = useT();
   return (
     <PickMenu<string>
-      label="Labels"
+      label={t('tasks.prop.labels')}
       align={align}
       multiple
       search={set.length + others.length > 8}
       choices={[
         ...set.map((d) => ({ value: d.name, label: labelTitle(d.name), mark: <LabelMark def={d} label={d.name} />, ...(d.hint ? { hint: d.hint } : {}) })),
-        ...others.map((l) => ({ value: l, label: labelTitle(l), section: 'Not in the set', mark: <LabelMark def={undefined} label={l} /> })),
+        ...others.map((l) => ({ value: l, label: labelTitle(l), section: t('tasks.pick.notInSet'), mark: <LabelMark def={undefined} label={l} /> })),
       ]}
       chosen={issue.labels}
       onPick={(l) => save(issue.labels.includes(l) ? issue.labels.filter((x) => x !== l) : [...issue.labels, l])}
-      actions={[{ label: 'New Label…', icon: 'plus', onSelect: () => openSheet({ kind: 'new_label', projectId: boardOf(issue), issueId: issue.id }) }]}
+      actions={[{ label: t('tasks.pick.newLabel'), icon: 'plus', onSelect: () => openSheet({ kind: 'new_label', projectId: boardOf(issue), issueId: issue.id }) }]}
     >
       {children}
     </PickMenu>
@@ -104,12 +109,13 @@ export function LabelsPicker({ issue, children, align }: { issue: Issue; childre
 
 /** Pick another task (a parent, a blocker, a related one), by key or words. */
 export function TaskPicker({ label, candidates, onPick, children, align }: { label: string; candidates: readonly Issue[]; onPick: (issue: Issue) => void; children: ReactNode; align?: 'start' | 'end' }) {
+  const t = useT();
   return (
     <PickMenu<string>
       label={label}
       align={align}
       search
-      placeholder="Find a task…"
+      placeholder={t('tasks.pick.findTask')}
       choices={candidates.map((i) => ({ value: i.id, label: `${i.key} ${i.title}`, mark: <StatusIcon status={i.status} /> }))}
       chosen={[]}
       onPick={(id) => {

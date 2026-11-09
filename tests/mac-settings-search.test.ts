@@ -2,12 +2,17 @@ import { readFileSync } from 'node:fs';
 import { THREAD_LIMIT_ROWS } from '../src/shared/threads.js';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PANES, SETTINGS } from '../packages/mac/src/dialogs/settings-index.js';
+import { panes, settingsIndex } from '../packages/mac/src/dialogs/settings-index.js';
+import { type Key, t as words } from '../packages/mac/src/i18n/index.js';
 import { HIDEABLE_BUTTONS } from '../src/ui/settings-menus.js';
 import { EXPERIMENTS, EXPERIMENT_INFO } from '../src/shared/experiments.js';
 import { flatHits, foldText, hitAnchors, searchSettings, settingAnchor } from '../packages/mac/src/lib/settings-search.js';
 
 /** Settings search (BLG-740): find a setting by typing, and jump to its row. */
+
+// In English, as the tests run.
+const PANES = panes();
+const SETTINGS = settingsIndex();
 
 const search = (q: string) => searchSettings(q, SETTINGS, PANES);
 const top = (q: string) => flatHits(search(q))[0];
@@ -126,7 +131,9 @@ describe('every static setting', () => {
 // function of Settings.tsx) is read; every literal Row label and Group title in it must be
 // indexed, and every indexed label must still be in it.
 const MAC = path.join(__dirname, '../packages/mac/src');
-const read = (file: string): string => readFileSync(path.join(MAC, file), 'utf8');
+// The panes' words come from the dictionary (i18n/en): each `t('key')` reads as its English, quoted as it was.
+const english = (src: string): string => src.replace(/\{\w+\('(\w+\.[\w.]+)'\)\}/g, (_, k: string) => JSON.stringify(words(k as Key))).replace(/'(\w+\.[\w.]+)'/g, (_, k: string) => JSON.stringify(words(k as Key)));
+const read = (file: string): string => english(readFileSync(path.join(MAC, file), 'utf8'));
 const SETTINGS_TSX = read('dialogs/Settings.tsx');
 
 /** One top-level function of a file: from its declaration to the next top-level declaration. */

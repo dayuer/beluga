@@ -8,6 +8,7 @@ import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import e from './env-settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 interface EnvRow extends EnvVar {
   readonly id: number;
@@ -24,17 +25,18 @@ type Status = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; text: stri
 function ImportBox({ onImport, onClose }: { onImport: (vars: EnvVar[]) => void; onClose: () => void }) {
   const [text, setText] = useState('');
   const parsed = parseEnvText(text);
+  const t = useT();
   return (
     <div className={e.importBox}>
-      <textarea className={e.importText} aria-label="KEY=value lines" autoFocus spellCheck={false} placeholder={'API_URL=https://api.example.com\nexport TOKEN="…"'} value={text} onChange={(ev) => setText(ev.target.value)} />
+      <textarea className={e.importText} aria-label={t('settings.env.lines')} autoFocus spellCheck={false} placeholder={'API_URL=https://api.example.com\nexport TOKEN="…"'} value={text} onChange={(ev) => setText(ev.target.value)} />
       <div className={e.importBar}>
-        <span className={e.muted}>{text.trim() ? `${parsed.vars.length} variable${parsed.vars.length === 1 ? '' : 's'}${parsed.skipped.length ? ` · ${parsed.skipped.length} line${parsed.skipped.length === 1 ? '' : 's'} skipped` : ''}` : 'Lines like KEY=value. # comments and export are fine.'}</span>
+        <span className={e.muted}>{text.trim() ? `${t('settings.env.variables', { n: parsed.vars.length })}${parsed.skipped.length ? t('settings.env.skipped', { n: parsed.skipped.length }) : ''}` : t('settings.env.linesHint')}</span>
         <span className={e.flex} />
         <Button size="small" variant="quiet" onClick={onClose}>
-          Cancel
+          {t('settings.common.cancel')}
         </Button>
         <Button size="small" variant="primary" disabled={!parsed.vars.length} onClick={() => onImport(parsed.vars)}>
-          Add {parsed.vars.length || ''}
+          {t('settings.env.addN', { n: parsed.vars.length || '' })}
         </Button>
       </div>
     </div>
@@ -48,6 +50,7 @@ function ImportBox({ onImport, onClose }: { onImport: (vars: EnvVar[]) => void; 
  */
 export function EnvEditor({ projectId }: { projectId: string }) {
   const api = useApi();
+  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const keysHere = useApp((st) => (project ? st.envKeys.projects[project.root] : st.envKeys.global));
   const [rows, setRows] = useState<EnvRow[] | undefined>(undefined);
@@ -88,7 +91,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
   const problems = envProblems(rows ?? []);
   const commit = (next: readonly EnvRow[], nextDotenv = dotenv): void => {
     editing.current = false;
-    if (envProblems(next).size) return setStatus({ kind: 'error', text: 'Fix the highlighted names to save' });
+    if (envProblems(next).size) return setStatus({ kind: 'error', text: t('settings.env.fixNames') });
     const snapshot = JSON.stringify([filled(next), nextDotenv]);
     if (snapshot === saved.current) return;
     api.env.set(projectId || undefined, filled(next), projectId ? nextDotenv : undefined).then(
@@ -123,7 +126,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
     api.env.importDotenv(projectId).then(
       (n) => {
         setCopying(false);
-        setStatus(n ? { kind: 'saved' } : { kind: 'error', text: 'They’re all in Beluga already' });
+        setStatus(n ? { kind: 'saved' } : { kind: 'error', text: t('settings.env.allIn') });
       },
       (err: unknown) => {
         setCopying(false);
@@ -152,7 +155,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
   };
   useEffect(() => () => saveOnClose.current(), []);
 
-  if (!rows) return <div className={s.note}>Loading…</div>;
+  if (!rows) return <div className={s.note}>{t('settings.env.loading')}</div>;
   const masked = (id: number): boolean => !showAll && !shown.has(id);
   const fromFile = new Map(projectId && dotenv ? dotenvVars.map((v) => [v.key, v.value]) : []);
   const own = new Set(rows.map((r) => r.key));
@@ -166,7 +169,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
     ...[...fromFile].map(([key, value]): Listed => byKey.get(key) ?? { kind: 'file', key, value }),
     ...rows.map((row, index): Listed => ({ kind: 'own', row, index })).filter((x) => !(x.kind === 'own' && fromFile.has(x.row.key))),
   ];
-  const filesLabel = dotenvFiles.length ? dotenvFiles.join(' and ') : '.env';
+  const filesLabel = dotenvFiles.length ? dotenvFiles.join(t('settings.layout.and')) : '.env';
 
   return (
     <>
@@ -175,13 +178,13 @@ export function EnvEditor({ projectId }: { projectId: string }) {
           <div className={e.sourceBar}>
             <Icon name="file" size={12} className={e.sourceIcon} />
             <span className={e.sourceText}>
-              Include the main folder’s {filesLabel}
+              {t('settings.env.include', { files: filesLabel })}
               <span className={e.muted}>
-                {dotenv ? (dotenvVars.length ? ` · ${dotenvVars.length} variable${dotenvVars.length === 1 ? '' : 's'}, read fresh each time something starts` : ' · none there yet') : ' · off: only the variables set here'}
+                {dotenv ? (dotenvVars.length ? t('settings.env.includeCount', { n: dotenvVars.length }) : t('settings.env.includeNone')) : t('settings.env.includeOff')}
               </span>
             </span>
             <Switch
-              label="Use the main folder's .env"
+              label={t('settings.env.useMain')}
               on={dotenv}
               onChange={(v) => {
                 setDotenv(v);
@@ -191,35 +194,35 @@ export function EnvEditor({ projectId }: { projectId: string }) {
           </div>
         ) : null}
         <div className={e.head}>
-          <span>Name</span>
-          <span>Value</span>
-          <Tip label={showAll ? 'Hide the values' : 'Show the values'}>
-            <button type="button" className={cx(e.eye, showAll && e.eyeOn)} aria-label="Show values" aria-pressed={showAll} onClick={() => setShowAll(!showAll)}>
+          <span>{t('settings.env.name')}</span>
+          <span>{t('settings.env.value')}</span>
+          <Tip label={showAll ? t('settings.env.hideValues') : t('settings.env.showValues')}>
+            <button type="button" className={cx(e.eye, showAll && e.eyeOn)} aria-label={t('settings.env.showValuesAria')} aria-pressed={showAll} onClick={() => setShowAll(!showAll)}>
               <Icon name="eye" size={13} />
             </button>
           </Tip>
           <span />
         </div>
-        {rows.length || fileRows.length ? null : <div className={e.empty}>{projectId ? 'No variables yet, and no .env in the main folder. Add one, or paste a few KEY=value lines.' : 'No variables yet. Add one, or paste a few KEY=value lines.'}</div>}
+        {rows.length || fileRows.length ? null : <div className={e.empty}>{projectId ? t('settings.env.emptyProject') : t('settings.env.empty')}</div>}
         {listed.map((item) => {
           if (item.kind === 'file') {
             const { key, value } = item;
             const hidden = !showAll && !shownFile.has(key);
             return (
               <div key={`file:${key}`} className={e.row}>
-                <input className={cx(e.key, e.fixedKey)} aria-label="Name" value={key} readOnly tabIndex={-1} />
+                <input className={cx(e.key, e.fixedKey)} aria-label={t('settings.env.name')} value={key} readOnly tabIndex={-1} />
                 <input
                   className={cx(e.value, hidden && value && e.masked)}
-                  aria-label={`Value of ${key} (from ${filesLabel}; typing sets it in Beluga)`}
+                  aria-label={t('settings.env.fileValueAria', { key, files: filesLabel })}
                   value={value}
                   spellCheck={false}
                   autoComplete="off"
                   onChange={(ev) => override(key, ev.target.value, ev.target.selectionStart)}
                 />
-                <button type="button" className={cx(e.eye, !hidden && e.eyeOn)} aria-label={hidden ? `Show ${key}` : `Hide ${key}`} aria-pressed={!hidden} disabled={showAll} onClick={() => setShownFile((set) => (set.has(key) ? new Set([...set].filter((x) => x !== key)) : new Set([...set, key])))}>
+                <button type="button" className={cx(e.eye, !hidden && e.eyeOn)} aria-label={hidden ? t('settings.env.show', { what: key }) : t('settings.env.hide', { what: key })} aria-pressed={!hidden} disabled={showAll} onClick={() => setShownFile((set) => (set.has(key) ? new Set([...set].filter((x) => x !== key)) : new Set([...set, key])))}>
                   <Icon name="eye" size={13} />
                 </button>
-                <Tip label={`From the main folder’s ${filesLabel}. Type over it to change it here; the file stays as it is.`}>
+                <Tip label={t('settings.env.fromFile', { files: filesLabel })}>
                   <span className={e.sourceTag}>.env</span>
                 </Tip>
               </div>
@@ -232,7 +235,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
             <div key={r.id} className={cx(e.row, problems.has(i) && e.bad)}>
               <input
                 className={cx(e.key, overrides && e.fixedKey)}
-                aria-label="Name"
+                aria-label={t('settings.env.name')}
                 aria-invalid={problems.has(i)}
                 value={r.key}
                 placeholder="NAME"
@@ -253,9 +256,9 @@ export function EnvEditor({ projectId }: { projectId: string }) {
               />
               <input
                 className={cx(e.value, masked(r.id) && r.value && e.masked)}
-                aria-label={`Value of ${r.key || 'the new variable'}`}
+                aria-label={t('settings.env.valueOf', { key: r.key || t('settings.env.newVariable') })}
                 value={r.value}
-                placeholder="value"
+                placeholder={t('settings.env.valuePlaceholder')}
                 spellCheck={false}
                 autoComplete="off"
                 autoFocus={focusId?.id === r.id && focusId.field === 'value'}
@@ -268,32 +271,32 @@ export function EnvEditor({ projectId }: { projectId: string }) {
                 onChange={(ev) => change(r.id, { value: ev.target.value })}
                 onBlur={() => commit(rows)}
               />
-              <button type="button" className={cx(e.eye, !masked(r.id) && e.eyeOn)} aria-label={masked(r.id) ? `Show ${r.key || 'value'}` : `Hide ${r.key || 'value'}`} aria-pressed={!masked(r.id)} disabled={showAll} onClick={() => setShown((set) => (set.has(r.id) ? new Set([...set].filter((x) => x !== r.id)) : new Set([...set, r.id])))}>
+              <button type="button" className={cx(e.eye, !masked(r.id) && e.eyeOn)} aria-label={masked(r.id) ? t('settings.env.show', { what: r.key || t('settings.env.valueWord') }) : t('settings.env.hide', { what: r.key || t('settings.env.valueWord') })} aria-pressed={!masked(r.id)} disabled={showAll} onClick={() => setShown((set) => (set.has(r.id) ? new Set([...set].filter((x) => x !== r.id)) : new Set([...set, r.id])))}>
                 <Icon name="eye" size={13} />
               </button>
               {overrides ? (
-                <Tip label={`Changed here, over the main folder’s ${filesLabel}. Click to use the file’s value again.`}>
-                  <button type="button" className={cx(e.sourceTag, e.sourceEdited)} aria-label={`Use ${filesLabel} for ${r.key}`} onClick={() => remove(r.id)}>
+                <Tip label={t('settings.env.changedTip', { files: filesLabel })}>
+                  <button type="button" className={cx(e.sourceTag, e.sourceEdited)} aria-label={t('settings.env.useFileFor', { files: filesLabel, key: r.key })} onClick={() => remove(r.id)}>
                     <Icon name="refresh" size={10} />
                   </button>
                 </Tip>
               ) : (
-                <button type="button" className={e.remove} aria-label={`Remove ${r.key || 'this row'}`} onClick={() => remove(r.id)}>
+                <button type="button" className={e.remove} aria-label={t('settings.env.removeRow', { what: r.key || t('settings.env.thisRow') })} onClick={() => remove(r.id)}>
                   <Icon name="x" size={10} />
                 </button>
               )}
               {problems.has(i) ? <div className={e.problem}>{problems.get(i)}</div> : null}
               {!problems.has(i) && overrides ? (
                 <div className={e.override}>
-                  {fileValue === r.value ? `Set here, same as the ${filesLabel}.` : `Changed here. The ${filesLabel} file is left as it is.`}{' '}
+                  {fileValue === r.value ? t('settings.env.sameAsFile', { files: filesLabel }) : t('settings.env.changedHere', { files: filesLabel })}{' '}
                   <button type="button" className={e.inlineLink} onClick={() => remove(r.id)}>
-                    Use {filesLabel}
+                    {t('settings.env.useFile', { files: filesLabel })}
                   </button>
                 </div>
               ) : null}
               {!problems.has(i) && overridden[r.key]?.length ? (
                 <div className={e.override}>
-                  Not used in {overridden[r.key]!.join(', ')}: {overridden[r.key]!.length > 1 ? 'they set' : 'it sets'} {r.key} too, and that wins. Change it there.
+                  {t('settings.env.notUsed', { where: overridden[r.key]!.join(', '), n: overridden[r.key]!.length, key: r.key })}
                 </div>
               ) : null}
             </div>
@@ -302,17 +305,17 @@ export function EnvEditor({ projectId }: { projectId: string }) {
         {importing ? <ImportBox onImport={addAll} onClose={() => setImporting(false)} /> : null}
         <div className={e.foot}>
           <Button size="small" variant="quiet" icon="plus" onClick={add}>
-            Add variable
+            {t('settings.env.addVariable')}
           </Button>
           {importing ? null : (
             <Button size="small" variant="quiet" icon="clip" onClick={() => setImporting(true)}>
-              Paste lines…
+              {t('settings.env.paste')}
             </Button>
           )}
           {projectId && dotenv && notCopied ? (
-            <Tip label="Copies the .env values into Beluga, so they stay even if the file changes or goes">
+            <Tip label={t('settings.env.keepCopyTip')}>
               <Button size="small" variant="quiet" icon="download" disabled={copying} onClick={copyIn}>
-                {copying ? 'Copying…' : 'Keep a Copy in Beluga'}
+                {copying ? t('settings.env.copying') : t('settings.env.keepCopy')}
               </Button>
             </Tip>
           ) : null}
@@ -320,7 +323,7 @@ export function EnvEditor({ projectId }: { projectId: string }) {
           <span className={cx(e.status, status.kind === 'error' && e.statusError)} role="status">
             {status.kind === 'saved' ? (
               <>
-                <Icon name="check" size={11} /> Saved
+                <Icon name="check" size={11} /> {t('settings.env.saved')}
               </>
             ) : status.kind === 'error' ? (
               status.text
@@ -329,10 +332,10 @@ export function EnvEditor({ projectId }: { projectId: string }) {
         </div>
       </Group>
       {projectId ? (
-        <Group title="Worktrees">
-          <Row label="New keys go to the main folder" detail="A key a worktree adds to its .env (one the main folder doesn’t have) is added there too, so the next worktree works. A changed value is asked about: copy it there, or save it in Beluga.">
+        <Group title={t('settings.env.worktrees')}>
+          <Row label={t('settings.env.newKeys')} detail={t('settings.env.newKeysDetail')}>
             <Switch
-              label="New keys from worktrees go to the main folder's .env"
+              label={t('settings.env.newKeysAria')}
               on={newKeysBack}
               onChange={(v) => {
                 setNewKeysBack(v);
@@ -349,17 +352,17 @@ export function EnvEditor({ projectId }: { projectId: string }) {
         </Group>
       ) : null}
       <DatabaseTest projectId={projectId} />
-      <Group title="Your agent">
+      <Group title={t('settings.agent.yourAgent')}>
         <Row
-          label="Read .env files without asking"
+          label={t('settings.env.readEnv')}
           detail={
             projectId
-              ? 'In this project, and it gets the .env values above too. Off: it asks you each time it wants one. A friend’s request never gets them.'
-              : 'In every project. Off: your agent asks you each time (or as each project says). A friend’s request never gets them.'
+              ? t('settings.env.readEnvProject')
+              : t('settings.env.readEnvAll')
           }
         >
           <Switch
-            label="Your agent reads .env files without asking"
+            label={t('settings.env.readEnvAria')}
             on={claudeDotenv}
             onChange={(v) => {
               setClaudeDotenv(v);
@@ -385,24 +388,25 @@ export function EnvEditor({ projectId }: { projectId: string }) {
 function DatabaseTest({ projectId }: { projectId: string }) {
   const api = useApi();
   const [result, setResult] = useState<{ ok: true; from: string } | { ok: false; message: string } | 'testing' | undefined>(undefined);
+  const t = useT();
   const test = (): void => {
     setResult('testing');
     api.env.testDatabase(projectId || undefined).then(setResult, (err: unknown) => setResult({ ok: false, message: errorText(err) }));
   };
   return (
-    <Group title="Database">
+    <Group title={t('settings.env.database')}>
       <Row
-        label="Postgres for your agent’s views"
+        label={t('settings.env.postgres')}
         detail={
           result === undefined || result === 'testing'
-            ? 'Uses DATABASE_URL (or POSTGRES_URL…), or a Supabase project’s URL and SUPABASE_DB_PASSWORD, from here or the project’s .env.'
+            ? t('settings.env.postgresDetail')
             : result.ok
-              ? `Connected, using ${result.from}.`
+              ? t('settings.env.connected', { from: result.from })
               : result.message
         }
       >
         <Button size="small" icon={result !== undefined && result !== 'testing' && result.ok ? 'check' : undefined} disabled={result === 'testing'} onClick={test}>
-          {result === 'testing' ? 'Testing…' : 'Test Connection'}
+          {result === 'testing' ? t('settings.env.testing') : t('settings.env.test')}
         </Button>
       </Row>
     </Group>
@@ -419,19 +423,18 @@ export function EnvironmentSettings() {
   const [scope, setScope] = useState('');
   const count = (n: number): string => (n ? ` · ${n}` : '');
   const agent = useMyAgentName();
+  const t = useT();
   return (
     <>
-      <p className={e.intro}>
-        Given to your shells, setup and run commands, and your {agent}, never to a friend’s request. They stay on {thisComputer()}. Changes apply right away to your {agent}’s next message and to new shells; a shell or dev server already running offers to restart with them.
-      </p>
+      <p className={e.intro}>{t('settings.env.intro', { agent, computer: thisComputer() })}</p>
       <Group>
-        <Row label="Variables for" detail={scope ? 'This project’s workspaces. They win over yours.' : 'Every shell, script and agent run.'}>
+        <Row label={t('settings.env.variablesFor')} detail={scope ? t('settings.env.forProject') : t('settings.env.forAll')}>
           <Select
-            label="Variables for"
+            label={t('settings.env.variablesFor')}
             value={scope}
             onChange={setScope}
             options={[
-              { value: '', label: `Everywhere${count(envKeys.global.length)}` },
+              { value: '', label: `${t('settings.env.everywhere')}${count(envKeys.global.length)}` },
               ...projects.map((p) => ({ value: p.id, label: `${p.name}${count(envKeys.projects[p.root]?.keys.length ?? 0)}` })),
             ]}
           />

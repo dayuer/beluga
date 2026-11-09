@@ -12,6 +12,7 @@ import { openSheet } from '../../lib/sheets.js';
 import { openExternal } from '../../lib/system.js';
 import { whileBusy } from '../../lib/ws-busy.js';
 import s from './git-trouble.module.css';
+import { useT } from '../../i18n/index.js';
 
 const KIND_ICON: Record<GitTroubleKind, IconName> = { ssh_denied: 'lock', host_key: 'lock', no_access: 'eyeOff', https_auth: 'person', gh_missing: 'download', gh_logged_out: 'person', no_remote: 'branch', offline: 'globe' };
 
@@ -26,6 +27,7 @@ const FIX_ICON: Partial<Record<GitFix['id'], IconName>> = { push_https: 'up', us
  * Details (BLG-213). Nothing about the project changes without a click, and Always Use HTTPS asks again.
  */
 export function GitTroubleSheet({ wsId, trouble, retry, close }: { wsId: string; trouble: GitTrouble; retry: GitRetry; close: () => void }) {
+  const t = useT();
   const api = useApi();
   const { client, ui } = useBeluga();
   const [main, ...more] = trouble.fixes;
@@ -47,9 +49,9 @@ export function GitTroubleSheet({ wsId, trouble, retry, close }: { wsId: string;
     if (fix.id === 'use_https') {
       return openSheet({
         kind: 'confirm',
-        title: 'Always use HTTPS for this project?',
-        message: `${fix.detail} Pushes then use your GitHub CLI login instead of an SSH key, here and in Terminal.`,
-        confirm: 'Use HTTPS',
+        title: t('dialogs.gitTrouble.httpsTitle'),
+        message: t('dialogs.gitTrouble.httpsMessage', { detail: fix.detail }),
+        confirm: t('dialogs.gitTrouble.useHttps'),
         run: () => start(fix),
       });
     }
@@ -59,12 +61,12 @@ export function GitTroubleSheet({ wsId, trouble, retry, close }: { wsId: string;
   const items: ActionItem[] = [
     ...more.map((f): ActionItem => ({ label: f.label, hint: f.detail, ...(FIX_ICON[f.id] ? { icon: FIX_ICON[f.id] } : {}), onSelect: () => pick(f) })),
     {
-      label: 'Copy Details',
+      label: t('dialogs.gitTrouble.copyDetails'),
       icon: 'copy',
       separate: more.length > 0,
       onSelect: () => {
         void copyText(trouble.raw);
-        toast(client, 'Copied what git said');
+        toast(client, t('dialogs.gitTrouble.copied'));
       },
     },
   ];
@@ -77,14 +79,14 @@ export function GitTroubleSheet({ wsId, trouble, retry, close }: { wsId: string;
       icon={KIND_ICON[trouble.kind]}
       intro={trouble.explain}
       submitLabel={main.label}
-      cancelLabel="Not Now"
+      cancelLabel={t('dialogs.gitTrouble.notNow')}
       onSubmit={() => {
         pick(main);
       }}
       onCancel={close}
       footer={
         <ActionsDropdown items={items} align="start">
-          <IconButton icon="more" label="Other ways to fix it" />
+          <IconButton icon="more" label={t('dialogs.gitTrouble.otherWays')} />
         </ActionsDropdown>
       }
     >
@@ -95,13 +97,13 @@ export function GitTroubleSheet({ wsId, trouble, retry, close }: { wsId: string;
         </p>
         {main.command ? (
           <div className={s.command}>
-            <div className={s.commandTitle}>It runs this in Beluga’s terminal, where you answer it:</div>
+            <div className={s.commandTitle}>{t('dialogs.gitTrouble.runsThis')}</div>
             <CommandLine command={main.command} />
           </div>
         ) : null}
         {trouble.raw ? (
           <details className={s.details}>
-            <summary>Details</summary>
+            <summary>{t('dialogs.gitTrouble.details')}</summary>
             <pre className="selectable">{trouble.raw}</pre>
           </details>
         ) : null}

@@ -1,3 +1,4 @@
+import { type LanguageSetting, resolveLocale } from '../../../../src/shared/i18n.js';
 import { useSyncExternalStore } from 'react';
 import { onPowerSaving, powerSaving } from './power.js';
 import { DEFAULT_FIRE, type FireLook, fireLookOf } from '../chat/fire-look.js';
@@ -15,6 +16,8 @@ import type { DuringTurnAction } from '../chat/send-action.js';
  */
 export interface UiPrefs {
   readonly appearance: 'system' | 'light' | 'dark';
+  /** The language the window's own words show in (Settings › Appearance › Language); 'system': the Mac's. */
+  readonly language: LanguageSetting;
   /** The theme for light and the one for dark (lib/themes.ts): Match the System switches between them. */
   readonly lightTheme: string;
   readonly darkTheme: string;
@@ -152,6 +155,7 @@ export type Accent = keyof typeof ACCENTS;
 
 export const DEFAULT_PREFS: UiPrefs = {
   appearance: 'system',
+  language: 'system',
   lightTheme: 'light',
   darkTheme: 'dark',
   accent: 'system',
@@ -316,6 +320,7 @@ export function apply(p: UiPrefs = shown): void {
   const theme = themeFor(base, p);
   themeSheet();
   root.dataset.theme = base;
+  root.lang = resolveLocale(p.language, navigator.languages ?? [navigator.language]);
   root.dataset.palette = theme.id;
   root.dataset.edges = theme.lit ? 'lit' : 'soft';
   root.dataset.density = p.density;

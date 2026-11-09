@@ -17,6 +17,7 @@ import { HarnessMark } from '../threads/HarnessMark.js';
 import { Row, Section } from './sidebar-parts.js';
 import s from './Sidebar.module.css';
 import m from './signal.module.css';
+import { t, useT } from '../i18n/index.js';
 
 /**
  * The sidebar's conversations by category, for you: Inbox (what's yours to look at), then Working,
@@ -32,6 +33,7 @@ const allEntries = (state: Parameters<typeof categoriesOf>[0]): readonly Categor
 
 export function CategorySections() {
   const actions = useActions();
+  const t = useT();
   const list = useEntryList(allEntries);
   const [settledShown, setSettledShown] = useState(SETTLED_PAGE);
   const now = useClock(true, 30_000);
@@ -51,10 +53,10 @@ export function CategorySections() {
         const limited = c === 'settled' ? visibleRows(shown.map((x) => ({ ...x, channel: x.e.channel })), settledShown, list.here) : shown;
         return (
           <div key={c} role="region" aria-label={CATEGORY_TITLES[c]} className={m.section}>
-            <Section id={c === 'active' ? 'inbox' : c} title={CATEGORY_TITLES[c]} count={shown.length} keep={open.map(row)} action={inbox ? <><ChatsMenu /><IconButton icon="plus" label="New chat (not tied to a project)" onClick={newChat} /></> : undefined}>
+            <Section id={c === 'active' ? 'inbox' : c} title={CATEGORY_TITLES[c]} count={shown.length} keep={open.map(row)} action={inbox ? <><ChatsMenu /><IconButton icon="plus" label={t('layout.categories.newChat')} onClick={newChat} /></> : undefined}>
               {limited.map(row)}
-              {inbox && !shown.length ? <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label="Talk to your agent about anything" onClick={newChat} /> : null}
-              {limited.length < shown.length ? <Row className={s.hintRow} label="Show more" onClick={() => setSettledShown(settledShown + SETTLED_PAGE)} /> : null}
+              {inbox && !shown.length ? <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label={t('layout.categories.talk')} onClick={newChat} /> : null}
+              {limited.length < shown.length ? <Row className={s.hintRow} label={t('layout.categories.showMore')} onClick={() => setSettledShown(settledShown + SETTLED_PAGE)} /> : null}
             </Section>
           </div>
         );
@@ -64,6 +66,7 @@ export function CategorySections() {
 }
 
 function CategoryRow({ e, at, list, now }: { e: CategoryEntry; at: number; list: EntryList<CategoryEntry>; now: number }) {
+  useT();
   const actions = useActions();
   const { client } = useBeluga();
   const words = statusWords(e.status, now);
@@ -109,5 +112,5 @@ function CategoryRow({ e, at, list, now }: { e: CategoryEntry; at: number; list:
 function menuOf(e: CategoryEntry, run: ReturnType<typeof useActions>['run'], client: ReturnType<typeof useBeluga>['client']): ActionItem[] {
   const state = client.store.getState();
   if (e.kind === 'workspace') return workspaceItems(state, e.ws, run, client);
-  return [{ label: 'Open', icon: 'chevronRight', onSelect: () => openEntry(e, run, client) }, ...triageItems(state, e.channel, run, client)];
+  return [{ label: t('layout.categories.open'), icon: 'chevronRight', onSelect: () => openEntry(e, run, client) }, ...triageItems(state, e.channel, run, client)];
 }
