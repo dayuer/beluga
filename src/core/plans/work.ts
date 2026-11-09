@@ -1,5 +1,6 @@
 import type { PlanTools } from '../../agent/types.js';
 import type { AgentRef } from '../../protocol.js';
+import { autoAutonomy, autoChecker } from '../../shared/auto-route.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, Issue } from '../board/model.js';
 import type { BoardWork } from '../board/work.js';
@@ -72,6 +73,8 @@ export class PlansWork {
 
   constructor(private readonly deps: PlansWorkDeps) {
     this.plans = deps.plans;
+    // Its check agent, else its work agent; none named: auto route's strongest (fork, shared/auto-route.ts), else the project's.
+    const checker = (plan: Plan): AgentRef | undefined => checkerAgentOf(plan) ?? autoChecker(deps.store.getState());
     this.reviewer = new DraftReviewer({
       store: deps.store,
       plans: deps.plans,
@@ -81,12 +84,12 @@ export class PlansWork {
         ? {
             reviewChat: async (plan: Plan) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Review: ${planTitle(plan)}`.slice(0, 40), undefined, { quiet: true });
-              const agent = checkerAgentOf(plan);
+              const agent = checker(plan);
               if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             chatAgent: (chat: string, plan: Plan) => {
-              const agent = checkerAgentOf(plan);
+              const agent = checker(plan);
               if (agent) deps.controller!.manager.setAgent(chat, agent);
             },
           }
@@ -114,7 +117,7 @@ export class PlansWork {
             // On the plan's check agent, else its work agent (BLG-503); none picked: the project's.
             checkerChat: async (plan, milestone) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Check: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
-              const agent = checkerAgentOf(plan);
+              const agent = checker(plan);
               if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
@@ -222,7 +225,9 @@ export class PlansWork {
     const ws = channel.startsWith(WS) ? this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === channel.slice(WS.length)) : undefined;
     const project = ws ? this.deps.store.getState().projects.find((p) => p.id === ws.projectId && p.root) : undefined;
     if (!ws || !project) throw new Error('Plans belong to a project: start one from a conversation in a project');
-    return this.plans.create({ projectId: project.id, home: channel, ...(autonomy ? { autonomy } : {}) }, this.me());
+    // None asked: autopilot with auto route on (fork), else the plans' default.
+    const mode = autonomy ?? autoAutonomy(this.deps.store.getState());
+    return this.plans.create({ projectId: project.id, home: channel, ...(mode ? { autonomy: mode } : {}) }, this.me());
   }
 
   /** Approve the draft: its tasks go on the board, and the plan runs (or carries on with the changes). */

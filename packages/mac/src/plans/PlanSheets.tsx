@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useDefaultAutonomy } from './use-default-autonomy.js';
 import { AUTONOMIES, type Autonomy, DEFAULT_AUTONOMY, TESTS_AT, type TestsAt } from '@beluga/core/plans/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { Field, FormSheet, Popup, TextArea } from '../components/FormSheet.js';
@@ -35,7 +36,8 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
   const [goal, setGoal] = useState('');
   const known = projectId !== undefined && projects.some((p) => p.id === projectId);
   const [project, setProject] = useState((known ? projectId : projects.some((p) => p.id === prefs.project) ? prefs.project : projects[0]?.id) ?? '');
-  const [autonomy, setAutonomy] = useState<Autonomy>(DEFAULT_AUTONOMY);
+  const startsAs = useDefaultAutonomy();
+  const [autonomy, setAutonomy] = useState<Autonomy>(startsAs);
   const [testsAt, setTestsAt] = useState<TestsAt>('milestone');
   const agents = useAgentEntries();
   const runtimes = useApp((s) => s.runtimes);

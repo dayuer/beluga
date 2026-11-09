@@ -23,11 +23,21 @@
 
 | 档位 | 条件 | 默认候选，依次尝试 |
 |---|---|---|
-| 疑难 | 带 `hard` 标签，或优先级为紧急、高 | `local:anthropic/claude-opus-5-5`(API key)→ `claude:opus`(订阅) |
+| 疑难 | 带 `hard` 标签，或优先级为紧急、高，或估点 ≥ 5 | `local:anthropic/claude-opus-5-5`(API key)→ `claude:opus`(订阅) |
 | 其他 | 其余所有任务 | `local:bigmodel/glm-5.3[1m]` → `local:deepseek/deepseek-flash[1m]` → `local:anthropic/claude-haiku-5-5` → `claude:haiku` |
 
 - 每档取第一个在本机可用的候选。可用的标准和 agent 选择器一致：运行时已配置;local endpoint 列出了这个模型，并且正在应答。选择器里灰掉的候选会被跳过。
 - 某一档的候选全部不可用时，交给你的默认 agent,和以前一样。
+
+## 和 Plans 一起用：自动拆、自动选、自动推进
+
+自动路由开启时:
+
+- **新 Plan 默认用 Autopilot**:在对话里开 Plan,或在 Plans、项目首页新建时，默认选中 Autopilot,按里程碑自动推进，只有出错才停。你仍然可以在创建时改成别的。
+- **Plan 拆出的任务按估点分档**:Plan 负责人给每张任务卡估 1、2、3 或 5 点。估点 ≥ 5 的任务走疑难档(Opus),其余走 GLM 那一档。阈值可以在 `settings.json` 的 `autoRoute.hardEstimate` 里改，设为 0 表示不按估点判断。
+- **里程碑由 Opus 检查**:Plan 没有指定检查 agent,也没有指定工作 agent 时，里程碑检查和草稿审查用疑难档的第一个(Opus)。指定了的话用你指定的。
+
+注意:Plan 设了自己的工作 agent 时，它的所有任务都用那个 agent,自动路由会让位。想让每个任务按需求选模型，Plan 的 agent 留空。
 
 ## 让任务能带上 `hard` 标签
 
