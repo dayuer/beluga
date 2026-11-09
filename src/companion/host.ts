@@ -17,6 +17,7 @@ import { type DeviceBook, type DeviceRecord, deviceId } from './devices.js';
 import { type DocumentBytes, FileServer, RefTable, type Thumbnailer } from './files.js';
 import { ProjectIcons, type SmallIcon } from './icons.js';
 import type { MergeBook } from './merge.js';
+import { CLIENT_BLOCKED_FRAMES, clientRefusal, topicInProject } from './client-scope.js';
 import { DevicePairing, type PairStartOptions, type PairingInfo } from './pair.js';
 import { Uploads } from './uploads.js';
 import { type MacVoice, sharedVoice } from '../core/voice.js';
@@ -374,6 +375,7 @@ class PhoneLink implements PhoneLinkHandle {
       this.host.tellComputers(this);
       return;
     }
+    if (this.device.client && CLIENT_BLOCKED_FRAMES.has(frame.t)) return;
     switch (frame.t) {
       case 'hello':
         return;
@@ -382,6 +384,7 @@ class PhoneLink implements PhoneLinkHandle {
       case 'call':
         return void this.host.phoneCall(this, frame.method, frame.args).then((r) => this.send({ t: 'result', id: frame.id, ...r, ...(r.ok ? {} : { error: r.error.slice(0, 2000) }) }));
       case 'get':
+        if (this.device.client && frame.variant === 'text') return this.send({ t: 'result', id: frame.id, ok: false, error: 'That isn’t available to you' });
         return void this.host.files
           .piece(frame.ref, frame.variant, frame.off)
           .then((p) => this.send({ t: 'chunk', id: frame.id, ...p }))
@@ -457,7 +460,9 @@ class PhoneLink implements PhoneLinkHandle {
 
   /** The topics on the phone's screen now: new ones are sent at once, gone ones forgotten. */
   subscribe(topics: readonly Topic[]): void {
-    const wanted = new Set(topics.slice(0, MAX_TOPICS));
+    const project = this.device.client?.project;
+    const state = project === undefined ? undefined : this.host.state();
+    const wanted = new Set(topics.slice(0, MAX_TOPICS).filter((t) => state === undefined || topicInProject(state, project!, t)));
     for (const [t, st] of this.topics) {
       if (wanted.has(t)) continue;
       clearTimeout(st.timer);
@@ -911,7 +916,12 @@ export class CompanionHost {
 
   /** A call from a phone: only what the allowlist says it may, then exactly as a screen's call. */
   async phoneCall(link: PhoneLink, method: string, args: readonly unknown[]): Promise<CallOutcome> {
-    if (!phoneMay(method)) return { ok: false, error: `${method} is only on your Mac` };
+    const project = link.device.client?.project;
+    if (project !== undefined) {
+      // A customer's phone: its own, much shorter list, and only its project (client-scope.ts).
+      const why = clientRefusal(this.state(), project, method, args);
+      if (why) return { ok: false, error: why };
+    } else if (!phoneMay(method)) return { ok: false, error: `${method} is only on your Mac` };
     // A conversation asked from the phone: tell it when its answer is done.
     if (method === 'session.submit') {
       const channel = (args[1] as { channel?: unknown } | null | undefined)?.channel;
