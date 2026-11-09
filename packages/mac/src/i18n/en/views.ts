@@ -483,6 +483,8 @@ export const views = {
   "views.diff.split": "Split",
   "views.diff.asItIs": "The file as it is now",
   "views.diff.theFile": "The file",
+  "views.diff.waiting": "{count} comment(s) waiting to send",
+  "views.diff.goToChat": "Go to Chat",
   "views.diff.theChanges": "The changes",
   "views.diff.loading": "Loading the diff…",
   "views.ago.yesterday": "yesterday",

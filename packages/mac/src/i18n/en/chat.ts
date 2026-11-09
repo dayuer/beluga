@@ -217,6 +217,7 @@ export const chat = {
   'chat.items.signInClaudeTip': 'Sign in to Claude Code again; then the run picks up where it stopped',
   'chat.items.signIn': 'Sign In',
   'chat.items.signInOpencodeTip': 'Add or renew a model provider in Terminal (opencode auth login), then Continue',
+  'chat.items.signInCopilotTip': 'Sign in to GitHub in Terminal (copilot login), then Continue',
   'chat.items.continueTip': 'Send “continue”: {agent} picks up where it stopped',
   'chat.items.continue': 'Continue',
   'chat.items.forSession': 'For This Session',
@@ -324,6 +325,11 @@ export const chat = {
   'chat.modelPicker.handoff': 'Write a handoff note first',
   'chat.modelPicker.handoffLimited': '{from} is at its plan limit, so it can’t write one.',
   'chat.modelPicker.handoffDetail': '{from} sums up what’s done and what’s left, using your {from} plan.',
+  'chat.modelPicker.agent': 'Agent',
+  'chat.modelPicker.agents': 'Agents',
+  'chat.modelPicker.atWork': '{name}, at work here',
+  'chat.modelPicker.modelsTab': 'Models',
+  'chat.modelPicker.noLevel': 'This model doesn’t take this level',
 
   // ContextMeter
   'chat.context.ariaCompacting': 'Context: compacting',

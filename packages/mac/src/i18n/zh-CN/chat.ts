@@ -221,6 +221,7 @@ export const chat: Translation<typeof en> = {
   'chat.items.signInClaudeTip': '重新登录 Claude Code，然后从停下的地方接着跑',
   'chat.items.signIn': '登录',
   'chat.items.signInOpencodeTip': '在终端里添加或续期模型提供方（opencode auth login），然后点继续',
+  'chat.items.signInCopilotTip': '在终端里登录 GitHub（copilot login），然后点继续',
   'chat.items.continueTip': '发送“continue”：{agent} 从停下的地方接着做',
   'chat.items.continue': '继续',
   'chat.items.forSession': '本次会话',
@@ -328,6 +329,11 @@ export const chat: Translation<typeof en> = {
   'chat.modelPicker.handoff': '先写一份交接说明',
   'chat.modelPicker.handoffLimited': '{from} 已到套餐额度，写不了交接说明。',
   'chat.modelPicker.handoffDetail': '{from} 用你的 {from} 套餐总结已完成和待完成的内容。',
+  'chat.modelPicker.agent': 'Agent',
+  'chat.modelPicker.agents': 'Agent 列表',
+  'chat.modelPicker.atWork': '{name}，正在这里工作',
+  'chat.modelPicker.modelsTab': '模型',
+  'chat.modelPicker.noLevel': '这个模型不支持这一档',
 
   // ContextMeter
   'chat.context.ariaCompacting': '上下文：正在压缩',

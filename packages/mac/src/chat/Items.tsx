@@ -568,10 +568,10 @@ function TurnCard({
                 </Button>
               </ActionsDropdown>
             </div>
-          ) : limited && failure?.kind === 'signed_out' && failure.runtime === 'opencode' ? (
-            // OpenCode's model provider said no (a key expired, none set up): add one in Terminal (`opencode auth login`), then Continue.
+          ) : limited && failure?.kind === 'signed_out' && (failure.runtime === 'opencode' || failure.runtime === 'copilot') ? (
+            // OpenCode's model provider said no (a key expired, none set up), or Copilot's GitHub sign-in did: sign in in Terminal (`opencode auth login`, `copilot login`), then Continue.
             <div className={s.limitActions}>
-              <Button size="small" icon="person" onClick={() => void client.api.workbench.agentSignIn('opencode').catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))} title={t('chat.items.signInOpencodeTip')}>
+              <Button size="small" icon="person" onClick={() => void client.api.workbench.agentSignIn(failure.runtime!).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))} title={failure.runtime === 'copilot' ? t('chat.items.signInCopilotTip') : t('chat.items.signInOpencodeTip')}>
                 {t('chat.items.signIn')}
               </Button>
               <Button size="small" icon="play" onClick={resume} title={t('chat.items.continueTip', { agent: agentName(item.agent) })}>
