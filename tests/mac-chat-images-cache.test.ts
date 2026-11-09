@@ -6,11 +6,16 @@ vi.mock('@beluga/core/attachment-share.js', () => ({ ATTACHMENT_SCHEME: 'beluga-
 /** A fake core: every image is a tiny PNG; counts the reads. `versions`: a file's size and time (missing: it can't be told). */
 const reads: string[] = [];
 const versions = new Map<string, { size: number; mtime: number }>();
+/** Paths with nothing there (an agent's mistyped path). */
+const missing = new Set<string>();
+const calls: string[] = [];
 const api = {
+  local: { statFiles: async (paths: string[]) => paths.map((p) => ({ path: p, kind: missing.has(p) ? 'missing' : 'file' })) },
   session: { localLocation: async (p: string) => ({ owner: '', share: '', path: p }) },
   files: {
     readImageFile: async (at: { path: string }) => (reads.push(at.path), { data: btoa('png'), mediaType: 'image/png' }),
     version: async (at: { path: string }) => {
+      calls.push(`version ${at.path}`);
       const v = versions.get(at.path);
       if (!v) throw new Error('ENOENT');
       return v;
@@ -32,6 +37,8 @@ beforeEach(() => {
   revoked.clear();
   reads.length = 0;
   versions.clear();
+  missing.clear();
+  calls.length = 0;
   vi.resetModules();
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:${++made}`);
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation((u: string) => void revoked.add(u));
@@ -120,5 +127,16 @@ describe('a picture rewritten under the same name shows the new one (BLG-749)', 
     const first = await loadImage(api, img(1), 'thumb');
     expect(await loadImage(api, img(1), 'thumb')).toBe(first);
     expect(reads).toHaveLength(1);
+  });
+});
+
+describe('a picture at a path with nothing there', () => {
+  it('shows as missing on its own, without a call that fails (each failed call is a "Something went wrong" toast)', async () => {
+    const { loadImage } = await images();
+    missing.add('/.beluga/scratch/uilint/compose.png');
+    const gone = { href: 'local:/.beluga/scratch/uilint/compose.png', owner: '', file: '', local: '/.beluga/scratch/uilint/compose.png' };
+    await expect(loadImage(api, gone, 'thumb')).rejects.toThrow('No picture at /.beluga/scratch/uilint/compose.png');
+    expect(calls).toEqual([]);
+    expect(reads).toEqual([]);
   });
 });
