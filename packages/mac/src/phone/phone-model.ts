@@ -79,3 +79,9 @@ export function clientInviteArgs(project: string, days: number = DEFAULT_INVITE_
   const d = Math.min(Math.max(Math.round(days) || DEFAULT_INVITE_DAYS, 1), 7);
   return { project, ttlMs: d * 24 * 3600_000 };
 }
+
+/** 「客户 · 项目名」 on a customer's phone in the list; nothing on your own (BLG-34). */
+export function clientTag(d: Pick<DeviceView, 'client'>, projects: readonly { readonly id: string; readonly name: string }[]): string | undefined {
+  if (!d.client) return undefined;
+  return t('phone.list.client', { project: projects.find((x) => x.id === d.client!.project)?.name ?? d.client.project });
+}

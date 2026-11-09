@@ -873,6 +873,8 @@ export const misc = {
   'phone.pair.scan': 'Scan with the Beluga app on your phone',
   'phone.pair.scanOr': 'Scan this with the Beluga app on your phone, or type the code:',
   'phone.pair.once': 'Works once, for {left}.',
+  'phone.list.client': 'Customer · {project}',
+  'phone.list.revoke': 'Revoke',
   'phone.invite.title': 'Invite a customer',
   'phone.invite.project': 'Project',
   'phone.invite.projectDetail': 'The customer sees only this project: its conversations, cards and screenshots.',

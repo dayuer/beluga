@@ -12,7 +12,7 @@ import { errorText, quietly } from '../network/use-net.js';
 import { Group, Row, Select } from '../dialogs/settings-controls.js';
 import type { KeepAwake } from '@beluga/shared/settings-schema.js';
 import { pathLabel } from '../../../../src/companion/diagnose.js';
-import { DEFAULT_INVITE_DAYS, INVITE_DAYS, clientInviteArgs, leftText, markOf, seenText } from './phone-model.js';
+import { DEFAULT_INVITE_DAYS, INVITE_DAYS, clientInviteArgs, clientTag, leftText, markOf, seenText } from './phone-model.js';
 import p from '../dialogs/native/person.module.css';
 import s from './phone.module.css';
 import { computerWord, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
@@ -183,6 +183,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
   const { client } = useBeluga();
   useT();
   const devices = useDevices();
+  const projects = useApp((st) => st.projects, sameDeep);
   if (!devices.length) return <div className={s.empty}>{t('phone.list.empty')}</div>;
   return (
     <ul className={s.devices} aria-label={t('phone.list.yourPhones')}>
@@ -194,6 +195,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
             </span>
             <span className={s.deviceText}>
               <span className={s.deviceName}>{d.name}</span>
+              {clientTag(d, projects) ? <span className={s.path} data-client="true">{clientTag(d, projects)}</span> : null}
               <span className={s.dim}>
                 {d.platform === 'ios' ? 'iPhone' : 'Android'}
                 {d.app ? t('phone.list.app', { v: d.app }) : ''} · {seenText(d, now)}
@@ -205,10 +207,10 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
               ) : null}
             </span>
             <Button size="small" variant="quiet" onClick={() => void client.api.companion['devices.remove'](d.id)}>
-              {t('phone.list.remove')}
+              {d.client ? t('phone.list.revoke') : t('phone.list.remove')}
             </Button>
           </div>
-          {control ? <PhoneClaude d={d} /> : null}
+          {control && !d.client ? <PhoneClaude d={d} /> : null}
         </li>
       ))}
     </ul>

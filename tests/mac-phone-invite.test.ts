@@ -14,3 +14,14 @@ describe('client invite arguments', () => {
     expect(Math.max(...INVITE_DAYS)).toBe(7);
   });
 });
+
+/** 客户设备标记 (BLG-34). */
+describe('client tag in the phone list', () => {
+  const projects = [{ id: 'shop', name: 'Shop' }];
+  it('names the project on a customer’s phone, nothing on your own', async () => {
+    const { clientTag } = await import('../packages/mac/src/phone/phone-model.js');
+    expect(clientTag({ client: { project: 'shop' } }, projects)).toMatch(/Shop/);
+    expect(clientTag({ client: { project: 'gone' } }, projects)).toMatch(/gone/);
+    expect(clientTag({}, projects)).toBeUndefined();
+  });
+});

@@ -874,6 +874,8 @@ export const misc: Translation<typeof en> = {
   'phone.pair.scan': '用手机上的 Beluga 应用扫描',
   'phone.pair.scanOr': '用手机上的 Beluga 应用扫描，或输入配对码：',
   'phone.pair.once': '仅可使用一次，{left}。',
+  'phone.list.client': '客户 · {project}',
+  'phone.list.revoke': '撤销',
   'phone.invite.title': '邀请客户',
   'phone.invite.project': '项目',
   'phone.invite.projectDetail': '客户只能看到这个项目的对话、确认卡片和截图。',
