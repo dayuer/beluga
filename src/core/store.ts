@@ -317,7 +317,7 @@ export interface Prefs {
   readonly defaultAgent?: AgentRef;
   /** Per-project defaults over `defaultAgent`, by project name. */
   readonly projectAgents?: Readonly<Record<string, AgentRef>>;
-  /** Who works a task nobody picked an agent for (shared/auto-route.ts; undefined: on, its defaults). */
+  /** Who works a task nobody picked an agent for (shared/auto-route.ts; undefined: its defaults, on once a local candidate runs here). */
   readonly autoRoute?: Settings['autoRoute'];
   readonly autoSetup: boolean;
   /** What new worktrees' branches start with (`beluga/`; empty: none). */

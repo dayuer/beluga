@@ -23,9 +23,7 @@ import { draftIn } from '../network/NetComposer.js';
 import { IssueMark } from '../issues/task-bits.js';
 import { useStartWith } from '../components/agent-options.js';
 import { useMyAgent } from '../lib/agent-words.js';
-import { agentName } from '@beluga/shared/agent-label.js';
-import { autoAgentName } from '@beluga/shared/auto-route.js';
-import { useAutoAgent } from './use-auto-agent.js';
+import { startWho, useAutoAgent } from './use-auto-agent.js';
 import type { AgentRef } from '@beluga/protocol.js';
 import t from './tasks.module.css';
 import { t as tNow, useT } from '../i18n/index.js';
@@ -303,15 +301,12 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
   const ownAgent = (issue: Issue): AgentRef | undefined => issue.agent ?? (issue.plan ? plans.find((p) => p.id === issue.plan!.id)?.agent : undefined);
   // Nobody picked one: auto route's (fork), as the daemon will pick it when it starts.
   const auto = useAutoAgent();
-  const startsWith = (issue: Issue): string => {
-    const routed = ownAgent(issue) ? undefined : auto(issue);
-    return ownAgent(issue) ? agentName(ownAgent(issue)) : routed ? tr('tasks.start.auto', { model: autoAgentName(routed) }) : tr('tasks.start.yourAgent');
-  };
   const startIt = (issue: Issue, agent: AgentRef | undefined): void => void act(() => api.start(issue.id, { claude: true, ...(agent ? { agent } : {}) }));
   /** Start with ▸ (BLG-506): every agent and model, this start only; "your agent" over its own is yours by name. */
   const startWithMenu = (issue: Issue): ActionItem => {
     const own = ownAgent(issue);
-    return { label: tr('plans.outline.startWith'), icon: 'play', submenu: startWith(own, (a) => startIt(issue, a ?? (own || auto(issue) ? mine : undefined)), ''), onSelect: () => undefined };
+    const routed = auto(issue);
+    return { label: tr('plans.outline.startWith'), icon: 'play', submenu: startWith(own ?? routed, (a) => startIt(issue, a ?? (own || routed ? mine : undefined)), ''), onSelect: () => undefined };
   };
   const sharedWith = useSharedWith();
   /** Your chat with a teammate, the task in the box (BLG-263: you ask, nothing is given to their Claude). */
@@ -356,7 +351,7 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
         : startable
           ? [
               // Its agent is still writing it: starting waits for the brief (BLG-598).
-              { label: tr('plans.details.start'), icon: 'play' as const, hint: issue.drafting ? tr('tasks.menu.onceWritten') : tr('tasks.menu.startHint', { who: startsWith(issue) }), disabled: Boolean(issue.drafting), onSelect: () => startIt(issue, ownAgent(issue)) },
+              { label: tr('plans.details.start'), icon: 'play' as const, hint: issue.drafting ? tr('tasks.menu.onceWritten') : tr('tasks.menu.startHint', { who: startWho(ownAgent(issue), auto(issue)) }), disabled: Boolean(issue.drafting), onSelect: () => startIt(issue, ownAgent(issue)) },
               { ...startWithMenu(issue), disabled: Boolean(issue.drafting) },
               { label: tr('tasks.menu.worktreeOnly'), icon: 'branch' as const, hint: tr('tasks.menu.withoutAgent'), disabled: Boolean(issue.drafting), onSelect: () => void act(() => api.start(issue.id, {})) },
             ]

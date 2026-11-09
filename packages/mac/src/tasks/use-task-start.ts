@@ -1,14 +1,11 @@
 import type { Issue } from '@beluga/core/board/model.js';
 import type { AgentRef } from '@beluga/protocol.js';
-import { agentName } from '@beluga/shared/agent-label.js';
-import { autoAgentName } from '@beluga/shared/auto-route.js';
 import { useStartWith } from '../components/agent-options.js';
 import type { ActionItem } from '../components/SpecMenu.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import { useApp } from '../lib/beluga.js';
 import { useTaskActions } from './use-tasks.js';
-import { useAutoAgent } from './use-auto-agent.js';
-import { t } from '../i18n/index.js';
+import { startWho, useAutoAgent } from './use-auto-agent.js';
 
 /** Who starts a task, and how (see useTaskStart). */
 export interface TaskStart {
@@ -37,6 +34,6 @@ export function useTaskStart(issue: Issue): TaskStart {
     return act(() => api.start(issue.id, { claude: true, ...(who ? { agent: who } : {}) }));
   };
   // "Your agent" picked over a task (or plan) with its own: yours, by name (none would mean its own again).
-  const items = (pick: (agent: AgentRef | undefined) => void): ActionItem[] => startWith(own, (a) => pick(a ?? (own || routed ? mine : undefined)));
-  return { who: own ? agentName(own) : routed ? t('tasks.start.auto', { model: autoAgentName(routed) }) : t('tasks.start.yourAgent'), start, items };
+  const items = (pick: (agent: AgentRef | undefined) => void): ActionItem[] => startWith(own ?? routed, (a) => pick(a ?? (own || routed ? mine : undefined)));
+  return { who: startWho(own, routed), start, items };
 }

@@ -23,12 +23,16 @@ import { openOnMac } from '../../lib/mac';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
 import { agentName } from '../../../../src/shared/agent-label';
+import { autoAgentName } from '../../../../src/shared/auto-route';
 
 /**
  * One task (BLG-48): its goal (code folded), the acceptance criteria with their ticks, the
  * worktree and pull request doing it, and its activity, live. Comment below; start it in a new
  * worktree with Claude, or move it along, from here. Editing the brief stays on the Mac.
  */
+/** Who works it, in a few words: auto route's pick by its model (1.51, fork), else the agent's name. */
+const whoOf = (t: Pick<TaskPageView, 'agent' | 'autoAgent'>): string => (t.agent ? (t.autoAgent ? autoAgentName(t.agent) : agentName(t.agent)) : 'your agent');
+
 export default function Task() {
   const { scrolled, onScroll } = useScrolled();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,7 +58,7 @@ export default function Task() {
     const ws = await store.call<string>(calls.start(t.key, agent), { queue: false }).catch((e: Error) => (store.toast({ text: e.message, tone: 'error' }), undefined));
     setStarting(false);
     if (typeof ws === 'string') {
-      store.toast({ text: `${t.key} started: ${agent ? agent.label : t.agent ? agentName(t.agent) : 'your agent'} is on it`, tone: 'ok' });
+      store.toast({ text: `${t.key} started: ${agent ? agent.label : t.agent ? whoOf(t) : 'your agent'} is on it`, tone: 'ok' });
       router.push(convHref(`conv:ws:${ws}`));
     }
   };
@@ -63,10 +67,10 @@ export default function Task() {
   // in its conversation); else its own agent, or your default.
   const defaultLabel = t?.agents?.groups.find((g) => g.isDefault)?.label;
   // Nobody picked one (1.51, fork): the one auto route gives it, said as such.
-  const agentWords = t?.agent ? `${t.autoAgent ? 'Auto · ' : ''}${agentName(t.agent, { model: true })}` : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
+  const agentWords = t?.agent ? (t.autoAgent ? `Auto · ${autoAgentName(t.agent)}` : agentName(t.agent, { model: true })) : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
   const agentRuntime = t?.agent?.runtime ?? t?.agents?.groups.find((g) => g.isDefault)?.runtime;
   // The main Start is its own agent's (else yours); Start with… lists every agent, from ⋯.
-  const startLabel = t?.agent ? `Start with ${agentName(t.agent)}` : 'Start with your agent';
+  const startLabel = t?.agent ? `Start with ${whoOf(t)}` : 'Start with your agent';
   const canStartWith = Boolean(canStart && t?.agents && agentPicksSupported());
 
   return (
@@ -209,7 +213,7 @@ export default function Task() {
         onClose={() => setMenu(false)}
         title={t ? `${t.key} ${t.title}` : undefined}
         options={[
-          { Icon: Play, label: startLabel, sub: `A new worktree, ${t?.agent ? agentName(t.agent) : 'your agent'} working on it`, tone: 'peach', hidden: !canStart, onPress: () => void start() },
+          { Icon: Play, label: startLabel, sub: `A new worktree, ${t?.agent ? whoOf(t) : 'your agent'} working on it`, tone: 'peach', hidden: !canStart, onPress: () => void start() },
           { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Start with…', sub: 'Another agent or model, for this start only', tone: 'mint', hidden: !canStartWith, onPress: () => setStartWith(true) },
           { Icon: ArrowRightLeft, label: 'Move to…', sub: st ? `Now ${st.label}` : undefined, tone: 'sky', hidden: !t?.moves.length, onPress: () => setMoving(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its brief, proof and history', tone: 'plain', onPress: () => void openOnMac({ topic }) },

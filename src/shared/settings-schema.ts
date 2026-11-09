@@ -130,7 +130,7 @@ export const Settings = z.object({
   defaultAgent: AgentRef.optional(),
   /** A project's own default agent (by project name), over `defaultAgent` for work in that project. */
   projectAgents: z.record(z.string().min(1).max(80), AgentRef).optional(),
-  /** Who works a task nobody picked an agent for (fork: shared/auto-route.ts); unset: on, with its defaults. */
+  /** Who works a task nobody picked an agent for (fork: shared/auto-route.ts); unset: its defaults, on once a local candidate runs here. */
   autoRoute: AutoRoute.optional(),
   /** What new worktrees' branches start with (`beluga/<name>`); empty: no prefix. */
   branchPrefix: z.string().regex(BRANCH_PREFIX_RE).catch(BRANCH_PREFIX_DEFAULT),

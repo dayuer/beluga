@@ -1118,7 +1118,7 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     ...(i.pr ? { pr: { number: i.pr.number, state: i.pr.state, title: clip(plainLine(i.pr.title, 300), 300), checks: i.pr.checks } } : {}),
     moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: STATUS_INFO[s].label })),
     // Who works it (BLG-498), shown only (BLG-569): with a worktree on it, the agent and model running
-    // there (changed in its conversation); else its own (none: your default). The list is for Start with….
+    // there (changed in its conversation); else its own, else auto route's pick (fork, `autoAgent`), else none: your default. The list is for Start with….
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : autoOf(state, i)),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
   };

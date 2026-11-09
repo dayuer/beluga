@@ -11,8 +11,15 @@ import type { AgentRef } from '../protocol.js';
 import type { RuntimeChoice } from './agent-runtimes.js';
 import { modelName } from './agent-label.js';
 
-/** A candidate, as the agent pickers value one: `runtime:model` ('' model: the runtime's default). */
-const CHOICE = /^[a-z][a-z0-9-]{0,19}:[\w.:/@[\]-]{0,120}$/;
+/**
+ * A candidate, as the agent pickers value one: `runtime:model` ('' model: the runtime's default).
+ * A local model is "<endpoint id>/<model>", the model as its endpoint names it (any characters but
+ * spaces), within an AgentRef's 64.
+ */
+const CHOICE = /^[a-z][a-z0-9-]{0,19}:\S{0,64}$/;
+
+/** Most candidates a list keeps. */
+export const MAX_CANDIDATES = 8;
 
 /** The label that marks a task as hard (a project's own label: add it in the project's labels). */
 export const HARD_LABEL = 'hard';
@@ -25,13 +32,13 @@ export const BUILD_DEFAULT: readonly string[] = ['local:bigmodel/glm-5.3[1m]', '
 
 /** Settings › Auto Route, kept in settings.json. Every field unset: its default. */
 export const AutoRoute = z.object({
-  /** Off: tasks without an agent go to your default agent, as before. Unset: on with a local model endpoint (autoRouteOn). */
+  /** Off: tasks without an agent go to your default agent, as before. Unset: on once a local candidate runs here (autoRouteOn). */
   on: z.boolean().optional(),
   hardLabel: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/).optional(),
   /** Urgent and high priority count as hard too. */
   urgentIsHard: z.boolean().optional(),
-  hard: z.array(z.string().regex(CHOICE)).max(8).optional(),
-  build: z.array(z.string().regex(CHOICE)).max(8).optional(),
+  hard: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
+  build: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
 });
 export type AutoRoute = z.infer<typeof AutoRoute>;
 
@@ -44,10 +51,12 @@ export interface Routable {
 }
 
 /**
- * Whether it's on: as you set it; unset, on once this Mac has a local model endpoint (the cheap
- * models it routes to), so a Mac with only Claude works as it always did until you turn it on.
+ * Whether it's on: as you set it; unset, on once one of its local candidates (the models on your
+ * own endpoints it exists for) runs here. A Mac without them, say with only Claude or only Ollama,
+ * works as it always did until you turn it on.
  */
-export const autoRouteOn = (route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[]): boolean => route?.on ?? runtimes.some((r) => r.id === 'local' && r.available);
+export const autoRouteOn = (route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[]): boolean =>
+  route?.on ?? [...tierList('hard', route), ...tierList('build', route)].some((v) => v.startsWith('local:') && candidateRuns(runtimes, v));
 
 /** Which list a task draws from. */
 export function autoTierOf(task: Routable, route: AutoRoute | undefined): AutoTier {
@@ -77,6 +86,12 @@ export function runsHere(runtimes: readonly RuntimeChoice[], runtime: string, mo
   if (!model || runtime === 'claude' || !r.models) return true;
   const m = r.models.find((x) => x.value === model);
   return Boolean(m && !m.why);
+}
+
+/** Whether a candidate value (`runtime:model`) runs here now. */
+export function candidateRuns(runtimes: readonly RuntimeChoice[], value: string): boolean {
+  const c = parseChoice(value);
+  return Boolean(c && runsHere(runtimes, c.runtime, c.model));
 }
 
 /**
