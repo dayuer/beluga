@@ -12,7 +12,7 @@ import { errorText, quietly } from '../network/use-net.js';
 import { Group, Row, Select } from '../dialogs/settings-controls.js';
 import type { KeepAwake } from '@beluga/shared/settings-schema.js';
 import { pathLabel } from '../../../../src/companion/diagnose.js';
-import { leftText, markOf, seenText } from './phone-model.js';
+import { DEFAULT_INVITE_DAYS, INVITE_DAYS, clientInviteArgs, leftText, markOf, seenText } from './phone-model.js';
 import p from '../dialogs/native/person.module.css';
 import s from './phone.module.css';
 import { computerWord, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
@@ -284,6 +284,62 @@ export function Pairing({ now }: { now: number }) {
   );
 }
 
+/**
+ * 邀请客户 (BLG-33): a pairing for a customer's phone, tied to one project and good for a day or
+ * more. It shows the same link and code as Pair a Phone…; what pairs becomes that project's client.
+ */
+export function ClientInvite({ now }: { now: number }) {
+  const { client } = useBeluga();
+  useT();
+  const projects = useApp((st) => st.projects.filter((x) => x.root && !x.error), sameDeep);
+  const pairing = usePairing();
+  const [project, setProject] = useState<string>();
+  const [days, setDays] = useState(DEFAULT_INVITE_DAYS);
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const chosen = project ?? projects[0]?.id;
+  if (pairing) {
+    // An invite is open: its link and code (or "Pair this phone?"); a pairing of your own phone isn't this group's.
+    if (!pairing.project) return <div className={s.dim}>{t('phone.invite.busy')}</div>;
+    const name = projects.find((x) => x.id === pairing.project)?.name ?? pairing.project;
+    return (
+      <>
+        <div className={s.dim}>{t('phone.invite.for', { project: name })}</div>
+        <Pairing now={now} />
+      </>
+    );
+  }
+  if (!projects.length) return <div className={s.dim}>{t('phone.invite.none')}</div>;
+  const start = async (): Promise<void> => {
+    if (!chosen) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await quietly(client, client.api.companion['pair.start'](clientInviteArgs(chosen, days)));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Row label={t('phone.invite.project')} detail={t('phone.invite.projectDetail')}>
+        <Select label={t('phone.invite.project')} value={chosen ?? ''} onChange={setProject} options={projects.map((x) => ({ value: x.id, label: x.name }))} />
+      </Row>
+      <Row label={t('phone.invite.valid')} detail={t('phone.invite.validDetail')}>
+        <Select label={t('phone.invite.valid')} value={String(days)} onChange={(v) => setDays(Number(v))} options={INVITE_DAYS.map((d) => ({ value: String(d), label: t('phone.invite.days', { n: d }) }))} />
+      </Row>
+      <div className={s.pairRow}>
+        {error ? <div className={s.error}>{error}</div> : null}
+        <Button variant="primary" disabled={busy || !chosen} aria-busy={busy || undefined} onClick={() => void start()}>
+          {t('phone.invite.button')}
+        </Button>
+      </div>
+    </>
+  );
+}
+
 /** The popover's line about the relay, only when it isn't ready (that's the news). */
 function RelayLine() {
   const relay = useRelay();
@@ -429,8 +485,11 @@ export function PhoneSettings() {
         <Row label={t('phone.settings.app')} detail={t('phone.settings.appDetail', { computer: yourComputer() })}>
           <span />
         </Row>
+        <div className={s.inSettings}>{usePairing()?.project ? null : <Pairing now={now} />}</div>
+      </Group>
+      <Group title={t('phone.invite.title')}>
         <div className={s.inSettings}>
-          <Pairing now={now} />
+          <ClientInvite now={now} />
         </div>
       </Group>
     </>

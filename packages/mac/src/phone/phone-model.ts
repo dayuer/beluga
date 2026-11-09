@@ -69,3 +69,13 @@ export function touchCaption(touch: PhoneTouchData): string {
       return t('phone.model.opened', { what: touch.what ?? t('phone.model.anApp') });
   }
 }
+
+/** How long a client invite may last, in days (the daemon's default is 1, its most 7). */
+export const INVITE_DAYS = [1, 2, 3, 7] as const;
+export const DEFAULT_INVITE_DAYS = 1;
+
+/** The arguments of `companion.pair.start` for a customer's invite to one project. */
+export function clientInviteArgs(project: string, days: number = DEFAULT_INVITE_DAYS): { project: string; ttlMs: number } {
+  const d = Math.min(Math.max(Math.round(days) || DEFAULT_INVITE_DAYS, 1), 7);
+  return { project, ttlMs: d * 24 * 3600_000 };
+}
