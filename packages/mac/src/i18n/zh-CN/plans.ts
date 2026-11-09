@@ -271,6 +271,8 @@ export const plans: Translation<typeof en> = {
   'plans.page.answerInWorktree': '在它的工作树里回答',
   'plans.page.pause': '暂停',
   'plans.page.runAtOnce': '同时运行',
+  'plans.page.agentForChecks': '验收用的 Agent',
+  'plans.page.sameAsWork': '与干活的相同',
   'plans.page.agentForWork': '执行工作的 Agent',
   'plans.page.whenToRunTests': '何时跑测试',
   'plans.page.approveWithoutWaiting': '不等了，直接批准',

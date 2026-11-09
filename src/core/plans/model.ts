@@ -307,6 +307,8 @@ export interface Plan {
   readonly testsAt: TestsAt;
   /** The agent (and model) its milestones and tasks are worked on by (BLG-497); none: your default. A task's own agent beats it. */
   readonly agent?: AgentRef;
+  /** The agent its milestone checkers and draft reviews run on: a stronger model than the work's; none: `agent`'s. */
+  readonly checkAgent?: AgentRef;
   readonly paused: boolean;
   readonly runs: Readonly<Record<string, MilestoneRun>>;
   /** Tasks whose start is being combined from several branches (by plan task id). */
@@ -495,6 +497,9 @@ export function planTaskOfIssue(state: PlansState, issueId: string): { readonly 
   }
   return undefined;
 }
+
+/** Who checks a plan's milestones and reviews its drafts: its check agent, else its work agent, else your default. */
+export const checkerAgentOf = (plan: Pick<Plan, 'agent' | 'checkAgent'>): AgentRef | undefined => plan.checkAgent ?? plan.agent;
 
 /** A milestone's own autonomy, else its plan's. */
 export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => milestone?.autonomy ?? plan.autonomy;

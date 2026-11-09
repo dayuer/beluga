@@ -423,6 +423,7 @@ export const PHONE: Record<Method, Side> = {
   'plans.setTestsAt': 'mac',
   // Who works the plan's milestones and tasks from here on (BLG-498): a pick from a list.
   'plans.setWorkAgent': 'phone',
+  'plans.setCheckAgent': 'phone',
   'plans.tidyUp': 'mac',
   'plans.pass': 'phone',
   'plans.recheck': 'phone',

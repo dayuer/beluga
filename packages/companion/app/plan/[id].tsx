@@ -48,6 +48,7 @@ export default function Plan() {
   const [menu, setMenu] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [pickingCheck, setPickingCheck] = useState(false);
   // Who works its milestones and tasks (1.35, BLG-498): its own pick, else your default; changed from ⋯.
   const defaultGroup = p?.agents?.groups.find((g) => g.isDefault);
   const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
@@ -55,6 +56,14 @@ export default function Plan() {
   const setAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanAgent(id ?? '', agent, label)).then(
       (said) => store.toast({ text: typeof said === 'string' ? said : `${label} works this plan`, tone: 'ok' }),
+      (e: Error) => store.toast({ text: e.message, tone: 'error' }),
+    );
+  };
+  // Who checks its milestones and reviews its drafts (1.48): its own pick, else the agent for its work.
+  const checkWords = p?.checkAgent ? agentName(p.checkAgent, { model: true }) : 'Same as its work';
+  const setCheckAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
+    void store.call<string>(calls.setPlanCheckAgent(id ?? '', agent, label)).then(
+      (said) => store.toast({ text: typeof said === 'string' ? said : `${label} checks this plan`, tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
@@ -90,6 +99,7 @@ export default function Plan() {
         title={p?.title}
         options={[
           { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Agent for its work', sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
+          { Icon: markIcon(runtimeMark(p?.checkAgent?.runtime ?? agentRuntime)), label: 'Agent for its checks', sub: checkWords, tone: 'lavender', hidden: !p?.agents || !store.supports('checkAgent'), onPress: () => setPickingCheck(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
@@ -101,6 +111,15 @@ export default function Plan() {
         onClose={() => setPicking(false)}
         yours={{ on: !p?.agent, onPick: () => setAgent(null, 'Your agent') }}
         onPick={(g, value, label) => setAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
+      />
+      <AgentChoiceSheet
+        title="Agent for its checks"
+        caption="Checks its milestones and reviews its drafts: a stronger model than the work's, say"
+        picker={p?.agents}
+        visible={pickingCheck}
+        onClose={() => setPickingCheck(false)}
+        yours={{ on: !p?.checkAgent, onPick: () => setCheckAgent(null, 'Same as its work'), label: 'Same as its work', caption: `Whoever works it checks it too (${agentWords})` }}
+        onPick={(g, value, label) => setCheckAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
       />
       <Options
         visible={howOpen}

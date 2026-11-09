@@ -92,6 +92,7 @@ const SavedPlan = z
     testsAt: z.enum(TESTS_AT).catch('milestone'),
     // Who works it (BLG-497): one that doesn't read is let go (your default works it).
     agent: AgentRef.optional().catch(undefined),
+    checkAgent: AgentRef.optional().catch(undefined),
     body: Body.optional().catch(undefined),
     draft: Body.optional().catch(undefined),
     paused: z.boolean().default(false),
@@ -271,10 +272,17 @@ export class Plans {
    */
   setWorkAgent(id: string, agent: AgentRef | undefined, by: Actor): Plan {
     const plan = this.need(id);
-    const was = plan.agent;
-    if (was?.runtime === agent?.runtime && was?.model === agent?.model && was?.label === agent?.label) return plan;
+    if (sameAgent(plan.agent, agent)) return plan;
     const text = agent ? `gave its work to ${agentName(agent, { model: true })} from here on` : 'gave its work to the default agent from here on';
-    return this.change(plan, { agent: agent ? { runtime: agent.runtime, label: agent.label, ...(agent.model ? { model: agent.model } : {}) } : undefined }, [event(by, 'note', text, this.now())]);
+    return this.change(plan, { agent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
+  }
+
+  /** The agent its milestone checkers and draft reviews run on from here on; undefined: the work's agent. */
+  setCheckAgent(id: string, agent: AgentRef | undefined, by: Actor): Plan {
+    const plan = this.need(id);
+    if (sameAgent(plan.checkAgent, agent)) return plan;
+    const text = agent ? `gave its checks to ${agentName(agent, { model: true })} from here on` : 'gave its checks back to the agent for its work';
+    return this.change(plan, { checkAgent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
   }
 
   /** The head Claude was asked to check a milestone (a new round of checking). */
@@ -542,5 +550,8 @@ function milestoneName(plan: Plan, id: string): string {
   const m = (plan.body ?? plan.draft)?.milestones.find((x) => x.id === id);
   return m ? `“${m.title}”` : 'a milestone';
 }
+
+const sameAgent = (a: AgentRef | undefined, b: AgentRef | undefined): boolean => a?.runtime === b?.runtime && a?.model === b?.model && a?.label === b?.label;
+const agentOnly = (a: AgentRef): AgentRef => ({ runtime: a.runtime, label: a.label, ...(a.model ? { model: a.model } : {}) });
 
 const sameActor = (a: Actor, b: Actor): boolean => a.kind === b.kind && (a.kind === 'person' ? a.id === (b as typeof a).id : a.kind === 'claude' ? a.owner === (b as typeof a).owner : true);

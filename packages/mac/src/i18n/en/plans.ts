@@ -276,6 +276,8 @@ export const plans = {
   'plans.page.answerInWorktree': 'Answer in Its Worktree',
   'plans.page.pause': 'Pause',
   'plans.page.runAtOnce': 'Run at Once',
+  'plans.page.agentForChecks': 'Agent for Its Checks',
+  'plans.page.sameAsWork': 'Same as Its Work',
   'plans.page.agentForWork': 'Agent for Its Work',
   'plans.page.whenToRunTests': 'When to Run Tests',
   'plans.page.approveWithoutWaiting': 'Approve Without Waiting',

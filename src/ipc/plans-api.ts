@@ -64,6 +64,8 @@ export const PLANS_API = {
   // Who works the plan's milestones and tasks from here on (BLG-498): an agent, or null for your default.
   // Milestones and tasks already at work keep theirs → what happened, in words.
   'plans.setWorkAgent': { args: z.tuple([id, AgentRef.nullish()]) },
+  // Who checks its milestones and reviews its drafts from here on: an agent, or null for the agent for its work → in words.
+  'plans.setCheckAgent': { args: z.tuple([id, AgentRef.nullish()]) },
   'plans.tidyUp': { args: z.tuple([id, z.boolean()]) },
   // Pass a milestone (the next one opens), or send it back to the head Claude with what's missing.
   'plans.pass': { args: z.tuple([id, ref]) },
