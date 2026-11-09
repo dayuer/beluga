@@ -1708,6 +1708,8 @@ export interface DeviceView {
   readonly path?: LinkPath;
   /** That in words, when it's worth saying ("couldn't connect directly on its network; it used the relay"). */
   readonly note?: string;
+  /** A customer's phone: the one project it may see (absent for your own devices). */
+  readonly client?: { readonly project: string };
   /** Claude using it (BLG-150): what you allow on the Mac, what the phone allows, and how it's reached now (the host fills this in; an older slice won't have it). */
   readonly control?: PhoneControlView;
 }
@@ -1774,5 +1776,5 @@ export interface CableView {
 
 export interface CompanionSlice {
   /** `relay`: how phones on other networks reach this Mac now (reach.ts), for Settings › Phone (BLG-126). */
-  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
+  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly project?: string; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
 }

@@ -17,7 +17,7 @@ import { type DeviceBook, type DeviceRecord, deviceId } from './devices.js';
 import { type DocumentBytes, FileServer, RefTable, type Thumbnailer } from './files.js';
 import { ProjectIcons, type SmallIcon } from './icons.js';
 import type { MergeBook } from './merge.js';
-import { DevicePairing, type PairingInfo } from './pair.js';
+import { DevicePairing, type PairStartOptions, type PairingInfo } from './pair.js';
 import { Uploads } from './uploads.js';
 import { type MacVoice, sharedVoice } from '../core/voice.js';
 import type { VoiceModelId } from '../shared/voice-models.js';
@@ -644,9 +644,9 @@ export class CompanionHost {
 
   // ---- the API (companion-handlers.ts)
 
-  pairStart(): Promise<PairingInfo> {
+  pairStart(opts?: PairStartOptions): Promise<PairingInfo> {
     const why = this.opts.cannotPair?.();
-    return why ? Promise.reject(new Error(why)) : this.pairing.start();
+    return why ? Promise.reject(new Error(why)) : this.pairing.start(opts);
   }
 
   /** Pair the phone on the USB cable (BLG-190): a pairing opens here and on the phone, the four pictures as ever. */

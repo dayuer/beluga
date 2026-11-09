@@ -34,7 +34,7 @@ const phoneDraft = z
 
 export const COMPANION_API = {
   // Open a one-time pairing (10 minutes, one phone): → { link, code, expiresAt }. Starting another replaces it.
-  'companion.pair.start': { args: z.tuple([]) },
+  'companion.pair.start': { args: z.tuple([z.object({ project: z.string().min(1).max(200).optional(), ttlMs: z.number().int().min(60_000).optional() }).optional()]) },
   // Pair the phone that's waiting (its name and fingerprint are in companion.pairing.waiting).
   'companion.pair.approve': { args: z.tuple([]) },
   // Close the pairing (a waiting phone is told no).
