@@ -34,6 +34,9 @@ import { expectClaude, launchFlight } from './flight.js';
 import { type WorktreeChoice, WorktreeDraft } from './WorktreeDraft.js';
 import { sendSteerNow, stopClaude } from '../lib/commands.js';
 import { useAttachments } from './use-attachments.js';
+import { CommentCards } from './CommentCards.js';
+import { useWaitingComments } from '../views/DiffComment.js';
+import { takeComments, withComments } from '../views/diff-comments.js';
 import { MentionHighlighter } from './MentionHighlighter.js';
 import { useSuggestions } from './Suggestions.js';
 import { useMentionWorld, worktreeOf } from './Mention.js';
@@ -203,6 +206,9 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
   // Images pasted, dropped or named by their path wait as thumbnails above the text, with an
   // "[image N]" where they go; other pasted files as chips (see use-attachments). They wait with
   // the words, so a new chat or worktree page keeps its own too.
+  // Comments on the changes waiting above the box (CommentCards): enough to send on their own.
+  const commentsWaiting = useWaitingComments(draftKey).length > 0;
+  const ready = !!buffer.trim() || commentsWaiting;
   const att = useAttachments({ channel: draftKey, box: ref, text: () => ui.get().buffer, setText: (buffer, cursor) => ui.patch({ buffer, cursor }) });
   // A plan or a question waiting above the box: what you type answers it (the turn is waiting on you, not working).
   const answering = state.answering;
@@ -459,7 +465,14 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     }
     secretWarned.current = undefined;
     // Images stay where you referenced them in the words; any you took the reference out of go after them.
-    const { text, images, shown, putBack } = att.take(typed);
+    const { text: words, images, shown, putBack: putFilesBack } = att.take(typed);
+    // Comments on the changes waiting above the box go after the words (views/diff-comments.ts).
+    const notes = typed.startsWith('/') ? undefined : takeComments(draftKey);
+    const text = withComments(words, notes?.comments ?? []);
+    const putBack = (): void => {
+      putFilesBack();
+      notes?.putBack();
+    };
     if (!text && !(draftProject && worktree.name.trim())) {
       if (draftProject) toast(client, t('chat.composer.describeOrName'), 'info');
       return;
@@ -653,6 +666,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           </div>
         ) : null}
         {att.waiting}
+        <CommentCards box={draftKey} />
         <MentionedTasks text={buffer} world={mentionWorld} />
         <DictationStrip box={ref} />
         <div className={s.inputWrap}>
@@ -741,7 +755,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
             </Tip>
           ) : answering ? (
             <Tip label={answerSend(answering, agentHere).tip} keys={sendKeys}>
-              <button type="button" className={cx(s.split, s.answer, buffer.trim() && s.splitReady)} onClick={() => send(false)} disabled={!buffer.trim()}>
+              <button type="button" className={cx(s.split, s.answer, ready && s.splitReady)} onClick={() => send(false)} disabled={!ready}>
                 <Icon name="send" size={12} />
                 <span className={s.chipLabel}>{answerSend(answering, agentHere).label}</span>
               </button>
@@ -749,20 +763,20 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           ) : queueing ? (
             <div className={cx(s.split, buffer.trim() && s.splitReady)} role="group" aria-label={t('chat.composer.working', { agent: agentHere })}>
               <Tip label={actionTip(mainAction)} keys={sendKeys}>
-                <button type="button" className={s.splitMain} aria-label={actionLabel(mainAction)} onClick={() => send(false)} disabled={!buffer.trim()}>
+                <button type="button" className={s.splitMain} aria-label={actionLabel(mainAction)} onClick={() => send(false)} disabled={!ready}>
                   <Icon name={mainAction === 'steer' ? 'send' : 'clock'} size={12} />
                   <span className={s.chipLabel}>{actionLabel(mainAction)}</span>
                 </button>
               </Tip>
               {canSteer ? <Tip label={actionTip(otherAction)} keys={shortcutKeys('composer-steer')}>
-                <button type="button" className={s.splitAlt} onClick={() => send(true)} disabled={!buffer.trim()}>
+                <button type="button" className={s.splitAlt} onClick={() => send(true)} disabled={!ready}>
                   {actionLabel(otherAction)}
                 </button>
               </Tip> : null}
             </div>
           ) : (
             <Tip label={prefs.sendWith === 'enter' ? t('chat.composer.sendTipEnter', { key: returnName() }) : t('chat.composer.sendTipCmd', { keys: cmdReturn() })} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
-              <button type="button" className={cx(s.send, buffer.trim() && s.sendReady)} onClick={() => send(false)} aria-label={t('chat.composer.send')} disabled={!buffer.trim()}>
+              <button type="button" className={cx(s.send, ready && s.sendReady)} onClick={() => send(false)} aria-label={t('chat.composer.send')} disabled={!ready}>
                 <Icon name="send" size={14} />
               </button>
             </Tip>

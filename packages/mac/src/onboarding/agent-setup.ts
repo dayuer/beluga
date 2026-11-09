@@ -14,6 +14,7 @@ import { runtimeLabel, shownRuntimes } from '../lib/prefs-words.js';
 export const INSTALLS: Readonly<Record<string, { readonly page: string; readonly command: string }>> = {
   codex: { page: 'https://developers.openai.com/codex', command: 'npm i -g @openai/codex' },
   opencode: { page: 'https://opencode.ai/download', command: 'npm i -g opencode-ai' },
+  copilot: { page: 'https://github.com/features/copilot/cli', command: 'npm i -g @github/copilot' },
 };
 
 /** Codex's own install: the app, or its CLI from npm. */
@@ -49,7 +50,7 @@ export const FIX_LABEL: Readonly<Record<AgentFix, string>> = {
   get set_up() { return t('onboarding.agents.fix.set_up'); },
 };
 
-/** A row's button: "Sign In", "Get Codex", "Get OpenCode", "Set Up…". */
+/** A row's button: "Sign In", "Get Codex", "Get OpenCode", "Get Copilot", "Set Up…". */
 export const fixLabel = (row: Pick<AgentRow, 'id' | 'label' | 'fix'>): string => (row.fix === 'install' ? t('onboarding.agents.get', { name: runtimeLabel(row.id, row.label) }) : row.fix ? FIX_LABEL[row.fix] : '');
 
 /** Where a runtime stands: what it said once asked, else ready when it runs here; undefined: not asked yet. */
@@ -74,6 +75,11 @@ const DETAIL: Readonly<Record<string, Partial<Record<RuntimeState, string>> & { 
     get ready() { return t('onboarding.agents.opencode.ready'); },
     get signed_out() { return t('onboarding.agents.opencode.signed_out'); },
     get missing() { return t('onboarding.agents.opencode.missing'); },
+  },
+  copilot: {
+    get ready() { return t('onboarding.agents.copilot.ready'); },
+    get signed_out() { return t('onboarding.agents.copilot.signed_out'); },
+    get missing() { return t('onboarding.agents.copilot.missing'); },
   },
   local: {
     get ready() { return t('onboarding.agents.local.ready', { computer: thisComputer() }); },

@@ -77,6 +77,9 @@ export const misc = {
   'onboarding.agents.opencode.ready': 'The open-source coding agent, on the models you set up in it (its free ones too).',
   'onboarding.agents.opencode.signed_out': 'Installed. Add a model provider once (opencode auth login).',
   'onboarding.agents.opencode.missing': 'Install OpenCode, or in Terminal:',
+  'onboarding.agents.copilot.ready': 'GitHub’s coding agent, through Copilot CLI. Copilot Free works, on Auto.',
+  'onboarding.agents.copilot.signed_out': 'Installed. Sign in once with your GitHub account (copilot login), and turn on Copilot for it (Free is enough).',
+  'onboarding.agents.copilot.missing': 'Install GitHub Copilot CLI, or in Terminal:',
   'onboarding.agents.local.ready': 'A model of your own: Ollama on {computer}, or an endpoint you added. Free.',
   'onboarding.agents.local.no_endpoint': 'Ollama on {computer}, or any endpoint you add. Free, on your own models.',
   // onboarding/AgentsStep.tsx

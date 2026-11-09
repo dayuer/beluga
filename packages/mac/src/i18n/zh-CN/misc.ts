@@ -78,6 +78,9 @@ export const misc: Translation<typeof en> = {
   'onboarding.agents.opencode.ready': '开源编程 Agent，使用你在其中设置的模型（包括免费模型）。',
   'onboarding.agents.opencode.signed_out': '已安装。添加一次模型提供方即可（opencode auth login）。',
   'onboarding.agents.opencode.missing': '安装 OpenCode，或在终端中运行：',
+  'onboarding.agents.copilot.ready': 'GitHub 的编程 agent，通过 Copilot CLI 运行。Copilot Free 也能用，选 Auto。',
+  'onboarding.agents.copilot.signed_out': '已安装。用 GitHub 账号登录一次（copilot login），并为它开启 Copilot（Free 就够）。',
+  'onboarding.agents.copilot.missing': '安装 GitHub Copilot CLI，或在终端中运行：',
   'onboarding.agents.local.ready': '你自己的模型：这台电脑上的 Ollama，或你添加的端点。免费。',
   'onboarding.agents.local.no_endpoint': '这台电脑上的 Ollama，或你添加的任意端点。免费，用你自己的模型。',
   // onboarding/AgentsStep.tsx
