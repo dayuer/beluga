@@ -11,7 +11,7 @@ import { SourceSchema, ViewQuerySchema } from '../shared/view-spec.js';
  * conversation). Which of these a phone may call is in src/companion/coverage.ts. Browser-safe: zod only.
  */
 
-const topic = z.string().regex(/^(conv|chat):[\w:.-]{1,200}$/);
+const topic = z.string().regex(/^(conv|chat|client):[\w:.-]{1,200}$/);
 const files = z.array(UploadRef).max(MAX_UPLOADS);
 /** A worktree's conversation. */
 const wsTopic = z.string().regex(/^conv:ws:[\w.-]{1,200}$/);

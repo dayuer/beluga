@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { clientConv, clientHome, clientOlder } from '../src/companion/client-view.js';
 import { FileServer, RefTable } from '../src/companion/files.js';
-import { ChatsView, ChatView, ConvView, DashboardView, HomeView, PeopleView, PlansView, PlanView, SentinelPageView, SentinelsView, TaskPageView, TasksView, type Topic, WidgetsView, WorkView, viewSchema } from '../src/companion/protocol.js';
+import { ChatsView, ChatView, ClientConvView, ClientHomeView, ConvView, DashboardView, HomeView, PeopleView, PlansView, PlanView, SentinelPageView, SentinelsView, TaskPageView, TasksView, type Topic, WidgetsView, WorkView, viewSchema } from '../src/companion/protocol.js';
 import { type ViewContext, convTurns, homeView, needsYou, sentinelDone, viewOf } from '../src/companion/views.js';
 import { NO_SENTINEL, type Sentinel, type SentinelState } from '../src/core/sentinel/model.js';
 import { type Action, type DomainState, Store, initialState } from '../src/core/store.js';
@@ -367,6 +368,21 @@ describe('the views of a known Mac', () => {
       ['local', false],
     ]);
     expect(w1.agent?.groups[1]?.why).toMatch(/Codex/);
+  });
+
+  it('a customer sees its project as words, with no code, steps or other projects', () => {
+    const home = ClientHomeView.parse(clientHome(state, ctx, 'p1'));
+    expect(home.project).toEqual({ id: 'p1', name: 'landing' });
+    expect(home.conversations.map((c) => c.topic).sort()).toEqual(['client:w1', 'client:w2']);
+    expect(clientHome(state, ctx, 'nope')).toBeUndefined();
+    const conv = ClientConvView.parse(clientConv(state, ctx, 'p1', 'client:w1'));
+    const answer = conv.turns.find((t) => t.who === 'claude')!;
+    expect(answer.text).toBe('Add a middleware:\n\n\n\nThen protect `/api/payments`.');
+    expect(JSON.stringify(conv)).not.toMatch(/requireUser|\[\[code|steps|trail|subagents/);
+    // Not another project's, not the Mac's own conversation topic.
+    expect(clientConv(state, ctx, 'other', 'client:w1')).toBeUndefined();
+    expect(clientConv(state, ctx, 'p1', 'conv:ws:w1')).toBeUndefined();
+    expect(() => clientOlder(state, ctx, 'other', 'client:w1', 'x')).toThrow();
   });
 
   it('a conversation: code folded, steps in words, sub-agents with their outputs', () => {

@@ -17,6 +17,7 @@ import { type DeviceBook, type DeviceRecord, deviceId } from './devices.js';
 import { type DocumentBytes, FileServer, RefTable, type Thumbnailer } from './files.js';
 import { ProjectIcons, type SmallIcon } from './icons.js';
 import type { MergeBook } from './merge.js';
+import { clientConv, clientHome, clientOlder } from './client-view.js';
 import { CLIENT_BLOCKED_FRAMES, clientRefusal, topicInProject } from './client-scope.js';
 import { DevicePairing, type PairStartOptions, type PairingInfo } from './pair.js';
 import { Uploads } from './uploads.js';
@@ -369,7 +370,7 @@ class PhoneLink implements PhoneLinkHandle {
       this.hello = frame;
       const state = this.host.state();
       const relay = this.host.relayUrl();
-      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}) });
+      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}), ...(this.device.client ? { client: { project: this.device.client.project, name: (state.projects.find((p) => p.id === this.device.client!.project)?.name ?? '').slice(0, 200) } } : {}) });
       this.host.helloed(this, frame.app, frame.via);
       this.subscribe(frame.topics);
       this.host.tellComputers(this);
@@ -486,7 +487,7 @@ class PhoneLink implements PhoneLinkHandle {
   }
 
   private sendView(topic: Topic, st: TopicState): void {
-    const data = this.host.render(topic);
+    const data = this.host.render(topic, this.device.client?.project);
     if (data === undefined) return;
     const json = JSON.stringify(data);
     const hash = createHash('sha256').update(json).digest('base64');
@@ -921,6 +922,14 @@ export class CompanionHost {
       // A customer's phone: its own, much shorter list, and only its project (client-scope.ts).
       const why = clientRefusal(this.state(), project, method, args);
       if (why) return { ok: false, error: why };
+      if (method === 'companion.older') {
+        try {
+          const page = args[1] as { before: string; limit?: number };
+          return { ok: true, value: clientOlder(this.state(), this.ctx, project, String(args[0]), page.before, page.limit) };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      }
     } else if (!phoneMay(method)) return { ok: false, error: `${method} is only on your Mac` };
     // A conversation asked from the phone: tell it when its answer is done.
     if (method === 'session.submit') {
@@ -945,9 +954,9 @@ export class CompanionHost {
     };
   }
 
-  render(topic: Topic): unknown {
+  render(topic: Topic, project?: string): unknown {
     const state = this.state();
-    let data = viewOf(state, this.ctx, topic);
+    let data = project !== undefined ? (topic === 'client' ? clientHome(state, this.ctx, project) : clientConv(state, this.ctx, project, topic)) : viewOf(state, this.ctx, topic);
     // A view must fit in a frame: a long conversation sends fewer turns (the rest: companion.older).
     let size = data === undefined ? 0 : Buffer.byteLength(JSON.stringify(data));
     while (size > MAX_COMPANION_FRAME - 4096 && data && typeof data === 'object' && 'turns' in data) {

@@ -23,7 +23,11 @@ export const projectWorkspaces = (state: DomainState, project: string): Readonly
 export const channelInProject = (state: DomainState, project: string, channel: unknown): boolean => typeof channel === 'string' && channel.startsWith('ws:') && projectWorkspaces(state, project).has(channel.slice(3));
 
 /** A `conv:` topic of the project's. */
-export const topicInProject = (state: DomainState, project: string, topic: string): boolean => topic.startsWith('conv:') && channelInProject(state, project, topic.slice(5));
+export const topicInProject = (state: DomainState, project: string, topic: string): boolean => {
+  // A client sees its own two topics: `client` and `client:<workspace id>`. The Mac's `conv:` views carry code, steps and files, so it never gets those.
+  if (topic === 'client') return true;
+  return topic.startsWith('client:') && channelInProject(state, project, `ws:${topic.slice('client:'.length)}`);
+};
 
 /** Why a client's call is refused, or undefined when it may go ahead. */
 export function clientRefusal(state: DomainState, project: string, method: string, args: readonly unknown[]): string | undefined {
@@ -41,7 +45,7 @@ export function clientRefusal(state: DomainState, project: string, method: strin
       channel = state.questions.find((q) => q.qid === args[0])?.channel;
       break;
     case 'companion.older':
-      return typeof args[0] === 'string' && topicInProject(state, project, args[0]) ? undefined : 'That conversation isn’t yours';
+      return typeof args[0] === 'string' && args[0].startsWith('client:') && topicInProject(state, project, args[0]) ? undefined : 'That conversation isn’t yours';
   }
   return channelInProject(state, project, channel) ? undefined : 'That isn’t in your project';
 }

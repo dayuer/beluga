@@ -29,7 +29,7 @@ describe('what a client may call', () => {
     expect(refuse('host.answerApproval', ['once', 'a1'])).toBeUndefined();
     expect(refuse('questions.answer', ['q1', {}])).toBeUndefined();
     expect(refuse('questions.pick', ['q1', 'x', 'y'])).toBeUndefined();
-    expect(refuse('companion.older', ['conv:ws:w1', { before: 'm' }])).toBeUndefined();
+    expect(refuse('companion.older', ['client:w1', { before: 'm' }])).toBeUndefined();
   });
 
   it('refuses every method off its list, including what your own phone may do', () => {
@@ -52,12 +52,15 @@ describe('what a client may call', () => {
     expect(refuse('host.answerApproval', ['once', 'missing'])).toBeDefined();
     expect(refuse('questions.answer', ['q2', {}])).toBeDefined();
     expect(refuse('questions.pick', ['nope', 'x', 'y'])).toBeDefined();
-    expect(refuse('companion.older', ['conv:ws:w2', { before: 'm' }])).toBeDefined();
+    expect(refuse('companion.older', ['client:w2', { before: 'm' }])).toBeDefined();
+    expect(refuse('companion.older', ['conv:ws:w1', { before: 'm' }])).toBeDefined();
     expect(refuse('companion.older', ['home', { before: 'm' }])).toBeDefined();
   });
 
   it('only subscribes it to its own project’s conversations', () => {
-    expect(topicInProject(state, 'shop', 'conv:ws:w1')).toBe(true);
-    for (const t of ['conv:ws:w2', 'conv:room', 'home', 'work', 'plans', 'tasks', 'chat:dm:x', 'conv:mac:assistant']) expect(topicInProject(state, 'shop', t)).toBe(false);
+    expect(topicInProject(state, 'shop', 'client')).toBe(true);
+    expect(topicInProject(state, 'shop', 'client:w1')).toBe(true);
+    // The Mac's views carry code, steps and files: a client never gets them, even for its own worktree.
+    for (const t of ['conv:ws:w1', 'client:w2', 'client:old', 'conv:ws:w2', 'conv:room', 'home', 'work', 'plans', 'tasks', 'chat:dm:x', 'conv:mac:assistant']) expect(topicInProject(state, 'shop', t)).toBe(false);
   });
 });
