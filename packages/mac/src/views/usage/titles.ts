@@ -1,6 +1,7 @@
 import type { Totals } from '@beluga/shared/stats.js';
 import type { IconName } from '../../components/Icon.js';
 import { compact, formatCost } from './usage-model.js';
+import { type Key, t } from '../../i18n/index.js';
 
 /**
  * Titles you earn from your stats (the Usage tab's card and recap): playful, but each with a plain
@@ -31,7 +32,6 @@ const sumHours = (hours: readonly number[], pick: (day: number, hour: number) =>
 
 interface Rule {
   readonly id: string;
-  readonly name: string;
   readonly icon: IconName;
   readonly color: string;
   /** How far past the bar (≥ 1 earns it), and why. */
@@ -40,17 +40,17 @@ interface Rule {
 
 const share = (part: number, whole: number): number => (whole ? part / whole : 0);
 const pct = (f: number): string => `${Math.round(f * 100)}%`;
+const why = (id: string, vars: Record<string, string | number>): string => t(`views.titles.${id}Why` as Key, vars);
 
 const RULES: readonly Rule[] = [
-  { id: 'code-god', name: 'Code God', icon: 'bolt', color: '#8c7bf0', test: (x) => ({ score: (x.all.linesAdded + x.all.linesRemoved) / 10_000, why: `${compact(x.all.linesAdded + x.all.linesRemoved)} lines shipped in merged PRs` }) },
-  { id: 'merge-machine', name: 'Merge Machine', icon: 'merge', color: '#b294f0', test: (x) => ({ score: x.all.prsMerged / 25, why: `${x.all.prsMerged} pull requests merged` }) },
-  { id: 'talkative', name: 'Talkative', icon: 'send', color: '#6ea8f5', test: (x) => ({ score: x.all.prompts / 1000, why: `${x.all.prompts.toLocaleString()} prompts sent` }) },
-  { id: 'novelist', name: 'The Novelist', icon: 'book', color: '#5fb3d9', test: (x) => ({ score: share(x.all.chars, x.all.prompts) / 450, why: `${Math.round(share(x.all.chars, x.all.prompts))} characters a prompt` }) },
-  { id: 'paste-wizard', name: 'Copy-Paste Wizard', icon: 'clip', color: '#f2b84b', test: (x) => ({ score: x.all.pasted / 250_000, why: `${compact(x.all.pasted)} characters pasted` }) },
-  { id: 'voice', name: 'Voice Commander', icon: 'mic', color: '#ef8fb4', test: (x) => ({ score: x.all.dictationMs / HOUR, why: `${Math.round(x.all.dictationMs / 60_000)} minutes dictated` }) },
+  { id: 'code-god', icon: 'bolt', color: '#8c7bf0', test: (x) => ({ score: (x.all.linesAdded + x.all.linesRemoved) / 10_000, why: why('code-god', { n: compact(x.all.linesAdded + x.all.linesRemoved) }) }) },
+  { id: 'merge-machine', icon: 'merge', color: '#b294f0', test: (x) => ({ score: x.all.prsMerged / 25, why: why('merge-machine', { n: x.all.prsMerged }) }) },
+  { id: 'talkative', icon: 'send', color: '#6ea8f5', test: (x) => ({ score: x.all.prompts / 1000, why: why('talkative', { n: x.all.prompts.toLocaleString() }) }) },
+  { id: 'novelist', icon: 'book', color: '#5fb3d9', test: (x) => ({ score: share(x.all.chars, x.all.prompts) / 450, why: why('novelist', { n: Math.round(share(x.all.chars, x.all.prompts)) }) }) },
+  { id: 'paste-wizard', icon: 'clip', color: '#f2b84b', test: (x) => ({ score: x.all.pasted / 250_000, why: why('paste-wizard', { n: compact(x.all.pasted) }) }) },
+  { id: 'voice', icon: 'mic', color: '#ef8fb4', test: (x) => ({ score: x.all.dictationMs / HOUR, why: why('voice', { n: Math.round(x.all.dictationMs / 60_000) }) }) },
   {
     id: 'night-owl',
-    name: 'Night Owl',
     icon: 'eye',
     color: '#7d86e8',
     test: (x) => {
@@ -58,12 +58,11 @@ const RULES: readonly Rule[] = [
         sumHours(x.hours, (_, h) => h >= 22 || h < 4),
         sumHours(x.hours, () => true),
       );
-      return { score: f / 0.2, why: `${pct(f)} of prompts between 10 PM and 4 AM` };
+      return { score: f / 0.2, why: why('night-owl', { pct: pct(f) }) };
     },
   },
   {
     id: 'early-bird',
-    name: 'Early Bird',
     icon: 'bulb',
     color: '#f5c35b',
     test: (x) => {
@@ -71,12 +70,11 @@ const RULES: readonly Rule[] = [
         sumHours(x.hours, (_, h) => h >= 5 && h < 9),
         sumHours(x.hours, () => true),
       );
-      return { score: f / 0.2, why: `${pct(f)} of prompts before 9 AM` };
+      return { score: f / 0.2, why: why('early-bird', { pct: pct(f) }) };
     },
   },
   {
     id: 'weekend',
-    name: 'Weekend Warrior',
     icon: 'calendar',
     color: '#5cc49a',
     test: (x) => {
@@ -84,23 +82,30 @@ const RULES: readonly Rule[] = [
         sumHours(x.hours, (d) => d === 0 || d === 6),
         sumHours(x.hours, () => true),
       );
-      return { score: f / 0.25, why: `${pct(f)} of prompts on weekends` };
+      return { score: f / 0.25, why: why('weekend', { pct: pct(f) }) };
     },
   },
-  { id: 'marathon', name: 'Marathoner', icon: 'clock', color: '#4fb8a8', test: (x) => ({ score: x.all.agentMs / (100 * HOUR), why: `${Math.round(x.all.agentMs / HOUR).toLocaleString()} hours of agent time` }) },
-  { id: 'branches', name: 'Branch Collector', icon: 'branch', color: '#6cc187', test: (x) => ({ score: x.all.worktrees / 50, why: `${x.all.worktrees} worktrees made` }) },
-  { id: 'tidy', name: 'Neat Freak', icon: 'archive', color: '#8fcfc4', test: (x) => ({ score: x.all.worktrees >= 10 ? share(x.all.archived, x.all.worktrees) / 0.6 : 0, why: `${pct(share(x.all.archived, x.all.worktrees))} of worktrees put away` }) },
-  { id: 'streak', name: 'Streak Keeper', icon: 'flame', color: '#f09a6b', test: (x) => ({ score: x.longestStreak / 14, why: `${x.longestStreak} days in a row` }) },
-  { id: 'polyglot', name: 'Agent Whisperer', icon: 'bot', color: '#a0a7f2', test: (x) => ({ score: (x.agents - 1) / 2, why: `${x.agents} different agents` }) },
-  { id: 'tycoon', name: 'Token Tycoon', icon: 'coin', color: '#e7a95b', test: (x) => ({ score: x.all.tokens / 50_000_000, why: `${compact(x.all.tokens)} tokens, ${formatCost(x.all.cost)}` }) },
+  { id: 'marathon', icon: 'clock', color: '#4fb8a8', test: (x) => ({ score: x.all.agentMs / (100 * HOUR), why: why('marathon', { n: Math.round(x.all.agentMs / HOUR).toLocaleString() }) }) },
+  { id: 'branches', icon: 'branch', color: '#6cc187', test: (x) => ({ score: x.all.worktrees / 50, why: why('branches', { n: x.all.worktrees }) }) },
+  { id: 'tidy', icon: 'archive', color: '#8fcfc4', test: (x) => ({ score: x.all.worktrees >= 10 ? share(x.all.archived, x.all.worktrees) / 0.6 : 0, why: why('tidy', { pct: pct(share(x.all.archived, x.all.worktrees)) }) }) },
+  { id: 'streak', icon: 'flame', color: '#f09a6b', test: (x) => ({ score: x.longestStreak / 14, why: why('streak', { n: x.longestStreak }) }) },
+  { id: 'polyglot', icon: 'bot', color: '#a0a7f2', test: (x) => ({ score: (x.agents - 1) / 2, why: why('polyglot', { n: x.agents }) }) },
+  { id: 'tycoon', icon: 'coin', color: '#e7a95b', test: (x) => ({ score: x.all.tokens / 50_000_000, why: why('tycoon', { n: compact(x.all.tokens), cost: formatCost(x.all.cost) }) }) },
 ];
 
 /** Everyone starts here: nothing earned yet. */
-export const ROOKIE: Title = { id: 'rookie', name: 'Fresh Start', icon: 'sparkles', color: '#9fb7f5', why: 'Titles come as your stats grow', score: 0 };
+export const ROOKIE: Title = {
+  id: 'rookie',
+  get name() { return t('views.titles.rookie'); },
+  icon: 'sparkles',
+  color: '#9fb7f5',
+  get why() { return t('views.titles.rookieWhy'); },
+  score: 0,
+};
 
 /** The titles earned, best first (your title first); none: the starting one. */
 export function titlesOf(x: TitleInput): Title[] {
-  const earned = RULES.map((r) => ({ id: r.id, name: r.name, icon: r.icon, color: r.color, ...r.test(x) }))
+  const earned = RULES.map((r) => ({ id: r.id, name: t(`views.titles.${r.id}` as Key), icon: r.icon, color: r.color, ...r.test(x) }))
     .filter((t) => Number.isFinite(t.score) && t.score >= 1)
     .sort((a, b) => b.score - a.score);
   return earned.length ? earned : [ROOKIE];

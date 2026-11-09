@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { Icon } from '../components/Icon.js';
 import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
@@ -9,11 +10,12 @@ import s from './threads.module.css';
 export function StartedByLine({ channel }: { channel: string }) {
   const actions = useActions();
   const parent = useApp((st) => startedBy(st, channel), (a, b) => a === b || Boolean(a && b && sameFields(a, b)));
+  const t = useT();
   if (!parent) return null;
   return (
     <div className={s.startedBy} data-started-by="">
       <Icon name="up" size={11} />
-      <span>Started by </span>
+      <span>{t('threads.startedBy')}</span>
       {parent.openId ? (
         <button type="button" className={s.link} onClick={() => actions.run({ type: 'open_ws', id: parent.openId! })}>
           {parent.title}
@@ -29,10 +31,11 @@ export function StartedByLine({ channel }: { channel: string }) {
 export function ThreadStartLine({ thread }: { thread: ThreadStart }) {
   const actions = useActions();
   const mixed = useApp(mixedHarnesses);
+  const t = useT();
   return (
     <div className={s.startLine} data-thread-start={thread.id}>
       <span title={thread.agent}>{mixed ? <Icon name={thread.mark} size={12} fill="currentColor" /> : <Icon name="bot" size={12} />}</span>
-      <span>Started thread </span>
+      <span>{t('threads.startedThread')}</span>
       {thread.archived ? (
         <span className={s.gone}>{thread.title}</span>
       ) : (

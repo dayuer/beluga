@@ -10,6 +10,7 @@ import { toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { useMyAgentName } from '../../lib/agent-words.js';
 import { type MainLine, agoText } from './home-model.js';
 import s from './main-sync.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 /**
  * Under the project's name: Update main (fetch and fast-forward), Fetch and when it last did, the
@@ -30,10 +31,9 @@ type Dialog =
   | { readonly kind: 'fork'; readonly message: string };
 
 /** A fetch that failed, as the dialog that offers Claude (git's own words go along). */
-const fetchDialog = (message: string, detail?: string): Dialog => ({ kind: 'claude', title: 'Couldn’t fetch', message: detail && !message.includes(detail) ? `${message} Git said: ${detail}` : message });
+const fetchDialog = (message: string, detail?: string): Dialog => ({ kind: 'claude', title: tNow('views.sync.couldntFetch'), message: detail && !message.includes(detail) ? tNow('views.sync.gitSaid', { message, detail }) : message });
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Re-render every so often (for "fetched 3 min ago"). */
 function useNow(ms: number): number {
@@ -53,6 +53,7 @@ function useClaudeUpdating(project: Project): { id: string; worktree: boolean } 
 
 export function MainSyncBar({ project, line }: { project: Project; line: MainLine }) {
   const agent = useMyAgentName();
+  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   const actions = useActions();
@@ -86,7 +87,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
   /** What an update came back with that needs you (the rest the core already said in a toast). */
   const decide = (out: UpdateOutcome | StashUpdateOutcome): void => {
     if ('restored' in out && !out.restored) {
-      setDialog({ kind: 'conflicts', files: out.conflicts ?? [], message: `${branch} is up to date, but putting your changes back conflicted with the new commits. Your changes are safe in the stash “${out.stash?.message ?? 'beluga'}”, and the files have conflict markers.` });
+      setDialog({ kind: 'conflicts', files: out.conflicts ?? [], message: t('views.sync.restoreConflict', { branch, stash: out.stash?.message ?? 'beluga' }) });
       return;
     }
     switch (out.kind) {
@@ -94,13 +95,13 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
         setDialog({ kind: 'dirty', files: out.files, behind: out.behind });
         return;
       case 'diverged':
-        setDialog({ kind: 'claude', title: `${out.branch} and ${out.upstream} have both moved on`, message: `${out.branch} has ${plural(out.ahead, 'commit')} that ${out.ahead === 1 ? 'isn’t' : 'aren’t'} on ${out.upstream}, and ${out.upstream} has ${plural(out.behind, 'new commit')}. Bringing them together takes a merge or a rebase.` });
+        setDialog({ kind: 'claude', title: t('views.sync.divergedTitle', { branch: out.branch, upstream: out.upstream }), message: t('views.sync.divergedMessage', { branch: out.branch, upstream: out.upstream, ahead: out.ahead, behind: out.behind }) });
         return;
       case 'busy':
-        setDialog({ kind: 'claude', inMain: true, title: `A ${out.operation} is stopped halfway in main`, message: `The main folder is in the middle of a ${out.operation} (there are conflicts to resolve). Your agent can finish it and then update ${branch}.` });
+        setDialog({ kind: 'claude', inMain: true, title: t('views.sync.busyTitle', { operation: out.operation }), message: t('views.sync.busyMessage', { operation: out.operation, branch }) });
         return;
       case 'failed':
-        setDialog({ kind: 'claude', title: `Couldn’t update ${branch}`, message: out.message });
+        setDialog({ kind: 'claude', title: t('views.sync.couldntUpdate', { branch }), message: out.message });
         return;
       case 'fetch_failed':
         setDialog(fetchDialog(out.message, out.detail));
@@ -141,7 +142,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
       if (!out) return;
       if (out.kind === 'dirty') setDialog({ kind: 'switch', dirty: out.files?.length || sync.dirty || 1 });
       else if (out.kind === 'conflicts') setDialog({ kind: 'conflicts', files: out.files ?? [], message: out.message ?? '' });
-      else if (out.kind === 'failed') toast(client, out.message ?? `Couldn’t switch to ${branch}`, 'error');
+      else if (out.kind === 'failed') toast(client, out.message ?? t('views.sync.couldntSwitch', { branch }), 'error');
     });
   };
 
@@ -151,66 +152,66 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
   const original = fork ? `${fork.owner}/${fork.repo}` : '';
   // Only when there's something to bring in (unknown counts too: GitHub didn't say).
   const showFork = Boolean(fork) && (fork?.behind ?? 1) > 0;
-  const fetchedLabel = sync.fetching ? 'Fetching…' : sync.fetchedAt ? `fetched ${agoText(sync.fetchedAt, now)}` : 'never fetched';
+  const fetchedLabel = sync.fetching ? t('views.sync.fetching') : sync.fetchedAt ? t('views.sync.fetched', { ago: agoText(sync.fetchedAt, now) }) : t('views.sync.neverFetched');
 
   return (
     <div className={s.wrap}>
       {line.elsewhere ? (
-        <div className={s.callout} role="note" aria-label="Main folder branch">
+        <div className={s.callout} role="note" aria-label={t('views.sync.mainBranchAria')}>
           <Icon name="branch" size={13} className={s.calloutIcon} />
           <span className={s.calloutText}>
-            <strong>{line.elsewhere}.</strong> Updating and History here are about {branch}{sync.dirty ? `; the folder has ${plural(sync.dirty, 'uncommitted change')}` : ''}.
+            <strong>{t('views.sync.elsewhere', { line: line.elsewhere })}</strong> {t('views.sync.aboutBranch', { branch })}{sync.dirty ? t('views.sync.folderHas', { n: sync.dirty }) : ''}{t('views.sync.period')}
           </span>
-          <Tip label={sync.dirty ? 'Choose what happens to the uncommitted changes first' : `Check out ${branch} in the main folder`}>
+          <Tip label={sync.dirty ? t('views.sync.chooseFirst') : t('views.sync.checkOutTip', { branch })}>
             <Button size="small" disabled={busy === 'switch'} onClick={() => (sync.dirty ? setDialog({ kind: 'switch', dirty: sync.dirty }) : switchTo('clean'))}>
-              {busy === 'switch' ? 'Switching…' : `Switch to ${branch}`}
+              {busy === 'switch' ? t('views.sync.switching') : t('views.sync.switchTo', { branch })}
             </Button>
           </Tip>
         </div>
       ) : null}
       {claude ? (
-        <div className={cx(s.callout, s.calloutClaude)} role="status" aria-label="Your agent is updating main">
+        <div className={cx(s.callout, s.calloutClaude)} role="status" aria-label={t('views.sync.agentUpdatingAria')}>
           <Dot tone="claude" live />
           <span className={s.calloutText}>
-            <strong>Your agent is updating {branch}.</strong> {claude.worktree ? 'It works in a worktree of its own and leaves the main folder to you.' : 'It may only sync git here: fetch, merge, stash, resolve conflicts.'} Nothing is pushed.
+            <strong>{t('views.sync.agentUpdating', { branch })}</strong> {claude.worktree ? t('views.sync.agentInWorktree') : t('views.sync.agentInMain')} {t('views.sync.nothingPushed')}
           </span>
           <Button size="small" onClick={() => actions.run({ type: 'open_ws', id: claude.id, tab: 'chat' })}>
-            Open
+            {t('views.sync.open')}
           </Button>
         </div>
       ) : null}
       <div className={s.bar}>
         {showUpdate ? (
-          <Tip label={diverged ? `Both sides moved on: choose how to bring them together` : `Fetch ${upstream} and fast-forward ${branch}${sync.onDefault ? '' : ' (the folder stays where it is)'}`}>
+          <Tip label={diverged ? t('views.sync.bothMoved') : t(sync.onDefault ? 'views.sync.updateTip' : 'views.sync.updateTipElsewhere', { upstream, branch })}>
             <Button size="small" variant="primary" icon="download" disabled={busy === 'update' || Boolean(claude)} onClick={update}>
-              {busy === 'update' ? 'Updating…' : `Update ${branch}`}
+              {busy === 'update' ? t('views.sync.updating') : t('views.sync.update', { branch })}
             </Button>
           </Tip>
         ) : null}
         {showFork && fork ? (
-          <Tip label={`Bring ${original}’s new commits into your fork’s ${fork.forkBranch} on GitHub, then update ${branch} here`}>
+          <Tip label={t('views.sync.forkTip', { original, forkBranch: fork.forkBranch, branch })}>
             <Button size="small" variant={showUpdate ? undefined : 'primary'} icon="merge" disabled={busy === 'fork' || Boolean(claude)} onClick={syncFork}>
-              {busy === 'fork' ? 'Syncing…' : 'Sync Fork'}
+              {busy === 'fork' ? t('views.sync.syncing') : t('views.sync.syncFork')}
             </Button>
           </Tip>
         ) : null}
         {sync.upstream ? (
-          <Tip label={`Fetch ${sync.remote ?? 'origin'} now (Beluga also fetches quietly every 15 minutes)`}>
+          <Tip label={t('views.sync.fetchTip', { remote: sync.remote ?? 'origin' })}>
             <Button size="small" variant="quiet" icon="refresh" className={cx(sync.fetching && s.spinning)} disabled={sync.fetching} onClick={fetchNow}>
-              Fetch
+              {t('views.sync.fetch')}
             </Button>
           </Tip>
         ) : null}
         {showFork && fork?.behind ? (
-          <span className={s.status} aria-label={`${plural(fork.behind, 'new commit')} on ${original}`}>
-            {fork.behind} new on {original}
+          <span className={s.status} aria-label={t('views.sync.newCommitsOn', { n: fork.behind, original })}>
+            {t('views.sync.newOn', { n: fork.behind, original })}
           </span>
         ) : null}
         {sync.fetchError ? (
-          <Tip label={`${sync.fetchError.message} Click to let your agent look into it.`}>
+          <Tip label={t('views.sync.fetchErrorTip', { message: sync.fetchError.message })}>
             <button type="button" className={cx(s.status, s.statusWarn, s.statusButton)} onClick={() => setDialog(fetchDialog(sync.fetchError!.message))}>
               <Icon name="alert" size={12} />
-              {sync.fetchError.reason === 'auth' ? 'Sign-in needed to fetch' : sync.fetchError.reason === 'offline' ? 'Couldn’t reach the remote' : 'Couldn’t fetch'}
+              {sync.fetchError.reason === 'auth' ? t('views.sync.signIn') : sync.fetchError.reason === 'offline' ? t('views.sync.offline') : t('views.sync.couldntFetch')}
             </button>
           </Tip>
         ) : sync.upstream ? (
@@ -221,12 +222,12 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
       </div>
       {dialog?.kind === 'dirty' ? (
         <Alert
-          title="Your uncommitted changes are in the way"
+          title={t('views.sync.dirtyTitle')}
           icon="alert"
-          message={`${upstream} has ${plural(dialog.behind, 'new commit')}, and some change files you’ve edited in main. Beluga can stash your changes, update, and put them back, or move them to a worktree of their own first.`}
-          table={{ caption: 'Changed in main', columns: ['File'], rows: dialog.files.slice(0, 8).map((f) => [<code key={f}>{f}</code>]) }}
-          confirm={{ label: 'Stash and Update', onClick: stashAndUpdate }}
-          alternative={{ label: 'Move to Worktree', onClick: moveAndUpdate }}
+          message={t('views.sync.dirtyMessage', { upstream, n: dialog.behind })}
+          table={{ caption: t('views.sync.changedInMain'), columns: [t('views.sync.file')], rows: dialog.files.slice(0, 8).map((f) => [<code key={f}>{f}</code>]) }}
+          confirm={{ label: t('views.sync.stashAndUpdate'), onClick: stashAndUpdate }}
+          alternative={{ label: t('views.sync.moveToWorktree'), onClick: moveAndUpdate }}
           onCancel={() => setDialog(undefined)}
         />
       ) : null}
@@ -240,48 +241,48 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
               {dialog.message}
               <span className={s.alertNote}>
                 {dialog.inMain
-                  ? ' Your agent can do it in the main folder: it may only sync git there (fetch, merge or rebase, stash, resolve conflicts), keeps your changes, never pushes, and explains what it did.'
-                  : ' Your agent works it out in a worktree of its own, leaves the main folder and your changes alone, never pushes, and tells you the step left, if any.'}
+                  ? t('views.sync.claudeInMain')
+                  : t('views.sync.claudeInWorktree')}
               </span>
             </>
           }
-          confirm={{ label: `Let ${agent} Handle It`, onClick: askClaude }}
+          confirm={{ label: t('views.sync.letHandle', { agent }), onClick: askClaude }}
           onCancel={() => setDialog(undefined)}
         />
       ) : null}
       {dialog?.kind === 'conflicts' ? (
         <Alert
-          title="Your changes conflicted with the update"
+          title={t('views.sync.conflictTitle')}
           icon="alert"
           message={dialog.message}
-          {...(dialog.files.length ? { table: { caption: 'Conflicts in', columns: ['File'], rows: dialog.files.slice(0, 8).map((f) => [<code key={f}>{f}</code>]) } } : {})}
-          confirm={{ label: `Let ${agent} Handle It`, onClick: askClaude }}
-          cancel="I’ll Handle It"
+          {...(dialog.files.length ? { table: { caption: t('views.sync.conflictsIn'), columns: [t('views.sync.file')], rows: dialog.files.slice(0, 8).map((f) => [<code key={f}>{f}</code>]) } } : {})}
+          confirm={{ label: t('views.sync.letHandle', { agent }), onClick: askClaude }}
+          cancel={t('views.sync.illHandle')}
           onCancel={() => setDialog(undefined)}
         />
       ) : null}
       {dialog?.kind === 'fork' ? (
         <Alert
-          title={`Your fork and ${original} conflict`}
+          title={t('views.sync.forkConflict', { original })}
           icon="claude"
           tone="info"
           message={
             <>
               {dialog.message}
-              <span className={s.alertNote}> Your agent merges {original} in, in a worktree of its own, resolves the conflicts, and opens a pull request into your fork’s {fork?.forkBranch ?? branch}. Nothing goes to {original}.</span>
+              <span className={s.alertNote}>{t('views.sync.forkNote', { original, forkBranch: fork?.forkBranch ?? branch })}</span>
             </>
           }
-          confirm={{ label: `Let ${agent} Handle It`, onClick: forkWithClaude }}
+          confirm={{ label: t('views.sync.letHandle', { agent }), onClick: forkWithClaude }}
           onCancel={() => setDialog(undefined)}
         />
       ) : null}
       {dialog?.kind === 'switch' ? (
         <Alert
-          title={`Switch the main folder to ${branch}?`}
+          title={t('views.sync.switchTitle', { branch })}
           icon="branch"
-          message={`It has ${plural(dialog.dirty, 'uncommitted change')} on ${sync.current ?? 'a detached HEAD'}. Move ${sync.current ?? 'that work'} and its changes to a worktree of their own (recommended), or bring the changes along to ${branch}.`}
-          confirm={{ label: 'Move to Worktree', onClick: () => switchTo('move') }}
-          alternative={{ label: 'Bring Them Along', onClick: () => switchTo('stash') }}
+          message={t('views.sync.switchMessage', { n: dialog.dirty, current: sync.current ?? t('views.home.detachedHead'), work: sync.current ?? t('views.sync.thatWork'), branch })}
+          confirm={{ label: t('views.sync.moveToWorktree'), onClick: () => switchTo('move') }}
+          alternative={{ label: t('views.sync.bringAlong'), onClick: () => switchTo('stash') }}
           onCancel={() => setDialog(undefined)}
         />
       ) : null}

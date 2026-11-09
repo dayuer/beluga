@@ -6,6 +6,7 @@ import { copyText } from '../../lib/copy.js';
 import { useActions } from '../../lib/actions.js';
 import { contrast, inkOn, parseColor, toHex, toHsl } from './format.js';
 import v from './views.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * Colors Claude shows: swatches with their names and values (click one to copy it), how each
@@ -18,7 +19,8 @@ const BLACK = { r: 17, g: 17, b: 17 };
 
 export function ColorsView({ view }: { view: View }) {
   const actions = useActions();
-  const [colors, setColors] = useState<Swatch[]>(() => (view.swatches.length ? [...view.swatches] : [{ value: '#3987e5', name: 'Color 1' }]));
+  const t = useT();
+  const [colors, setColors] = useState<Swatch[]>(() => (view.swatches.length ? [...view.swatches] : [{ value: '#3987e5', name: t('common.colors.colorN', { n: 1 }) }]));
   const [copied, setCopied] = useState<number>();
   const pick = view.pick;
   const changed = JSON.stringify(colors) !== JSON.stringify(view.swatches);
@@ -39,28 +41,28 @@ export function ColorsView({ view }: { view: View }) {
             <div key={i} className={v.swatch}>
               <div className={v.swatchFace} style={{ background: c.value, color: rgb ? inkOn(rgb) : undefined }}>
                 {pick && rgb ? (
-                  <input type="color" className={v.picker} value={toHex(rgb)} aria-label={`Pick ${c.name ?? `color ${i + 1}`}`} onChange={(e) => setColors((all) => all.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                  <input type="color" className={v.picker} value={toHex(rgb)} aria-label={t('common.colors.pick', { name: c.name ?? t('common.colors.colorLowerN', { n: i + 1 }) })} onChange={(e) => setColors((all) => all.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
                 ) : null}
                 {rgb ? (
                   <span className={v.contrast}>
-                    <Tip label="Contrast with white text">
+                    <Tip label={t('common.colors.onWhite')}>
                       <span style={{ color: '#fff' }}>Aa {contrast(rgb, WHITE).toFixed(1)}</span>
                     </Tip>
-                    <Tip label="Contrast with black text">
+                    <Tip label={t('common.colors.onBlack')}>
                       <span style={{ color: '#111' }}>Aa {contrast(rgb, BLACK).toFixed(1)}</span>
                     </Tip>
                   </span>
                 ) : null}
                 {pick ? <Icon name="pencil" size={11} className={v.pickMark} /> : null}
               </div>
-              <button type="button" className={v.swatchMeta} onClick={() => copyOne(i, c.value)} title="Copy">
-                <span className={v.swatchName}>{c.name ?? `Color ${i + 1}`}</span>
-                <span className={v.swatchValue}>{copied === i ? 'Copied' : c.value}</span>
+              <button type="button" className={v.swatchMeta} onClick={() => copyOne(i, c.value)} title={t('common.ui.copy')}>
+                <span className={v.swatchName}>{c.name ?? t('common.colors.colorN', { n: i + 1 })}</span>
+                <span className={v.swatchValue}>{copied === i ? t('common.ui.copied') : c.value}</span>
                 {rgb && !/^hsl/i.test(c.value) ? <span className={v.swatchAlt}>{toHsl(rgb)}</span> : null}
                 {c.note ? <span className={v.swatchAlt}>{c.note}</span> : null}
               </button>
               {pick && colors.length > 1 ? (
-                <button type="button" className={v.swatchRemove} aria-label={`Remove ${c.name ?? `color ${i + 1}`}`} onClick={() => setColors((all) => all.filter((_, j) => j !== i))}>
+                <button type="button" className={v.swatchRemove} aria-label={t('common.colors.remove', { name: c.name ?? t('common.colors.colorLowerN', { n: i + 1 }) })} onClick={() => setColors((all) => all.filter((_, j) => j !== i))}>
                   <Icon name="x" size={9} />
                 </button>
               ) : null}
@@ -68,7 +70,7 @@ export function ColorsView({ view }: { view: View }) {
           );
         })}
         {pick && colors.length < 64 ? (
-          <button type="button" className={v.swatchAdd} onClick={() => setColors((all) => [...all, { value: all.at(-1)?.value ?? '#888888', name: `Color ${all.length + 1}` }])} aria-label="Add a Color">
+          <button type="button" className={v.swatchAdd} onClick={() => setColors((all) => [...all, { value: all.at(-1)?.value ?? '#888888', name: t('common.colors.colorN', { n: all.length + 1 }) }])} aria-label={t('common.colors.add')}>
             <Icon name="plus" size={14} />
           </button>
         ) : null}
@@ -76,23 +78,23 @@ export function ColorsView({ view }: { view: View }) {
       <div className={v.colorBar}>
         <button type="button" className={v.action} onClick={() => copyOne(-1, asCss())}>
           <Icon name="copy" size={11} />
-          {copied === -1 ? 'Copied' : 'Copy as CSS'}
+          {copied === -1 ? t('common.ui.copied') : t('common.colors.copyCss')}
         </button>
         <button type="button" className={v.action} onClick={() => copyOne(-2, JSON.stringify(colors, null, 2))}>
           <Icon name="copy" size={11} />
-          {copied === -2 ? 'Copied' : 'Copy as JSON'}
+          {copied === -2 ? t('common.ui.copied') : t('common.viewBlock.copyJson')}
         </button>
         {pick ? (
           <>
             <span className={v.grow} />
             {changed ? (
               <button type="button" className={v.linkButton} onClick={() => setColors([...view.swatches])}>
-                Reset
+                {t('common.colors.reset')}
               </button>
             ) : null}
             <button type="button" className={cx(v.primary)} onClick={() => actions.typeInto(`Use these colors: ${asText()}`)}>
               <Icon name="send" size={11} />
-              Use These Colors
+              {t('common.colors.use')}
             </button>
           </>
         ) : null}

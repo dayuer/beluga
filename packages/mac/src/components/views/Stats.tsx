@@ -3,6 +3,7 @@ import { Icon } from '../Icon.js';
 import type { ViewData } from './use-view-data.js';
 import { formatCell, formatNumber, isNumeric } from './format.js';
 import v from './views.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * Stat tiles: a few numbers that matter, each big, with its change (green when it's good, which
@@ -12,8 +13,9 @@ import v from './views.module.css';
  */
 
 export function StatTiles({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const items = view.items.length && !data.switched ? view.items : statsFromRows(data);
-  if (!items.length) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to show'}</div>;
+  if (!items.length) return <div className={v.empty}>{data.loading ? t('common.table.loading') : t('common.views.noStats')}</div>;
   return (
     <div className={v.stats} data-count={Math.min(items.length, 4)}>
       {items.map((s, i) => (

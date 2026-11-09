@@ -17,8 +17,10 @@ import { SHOW_WELCOME } from '../onboarding/onboarding-model.js';
 import { pastePlain } from '../chat/paste-paths.js';
 import type { PlaceKind } from './go.js';
 import { throttle } from './throttle.js';
+import { menuWord, startMenuLanguage } from './menu-language.js';
 import { fromMenu } from './shortcuts.js';
 import { windowActive } from './window-active.js';
+import { t, tl } from '../i18n/index.js';
 import { newChatProject } from './project-home.js';
 import { type MenuBarCounts, SPOUT_EVERY_MS, spoutStep, trayTitle } from '../menubar/menubar-look.js';
 import { shownState } from '../network/net-model.js';
@@ -72,7 +74,7 @@ export function runMenuItem(id: string, client: SocketClient, ui: UiStore, actio
       if (project?.root) actions.run({ type: 'new_worktree', projectId: project.id });
       else {
         // A worktree needs a project: offer to add one, the way Add Project does.
-        client.store.dispatch({ type: 'toast', text: 'A worktree needs a project: add one first', level: 'warn' });
+        client.store.dispatch({ type: 'toast', text: t('common.native.needsProject'), level: 'warn' });
         actions.run({ type: 'add_project' });
       }
       return;
@@ -113,7 +115,7 @@ export function runMenuItem(id: string, client: SocketClient, ui: UiStore, actio
       const tab = id.slice('panel-'.length) as PanelTab;
       if (!PANEL_TABS.includes(tab)) return;
       return byMenu(`panel-${tab}`, () => {
-        if (!showPanelTab(state, tab)) client.store.dispatch({ type: 'toast', text: `No ${PANEL_LABELS[tab]} here`, level: 'info' });
+        if (!showPanelTab(state, tab)) client.store.dispatch({ type: 'toast', text: t('common.native.noPanel', { tab: tl('PANEL_LABELS', tab, 'text', PANEL_LABELS[tab]) }), level: 'info' });
       });
     }
     case 'appearance-system':
@@ -399,7 +401,7 @@ export function useMenuState(client: SocketClient): void {
         const st = commandState(state, id);
         enabled[id] = st.enabled;
         if (st.checked !== undefined) checked[id] = st.checked;
-        if (st.label) labels[id] = st.label;
+        if (st.label) labels[id] = menuWord(st.label);
       }
       const key = JSON.stringify([enabled, checked, labels]);
       if (key === last) return;
@@ -410,10 +412,15 @@ export function useMenuState(client: SocketClient): void {
     const update = (): void => {
       timer ??= setTimeout(send, 150);
     };
+    const offLanguage = startMenuLanguage();
     send();
     const off = client.store.subscribe(update);
+    // A new language renames Run / Stop Running too.
+    const offPrefs = subscribePrefs(update);
     return () => {
       off();
+      offPrefs();
+      offLanguage();
       if (timer) clearTimeout(timer);
     };
   }, [client]);

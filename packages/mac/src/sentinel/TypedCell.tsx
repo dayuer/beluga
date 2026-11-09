@@ -10,6 +10,7 @@ import { openSheet } from '../lib/sheets.js';
 import { keptRow } from './numbers-model.js';
 import { useSentinelActions } from './use-sentinel.js';
 import n from './numbers.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * A kept table's typed cells (BLG-381): what its sentinel said a column holds, drawn so. A document
@@ -30,6 +31,7 @@ export function typedCells(m: Pick<MetricSeries, 'sentinelId' | 'name' | 'rows'>
 function TypedCell({ m, t, cell, row }: { m: Pick<MetricSeries, 'sentinelId' | 'name' | 'rows'>; t: MetricColumn; cell: Cell; row: Row }) {
   const api = useApi();
   const a = useSentinelActions();
+  const tr = useT();
   const text = String(cell);
   // A chip or a button in a row opens what it says, not the row.
   const own = (run: () => void) => (e: React.MouseEvent) => {
@@ -94,7 +96,7 @@ function TypedCell({ m, t, cell, row }: { m: Pick<MetricSeries, 'sentinelId' | '
     case 'rating': {
       const r = ratingOf(cell, t.max);
       return r ? (
-        <span className={n.rating} role="img" aria-label={`${r.value} of ${r.max}`}>
+        <span className={n.rating} role="img" aria-label={tr('sentinel.typed.rating', { value: r.value, max: r.max })}>
           {Array.from({ length: r.max }, (_, i) => (
             <Icon key={i} name="star" size={11} className={i < Math.round(r.value) ? n.starOn : n.starOff} />
           ))}
@@ -102,14 +104,14 @@ function TypedCell({ m, t, cell, row }: { m: Pick<MetricSeries, 'sentinelId' | '
       ) : undefined;
     }
     case 'action': {
-      const words = t.button?.trim() || t.label?.trim() || 'Run';
+      const words = t.button?.trim() || t.label?.trim() || tr('sentinel.typed.run');
       return (
         <button
           type="button"
           className={n.rowAction}
           onClick={own(() => {
             const kept = keptRow(m.rows, row) ?? row;
-            void a.act(() => api.sentinel.runRow(m.sentinelId, m.name, t.key, kept as Record<string, string | number | boolean | null>), `${words}: running`);
+            void a.act(() => api.sentinel.runRow(m.sentinelId, m.name, t.key, kept as Record<string, string | number | boolean | null>), tr('sentinel.typed.running', { words }));
           })}
         >
           <Icon name="play" size={10} />

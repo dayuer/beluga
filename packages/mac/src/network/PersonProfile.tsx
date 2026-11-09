@@ -13,6 +13,7 @@ import { PresenceDot } from './Avatars.js';
 import { belugaLine, presenceLine, shownState } from './net-model.js';
 import { openDm, openFriendCard } from './use-net.js';
 import p from '../dialogs/native/person.module.css';
+import { tl, useT } from '../i18n/index.js';
 
 /** Someone you know on the network (a friend, or someone in one of your groups), by their id. */
 function usePerson(peerId: string): { person?: PersonView; friend: boolean } {
@@ -33,6 +34,7 @@ function usePerson(peerId: string): { person?: PersonView; friend: boolean } {
  * what they're happy to be asked for, how much you trust them). Nobody known: plain, not a button.
  */
 export function PersonButton({ peerId, name, className, children }: { peerId: string; name: string; className?: string; children: ReactNode }) {
+  const t = useT();
   const { ui } = useBeluga();
   const room = useApp((st) => st.peers.findIndex((x) => x.peerId === peerId && x.peerId !== st.selfId));
   const { person, friend } = usePerson(peerId);
@@ -42,7 +44,7 @@ export function PersonButton({ peerId, name, className, children }: { peerId: st
     <button
       type="button"
       className={cx(p.personButton, className)}
-      aria-label={`${name}’s profile`}
+      aria-label={t('network.profile.label', { name })}
       onClick={(e) => {
         e.stopPropagation();
         if (room >= 0) openPerson(ui, room, e.currentTarget);
@@ -81,6 +83,7 @@ export function PersonButton({ peerId, name, className, children }: { peerId: st
 
 /** Someone on the network as a card: picture (click to see it large), status, their note, trust. */
 function ProfileCard({ person, friend, close }: { person: PersonView; friend: boolean; close: () => void }) {
+  const t = useT();
   const { client } = useBeluga();
   const trust = useApp((st) => trustOf(st, person.peerId));
   // Their plans, as their card told you: only when they share them with you (BLG-597).
@@ -92,7 +95,7 @@ function ProfileCard({ person, friend, close }: { person: PersonView; friend: bo
         <ZoomAvatar name={person.name} id={person.peerId} size={56} />
         <div className={p.who}>
           <div className={p.name}>{person.name}</div>
-          <div className={p.tags}>{friend ? <Tag tone="accent">Friend</Tag> : <Tag tone="muted">In your group</Tag>}</div>
+          <div className={p.tags}>{friend ? <Tag tone="accent">{t('network.profile.friend')}</Tag> : <Tag tone="muted">{t('network.profile.inGroup')}</Tag>}</div>
           <div className={cx(p.line, p.presence)}>
             <PresenceDot state={state} size={8} />
             {presenceLine(person)}
@@ -104,7 +107,7 @@ function ProfileCard({ person, friend, close }: { person: PersonView; friend: bo
         <div className={p.actions}>
           <Action
             icon="chat"
-            label="Message"
+            label={t('network.profile.message')}
             onClick={() => {
               close();
               openDm(client, person.peerId);
@@ -116,15 +119,15 @@ function ProfileCard({ person, friend, close }: { person: PersonView; friend: bo
         <PlanUsage usages={usages} />
       ) : friend ? (
         <div className={p.block}>
-          <div className={p.blockLabel}>Usage</div>
-          <div className={p.blockDetail}>{person.name} doesn’t share how much of their plans is left with you. People share it with friends they trust.</div>
+          <div className={p.blockLabel}>{t('network.profile.usage')}</div>
+          <div className={p.blockDetail}>{t('network.profile.noUsage', { name: person.name })}</div>
         </div>
       ) : null}
       <AskMeFor peerId={person.peerId} name={person.name} />
       <div className={p.block}>
-        <div className={p.blockLabel}>Trust</div>
+        <div className={p.blockLabel}>{t('network.profile.trust')}</div>
         <div className={p.blockDetail}>
-          <strong>{TRUST_INFO[trust].label}.</strong> {TRUST_INFO[trust].detail}
+          <strong>{tl('TRUST_INFO', trust, 'label', TRUST_INFO[trust].label)}.</strong> {tl('TRUST_INFO', trust, 'detail', TRUST_INFO[trust].detail)}
         </div>
         {friend ? (
           <div className={p.blockDetail}>
@@ -136,7 +139,7 @@ function ProfileCard({ person, friend, close }: { person: PersonView; friend: bo
                 openFriendCard(client, person.peerId);
               }}
             >
-              Change in their card…
+              {t('network.profile.change')}
             </button>
           </div>
         ) : null}

@@ -11,6 +11,7 @@ import { ago } from '../tasks/tasks-model.js';
 import p from '../plans/plans.module.css';
 import s from './shared-plans.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
+import { t, useT } from '../i18n/index.js';
 
 /**
  * Plans shared within a team (BLG-225). Yours: Share Plan with Team in the plan's •••, and Team
@@ -39,30 +40,32 @@ export function usePlanTeamItems(planId: string, projectId: string): readonly Ac
   const shared = useApp((st) => Boolean(st.team.planShares[planId]));
   const api = useApi();
   const say = useSay();
+  useT();
   if (!mates.length && !shared) return [];
-  return [shared ? { label: 'Stop Sharing with Team', icon: 'people', separate: true, onSelect: () => void say(api.team.sharePlan(planId, false)) } : { label: 'Share Plan with Team', icon: 'people', separate: true, onSelect: () => void say(api.team.sharePlan(planId, true)) }];
+  return [shared ? { label: t('team.plans.stopSharing'), icon: 'people', separate: true, onSelect: () => void say(api.team.sharePlan(planId, false)) } : { label: t('team.plans.share'), icon: 'people', separate: true, onSelect: () => void say(api.team.sharePlan(planId, true)) }];
 }
 
-const reviewWords = (r: PlanReview): string => (r.kind === 'approve' ? 'approved it' : r.kind === 'suggest' ? `suggests ${r.ops?.length === 1 ? 'a change' : `${r.ops?.length ?? 0} changes`}` : 'commented');
+const reviewWords = (r: PlanReview): string => (r.kind === 'approve' ? t('team.plans.approvedIt') : r.kind === 'suggest' ? (r.ops?.length === 1 ? t('team.plans.suggestsOne') : t('team.plans.suggestsMany', { n: r.ops?.length ?? 0 })) : t('team.plans.commented'));
 
 /** What one suggested op changes, in words. */
 function opWords(op: unknown): string {
   const o = op as { op?: string; id?: string; patch?: { title?: string; goal?: string }; title?: string; milestone?: unknown };
   switch (o.op) {
     case 'update_task':
-      return `Change ${o.id}${o.patch?.title ? ` to “${o.patch.title}”` : ''}${o.patch?.goal ? `: ${o.patch.goal}` : ''}`;
+      return `${t('team.plans.changeTask', { id: o.id ?? '' })}${o.patch?.title ? t('team.plans.changeTo', { title: o.patch.title }) : ''}${o.patch?.goal ? `: ${o.patch.goal}` : ''}`;
     case 'add_task':
-      return 'Add a task';
+      return t('team.plans.addTask');
     case 'remove_task':
-      return `Take out ${o.id}`;
+      return t('team.plans.takeOut', { id: o.id ?? '' });
     case 'retitle':
-      return `Rename the plan${o.title ? ` “${o.title}”` : ''}`;
+      return `${t('team.plans.rename')}${o.title ? ` “${o.title}”` : ''}`;
     default:
-      return o.op ? o.op.replace(/_/g, ' ') : 'A change';
+      return o.op ? o.op.replace(/_/g, ' ') : t('team.plans.aChange');
   }
 }
 
 function ReviewRow({ r, trailing }: { r: PlanReview; trailing?: ReactNode }) {
+  useT();
   return (
     <li className={s.review}>
       <Avatar name={r.name} id={r.by} size={22} />
@@ -71,7 +74,7 @@ function ReviewRow({ r, trailing }: { r: PlanReview; trailing?: ReactNode }) {
           <strong>{r.name}</strong> {reviewWords(r)}
           {r.kind === 'approve' ? <Icon name="check" size={12} /> : null}
           <span className={s.when}>{ago(r.at)}</span>
-          {r.settled ? <span className={s.settled}>{r.settled === 'applied' ? 'Applied' : 'Set aside'}</span> : null}
+          {r.settled ? <span className={s.settled}>{r.settled === 'applied' ? t('team.plans.applied') : t('team.plans.setAside')}</span> : null}
         </div>
         {r.text ? <div className={s.reviewText}>{r.text}</div> : null}
         {r.ops?.length ? (
@@ -92,14 +95,15 @@ export function TeamReviews({ planId }: { planId: string }) {
   const share = useApp((st) => st.team.planShares[planId], sameDeep);
   const api = useApi();
   const say = useSay();
+  useT();
   if (!share) return null;
-  const names = share.peers.length ? `Shared with your team` : 'Shared with your team (nobody can open it yet)';
+  const names = share.peers.length ? t('team.plans.sharedWithTeam') : t('team.plans.sharedNobody');
   return (
-    <section className={s.panel} aria-label="Team reviews">
+    <section className={s.panel} aria-label={t('team.plans.teamReviews')}>
       <div className={s.panelHead}>
         <Icon name="people" size={13} />
         <span>{names}</span>
-        <span className={s.when}>{share.reviews.length ? `${share.reviews.length} review${share.reviews.length === 1 ? '' : 's'}` : 'No reviews yet'}</span>
+        <span className={s.when}>{share.reviews.length ? t('team.plans.reviews', { n: share.reviews.length }) : t('team.plans.noReviews')}</span>
       </div>
       {share.reviews.length ? (
         <ul className={s.reviews}>
@@ -110,11 +114,11 @@ export function TeamReviews({ planId }: { planId: string }) {
               trailing={
                 r.kind === 'suggest' && !r.settled ? (
                   <>
-                    <Button size="small" variant="primary" onClick={() => void say(api.team.applySuggestion(planId, r.id), 'Applied the suggestion')}>
-                      Apply
+                    <Button size="small" variant="primary" onClick={() => void say(api.team.applySuggestion(planId, r.id), t('team.plans.appliedToast'))}>
+                      {t('team.plans.apply')}
                     </Button>
-                    <ActionsDropdown items={[{ label: 'Set Aside', onSelect: () => void say(api.team.dismissSuggestion(planId, r.id)) }]}>
-                      <IconButton icon="more" label="More" />
+                    <ActionsDropdown items={[{ label: t('team.plans.setAsideButton'), onSelect: () => void say(api.team.dismissSuggestion(planId, r.id)) }]}>
+                      <IconButton icon="more" label={t('team.plans.more')} />
                     </ActionsDropdown>
                   </>
                 ) : undefined
@@ -131,19 +135,20 @@ export function TeamReviews({ planId }: { planId: string }) {
 export function SharedPlansList({ projectId }: { projectId: string }) {
   const plans = useApp((st) => st.team.plans.filter((x) => x.projectId === projectId), sameDeep);
   const actions = useActions();
+  useT();
   if (!plans.length) return null;
   return (
     <>
-      <div className={s.caption}>Shared by your team</div>
-      <ul className={p.rows} aria-label="Plans shared by your team">
+      <div className={s.caption}>{t('team.plans.sharedBy')}</div>
+      <ul className={p.rows} aria-label={t('team.plans.sharedByList')}>
         {plans.map((plan) => (
           <li key={`${plan.owner}/${plan.id}`}>
-            <button type="button" className={p.row} onClick={() => actions.run({ type: 'view', view: { kind: 'team_plan', owner: plan.owner, id: plan.id } })} aria-label={`${plan.title}, shared by ${plan.ownerName}`}>
+            <button type="button" className={p.row} onClick={() => actions.run({ type: 'view', view: { kind: 'team_plan', owner: plan.owner, id: plan.id } })} aria-label={t('team.plans.rowLabel', { title: plan.title, name: plan.ownerName })}>
               <Avatar name={plan.ownerName} id={plan.owner} size={20} />
               <span className={p.rowMain}>
                 <span className={p.rowTitle}>{plan.title}</span>
                 <span className={p.rowSub}>
-                  {plan.ownerName}’s · {plan.body.milestones.length} milestones · {plan.body.milestones.reduce((n, m) => n + m.tasks.length, 0)} tasks · {plan.status === 'draft' ? 'draft' : plan.status === 'active' ? 'running' : 'done'}
+                  {t('team.plans.rowSub', { name: plan.ownerName, milestones: plan.body.milestones.length, tasks: plan.body.milestones.reduce((n, m) => n + m.tasks.length, 0), status: plan.status === 'draft' ? t('team.plans.draft') : plan.status === 'active' ? t('team.plans.running') : t('team.plans.done') })}
                 </span>
               </span>
               <span className={p.rowWhen}>{ago(plan.updatedAt)}</span>
@@ -164,7 +169,8 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
   const say = useSay();
   const [comment, setComment] = useState('');
   const [editing, setEditing] = useState<string | undefined>();
-  if (!plan) return <Empty icon="flag" title="This plan isn’t shared with you any more" detail="Its owner stopped sharing it, or left the team." />;
+  useT();
+  if (!plan) return <Empty icon="flag" title={t('team.plans.notShared')} detail={t('team.plans.notSharedDetail')} />;
   const approved = plan.reviews.some((r) => r.by === self && r.kind === 'approve' && r.rev === plan.rev);
   const send = (): void => {
     if (!comment.trim()) return;
@@ -174,16 +180,16 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
   return (
     <div className={s.page}>
       <header className={s.head}>
-        <IconButton icon="back" label="All Plans" onClick={back} />
+        <IconButton icon="back" label={t('team.plans.allPlans')} onClick={back} />
         <div className={s.headMain}>
           <h1 className={s.title}>{plan.title}</h1>
           <div className={s.meta}>
             <Avatar name={plan.ownerName} id={plan.owner} size={14} />
-            {plan.ownerName}’s plan · {plan.status === 'draft' ? 'a draft' : plan.status === 'active' ? 'approved and running' : 'done'} · read-only
+            {t('team.plans.meta', { name: plan.ownerName, status: plan.status === 'draft' ? t('team.plans.aDraft') : plan.status === 'active' ? t('team.plans.approvedRunning') : t('team.plans.done') })}
           </div>
         </div>
-        <Button variant="primary" size="small" icon="check" disabled={approved} onClick={() => void say(api.team.reviewPlan(owner, id, { kind: 'approve' }), `Told ${plan.ownerName} you approve`)}>
-          {approved ? 'Approved' : 'Approve'}
+        <Button variant="primary" size="small" icon="check" disabled={approved} onClick={() => void say(api.team.reviewPlan(owner, id, { kind: 'approve' }), t('team.plans.toldApprove', { name: plan.ownerName }))}>
+          {approved ? t('team.plans.approved') : t('team.plans.approve')}
         </Button>
       </header>
       {plan.body.goal ? <p className={s.goal}>{plan.body.goal}</p> : null}
@@ -203,28 +209,28 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
               </ul>
             ) : null}
             <ul className={s.tasks}>
-              {m.tasks.map((t) => (
-                <li key={t.id} className={cx(s.task, editing === t.id && s.taskEditing)}>
+              {m.tasks.map((task) => (
+                <li key={task.id} className={cx(s.task, editing === task.id && s.taskEditing)}>
                   <div className={s.taskLine}>
                     <Icon name="task" size={12} />
-                    <span className={s.taskTitle}>{t.title}</span>
-                    {t.assignee === 'me' ? <span className={s.when}>for {plan.ownerName}</span> : null}
-                    <ActionsDropdown items={[{ label: 'Suggest a Change…', icon: 'pencil', onSelect: () => setEditing(t.id) }]}>
-                      <IconButton icon="more" label={`More for ${t.title}`} />
+                    <span className={s.taskTitle}>{task.title}</span>
+                    {task.assignee === 'me' ? <span className={s.when}>{t('team.plans.forName', { name: plan.ownerName })}</span> : null}
+                    <ActionsDropdown items={[{ label: t('team.plans.suggestChange'), icon: 'pencil', onSelect: () => setEditing(task.id) }]}>
+                      <IconButton icon="more" label={t('team.plans.moreFor', { name: task.title })} />
                     </ActionsDropdown>
                   </div>
-                  {t.goal ? <div className={s.taskGoal}>{t.goal}</div> : null}
-                  {editing === t.id ? <Suggest plan={plan} task={t} onDone={() => setEditing(undefined)} /> : null}
+                  {task.goal ? <div className={s.taskGoal}>{task.goal}</div> : null}
+                  {editing === task.id ? <Suggest plan={plan} task={task} onDone={() => setEditing(undefined)} /> : null}
                 </li>
               ))}
             </ul>
           </li>
         ))}
       </ol>
-      <section className={s.panel} aria-label="Reviews">
+      <section className={s.panel} aria-label={t('team.plans.reviewsLabel')}>
         <div className={s.panelHead}>
           <Icon name="chat" size={13} />
-          <span>What the team said</span>
+          <span>{t('team.plans.teamSaid')}</span>
         </div>
         {plan.reviews.length ? (
           <ul className={s.reviews}>
@@ -237,7 +243,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
           <textarea
             className={s.input}
             value={comment}
-            placeholder={`Comment for ${plan.ownerName}…`}
+            placeholder={t('team.plans.commentFor', { name: plan.ownerName })}
             rows={2}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => {
@@ -248,7 +254,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
             }}
           />
           <Button size="small" disabled={!comment.trim()} onClick={send}>
-            Comment
+            {t('team.plans.comment')}
           </Button>
         </div>
       </section>
@@ -263,22 +269,23 @@ function Suggest({ plan, task, onDone }: { plan: SharedPlan; task: SharedPlan['b
   const [title, setTitle] = useState(task.title);
   const [goal, setGoal] = useState(task.goal ?? '');
   const [why, setWhy] = useState('');
+  useT();
   const changed = title.trim() !== task.title || goal.trim() !== (task.goal ?? '');
   const go = (): void => {
     const patch = { ...(title.trim() !== task.title ? { title: title.trim() } : {}), ...(goal.trim() !== (task.goal ?? '') ? { goal: goal.trim() } : {}) };
-    void say(api.team.reviewPlan(plan.owner, plan.id, { kind: 'suggest', ops: [{ op: 'update_task', id: task.id, patch }], ...(why.trim() ? { text: why.trim() } : {}) }), `Suggested to ${plan.ownerName}`).then((r) => r && onDone());
+    void say(api.team.reviewPlan(plan.owner, plan.id, { kind: 'suggest', ops: [{ op: 'update_task', id: task.id, patch }], ...(why.trim() ? { text: why.trim() } : {}) }), t('team.plans.suggested', { name: plan.ownerName })).then((r) => r && onDone());
   };
   return (
     <div className={s.suggest}>
-      <input className={s.input} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
-      <textarea className={s.input} value={goal} rows={3} onChange={(e) => setGoal(e.target.value)} aria-label="Goal" placeholder="What it’s for" />
-      <input className={s.input} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why (optional)" aria-label="Why" />
+      <input className={s.input} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t('team.plans.title')} />
+      <textarea className={s.input} value={goal} rows={3} onChange={(e) => setGoal(e.target.value)} aria-label={t('team.plans.goal')} placeholder={t('team.plans.goalPlaceholder')} />
+      <input className={s.input} value={why} onChange={(e) => setWhy(e.target.value)} placeholder={t('team.plans.whyPlaceholder')} aria-label={t('team.plans.why')} />
       <div className={s.suggestBar}>
         <Button size="small" variant="quiet" onClick={onDone}>
-          Cancel
+          {t('team.plans.cancel')}
         </Button>
         <Button size="small" variant="primary" disabled={!changed || !title.trim()} onClick={go}>
-          Suggest
+          {t('team.plans.suggest')}
         </Button>
       </div>
     </div>

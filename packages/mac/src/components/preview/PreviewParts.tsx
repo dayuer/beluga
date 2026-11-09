@@ -5,23 +5,25 @@ import { Button, IconButton, cx } from '../ui.js';
 import type { FiredEvent } from './preview-model.js';
 import type { AuditIssue } from './use-preview.js';
 import s from './preview.module.css';
+import { useT } from '../../i18n/index.js';
 
 /** The pieces of a live preview around its frame (PreviewBlock.tsx): why it isn't drawing, what fired, what the check found. */
 
 /** Why it isn't drawing, in plain words, with the one thing to do about it. */
 export function ProblemCard({ problem, touched, onReset, onAsk, onRetry, onTurnOn, url }: { problem: PreviewProblem; touched: boolean; onReset: () => void; onAsk: () => void; onRetry: () => void; onTurnOn: () => void; url: string | undefined }) {
+  const t = useT();
   const action =
     problem.kind === 'off'
-      ? { label: 'Turn On…', run: onTurnOn }
+      ? { label: t('common.ui.turnOn'), run: onTurnOn }
       : problem.kind === 'not-running'
-        ? { label: 'Try Again', run: onRetry }
+        ? { label: t('common.ui.tryAgain'), run: onRetry }
         : (problem.kind === 'no-frames' || problem.kind === 'elsewhere') && url
-          ? { label: 'Open in Browser', run: () => void openExternal(url) }
+          ? { label: t('common.previewBlock.openBrowser'), run: () => void openExternal(url) }
           : problem.kind === 'render' && touched
-            ? { label: 'Reset Props', run: onReset }
+            ? { label: t('common.previewBlock.resetProps'), run: onReset }
             : problem.kind === 'provider'
-              ? { label: 'Ask Agent to Set Up', run: onAsk }
-              : { label: 'Ask Agent to Fix', run: onAsk };
+              ? { label: t('common.previewBlock.askSetUp'), run: onAsk }
+              : { label: t('common.previewBlock.askFix'), run: onAsk };
   return (
     <div className={cx(s.problem, (problem.kind === 'render' || problem.kind === 'provider') && s.problemOver)} role="status">
       <Icon name="info" size={14} className={s.problemIcon} />
@@ -54,16 +56,17 @@ export function EventsStrip({ events }: { events: readonly FiredEvent[] }) {
 
 /** What the accessibility check found, in plain words; each shows its element in the drawing. */
 export function AuditPanel({ issues, onShow, onAgain, onClose }: { issues: readonly AuditIssue[]; onShow: (id: string) => void; onAgain: () => void; onClose: () => void }) {
+  const t = useT();
   return (
     <div className={s.audit}>
       <div className={s.panelHead}>
-        <span className={s.panelTitle}>Accessibility</span>
-        <span className={s.panelHint}>{issues.length ? `${issues.length === 1 ? 'One thing' : `${issues.length} things`} to look at. Click one to see it.` : 'Nothing to fix found: names, labels, contrast and headings look right.'}</span>
+        <span className={s.panelTitle}>{t('common.previewParts.a11y')}</span>
+        <span className={s.panelHint}>{issues.length ? t('common.previewParts.issues', { n: issues.length }) : t('common.previewParts.noIssues')}</span>
         <span className={s.grow} />
         <Button size="small" variant="quiet" onClick={onAgain}>
-          Check Again
+          {t('common.previewParts.checkAgain')}
         </Button>
-        <IconButton icon="x" label="Close" onClick={onClose} />
+        <IconButton icon="x" label={t('common.ui.close')} onClick={onClose} />
       </div>
       {issues.length ? (
         <ul className={s.issues}>

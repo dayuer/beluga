@@ -20,6 +20,7 @@ import { MAC_SCOPE, type Need, dotsOf, doesLine, durationText, filterSentinels, 
 import { sentinelMenu, useRunsFolder, useSentinelActions, useSentinelState, type SentinelActions } from './use-sentinel.js';
 import s from './home.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * Sentinel, one page (BLG-300): what needs you, your board's numbers at a glance, and every
@@ -40,6 +41,7 @@ export function SentinelHome() {
   const state = useSentinelState();
   const view = useApp((st) => st.view);
   const actions = useActions();
+  const t = useT();
   const [scope, setScope] = useState<string | undefined>(view.kind === 'sentinel' ? view.projectId : undefined);
   const [board, setBoard] = useState<string | undefined>(view.kind === 'dashboard' ? view.id : undefined);
   useEffect(() => {
@@ -66,7 +68,7 @@ export function SentinelHome() {
     actions.run({ type: 'view', view: { kind: 'sentinel', ...(scope ? { projectId: scope } : {}) } });
   };
 
-  if (!state.enabled) return <Empty icon="sentinel" title="Sentinel needs the Beluga app" detail={`Sentinels run on ${thisComputer()}, as you: open the Beluga app to make one.`} />;
+  if (!state.enabled) return <Empty icon="sentinel" title={t('sentinel.run.needsApp')} detail={t('sentinel.home.needsAppDetail', { computer: thisComputer() })} />;
   // Nothing set up yet: the conversation is the page (BLG-590). Once your agent makes the first
   // sentinel, the page shows it and the chat moves aside, docked on the right.
   if (!any && asking) {
@@ -137,6 +139,7 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
   const ask = useAsk();
   const asking = useApp((st) => st.view.kind === 'sentinel_chat');
   const now = useClock(true, 30_000);
+  const t = useT();
   const [query, setQuery] = useState('');
   const find = useRef<HTMLInputElement>(null);
 
@@ -168,19 +171,19 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
   const groups = groupSentinels(shown, projects);
   const more: ActionItem[] = [
     {
-      label: 'Run at Once',
+      label: t('sentinel.home.runAtOnce'),
       icon: 'claude',
-      submenu: Array.from({ length: MAX_RUN_AT_ONCE }, (_, i) => i + 1).map((n) => ({ label: n === 1 ? '1 at a time' : `${n} at once`, checked: state.runAtOnce === n, onSelect: () => void a.act(() => a.api.setRunAtOnce(n)) })),
+      submenu: Array.from({ length: MAX_RUN_AT_ONCE }, (_, i) => i + 1).map((n) => ({ label: t('sentinel.home.atOnce', { n }), checked: state.runAtOnce === n, onSelect: () => void a.act(() => a.api.setRunAtOnce(n)) })),
       onSelect: () => undefined,
     },
-    ...(folder ? [{ label: 'Open the Runs Folder', icon: 'folder' as const, hint: 'Each run’s outputs and report', onSelect: () => a.openFolder(folder) }] : []),
+    ...(folder ? [{ label: t('sentinel.home.runsFolder'), icon: 'folder' as const, hint: t('sentinel.home.runsFolderHint'), onSelect: () => a.openFolder(folder) }] : []),
   ];
   const projectOf = (id: string | undefined) => projects.find((p) => p.id === id);
   return (
     <>
       <div className={s.bar}>
         <PickMenu<string>
-          label="Project"
+          label={t('sentinel.event.project')}
           choices={scopes.map((x) => ({
             value: x.value ?? ALL,
             label: x.label,
@@ -190,7 +193,7 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
           chosen={[scoped ?? ALL]}
           onPick={(v) => setScope(v === ALL ? undefined : v)}
         >
-          <button type="button" className={s.pick} aria-label={`Project: ${here.label}`}>
+          <button type="button" className={s.pick} aria-label={t('sentinel.home.projectLabel', { name: here.label })}>
             {scoped && scoped !== MAC_SCOPE ? <ProjectIcon id={scoped} name={here.label} size={16} /> : <Icon name={scoped === MAC_SCOPE ? 'laptop' : 'grid'} size={14} />}
             <span>{here.label}</span>
             <span className={s.count}>{here.count}</span>
@@ -203,8 +206,8 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
             ref={find}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a sentinel"
-            aria-label="Find a sentinel"
+            placeholder={t('sentinel.home.find')}
+            aria-label={t('sentinel.home.find')}
             onKeyDown={(e) => {
               if (e.key === 'Escape') (setQuery(''), (e.target as HTMLInputElement).blur());
             }}
@@ -212,18 +215,18 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
         </label>
         <span className={s.grow} />
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label="More for Sentinel" />
+          <IconButton icon="more" label={t('sentinel.home.moreForSentinel')} />
         </ActionsDropdown>
         {asking ? null : (
-          <Tip label="Say what you want watched; your agent sets it up beside this page">
+          <Tip label={t('sentinel.home.askTip')}>
             <Button size="small" icon="claude" onClick={() => ask()}>
-              Ask Your Agent
+              {t('sentinel.addTile.askAgent')}
             </Button>
           </Tip>
         )}
-        <Tip label="Describe one, start from a recipe, or build it step by step" keys={shortcutKeys('page-new')}>
+        <Tip label={t('sentinel.home.newTip')} keys={shortcutKeys('page-new')}>
           <Button variant="primary" size="small" icon="plus" onClick={() => openSheet({ kind: 'new_sentinel', ...(scoped ? { projectId: scoped } : {}) })}>
-            New Sentinel
+            {t('sentinel.new.title')}
           </Button>
         </Tip>
       </div>
@@ -236,12 +239,12 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
         </Board>
       )}
 
-      <section aria-label="Watching">
-        <SectionHead title="Watching" count={shown.length} />
+      <section aria-label={t('sentinel.home.watching')}>
+        <SectionHead title={t('sentinel.home.watching')} count={shown.length} />
         {!shown.length ? (
-          <div className={s.nothing}>{query ? `Nothing called “${query}”${scoped ? ` in ${here.label}` : ''}.` : `No sentinels in ${here.label}.`}</div>
+          <div className={s.nothing}>{query ? (scoped ? t('sentinel.home.nothingCalledIn', { query, where: here.label }) : t('sentinel.home.nothingCalled', { query })) : t('sentinel.home.noneIn', { where: here.label })}</div>
         ) : (
-          <div role="table" aria-label="Sentinels">
+          <div role="table" aria-label={t('sentinel.home.sentinels')}>
             {groups.map((g) => (
               <div key={g.projectId ?? MAC_SCOPE} role="rowgroup" aria-label={g.name}>
                 {groups.length > 1 ? (
@@ -264,9 +267,10 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
 
 /** What waits for you, each with the one thing to do about it. */
 function NeedsYou({ needs, a }: { needs: readonly Need[]; a: SentinelActions }) {
+  const t = useT();
   return (
-    <section aria-label="Needs you">
-      <SectionHead title="Needs you" count={needs.length} />
+    <section aria-label={t('sentinel.home.needsYou')}>
+      <SectionHead title={t('sentinel.home.needsYou')} count={needs.length} />
       <div className={s.needs}>
         {needs.map((x) => (
           <div key={x.key} className={s.need} data-kind={x.kind} data-need={x.key}>
@@ -277,21 +281,21 @@ function NeedsYou({ needs, a }: { needs: readonly Need[]; a: SentinelActions }) 
             </button>
             {x.kind === 'merge' ? (
               <>
-                <Button size="small" variant="quiet" onClick={() => void a.act(() => a.api.decide(x.run.id, 'skip'), x.run.pr ? `#${x.run.pr.number} stays open` : 'Not now')}>
-                  Not Now
+                <Button size="small" variant="quiet" onClick={() => void a.act(() => a.api.decide(x.run.id, 'skip'), x.run.pr ? t('sentinel.run.staysOpen', { n: x.run.pr.number }) : t('sentinel.run.notNowToast'))}>
+                  {t('sentinel.run.notNow')}
                 </Button>
-                <Button size="small" variant="merge" icon="merge" onClick={() => void a.act(() => a.api.decide(x.run.id, 'merge'), x.run.pr ? `Merged #${x.run.pr.number}` : 'Merged')}>
-                  Merge
+                <Button size="small" variant="merge" icon="merge" onClick={() => void a.act(() => a.api.decide(x.run.id, 'merge'), x.run.pr ? t('sentinel.run.mergedN', { n: x.run.pr.number }) : t('sentinel.run.merged'))}>
+                  {t('sentinel.run.merge')}
                 </Button>
               </>
             ) : (
               <>
                 <Button size="small" variant="quiet" onClick={() => a.open(x.sentinel.id)}>
-                  Open
+                  {t('sentinel.home.open')}
                 </Button>
                 {x.kind === 'trouble' ? null : (
                   <Button size="small" variant="primary" icon="play" onClick={() => void a.setPaused(x.sentinel, false)}>
-                    {x.kind === 'failing' ? 'Resume' : 'Turn On'}
+                    {x.kind === 'failing' ? t('sentinel.menu.resume') : t('sentinel.menu.turnOn')}
                   </Button>
                 )}
               </>
@@ -309,6 +313,7 @@ const WatchRow = memo(function WatchRow({ item, state, now, a }: { item: Sentine
   const dots = dotsOf(state, item.id, now);
   const menu = (): ActionItem[] => sentinelMenu(item, lastRunOf(state, item.id), a);
   const broken = item.pausedWhy && item.pausedWhy !== CLAUDE_CHANGED;
+  const t = useT();
   return (
     <ActionsContext items={menu}>
       <div
@@ -319,7 +324,7 @@ const WatchRow = memo(function WatchRow({ item, state, now, a }: { item: Sentine
         data-sentinel={item.id}
         onClick={() => a.open(item.id)}
         onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && a.open(item.id)}
-        aria-label={`${item.name}, ${row.sentence}${item.paused ? ', paused' : ''}`}
+        aria-label={item.paused ? t('sentinel.home.rowLabelPaused', { name: item.name, when: row.sentence }) : t('sentinel.home.rowLabel', { name: item.name, when: row.sentence })}
       >
         <TriggerDisc kind={item.trigger.kind} paused={item.paused} size={28} />
         <span className={s.rowMain}>
@@ -330,21 +335,21 @@ const WatchRow = memo(function WatchRow({ item, state, now, a }: { item: Sentine
             </span>
           </span>
           <span className={s.found} data-state={row.last?.state} title={row.last?.headline}>
-            {broken ? <span className={s.problem}>{pausedWords(item)} · </span> : item.paused ? <span className={s.quiet}>{pausedWords(item) ?? 'Paused'} · </span> : row.trouble ? <span className={s.problem}>Can’t watch: {row.trouble} · </span> : null}
-            {row.last ? (row.last.state === 'done' || row.last.state === 'skipped' ? row.last.headline : `${row.last.label}: ${row.last.headline}`) : 'Hasn’t run yet'}
+            {broken ? <span className={s.problem}>{pausedWords(item)} · </span> : item.paused ? <span className={s.quiet}>{pausedWords(item) ?? t('sentinel.home.paused')} · </span> : row.trouble ? <span className={s.problem}>{t('sentinel.home.cantWatch', { why: row.trouble })} · </span> : null}
+            {row.last ? (row.last.state === 'done' || row.last.state === 'skipped' ? row.last.headline : t('sentinel.home.stateHeadline', { state: row.last.label, headline: row.last.headline })) : t('sentinel.home.notRunYet')}
           </span>
         </span>
-        <span className={s.dots} aria-label={`Last ${dots.length} runs`}>
+        <span className={s.dots} aria-label={t('sentinel.home.lastRuns', { n: dots.length })}>
           {dots.map((d) => (
             <Tip key={d.id} label={d.label}>
               <i data-tone={RUN_STATE_INFO[d.state].tone} data-live={d.state === 'running' || undefined} />
             </Tip>
           ))}
         </span>
-        <span className={s.next}>{row.last && !item.paused ? (row.next ?? (item.trigger.kind === 'manual' ? 'by hand' : 'on its event')) : item.paused ? '' : (row.next ?? '')}</span>
+        <span className={s.next}>{row.last && !item.paused ? (row.next ?? (item.trigger.kind === 'manual' ? t('sentinel.home.byHand') : t('sentinel.home.onEvent'))) : item.paused ? '' : (row.next ?? '')}</span>
         <span className={s.rowMore} onClick={(e) => e.stopPropagation()}>
           <ActionsDropdown items={menu()}>
-            <IconButton icon="more" label={`What to do with ${item.name}`} />
+            <IconButton icon="more" label={t('sentinel.home.whatToDo', { name: item.name })} />
           </ActionsDropdown>
         </span>
       </div>
@@ -358,12 +363,13 @@ const WatchRow = memo(function WatchRow({ item, state, now, a }: { item: Sentine
  */
 function Latest({ state, scope, now, a }: { state: SentinelState; scope: string | undefined; now: number; a: SentinelActions }) {
   const [all, setAll] = useState(false);
+  const t = useT();
   const latest = latestOf(state, scope);
   if (!latest.length) return null;
   const shown = all ? latest : latest.slice(0, LATEST_FIRST);
   return (
-    <div className={s.latest} role="feed" aria-label="What came back">
-      <div className={s.latestHead}>What came back</div>
+    <div className={s.latest} role="feed" aria-label={t('sentinel.home.cameBack')}>
+      <div className={s.latestHead}>{t('sentinel.home.cameBack')}</div>
       <div className={s.messages}>
         {shown.map(({ sentinel, run }) => (
           <Message key={run.id} sentinel={sentinel} run={run} now={now} a={a} />
@@ -371,7 +377,7 @@ function Latest({ state, scope, now, a }: { state: SentinelState; scope: string 
       </div>
       {latest.length > LATEST_FIRST ? (
         <button type="button" className={s.messageMore} style={{ marginTop: 8 }} onClick={() => setAll(!all)}>
-          {all ? 'Show fewer' : `Show ${latest.length - LATEST_FIRST} more`}
+          {all ? t('sentinel.home.showFewer') : t('sentinel.home.showMore', { n: latest.length - LATEST_FIRST })}
         </button>
       ) : null}
     </div>
@@ -384,6 +390,7 @@ const Message = memo(function Message({ sentinel, run, now, a }: { sentinel: Sen
   const project = sentinel.projectId ? projects.find((p) => p.id === sentinel.projectId) : undefined;
   const [report, setReport] = useState<string>();
   const [open, setOpen] = useState(false);
+  const t = useT();
   const ended = run.state !== 'running' && run.state !== 'queued';
   useEffect(() => {
     if (!ended) return;
@@ -415,11 +422,11 @@ const Message = memo(function Message({ sentinel, run, now, a }: { sentinel: Sen
           <Markdown text={rest} tasks />
         </div>
       ) : run.state === 'done' && !run.headline ? (
-        <div className={s.messageQuiet}>Done · {durationText(runDuration(run, now))}</div>
+        <div className={s.messageQuiet}>{t('sentinel.home.doneTook', { d: durationText(runDuration(run, now)) })}</div>
       ) : null}
       {rest && rest.length > 280 ? (
         <button type="button" className={s.messageMore} onClick={() => setOpen(!open)}>
-          {open ? 'Show less' : 'Show all'}
+          {open ? t('sentinel.home.showLess') : t('sentinel.home.showAll')}
         </button>
       ) : null}
     </article>
@@ -429,12 +436,12 @@ const Message = memo(function Message({ sentinel, run, now, a }: { sentinel: Sen
 // ---------------------------------------------------------------- the first visit
 
 /** One-tap ideas under the box: the first lets Claude look at your projects and suggest. */
-const IDEAS: ReadonlyArray<{ readonly label: string; readonly icon: Parameters<typeof Icon>[0]['name']; readonly prompt: string }> = [
-  { label: 'Suggest Some for Me', icon: 'sparkles', prompt: 'I’m new to Sentinel. Look at my projects and what they use, and suggest three watchers that would help me, each in one plain line. Set them up, with a board for their numbers, when I say yes.' },
-  { label: 'Make Me a Dashboard', icon: 'gauge', prompt: 'Make me a dashboard with the numbers that matter for my projects, and set up what keeps them fresh.' },
-  { label: 'A Morning Brief', icon: 'clock', prompt: 'Every weekday morning, tell me on my phone what changed in my projects and what needs me first.' },
-  { label: 'Watch My Website', icon: 'pulse', prompt: 'Check my website every 5 minutes and tell me the moment it stops answering, and when it’s back.' },
-  { label: 'Fix Failing Tests', icon: 'wrench', prompt: 'When the tests fail on GitHub for one of my projects, have the agent fix it and open a pull request for me to merge.' },
+const ideas = (t: ReturnType<typeof useT>): ReadonlyArray<{ readonly label: string; readonly icon: Parameters<typeof Icon>[0]['name']; readonly prompt: string }> => [
+  { label: t('sentinel.chat.suggest'), icon: 'sparkles', prompt: t('sentinel.home.idea.suggestPrompt') },
+  { label: t('sentinel.home.idea.dashboard'), icon: 'gauge', prompt: t('sentinel.home.idea.dashboardPrompt') },
+  { label: t('sentinel.chat.brief'), icon: 'clock', prompt: t('sentinel.chat.briefPrompt', { project: t('sentinel.chat.myProjects') }) },
+  { label: t('sentinel.home.idea.website'), icon: 'pulse', prompt: t('sentinel.home.idea.websitePrompt') },
+  { label: t('sentinel.chat.fix'), icon: 'wrench', prompt: t('sentinel.home.idea.fixPrompt') },
 ];
 
 /**
@@ -444,6 +451,7 @@ const IDEAS: ReadonlyArray<{ readonly label: string; readonly icon: Parameters<t
  */
 function FirstVisit() {
   const ask = useAsk();
+  const t = useT();
   // A conversation already under way (you went back to this page from it): one click returns to it.
   const talked = useApp((st) => {
     const channel = sentinelChatChannel(st.sentinel.chats?.active ?? FIRST_SENTINEL_CHAT);
@@ -457,16 +465,16 @@ function FirstVisit() {
   };
   return (
     <div className={s.first} data-testid="sentinel-first">
-      <h1 className={s.firstTitle}>Let your agent keep an eye on things</h1>
-      <p className={s.lede}>Say what you want to see or keep an eye on. Your agent builds the dashboard, watcher or pipeline for you; nothing runs until you turn it on.</p>
+      <h1 className={s.firstTitle}>{t('sentinel.home.firstTitle')}</h1>
+      <p className={s.lede}>{t('sentinel.home.lede')}</p>
       <Showcase onPick={(slide) => ask(slide.prompt)} />
       <div className={s.composer}>
         <textarea
           className={s.composerText}
           value={words}
           rows={2}
-          placeholder="Every morning, tell me what changed and what needs me first…"
-          aria-label="What should Beluga keep an eye on?"
+          placeholder={t('sentinel.home.composerPlaceholder')}
+          aria-label={t('sentinel.home.composerLabel')}
           onChange={(e) => setWords(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -476,13 +484,13 @@ function FirstVisit() {
           }}
         />
         <div className={s.composerRow}>
-          <span className={s.composerHint}>Your agent asks before anything new can run</span>
+          <span className={s.composerHint}>{t('sentinel.home.composerHint')}</span>
           <span className={s.grow} />
-          <IconButton icon="send" label="Ask Your Agent" className={s.send} disabled={!words.trim()} onClick={send} />
+          <IconButton icon="send" label={t('sentinel.addTile.askAgent')} className={s.send} disabled={!words.trim()} onClick={send} />
         </div>
       </div>
-      <div className={s.ideas} role="list" aria-label="Ideas">
-        {IDEAS.map((x, i) => (
+      <div className={s.ideas} role="list" aria-label={t('sentinel.home.ideas')}>
+        {ideas(t).map((x, i) => (
           <button key={x.label} type="button" role="listitem" className={s.idea} data-lead={i === 0 || undefined} onClick={() => ask(x.prompt)}>
             <Icon name={x.icon} size={13} />
             {x.label}
@@ -492,14 +500,14 @@ function FirstVisit() {
       <div className={s.firstFoot}>
         {talked ? (
           <button type="button" className={s.link} onClick={() => ask()}>
-            Back to your conversation
+            {t('sentinel.home.backToChat')}
           </button>
         ) : null}
         <button type="button" className={s.link} onClick={() => openSheet({ kind: 'new_sentinel', way: 'recipe' })}>
-          Every recipe
+          {t('sentinel.home.everyRecipe')}
         </button>
         <button type="button" className={s.link} onClick={() => openSheet({ kind: 'new_sentinel', way: 'build' })}>
-          Build one step by step
+          {t('sentinel.home.buildStepByStep')}
         </button>
       </div>
     </div>

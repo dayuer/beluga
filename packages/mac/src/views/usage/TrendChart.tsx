@@ -5,6 +5,7 @@ import type { MetricDef } from './stats-model.js';
 import { smoothPath } from '@beluga/shared/stats-trend.js';
 import type { Trend } from './trend-model.js';
 import s from './stats.module.css';
+import { useT } from '../../i18n/index.js';
 
 /** Stacked: how much in all; Share: who did what part of each step (every step 100%). */
 export type TrendMode = 'stacked' | 'share';
@@ -52,6 +53,7 @@ function linePath(high: readonly number[]): string {
  * only its band. Share shows each one's part of every step instead of how much.
  */
 export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: MetricDef; mode: TrendMode; animate: string; why?: string }) {
+  const t = useT();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [focus, setFocus] = useState<string | undefined>(undefined);
   const [hover, setHover] = useState<number | undefined>(undefined);
@@ -85,7 +87,7 @@ export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: 
     if (!r || n < 1) return;
     setHover(Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width) * (n - 1)))));
   };
-  if (!trend.series.length) return <p className={s.quiet}>{why ?? `Nothing yet for ${m.label.toLowerCase()} in this stretch.`}</p>;
+  if (!trend.series.length) return <p className={s.quiet}>{why ?? t('views.trend.nothing', { metric: m.label.toLowerCase() })}</p>;
   const b = hover !== undefined ? trend.buckets[hover] : undefined;
   const at = hover !== undefined ? (n <= 1 ? 50 : (hover / (n - 1)) * 100) : 0;
   const stepTotal = hover !== undefined ? shown.reduce((t, x) => t + x.values[hover]!, 0) : 0;
@@ -101,7 +103,7 @@ export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: 
             </span>
           ))}
         </div>
-        <div ref={box} className={s.trendBox} onMouseMove={onMove} onMouseLeave={() => setHover(undefined)} role="img" aria-label={`${m.label} over time: ${shown.map((x) => `${x.name} ${m.format(x.total)}`).join(', ')}`}>
+        <div ref={box} className={s.trendBox} onMouseMove={onMove} onMouseLeave={() => setHover(undefined)} role="img" aria-label={`${t('views.trend.overTime', { metric: m.label })}: ${shown.map((x) => `${x.name} ${m.format(x.total)}`).join(', ')}`}>
           <div key={animate} className={s.trendDraw}>
             {/* The bands' fill: dithered, dense at each band's peak and thinning out to the bottom. */}
             <DitherFill bands={fills} width={W} height={H} className={s.trendDither} />
@@ -141,7 +143,7 @@ export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: 
                       <span>{mode === 'share' && stepTotal ? `${Math.round((x.values[hover]! / stepTotal) * 100)}%` : m.format(x.values[hover]!)}</span>
                     </div>
                   ))}
-                {!stepTotal ? <div className={s.tipRow}>Nothing this time</div> : null}
+                {!stepTotal ? <div className={s.tipRow}>{t('views.trend.nothingThisTime')}</div> : null}
               </div>
             </>
           ) : null}
@@ -156,7 +158,7 @@ export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: 
           )}
         </div>
       </div>
-      <div className={s.legend2} role="group" aria-label="Show or hide">
+      <div className={s.legend2} role="group" aria-label={t('views.trend.showHide')}>
         {trend.series.map((x) => {
           const off = hidden.has(x.key);
           return (
@@ -169,7 +171,7 @@ export function TrendChart({ trend, m, mode, animate, why }: { trend: Trend; m: 
               onClick={() => toggle(x.key)}
               onMouseEnter={() => !off && setFocus(x.key)}
               onMouseLeave={() => setFocus(undefined)}
-              title={off ? `Show ${x.name}` : `Hide ${x.name}`}
+              title={off ? t('views.trend.show', { name: x.name }) : t('views.trend.hide', { name: x.name })}
             >
               <span className={s.swatch} />
               {x.name}

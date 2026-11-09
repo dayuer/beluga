@@ -8,6 +8,7 @@ import { useApi, useApp } from '../../lib/beluga.js';
 import { openSheet } from '../../lib/sheets.js';
 import { sameDeep } from '../../lib/stable.js';
 import s from './env-asks.module.css';
+import { useT } from '../../i18n/index.js';
 
 const NONE: readonly EnvChange[] = [];
 
@@ -18,6 +19,7 @@ const NONE: readonly EnvChange[] = [];
  */
 function EnvAsk({ wsId, changes, name }: { wsId: string; changes: readonly EnvChange[]; name?: string }) {
   const api = useApi();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const files = changes.map((c) => c.file);
   const act = (run: () => Promise<unknown>): void => {
@@ -25,31 +27,31 @@ function EnvAsk({ wsId, changes, name }: { wsId: string; changes: readonly EnvCh
     void run().finally(() => setBusy(false));
   };
   return (
-    <div className={s.ask} role="status" aria-label="Env changes in this worktree">
+    <div className={s.ask} role="status" aria-label={t('views.env.aria')}>
       <Icon name="lock" size={13} className={s.icon} />
       <span className={s.text}>
         {name ? <strong>{name} </strong> : null}
-        changed {files.length === 1 ? <code>{files[0]}</code> : `${files.length} env files`}
+        {t('views.env.changed')} {files.length === 1 ? <code>{files[0]}</code> : t('views.env.files', { n: files.length })}
         {changes.length === 1 ? (
           <>
             {' '}
             <EnvKeys change={changes[0]!} />
           </>
         ) : null}
-        <span className={s.detail}>{name ? '' : ' · the main folder doesn’t have it'}</span>
+        <span className={s.detail}>{name ? '' : t('views.env.mainLacks')}</span>
       </span>
-      <Tip label="Write it into the main folder’s file; other worktrees that didn’t change theirs follow">
+      <Tip label={t('views.env.copyTip')}>
         <Button size="small" disabled={busy} onClick={() => act(() => api.workspaces.applyEnvBack(wsId))}>
-          Copy to Main Folder
+          {t('views.env.copy')}
         </Button>
       </Tip>
-      <Tip label="The project’s own variables in Beluga: every worktree and run gets them; the file stays as it is">
+      <Tip label={t('views.env.saveTip')}>
         <Button size="small" variant="quiet" disabled={busy} onClick={() => act(() => api.workspaces.saveEnvInBeluga(wsId))}>
-          Save in Beluga
+          {t('views.env.save')}
         </Button>
       </Tip>
-      <ActionsDropdown items={[{ label: 'Keep in This Worktree Only', hint: 'asked again if it changes', onSelect: () => act(() => api.workspaces.keepEnvHere(wsId)) }]}>
-        <IconButton icon="more" label="More for these env changes" disabled={busy} />
+      <ActionsDropdown items={[{ label: t('views.env.keep'), hint: t('views.env.keepHint'), onSelect: () => act(() => api.workspaces.keepEnvHere(wsId)) }]}>
+        <IconButton icon="more" label={t('views.env.more')} disabled={busy} />
       </ActionsDropdown>
     </div>
   );
@@ -96,11 +98,12 @@ export function ProjectEnvAsks({ projectId }: { projectId: string }) {
 export function EnvPill({ projectId, root }: { projectId: string; root: string }) {
   const own = useApp((st) => st.envKeys.projects[root]?.keys.length ?? 0);
   const off = useApp((st) => st.envKeys.projects[root]?.dotenv === false);
+  const t = useT();
   return (
-    <Tip label={off ? 'Its variables (the main folder’s .env is switched off)' : 'Its variables and the main folder’s .env'}>
+    <Tip label={off ? t('views.env.pillOffTip') : t('views.env.pillTip')}>
       <button type="button" className={s.pill} onClick={() => openSheet({ kind: 'project_env', projectId })}>
         <Icon name="lock" size={11} />
-        Environment
+        {t('views.env.environment')}
         {own ? <strong>{own}</strong> : null}
       </button>
     </Tip>

@@ -4,7 +4,7 @@ import { type IssueStatus, STATUS_INFO } from '@beluga/core/board/model.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { StatusIcon } from '../tasks/marks.js';
-import { t } from '../i18n/index.js';
+import { t, tl } from '../i18n/index.js';
 import s from './composer.module.css';
 
 /** Suggestions listed under / and @ at most (Beluga's commands and every one of Claude's skills). */
@@ -144,7 +144,7 @@ function TaskOption({ task, asking }: { task: NonNullable<Suggestion['task']>; a
       ) : (
         <span className={s.sugTitle}>{task.title}</span>
       )}
-      {task.elsewhere ? <span className={s.sugProject}>{task.elsewhere}</span> : status ? <span className={s.sugStatus}>{status.label}</span> : null}
+      {task.elsewhere ? <span className={s.sugProject}>{task.elsewhere}</span> : status ? <span className={s.sugStatus}>{tl('STATUS_INFO', task.status, 'label', status.label)}</span> : null}
     </>
   );
 }

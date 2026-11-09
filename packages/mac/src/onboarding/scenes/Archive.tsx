@@ -1,3 +1,4 @@
+import { t, useT } from '../../i18n/index.js';
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon } from '../../components/Icon.js';
 import { SPRING, Ticker } from '../fx.js';
@@ -10,10 +11,10 @@ import s from './scenes.module.css';
  * fold into a small capsule on the shelf. Restore checks the branch out again.
  */
 
-const CARDS: ReadonlyArray<{ label: string; kept: boolean }> = [
-  { label: 'Folder · node_modules, builds', kept: false },
-  { label: 'Conversation · 214 messages', kept: true },
-  { label: 'Branch · fix/safari-scroll', kept: true },
+const CARDS: ReadonlyArray<{ readonly label: string; kept: boolean }> = [
+  { get label() { return t('onboarding.scene.archive.folder'); }, kept: false },
+  { get label() { return t('onboarding.scene.archive.conversation'); }, kept: true },
+  { get label() { return t('onboarding.scene.archive.branch'); }, kept: true },
 ];
 const FULL_MB = 1240;
 const PACKED_MB = 0.6;
@@ -25,6 +26,7 @@ const BEATS = [1800, 1100, 2200, 1500] as const;
 
 export function Archive() {
   const beat = useBeats(BEATS, 2);
+  useT();
   const packed = beat === 1 || beat === 2;
   const restored = beat === 3;
   return (
@@ -56,18 +58,18 @@ export function Archive() {
               <motion.div key="capsule" className={s.capsule} initial={{ opacity: 0, scale: 0.6, y: 40 }} animate={{ opacity: 1, scale: 1, y: 52 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ ...SPRING, delay: 0.35 }}>
                 <Icon name="archive" size={13} />
                 <span className={s.mono}>fix/safari-scroll</span>
-                <span className={s.dim}>archived</span>
+                <span className={s.dim}>{t('onboarding.scene.archive.archived')}</span>
               </motion.div>
             ) : null}
           </AnimatePresence>
         </div>
         <div className={s.size}>
-          <span className={s.dim}>On disk</span>
+          <span className={s.dim}>{t('onboarding.scene.archive.onDisk')}</span>
           <strong>
             <Ticker key={packed ? 'packed' : restored ? 'restored' : 'full'} value={packed ? PACKED_MB : FULL_MB} from={packed ? FULL_MB : restored ? PACKED_MB : FULL_MB} format={size} duration={packed ? 1.2 : 0.8} />
           </strong>
           <span className={s.saved} data-on={packed}>
-            {packed ? 'Only the branch and the conversation stay' : restored ? 'Checked out again, every message intact' : 'A finished worktree'}
+            {packed ? t('onboarding.scene.archive.packed') : restored ? t('onboarding.scene.archive.restored') : t('onboarding.scene.archive.finished')}
           </span>
         </div>
       </div>

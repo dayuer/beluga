@@ -15,7 +15,7 @@ import s from './sharing.module.css';
 import v from './invite.module.css';
 import { thisComputer } from '../../lib/os-words.js';
 import { rich } from './pick.js';
-import { t, useT } from '../../i18n/index.js';
+import { t, useT, tl } from '../../i18n/index.js';
 
 const sentence = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -102,9 +102,9 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
         <span className={s.hint}>{c.scope === 'room' ? t('dialogs.invite.roomHint') : t('dialogs.invite.projectHint')}</span>
       </Field>
       <Field label={t('dialogs.invite.theyCan')}>
-        <Choice<GuestCan> label={t('dialogs.invite.theyCan')} value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: CAN_INFO[can].label, icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
+        <Choice<GuestCan> label={t('dialogs.invite.theyCan')} value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: tl('CAN_INFO', can, 'label', CAN_INFO[can].label), icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
         <span className={s.hint}>
-          {sentence(CAN_INFO[c.can].detail)}.{noGuests && c.can !== 'watch' ? ` ${noGuests}` : ''}
+          {sentence(tl('CAN_INFO', c.can, 'detail', CAN_INFO[c.can].detail))}{t('common.punct.period')}{noGuests && c.can !== 'watch' ? ` ${noGuests}` : ''}
         </span>
       </Field>
       <Field label={t('dialogs.invite.theLink')}>
@@ -125,7 +125,7 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
                   <Icon name="link" size={14} className={s.itemIcon} />
                   <div className={s.itemText}>
                     <span className={s.itemTitle}>
-                      {l.label === 'everything' ? t('dialogs.invite.everythingLabel') : l.label} <Tag tone="accent">{CAN_INFO[l.can].short}</Tag>
+                      {l.label === 'everything' ? t('dialogs.invite.everythingLabel') : l.label} <Tag tone="accent">{tl('CAN_INFO', l.can, 'short', CAN_INFO[l.can].short)}</Tag>
                     </span>
                     <span className={s.itemDetail}>{[sentence(expiresIn(l.expiresAt, Date.now())), l.used ? t('dialogs.invite.usedBy', { name: l.used }) : t('dialogs.invite.notUsed'), l.singleUse ? t('dialogs.invite.onePerson') : t('dialogs.invite.anyone'), l.knock ? t('dialogs.invite.knocksFirst') : t('dialogs.invite.noKnock')].join(' · ')}</span>
                   </div>
@@ -191,7 +191,7 @@ function Waiting() {
               <Avatar name={name} id={k.peerId} size={24} />
               <div className={s.itemText}>
                 <span className={s.itemTitle}>{name}</span>
-                <span className={s.itemDetail}>{link ? t('dialogs.invite.wants', { label: link.label, can: CAN_INFO[link.can].short }) : t('dialogs.invite.atDoor')}</span>
+                <span className={s.itemDetail}>{link ? t('dialogs.invite.wants', { label: link.label, can: tl('CAN_INFO', link.can, 'short', CAN_INFO[link.can].short) }) : t('dialogs.invite.atDoor')}</span>
               </div>
               <div className={s.itemButtons}>
                 <Button size="small" variant="quiet" onClick={() => void api.invites.decline(k.peerId)}>

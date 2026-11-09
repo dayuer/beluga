@@ -6,13 +6,14 @@ import { Card, meterTone } from './parts.js';
 import { duration } from './stats-model.js';
 import { usePicked } from './use-stats.js';
 import s from './stats.module.css';
+import { type Key, useT } from '../../i18n/index.js';
 
 const DAY = 86_400_000;
 /** The sessions of the last week, the weeks of the last six. */
 const SPAN: Record<PlanKind, number> = { session: 7 * DAY, week: 6 * 7 * DAY };
-const KINDS: ReadonlyArray<{ value: PlanKind; label: string; hint: string }> = [
-  { value: 'session', label: '5-hour', hint: 'Each 5-hour session, the last 7 days' },
-  { value: 'week', label: 'Weekly', hint: 'Each week, the last six' },
+const KINDS: ReadonlyArray<{ value: PlanKind; label: Key; hint: Key }> = [
+  { value: 'session', label: 'views.sessions.fiveHour', hint: 'views.sessions.fiveHourHint' },
+  { value: 'week', label: 'views.sessions.weekly', hint: 'views.sessions.weeklyHint' },
 ];
 const TONE: Record<'calm' | 'warn' | 'hot', string> = { calm: 'var(--series-1)', warn: 'var(--series-4)', hot: 'var(--series-8)' };
 
@@ -20,12 +21,13 @@ const when = (w: PlanWindow): string => {
   const start = new Date(w.resetsAt - PLAN_SPAN[w.kind]);
   const end = new Date(w.resetsAt);
   if (w.kind === 'week') return `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-  const t = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: d.getMinutes() ? '2-digit' : undefined });
-  return `${start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${t(start)} – ${t(end)}`;
+  const time = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: d.getMinutes() ? '2-digit' : undefined });
+  return `${start.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${time(start)} – ${time(end)}`;
 };
 
 /** Each window as a block on a timeline: its height is how much you used, the faint rest is what was left. */
 function Timeline({ windows, kind, now, hover, onHover }: { windows: readonly PlanWindow[]; kind: PlanKind; now: number; hover?: number; onHover: (i?: number) => void }) {
+  const t = useT();
   const end = Math.max(now, ...windows.map((w) => w.resetsAt));
   const from = end - SPAN[kind];
   const span = end - from;
@@ -40,7 +42,7 @@ function Timeline({ windows, kind, now, hover, onHover }: { windows: readonly Pl
   }
   return (
     <div className={s.timeline} onMouseLeave={() => onHover(undefined)}>
-      <div className={s.timelinePlot} role="list" aria-label={kind === 'session' ? '5-hour sessions, the last 7 days' : 'Weeks, the last six'}>
+      <div className={s.timelinePlot} role="list" aria-label={kind === 'session' ? t('views.sessions.sessionsAria') : t('views.sessions.weeksAria')}>
         {marks.map((mk) => (
           <span key={mk.at} className={s.timelineMark} style={{ left: `${mk.at}%` }} />
         ))}
@@ -51,7 +53,7 @@ function Timeline({ windows, kind, now, hover, onHover }: { windows: readonly Pl
             <div
               key={`${w.resetsAt}`}
               role="listitem"
-              aria-label={`${when(w)}: ${Math.round(w.peak)}% used${w.open ? ', still going' : ''}`}
+              aria-label={`${when(w)}: ${t('views.sessions.pctUsed', { pct: Math.round(w.peak) })}${w.open ? t('views.sessions.stillGoing') : ''}`}
               className={cx(s.window, w.open && s.windowOpen, hover === i && s.windowOn, kind === 'week' && s.windowWeek)}
               style={{ left: `${Math.max(0, left)}%`, width: `calc(${width - Math.max(0, -left)}% - ${kind === 'week' ? 6 : 1}px)`, '--t': TONE[meterTone(w.peak)] } as React.CSSProperties}
               onMouseEnter={() => onHover(i)}
@@ -61,7 +63,7 @@ function Timeline({ windows, kind, now, hover, onHover }: { windows: readonly Pl
             </div>
           );
         })}
-        <span className={s.now} style={{ left: `${pos(now)}%` }} title="Now" />
+        <span className={s.now} style={{ left: `${pos(now)}%` }} title={t('views.sessions.now')} />
       </div>
       <div className={s.timelineTicks} aria-hidden>
         {marks.map((mk) =>
@@ -92,6 +94,7 @@ const byClaudeFirst = (a: string, b: string): number => (a === 'claude' ? -1 : b
  * there's no card at all.
  */
 export function SessionsCard({ windows, limits, now }: { windows: readonly PlanWindow[]; limits: readonly PlanLimit[]; now: number }) {
+  const t = useT();
   const known = useMemo(() => [...windows.map((w) => ({ runtime: w.runtime, kind: w.kind })), ...limits], [windows, limits]);
   const runtimes = useMemo(() => [...new Set(known.map((k) => k.runtime))].sort(byClaudeFirst), [known]);
   const [wanted, setKind] = usePicked<PlanKind>('beluga.sessions.kind', 'session', ['session', 'week']);
@@ -106,19 +109,19 @@ export function SessionsCard({ windows, limits, now }: { windows: readonly PlanW
   const open = list.find((w) => w.open);
   const shown = hover !== undefined ? list[hover] : undefined;
   const name = RUNTIME_NAMES[runtime] ?? runtime;
-  const unit = kind === 'session' ? 'session' : 'week';
+  const unit = kind === 'session' ? t('views.sessions.session') : t('views.sessions.week');
   const aside = (
     <>
-      {runtimes.length > 1 ? <Segmented label="Agent" value={runtime} options={runtimes.map((r) => ({ value: r, label: RUNTIME_NAMES[r] ?? r }))} onChange={(r) => (setPicked(r), setHover(undefined))} /> : null}
-      {kinds.length > 1 ? <Segmented label="Window" value={kind} options={kinds} onChange={(k) => (setKind(k), setHover(undefined))} /> : null}
+      {runtimes.length > 1 ? <Segmented label={t('views.breakdown.agent')} value={runtime} options={runtimes.map((r) => ({ value: r, label: RUNTIME_NAMES[r] ?? r }))} onChange={(r) => (setPicked(r), setHover(undefined))} /> : null}
+      {kinds.length > 1 ? <Segmented label={t('views.sessions.window')} value={kind} options={kinds.map((k) => ({ value: k.value, label: t(k.label), hint: t(k.hint) }))} onChange={(k) => (setKind(k), setHover(undefined))} /> : null}
     </>
   );
   return (
-    <Card label="Plan sessions" title={kind === 'session' ? 'Sessions' : 'Weeks'}>
+    <Card label={t('views.sessions.aria')} title={kind === 'session' ? t('views.sessions.sessions') : t('views.sessions.weeks')}>
       {runtimes.length > 1 || kinds.length > 1 ? <div className={s.sessionsSwitches}>{aside}</div> : null}
       {!list.length ? (
         <p className={s.quiet}>
-          Beluga keeps your {name} plan’s {kind === 'session' ? '5-hour sessions' : 'weeks'} from now on: each shows here with how much of it you used.
+          {t(kind === 'session' ? 'views.sessions.keepsSessions' : 'views.sessions.keepsWeeks', { name })}
         </p>
       ) : (
         <>
@@ -126,17 +129,17 @@ export function SessionsCard({ windows, limits, now }: { windows: readonly PlanW
             <>
               <div className={s.sessionsHero}>
                 <span className={s.sessionsValue}>{Math.round(sum.used)}%</span>
-                <span className={s.sessionsUnit}>of each {unit} used, on average</span>
+                <span className={s.sessionsUnit}>{t('views.sessions.average', { unit })}</span>
               </div>
               <div className={s.sessionsFacts}>
                 <span>
-                  <strong>{sum.maxed}</strong> ran out
+                  <strong>{sum.maxed}</strong> {t('views.sessions.ranOut')}
                 </span>
                 <span>
-                  <strong>≈ {duration(sum.leftMs)}</strong> left unused
+                  <strong>≈ {duration(sum.leftMs)}</strong> {t('views.sessions.leftUnused')}
                 </span>
                 <span>
-                  <strong>{sum.windows}</strong> {kind === 'session' ? 'sessions' : 'weeks'}
+                  <strong>{sum.windows}</strong> {kind === 'session' ? t('views.sessions.sessionsLower') : t('views.sessions.weeksLower')}
                 </span>
               </div>
             </>
@@ -145,11 +148,11 @@ export function SessionsCard({ windows, limits, now }: { windows: readonly PlanW
             <>
               <div className={s.sessionsHero}>
                 <span className={s.sessionsValue}>{open ? `${Math.round(open.peak)}%` : '–'}</span>
-                <span className={s.sessionsUnit}>of this {unit} used so far</span>
+                <span className={s.sessionsUnit}>{t('views.sessions.soFar', { unit })}</span>
               </div>
               <div className={s.sessionsFacts}>
                 <span>
-                  Once it resets, how much you used and what was left show here, {unit} after {unit}.
+                  {t('views.sessions.onceResets', { unit })}
                 </span>
               </div>
             </>
@@ -158,11 +161,11 @@ export function SessionsCard({ windows, limits, now }: { windows: readonly PlanW
           <div className={s.sessionsFoot}>
             {shown ? (
               <span className={s.calendarHover}>
-                <strong>{when(shown)}</strong> · {Math.round(shown.peak)}% used{shown.open ? ' so far' : `, ${Math.round(100 - shown.peak)}% left`}
-                {shown.peak >= 99.5 ? ' · ran out' : ''}
+                <strong>{when(shown)}</strong> · {t('views.sessions.pctUsed', { pct: Math.round(shown.peak) })}{shown.open ? t('views.sessions.soFarSuffix') : t('views.sessions.leftSuffix', { pct: Math.round(100 - shown.peak) })}
+                {shown.peak >= 99.5 ? t('views.sessions.ranOutSuffix') : ''}
               </span>
             ) : (
-              <span>{kind === 'session' ? 'Each block is a 5-hour session: its height is how much you used' : 'Each block is a week: its height is how much you used'}</span>
+              <span>{kind === 'session' ? t('views.sessions.blockSession') : t('views.sessions.blockWeek')}</span>
             )}
           </div>
         </>

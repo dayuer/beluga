@@ -7,7 +7,7 @@ import { keyPlatform } from '../../lib/shortcuts-model.js';
 import { generatedName, randomSeed } from '../../lib/sounds/generated.js';
 import { playSound } from '../../lib/sounds/player.js';
 import s from './sound.module.css';
-import { t, useT } from '../../i18n/index.js';
+import { t, useT, tl } from '../../i18n/index.js';
 
 const FAMILIES = familiesHere(keyPlatform() === 'mac');
 
@@ -97,7 +97,7 @@ export function SoundPicker({ value, volume, made, onPick, onKeep, kindLabel }: 
   const [family, setFamily] = useState<SoundFamily>(FAMILIES.includes(value.kind) ? value.kind : 'chip');
   const current = choiceKey(value);
   const tiles = (choices: readonly SoundChoice[]) => (
-    <div className={s.tiles} role="radiogroup" aria-label={t('dialogs.sound.familySounds', { family: FAMILY_LABELS[family] })}>
+    <div className={s.tiles} role="radiogroup" aria-label={t('dialogs.sound.familySounds', { family: tl('FAMILY_LABELS', family, 'text', FAMILY_LABELS[family]) })}>
       {choices.map((c) => (
         <Tile key={choiceKey(c)} choice={c} on={choiceKey(c) === current} volume={volume} onPick={onPick} />
       ))}
@@ -107,7 +107,7 @@ export function SoundPicker({ value, volume, made, onPick, onKeep, kindLabel }: 
   return (
     <div className={s.picker}>
       {kindLabel ? <div className={s.pickerFor}>{t('dialogs.sound.for', { kind: kindLabel })}</div> : null}
-      <Segmented<SoundFamily> label={t('dialogs.sound.kind')} value={family} onChange={setFamily} options={FAMILIES.map((f) => ({ value: f, label: FAMILY_LABELS[f], hint: hints[f] }))} />
+      <Segmented<SoundFamily> label={t('dialogs.sound.kind')} value={family} onChange={setFamily} options={FAMILIES.map((f) => ({ value: f, label: tl('FAMILY_LABELS', f, 'text', FAMILY_LABELS[f]), hint: hints[f] }))} />
       <p className={s.hint}>{hints[family]}</p>
       {family === 'chip' ? tiles(CHIP_CHOICES) : null}
       {family === 'mac' ? tiles(MAC_CHOICES) : null}

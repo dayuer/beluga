@@ -8,6 +8,7 @@ import { ACCESS_COPY, accessAction, grantText } from './access-copy.js';
 import { EASE_OUT, Rise, SPRING, Words } from './fx.js';
 import { ACCESS, type AccessStep, type Step, accessPlace } from './onboarding-model.js';
 import s from './onboarding.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * One macOS permission a step, every one optional: what it lets Claude do (one sentence), a
@@ -29,6 +30,7 @@ export function AppTile({ size = 22 }: { readonly size?: number }) {
 
 /** How it stands, as a soft pill: green once allowed, quiet otherwise. */
 function GrantPill({ grant, asked }: { readonly grant: Grant | undefined; readonly asked: boolean }) {
+  useT();
   return (
     <motion.span key={`${grant}-${asked}`} className={s.grant} data-grant={grant ?? 'unknown'} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={SPRING}>
       <Icon name={grant === 'granted' ? 'check' : grant === 'off' ? 'lock' : 'info'} size={11} />
@@ -39,6 +41,7 @@ function GrantPill({ grant, asked }: { readonly grant: Grant | undefined; readon
 
 /** System Settings › Privacy & Security › that pane, in miniature: Beluga in its list, its switch as macOS has it. */
 function MiniPane({ step, grant }: { readonly step: AccessStep; readonly grant: Grant | undefined }) {
+  const t = useT();
   const copy = ACCESS_COPY[step];
   const on = grant === 'granted';
   return (
@@ -53,7 +56,7 @@ function MiniPane({ step, grant }: { readonly step: AccessStep; readonly grant: 
         <span>{copy.name}</span>
       </div>
       <div className={s.paneBody}>
-        <span className={s.paneCrumb}>Privacy &amp; Security</span>
+        <span className={s.paneCrumb}>{t('onboarding.accessSteps.privacy')}</span>
         <div className={s.paneList}>
           <div className={s.paneRow} data-faint>
             <span className={s.paneApp} style={{ background: '#d7dbe2' }} />
@@ -80,13 +83,14 @@ function MiniPane({ step, grant }: { readonly step: AccessStep; readonly grant: 
 
 /** The four permissions as small chips under the step: where you are, which are allowed, each a way there. */
 function AccessDots({ step, access, go }: { readonly step: AccessStep; readonly access: PrivacyAccess | undefined; readonly go: (to: Step) => void }) {
+  const t = useT();
   return (
-    <div className={s.accessDots} role="group" aria-label="Permissions">
+    <div className={s.accessDots} role="group" aria-label={t('onboarding.accessSteps.permissions')}>
       {ACCESS.map((a) => {
         const copy = ACCESS_COPY[a];
         const granted = access?.[a] === 'granted';
         return (
-          <button key={a} type="button" className={cx(s.accessDot, a === step && s.accessDotOn)} data-tint={a} aria-current={a === step ? 'step' : undefined} aria-label={`${copy.name}${granted ? ', allowed' : ''}`} title={copy.name} onClick={() => go(a)}>
+          <button key={a} type="button" className={cx(s.accessDot, a === step && s.accessDotOn)} data-tint={a} aria-current={a === step ? 'step' : undefined} aria-label={granted ? t('onboarding.accessSteps.dotAllowed', { name: copy.name }) : copy.name} title={copy.name} onClick={() => go(a)}>
             <Icon name={copy.icon} size={12} />
             {/* Only the one you're on says its name: the others are a tap away. */}
             {a === step ? <span>{copy.name}</span> : null}
@@ -99,6 +103,7 @@ function AccessDots({ step, access, go }: { readonly step: AccessStep; readonly 
 }
 
 export function AccessStepView({ step, access, recheck, go }: { readonly step: AccessStep; readonly access: PrivacyAccess | undefined; readonly recheck: () => void; readonly go: (to: Step) => void }) {
+  const t = useT();
   const copy = ACCESS_COPY[step];
   const grant = access?.[step];
   const [asked, setAsked] = useState(false);
@@ -119,7 +124,7 @@ export function AccessStepView({ step, access, recheck, go }: { readonly step: A
       <div className={s.tourText}>
         <Rise className={s.eyebrow}>
           <Icon name={copy.icon} size={12} /> {copy.name}
-          {place ? <span className={s.eyebrowSoft}>· Optional · {place.at} of {place.of}</span> : null}
+          {place ? <span className={s.eyebrowSoft}>{t('onboarding.accessSteps.place', { at: place.at, of: place.of })}</span> : null}
         </Rise>
         <h2 className={s.title}>
           <Words text={copy.title} delay={0.05} />
@@ -131,12 +136,12 @@ export function AccessStepView({ step, access, recheck, go }: { readonly step: A
           <AnimatePresence mode="wait" initial={false}>
             <GrantPill grant={grant} asked={asked} />
           </AnimatePresence>
-          <span className={s.accessHint}>{grant === 'granted' ? 'You can change it any time in System Settings.' : asked ? copy.how : copy.without}</span>
+          <span className={s.accessHint}>{grant === 'granted' ? t('onboarding.accessSteps.changeAnyTime') : asked ? copy.how : copy.without}</span>
         </Rise>
         <Rise delay={0.5} className={s.accessActions}>
           {grant === 'granted' ? (
             <button type="button" className={s.textLink} onClick={open}>
-              <Icon name="external" size={11} /> Open System Settings
+              <Icon name="external" size={11} /> {t('onboarding.access.openSettings')}
             </button>
           ) : (
             <motion.button type="button" className={s.solidButton} onClick={open} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}>

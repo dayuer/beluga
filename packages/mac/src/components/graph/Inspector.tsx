@@ -8,6 +8,7 @@ import { IconButton } from '../ui.js';
 import { KIND_NAME, connections, linkGoal } from './graph-model.js';
 import { KindIcon, StatusMark, StatusPill } from './marks.js';
 import g from './graph.module.css';
+import { tl, useT } from '../../i18n/index.js';
 
 /**
  * A node's details, beside the graph: what it is, Claude's notes on it (Markdown), its fields,
@@ -18,11 +19,12 @@ import g from './graph.module.css';
 /** A node's link: opens the page or the file (relative paths are in the workspace on screen). */
 function NodeLink({ label, href }: { label: string; href: string }) {
   const actions = useActions();
+  const t = useT();
   const root = useApp((s) => (s.view.kind === 'workspace' ? findWorkspace(s.projects, s.view.id)?.path : undefined));
   const goal = linkGoal(href, root);
   if (goal.kind === 'none') {
     return (
-      <span className={g.nodeLinkOff} title={`${href} (can’t open this here)`}>
+      <span className={g.nodeLinkOff} title={t('common.inspector.cantOpen', { href })}>
         {label}
       </span>
     );
@@ -36,24 +38,25 @@ function NodeLink({ label, href }: { label: string; href: string }) {
 }
 
 export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabel }: { graph: Graph; node: GraphNode; onPick: (id: string) => void; onClose: () => void; wide: boolean; onOpen?: () => void; openLabel?: string }) {
+  const t = useT();
   const links = node.links ?? [];
   const lines = connections(graph, node.id);
   return (
-    <aside className={g.inspector} data-wide={wide ? 'true' : 'false'} aria-label={`About ${node.label}`}>
+    <aside className={g.inspector} data-wide={wide ? 'true' : 'false'} aria-label={t('common.inspector.about', { name: node.label })}>
       <header className={g.inspectorHead}>
         <span className={`${g.kindIcon} ${g.kindIconLg}`} data-kind={node.type}>
           <KindIcon kind={node.type} size={16} />
         </span>
         <span className={g.titles}>
           <span className={g.inspectorTitle}>{node.label}</span>
-          <span className={g.sublabel}>{[KIND_NAME[node.type], node.tag].filter(Boolean).join(' · ')}</span>
+          <span className={g.sublabel}>{[tl('GRAPH_KIND_NAME', node.type, 'text', KIND_NAME[node.type]), node.tag].filter(Boolean).join(' · ')}</span>
         </span>
-        <IconButton icon="x" label="Close" onClick={onClose} />
+        <IconButton icon="x" label={t('common.ui.close')} onClick={onClose} />
       </header>
       <div className={g.inspectorBody}>
         {onOpen ? (
           <button type="button" className={g.inspectorOpen} onClick={onOpen}>
-            {openLabel ?? 'Open'}
+            {openLabel ?? t('common.ui.open')}
             <Icon name="arrowRight" size={12} />
           </button>
         ) : null}
@@ -71,7 +74,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
         ) : null}
         {node.fields?.length ? (
           <section>
-            <h4 className={g.inspectorSection}>Fields</h4>
+            <h4 className={g.inspectorSection}>{t('common.inspector.fields')}</h4>
             <ul className={g.fields}>
               {node.fields.map((f, i) => (
                 <li key={`${i}:${f.name}`} className={g.fieldRow}>
@@ -88,7 +91,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
         ) : null}
         {node.items?.length ? (
           <section>
-            <h4 className={g.inspectorSection}>Steps</h4>
+            <h4 className={g.inspectorSection}>{t('common.inspector.steps')}</h4>
             <ol className={g.inspectorItems}>
               {node.items.map((it, i) => (
                 <li key={`${i}:${it.label}`} className={g.item} data-status={it.status}>
@@ -102,7 +105,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
         ) : null}
         {links.length ? (
           <section>
-            <h4 className={g.inspectorSection}>Links</h4>
+            <h4 className={g.inspectorSection}>{t('common.inspector.links')}</h4>
             <div className={g.nodeLinks}>
               {links.map((l, i) => (
                 <NodeLink key={`${i}:${l.href}`} label={l.label} href={l.href} />
@@ -112,7 +115,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
         ) : null}
         {lines.length ? (
           <section>
-            <h4 className={g.inspectorSection}>Connections</h4>
+            <h4 className={g.inspectorSection}>{t('common.inspector.connections')}</h4>
             <ul className={g.connections}>
               {lines.map((c) => (
                 <li key={`${c.edge.id}:${c.other.id}`}>
@@ -121,7 +124,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
                       <KindIcon kind={c.other.type} size={12} />
                     </span>
                     <span className={g.connectionText}>
-                      <span className={g.connectionVerb}>{c.verb}</span>
+                      <span className={g.connectionVerb}>{tl('GRAPH_EDGE_VERB', c.edge.kind, c.edge.from === node.id ? 'out' : 'in', c.verb)}</span>
                       <span className={g.connectionName}>{c.other.label}</span>
                     </span>
                     {c.edge.label ? <span className={g.connectionLabel}>{c.edge.label}</span> : null}
@@ -131,7 +134,7 @@ export function Inspector({ graph, node, onPick, onClose, wide, onOpen, openLabe
             </ul>
           </section>
         ) : null}
-        {!node.details && !node.fields?.length && !node.items?.length && !links.length && !lines.length && !node.sublabel ? <p className={g.inspectorEmpty}>Nothing more about this one.</p> : null}
+        {!node.details && !node.fields?.length && !node.items?.length && !links.length && !lines.length && !node.sublabel ? <p className={g.inspectorEmpty}>{t('common.inspector.nothing')}</p> : null}
       </div>
     </aside>
   );

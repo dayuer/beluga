@@ -3,6 +3,7 @@ import { ProjectIcon } from '../../components/ProjectIcon.js';
 import { cx } from '../../components/ui.js';
 import type { GroupBy, GroupRow, MetricDef } from './stats-model.js';
 import s from './stats.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 /** At most this many get a slice and a row; the rest are one "more". */
 const SHOWN = 6;
@@ -13,12 +14,13 @@ const C = 2 * Math.PI * R;
 function sliced(rows: readonly GroupRow[]): GroupRow[] {
   if (rows.length <= SHOWN + 1) return [...rows];
   const rest = rows.slice(SHOWN);
-  const more: GroupRow = { key: '\u0000more', name: `${rest.length} more`, color: 'var(--series-other)', value: rest.reduce((n, r) => n + r.value, 0), totals: rest[0]!.totals };
+  const more: GroupRow = { key: '\u0000more', name: tNow('views.usage.nMore', { n: rest.length }), color: 'var(--series-other)', value: rest.reduce((n, r) => n + r.value, 0), totals: rest[0]!.totals };
   return [...rows.slice(0, SHOWN), more];
 }
 
 /** A ring of slices; the one you point at (here or in the list) stands out, and its share is in the middle. */
 function Donut({ rows, m, sum, hover, onHover }: { rows: readonly GroupRow[]; m: MetricDef; sum: number; hover?: string; onHover: (key?: string) => void }) {
+  const t = useT();
   let at = 0;
   const on = rows.find((r) => r.key === hover);
   return (
@@ -46,7 +48,7 @@ function Donut({ rows, m, sum, hover, onHover }: { rows: readonly GroupRow[]; m:
       </svg>
       <div className={s.donutMiddle} aria-hidden>
         <strong>{on ? `${Math.round((on.value / sum) * 100)}%` : m.format(sum)}</strong>
-        <span>{on ? on.name : 'in all'}</span>
+        <span>{on ? on.name : t('views.share.inAll')}</span>
       </div>
     </div>
   );
@@ -54,15 +56,16 @@ function Donut({ rows, m, sum, hover, onHover }: { rows: readonly GroupRow[]; m:
 
 /** Each project (or agent): a ring of their shares, and the list with a bar each; pointing at one lights it in both. */
 export function Share({ rows, m, by, why }: { rows: readonly GroupRow[]; m: MetricDef; by: GroupBy; why?: string }) {
+  const t = useT();
   const [hover, setHover] = useState<string | undefined>(undefined);
-  if (!rows.length) return <p className={s.quiet}>{why ?? `Nothing here for ${m.label.toLowerCase()} in this stretch yet.`}</p>;
+  if (!rows.length) return <p className={s.quiet}>{why ?? t('views.share.nothing', { metric: m.label.toLowerCase() })}</p>;
   const list = sliced(rows);
   const max = Math.max(1, ...list.map((r) => r.value));
   const sum = list.reduce((n, r) => n + r.value, 0);
   return (
     <div className={s.share}>
       <Donut rows={list} m={m} sum={sum} {...(hover ? { hover } : {})} onHover={setHover} />
-      <ol className={s.ranking} aria-label={`${m.label} by ${by}`} onMouseLeave={() => setHover(undefined)}>
+      <ol className={s.ranking} aria-label={t('views.share.byAria', { metric: m.label, by: by === 'agent' ? t('views.statsSec.agentWord') : t('views.statsSec.projectWord') })} onMouseLeave={() => setHover(undefined)}>
         {list.map((r, i) => (
           <li key={r.key} className={cx(s.rank, hover && hover !== r.key && s.rankDim)} style={{ '--g': r.color, animationDelay: `${i * 40}ms` } as React.CSSProperties} onMouseEnter={() => setHover(r.key)}>
             <span className={s.rankName}>

@@ -28,7 +28,7 @@ import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
-import { t, useT, useLocale } from '../i18n/index.js';
+import { t, useT, useLocale, tl } from '../i18n/index.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
@@ -572,7 +572,7 @@ function People() {
           others.map((p) => {
             const friend = state.network.friends.some((f) => f.peerId === p.peerId);
             return (
-              <Row key={p.peerId} label={p.name} detail={t('settings.people.trustDetail', { trust: TRUST_INFO[trustOf(state, p.peerId)].label, how: friend ? t('settings.people.changeOnCard') : t('settings.people.befriendToSet') })}>
+              <Row key={p.peerId} label={p.name} detail={t('settings.people.trustDetail', { trust: tl('TRUST_INFO', trustOf(state, p.peerId), 'label', TRUST_INFO[trustOf(state, p.peerId)].label), how: friend ? t('settings.people.changeOnCard') : t('settings.people.befriendToSet') })}>
                 <Avatar name={p.name} id={p.peerId} size={20} />
                 {friend ? (
                   <Button
@@ -599,7 +599,7 @@ function People() {
       {remembered.length ? (
         <Group title={t('settings.people.remembered')}>
           {remembered.map(([id, r]) => (
-            <Row key={id} label={r.name} detail={TRUST_INFO[r.trust].label}>
+            <Row key={id} label={r.name} detail={tl('TRUST_INFO', r.trust, 'label', TRUST_INFO[r.trust].label)}>
               <Button variant="quiet" onClick={() => void api.people.forget(id)}>
                 {t('settings.people.forget')}
               </Button>
@@ -609,7 +609,7 @@ function People() {
       ) : null}
       <Group title={t('settings.people.remote')}>
         <Row label={t('settings.people.reach')} detail={t('settings.people.reachDetail')}>
-          <Select label={t('settings.people.tunnel')} value={state.prefs.tunnel} onChange={(v) => void api.session.setPrefs({ tunnel: v })} options={TUNNEL_ORDER.map((id) => ({ value: id, label: TUNNEL_LABELS[id] }))} />
+          <Select label={t('settings.people.tunnel')} value={state.prefs.tunnel} onChange={(v) => void api.session.setPrefs({ tunnel: v })} options={TUNNEL_ORDER.map((id) => ({ value: id, label: tl('TUNNEL_LABELS', id, 'text', TUNNEL_LABELS[id]) }))} />
         </Row>
         {state.isHost ? (
           <Row label={t('settings.people.takeNew')} detail={state.roomOpen ? t('settings.people.roomOpenDetail') : t('settings.people.roomClosedDetail')}>

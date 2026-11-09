@@ -1,3 +1,4 @@
+import { t, tl } from '../i18n/index.js';
 import type { AppState } from '../../../../src/core/store.js';
 import { type ThreadNode, stopOrder } from '../../../../src/core/threads/model.js';
 import { type AgentRef, defaultAgentOf } from '../../../../src/protocol.js';
@@ -173,7 +174,7 @@ export function foldSummary(rows: readonly FoldRow[]): string {
   const threads = rows.filter((r) => r.kind === 'thread');
   if (!threads.length) return subAgentsSummary(agents);
   const running = foldRunning(rows);
-  return [`${threads.length} thread${threads.length === 1 ? '' : 's'}`, agents.length ? `${agents.length} sub-agent${agents.length === 1 ? '' : 's'}` : '', running ? `${running} running` : ''].filter(Boolean).join(' · ');
+  return [t('threads.nThreads', { n: threads.length }), agents.length ? t('threads.nSubAgents', { n: agents.length }) : '', running ? t('claudeCode.activity.nRunning', { n: running }) : ''].filter(Boolean).join(' · ');
 }
 
 /** A fold's row as the panel draws it: a thread, or a native sub-agent with its parent's harness. */
@@ -183,8 +184,8 @@ export function familyRowOf(state: ThreadFamilySource, parent: Workspace, row: F
 
 /** A row's last word: its timer while it works, else what it is now. */
 export function rowEnd(row: ThreadFamilyRow, now: number): string {
-  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return `Waiting · ${resetWords(row.resumesAt, now)}`;
-  return row.state === 'running' ? span(now - row.since) : THREAD_WORDS[row.state];
+  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return t('threads.waitingUntil', { when: resetWords(row.resumesAt, now) });
+  return row.state === 'running' ? span(now - row.since) : tl('THREAD_WORDS', row.state, 'text', THREAD_WORDS[row.state]);
 }
 
 export function foldRunning(rows: readonly FoldRow[]): number {

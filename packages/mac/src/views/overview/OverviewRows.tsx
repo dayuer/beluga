@@ -12,13 +12,14 @@ import type { OverviewItem } from './overview-model.js';
 import s from '../overview.module.css';
 import { revealLabel } from '../../lib/os-words.js';
 import { chordLabel } from '../../lib/shortcuts-model.js';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 const ago = (ts: number, now: number): string => {
   const m = Math.round((now - ts) / 60_000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
+  if (m < 1) return tNow('views.ago.now');
+  if (m < 60) return tNow('views.ago.min', { n: m });
   const h = Math.round(m / 60);
-  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
+  return h < 24 ? tNow('views.ago.h', { n: h }) : tNow('views.ago.d', { n: Math.round(h / 24) });
 };
 
 /** What every row shares: it's focusable (one at a time, the arrow keys move it), and clicking selects it. */
@@ -56,22 +57,23 @@ function PlanItemRow(props: RowBase & { now: number }) {
   const { item, now } = props;
   const plan = item.plan!;
   const act = useApp((st) => activityOf(st.log, `ws:${item.ws.id}`));
+  const t = useT();
   const tone = item.needs ? 'warn' : item.rank === 2 ? 'claude' : 'muted';
-  const items: ActionItem[] = [{ label: 'Open Plan', icon: 'chevronRight', onSelect: () => props.onOpen(item) }];
+  const items: ActionItem[] = [{ label: t('views.overview.openPlan'), icon: 'chevronRight', onSelect: () => props.onOpen(item) }];
   return (
     <ActionsContext items={items}>
-      <div {...rowProps(props, `${plan.title}, plan${plan.tip ? `, ${plan.tip}` : ''}`)} className={s.row} data-plan-item={plan.plan.id}>
+      <div {...rowProps(props, `${plan.title}${t('views.overview.planSuffix')}${plan.tip ? `, ${plan.tip}` : ''}`)} className={s.row} data-plan-item={plan.plan.id}>
         <span className={s.kind}>
           <Icon name="flag" size={14} />
         </span>
         <span className={s.name}>
           {plan.title}
-          {plan.unread ? <span className={s.unread}>{plan.unread} new</span> : null}
+          {plan.unread ? <span className={s.unread}>{t('views.overview.new', { n: plan.unread })}</span> : null}
         </span>
-        <span className={s.branch}>plan</span>
+        <span className={s.branch}>{t('views.overview.plan')}</span>
         <span className={cx(s.state, s[`tone_${tone}`])}>
           <Dot tone={tone === 'claude' ? 'plan' : tone} live={item.rank === 2} />
-          {plan.tip || 'Plan'}
+          {plan.tip || t('views.overview.planCap')}
         </span>
         <span className={s.extra} title={item.last}>
           {item.last ?? ''}
@@ -94,6 +96,7 @@ function WorkspaceItemRow(props: RowBase & { now: number }) {
   const w = item.ws;
   const actions = useActions();
   const { client } = useBeluga();
+  const t = useT();
   // What the row shows, worked out from the shared state: drawn again only when part of it changes.
   const { st, running, lastTs, unread, pr, ctx } = useApp((full) => {
     const act = activityOf(full.log, `ws:${w.id}`);
@@ -107,16 +110,16 @@ function WorkspaceItemRow(props: RowBase & { now: number }) {
         </span>
         <span className={s.name}>
           {w.name}
-          {unread ? <span className={s.unread}>{unread} new</span> : null}
+          {unread ? <span className={s.unread}>{t('views.overview.new', { n: unread })}</span> : null}
         </span>
-        <span className={s.branch}>{w.branch ?? (w.kind === 'chat' ? 'chat' : '')}</span>
+        <span className={s.branch}>{w.branch ?? (w.kind === 'chat' ? t('views.overview.chat') : '')}</span>
         <span className={cx(s.state, s[`tone_${st.tone}`])}>
           <Dot tone={running && w.kind === 'worktree' ? 'worktree' : st.tone} live={running} />
           {st.label}
         </span>
         <span className={s.extra} title={item.last}>
           {pr ? describePr(pr) : ''}
-          {ctx ? `${pr ? ' · ' : ''}${Math.round((ctx.used / ctx.window) * 100)}% context` : ''}
+          {ctx ? `${pr ? ' · ' : ''}${t('views.overview.context', { pct: Math.round((ctx.used / ctx.window) * 100) })}` : ''}
           {!pr && !ctx && item.last ? item.last : ''}
         </span>
         <span className={s.when}>{lastTs ? ago(lastTs, now) : item.size !== undefined ? formatBytes(item.size) : ''}</span>
@@ -137,10 +140,10 @@ export interface ArchivedActions {
 /** The archived row's menu: right-click, or its ⋯ button. */
 export function archivedItems(item: OverviewItem, act: ArchivedActions): ActionItem[] {
   return [
-    { label: 'Restore', icon: 'refresh', hint: item.ws.kind === 'worktree' ? (item.ws.archive ? 'Bring the worktree back as it was' : 'Make the worktree again from its branch') : 'Show it in the sidebar again', onSelect: () => act.restore(item) },
-    { label: 'Read Conversation', icon: 'eye', keys: 'Space', onSelect: () => act.read(item) },
+    { label: tNow('views.overview.restore'), icon: 'refresh', hint: item.ws.kind === 'worktree' ? (item.ws.archive ? tNow('views.overview.restoreAsWas') : tNow('views.overview.restoreFromBranch')) : tNow('views.overview.restoreChat'), onSelect: () => act.restore(item) },
+    { label: tNow('views.overview.read'), icon: 'eye', keys: 'Space', onSelect: () => act.read(item) },
     ...(item.project.root ? [{ label: revealLabel('Project'), icon: 'folder' as const, onSelect: () => act.finder(item) }] : []),
-    { label: 'Delete Permanently…', danger: true, keys: chordLabel('Cmd+Backspace'), onSelect: () => act.remove(item) },
+    { label: tNow('views.overview.deletePermanently'), danger: true, keys: chordLabel('Cmd+Backspace'), onSelect: () => act.remove(item) },
   ];
 }
 
@@ -153,40 +156,41 @@ export function ArchivedRow(props: RowBase & { act: ArchivedActions }) {
   const w = item.ws;
   const worktree = w.kind === 'worktree';
   const busy = act.restoring === w.id;
+  const t = useT();
   // Archived smartly: everything of yours is kept, and it says what it freed.
   const smart = w.archive;
-  const kept = smart ? (smart.freedBytes ? `Freed ${formatBytes(smart.freedBytes)}` : 'Everything kept') : worktree && w.branch ? 'Branch kept' : 'Conversation kept';
+  const kept = smart ? (smart.freedBytes ? t('views.overview.freed', { size: formatBytes(smart.freedBytes) }) : t('views.overview.everythingKept')) : worktree && w.branch ? t('views.overview.branchKept') : t('views.overview.conversationKept');
   const keptLong = smart
-    ? `Everything of yours is kept: uncommitted work, new files and ignored files (${formatBytes(smart.keptBytes)} compressed). ${smart.freedBytes ? `Dependencies, builds and caches (${formatBytes(smart.freedBytes)}) were cleared; restoring makes them again${smart.remake.length ? ` (${smart.remake.join(', ')})` : ''}.` : ''}`
+    ? `${t('views.overview.keptLong', { size: formatBytes(smart.keptBytes) })} ${smart.freedBytes ? (smart.remake.length ? t('views.overview.clearedRemake', { size: formatBytes(smart.freedBytes), remake: smart.remake.join(', ') }) : t('views.overview.cleared', { size: formatBytes(smart.freedBytes) })) : ''}`
     : worktree && w.branch
-      ? `The folder was removed. Branch ${w.branch} and the conversation are kept.`
-      : 'The conversation is kept.';
+      ? t('views.overview.folderRemoved', { branch: w.branch })
+      : t('views.overview.conversationIsKept');
   const items = archivedItems(item, act);
   return (
     <ActionsContext items={items}>
-      <div {...rowProps(props, `${w.name}, archived`)} className={cx(s.row, s.archived)}>
+      <div {...rowProps(props, t('views.overview.archivedAria', { name: w.name }))} className={cx(s.row, s.archived)}>
         <span className={s.kind}>
           <Icon name="archive" size={14} />
         </span>
         <span className={s.name}>{w.name}</span>
-        <span className={s.branch}>{w.branch ?? (w.kind === 'chat' ? 'chat' : '')}</span>
+        <span className={s.branch}>{w.branch ?? (w.kind === 'chat' ? t('views.overview.chat') : '')}</span>
         <span className={cx(s.state, s.tone_muted)}>
           <Dot tone="muted" />
-          Archived
+          {t('views.overview.filterArchived')}
         </span>
         <span className={s.extra} title={keptLong}>
           {kept}
         </span>
         <span className={s.when}>{smart ? formatBytes(smart.keptBytes) : item.size !== undefined ? formatBytes(item.size) : ''}</span>
         <span className={cx(s.hoverActions, busy && s.hoverBusy)}>
-          <Tip label={worktree ? (smart ? 'Bring the worktree back as it was, and open it' : 'Make the worktree again from its branch, and open it') : 'Show it in the sidebar again, and open it'}>
+          <Tip label={worktree ? (smart ? t('views.overview.restoreAsWasTip') : t('views.overview.restoreFromBranchTip')) : t('views.overview.restoreChatTip')}>
             <Button size="small" variant="plain" disabled={busy} onClick={() => act.restore(item)}>
-              {busy ? 'Restoring…' : 'Restore'}
+              {busy ? t('views.overview.restoring') : t('views.overview.restore')}
             </Button>
           </Tip>
-          <IconButton icon="eye" label="Read Conversation" keys="Space" onClick={() => act.read(item)} />
+          <IconButton icon="eye" label={t('views.overview.read')} keys="Space" onClick={() => act.read(item)} />
           <ActionsDropdown items={items}>
-            <button type="button" className={s.more} aria-label={`More for ${w.name}`}>
+            <button type="button" className={s.more} aria-label={t('views.overview.moreFor', { name: w.name })}>
               <Icon name="more" size={14} />
             </button>
           </ActionsDropdown>

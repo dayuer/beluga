@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.js';
 import { APP_VERSION } from '../lib/boot.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { usePrefs } from '../lib/prefs.js';
+import { useT } from '../i18n/index.js';
 import { usePrivacyAccess } from '../lib/privacy.js';
 import { AccessStepView } from './AccessSteps.js';
 import { AgentsStep } from './AgentsStep.js';
@@ -72,15 +73,16 @@ export function useOnboarding(): { open: boolean; start: Step; close: (how: 'fin
 
 /** The dots under every step: where you are, the tour's and the permissions' parts grouped, each one a way back. */
 function Progress({ step, go }: { readonly step: Step; readonly go: (to: Step) => void }) {
+  const t = useT();
   const at = stepIndex(step);
   return (
-    <div className={s.progress} role="group" aria-label="Steps">
+    <div className={s.progress} role="group" aria-label={t('onboarding.onboarding.steps')}>
       {STEPS.map((st, i) => (
         <button
           key={st}
           type="button"
           aria-current={st === step ? 'step' : undefined}
-          aria-label={`Step ${i + 1} of ${STEPS.length}`}
+          aria-label={t('onboarding.onboarding.stepOf', { at: i + 1, of: STEPS.length })}
           className={s.progressDot}
           data-past={i < at}
           // A little room where a group (the tour, the permissions) starts or ends.
@@ -103,6 +105,7 @@ function Progress({ step, go }: { readonly step: Step; readonly go: (to: Step) =
  */
 export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly start?: Step; readonly onClose: (how: 'finished' | 'skipped') => void; readonly onArrive?: () => void }) {
   const { ui } = useBeluga();
+  const t = useT();
   const prefs = usePrefs();
   const projects = useApp((st) => st.projects.filter((p) => p.root).length);
   const phones = useApp((st) => st.companion.devices.length);
@@ -137,8 +140,8 @@ export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly st
   const sound = useRef<Prepared>(undefined);
   useEffect(() => {
     if (step !== 'ready' || still) return;
-    const t = setTimeout(() => (sound.current ??= prepareWormhole()), 1600);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => (sound.current ??= prepareWormhole()), 1600);
+    return () => clearTimeout(timer);
   }, [step, still]);
   useEffect(() => () => sound.current?.discard(), []);
   useEffect(
@@ -213,7 +216,7 @@ export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly st
         data-clear={step === 'ready' && !still ? '' : undefined}
         role="dialog"
         aria-modal="true"
-        aria-label="Welcome to Beluga"
+        aria-label={t('onboarding.onboarding.welcome')}
         data-welcome=""
         initial={{ opacity: 0 }}
         animate={finale ? { opacity: inside ? 0 : 1 } : leaving ? { opacity: 0, scale: 1.04, filter: 'blur(14px)' } : { opacity: 1, scale: 1, filter: 'blur(0px)' }}
@@ -225,7 +228,7 @@ export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly st
         <div className={s.titlebar} data-tauri-drag-region />
         {step !== 'ready' ? (
           <button type="button" className={s.skip} onClick={() => finish('skipped')}>
-            Skip Setup
+            {t('onboarding.onboarding.skipSetup')}
           </button>
         ) : null}
 
@@ -268,23 +271,23 @@ export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly st
           {showNav ? (
             <motion.footer className={s.footer} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} transition={{ duration: 0.45, ease: EASE_OUT }}>
               <Glass radius={28} className={s.navGlass}>
-              <button type="button" className={s.navBack} onClick={back} aria-label="Back">
+              <button type="button" className={s.navBack} onClick={back} aria-label={t('onboarding.onboarding.back')}>
                 <Icon name="back" size={14} />
               </button>
               <Progress step={step} go={go} />
               <div className={s.navRight}>
                 {place ? (
                   <button type="button" className={s.navSkipTour} onClick={() => go(afterTour())}>
-                    Skip Tour
+                    {t('onboarding.onboarding.skipTour')}
                   </button>
                 ) : null}
                 {inAccess(step) ? (
                   <button type="button" className={s.navSkipTour} onClick={() => go(afterAccess())}>
-                    Skip Permissions
+                    {t('onboarding.onboarding.skipPermissions')}
                   </button>
                 ) : null}
                 <motion.button type="button" className={s.navNext} data-quiet={(inAccess(step) && privacy.access?.[step] !== 'granted') || (step === 'phone' && !phones) ? '' : undefined} onClick={next} whileTap={{ scale: 0.96 }}>
-                  {step === LAST_SETTING ? 'Finish' : inAccess(step) ? accessNext(privacy.access?.[step]) : 'Continue'}
+                  {step === LAST_SETTING ? t('onboarding.onboarding.finish') : inAccess(step) ? accessNext(privacy.access?.[step]) : t('onboarding.onboarding.continue')}
                   <Icon name="arrowRight" size={13} />
                 </motion.button>
               </div>

@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { useEffect, useRef, useState } from 'react';
 import type { GhJob, GhRunFull } from '@beluga/core/ci/model.js';
 import { durationWords, eventWords, fileName, isLive, jobsSummary, runDuration, runTone, shortSha, sortJobs, spanOf, statusWords } from '@beluga/core/ci/model.js';
@@ -31,6 +32,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
  */
 export function RunPage({ projectId, runId }: { projectId: string; runId: number }) {
   const { data, error, loading, refresh } = useRun(projectId, runId);
+  const tr = useT();
   const actions = useActions();
   const late = useLateArrival(`${projectId}#${runId}`, data !== undefined);
   if (!data) {
@@ -38,26 +40,27 @@ export function RunPage({ projectId, runId }: { projectId: string; runId: number
       return (
         <Empty
           icon="alert"
-          title="Couldn’t read the run"
+          title={tr('ci.run.cantRead')}
           detail={error}
           action={
             <EmptyActions>
-              <Button onClick={refresh}>Try Again</Button>
+              <Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>
               <Button variant="quiet" onClick={() => actions.run({ type: 'view', view: runWayBack(projectId) })}>
-                Back
+                {tr('issues.page.back')}
               </Button>
             </EmptyActions>
           }
         />
       );
     }
-    return <Empty icon="pulse" title="Asking GitHub…" detail="For the run’s jobs and steps" />;
+    return <Empty icon="pulse" title={tr('issues.view.asking')} detail={tr('ci.run.forJobs')} />;
   }
   return <Page projectId={projectId} repo={data.repo} run={data.run} loading={loading} refresh={refresh} late={late} />;
 }
 
 function Page({ projectId, repo, run, loading, refresh, late }: { projectId: string; repo: GitHubRepo; run: GhRunFull; loading: boolean; refresh: () => void; late: boolean }) {
   const wrap = useRef<HTMLDivElement>(null);
+  const tr = useT();
   const actions = useActions();
   const back = (): void => actions.run({ type: 'view', view: runWayBack(projectId) });
   const swipe = useSwipeBack(wrap, back);
@@ -74,21 +77,21 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
         <SwipeBackEdge progress={swipe} />
         <div className={t.page}>
           <div className={t.pageMain}>
-            <nav className={t.crumbs} aria-label="Where this run is">
-              <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
+            <nav className={t.crumbs} aria-label={tr('ci.run.where')}>
+              <IconButton icon="back" label={tr('issues.page.back')} keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
               <button type="button" className={t.crumb} onClick={() => a.openList(projectId)}>
-                Actions
+                {tr('ci.run.actions')}
               </button>
               <Icon name="chevronRight" size={10} />
               <span className={t.crumbPlain}>{project?.name ?? repoSlug(repo)}</span>
               <span className={t.grow} />
               <span className={t.pageKey}>
                 {run.workflow} #{run.number}
-                {run.attempt > 1 ? ` · attempt ${run.attempt}` : ''}
+                {run.attempt > 1 ? tr('ci.run.attemptN', { n: run.attempt }) : ''}
               </span>
-              <IconButton icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
+              <IconButton icon="refresh" label={loading ? tr('issues.view.asking') : tr('issues.view.askAgain')} className={cx(loading && s.spinning)} onClick={refresh} />
               <ActionsDropdown items={menu(run, { open: false, then: refresh })}>
-                <IconButton icon="more" label="More" />
+                <IconButton icon="more" label={tr('issues.page.more')} />
               </ActionsDropdown>
             </nav>
             <header className={t.pageHead}>
@@ -104,12 +107,12 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
                 <span className={t.grow} />
                 {failed ? (
                   <Button size="small" icon="refresh" onClick={() => void a.rerun(projectId, run.id, true).then((ok) => ok && refresh())}>
-                    Re-run Failed Jobs
+                    {tr('ci.parts.rerunFailed')}
                   </Button>
                 ) : null}
                 {live ? (
                   <Button size="small" icon="stop" onClick={() => a.cancel(projectId, run.id, run.title, refresh)}>
-                    Cancel Run
+                    {tr('ci.use.cancelRun')}
                   </Button>
                 ) : null}
                 <Button size="small" variant="quiet" icon="external" onClick={() => a.openOnGitHub(run.url)}>
@@ -118,12 +121,12 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
               </div>
             </header>
             {run.file !== undefined && run.path ? (
-              <section className={s.runGraph} aria-label="The workflow">
+              <section className={s.runGraph} aria-label={tr('ci.run.theWorkflow')}>
                 <WorkflowGraph text={run.file} path={run.path} title={run.workflow} jobs={run.jobs} />
               </section>
             ) : null}
-            <section className={s.jobs} aria-label="Jobs">
-              {run.jobs.length ? sortJobs(run.jobs).map((job) => <JobCard key={job.id} projectId={projectId} job={job} />) : <p className={s.graphNote}>{live ? 'Waiting for a runner to pick it up…' : 'This run has no jobs.'}</p>}
+            <section className={s.jobs} aria-label={tr('ci.run.jobs')}>
+              {run.jobs.length ? sortJobs(run.jobs).map((job) => <JobCard key={job.id} projectId={projectId} job={job} />) : <p className={s.graphNote}>{live ? tr('ci.run.waitingRunner') : tr('ci.run.noJobs')}</p>}
             </section>
           </div>
           <Properties repo={repo} run={run} />
@@ -138,6 +141,7 @@ function JobCard({ projectId, job }: { projectId: string; job: GhJob }) {
   const tone = runTone(job);
   const [open, setOpen] = useState(tone === 'failed' || tone === 'running');
   const a = useCiActions();
+  const tr = useT();
   // A job that starts running, or fails, while you watch opens by itself.
   const was = useRef(tone);
   useEffect(() => {
@@ -183,14 +187,14 @@ function JobCard({ projectId, job }: { projectId: string; job: GhJob }) {
               })}
             </ol>
           ) : (
-            <p className={s.graphNote}>{isLive(job) ? 'Waiting for a runner…' : 'No steps ran.'}</p>
+            <p className={s.graphNote}>{isLive(job) ? tr('ci.run.waitingRunnerShort') : tr('ci.run.noSteps')}</p>
           )}
           <div className={s.jobFoot}>
             {tone === 'failed' ? <JobLog projectId={projectId} jobId={job.id} /> : null}
             <span className={t.grow} />
             {job.url ? (
               <Button size="small" variant="quiet" icon="external" onClick={() => a.openOnGitHub(job.url)}>
-                Full Log on GitHub
+                {tr('ci.run.fullLog')}
               </Button>
             ) : null}
           </div>
@@ -203,6 +207,7 @@ function JobCard({ projectId, job }: { projectId: string; job: GhJob }) {
 /** The end of a failed job's log, asked for when you want it. */
 function JobLog({ projectId, jobId }: { projectId: string; jobId: number }) {
   const a = useCiActions();
+  const tr = useT();
   const [log, setLog] = useState<{ readonly text?: string; readonly error?: string; readonly loading?: boolean }>();
   if (!log) {
     return (
@@ -217,11 +222,11 @@ function JobLog({ projectId, jobId }: { projectId: string; jobId: number }) {
           );
         }}
       >
-        Show Where It Failed
+        {tr('ci.run.showFailed')}
       </Button>
     );
   }
-  if (log.loading) return <span className={s.graphNote}>Reading the log…</span>;
+  if (log.loading) return <span className={s.graphNote}>{tr('ci.run.readingLog')}</span>;
   if (log.error) return <span className={s.graphNote}>{log.error}</span>;
   return (
     <div className={s.log}>
@@ -232,39 +237,40 @@ function JobLog({ projectId, jobId }: { projectId: string; jobId: number }) {
 
 function Properties({ repo, run }: { repo: GitHubRepo; run: GhRunFull }) {
   const a = useCiActions();
+  const tr = useT();
   const commit = `${repo.url}/commit/${run.sha}`;
   return (
-    <aside className={t.props} aria-label="Properties">
-      <Prop label="Status">
+    <aside className={t.props} aria-label={tr('issues.page.properties')}>
+      <Prop label={tr('ci.run.status')}>
         <span className={t.propStatic}>{statusWords(run)}</span>
       </Prop>
-      <Prop label="Workflow">
+      <Prop label={tr('ci.actions.workflow')}>
         <span className={t.propStatic}>
           {run.workflow}
           {run.path ? <span className={s.propHint}> · {fileName(run.path)}</span> : null}
         </span>
       </Prop>
-      <Prop label="Started by">
+      <Prop label={tr('ci.run.startedBy')}>
         <span className={t.propStatic}>
           {eventWords(run.event)}
           {run.actor ? ` · ${run.actor}` : ''}
         </span>
       </Prop>
       {run.branch ? (
-        <Prop label="Branch">
+        <Prop label={tr('ci.run.branch')}>
           <span className={cx(t.propStatic, t.mono, t.ellipsis)}>{run.branch}</span>
         </Prop>
       ) : null}
       {run.prs.length ? (
-        <Prop label="Pull request">
+        <Prop label={tr('ci.run.pr')}>
           <button type="button" className={t.propValue} onClick={() => a.openOnGitHub(`${repo.url}/pull/${run.prs[0]}`)}>
             <span className={t.mono}>#{run.prs[0]}</span>
           </button>
         </Prop>
       ) : null}
       {run.sha ? (
-        <Prop label="Commit">
-          <Tip label="Open the commit on GitHub">
+        <Prop label={tr('ci.run.commit')}>
+          <Tip label={tr('ci.run.openCommit')}>
             <button type="button" className={t.propValue} onClick={() => a.openOnGitHub(commit)}>
               <span className={t.mono}>{shortSha(run.sha)}</span>
             </button>
@@ -272,16 +278,16 @@ function Properties({ repo, run }: { repo: GitHubRepo; run: GhRunFull }) {
         </Prop>
       ) : null}
       <div className={t.propsRule} />
-      <Prop label="Started" quiet>
+      <Prop label={tr('ci.run.started')} quiet>
         <span className={t.propStatic}>{agoWords(run.startedAt)}</span>
       </Prop>
-      <Prop label={isLive(run) ? 'Running for' : 'Took'} quiet>
+      <Prop label={isLive(run) ? tr('ci.run.runningFor') : tr('ci.run.tookLabel')} quiet>
         <span className={t.propStatic}>
           <NowText>{(now) => durationWords(runDuration(run, now))}</NowText>
         </span>
       </Prop>
       {run.attempt > 1 ? (
-        <Prop label="Attempt" quiet>
+        <Prop label={tr('ci.run.attempt')} quiet>
           <span className={t.propStatic}>{run.attempt}</span>
         </Prop>
       ) : null}

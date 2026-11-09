@@ -14,11 +14,12 @@ import { ArchivedItem, WorktreeItem } from './WorktreeItem.js';
 import { forgetRebuildable, useRebuildable } from './use-rebuildable.js';
 import { FILTERS, type WorktreeFilter, type WorktreeRow, archivedRows, filterRows, totals, worktreeRows } from './worktrees-model.js';
 import s from './worktrees.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** What the build-files column holds, in words (its header's tooltip). */
-const BUILD_FILES = 'node_modules, build output and caches: Remove Build Files deletes them (the project’s setup makes them again). Your work and the worktree stay.';
+const BUILD_FILES = (): string => tNow('views.wt.buildFiles');
 
 /**
  * Every worktree in your projects, made by Beluga, by Claude Code's sub-agents or outside Beluga,
@@ -31,6 +32,7 @@ export function WorktreesView({ projectId }: { projectId?: string | undefined })
   const api = useApi();
   const { client } = useBeluga();
   const actions = useActions();
+  const t = useT();
   const projects = useApp((st) => st.projects);
   const disk = useApp((st) => st.disk);
   const prs = useApp((st) => st.prs);
@@ -102,78 +104,78 @@ export function WorktreesView({ projectId }: { projectId?: string | undefined })
     remove: (list: readonly WorktreeRow[]) => setBatch({ kind: 'delete', rows: list }),
   };
   const projectItems: ActionItem[] = [
-    { label: 'All Projects', checked: !projectId, onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees' } }) },
+    { label: t('views.overview.allProjects'), checked: !projectId, onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees' } }) },
     ...projects.filter((p) => p.root && p.workspaces.some((w) => w.kind === 'worktree')).map((p, i) => ({ label: p.name, checked: p.id === projectId, ...(i === 0 ? { separate: true } : {}), onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees', projectId: p.id } }) })),
   ];
   // Worktrees made outside Beluga that can go without losing anything: the Clean Up sheet, per project.
   const outsideIn = projects.filter((p) => p.root && (!projectId || p.id === projectId) && outsideOf(p).length);
   const moreItems: ActionItem[] = [
     ...(outsideIn.length === 1
-      ? [{ label: 'Clean Up Worktrees Made Outside Beluga…', hint: 'Those already merged or with nothing new; branches kept', onSelect: () => openSheet({ kind: 'clean_up_worktrees', projectId: outsideIn[0]!.id }) }]
+      ? [{ label: t('views.wt.cleanUpOutside'), hint: t('views.wt.cleanUpHint'), onSelect: () => openSheet({ kind: 'clean_up_worktrees', projectId: outsideIn[0]!.id }) }]
       : outsideIn.length
-        ? [{ label: 'Clean Up Worktrees Made Outside Beluga', onSelect: () => undefined, submenu: outsideIn.map((p) => ({ label: `${p.name}…`, onSelect: () => openSheet({ kind: 'clean_up_worktrees', projectId: p.id }) })) }]
+        ? [{ label: t('views.wt.cleanUpOutsideMenu'), onSelect: () => undefined, submenu: outsideIn.map((p) => ({ label: `${p.name}…`, onSelect: () => openSheet({ kind: 'clean_up_worktrees', projectId: p.id }) })) }]
         : []),
   ];
 
-  if (!rows.length) return <Empty icon="branch" title="No worktrees" detail="Worktrees made by Beluga, by Claude Code’s sub-agents or by other tools show up here, with the space they take." />;
+  if (!rows.length) return <Empty icon="branch" title={t('views.wt.none')} detail={t('views.wt.noneDetail')} />;
   return (
     <div className={s.page}>
       <header className={s.head}>
         <div className={s.title}>
-          <h1>Worktrees</h1>
+          <h1>{t('views.home.worktrees')}</h1>
           <p className={s.summary} aria-live="polite">
             {archivedView ? (
-              `${shown.length} archived · restore one as it was, or delete it for good`
+              t('views.wt.archivedSummary', { n: shown.length })
             ) : (
               <>
-                {sum.count} {sum.count === 1 ? 'worktree' : 'worktrees'} · {formatBytes(sum.bytes)}
-                {sum.rebuildable ? ` · ${formatBytes(sum.rebuildable)} is build files` : ''}
-                {sum.measured < sum.count ? <span className={s.pending}> · looking at {sum.count - sum.measured} more…</span> : null}
+                {t('views.wt.navCount', { n: sum.count })} · {formatBytes(sum.bytes)}
+                {sum.rebuildable ? t('views.wt.isBuildFiles', { size: formatBytes(sum.rebuildable) }) : ''}
+                {sum.measured < sum.count ? <span className={s.pending}>{t('views.wt.lookingAt', { n: sum.count - sum.measured })}</span> : null}
               </>
             )}
           </p>
         </div>
         <div className={s.tools}>
-          <Segmented label="Show" value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.id, label: `${f.label} ${filterRows(rows, f.id, projectId).length}`, hint: f.hint }))} />
+          <Segmented label={t('views.earnings.show')} value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.id, label: `${f.label} ${filterRows(rows, f.id, projectId).length}`, hint: f.hint }))} />
           <ActionsDropdown items={projectItems}>
             <Button size="small" variant="plain">
-              {project?.name ?? 'All Projects'} <Icon name="chevronDown" size={10} />
+              {project?.name ?? t('views.overview.allProjects')} <Icon name="chevronDown" size={10} />
             </Button>
           </ActionsDropdown>
           {moreItems.length ? (
             <ActionsDropdown items={moreItems} align="end">
-              <IconButton icon="more" label="More for worktrees" />
+              <IconButton icon="more" label={t('views.wt.more')} />
             </ActionsDropdown>
           ) : null}
         </div>
       </header>
-      <div role="grid" aria-label={archivedView ? 'Archived worktrees' : 'Worktrees'} aria-multiselectable className={s.grid}>
+      <div role="grid" aria-label={archivedView ? t('views.wt.archivedAria') : t('views.home.worktrees')} aria-multiselectable className={s.grid}>
         <div role="row" className={archivedView ? `${s.headRow} ${s.archivedRow}` : s.headRow}>
           <span role="columnheader" className={s.tick}>
-            <input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={(e) => tickAll(e.target.checked)} />
+            <input type="checkbox" aria-label={t('views.wt.selectAll')} checked={allShown} onChange={(e) => tickAll(e.target.checked)} />
           </span>
-          <span role="columnheader">Worktree</span>
-          <span role="columnheader">Made by</span>
+          <span role="columnheader">{t('views.wt.colWorktree')}</span>
+          <span role="columnheader">{t('views.wt.colMadeBy')}</span>
           {archivedView ? (
             <>
               <span role="columnheader" className={s.num}>
-                Archived
+                {t('views.overview.filterArchived')}
               </span>
-              <span role="columnheader" title="Whether Restore can bring it back, and how">
-                Comes back
+              <span role="columnheader" title={t('views.wt.colComesBackTip')}>
+                {t('views.wt.colComesBack')}
               </span>
               <span role="columnheader" />
             </>
           ) : (
             <>
-              <span role="columnheader" title="What's in it that isn't in main: uncommitted files and commits">
-                Not in main
+              <span role="columnheader" title={t('views.wt.colNotInMainTip')}>
+                {t('views.wt.colNotInMain')}
               </span>
               <span role="columnheader" className={s.num}>
-                Size
+                {t('views.overview.sortSize')}
               </span>
-              <span role="columnheader" className={s.num} title={BUILD_FILES}>
-                Build files
+              <span role="columnheader" className={s.num} title={BUILD_FILES()}>
+                {t('views.wt.colBuildFiles')}
               </span>
               <span role="columnheader" />
             </>
@@ -182,41 +184,41 @@ export function WorktreesView({ projectId }: { projectId?: string | undefined })
         {shown.length ? (
           shown.map((r) => (r.archived ? <ArchivedItem key={r.ws.id} row={r} ticked={ticked.has(r.ws.id)} onTick={(on) => tick(r.ws.id, on)} act={act} busy={running} /> : <WorktreeItem key={r.ws.id} row={r} plan={plans.get(r.ws.id)} ticked={ticked.has(r.ws.id)} onTick={(on) => tick(r.ws.id, on)} act={act} />))
         ) : (
-          <p className={s.none}>Nothing here: {FILTERS.find((f) => f.id === filter)?.hint.toLowerCase()}.</p>
+          <p className={s.none}>{t('views.wt.nothingHere', { hint: FILTERS.find((f) => f.id === filter)?.hint.toLowerCase() ?? '' })}</p>
         )}
       </div>
       {picked.length ? (
-        <footer className={s.bar} role="toolbar" aria-label="Selected worktrees">
+        <footer className={s.bar} role="toolbar" aria-label={t('views.wt.selectedAria')}>
           {archivedView ? (
             <>
-              <span className={s.barText}>{picked.length} selected</span>
+              <span className={s.barText}>{t('views.wt.selected', { n: picked.length })}</span>
               <Button size="small" variant="quiet" onClick={() => setTicked(new Set())} disabled={running}>
-                Deselect
+                {t('views.wt.deselect')}
               </Button>
               <Button size="small" onClick={() => act.remove(picked)} disabled={running}>
-                Delete…
+                {t('views.wt.delete')}
               </Button>
               <Button size="small" variant="primary" icon="refresh" onClick={() => act.restore(picked)} disabled={running || !picked.some((r) => r.archived?.restorable)}>
-                {running ? 'Working…' : 'Restore'}
+                {running ? t('views.wt.working') : t('views.overview.restore')}
               </Button>
             </>
           ) : (
             <>
               <span className={s.barText}>
-                {picked.length} selected · {formatBytes(pickedSum.bytes)}
-                {pickedSum.rebuildable ? ` · ${formatBytes(pickedSum.rebuildable)} is build files` : ''}
+                {t('views.wt.selected', { n: picked.length })} · {formatBytes(pickedSum.bytes)}
+                {pickedSum.rebuildable ? t('views.wt.isBuildFiles', { size: formatBytes(pickedSum.rebuildable) }) : ''}
               </span>
               <Button size="small" variant="quiet" onClick={() => setTicked(new Set())} disabled={running}>
-                Deselect
+                {t('views.wt.deselect')}
               </Button>
-              <Button size="small" onClick={() => act.free(picked)} disabled={running || !pickedSum.rebuildable} title={BUILD_FILES}>
-                Remove Build Files…
+              <Button size="small" onClick={() => act.free(picked)} disabled={running || !pickedSum.rebuildable} title={BUILD_FILES()}>
+                {t('views.wt.removeBuildFiles')}
               </Button>
-              <Button size="small" onClick={() => act.remove(picked)} disabled={running || picked.some((r) => r.archiving)} title="Delete them for good: the folders, Beluga’s branches and the conversations">
-                Delete…
+              <Button size="small" onClick={() => act.remove(picked)} disabled={running || picked.some((r) => r.archiving)} title={t('views.wt.deleteTip')}>
+                {t('views.wt.delete')}
               </Button>
               <Button size="small" variant="primary" icon="archive" onClick={() => act.archive(picked)} disabled={running}>
-                {running ? 'Working…' : 'Archive…'}
+                {running ? t('views.wt.working') : t('views.wt.archive')}
               </Button>
             </>
           )}

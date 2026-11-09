@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import type { CallView } from '@beluga/shared/calls.js';
 import { inApp } from '../lib/boot.js';
@@ -64,7 +65,7 @@ async function wire(client: SocketClient, engine: CallEngine): Promise<void> {
 export function syncFloat(client: SocketClient, engine: CallEngine, mine: CallView | undefined, ringing: readonly CallView[], speaking: ReadonlySet<string>): void {
   void wire(client, engine);
   const st = client.store.getState();
-  const nameOf = (c: string): string => (c === 'room' ? 'The room' : c.startsWith('dm:') ? (st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? 'a friend') : `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? 'channel'}`);
+  const nameOf = (c: string): string => (c === 'room' ? t('call.theRoomTitle') : c.startsWith('dm:') ? (st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? t('call.aFriend')) : `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? 'channel'}`);
   latest = floatState(mine, ringing, speaking, nameOf);
   void send();
 }

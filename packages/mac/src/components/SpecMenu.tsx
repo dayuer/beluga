@@ -7,6 +7,7 @@ import { useBeluga } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
 import { guiHint } from '../lib/gui-copy.js';
 import s from './SpecMenu.module.css';
+import { t as tNow } from '../i18n/index.js';
 
 /**
  * A menu built from its shared spec (projectMenu, personMenu…): the spec's options, ids and
@@ -184,7 +185,7 @@ export function ActionsContext({ items, children }: { items: readonly ActionItem
 
 function LazyRows({ items }: { items: readonly ActionItem[] | (() => readonly ActionItem[]) }) {
   const list = typeof items === 'function' ? items() : items;
-  if (!list.length) return <Context.Item className={s.item} disabled><span className={s.label}>Nothing to do here</span></Context.Item>;
+  if (!list.length) return <Context.Item className={s.item} disabled><span className={s.label}>{tNow('common.specMenu.nothing')}</span></Context.Item>;
   return <ActionRows items={list} Item={Context.Item as unknown as AnyItem} Separator={Context.Separator as unknown as AnySeparator} kit={CONTEXT_SUB} />;
 }
 

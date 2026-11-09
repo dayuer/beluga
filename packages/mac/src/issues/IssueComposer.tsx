@@ -9,6 +9,7 @@ import { useIssueActions } from './use-issues.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
+import { t, useT } from '../i18n/index.js';
 
 /**
  * Handing an issue to Claude, the way a project's home starts work: pick what Claude does
@@ -31,36 +32,37 @@ interface WayInfo {
 
 const WAYS: Readonly<Record<Way, WayInfo>> = {
   investigate: {
-    label: 'Investigate',
+    get label() { return t('issues.parts.investigate'); },
     icon: 'search',
-    hint: 'The agent finds out why it happens and reproduces it; nothing is fixed yet',
-    placeholder: 'Anything to look at first? “It only fails behind the proxy”',
-    what: () => 'In a new worktree: why it happens, and a reproduction. Nothing is fixed yet.',
+    get hint() { return t('issues.composer.investigateHint'); },
+    get placeholder() { return t('issues.composer.investigatePlaceholder'); },
+    what: () => t('issues.composer.investigateWhat'),
     whatIcon: 'branch',
-    go: 'Investigate',
+    get go() { return t('issues.parts.investigate'); },
   },
   fix: {
-    label: 'Fix It',
+    get label() { return t('issues.parts.fixIt'); },
     icon: 'wrench',
-    hint: 'The agent fixes it and opens a pull request that closes the issue',
-    placeholder: 'Anything the fix should do or avoid? “Keep the public API as it is”',
-    what: (n) => `In a new worktree, with a pull request that closes #${n}.`,
+    get hint() { return t('issues.composer.fixHint'); },
+    get placeholder() { return t('issues.composer.fixPlaceholder'); },
+    what: (n) => t('issues.composer.fixWhat', { n }),
     whatIcon: 'pr',
-    go: 'Fix It',
+    get go() { return t('issues.parts.fixIt'); },
   },
   task: {
-    label: 'Make a Task',
+    get label() { return t('issues.parts.makeTask'); },
     icon: 'task',
-    hint: 'On the board, written up by the agent, for later',
-    placeholder: 'Anything to add to the task?',
-    what: () => 'On the board as Ready, written up by the agent.',
+    get hint() { return t('issues.composer.taskHint'); },
+    get placeholder() { return t('issues.composer.taskPlaceholder'); },
+    what: () => t('issues.composer.taskWhat'),
     whatIcon: 'task',
-    go: 'Make Task',
+    get go() { return t('issues.composer.taskGo'); },
   },
 };
 
 export function IssueComposer({ projectId, number, task }: { projectId: string; number: number; task?: Issue }) {
   const a = useIssueActions();
+  useT();
   const prefs = usePrefs();
   const ways: readonly Way[] = task ? ['investigate', 'fix'] : ['investigate', 'fix', 'task'];
   const [way, setWay] = useState<Way>('investigate');
@@ -91,11 +93,11 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
   };
 
   return (
-    <section className={cx(h.composer, s.composer)} aria-label={`Hand #${number} to your agent`}>
+    <section className={cx(h.composer, s.composer)} aria-label={t('issues.composer.hand', { n: number })}>
       <div className={h.composerHead}>
-        <h2 className={cx(h.prompt, s.composerPrompt)}>{task ? `${task.key} is on the board. What should your agent do?` : 'What should your agent do?'}</h2>
+        <h2 className={cx(h.prompt, s.composerPrompt)}>{task ? t('issues.composer.onBoard', { key: task.key }) : t('issues.composer.whatShould')}</h2>
         <Segmented<Way>
-          label="What the agent does"
+          label={t('issues.composer.whatDoes')}
           value={shown}
           onChange={(w) => {
             setWay(w);
@@ -108,7 +110,7 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
         <textarea
           ref={box}
           className={cx(h.input, s.composerInput, 'selectable')}
-          aria-label="Anything the agent should know (optional)"
+          aria-label={t('issues.composer.note')}
           placeholder={info.placeholder}
           value={note}
           rows={2}
@@ -125,18 +127,18 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
         <div className={h.bar}>
           <span className={h.note}>
             <Icon name={writing ? 'pencil' : info.whatIcon} size={12} />
-            {writing ? `The agent is still writing ${task!.key} up; then it can start.` : info.what(number)}
+            {writing ? t('issues.composer.stillWriting', { key: task!.key }) : info.what(number)}
           </span>
           <span className={h.flex} />
           {shown === 'task' ? (
             <span className={s.composerCheck}>
-              <Checkbox checked={look} onChange={setLook} label="Look at the code first" />
+              <Checkbox checked={look} onChange={setLook} label={t('issues.composer.lookFirst')} />
             </span>
           ) : null}
-          <Tip label={shown === 'task' && look ? 'The agent reads the code first (read-only), then writes the task with where it is and the likely cause' : info.hint} keys={sendKeys}>
+          <Tip label={shown === 'task' && look ? t('issues.composer.lookHint') : info.hint} keys={sendKeys}>
             <button type="button" className={cx(d.create, ready && d.createReady)} aria-disabled={!ready} onClick={() => void go()} data-testid="issue-go">
               <Icon name={info.icon} size={12} />
-              {busy ? 'Starting…' : info.go}
+              {busy ? t('issues.composer.starting') : info.go}
               <span className={d.createKey}>{sendKeys}</span>
             </button>
           </Tip>

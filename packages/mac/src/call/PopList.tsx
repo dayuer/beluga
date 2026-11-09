@@ -1,3 +1,4 @@
+import { useT } from '../i18n/index.js';
 import { useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { Avatar, cx, personColor } from '../components/ui.js';
@@ -24,9 +25,10 @@ function Pop({ pop, age }: { pop: ChatPop; age: number }) {
 
 /** The messages that pop up, newest at the bottom (also the sharer's overlay, calloverlay/). */
 export function PopList({ pops, now, dark, className }: { pops: readonly ChatPop[]; now: number; dark?: boolean; className?: string }) {
+  const t = useT();
   if (!pops.length) return null;
   return (
-    <ol className={cx(s.pops, dark && s.dark, className)} aria-live="polite" aria-label="Messages in the chat">
+    <ol className={cx(s.pops, dark && s.dark, className)} aria-live="polite" aria-label={t('call.messagesInChat')}>
       {pops.map((p) => (
         <Pop key={p.id} pop={p} age={Math.max(0, now - p.at)} />
       ))}

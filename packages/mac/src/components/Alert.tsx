@@ -3,6 +3,7 @@ import { type ReactNode, useRef } from 'react';
 import { Icon, type IconName } from './Icon.js';
 import { cx } from './ui.js';
 import s from './alert.module.css';
+import { useT } from '../i18n/index.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
 
 export interface AlertButton {
@@ -43,7 +44,9 @@ export interface AlertProps {
  * the right. Return presses the default button (blue, or red when it destroys something),
  * Esc and Cancel close it without doing anything.
  */
-export function Alert({ title, message, icon = 'alert', tone = 'caution', table, confirm, alternative, cancel = 'Cancel', onCancel, children }: AlertProps) {
+export function Alert({ title, message, icon = 'alert', tone = 'caution', table, confirm, alternative, cancel: cancelAs, onCancel, children }: AlertProps) {
+  const t = useT();
+  const cancel = cancelAs ?? t('common.ui.cancel');
   const ok = useRef<HTMLButtonElement>(null);
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>

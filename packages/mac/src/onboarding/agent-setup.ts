@@ -1,6 +1,7 @@
 // Relative, not @beluga: tests at the repo's root import this file too.
 import type { RuntimeChoice, RuntimeState } from '../../../../src/shared/agent-runtimes.js';
 import { thisComputer } from '../lib/os-words.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Your agents, found (BLG-507): each runtime Beluga knows with where it stands on this Mac (ready,
@@ -35,16 +36,20 @@ export interface AgentRow {
 }
 
 export const STATE_WORDS: Readonly<Record<RuntimeState, string>> = {
-  ready: 'Ready',
-  signed_out: 'Not signed in',
-  missing: 'Not installed',
-  no_endpoint: 'No endpoint',
+  get ready() { return t('onboarding.agents.state.ready'); },
+  get signed_out() { return t('onboarding.agents.state.signed_out'); },
+  get missing() { return t('onboarding.agents.state.missing'); },
+  get no_endpoint() { return t('onboarding.agents.state.no_endpoint'); },
 };
 
-export const FIX_LABEL: Readonly<Record<AgentFix, string>> = { sign_in: 'Sign In', install: 'Get Codex', set_up: 'Set Up…' };
+export const FIX_LABEL: Readonly<Record<AgentFix, string>> = {
+  get sign_in() { return t('onboarding.agents.fix.sign_in'); },
+  get install() { return t('onboarding.agents.fix.install'); },
+  get set_up() { return t('onboarding.agents.fix.set_up'); },
+};
 
 /** A row's button: "Sign In", "Get Codex", "Get OpenCode", "Set Up…". */
-export const fixLabel = (row: Pick<AgentRow, 'label' | 'fix'>): string => (row.fix === 'install' ? `Get ${row.label}` : row.fix ? FIX_LABEL[row.fix] : '');
+export const fixLabel = (row: Pick<AgentRow, 'label' | 'fix'>): string => (row.fix === 'install' ? t('onboarding.agents.get', { name: row.label }) : row.fix ? FIX_LABEL[row.fix] : '');
 
 /** Where a runtime stands: what it said once asked, else ready when it runs here; undefined: not asked yet. */
 export function stateOf(r: RuntimeChoice, checked: boolean): RuntimeState | undefined {
@@ -55,23 +60,23 @@ export function stateOf(r: RuntimeChoice, checked: boolean): RuntimeState | unde
 
 const DETAIL: Readonly<Record<string, Partial<Record<RuntimeState, string>> & { readonly ready: string }>> = {
   claude: {
-    ready: 'Anthropic’s coding agent, through Claude Code. It comes with Beluga.',
-    signed_out: 'It comes with Beluga. Sign in once with your Claude account or an API key.',
-    missing: 'It comes with Beluga. Sign in once with your Claude account or an API key.',
+    get ready() { return t('onboarding.agents.claude.ready'); },
+    get signed_out() { return t('onboarding.agents.claude.signed_out'); },
+    get missing() { return t('onboarding.agents.claude.signed_out'); },
   },
   codex: {
-    ready: 'OpenAI’s coding agent, through the Codex app or its command line.',
-    signed_out: 'Installed. Sign in once with your ChatGPT account or an API key.',
-    missing: 'Install the Codex app, or in Terminal:',
+    get ready() { return t('onboarding.agents.codex.ready'); },
+    get signed_out() { return t('onboarding.agents.codex.signed_out'); },
+    get missing() { return t('onboarding.agents.codex.missing'); },
   },
   opencode: {
-    ready: 'The open-source coding agent, on the models you set up in it (its free ones too).',
-    signed_out: 'Installed. Add a model provider once (opencode auth login).',
-    missing: 'Install OpenCode, or in Terminal:',
+    get ready() { return t('onboarding.agents.opencode.ready'); },
+    get signed_out() { return t('onboarding.agents.opencode.signed_out'); },
+    get missing() { return t('onboarding.agents.opencode.missing'); },
   },
   local: {
-    ready: `A model of your own: Ollama on ${thisComputer()}, or an endpoint you added. Free.`,
-    no_endpoint: `Ollama on ${thisComputer()}, or any endpoint you add. Free, on your own models.`,
+    get ready() { return t('onboarding.agents.local.ready', { computer: thisComputer() }); },
+    get no_endpoint() { return t('onboarding.agents.local.no_endpoint', { computer: thisComputer() }); },
   },
 };
 
@@ -89,7 +94,7 @@ export function agentRows(runtimes: readonly RuntimeChoice[], checked: boolean):
     const known = DETAIL[r.id];
     const detail = (state && known?.[state]) ?? (state === 'ready' || !state ? (known?.ready ?? '') : (r.fix ?? r.why ?? ''));
     const fix = fixOf(r.id, state);
-    return { id: r.id, label: r.label, state, words: state ? STATE_WORDS[state] : 'Checking…', detail, ...(fix ? { fix } : {}) };
+    return { id: r.id, label: r.label, state, words: state ? STATE_WORDS[state] : t('onboarding.agents.checking'), detail, ...(fix ? { fix } : {}) };
   });
 }
 

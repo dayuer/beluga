@@ -16,6 +16,7 @@ import { Glass } from './Glass.js';
 import s from './onboarding.module.css';
 import { cmdReturn, notificationSettings, returnName, systemSettingsName } from '../lib/os-words.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
+import { useT } from '../i18n/index.js';
 
 type Appearance = UiPrefs['appearance'];
 
@@ -46,13 +47,14 @@ function MiniApp({ theme }: { readonly theme: AppTheme }) {
  * the centre, and the picked one's name beside them. Settings › Appearance has them all as windows.
  */
 function ThemeRow({ prefs }: { readonly prefs: UiPrefs }) {
+  const t = useT();
   const base = useDocTheme();
   const picked = themeFor(base, prefs);
   const [hover, setHover] = useState<AppTheme>();
   return (
     <Rise delay={0.45} className={s.accentRow}>
-      <span className={cx(s.label, s.themeLabel)}>Theme</span>
-      <div className={s.swatches} role="radiogroup" aria-label={base === 'dark' ? 'Dark theme' : 'Light theme'} onMouseLeave={() => setHover(undefined)}>
+      <span className={cx(s.label, s.themeLabel)}>{t('onboarding.setup.theme')}</span>
+      <div className={s.swatches} role="radiogroup" aria-label={base === 'dark' ? t('onboarding.setup.darkTheme') : t('onboarding.setup.lightTheme')} onMouseLeave={() => setHover(undefined)}>
         {THEMES.filter((th) => th.base === base).map((th) => (
           <motion.button
             key={th.id}
@@ -79,24 +81,25 @@ function ThemeRow({ prefs }: { readonly prefs: UiPrefs }) {
   );
 }
 
-const LOOKS: ReadonlyArray<{ value: Appearance; label: string }> = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+const LOOKS: ReadonlyArray<{ value: Appearance; label: 'onboarding.setup.light' | 'onboarding.setup.dark' | 'onboarding.setup.system' }> = [
+  { value: 'light', label: 'onboarding.setup.light' },
+  { value: 'dark', label: 'onboarding.setup.dark' },
+  { value: 'system', label: 'onboarding.setup.system' },
 ];
 
 /** Pick a look: three windows to choose from, and the accent. It all applies as you pick. */
 export function Look() {
+  const t = useT();
   const prefs = usePrefs();
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="Make it yours." />
+        <Words text={t('onboarding.setup.lookTitle')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        Pick a look and a theme. It changes as you choose, and Settings has them whenever you want another.
+        {t('onboarding.setup.lookBody')}
       </Rise>
-      <div className={s.looks} role="radiogroup" aria-label="Appearance">
+      <div className={s.looks} role="radiogroup" aria-label={t('onboarding.setup.appearance')}>
         {LOOKS.map((l, i) => {
           const on = prefs.appearance === l.value;
           return (
@@ -122,7 +125,7 @@ export function Look() {
               )}
               <span className={s.lookLabel}>
                 <span className={s.radio}>{on ? <motion.span layoutId="look-dot" className={s.radioDot} transition={SPRING} /> : null}</span>
-                {l.label}
+                {t(l.label)}
               </span>
             </motion.button>
           );
@@ -130,14 +133,14 @@ export function Look() {
       </div>
       <ThemeRow prefs={prefs} />
       <Rise delay={0.5} className={cx(s.accentRow, s.accentAfter)}>
-        <span className={s.label}>Accent</span>
-        <div className={s.swatches} role="radiogroup" aria-label="Accent">
+        <span className={s.label}>{t('onboarding.setup.accent')}</span>
+        <div className={s.swatches} role="radiogroup" aria-label={t('onboarding.setup.accent')}>
           {(Object.keys(ACCENTS) as Accent[]).filter((a) => a !== 'theme' || themeFor(baseNow(prefs), prefs).accent).map((a) => (
             <motion.button
               key={a}
               type="button"
               role="radio"
-              aria-label={a === 'system' ? 'System accent' : a === 'theme' ? `${themeFor(baseNow(prefs), prefs).name}’s own accent` : a}
+              aria-label={a === 'system' ? t('onboarding.setup.systemAccent') : a === 'theme' ? t('onboarding.setup.themeAccent', { name: themeFor(baseNow(prefs), prefs).name }) : a}
               aria-checked={prefs.accent === a}
               className={s.swatch}
               style={{ background: a === 'system' ? 'conic-gradient(#3b82f6, #8b5cf6, #e11d48, #d97706, #059669, #3b82f6)' : ACCENTS[a] }}
@@ -185,6 +188,7 @@ function SetupRow({ label, detail, children, index }: { readonly label: string; 
  * Someone still on the default starts on Arcade; a look of their own is left alone until they pick.
  */
 export function Fire() {
+  const t = useT();
   const look = usePrefs().maxFire;
   const set = (patch: Partial<FireLook>): void => {
     const next = { ...getPrefs().maxFire, ...patch };
@@ -200,27 +204,27 @@ export function Fire() {
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="Set your words on fire." />
+        <Words text={t('onboarding.setup.fireTitle')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        On Max effort, the box you type in burns. Pick one and type below to try it; Settings › Fire & Confetti has the rest.
+        {t('onboarding.setup.fireBody')}
       </Rise>
       <Rise delay={0.3} className={s.fireTry}>
         <Preview look={look} className={s.fireStage} />
       </Rise>
       <Glass radius={16} width="100%" className={s.fireRows}>
-        <SetupRow index={0} label={starter?.name ?? 'Your own'} detail={starter?.blurb ?? 'Tuned in Settings. Pick one to change it.'}>
-          <Choice label="Fire" value={picked ?? ''} onChange={(id) => set(STARTERS.find((x) => x.id === id)!.set)} options={STARTERS.map((x) => ({ value: x.id, label: x.name }))} />
+        <SetupRow index={0} label={starter?.name ?? t('onboarding.setup.yourOwn')} detail={starter?.blurb ?? t('onboarding.setup.tuned')}>
+          <Choice label={t('onboarding.setup.fire')} value={picked ?? ''} onChange={(id) => set(STARTERS.find((x) => x.id === id)!.set)} options={STARTERS.map((x) => ({ value: x.id, label: x.name }))} />
         </SetupRow>
         {picked !== 'none' ? (
-          <SetupRow index={1} label="Where it burns" detail={look.where === 'max' ? 'Only on Max effort, so it tells you you’re on Max.' : 'With every model and effort.'}>
+          <SetupRow index={1} label={t('onboarding.setup.whereBurns')} detail={look.where === 'max' ? t('onboarding.setup.onlyMax') : t('onboarding.setup.everyModel')}>
             <Choice
-              label="Where it burns"
+              label={t('onboarding.setup.whereBurns')}
               value={look.where}
               onChange={(where) => set({ where })}
               options={[
-                { value: 'max', label: 'On Max Only' },
-                { value: 'everywhere', label: 'Everywhere' },
+                { value: 'max', label: t('onboarding.setup.onMaxOnly') },
+                { value: 'everywhere', label: t('onboarding.setup.everywhere') },
               ]}
             />
           </SetupRow>
@@ -237,13 +241,14 @@ export function Fire() {
  */
 export function Popups() {
   const api = useApi();
+  const t = useT();
   const notify = useApp((st) => st.prefs.notify);
   const [asked, setAsked] = useState<'no' | 'asking' | 'done'>('no');
   // What macOS says (checked again as you come back from System Settings).
   const { access, recheck } = useNotificationAccess();
   const state = access?.state;
   // Where they wait once shown: Notification Center on a Mac and Windows; Linux desktops differ.
-  const kept = keyPlatform() === 'linux' ? '' : ', and stay in Notification Center';
+  const kept = keyPlatform() === 'linux' ? '' : t('onboarding.setup.keptCenter');
   const ask = (): void => {
     setAsked('asking');
     void askNotificationPermission()
@@ -256,44 +261,44 @@ export function Popups() {
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="Never miss it when your agent needs you." />
+        <Words text={t('onboarding.setup.popupsTitle')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        When your agent asks you something, a plan waits on your decision, or a friend asks your agent, a small card shows in the corner of your screen, over whatever you’re doing, full-screen apps too. It never takes the keyboard from you.
+        {t('onboarding.setup.popupsBody')}
       </Rise>
       <Glass radius={16} width="100%" className={s.rows}>
-        <SetupRow index={0} label="Show on-screen popups when something needs me" detail="Needs no permission. Off: you still get notifications.">
-          <Switch label="Show on-screen popups when something needs me" on={notify.popup !== false} onChange={(v) => void api.session.setPrefs({ notify: { ...notify, popup: v } })} />
+        <SetupRow index={0} label={t('onboarding.setup.showPopups')} detail={t('onboarding.setup.showPopupsDetail')}>
+          <Switch label={t('onboarding.setup.showPopups')} on={notify.popup !== false} onChange={(v) => void api.session.setPrefs({ notify: { ...notify, popup: v } })} />
         </SetupRow>
-        <SetupRow index={1} label="See one now" detail="A pretend friend’s request and a pretend decision, for a minute. Their buttons do nothing.">
+        <SetupRow index={1} label={t('onboarding.setup.seeOne')} detail={t('onboarding.setup.seeOneDetail')}>
           <button type="button" className={cx(s.input, s.rowButton)} onClick={previewRequestPopup}>
-            Show Me a Sample
+            {t('onboarding.setup.showSample')}
           </button>
         </SetupRow>
         <SetupRow
           index={2}
-          label="Notifications too"
+          label={t('onboarding.setup.notificationsToo')}
           detail={
             state === 'allowed'
-              ? `Allowed. They reach you when popups are off${kept}.`
+              ? t('onboarding.setup.notifAllowed', { kept })
               : state === 'off'
-                ? `Turned off for Beluga in ${notificationSettings()}.`
+                ? t('onboarding.setup.notifOff', { where: notificationSettings() })
                 : asked === 'done'
-                  ? `Asked. You can change it in ${notificationSettings()}.`
-                  : `Optional.${keyPlatform() === 'mac' ? ' macOS asks once.' : ''} They reach you when popups are off${kept}.`
+                  ? t('onboarding.setup.notifAsked', { where: notificationSettings() })
+                  : t('onboarding.setup.notifOptional', { mac: keyPlatform() === 'mac' ? t('onboarding.setup.macAsksOnce') : '', kept })
           }
         >
           {state === 'allowed' ? (
             <span className={s.grant} data-grant="granted">
-              <Icon name="check" size={11} /> Allowed
+              <Icon name="check" size={11} /> {t('onboarding.setup.allowed')}
             </span>
           ) : state === 'off' ? (
             <button type="button" className={cx(s.input, s.rowButton)} onClick={() => void openNotificationSettings()}>
-              Open {systemSettingsName()}
+              {t('onboarding.setup.open', { name: systemSettingsName() })}
             </button>
           ) : (
             <button type="button" className={cx(s.input, s.rowButton)} disabled={asked !== 'no'} onClick={ask}>
-              {asked === 'done' ? 'Asked' : asked === 'asking' ? 'Asking…' : 'Allow Notifications'}
+              {asked === 'done' ? t('onboarding.setup.asked') : asked === 'asking' ? t('onboarding.setup.asking') : t('onboarding.setup.allowNotifications')}
             </button>
           )}
         </SetupRow>
@@ -308,6 +313,7 @@ export function Popups() {
  */
 export function Setup() {
   const api = useApi();
+  const t = useT();
   const prefs = usePrefs();
   const self = useApp((st) => st.self?.name ?? '');
   const policy = useApp((st) => st.policy);
@@ -324,37 +330,37 @@ export function Setup() {
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="A few good defaults." />
+        <Words text={t('onboarding.setup.defaultsTitle')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        Already set to what works best for most people. Change anything now, or later in Settings.
+        {t('onboarding.setup.defaultsBody')}
       </Rise>
       <Glass radius={16} width="100%" className={s.rows}>
-        <SetupRow index={0} label="Your name" detail="What friends see when you work together.">
-          <input className={s.input} aria-label="Your name" value={name} placeholder="Your name" maxLength={64} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === 'Enter' && saveName()} />
+        <SetupRow index={0} label={t('onboarding.setup.yourName')} detail={t('onboarding.setup.yourNameDetail')}>
+          <input className={s.input} aria-label={t('onboarding.setup.yourName')} value={name} placeholder={t('onboarding.setup.yourName')} maxLength={64} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === 'Enter' && saveName()} />
         </SetupRow>
-        <SetupRow index={1} label="When a friend asks your agent" detail={policy === 'ask' ? 'Recommended: you see and approve every request.' : policy === 'auto' ? 'Requests from friends run without asking.' : 'Only you can use your agent.'}>
+        <SetupRow index={1} label={t('onboarding.setup.friendAsks')} detail={policy === 'ask' ? t('onboarding.setup.policyAsk') : policy === 'auto' ? t('onboarding.setup.policyAuto') : t('onboarding.setup.policyDeny')}>
           <Choice
-            label="Friends' requests"
+            label={t('onboarding.setup.friendsRequests')}
             value={policy}
             onChange={(v) => void api.session.setClaudeSharing(v)}
             options={[
-              { value: 'ask', label: 'Ask Me' },
-              { value: 'auto', label: 'Allow' },
-              { value: 'deny', label: 'Private' },
+              { value: 'ask', label: t('onboarding.setup.askMe') },
+              { value: 'auto', label: t('onboarding.setup.allow') },
+              { value: 'deny', label: t('onboarding.setup.private') },
             ]}
           />
         </SetupRow>
-        <SetupRow index={2} label="Tell me when my agent needs me" detail={core.notify.onlyAway ? 'When a run finishes or waits for you, while you’re in another app.' : 'When a run finishes or waits for you.'}>
-          <Switch label="Notifications" on={core.notify.desktop} onChange={(v) => void api.session.setPrefs({ notify: { ...core.notify, desktop: v, ...(v ? { onlyAway: true } : {}) } })} />
+        <SetupRow index={2} label={t('onboarding.setup.tellMe')} detail={core.notify.onlyAway ? t('onboarding.setup.tellMeAway') : t('onboarding.setup.tellMeAlways')}>
+          <Switch label={t('onboarding.setup.notifications')} on={core.notify.desktop} onChange={(v) => void api.session.setPrefs({ notify: { ...core.notify, desktop: v, ...(v ? { onlyAway: true } : {}) } })} />
         </SetupRow>
-        <SetupRow index={3} label="Ask before my agent runs commands" detail="Off lets your agent work on its own in your worktrees. Secrets stay blocked either way.">
-          <Switch label="Ask before running commands" on={core.selfApproval === 'ask'} onChange={(v) => void api.session.setPrefs({ selfApproval: v ? 'ask' : 'never' })} />
+        <SetupRow index={3} label={t('onboarding.setup.askBefore')} detail={t('onboarding.setup.askBeforeDetail')}>
+          <Switch label={t('onboarding.setup.askBeforeSwitch')} on={core.selfApproval === 'ask'} onChange={(v) => void api.session.setPrefs({ selfApproval: v ? 'ask' : 'never' })} />
         </SetupRow>
         {/* Your agent is picked on its own step, right after the welcome (AgentsStep.tsx). */}
-        <SetupRow index={4} label="Send messages with" detail={prefs.sendWith === 'enter' ? 'Shift-Return makes a new line.' : 'Return makes a new line.'}>
+        <SetupRow index={4} label={t('onboarding.setup.sendMessages')} detail={prefs.sendWith === 'enter' ? t('onboarding.setup.shiftReturn') : t('onboarding.setup.returnLine')}>
           <Choice
-            label="Send with"
+            label={t('onboarding.setup.sendWith')}
             value={prefs.sendWith}
             onChange={(v) => setPrefs({ sendWith: v })}
             options={[

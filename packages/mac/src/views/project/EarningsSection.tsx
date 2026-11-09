@@ -9,6 +9,7 @@ import { openExternal } from '../../lib/system.js';
 import { agoText } from './home-model.js';
 import h from '../project-home.module.css';
 import s from './earnings-section.module.css';
+import { type Key, useT } from '../../i18n/index.js';
 
 /**
  * A project's home, with Stripe connected: how it's doing lately, as one quiet row at the bottom
@@ -23,21 +24,22 @@ export function EarningsSection({ project }: { project: Project }) {
   const earnings = useProjectEarnings(project.root);
   const [range, setRange] = useKept<EarningsRange>(RANGE_KEY, (v) => EARNINGS_RANGES.find((r) => String(r) === v) ?? 30);
   const [open, setOpen] = useKept<boolean>(OPEN_KEY, (v) => v === 'true');
+  const t = useT();
   if (!earnings) return null;
-  const status = earnings.refreshing ? 'reading Stripe…' : earnings.updatedAt ? `updated ${updatedAgo(earnings.updatedAt)}` : undefined;
+  const status = earnings.refreshing ? t('views.earnings.reading') : earnings.updatedAt ? t('views.earnings.updated', { ago: updatedAgo(earnings.updatedAt) }) : undefined;
   const activity = earnings.activity;
   return (
-    <section className={h.section} aria-label="Earnings">
+    <section className={h.section} aria-label={t('views.earnings.title')}>
       <div className={h.sectionHead}>
-        <h3 className={h.sectionTitle}>Earnings</h3>
+        <h3 className={h.sectionTitle}>{t('views.earnings.title')}</h3>
         <span className={h.sectionHint}>
           {earnings.account ?? 'Stripe'}
-          {earnings.mode === 'test' ? ' · test mode' : ''}
+          {earnings.mode === 'test' ? t('views.earnings.testMode') : ''}
           {status ? ` · ${status}` : ''}
         </span>
         <span className={h.flex} />
         <Button size="small" variant="quiet" onClick={() => openStripe(project.id)}>
-          Stripe Earnings…
+          {t('views.earnings.stripeEarnings')}
         </Button>
       </div>
       <div className={h.rows}>
@@ -80,6 +82,7 @@ function useKept<T>(key: string, read: (stored: string | null) => T): [T, (v: T)
 }
 
 function NotYet({ project, earnings }: { project: Project; earnings: ProjectEarnings }) {
+  const t = useT();
   if (earnings.error && !earnings.refreshing) {
     return (
       <div className={cx(h.row, s.problem)} role="status">
@@ -88,12 +91,12 @@ function NotYet({ project, earnings }: { project: Project; earnings: ProjectEarn
         </span>
         <span className={h.rowMain}>{brandText(earnings.error.message)}</span>
         <button type="button" className={s.link} onClick={() => openStripe(project.id)}>
-          Stripe Earnings…
+          {t('views.earnings.stripeEarnings')}
         </button>
       </div>
     );
   }
-  return <p className={h.none}>Reading the last months from Stripe…</p>;
+  return <p className={h.none}>{t('views.earnings.readingMonths')}</p>;
 }
 
 /** The money of some totals in the currency earnings show in (≈ when some was converted). */
@@ -108,43 +111,42 @@ const shownOf = (totals: readonly MoneyTotal[], currency: string, fx: FxRates | 
   return { amount: c.amount, approx: c.converted, missing: c.missing };
 };
 
-const plural = (n: number, one: string, many: string): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 /** The folded row: the range's money and its change, payments, paying customers, the last payment. */
 function Summary({ activity, earnings, range, open, onToggle }: { activity: EarningsActivity; earnings: ProjectEarnings; range: EarningsRange; open: boolean; onToggle: () => void }) {
   const { currency, fx } = useMoney();
+  const t = useT();
   const fig = rangeFigures(activity, range);
   const earned = shownOf(fig.totals, currency, fx);
   const before = fig.before ? shownOf(fig.before.totals, currency, fx) : undefined;
-  const span = `the ${range} days before`;
-  const last = newestPaid(earnings);
+    const last = newestPaid(earnings);
   const money = `${earned.approx ? '≈ ' : ''}${formatGlance(earned.amount, currency)}`;
   return (
-    <button type="button" className={h.row} aria-expanded={open} aria-label={`${money} in the last ${range} days`} onClick={onToggle} data-earnings-summary>
+    <button type="button" className={h.row} aria-expanded={open} aria-label={t('views.earnings.summaryAria', { money, range })} onClick={onToggle} data-earnings-summary>
       <span className={h.rowIcon}>
         <Icon name="coin" size={13} />
       </span>
       <span className={h.rowMain}>
         <span className={h.rowTitle}>
-          <Tip label={`${formatMoney(earned.amount, currency)} in the last ${range} days${before ? `, ${formatMoney(before.amount, currency)} in ${span}` : ''}. Captured minus refunds, before Stripe’s fees.`}>
+          <Tip label={before ? t('views.earnings.summaryTipBefore', { now: formatMoney(earned.amount, currency), before: formatMoney(before.amount, currency), range }) : t('views.earnings.summaryTip', { now: formatMoney(earned.amount, currency), range })}>
             <span className={h.rowName}>{money}</span>
           </Tip>
-          <span className={s.range}>in the last {range} days</span>
+          <span className={s.range}>{t('views.earnings.inLast', { range })}</span>
           <Change now={earned.amount} before={before?.amount} />
         </span>
         <span className={h.rowLast}>
-          {plural(fig.payments, 'payment', 'payments')}
+          {t('views.earnings.payments', { n: fig.payments, shown: fig.payments.toLocaleString() })}
           <Change now={fig.payments} before={fig.before?.payments} />
           {fig.payers !== undefined ? (
             <>
               {' · '}
-              {plural(fig.payers, 'paying customer', 'paying customers')}
+              {t('views.earnings.payers', { n: fig.payers, shown: fig.payers.toLocaleString() })}
               <Change now={fig.payers} before={fig.before?.payers} />
             </>
           ) : null}
         </span>
       </span>
-      {last ? <span className={s.last}>last payment {agoText(last.at)}</span> : null}
+      {last ? <span className={s.last}>{t('views.earnings.lastPayment', { ago: agoText(last.at) })}</span> : null}
       <Icon name="chevronDown" size={11} className={cx(s.fold, open && s.folded)} />
     </button>
   );
@@ -152,8 +154,9 @@ function Summary({ activity, earnings, range, open, onToggle }: { activity: Earn
 
 /** Up or down against the span before, in percent ("new" when there was nothing then): a small mark. */
 function Change({ now, before }: { now: number; before: number | undefined }) {
+  const t = useT();
   if (before === undefined) return null;
-  if (before === 0) return now > 0 ? <span className={cx(s.change, s.up)}>new</span> : null;
+  if (before === 0) return now > 0 ? <span className={cx(s.change, s.up)}>{t('views.earnings.new')}</span> : null;
   const pct = Math.round(((now - before) / before) * 100);
   if (pct === 0) return <span className={cx(s.change, s.flat)}>±0%</span>;
   return (
@@ -167,6 +170,7 @@ function Change({ now, before }: { now: number; before: number | undefined }) {
 /** Unfolded: the range, each day, the latest payments. */
 function Details({ activity, earnings, range, onRange }: { activity: EarningsActivity; earnings: ProjectEarnings; range: EarningsRange; onRange: (r: EarningsRange) => void }) {
   const { currency, fx } = useMoney();
+  const t = useT();
   const fig = rangeFigures(activity, range);
   const note = missingNote(shownOf(fig.totals, currency, fx).missing);
   const allTime = earnings.totals ? shownOf(earnings.totals, currency, fx) : undefined;
@@ -174,15 +178,15 @@ function Details({ activity, earnings, range, onRange }: { activity: EarningsAct
     <div className={s.details}>
       <div className={s.bar}>
         <Segmented<`${EarningsRange}`>
-          label="Range"
+          label={t('views.earnings.range')}
           value={`${range}`}
           onChange={(v) => onRange(Number(v) as EarningsRange)}
-          options={EARNINGS_RANGES.map((r) => ({ value: `${r}` as const, label: `${r} days`, hint: `The last ${r} days, today included` }))}
+          options={EARNINGS_RANGES.map((r) => ({ value: `${r}` as const, label: t('views.earnings.days', { n: r }), hint: t('views.earnings.daysHint', { n: r }) }))}
         />
         <span className={h.flex} />
         {allTime ? (
           <span className={s.dim}>
-            All time {allTime.approx ? '≈ ' : ''}
+            {t('views.earnings.allTime')} {allTime.approx ? '≈ ' : ''}
             {formatGlance(allTime.amount, currency)}
           </span>
         ) : null}
@@ -192,7 +196,7 @@ function Details({ activity, earnings, range, onRange }: { activity: EarningsAct
         <p className={s.dim}>
           {note}
           {note && activity.partial ? ' ' : ''}
-          {activity.partial ? 'A busy account: Beluga read the newest 5,000 payments, so the oldest days may show only part.' : ''}
+          {activity.partial ? t('views.earnings.partial') : ''}
         </p>
       ) : null}
       <Latest latest={activity.latest} mode={earnings.mode} />
@@ -209,15 +213,16 @@ const longDay = (day: string): string => dateOf(day).toLocaleDateString(undefine
 
 /** What came in each day: a bar per day, the quiet ones a stub, today's a shade stronger. */
 function DayBars({ days, currency, fx }: { days: readonly RangeDay[]; currency: string; fx: FxRates | undefined }) {
+  const t = useT();
   const values = days.map((d) => convertParts(d.totals, currency, fx).amount);
   const max = Math.max(1, ...values);
   return (
     <div className={s.chartWrap}>
-      <div className={cx(s.chart, days.length > 40 && s.dense)} role="img" aria-label={`Earned each day, the last ${days.length} days`}>
+      <div className={cx(s.chart, days.length > 40 && s.dense)} role="img" aria-label={t('views.earnings.chartAria', { n: days.length })}>
         {days.map((d, i) => {
           const v = values[i]!;
           return (
-            <Tip key={d.day} label={`${longDay(d.day)} · ${v ? `${formatMoney(v, currency)} · ${plural(d.payments, 'payment', 'payments')}` : 'no payments'}`}>
+            <Tip key={d.day} label={`${longDay(d.day)} · ${v ? `${formatMoney(v, currency)} · ${t('views.earnings.payments', { n: d.payments, shown: d.payments.toLocaleString() })}` : t('views.earnings.noPayments')}`}>
               <span className={cx(s.col, i === days.length - 1 && s.today)}>
                 <span className={cx(s.fill, !v && s.zero)} style={v ? { height: `${Math.max(6, (v / max) * 100)}%` } : undefined} />
               </span>
@@ -227,7 +232,7 @@ function DayBars({ days, currency, fx }: { days: readonly RangeDay[]; currency: 
       </div>
       <div className={s.axis} aria-hidden="true">
         <span>{shortDay(days[0]!.day)}</span>
-        <span>Today</span>
+        <span>{t('views.earnings.today')}</span>
       </div>
     </div>
   );
@@ -235,19 +240,19 @@ function DayBars({ days, currency, fx }: { days: readonly RangeDay[]; currency: 
 
 type Filter = 'all' | 'refunds' | 'failed';
 
-const FILTERS: ReadonlyArray<{ value: Filter; label: string; test: (p: RecentPayment) => boolean }> = [
-  { value: 'all', label: 'All', test: () => true },
-  { value: 'refunds', label: 'Refunds', test: (p) => p.status === 'refunded' || p.status === 'partly_refunded' },
-  { value: 'failed', label: 'Failed', test: (p) => p.status === 'failed' },
+const FILTERS: ReadonlyArray<{ value: Filter; label: Key; test: (p: RecentPayment) => boolean }> = [
+  { value: 'all', label: 'views.earnings.all', test: () => true },
+  { value: 'refunds', label: 'views.earnings.refunds', test: (p) => p.status === 'refunded' || p.status === 'partly_refunded' },
+  { value: 'failed', label: 'views.earnings.failed', test: (p) => p.status === 'failed' },
 ];
 
 type Tone = 'ok' | 'info' | 'merged' | 'warn' | 'muted';
 
-const STATUS: Partial<Record<PaymentStatus, { label: string; tone: Tone }>> = {
-  refunded: { label: 'Refunded', tone: 'muted' },
-  partly_refunded: { label: 'Part refunded', tone: 'muted' },
-  pending: { label: 'Pending', tone: 'info' },
-  failed: { label: 'Failed', tone: 'warn' },
+const STATUS: Partial<Record<PaymentStatus, { label: Key; tone: Tone }>> = {
+  refunded: { label: 'views.earnings.refunded', tone: 'muted' },
+  partly_refunded: { label: 'views.earnings.partRefunded', tone: 'muted' },
+  pending: { label: 'views.earnings.pending', tone: 'info' },
+  failed: { label: 'views.earnings.failed', tone: 'warn' },
 };
 
 /** How many of the latest payments show before Show All. */
@@ -257,6 +262,7 @@ const FEW = 5;
 function Latest({ latest, mode }: { latest: readonly RecentPayment[]; mode: 'test' | 'live' }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [all, setAll] = useState(false);
+  const t = useT();
   const arrived = useArrived(latest);
   const offered = FILTERS.filter((f) => f.value === 'all' || latest.some(f.test));
   const chosen = offered.find((f) => f.value === filter) ?? FILTERS[0]!;
@@ -265,12 +271,12 @@ function Latest({ latest, mode }: { latest: readonly RecentPayment[]; mode: 'tes
   return (
     <div className={s.latest}>
       <div className={s.latestHead}>
-        <h4 className={s.latestTitle}>Latest payments</h4>
+        <h4 className={s.latestTitle}>{t('views.earnings.latest')}</h4>
         {offered.length > 1 ? (
-          <div className={s.filters} role="radiogroup" aria-label="Show">
+          <div className={s.filters} role="radiogroup" aria-label={t('views.earnings.show')}>
             {offered.map((f) => (
               <button key={f.value} type="button" role="radio" aria-checked={f.value === chosen.value} className={cx(s.filter, f.value === chosen.value && s.filterOn)} onClick={() => setFilter(f.value)}>
-                {f.label}
+                {t(f.label)}
                 {f.value === 'all' ? null : <span className={s.filterCount}>{latest.filter(f.test).length}</span>}
               </button>
             ))}
@@ -278,22 +284,22 @@ function Latest({ latest, mode }: { latest: readonly RecentPayment[]; mode: 'tes
         ) : null}
         <span className={h.flex} />
         <button type="button" className={s.link} onClick={() => void openExternal(stripePaymentsUrl(mode))}>
-          Open Stripe
+          {t('views.earnings.openStripe')}
           <Icon name="external" size={10} />
         </button>
       </div>
       {shown.length ? (
-        <div className={s.payments} role="list" aria-label="Latest payments">
+        <div className={s.payments} role="list" aria-label={t('views.earnings.latest')}>
           {shown.map((p) => (
             <PaymentRow key={p.id} payment={p} fresh={arrived.has(p.id)} />
           ))}
         </div>
       ) : (
-        <p className={s.dim}>{latest.length ? 'None of these lately.' : 'No payments in the last six months.'}</p>
+        <p className={s.dim}>{latest.length ? t('views.earnings.noneLately') : t('views.earnings.noneSixMonths')}</p>
       )}
       {list.length > FEW ? (
         <button type="button" className={cx(s.link, s.more)} onClick={() => setAll(!all)}>
-          {all ? 'Show Fewer' : `Show All ${list.length}`}
+          {all ? t('views.earnings.showFewer') : t('views.earnings.showAllN', { n: list.length })}
         </button>
       ) : null}
     </div>
@@ -302,14 +308,15 @@ function Latest({ latest, mode }: { latest: readonly RecentPayment[]; mode: 'tes
 
 function PaymentRow({ payment: p, fresh }: { payment: RecentPayment; fresh: boolean }) {
   const status = STATUS[p.status];
+  const t = useT();
   const gone = p.status === 'refunded' || p.status === 'failed';
   return (
     <div role="listitem" className={cx(s.pay, fresh && s.fresh)} data-payment={p.status}>
-      <span className={s.payWho}>{p.who ?? 'A customer'}</span>
+      <span className={s.payWho}>{p.who ?? t('views.earnings.aCustomer')}</span>
       {p.description ? <span className={s.payWhat}>{p.description}</span> : <span className={h.flex} />}
-      {fresh ? <span className={cx(s.badge, s.badgeNew)}>New</span> : null}
-      {status ? <span className={cx(s.badge, s[`badge_${status.tone}`])}>{status.label}</span> : null}
-      <Tip label={p.refunded && p.status === 'partly_refunded' ? `${formatMoney(p.refunded, p.currency)} refunded` : new Date(p.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}>
+      {fresh ? <span className={cx(s.badge, s.badgeNew)}>{t('views.earnings.newBadge')}</span> : null}
+      {status ? <span className={cx(s.badge, s[`badge_${status.tone}`])}>{t(status.label)}</span> : null}
+      <Tip label={p.refunded && p.status === 'partly_refunded' ? t('views.earnings.refundedAmount', { money: formatMoney(p.refunded, p.currency) }) : new Date(p.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}>
         <span className={cx(s.payAmount, gone && s.struck)}>{formatMoney(p.amount, p.currency)}</span>
       </Tip>
       <span className={s.payWhen}>{agoText(p.at)}</span>

@@ -12,6 +12,7 @@ import { useSentinelActions } from './use-sentinel.js';
 import g from '../layout/project-groups.module.css';
 import side from '../layout/Sidebar.module.css';
 import s from './sentinel-nav.module.css';
+import { useT } from '../i18n/index.js';
 
 export { isSentinelView };
 
@@ -24,12 +25,13 @@ export { isSentinelView };
  */
 export function SentinelNav() {
   const actions = useActions();
+  const t = useT();
   const { line, live, selected } = useApp((st) => ({ line: sidebarLine(st.sentinel), live: anyRunning(st.sentinel), selected: isSentinelView(st.view.kind) }), sameDeep);
   const all = useUi((u) => u.collapsed.includes(ROWS_KEY));
   const counts = useApp((st) => (st.sentinel.enabled ? sidebarSentinels(st.sentinel) : []).reduce((c, x) => ({ on: c.on + 1, quiet: c.quiet + (needsALook(x) ? 0 : 1) }), { on: 0, quiet: 0 }), sameDeep);
   const toggle = (): void => actions.run({ type: 'toggle_fold', key: ROWS_KEY });
   const fold = counts.quiet ? (
-    <button type="button" className={g.foldButton} aria-expanded={all} aria-label={all ? 'Show only the sentinels that need a look' : `Show all ${counts.on} sentinels that are on`} title={all ? 'Show only the ones that need a look' : `Show all ${counts.on} that are on`} onClick={(e) => (e.stopPropagation(), toggle())}>
+    <button type="button" className={g.foldButton} aria-expanded={all} aria-label={all ? t('sentinel.nav.onlyNeedLabel') : t('sentinel.nav.allOnLabel', { n: counts.on })} title={all ? t('sentinel.nav.onlyNeed') : t('sentinel.nav.allOn', { n: counts.on })} onClick={(e) => (e.stopPropagation(), toggle())}>
       <Icon name="chevronRight" size={9} className={cx(g.disclosure, all && g.disclosureOpen)} />
     </button>
   ) : null;
@@ -38,7 +40,7 @@ export function SentinelNav() {
     <>
       <Row
         icon={<Icon name="sentinel" size={14} />}
-        label="Sentinel"
+        label={t('sentinel.marks.sentinel')}
         detail={line.text}
         selected={selected}
         onClick={() => actions.run({ type: 'view', view: { kind: 'sentinel' } })}
@@ -90,7 +92,8 @@ function SentinelSideRow({ item }: { item: SideSentinel }) {
   const open = useUi((u) => u.collapsed.includes(runsKey(sentinel.id)));
   const selected = useApp((st) => st.view.kind === 'sentinel_page' && st.view.id === sentinel.id);
   const toggle = (): void => actions.run({ type: 'toggle_fold', key: runsKey(sentinel.id) });
-  const tip = needs ? `${sentinel.name} waits for you` : live ? `${sentinel.name} is running` : failed ? `${sentinel.name}: its last run failed` : `${sentinel.name}: ${runs.length ? `${runs.length} run${runs.length === 1 ? '' : 's'}` : 'no runs yet'}`;
+  const t = useT();
+  const tip = needs ? t('sentinel.model.need.waits', { name: sentinel.name }) : live ? t('sentinel.use.running', { name: sentinel.name }) : failed ? t('sentinel.nav.lastFailed', { name: sentinel.name }) : t('sentinel.nav.runs', { name: sentinel.name, n: runs.length });
   return (
     <>
       <Row
@@ -103,7 +106,7 @@ function SentinelSideRow({ item }: { item: SideSentinel }) {
         icon={
           <span className={s.sideIcon}>
             {runs.length ? (
-              <button type="button" className={g.foldButton} aria-label={open ? `Fold ${sentinel.name}’s runs` : `Show ${sentinel.name}’s runs`} onClick={(e) => (e.stopPropagation(), toggle())}>
+              <button type="button" className={g.foldButton} aria-label={open ? t('sentinel.nav.foldRuns', { name: sentinel.name }) : t('sentinel.nav.showRuns', { name: sentinel.name })} onClick={(e) => (e.stopPropagation(), toggle())}>
                 <Icon name="chevronRight" size={9} className={cx(g.disclosure, open && g.disclosureOpen)} />
               </button>
             ) : (
@@ -134,6 +137,7 @@ const RUN_ICON: Readonly<Record<SideRun['state'], IconName>> = { done: 'check', 
 
 function SideRuns({ sentinelId, runs }: { sentinelId: string; runs: readonly SideRun[] }) {
   const a = useSentinelActions();
+  const t = useT();
   const now = useClock(true, 60_000);
   const here = useApp((st) => (st.view.kind === 'sentinel_run' ? st.view.runId : undefined));
   return (
@@ -153,7 +157,7 @@ function SideRuns({ sentinelId, runs }: { sentinelId: string; runs: readonly Sid
           trailing={r.state === 'running' || r.state === 'queued' ? <DotMark tone="claude" live signal="working" /> : r.state === 'needs-you' ? <DotMark tone="warn" signal="needs" /> : <span className={s.when}>{ago(r.startedAt, now)}</span>}
         />
       ))}
-      {runs.length > SIDE_RUNS ? <Row indent={2} className={s.more} label={`All ${runs.length} on its page`} onClick={() => a.open(sentinelId)} /> : null}
+      {runs.length > SIDE_RUNS ? <Row indent={2} className={s.more} label={t('sentinel.nav.allOnPage', { n: runs.length })} onClick={() => a.open(sentinelId)} /> : null}
     </>
   );
 }

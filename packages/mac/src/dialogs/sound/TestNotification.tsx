@@ -11,7 +11,7 @@ import { playTestSound } from '../../lib/sounds/native.js';
 import { Row } from '../settings-controls.js';
 import s from './sound.module.css';
 import { keyPlatform } from '../../lib/shortcuts-model.js';
-import { useT } from '../../i18n/index.js';
+import { useT, tl } from '../../i18n/index.js';
 
 export interface TestNotificationProps {
   readonly n: NotifySettings;
@@ -62,7 +62,7 @@ export function TestNotification({ n, onChecked, onAction }: TestNotificationPro
           <span className={s.outcomeText}>{outcome.text}</span>
           {outcome.action ? (
             <Button size="small" onClick={() => onAction(outcome.action!)}>
-              {ACTION_LABELS[outcome.action]}
+              {tl('ACTION_LABELS', outcome.action, 'text', ACTION_LABELS[outcome.action])}
             </Button>
           ) : null}
         </div>

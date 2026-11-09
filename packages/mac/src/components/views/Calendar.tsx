@@ -6,6 +6,7 @@ import type { ViewData } from './use-view-data.js';
 import { formatCell, formatNumber, headingOf } from './format.js';
 import { useHoverTip } from './HoverTip.js';
 import v from './views.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * A calendar of days (GitHub's contributions): a column per week, Monday on top, each day a small
@@ -14,7 +15,7 @@ import v from './views.module.css';
  */
 
 const dateF = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-const DAYS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+const DAYS = ['mon', '', 'wed', '', 'fri', '', ''] as const;
 
 /** A YYYY-MM-DD as a local date (not UTC midnight). */
 const local = (d: string): Date => {
@@ -23,10 +24,11 @@ const local = (d: string): Date => {
 };
 
 export function CalendarView({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const dark = useDocTheme() === 'dark';
   const plan = useMemo(() => planCalendar(view, data.rows, data.columns), [view, data.rows, data.columns]);
   const { show, hide, tip } = useHoverTip();
-  if (!plan) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to put on a calendar (it needs a date)'}</div>;
+  if (!plan) return <div className={v.empty}>{data.loading ? t('common.table.loading') : t('common.views.noCalendar')}</div>;
   const scale = scaleOf(view, dark);
   const fmt = (n: number): string => (plan.valueColumn ? formatCell(n, plan.valueColumn) : formatNumber(n));
   const color = (d: CalendarDay): string => (d.inside ? scaleColor(d.value, plan.min, plan.max, scale) : 'transparent');
@@ -55,7 +57,7 @@ export function CalendarView({ view, data }: { view: View; data: ViewData }) {
           ))}
           {DAYS.map((d, i) => (
             <span key={`d${i}`} className={v.calDay} style={{ gridRow: i + 2, gridColumn: 1 }}>
-              {d}
+              {d ? t(`common.calendar.${d}`) : ''}
             </span>
           ))}
           {plan.weeks.map((week, w) =>
@@ -74,15 +76,15 @@ export function CalendarView({ view, data }: { view: View; data: ViewData }) {
       </div>
       <div className={v.calFoot}>
         <span>
-          {plan.days} {plan.days === 1 ? 'day' : 'days'} with activity · {fmt(plan.total)} total
+          {t('common.calendar.foot', { n: plan.days, total: fmt(plan.total) })}
         </span>
         <span className={v.grow} />
         <span className={v.calScale}>
-          Less
+          {t('common.calendar.less')}
           {scale.map((c) => (
             <span key={c} className={v.calSwatch} style={{ background: c }} />
           ))}
-          More
+          {t('common.calendar.more')}
         </span>
       </div>
       {tip}

@@ -10,7 +10,7 @@ import { NotifyStatusLine } from './sound/NotifyStatus.js';
 import { SoundSettings } from './sound/SoundSettings.js';
 import { TestNotification } from './sound/TestNotification.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
-import { type Key, useT } from '../i18n/index.js';
+import { type Key, useT, tl } from '../i18n/index.js';
 
 type Toggle = 'desktop' | 'onlyAway' | 'planMilestones' | 'needsYou' | 'done' | 'doneHere' | 'mentions' | 'people' | 'background' | 'sentinels' | 'problems' | 'pr';
 
@@ -67,7 +67,7 @@ export function NotificationSettings() {
             <Select<'off' | DndChoice>
               label={t('settings.notifications.dnd')}
               value="off"
-              options={[{ value: 'off', label: t('settings.common.off') }, ...DND_CHOICES]}
+              options={[{ value: 'off', label: t('settings.common.off') }, ...DND_CHOICES.map((c) => ({ ...c, label: tl('DND_CHOICES', c.value, 'label', c.label) }))]}
               onChange={(v) => save({ dnd: v === 'off' ? null : dndFor(v) })}
             />
           )}

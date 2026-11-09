@@ -1,3 +1,4 @@
+import { t, useT } from '../i18n/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import { type GhJob, isLive } from '@beluga/core/ci/model.js';
 import type { Graph } from '@beluga/shared/graph-spec.js';
@@ -21,12 +22,12 @@ export function useWorkflowShape(text: string | undefined): { readonly shape?: W
         if (gone) return;
         try {
           const shape = readWorkflow(y.parse(text, { uniqueKeys: false }));
-          setGot(shape ? { text, shape } : { text, error: 'This file has no jobs to draw' });
+          setGot(shape ? { text, shape } : { text, error: t('ci.graph.noJobs') });
         } catch (err) {
           setGot({ text, error: err instanceof Error ? err.message.split('\n')[0]! : String(err) });
         }
       },
-      () => !gone && setGot({ text, error: 'Couldn’t load the YAML reader' }),
+      () => !gone && setGot({ text, error: t('ci.graph.noYaml') }),
     );
     return () => void (gone = true);
   }, [text]);
@@ -45,10 +46,11 @@ export const shapeOf = (graph: Graph): string => JSON.stringify([graph.nodes.map
  */
 export function WorkflowGraph({ text, path, title, jobs }: { text: string; path: string; title?: string; jobs?: readonly GhJob[] }) {
   const { shape, error } = useWorkflowShape(text);
+  useT();
   const live = Boolean(jobs?.some(isLive));
   const now = useNow(live);
   const graph = useMemo(() => (shape ? workflowGraph(shape, { path, ...(title ? { title } : {}), ...(jobs ? { jobs } : {}), now }) : undefined), [shape, path, title, jobs, live ? now : 0]);
-  if (error) return <p className={s.graphNote}>Can’t draw {path.split('/').pop()}: {error}</p>;
-  if (!graph) return <div className={s.graphWait} aria-label="Drawing the workflow" />;
+  if (error) return <p className={s.graphNote}>{t('ci.graph.cantDraw', { file: path.split('/').pop() ?? '', error })}</p>;
+  if (!graph) return <div className={s.graphWait} aria-label={t('ci.graph.drawing')} />;
   return <GraphBlock code={JSON.stringify(graph)} shapeKey={shapeOf(graph)} />;
 }

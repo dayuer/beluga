@@ -14,6 +14,7 @@ import { AuditPanel, EventsStrip, ProblemCard } from './PreviewParts.js';
 import { type ComponentWidth, COMPONENT_WIDTHS, askToFix, frameHeight, pageScale, propsForAgent, variantField } from './preview-model.js';
 import { PIN_STATES, type PinState, usePreview } from './use-preview.js';
 import s from './preview.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 /**
  * A live preview (Settings › Experimental › Live previews): a component or page of the worktree,
@@ -24,7 +25,7 @@ import s from './preview.module.css';
 
 /** How tall a page is shown (a component's frame takes its own height). */
 const PAGE_HEIGHT = { regular: 420, expanded: 720 } as const;
-const SIZE_LABEL: Readonly<Record<PreviewSize, string>> = { phone: 'Phone', tablet: 'Tablet', desktop: 'Desktop' };
+const sizeLabel = (size: PreviewSize | 'fit'): string => tNow(`common.previewBlock.size.${size}` as const);
 /** Built a little before it scrolls into view, so it's there when you get to it. */
 const AHEAD = '240px';
 /** A frame this far off screen is unloaded (its memory, its connection), and loads again on the way back. */
@@ -52,9 +53,10 @@ function useAwayLong(): boolean {
 export function PreviewBlock({ code, live, local }: { code: string; live: boolean; local: boolean }) {
   const ref = useMemo(() => parsePreviewRef(code), [code]);
   const { draws, wsId } = usePreviewHere(local);
-  if (!ref) return live ? <Waiting text="Getting the preview ready…" /> : <PreviewNotice code={code} local={local} />;
+  const t = useT();
+  if (!ref) return live ? <Waiting text={t('common.previewBlock.gettingReady')} /> : <PreviewNotice code={code} local={local} />;
   if (!draws || !wsId) return <PreviewNotice code={code} local={local} />;
-  if (live) return <Waiting text={`Getting ${previewTitle(ref)} ready…`} />;
+  if (live) return <Waiting text={t('common.previewBlock.gettingNamed', { name: previewTitle(ref) })} />;
   return <PreviewView ref_={ref} wsId={wsId} />;
 }
 
@@ -110,6 +112,7 @@ function useWidth(el: React.RefObject<HTMLElement | null>): number {
 export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: PreviewRef; wsId: string; embedded?: boolean }) {
   const api = useApi();
   const { client, ui } = useBeluga();
+  const t = useT();
   const box = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const seen = useSeen(box);
@@ -138,40 +141,40 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
   const ask = (): void => void (p.problem && quoteInBox(ui, askToFix(title, p.problem, p.values)));
   const tools = !page && p.drawn && !p.problem;
   const savePicture = (): void =>
-    void p.picture().then((out) => (out.path ? say(`Saved a picture to ${out.path}`) : say(`Couldn’t save a picture: ${out.failed}`, 'warn')));
+    void p.picture().then((out) => (out.path ? say(t('common.previewBlock.savedPicture', { path: out.path })) : say(t('common.previewBlock.couldntSavePicture', { why: out.failed ?? '' }), 'warn')));
   const togglePin = (state: PinState): void => p.setPinned(p.pinned.includes(state) ? p.pinned.filter((x) => x !== state) : [...p.pinned, state]);
 
   // ••• and right-click: everything beyond the frame and its props.
   const items: ActionItem[] = [
-    ...(file ? [{ label: 'Open in Editor', icon: 'external' as const, onSelect: goTo }] : []),
-    ...(target.kind === 'url' ? [{ label: 'Open in Browser', icon: 'globe' as const, onSelect: () => void openExternal(target.url) }] : []),
-    { label: 'Draw Again', icon: 'refresh', onSelect: p.redraw },
+    ...(file ? [{ label: t('common.ui.openInEditor'), icon: 'external' as const, onSelect: goTo }] : []),
+    ...(target.kind === 'url' ? [{ label: t('common.previewBlock.openBrowser'), icon: 'globe' as const, onSelect: () => void openExternal(target.url) }] : []),
+    { label: t('common.previewBlock.drawAgain'), icon: 'refresh', onSelect: p.redraw },
     ...(!page && exports.length > 1
       ? [
           {
-            label: 'Component',
+            label: t('common.previewBlock.component'),
             separate: true,
             onSelect: () => undefined,
             submenu: [
               ...exports.map((e) => ({ label: e, checked: !p.gallery && e === name, onSelect: () => (setPick(e), p.setGallery(false)) })),
-              ...(p.ok?.gallery ? [{ label: 'All Components', separate: true, checked: p.gallery, onSelect: () => p.setGallery(!p.gallery) }] : []),
+              ...(p.ok?.gallery ? [{ label: t('common.previewBlock.allComponents'), separate: true, checked: p.gallery, onSelect: () => p.setGallery(!p.gallery) }] : []),
             ],
           },
         ]
       : []),
     ...(!page
       ? [
-          { label: 'Width', separate: exports.length <= 1, onSelect: () => undefined, submenu: COMPONENT_WIDTHS.map((w) => ({ label: w.label, checked: width === w.value, onSelect: () => setWidth(w.value) })) },
-          { label: 'Canvas', onSelect: () => undefined, submenu: [{ label: 'Light', checked: p.canvas === 'light', onSelect: () => p.setCanvas('light') }, { label: 'Dark', checked: p.canvas === 'dark', onSelect: () => p.setCanvas('dark') }] },
-          { label: 'Pin State', onSelect: () => undefined, submenu: PIN_STATES.map((st) => ({ label: st[0]!.toUpperCase() + st.slice(1), checked: p.pinned.includes(st), onSelect: () => togglePin(st) })) },
-          { label: 'Check Accessibility', icon: 'eye' as const, separate: true, disabled: !tools, onSelect: p.check },
-          { label: 'Save as Picture', icon: 'image' as const, disabled: !tools, onSelect: savePicture },
-          { label: 'Use These Props', icon: 'chat' as const, separate: true, disabled: !fields.length, onSelect: () => quoteInBox(ui, propsForAgent(name, file, p.values)) },
-          { label: 'Copy Props as JSON', icon: 'copy' as const, disabled: !fields.length, onSelect: () => void copyText(JSON.stringify(p.values, null, 2)).then(() => say('Copied the props')) },
-          { label: 'Reset Props', disabled: !p.touched.size, onSelect: p.reset },
+          { label: t('common.previewBlock.width'), separate: exports.length <= 1, onSelect: () => undefined, submenu: COMPONENT_WIDTHS.map((w) => ({ label: sizeLabel(w.value), checked: width === w.value, onSelect: () => setWidth(w.value) })) },
+          { label: t('common.previewBlock.canvas'), onSelect: () => undefined, submenu: [{ label: t('common.previewBlock.light'), checked: p.canvas === 'light', onSelect: () => p.setCanvas('light') }, { label: t('common.previewBlock.dark'), checked: p.canvas === 'dark', onSelect: () => p.setCanvas('dark') }] },
+          { label: t('common.previewBlock.pinState'), onSelect: () => undefined, submenu: PIN_STATES.map((st) => ({ label: t(`common.previewBlock.pin.${st}`), checked: p.pinned.includes(st), onSelect: () => togglePin(st) })) },
+          { label: t('common.previewBlock.checkA11y'), icon: 'eye' as const, separate: true, disabled: !tools, onSelect: p.check },
+          { label: t('common.previewBlock.savePicture'), icon: 'image' as const, disabled: !tools, onSelect: savePicture },
+          { label: t('common.previewBlock.useProps'), icon: 'chat' as const, separate: true, disabled: !fields.length, onSelect: () => quoteInBox(ui, propsForAgent(name, file, p.values)) },
+          { label: t('common.previewBlock.copyProps'), icon: 'copy' as const, disabled: !fields.length, onSelect: () => void copyText(JSON.stringify(p.values, null, 2)).then(() => say(t('common.previewBlock.copiedProps'))) },
+          { label: t('common.previewBlock.resetProps'), disabled: !p.touched.size, onSelect: p.reset },
         ]
       : []),
-    ...(p.problem ? [{ label: p.problem.kind === 'provider' ? 'Ask Agent to Set Up' : 'Ask Agent to Fix', icon: 'chat' as const, separate: true, onSelect: ask }] : []),
+    ...(p.problem ? [{ label: p.problem.kind === 'provider' ? t('common.previewBlock.askSetUp') : t('common.previewBlock.askFix'), icon: 'chat' as const, separate: true, onSelect: ask }] : []),
   ];
 
   // How wide it's drawn (a page or a component at a device's width is shown smaller to fit).
@@ -184,7 +187,7 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
   const shown = p.drawn && !(p.result && !p.result.ok);
   const heading = (
     <button type="button" className={s.title} onClick={exports.length > 1 ? undefined : goTo}>
-      {p.gallery ? `All components · ${file?.split('/').pop() ?? title}` : exports.length > 1 ? `${name} · ${file?.split('/').pop() ?? ''}` : title}
+      {p.gallery ? `${t('common.previewBlock.allComponentsLower')} · ${file?.split('/').pop() ?? title}` : exports.length > 1 ? `${name} · ${file?.split('/').pop() ?? ''}` : title}
       {exports.length > 1 ? <Icon name="chevronDown" size={10} className={s.titleChevron} /> : null}
     </button>
   );
@@ -195,39 +198,39 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
         <figcaption className={s.head}>
           <Icon name="eye" size={12} className={s.headIcon} />
           {exports.length > 1 ? (
-            <ActionsDropdown align="start" items={items.find((i) => i.label === 'Component')?.submenu ?? []}>
+            <ActionsDropdown align="start" items={items.find((i) => i.label === t('common.previewBlock.component'))?.submenu ?? []}>
               {heading}
             </ActionsDropdown>
           ) : file ? (
-            <Tip label="Open in Editor">{heading}</Tip>
+            <Tip label={t('common.ui.openInEditor')}>{heading}</Tip>
           ) : (
             <span className={s.title}>{title}</span>
           )}
           {p.stale ? (
             <Tip label={`${p.stale.title}. ${p.stale.detail}`}>
-              <span className={s.staleChip}>Waiting for the file</span>
+              <span className={s.staleChip}>{t('common.previewBlock.waitingFile')}</span>
             </Tip>
           ) : p.ok ? (
-            <Tip label="Follows the file: it redraws when it changes">
+            <Tip label={t('common.previewBlock.follows')}>
               <span className={s.liveChip}>
                 <span className={s.liveDot} />
-                Live
+                {t('common.viewBlock.live')}
               </span>
             </Tip>
           ) : null}
-          {p.pinned.length ? <span className={s.pinChip}>{p.pinned.map((x) => x[0]!.toUpperCase() + x.slice(1)).join(', ')} pinned</span> : null}
+          {p.pinned.length ? <span className={s.pinChip}>{t('common.previewBlock.pinned', { states: p.pinned.map((x) => t(`common.previewBlock.pin.${x}`)).join(t('common.fileTree.sep')) })}</span> : null}
           <span className={s.grow} />
-          {page ? <Segmented label="Width" value={size} onChange={setSize} options={PREVIEW_SIZES.map((v) => ({ value: v, label: SIZE_LABEL[v] }))} /> : null}
+          {page ? <Segmented label={t('common.previewBlock.width')} value={size} onChange={setSize} options={PREVIEW_SIZES.map((v) => ({ value: v, label: sizeLabel(v) }))} /> : null}
           {!page && p.ok && fields.length && !p.gallery ? (
             <Button size="small" variant="quiet" icon="wrench" aria-pressed={showProps} className={cx(showProps && s.on)} onClick={() => setShowProps((v) => !v)}>
-              Props
+              {t('common.previewBlock.props')}
             </Button>
           ) : null}
-          <IconButton icon="refresh" label="Draw again" onClick={p.redraw} />
+          <IconButton icon="refresh" label={t('common.previewBlock.drawAgainLower')} onClick={p.redraw} />
           <ActionsDropdown items={items}>
-            <IconButton icon="more" label="More" />
+            <IconButton icon="more" label={t('common.previewBlock.more')} />
           </ActionsDropdown>
-          {!embedded ? <IconButton icon="expand" label={expanded ? 'Smaller' : 'Bigger'} active={expanded} onClick={() => setExpanded((v) => !v)} /> : null}
+          {!embedded ? <IconButton icon="expand" label={expanded ? t('common.previewBlock.smaller') : t('common.previewBlock.bigger')} active={expanded} onClick={() => setExpanded((v) => !v)} /> : null}
         </figcaption>
         {ref.note ? <div className={s.note}>{ref.note}</div> : null}
         <div ref={stage} className={cx(s.stage, page && s.pageStage, p.canvas === 'dark' && s.stageDark)} style={{ height: stageHeight }}>
@@ -236,7 +239,7 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
               ref={p.frame}
               key={p.src.url}
               className={cx(s.frame, shown && s.frameShown)}
-              title={`Preview of ${title}`}
+              title={t('common.previewBlock.previewOf', { name: title })}
               src={p.src.url}
               sandbox="allow-scripts allow-same-origin allow-forms"
               referrerPolicy="no-referrer"
@@ -250,7 +253,7 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
           ) : !shown ? (
             <div className={s.skeleton}>
               <span className={s.skeletonPulse} />
-              {seen ? `Drawing ${name}…` : title}
+              {seen ? t('common.previewBlock.drawing', { name }) : title}
             </div>
           ) : null}
         </div>
@@ -259,18 +262,18 @@ export function PreviewView({ ref_: ref, wsId, embedded = false }: { ref_: Previ
         {showProps && p.ok && fields.length && !p.gallery ? (
           <div className={s.panel}>
             <div className={s.panelHead}>
-              <span className={s.panelTitle}>Props</span>
-              <span className={s.panelHint}>{p.touched.size ? 'Yours are kept for next time.' : 'Filled in from its types. Change any to redraw it.'}</span>
+              <span className={s.panelTitle}>{t('common.previewBlock.props')}</span>
+              <span className={s.panelHint}>{p.touched.size ? t('common.previewBlock.kept') : t('common.previewBlock.filled')}</span>
               <span className={s.grow} />
               {variantOf ? (
-                <Tip label={`Draw it once for each ${variantOf.name}`}>
+                <Tip label={t('common.previewBlock.eachHint', { name: variantOf.name })}>
                   <button type="button" className={cx(s.choice, p.variants && s.choiceOn)} aria-pressed={p.variants} onClick={() => p.setVariants(!p.variants)}>
-                    Every {variantOf.name}
+                    {t('common.previewBlock.every', { name: variantOf.name })}
                   </button>
                 </Tip>
               ) : null}
               <Button size="small" variant="quiet" disabled={!p.touched.size} onClick={p.reset}>
-                Reset
+                {t('common.colors.reset')}
               </Button>
             </div>
             <PropControls fields={fields} values={p.values} onChange={p.change} onClear={p.clear} fired={p.fired} />

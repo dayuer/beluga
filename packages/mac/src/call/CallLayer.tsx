@@ -11,11 +11,13 @@ import { openCall, useCallEngine, useCallLive, useCallPlace, useMyCall, useRingi
 import { syncFloat } from './float.js';
 import { startOverlay } from './overlay.js';
 import c from './call.module.css';
+import { useT } from '../i18n/index.js';
 
 /** Someone rings you: a card at the top of the window, wherever you are in Beluga. */
 function Incoming({ call }: { call: CallView }) {
   const { client } = useBeluga();
   const engine = useCallEngine();
+  const t = useT();
   const place = useCallPlace(call.conversation);
   const by = call.people.find((p) => p.peerId === call.ringBy) ?? call.people[0];
   const group = call.conversation.startsWith('group:');
@@ -25,7 +27,7 @@ function Incoming({ call }: { call: CallView }) {
     void engine.join(call.conversation).catch(() => undefined);
   };
   return (
-    <div className={c.incoming} role="alertdialog" aria-label={`${by?.name ?? 'Someone'} is calling`}>
+    <div className={c.incoming} role="alertdialog" aria-label={t('call.isCalling', { name: by?.name ?? t('call.someone') })}>
       <button type="button" className={c.incomingWho} onClick={() => openCall(client, call.conversation)}>
         <span className={c.ripples} aria-hidden="true">
           <span />
@@ -33,15 +35,15 @@ function Incoming({ call }: { call: CallView }) {
         </span>
         {by ? <CallAvatar peerId={by.peerId} name={by.name} size={36} speaking={false} /> : null}
         <span className={c.incomingText}>
-          <strong>{by?.name ?? 'Someone'} is calling</strong>
-          <span>{group ? `${place}${others.length ? ` · with ${namesOf(others)}` : ''}` : 'Voice call'}</span>
+          <strong>{t('call.isCalling', { name: by?.name ?? t('call.someone') })}</strong>
+          <span>{group ? `${place}${others.length ? t('call.withNames', { names: namesOf(others) }) : ''}` : t('call.voiceCall')}</span>
         </span>
       </button>
       <span className={c.incomingActions}>
-        <button type="button" className={c.roundDecline} aria-label="Decline" onClick={() => void client.api.calls.decline(call.conversation)}>
+        <button type="button" className={c.roundDecline} aria-label={t('call.decline')} onClick={() => void client.api.calls.decline(call.conversation)}>
           <Icon name="callEnd" size={17} />
         </button>
-        <button type="button" className={c.roundJoin} aria-label="Join" onClick={join}>
+        <button type="button" className={c.roundJoin} aria-label={t('call.join')} onClick={join}>
           <Icon name="call" size={16} />
         </button>
       </span>
@@ -52,6 +54,7 @@ function Incoming({ call }: { call: CallView }) {
 /** The call you're in, in the sidebar while you look at something else: back to it in one click. */
 export function CallPill() {
   const { client } = useBeluga();
+  const t = useT();
   const call = useMyCall();
   const live = useCallLive();
   const showing = useShowing(call?.conversation);
@@ -62,7 +65,7 @@ export function CallPill() {
   const talking = others.find((p) => live.speaking.has(p.peerId));
   const sharing = call.people.some((p) => p.me && p.sharing);
   return (
-    <div className={cx(c.pill, sharing && c.pillSharing)} role="region" aria-label={`Call in ${place}`}>
+    <div className={cx(c.pill, sharing && c.pillSharing)} role="region" aria-label={t('call.callIn', { place })}>
       <button type="button" className={c.pillMain} onClick={() => openCall(client, call.conversation)}>
         <span className={c.pillFaces}>
           {others.slice(0, 3).map((p) => (
@@ -71,7 +74,7 @@ export function CallPill() {
         </span>
         <span className={c.pillText}>
           <strong>{place}</strong>
-          <span>{sharing ? 'You’re sharing your screen' : talking ? `${talking.name} is talking` : others.length ? callLength(now - call.startedAt) : 'Ringing…'}</span>
+          <span>{sharing ? t('call.youShare') : talking ? t('call.isTalking', { name: talking.name }) : others.length ? callLength(now - call.startedAt) : t('call.ringing')}</span>
         </span>
       </button>
       <CallControls call={call} compact />

@@ -6,22 +6,24 @@ import { type ConnectedProject, formatGlance, formatMoney, missingNote, openStri
 import type { ConvertedRow } from '../../lib/money.js';
 import { Card } from './parts.js';
 import s from './usage.module.css';
+import { t as tNow, useT } from '../../i18n/index.js';
 
 /** One connected project: its name, what it earned in the shown currency, and a thin bar for its part of the total. */
 function EarningsRow({ row, currency }: { row: ConvertedRow<ConnectedProject>; currency: string }) {
+  const t = useT();
   const { project, earnings } = row.item;
   const counted = Boolean(earnings.totals);
   const nothingConverts = counted && row.money.missing.length > 0 && row.money.missing.length === earnings.totals!.length;
-  const amount = !counted ? 'Counting…' : nothingConverts ? '—' : formatGlance(row.money.amount, currency);
+  const amount = !counted ? t('views.earningsCard.countingTile') : nothingConverts ? '—' : formatGlance(row.money.amount, currency);
   const pct = Math.round(row.share * 100);
   return (
     <li>
       <Tip label={<EarningsTipBody earnings={earnings} />}>
-        <button type="button" className={cx(s.earnRow, earnings.refreshing && s.earnCounting)} onClick={() => openStripe(project.id)} aria-label={`${project.name}: ${counted ? formatMoney(row.money.amount, currency) : 'counting'}${counted && pct ? `, ${pct}% of the total` : ''}`}>
+        <button type="button" className={cx(s.earnRow, earnings.refreshing && s.earnCounting)} onClick={() => openStripe(project.id)} aria-label={`${project.name}: ${counted ? formatMoney(row.money.amount, currency) : t('views.earningsSum.counting')}${counted && pct ? t('views.earningsSum.ofTotal', { pct }) : ''}`}>
           <span className={s.earnName}>
             <ProjectIcon id={project.id} name={project.name} size={14} />
             <span className={s.earnLabel}>{project.name}</span>
-            {earnings.mode === 'test' ? <span className={s.earnTest}>test</span> : null}
+            {earnings.mode === 'test' ? <span className={s.earnTest}>{t('views.earningsCard.test')}</span> : null}
             {earnings.error ? <Icon name="alert" size={11} className={s.alertWarn} /> : null}
           </span>
           <span className={s.earnAmount}>{amount}</span>
@@ -41,14 +43,15 @@ function EarningsRow({ row, currency }: { row: ConvertedRow<ConnectedProject>; c
  * a project's own currencies show on hover. With none connected, a quiet way to connect one.
  */
 export function EarningsSummaryCard() {
+  const t = useT();
   const summary = useConvertedEarnings();
   if (!summary.projects.length) {
     return (
-      <Card label="Earnings" title="Earnings" className={s.earnCard}>
-        <p className={s.quiet}>Connect Stripe to a project and what it has earned, all-time, shows here and beside it in the sidebar.</p>
+      <Card label={t('views.earnings.title')} title={t('views.earnings.title')} className={s.earnCard}>
+        <p className={s.quiet}>{t('views.earningsSum.connectDetail')}</p>
         <div className={s.earnConnect}>
           <Button size="small" icon="coin" onClick={() => openStripe()}>
-            Connect Stripe…
+            {t('views.earningsCard.connect')}
           </Button>
         </div>
       </Card>
@@ -57,33 +60,33 @@ export function EarningsSummaryCard() {
   const { converted, fx } = summary;
   const { currency, total } = converted;
   const counted = summary.projects.some((c) => c.earnings.totals);
-  const status = summary.refreshing ? 'Counting…' : summary.updatedAt ? `Updated ${updatedAgo(summary.updatedAt)}` : undefined;
+  const status = summary.refreshing ? t('views.earningsCard.countingTile') : summary.updatedAt ? t('views.earningsSum.updated', { ago: updatedAgo(summary.updatedAt) }) : undefined;
   const count = summary.projects.length;
-  const caption = ['All time', `${count} ${count === 1 ? 'project' : 'projects'}`, ...(total.converted && fx ? [`ECB rates, updated ${ratesWhen(fx.at)}`] : [])].join(' · ');
+  const caption = [t('views.earnings.allTime'), t('views.earningsSum.projects', { n: count }), ...(total.converted && fx ? [t('views.earningsSum.rates', { when: ratesWhen(fx.at) })] : [])].join(' · ');
   const note = missingNote(total.missing);
   return (
     <Card
-      label="Earnings"
-      title="Earnings"
+      label={t('views.earnings.title')}
+      title={t('views.earnings.title')}
       className={s.earnCard}
       aside={
         <>
           {status ? <span className={s.updated}>{status}</span> : null}
-          <IconButton icon="plus" label="Connect Stripe to Another Project…" className={s.earnAdd} onClick={() => openStripe()} />
+          <IconButton icon="plus" label={t('views.earningsSum.another')} className={s.earnAdd} onClick={() => openStripe()} />
         </>
       }
     >
       <div className={s.earnBody}>
         <div className={s.earnSummary}>
-          <Tip label={total.converted ? `${formatMoney(total.amount, currency)} · approximate, other currencies converted at the ECB’s rates` : formatMoney(total.amount, currency)}>
-            <span className={s.earnTotal} data-earnings-total={currency} aria-label={`All-time earnings ${total.converted ? 'about ' : ''}${formatMoney(total.amount, currency)}`}>
+          <Tip label={total.converted ? t('views.earningsSum.approx', { money: formatMoney(total.amount, currency) }) : formatMoney(total.amount, currency)}>
+            <span className={s.earnTotal} data-earnings-total={currency} aria-label={t(total.converted ? 'views.earningsSum.totalAboutAria' : 'views.earningsSum.totalAria', { money: formatMoney(total.amount, currency) })}>
               {counted ? formatGlance(total.amount, currency) : '—'}
             </span>
           </Tip>
           <div className={s.earnCaption}>{caption}</div>
           {note ? <div className={s.earnNote}>{note}</div> : null}
         </div>
-        <ul className={s.earnList} aria-label="Earnings by project">
+        <ul className={s.earnList} aria-label={t('views.earningsSum.byProject')}>
           {converted.rows.map((row) => (
             <EarningsRow key={row.item.project.id} row={row} currency={currency} />
           ))}

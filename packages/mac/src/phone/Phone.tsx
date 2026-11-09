@@ -1,3 +1,4 @@
+import { t, useT } from '../i18n/index.js';
 import * as Popover from '@radix-ui/react-popover';
 import { useState } from 'react';
 import type { DeviceView, PhoneUse } from '../../../../src/companion/protocol.js';
@@ -31,30 +32,36 @@ const useRelay = () => useApp((st) => st.companion.relay);
 const useAdb = () => useApp((st) => st.companion.adb, sameDeep);
 
 /** How Claude may use this phone (BLG-150): the preset, the route it's reached by, and adb pairing. */
-const USE_OPTIONS: ReadonlyArray<{ value: PhoneUse; label: string }> = [
-  { value: 'off', label: 'Off' },
-  { value: 'ask', label: 'Ask each time' },
-  { value: 'use', label: 'Use' },
-  { value: 'full', label: 'Full (shell too)' },
+const USE_OPTIONS = (): ReadonlyArray<{ value: PhoneUse; label: string }> => [
+  { value: 'off', label: t('phone.use.off') },
+  { value: 'ask', label: t('phone.use.ask') },
+  { value: 'use', label: t('phone.use.use') },
+  { value: 'full', label: t('phone.use.full') },
 ];
-const ROUTE_WORDS: Record<string, string> = { usb: 'over USB', wifi: 'Wireless debugging, straight over this Wi‑Fi', link: 'Wireless debugging, through Beluga’s encrypted link', accessibility: 'the Accessibility service' };
+const ROUTE_WORDS: Record<string, string> = {
+  get usb() { return t('phone.route.usb'); },
+  get wifi() { return t('phone.route.wifi'); },
+  get link() { return t('phone.route.link'); },
+  get accessibility() { return t('phone.route.accessibility'); },
+};
 
 function PhoneClaude({ d }: { d: DeviceView }) {
   const { client } = useBeluga();
+  useT();
   const c = d.control;
   if (!c || d.platform === 'ios') return null;
   const route = c.routes[0];
   return (
     <div className={s.control}>
-      <Row label="Let your agent use this phone" detail={route ? `Reached by ${ROUTE_WORDS[route] ?? route}.` : (c.note ?? 'Not reachable right now.')}>
-        <Select label="Let your agent use this phone" value={c.use} onChange={(v) => void client.api.companion['phone.use'](d.id, v as PhoneUse)} options={USE_OPTIONS.map((o) => ({ ...o }))} />
+      <Row label={t('phone.letUse')} detail={route ? t('phone.reachedBy', { how: ROUTE_WORDS[route] ?? route }) : (c.note ?? t('phone.notReachable'))}>
+        <Select label={t('phone.letUse')} value={c.use} onChange={(v) => void client.api.companion['phone.use'](d.id, v as PhoneUse)} options={USE_OPTIONS().map((o) => ({ ...o }))} />
       </Row>
       {c.use !== 'off' && c.accessibility !== true ? <BelugaLink id={d.id} reachable={c.usb === true || c.adb === 'connected' || c.adb === 'ready'} /> : null}
       {c.use !== 'off' && (c.usb || c.adb !== 'off') ? <OverWifi id={d.id} on={c.adb !== undefined && c.adb !== 'off'} cable={c.usb === true} path={c.wifiPath} /> : null}
       {c.use !== 'off' && c.adb === 'unpaired' ? (
-        <Row label="Wireless debugging" detail="On the phone, open Wireless debugging › Pair device with pairing code, then type the six digits into Beluga’s notification.">
+        <Row label={t('phone.wireless')} detail={t('phone.wirelessDetail')}>
           <Button size="small" onClick={() => void quietly(client, client.api.companion['phone.pairAdb'](d.id))}>
-            Connect
+            {t('phone.connect')}
           </Button>
         </Row>
       ) : null}
@@ -69,6 +76,7 @@ function PhoneClaude({ d }: { d: DeviceView }) {
  */
 function BelugaLink({ id, reachable }: { id: string; reachable: boolean }) {
   const { client } = useBeluga();
+  useT();
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string>();
   const go = async (): Promise<void> => {
@@ -83,12 +91,12 @@ function BelugaLink({ id, reachable }: { id: string; reachable: boolean }) {
     }
   };
   const detail = reachable
-    ? `Beluga Link is the small app on the phone that lets your agent tap and type there without a cable. It’s separate so Android’s Play Protect never blocks Beluga itself; set up from here, Link isn’t blocked either. ${upFirst(thisComputer())} installs it and turns it on.`
-    : 'Beluga Link is the small app on the phone that lets your agent tap and type there without a cable. Downloaded on the phone, Android may block it (“App blocked to protect your device”); set up from here, it isn’t. Connect the phone with a USB cable first.';
+    ? t('phone.link.reachable', { computer: upFirst(thisComputer()) })
+    : t('phone.link.unreachable');
   return (
     <Row label="Beluga Link" detail={said ?? detail}>
       <Button size="small" disabled={busy || !reachable} onClick={() => void go()}>
-        {busy ? 'Setting Up…' : 'Set Up Beluga Link'}
+        {busy ? t('phone.link.settingUp') : t('phone.link.setUp')}
       </Button>
     </Row>
   );
@@ -100,6 +108,7 @@ function BelugaLink({ id, reachable }: { id: string; reachable: boolean }) {
  */
 function OverWifi({ id, on, cable, path }: { id: string; on: boolean; cable: boolean; path?: 'direct' | 'blocked' }) {
   const { client } = useBeluga();
+  useT();
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string>();
   const go = async (next: boolean): Promise<void> => {
@@ -115,22 +124,20 @@ function OverWifi({ id, on, cable, path }: { id: string; on: boolean; cable: boo
   };
   const way =
     path === 'blocked'
-      ? `This Wi‑Fi keeps devices apart (dorms, campuses and cafés often do), so the ${computerWord()} reaches the phone through Beluga’s end-to-end encrypted link instead: a little slower. On another network it connects straight.`
+      ? t('phone.wifi.blocked', { computer: computerWord() })
       : path === 'direct'
-        ? `On this Wi‑Fi the ${computerWord()} connects straight to the phone, once it proves it’s yours (a one-time code sent over Beluga’s encrypted link), so nobody else on the network can pass for it.`
-        : 'Straight over the Wi‑Fi when the network lets devices reach each other and the phone proves it’s yours, else through Beluga’s end-to-end encrypted link.';
-  const detail = on
-    ? `Wireless debugging is on. ${way} While it’s on, the phone listens for debugging on its Wi‑Fi (only keys it allowed get in); Beluga turns it off after 15 minutes unused.`
-    : `Keep using it when you unplug the cable: this turns on the phone’s Wireless debugging. ${way} Beluga turns it off after 15 minutes unused. Tap Allow on the phone when it asks (not “Always”).`;
+        ? t('phone.wifi.direct', { computer: computerWord() })
+        : t('phone.wifi.either');
+  const detail = on ? t('phone.wifi.on', { way }) : t('phone.wifi.off', { way });
   return (
-    <Row label="Over Wi‑Fi" detail={said ?? detail}>
+    <Row label={t('phone.wifi.label')} detail={said ?? detail}>
       {on ? (
         <Button size="small" disabled={busy} onClick={() => void go(false)}>
-          {busy ? 'Turning Off…' : 'Turn Off'}
+          {busy ? t('phone.wifi.turningOff') : t('phone.wifi.turnOff')}
         </Button>
       ) : (
         <Button size="small" disabled={busy || !cable} onClick={() => void go(true)}>
-          {busy ? 'Waiting for the phone…' : 'Use over Wi‑Fi'}
+          {busy ? t('phone.wifi.waiting') : t('phone.wifi.use')}
         </Button>
       )}
     </Row>
@@ -139,32 +146,33 @@ function OverWifi({ id, on, cable, path }: { id: string; on: boolean; cable: boo
 
 /** How phones on other networks (a dorm's or a café's Wi-Fi, mobile data) reach this Mac, in a line (BLG-126). */
 export function relayText(relay: 'ready' | 'starting' | 'off' | undefined): { readonly text: string; readonly ok: boolean } | undefined {
-  if (relay === 'ready') return { text: `Ready: your phone reaches ${thisComputer()} from any network, end-to-end encrypted.`, ok: true };
-  if (relay === 'starting') return { text: 'Starting the relay… Phones on a network that blocks direct connections connect in a moment, by themselves.', ok: false };
-  if (relay === 'off') return { text: `Off: Remote access is set to direct only, so a phone on a network that blocks direct connections can’t reach ${thisComputer()}.`, ok: false };
+  if (relay === 'ready') return { text: t('phone.relay.ready', { computer: thisComputer() }), ok: true };
+  if (relay === 'starting') return { text: t('phone.relay.starting'), ok: false };
+  if (relay === 'off') return { text: t('phone.relay.off', { computer: thisComputer() }), ok: false };
   return undefined;
 }
 
-const KEEP_AWAKE_OPTIONS: ReadonlyArray<{ value: KeepAwake; label: string }> = [
-  { value: 'off', label: 'Never' },
-  { value: 'power', label: 'On power' },
-  { value: 'always', label: 'Always' },
+const KEEP_AWAKE_OPTIONS = (): ReadonlyArray<{ value: KeepAwake; label: string }> => [
+  { value: 'off', label: t('phone.awake.never') },
+  { value: 'power', label: t('phone.awake.power') },
+  { value: 'always', label: t('phone.awake.always') },
 ];
 
 /** Whether phones reach this Mac from anywhere now, and keeping it awake for them. */
 function Reaching() {
   const { client } = useBeluga();
+  useT();
   const relay = relayText(useRelay());
   const keepAwake = useApp((st) => st.prefs.keepAwake ?? 'off');
   return (
     <>
       {relay ? (
-        <Row label="From other networks" detail={relay.text}>
-          <span className={cx(s.relayDot, relay.ok && s.relayOk)} aria-label={relay.ok ? 'Ready' : 'Not ready'} />
+        <Row label={t('phone.relay.label')} detail={relay.text}>
+          <span className={cx(s.relayDot, relay.ok && s.relayOk)} aria-label={relay.ok ? t('phone.relay.okLabel') : t('phone.relay.notOk')} />
         </Row>
       ) : null}
-      <Row label={`Keep ${thisComputer()} awake`} detail={`A sleeping ${computerWord()} can’t be reached or woken from your phone, so Beluga keeps it from sleeping while a phone is paired. The display still sleeps; closing the lid still sleeps it. Your phone can change this too.`}>
-        <Select label={`Keep ${thisComputer()} awake`} value={keepAwake} onChange={(v) => void client.api.session.setPrefs({ keepAwake: v })} options={KEEP_AWAKE_OPTIONS.map((o) => ({ ...o }))} />
+      <Row label={t('phone.awake.label', { computer: thisComputer() })} detail={t('phone.awake.detail', { computer: computerWord() })}>
+        <Select label={t('phone.awake.label', { computer: thisComputer() })} value={keepAwake} onChange={(v) => void client.api.session.setPrefs({ keepAwake: v })} options={KEEP_AWAKE_OPTIONS().map((o) => ({ ...o }))} />
       </Row>
     </>
   );
@@ -173,10 +181,11 @@ function Reaching() {
 /** The phones you paired: each with how it is now, Remove, and (in Settings) how Claude may use it. */
 function DeviceList({ now, control = false }: { now: number; control?: boolean }) {
   const { client } = useBeluga();
+  useT();
   const devices = useDevices();
-  if (!devices.length) return <div className={s.empty}>No phone yet. Pair one to see what your agent is doing, answer and ask from anywhere.</div>;
+  if (!devices.length) return <div className={s.empty}>{t('phone.list.empty')}</div>;
   return (
-    <ul className={s.devices} aria-label="Your phones">
+    <ul className={s.devices} aria-label={t('phone.list.yourPhones')}>
       {devices.map((d) => (
         <li key={d.id} className={s.device}>
           <div className={s.deviceHead}>
@@ -187,7 +196,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
               <span className={s.deviceName}>{d.name}</span>
               <span className={s.dim}>
                 {d.platform === 'ios' ? 'iPhone' : 'Android'}
-                {d.app ? ` · app ${d.app}` : ''} · {seenText(d, now)}
+                {d.app ? t('phone.list.app', { v: d.app }) : ''} · {seenText(d, now)}
               </span>
               {d.path ? (
                 <span className={s.path} title={d.note}>
@@ -196,7 +205,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
               ) : null}
             </span>
             <Button size="small" variant="quiet" onClick={() => void client.api.companion['devices.remove'](d.id)}>
-              Remove
+              {t('phone.list.remove')}
             </Button>
           </div>
           {control ? <PhoneClaude d={d} /> : null}
@@ -209,6 +218,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
 /** Pair a Phone…: the QR and the code while a pairing is open, and "Pair this phone?" once one is waiting (also on the welcome's phone step). */
 export function Pairing({ now }: { now: number }) {
   const { client } = useBeluga();
+  useT();
   const pairing = usePairing();
   const devices = useDevices();
   const [error, setError] = useState<string>();
@@ -232,11 +242,11 @@ export function Pairing({ now }: { now: number }) {
         <Button variant={devices.length ? 'plain' : 'primary'} className={cx(s.pairButton, busy && s.opening, busy && devices.length > 0 && s.openingPlain)} disabled={busy || devices.length >= 4} aria-busy={busy || undefined} onClick={() => void start()}>
           <span className={s.pairFace} data-shown={busy ? undefined : 'true'}>
             <Icon name="phone" size={14} />
-            Pair a Phone…
+            {t('onboarding.phoneStep.pair')}
           </span>
           <span className={s.pairFace} data-shown={busy ? 'true' : undefined}>
             <span className={s.spinner} aria-hidden="true" />
-            Opening…
+            {t('onboarding.phoneStep.opening')}
           </span>
         </Button>
       </div>
@@ -245,15 +255,15 @@ export function Pairing({ now }: { now: number }) {
   if (pairing.waiting) {
     return (
       <div className={s.pairing}>
-        <div className={s.pairTitle}>Pair “{pairing.waiting.name}”?</div>
-        <div className={s.fingerprint} aria-label={`Fingerprint ${pairing.waiting.fingerprint}`}>
+        <div className={s.pairTitle}>{t('phone.pair.title', { name: pairing.waiting.name })}</div>
+        <div className={s.fingerprint} aria-label={t('phone.pair.fingerprint', { f: pairing.waiting.fingerprint })}>
           {pairing.waiting.fingerprint}
         </div>
-        <div className={s.dim}>Your phone shows the same four pictures. If it doesn’t, don’t pair.</div>
+        <div className={s.dim}>{t('phone.pair.same')}</div>
         <div className={s.buttons}>
-          <Button onClick={() => void client.api.companion['pair.cancel']()}>Don’t Pair</Button>
+          <Button onClick={() => void client.api.companion['pair.cancel']()}>{t('phone.pair.dont')}</Button>
           <Button variant="primary" onClick={() => void client.api.companion['pair.approve']()}>
-            Pair
+            {t('phone.pair.pair')}
           </Button>
         </div>
       </div>
@@ -262,13 +272,13 @@ export function Pairing({ now }: { now: number }) {
   return (
     <div className={s.pairing}>
       <div className={s.qr}>
-        <QrCode text={pairing.link} size={148} label="Scan with the Beluga app on your phone" />
+        <QrCode text={pairing.link} size={148} label={t('phone.pair.scan')} />
       </div>
-      <div className={s.dim}>Scan this with the Beluga app on your phone, or type the code:</div>
+      <div className={s.dim}>{t('phone.pair.scanOr')}</div>
       <div className={s.code}>{pairing.code}</div>
-      <div className={s.dim}>Works once, for {leftText(pairing.expiresAt, now)}.</div>
+      <div className={s.dim}>{t('phone.pair.once', { left: leftText(pairing.expiresAt, now) })}</div>
       <div className={s.buttons}>
-        <Button onClick={() => void client.api.companion['pair.cancel']()}>Cancel</Button>
+        <Button onClick={() => void client.api.companion['pair.cancel']()}>{t('phone.pair.cancel')}</Button>
       </div>
     </div>
   );
@@ -277,6 +287,7 @@ export function Pairing({ now }: { now: number }) {
 /** The popover's line about the relay, only when it isn't ready (that's the news). */
 function RelayLine() {
   const relay = useRelay();
+  useT();
   const said = relay === 'ready' ? undefined : relayText(relay);
   return said ? <div className={s.relayLine}>{said.text}</div> : null;
 }
@@ -286,19 +297,20 @@ export function PhoneMark() {
   const devices = useDevices();
   const pairing = usePairing();
   const now = useMinute();
+  useT();
   if (!devices.length && !pairing) return null;
   const { lit, title } = markOf(devices, now);
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" className={cx(s.mark, lit && s.lit)} title={title} aria-label={`Your phone: ${title}`}>
+        <button type="button" className={cx(s.mark, lit && s.lit)} title={title} aria-label={t('phone.mark.label', { title })}>
           <Icon name="phone" size={14} />
           {lit ? <span className={s.markDot} aria-hidden="true" /> : null}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={cx(p.card, s.card)} side="top" align="end" sideOffset={8} collisionPadding={10} aria-label="Your phone">
-          <div className={s.head}>Phone</div>
+        <Popover.Content className={cx(p.card, s.card)} side="top" align="end" sideOffset={8} collisionPadding={10} aria-label={t('phone.mark.yourPhone')}>
+          <div className={s.head}>{t('onboarding.phoneStep.eyebrow')}</div>
           <DeviceList now={now} />
           <RelayLine />
           <Pairing now={now} />
@@ -311,15 +323,16 @@ export function PhoneMark() {
 /** Whether adb (Android platform-tools) is on this Mac — needed for Wireless debugging, screenshots and shell. */
 function AdbLine() {
   const adb = useAdb();
+  useT();
   if (!adb) return null;
   const detail = adb.path
-    ? `Found adb ${adb.version ?? ''} on ${thisComputer()}.`
+    ? t('phone.adb.found', { v: adb.version ?? '', computer: thisComputer() })
     : adb.fetching
-      ? 'Getting Android platform-tools…'
-      : 'adb (Android platform-tools) isn’t installed. The Accessibility route still works without it; for Wireless debugging, shell and logs, install it.';
+      ? t('phone.adb.getting')
+      : t('phone.adb.missing');
   return (
-    <Row label={`adb on ${thisComputer()}`} detail={detail}>
-      {adb.path ? <span className={cx(s.relayDot, s.relayOk)} aria-label="Found" /> : <span className={s.relayDot} aria-label="Not found" />}
+    <Row label={t('phone.adb.label', { computer: thisComputer() })} detail={detail}>
+      {adb.path ? <span className={cx(s.relayDot, s.relayOk)} aria-label={t('phone.adb.foundLabel')} /> : <span className={s.relayDot} aria-label={t('phone.adb.notFound')} />}
     </Row>
   );
 }
@@ -330,6 +343,7 @@ function AdbLine() {
  */
 function OnTheCable() {
   const { client } = useBeluga();
+  useT();
   const cable = useAdb()?.cable;
   const devices = useDevices();
   const [busy, setBusy] = useState(false);
@@ -350,53 +364,54 @@ function OnTheCable() {
   // Developer options, or About phone when they aren't on yet (tap Build number seven times there).
   const showOnPhone = (): Promise<string> =>
     client.api.companion['phone.settings'](linked!.id, 'developer').then(
-      () => 'Developer options are open on the phone: turn on USB debugging.',
-      () => client.api.companion['phone.settings'](linked!.id, 'about').then(() => 'About phone is open on the phone: tap Software information › Build number seven times, then Settings › Developer options › USB debugging.'),
+      () => t('phone.cable.devOpen'),
+      () => client.api.companion['phone.settings'](linked!.id, 'about').then(() => t('phone.cable.aboutOpen')),
     );
   const name = cable.name;
   if (cable.state === 'no-debugging')
     return (
-      <Row label="On the cable" detail={said ?? `${name} is plugged in, but USB debugging is off, so your agent can’t use the cable yet. On the phone: Settings › About phone › Software information › tap Build number seven times; then Settings › Developer options › USB debugging.`}>
+      <Row label={t('phone.cable.label')} detail={said ?? t('phone.cable.noDebugging', { name })}>
         {linked ? (
           <Button size="small" disabled={busy} onClick={() => void run(showOnPhone)}>
-            Open on the Phone
+            {t('phone.cable.openOnPhone')}
           </Button>
         ) : (
           <span />
         )}
       </Row>
     );
-  if (cable.state === 'unauthorized') return <Row label="On the cable" detail={`${name} is asking: unlock it and tap Allow on “Allow USB debugging?” (tick “Always allow from this computer” so it doesn’t ask again).`}><span /></Row>;
+  if (cable.state === 'unauthorized') return <Row label={t('phone.cable.label')} detail={t('phone.cable.unauthorized', { name })}><span /></Row>;
   if (cable.canPair)
     return (
-      <Row label="On the cable" detail={said ?? `${name} has Beluga but isn’t paired with ${thisComputer()}. Pair it over the cable: its Beluga opens the pairing, and you check the four pictures match.`}>
+      <Row label={t('phone.cable.label')} detail={said ?? t('phone.cable.canPair', { name, computer: thisComputer() })}>
         <Button size="small" disabled={busy} onClick={() => void run(() => client.api.companion['phone.pairCable']())}>
-          {busy ? 'Opening…' : 'Pair over the Cable'}
+          {busy ? t('onboarding.phoneStep.opening') : t('phone.cable.pairOver')}
         </Button>
       </Row>
     );
-  return <Row label="On the cable" detail={`${name} is plugged in: your agent and the mirror use the cable, the fastest way.`}><span /></Row>;
+  return <Row label={t('phone.cable.label')} detail={t('phone.cable.ok', { name })}><span /></Row>;
 }
 
 /** Settings › Phone. */
 export function PhoneSettings() {
   const now = useMinute();
+  useT();
   const cable = useAdb()?.cable;
   return (
     <>
       {cable ? (
-        <Group title="On the cable">
+        <Group title={t('phone.cable.label')}>
           <OnTheCable />
         </Group>
       ) : null}
-      <Group title="Your phones">
+      <Group title={t('phone.list.yourPhones')}>
         <div className={s.inSettings}>
           <DeviceList now={now} />
         </div>
       </Group>
       {useDevices().some((d) => d.platform !== 'ios') ? (
-        <Group title="Let your agent use your phone">
-          <Row label="How it works" detail={`Ask your agent on ${thisComputer()} to do something on your phone — look at the screen, tap, type, open apps, install a build. It uses Wireless debugging when it can, or Beluga Link, the phone’s small add-on app. Off until you choose a level below; set it up on the phone in Beluga › Settings.`}>
+        <Group title={t('phone.settings.letUse')}>
+          <Row label={t('phone.settings.how')} detail={t('phone.settings.howDetail', { computer: thisComputer() })}>
             <span />
           </Row>
           <AdbLine />
@@ -406,12 +421,12 @@ export function PhoneSettings() {
         </Group>
       ) : null}
       {useDevices().length ? (
-        <Group title={`Reaching ${yourComputer()}`}>
+        <Group title={t('phone.settings.reaching', { computer: yourComputer() })}>
           <Reaching />
         </Group>
       ) : null}
-      <Group title="Pair a phone">
-        <Row label="The Beluga app" detail={`Your phone gets its own key, signed by ${yourComputer()}: it shows what your agent is doing and lets you answer, ask and chat. It never sees code. Up to 4 phones; Remove cuts one off at once.`}>
+      <Group title={t('phone.model.pair')}>
+        <Row label={t('phone.settings.app')} detail={t('phone.settings.appDetail', { computer: yourComputer() })}>
           <span />
         </Row>
         <div className={s.inSettings}>

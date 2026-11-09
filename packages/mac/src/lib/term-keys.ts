@@ -1,5 +1,6 @@
 import type { ImportedKey, TermAction } from '../../../../src/terminal/import/keys.js';
 import { type KeyPress, chordLabel, chordsOf } from './shortcuts-model.js';
+import { t, tl } from '../i18n/index.js';
 
 /**
  * The terminal view's keys (BLG-537): what iTerm2 and Ghostty both do by default (⌘T a tab, ⌘D a
@@ -82,9 +83,10 @@ const LABELS: Readonly<Record<string, string>> = {
 
 /** A key's action in words ("Split right", "Tab 3", "Types Esc b"). */
 export function actionLabel(action: TermAction): string {
-  if (action.startsWith('tab:')) return `Tab ${action.slice(4)}`;
-  if (action.startsWith('text:')) return `Types ${visible(action.slice(5))}`;
-  return LABELS[action] ?? action;
+  if (action.startsWith('tab:')) return t('common.termKeys.tab', { n: action.slice(4) });
+  if (action.startsWith('text:')) return t('common.termKeys.types', { text: visible(action.slice(5)) });
+  const en = LABELS[action];
+  return en === undefined ? action : tl('termKeys', action, 'label', en);
 }
 
 /** Characters as people read them (Esc, ⏎, ⇥, ^A). */
@@ -112,7 +114,7 @@ export function termKeyRows(keys: readonly TermKey[]): Array<{ label: string; ke
     .filter(([a]) => !a.startsWith('tab:') || a === 'tab:1')
     .sort(([a], [b]) => order(a) - order(b))
     .map(([action, list]) => ({
-      label: action === 'tab:1' ? 'Tab 1 to 9' : actionLabel(action as TermAction),
+      label: action === 'tab:1' ? t('common.termKeys.tabs') : actionLabel(action as TermAction),
       keys: action === 'tab:1' ? `${chordLabel('Cmd+1')} … ${chordLabel('Cmd+9')}` : list.map((k) => chordLabel(k.chord)).join('  '),
       ...(list.some((k) => k.from) ? { from: list.find((k) => k.from)!.from! } : {}),
     }));

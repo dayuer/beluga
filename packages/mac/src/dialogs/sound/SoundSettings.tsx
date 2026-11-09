@@ -9,6 +9,7 @@ import { Group, Row } from '../settings-controls.js';
 import st from '../settings.module.css';
 import { PlayButton, SoundPicker } from './SoundPicker.js';
 import s from './sound.module.css';
+import { tl, useT } from '../../i18n/index.js';
 
 const GROUP_LABELS: Readonly<Record<SoundGroup, string>> = {
   needsYou: 'Your agent needs you',
@@ -32,6 +33,8 @@ export interface SoundSettingsProps {
 
 /** Settings › Notifications › Sound: which sound, per kind if you like, and how loud. */
 export function SoundSettings({ n, save, test }: SoundSettingsProps) {
+  const t = useT();
+  const group = (g: SoundGroup): string => tl('GROUP_LABELS', g, 'text', GROUP_LABELS[g]);
   const perKind = n.perKind !== null && n.perKind !== undefined;
   const [target, setTarget] = useState<Target>(perKind ? 'needsYou' : 'all');
   const [volume, setVolume] = useState(volumeOf(n));
@@ -74,46 +77,46 @@ export function SoundSettings({ n, save, test }: SoundSettingsProps) {
   };
 
   return (
-    <Group title="Sound">
-      <Row label="Sounds" detail={perKind ? 'Pick a kind below, then its sound.' : 'One sound for every notification.'}>
+    <Group title={t('common.soundSettings.sound')}>
+      <Row label={t('common.soundSettings.sounds')} detail={perKind ? t('common.soundSettings.perKindDetail') : t('common.soundSettings.sameDetail')}>
         <Segmented<'same' | 'kind'>
-          label="Sounds"
+          label={t('common.soundSettings.sounds')}
           value={perKind ? 'kind' : 'same'}
           onChange={setMode}
           options={[
-            { value: 'same', label: 'Same for all' },
-            { value: 'kind', label: 'Per kind' },
+            { value: 'same', label: t('common.soundSettings.same') },
+            { value: 'kind', label: t('common.soundSettings.perKind') },
           ]}
         />
       </Row>
       {perKind ? (
-        <div className={s.kinds} role="radiogroup" aria-label="Kind of notification">
+        <div className={s.kinds} role="radiogroup" aria-label={t('common.soundSettings.kindOf')}>
           {SOUND_GROUPS.map((g) => {
             const choice = soundFor(n, g);
             const on = editing === g;
             return (
               <div key={g} className={cx(st.row, s.kind, on && s.kindOn)}>
                 <button type="button" role="radio" aria-checked={on} className={s.kindPick} onClick={() => setTarget(g)}>
-                  <span className={st.rowLabel}>{GROUP_LABELS[g]}</span>
+                  <span className={st.rowLabel}>{group(g)}</span>
                   <span className={s.kindSound}>{soundTitle(choice)}</span>
                 </button>
-                <PlayButton choice={choice} volume={volume} label={`${GROUP_LABELS[g]}: ${soundTitle(choice)}`} />
+                <PlayButton choice={choice} volume={volume} label={t('common.soundSettings.play', { group: group(g), sound: soundTitle(choice) })} />
               </div>
             );
           })}
         </div>
       ) : (
-        <Row label="Notification sound" detail="Plays with each banner. Focus and System Settings can still silence it.">
+        <Row label={t('common.soundSettings.notificationSound')} detail={t('common.soundSettings.notificationSoundDetail')}>
           <span className={s.current}>{soundTitle(value)}</span>
           <PlayButton choice={value} volume={volume} label={soundTitle(value)} />
         </Row>
       )}
       {test}
-      <SoundPicker key={editing} value={value} volume={volume} made={n.madeSounds} onPick={pick} onKeep={keep} {...(editing === 'all' ? {} : { kindLabel: GROUP_LABELS[editing] })} />
-      <Row label="Volume" detail="For Beluga’s own sounds (8-bit and generated). Mac sounds play at your alert volume.">
+      <SoundPicker key={editing} value={value} volume={volume} made={n.madeSounds} onPick={pick} onKeep={keep} {...(editing === 'all' ? {} : { kindLabel: group(editing) })} />
+      <Row label={t('common.soundSettings.volume')} detail={t('common.soundSettings.volumeDetail')}>
         <input
           className={st.slider}
-          aria-label="Volume of Beluga’s sounds"
+          aria-label={t('common.soundSettings.volumeLabel')}
           type="range"
           min={0}
           max={1}

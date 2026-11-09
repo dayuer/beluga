@@ -1,5 +1,6 @@
 import type { ImportedTheme, TermColors, TerminalFound, TerminalLook } from '../../../../src/terminal/import/look.js';
 import type { ImportedKey } from '../../../../src/terminal/import/keys.js';
+import { say } from './late-words.js';
 
 /**
  * Bringing another terminal's look into Beluga's (BLG-212), the window's side: what an import
@@ -94,24 +95,23 @@ export function importPatch(look: TerminalLook, from: string, fontInstalled: (fa
   return { patch, ...(skippedFont ? { skippedFont } : {}) };
 }
 
-const CURSORS = { block: 'Block', bar: 'Bar', underline: 'Underline' } as const;
 
 /** What an import brings, a few words each ("Catppuccin Mocha colours", "JetBrains Mono 13 pt"…). */
 export function importSummary(look: TerminalLook, fontInstalled: (family: string) => boolean = () => true): string[] {
   const out: string[] = [];
-  if (look.theme) out.push(`${look.theme.name} colours${look.theme.light ? ', light and dark' : ''}`);
+  if (look.theme) out.push(say(look.theme.light ? 'common.terminalImport.colorsBoth' : 'common.terminalImport.colors', { name: look.theme.name }));
   if (look.font !== undefined || look.fontSize) {
-    const font = look.font === undefined ? '' : look.font === '' ? 'SF Mono' : fontInstalled(look.font) ? look.font : `${look.font} (not installed here)`;
+    const font = look.font === undefined ? '' : look.font === '' ? 'SF Mono' : fontInstalled(look.font) ? look.font : say('common.terminalImport.notInstalled', { font: look.font });
     out.push([font, look.fontSize ? `${look.fontSize} pt` : ''].filter(Boolean).join(' '));
   }
   if (look.cursor || look.cursorBlink !== undefined) {
-    const shape = look.cursor ? `${CURSORS[look.cursor]} cursor` : 'Cursor';
-    out.push(look.cursorBlink === undefined ? shape : `${shape}, ${look.cursorBlink ? 'blinking' : 'steady'}`);
+    const shape = look.cursor ? say(`common.terminalImport.cursor.${look.cursor}`) : say('common.terminalImport.cursor');
+    out.push(look.cursorBlink === undefined ? shape : say(look.cursorBlink ? 'common.terminalImport.blinking' : 'common.terminalImport.steady', { shape }));
   }
-  if (look.lineHeight !== undefined) out.push(`${look.lineHeight.toFixed(2)}× lines`);
-  if (look.scrollback !== undefined) out.push(`${nearestScrollback(look.scrollback).toLocaleString('en-US')} lines back`);
-  if (look.optionMeta !== undefined) out.push(look.optionMeta ? 'Option as Meta' : 'Option types symbols');
-  if (look.keys?.length) out.push(`${look.keys.length} ${look.keys.length === 1 ? 'key' : 'keys'} (tabs, splits…)`);
+  if (look.lineHeight !== undefined) out.push(say('common.terminalImport.lineHeight', { n: look.lineHeight.toFixed(2) }));
+  if (look.scrollback !== undefined) out.push(say('common.terminalImport.scrollback', { n: nearestScrollback(look.scrollback).toLocaleString('en-US') }));
+  if (look.optionMeta !== undefined) out.push(look.optionMeta ? say('common.terminalImport.optionMeta') : say('common.terminalImport.optionSymbols'));
+  if (look.keys?.length) out.push(say('common.terminalImport.keys', { n: look.keys.length }));
   return out;
 }
 

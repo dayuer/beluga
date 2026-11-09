@@ -9,6 +9,7 @@ import { loadImage } from '../../chat/images.js';
 import type { ViewData } from './use-view-data.js';
 import { alignOf, formatCell, formatNumber, headingOf, isNumeric, parseColor, toneOf } from './format.js';
 import v from './views.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * A view's rows as a table: headings sort (again: the other way; a third time: as they came),
@@ -22,6 +23,7 @@ export type DrawCell = (cell: Cell, col: Column, row: Row, full: boolean) => Rea
 
 export function DataTable({ view, data, full, cell }: { view: View; data: ViewData; full: boolean; cell?: DrawCell }) {
   const actions = useActions();
+  const t = useT();
   const [open, setOpen] = useState<number>();
   const columns = data.columns.filter((c) => !c.hidden);
   useEffect(() => setOpen(undefined), [data.page, data.sort, data.search, data.rows]);
@@ -49,11 +51,11 @@ export function DataTable({ view, data, full, cell }: { view: View; data: ViewDa
         <div className={v.toolbar}>
           <label className={v.search}>
             <Icon name="search" size={12} />
-            <input type="search" placeholder={data.mode === 'live' ? 'Search all rows' : 'Search'} value={data.search} onChange={(e) => data.setSearch(e.target.value)} aria-label="Search the rows" />
+            <input type="search" placeholder={data.mode === 'live' ? t('common.table.searchAll') : t('common.ui.search')} value={data.search} onChange={(e) => data.setSearch(e.target.value)} aria-label={t('common.table.searchRows')} />
           </label>
           {data.sort ? (
             <button type="button" className={v.chipButton} onClick={() => data.setSort(undefined)}>
-              Sorted by {headingOf(columns.find((c) => c.key === data.sort!.key) ?? { key: data.sort.key })} {data.sort.dir === 'asc' ? '↑' : '↓'}
+              {t('common.table.sortedBy', { column: headingOf(columns.find((c) => c.key === data.sort!.key) ?? { key: data.sort.key }) })} {data.sort.dir === 'asc' ? '↑' : '↓'}
               <Icon name="x" size={10} />
             </button>
           ) : null}
@@ -97,31 +99,31 @@ export function DataTable({ view, data, full, cell }: { view: View; data: ViewDa
             ))}
           </tbody>
         </table>
-        {!data.rows.length && !data.loading ? <div className={v.empty}>{data.search ? `Nothing matches “${data.search}”` : data.needsApproval ? 'Press Load to see the rows' : 'No rows'}</div> : null}
-        {!data.rows.length && data.loading ? <div className={v.empty}>Loading…</div> : null}
+        {!data.rows.length && !data.loading ? <div className={v.empty}>{data.search ? t('common.table.noMatch', { search: data.search }) : data.needsApproval ? t('common.table.pressLoad') : t('common.table.noRows')}</div> : null}
+        {!data.rows.length && data.loading ? <div className={v.empty}>{t('common.table.loading')}</div> : null}
       </div>
       {data.page > 0 || data.hasMore || (total !== undefined && total > shown) ? (
         <div className={v.pager}>
           <span className={v.count}>
             {shown ? `${formatNumber(from + 1)}–${formatNumber(from + shown)}` : '0'}
-            {total !== undefined ? ` of ${formatNumber(total)}` : data.hasMore ? ' of many' : ''}
+            {total !== undefined ? t('common.table.ofTotal', { total: formatNumber(total) }) : data.hasMore ? t('common.table.ofMany') : ''}
           </span>
           <span className={v.grow} />
-          <button type="button" className={v.pageButton} disabled={data.page === 0 || data.loading} onClick={() => data.setPage(data.page - 1)} aria-label="Previous Page">
+          <button type="button" className={v.pageButton} disabled={data.page === 0 || data.loading} onClick={() => data.setPage(data.page - 1)} aria-label={t('common.table.prevPage')}>
             <Icon name="back" size={11} />
           </button>
           <span className={v.pageNo}>
-            Page {data.page + 1}
-            {total !== undefined ? ` of ${Math.max(1, Math.ceil(total / data.pageSize))}` : ''}
+            {t('common.table.page', { n: data.page + 1 })}
+            {total !== undefined ? t('common.table.ofTotal', { total: Math.max(1, Math.ceil(total / data.pageSize)) }) : ''}
           </span>
-          <button type="button" className={v.pageButton} disabled={!data.hasMore || data.loading} onClick={() => data.setPage(data.page + 1)} aria-label="Next Page">
+          <button type="button" className={v.pageButton} disabled={!data.hasMore || data.loading} onClick={() => data.setPage(data.page + 1)} aria-label={t('common.table.nextPage')}>
             <Icon name="forward" size={11} />
           </button>
         </div>
       ) : shown > 0 ? (
         <div className={v.pager}>
           <span className={v.count}>
-            {formatNumber(shown)} {shown === 1 ? 'row' : 'rows'}
+            {t('common.table.rows', { n: shown, count: formatNumber(shown) })}
           </span>
         </div>
       ) : null}

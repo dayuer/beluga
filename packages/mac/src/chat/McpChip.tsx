@@ -7,7 +7,7 @@ import { useApp, useBeluga } from '../lib/beluga.js';
 import { myRuntime } from './ModelPicker.js';
 import { MCP_FROM, MCP_STATUS, checkMcp, mcpRuntimeOf, mcpSummary, signInMcp, useMcp } from '../lib/mcp.js';
 import { openExternal } from '../lib/system.js';
-import { useT } from '../i18n/index.js';
+import { useT, tl } from '../i18n/index.js';
 import s from './mcp.module.css';
 
 const OPEN_DELAY_MS = 220;
@@ -76,7 +76,7 @@ export function McpChip() {
                   </button>
                 ) : (
                   <span className={s.state} title={row.error}>
-                    {MCP_STATUS[row.status].words}
+                    {tl('MCP_STATUS', row.status, 'words', MCP_STATUS[row.status].words)}
                   </span>
                 )}
               </li>

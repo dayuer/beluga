@@ -12,6 +12,7 @@ import { kindLabel, sizeLabel } from './chat-model.js';
 import { useSay } from './use-net.js';
 import s from './network.module.css';
 import { revealLabel } from '../lib/os-words.js';
+import { t, useT } from '../i18n/index.js';
 
 /**
  * Files in a chat: cards with the file's state on this Mac (download it, watch it come, open it,
@@ -35,7 +36,7 @@ async function saveAs(client: SocketClient, f: ChatFile): Promise<string | undef
   if (!inApp()) return undefined;
   const [{ save }, { downloadDir }] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/api/path')]);
   const dir = await downloadDir().catch(() => '');
-  const to = await save({ title: `Save ${f.name}`, defaultPath: dir ? `${dir.replace(/\/+$/, '')}/${f.name}` : f.name });
+  const to = await save({ title: t('network.files.save', { name: f.name }), defaultPath: dir ? `${dir.replace(/\/+$/, '')}/${f.name}` : f.name });
   return to ? client.api.network['files.saveTo'](f.sha, to) : undefined;
 }
 
@@ -66,20 +67,20 @@ function fileItems(f: ChatFile, state: ChatFileState | undefined, ctx: { client:
     );
   if (state?.state !== 'here') {
     return [
-      ...(state?.state === 'coming' ? [{ label: 'Stop Downloading', icon: 'stop' as const, onSelect: () => run(client.api.network['files.cancel'](f.sha)) }] : [{ label: 'Download', icon: 'download' as const, onSelect: () => run(client.api.network['files.download'](f.sha, ctx.conversation)) }]),
-      { label: 'Copy Name', icon: 'copy', separate: true, onSelect: () => run(copyText(f.name), `Copied “${f.name}”`) },
+      ...(state?.state === 'coming' ? [{ label: t('network.files.stopDownloading'), icon: 'stop' as const, onSelect: () => run(client.api.network['files.cancel'](f.sha)) }] : [{ label: t('network.files.download'), icon: 'download' as const, onSelect: () => run(client.api.network['files.download'](f.sha, ctx.conversation)) }]),
+      { label: t('network.files.copyName'), icon: 'copy', separate: true, onSelect: () => run(copyText(f.name), t('network.files.copiedName', { name: f.name })) },
     ];
   }
   return [
     ...(webServed()
-      ? [{ label: 'Download', icon: 'download' as const, onSelect: () => run(openHere(client, f, state)) }]
+      ? [{ label: t('network.files.download'), icon: 'download' as const, onSelect: () => run(openHere(client, f, state)) }]
       : [
-          { label: 'Open', icon: 'external' as const, onSelect: () => run(openHere(client, f, state)) },
+          { label: t('network.files.open'), icon: 'external' as const, onSelect: () => run(openHere(client, f, state)) },
           { label: revealLabel(), icon: 'folder' as const, onSelect: () => run(revealHere(client, f, state)) },
         ]),
-    ...(inApp() ? [{ label: 'Save As…', icon: 'download' as const, onSelect: () => run(saveAs(client, f).then((to) => to && say(`Saved to ${to}`))) }] : []),
-    { label: 'Copy Name', icon: 'copy', separate: true, onSelect: () => run(copyText(f.name), `Copied “${f.name}”`) },
-    ...(state.path ? [{ label: 'Copy Path', onSelect: () => run(copyText(state.path!), 'Copied the path') }] : []),
+    ...(inApp() ? [{ label: t('network.files.saveAs'), icon: 'download' as const, onSelect: () => run(saveAs(client, f).then((to) => to && say(t('network.files.savedTo', { path: to })))) }] : []),
+    { label: t('network.files.copyName'), icon: 'copy', separate: true, onSelect: () => run(copyText(f.name), t('network.files.copiedName', { name: f.name })) },
+    ...(state.path ? [{ label: t('network.files.copyPath'), onSelect: () => run(copyText(state.path!), t('network.files.copiedPath')) }] : []),
   ];
 }
 
@@ -111,18 +112,19 @@ function usePreview(f: ChatFile, state: ChatFileState | undefined): string | und
  * it, with Show in Finder beside them; everything else is on its right-click menu.
  */
 function Picture({ f, state, url, detail }: { f: ChatFile; state: ChatFileState | undefined; url: string; detail: string }) {
+  const t = useT();
   const { client } = useBeluga();
   const say = useSay();
   return (
     <div className={s.picture} role="group" aria-label={`${f.name}, ${detail}`}>
-      <button type="button" className={s.pictureOpen} onClick={() => void openHere(client, f, state).catch((err: unknown) => say(errorText(err), 'error'))} aria-label={`Open ${f.name}`}>
+      <button type="button" className={s.pictureOpen} onClick={() => void openHere(client, f, state).catch((err: unknown) => say(errorText(err), 'error'))} aria-label={t('network.files.openName', { name: f.name })}>
         <img src={url} alt={f.name} draggable={false} />
       </button>
       <span className={s.pictureCaption} aria-hidden="true">
         <span className={s.pictureName}>{f.name}</span>
         <span>{detail}</span>
       </span>
-      <button type="button" className={s.pictureAction} aria-label={webServed() ? `Download ${f.name}` : revealLabel(f.name)} onClick={() => void revealHere(client, f, state).catch((err: unknown) => say(errorText(err), 'error'))}>
+      <button type="button" className={s.pictureAction} aria-label={webServed() ? t('network.files.downloadName', { name: f.name }) : revealLabel(f.name)} onClick={() => void revealHere(client, f, state).catch((err: unknown) => say(errorText(err), 'error'))}>
         <Icon name={webServed() ? 'download' : 'folder'} size={12} />
       </button>
     </div>
@@ -131,6 +133,7 @@ function Picture({ f, state, url, detail }: { f: ChatFile; state: ChatFileState 
 
 /** One file of a message. */
 export const FileCard = memo(function FileCard({ f, conversation, mine }: { f: ChatFile; conversation: string; mine: boolean }) {
+  const t = useT();
   const { client } = useBeluga();
   const say = useSay();
   const state = useFileState(f.sha);
@@ -145,12 +148,12 @@ export const FileCard = memo(function FileCard({ f, conversation, mine }: { f: C
   const detail = coming
     ? state.error && !state.received
       ? state.error
-      : `${sizeLabel(state.received ?? 0)} of ${sizeLabel(f.size)}`
+      : t('network.files.ofSize', { received: sizeLabel(state.received ?? 0), size: sizeLabel(f.size) })
     : state?.state === 'failed'
-      ? (state.error ?? 'Didn’t come')
+      ? (state.error ?? t('network.files.didntCome'))
       : here
         ? `${kindLabel(f)} · ${sizeLabel(f.size)}`
-        : `${kindLabel(f)} · ${sizeLabel(f.size)} · ${mine ? 'sent' : 'not downloaded'}`;
+        : `${kindLabel(f)} · ${sizeLabel(f.size)} · ${mine ? t('network.files.sent') : t('network.files.notDownloaded')}`;
   const url = usePreview(f, state);
   if (url && here) {
     return (
@@ -165,7 +168,7 @@ export const FileCard = memo(function FileCard({ f, conversation, mine }: { f: C
     <ActionsContext items={() => fileItems(f, state, { client, say, conversation })}>
       <div className={s.fileWrap} data-file={f.sha}>
         <div className={cx(s.file, state?.state === 'failed' && s.fileFailed)} role="group" aria-label={`${f.name}, ${detail}`}>
-          <button type="button" className={s.fileMain} onClick={primary} title={here ? `Open ${f.name}` : coming ? undefined : `Download ${f.name}`}>
+          <button type="button" className={s.fileMain} onClick={primary} title={here ? t('network.files.openName', { name: f.name }) : coming ? undefined : t('network.files.downloadName', { name: f.name })}>
             <span className={s.fileIcon}>
               <Icon name={f.image ? 'image' : 'file'} size={16} />
             </span>
@@ -175,15 +178,15 @@ export const FileCard = memo(function FileCard({ f, conversation, mine }: { f: C
             </span>
           </button>
           {coming ? (
-            <button type="button" className={s.fileAction} aria-label={`Stop downloading ${f.name}`} onClick={() => void client.api.network['files.cancel'](f.sha).catch(fail)}>
+            <button type="button" className={s.fileAction} aria-label={t('network.files.stopName', { name: f.name })} onClick={() => void client.api.network['files.cancel'](f.sha).catch(fail)}>
               <Icon name="x" size={11} />
             </button>
           ) : here ? (
-            <button type="button" className={s.fileAction} aria-label={webServed() ? `Download ${f.name}` : revealLabel(f.name)} onClick={() => void revealHere(client, f, state).catch(fail)}>
+            <button type="button" className={s.fileAction} aria-label={webServed() ? t('network.files.downloadName', { name: f.name }) : revealLabel(f.name)} onClick={() => void revealHere(client, f, state).catch(fail)}>
               <Icon name={webServed() ? 'download' : 'folder'} size={12} />
             </button>
           ) : (
-            <button type="button" className={s.fileAction} aria-label={state?.state === 'failed' ? `Try downloading ${f.name} again` : `Download ${f.name}`} onClick={() => void client.api.network['files.download'](f.sha, conversation).catch(fail)}>
+            <button type="button" className={s.fileAction} aria-label={state?.state === 'failed' ? t('network.files.tryAgain', { name: f.name }) : t('network.files.downloadName', { name: f.name })} onClick={() => void client.api.network['files.download'](f.sha, conversation).catch(fail)}>
               <Icon name={state?.state === 'failed' ? 'refresh' : 'download'} size={12} />
             </button>
           )}
@@ -211,15 +214,16 @@ export function MessageFiles({ files, conversation, mine }: { files: readonly Ch
 
 /** Files waiting in the message box: a chip each, with its state and a way to take it out. */
 export function PendingTray({ id, items }: { id: string; items: readonly Pending[] }) {
+  const t = useT();
   if (!items.length) return null;
   return (
-    <div className={s.tray} role="list" aria-label="Files to send">
+    <div className={s.tray} role="list" aria-label={t('network.files.toSend')}>
       {items.map((p) => (
         <span key={p.key} role="listitem" className={cx(s.trayItem, p.state === 'failed' && s.trayFailed)} title={p.error ?? p.name}>
           {p.thumb ? <img src={p.thumb} alt="" className={s.trayThumb} /> : <Icon name={p.state === 'failed' ? 'alert' : 'file'} size={12} />}
           <span className={s.trayName}>{p.name}</span>
-          <span className={s.traySize}>{p.state === 'adding' ? 'Preparing…' : p.state === 'failed' ? (p.error ?? 'Couldn’t add it') : p.file ? sizeLabel(p.file.size) : ''}</span>
-          <button type="button" aria-label={`Remove ${p.name}`} onClick={() => removePending(id, p.key)}>
+          <span className={s.traySize}>{p.state === 'adding' ? t('network.files.preparing') : p.state === 'failed' ? (p.error ?? t('network.files.couldntAdd')) : p.file ? sizeLabel(p.file.size) : ''}</span>
+          <button type="button" aria-label={t('network.files.remove', { name: p.name })} onClick={() => removePending(id, p.key)}>
             <Icon name="x" size={9} />
           </button>
         </span>

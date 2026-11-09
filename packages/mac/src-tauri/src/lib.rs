@@ -117,6 +117,12 @@ fn set_menu_state(
     }
 }
 
+/// The menus' words in the window's language (lib/menu-language.ts), id → text.
+#[tauri::command]
+fn set_menu_labels(app: tauri::AppHandle, labels: HashMap<String, String>) {
+    menu::set_labels(&app, labels);
+}
+
 /// Give menu-bar items your keys (Settings › Keyboard): an accelerator each, or none.
 #[tauri::command]
 fn set_menu_keys(app: tauri::AppHandle, keys: HashMap<String, Option<String>>) {
@@ -299,6 +305,7 @@ pub fn run() {
             set_menu_state,
             set_vibrancy,
             set_menu_keys,
+            set_menu_labels,
             set_tray_status,
             set_tray_presence,
             requests::set_tray_requests,

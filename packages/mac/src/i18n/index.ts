@@ -16,9 +16,21 @@ import { chat as enChat } from './en/chat.js';
 import { chat as zhChat } from './zh-CN/chat.js';
 import { plans as enPlans } from './en/plans.js';
 import { plans as zhPlans } from './zh-CN/plans.js';
+import { common as enCommon } from './en/common.js';
+import { common as zhCommon } from './zh-CN/common.js';
+import { sentinel as enSentinel } from './en/sentinel.js';
+import { sentinel as zhSentinel } from './zh-CN/sentinel.js';
+import { views as enViews } from './en/views.js';
+import { views as zhViews } from './zh-CN/views.js';
+import { network as enNetwork } from './en/network.js';
+import { network as zhNetwork } from './zh-CN/network.js';
+import { misc as enMisc } from './en/misc.js';
+import { misc as zhMisc } from './zh-CN/misc.js';
+import { menu as enMenu } from './en/menu.js';
+import { menu as zhMenu } from './zh-CN/menu.js';
 
-const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans } as const;
-const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans };
+const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu } as const;
+const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu };
 
 export type Key = keyof typeof EN & string;
 const tOf = makeT(EN, { 'zh-CN': ZH });
@@ -41,3 +53,14 @@ export function useLocale(): Locale {
 export function useT(): (key: Key, vars?: Vars) => string {
   return tOf(useLocale());
 }
+
+/**
+ * A label from a table shared with the engine or the phone (TRUST_INFO, CAN_INFO, PANEL_LABELS…),
+ * in the language shown: `common.<table>.<id>.<field>` from the dictionary, else the table's own
+ * English (`fallback`). The tables stay as they are in src/; tests/mac-i18n-common.test.ts checks
+ * every id of each table has its words in both languages.
+ */
+export const tl = (table: string, id: string, field: string, fallback: string): string => {
+  const key = `common.${table}.${id}.${field}`;
+  return key in EN ? t(key as Key) : fallback;
+};

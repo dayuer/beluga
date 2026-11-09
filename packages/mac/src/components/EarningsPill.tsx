@@ -6,6 +6,7 @@ import { Icon } from './Icon.js';
 import { PixelBurst } from './PixelBurst.js';
 import { Tip, cx } from './ui.js';
 import s from './earnings.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * What a project's tooltip says: its total in the currency earnings are shown in, what it earned in
@@ -13,32 +14,33 @@ import s from './earnings.module.css';
  */
 export function EarningsTipBody({ earnings }: { earnings: ProjectEarnings }) {
   const { fx } = useMoney();
+  const t = useT();
   const totals = earnings.totals ?? [];
   const money = useConverted(totals);
   const breakdown = money.converted || money.missing.length > 0;
   const note = missingNote(money.missing);
-  const head = earnings.refreshing && !earnings.totals ? 'Counting all-time earnings from Stripe…' : `All-time earnings · ${earnings.refreshing ? 'updating…' : `updated ${updatedAgo(earnings.updatedAt)}`}`;
+  const head = earnings.refreshing && !earnings.totals ? t('common.earningsPill.counting') : t('common.earningsPill.head', { when: earnings.refreshing ? t('common.earningsPill.updating') : t('common.earningsPill.updated', { ago: updatedAgo(earnings.updatedAt) }) });
   const newest = newestPaid(earnings);
   return (
     <span className={s.tipBody}>
       <span>{head}</span>
       {breakdown ? <span className={s.tipTotal}>≈ {formatMoney(money.amount, money.currency)}</span> : totals.length ? <span className={s.tipTotal}>{formatMoney(money.amount, money.currency)}</span> : null}
       {breakdown
-        ? totals.map((t) => (
-            <span key={t.currency} className={s.tipLine}>
-              <span>{t.currency.toUpperCase()}</span>
-              <span className={s.num}>{formatMoney(t.amount, t.currency)}</span>
+        ? totals.map((x) => (
+            <span key={x.currency} className={s.tipLine}>
+              <span>{x.currency.toUpperCase()}</span>
+              <span className={s.num}>{formatMoney(x.amount, x.currency)}</span>
             </span>
           ))
         : null}
       {note ? <span className={s.tipDim}>{note}</span> : null}
       {newest ? (
         <span className={s.tipDim}>
-          Last payment {updatedAgo(newest.at)}: {formatMoney(newest.amount, newest.currency)}
+          {t('common.earningsPill.last', { ago: updatedAgo(newest.at), amount: formatMoney(newest.amount, newest.currency) })}
         </span>
       ) : null}
-      {money.converted && fx ? <span className={s.tipDim}>Converted at the European Central Bank’s rates, updated {ratesWhen(fx.at)}; approximate.</span> : null}
-      {earnings.mode === 'test' ? <span className={s.tipDim}>Test mode</span> : null}
+      {money.converted && fx ? <span className={s.tipDim}>{t('common.earningsPill.converted', { when: ratesWhen(fx.at) })}</span> : null}
+      {earnings.mode === 'test' ? <span className={s.tipDim}>{t('common.earningsPill.test')}</span> : null}
       {earnings.error ? <span className={s.tipError}>{brandText(earnings.error.message)}</span> : null}
     </span>
   );
@@ -66,6 +68,7 @@ function usePulse(arrivals: number): boolean {
  */
 export function EarningsPill({ root, projectId, celebrate }: { root: string | undefined; projectId: string; celebrate?: boolean }) {
   const earnings = useProjectEarnings(root);
+  const t = useT();
   const ref = useRef<HTMLButtonElement>(null);
   const arrivals = usePaymentArrivals(earnings);
   const pulse = usePulse(arrivals);
@@ -87,7 +90,7 @@ export function EarningsPill({ root, projectId, celebrate }: { root: string | un
         ref={ref}
         type="button"
         className={cx(s.pill, earnings.refreshing && s.shimmer, earnings.mode === 'test' && s.test, failed && s.failed, earnings.error && shown && s.stale, !shown && !failed && !earnings.totals && s.pending, pulse && s.pulse)}
-        aria-label={shown ? `All-time earnings ${money.converted ? 'about ' : ''}${formatMoney(shown.amount, shown.currency)}` : failed ? 'Stripe earnings: a problem' : 'Counting earnings'}
+        aria-label={shown ? (money.converted ? t('common.earningsPill.ariaAbout', { amount: formatMoney(shown.amount, shown.currency) }) : t('common.earningsPill.aria', { amount: formatMoney(shown.amount, shown.currency) })) : failed ? t('common.earningsPill.problem') : t('common.earningsPill.countingShort')}
         data-earnings-pill={projectId}
         onClick={(e) => {
           e.stopPropagation();
