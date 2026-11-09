@@ -37,6 +37,8 @@ export const AutoRoute = z.object({
   hardLabel: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/).optional(),
   /** Urgent and high priority count as hard too. */
   urgentIsHard: z.boolean().optional(),
+  /** A task estimated at this many points or more is hard too (a plan's tasks carry one); 0: never. Unset: HARD_ESTIMATE. */
+  hardEstimate: z.number().int().min(0).max(8).optional(),
   hard: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
   build: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
 });
@@ -44,10 +46,14 @@ export type AutoRoute = z.infer<typeof AutoRoute>;
 
 export type AutoTier = 'hard' | 'build';
 
+/** From this many points a task is hard: a plan's writer sizes them 1, 2, 3 or 5 (8: split it). */
+export const HARD_ESTIMATE = 5;
+
 /** What of a task routing looks at. */
 export interface Routable {
   readonly labels: readonly string[];
   readonly priority: string;
+  readonly estimate?: number;
 }
 
 /**
@@ -63,6 +69,8 @@ export function autoTierOf(task: Routable, route: AutoRoute | undefined): AutoTi
   const label = route?.hardLabel ?? HARD_LABEL;
   if (task.labels.includes(label)) return 'hard';
   if (route?.urgentIsHard !== false && (task.priority === 'urgent' || task.priority === 'high')) return 'hard';
+  const big = route?.hardEstimate ?? HARD_ESTIMATE;
+  if (big > 0 && (task.estimate ?? 0) >= big) return 'hard';
   return 'build';
 }
 
@@ -101,7 +109,12 @@ export function candidateRuns(runtimes: readonly RuntimeChoice[], value: string)
  */
 export function autoAgentFor(task: Routable, route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[], chosen?: AgentRef): AgentRef | undefined {
   if (!autoRouteOn(route, runtimes) || chosen) return undefined;
-  for (const value of tierList(autoTierOf(task, route), route)) {
+  return firstRunning(tierList(autoTierOf(task, route), route), runtimes);
+}
+
+/** The first candidate of a list that runs here, as an agent. */
+function firstRunning(list: readonly string[], runtimes: readonly RuntimeChoice[]): AgentRef | undefined {
+  for (const value of list) {
     const c = parseChoice(value);
     if (!c || !runsHere(runtimes, c.runtime, c.model)) continue;
     const label = runtimes.find((r) => r.id === c.runtime)?.label ?? c.runtime;
@@ -109,6 +122,18 @@ export function autoAgentFor(task: Routable, route: AutoRoute | undefined, runti
   }
   return undefined;
 }
+
+/**
+ * Who checks a plan's milestones and reviews its drafts when the plan names no one (no check
+ * agent, no work agent): the hard list's first that runs here, Opus, so the work is judged by
+ * the strongest model before it's called done. Undefined: auto route is off (your default, as before).
+ */
+export function autoChecker(st: Pick<RouteState, 'prefs' | 'runtimes'>): AgentRef | undefined {
+  return autoRouteOn(st.prefs.autoRoute, st.runtimes) ? firstRunning(tierList('hard', st.prefs.autoRoute), st.runtimes) : undefined;
+}
+
+/** A new plan's autonomy with auto route on: autopilot (milestone to milestone on its own, stopping only when something fails). */
+export const autoAutonomy = (st: Pick<RouteState, 'prefs' | 'runtimes'>): 'autopilot' | undefined => (autoRouteOn(st.prefs.autoRoute, st.runtimes) ? 'autopilot' : undefined);
 
 /** What of the app's state routing reads: the daemon's, the Mac app's and the phone views' alike. */
 export interface RouteState {

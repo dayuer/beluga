@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDefaultAutonomy } from "../plans/use-default-autonomy.js";
 import type { PullRequest } from "@beluga/core/work-store.js";
 import { isPlanOwned } from "@beluga/core/plans/owner.js";
 import { activityOf } from "@beluga/ui/workspace-models.js";
@@ -7,7 +8,6 @@ import {
   AUTONOMIES,
   AUTONOMY_INFO,
   type Autonomy,
-  DEFAULT_AUTONOMY,
   type Plan,
 } from "@beluga/core/plans/model.js";
 import { EarningsPill } from "../components/EarningsPill.js";
@@ -248,7 +248,8 @@ function HomeComposer({ project }: { project: Project }) {
   const [base, setBase] = useState<string>();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [autonomy, setAutonomy] = useState<Autonomy>(DEFAULT_AUTONOMY);
+  const startsAs = useDefaultAutonomy();
+  const [autonomy, setAutonomy] = useState<Autonomy>(startsAs);
   const plans = usePlanActions();
   const plansOn = usePlans().enabled;
   const branches = useBranches(project.id);
@@ -273,7 +274,7 @@ function HomeComposer({ project }: { project: Project }) {
     setName("");
     setBase(undefined);
     setMode("worktree");
-    setAutonomy(DEFAULT_AUTONOMY);
+    setAutonomy(startsAs);
     ref.current?.focus();
   }, [project.id]);
   useLayoutEffect(() => {
