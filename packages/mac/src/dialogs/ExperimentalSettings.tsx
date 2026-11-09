@@ -4,6 +4,7 @@ import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import x from './experimental.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Settings › Experimental: early features, each off until you turn it on, each saying what it
@@ -14,14 +15,13 @@ import x from './experimental.module.css';
 export function ExperimentalSettings() {
   const api = useApi();
   const enabled = useApp((st) => st.prefs.experiments);
+  const t = useT();
   const set = (id: Experiment, on: boolean): void => void api.session.setPrefs({ experiments: withExperiment(enabled, id, on) });
   return (
     <>
       <div className={x.intro}>
         <Icon name="flask" size={16} className={x.introIcon} />
-        <p>
-          Early features we’re still shaping. They haven’t been tested as fully as the rest of Beluga, so each one is off until you turn it on, and it may change before it’s finished. Here’s what each does, and what it changes.
-        </p>
+        <p>{t('settings.experimental.intro')}</p>
       </div>
       {EXPERIMENTS.map((id) => {
         const info = EXPERIMENT_INFO[id];
@@ -32,19 +32,19 @@ export function ExperimentalSettings() {
               <Switch label={info.title} on={on} onChange={(v) => set(id, v)} />
             </Row>
             <div className={x.about}>
-              <div className={x.heading}>What changes</div>
+              <div className={x.heading}>{t('settings.experimental.changes')}</div>
               <ul className={x.changes}>
                 {info.changes.map((c) => (
                   <li key={c}>{c}</li>
                 ))}
               </ul>
-              <div className={x.heading}>On this computer</div>
+              <div className={x.heading}>{t('settings.experimental.cost')}</div>
               <p className={x.cost}>{info.cost}</p>
             </div>
           </Group>
         );
       })}
-      <p className={s.note}>Something not right in an experiment? Report a Problem, in About, tells us.</p>
+      <p className={s.note}>{t('settings.experimental.report')}</p>
     </>
   );
 }

@@ -4,6 +4,7 @@ import type { Workspace } from '@beluga/workspaces/types.js';
 import { BackgroundTasks } from '../../claude-code/BackgroundTasks.js';
 import { tasksForWorkspace } from '../../claude-code/background-model.js';
 import { useApp } from '../../lib/beluga.js';
+import { useT } from '../../i18n/index.js';
 
 /**
  * The right panel's Background: the commands Claude and its agents run in this workspace in the
@@ -18,8 +19,9 @@ export function useBackgroundRunning(ws: Workspace | undefined): boolean {
 }
 
 export function BackgroundTab({ wsId }: { wsId: string }) {
+  const t = useT();
   const sessions = useApp((st) => st.claudeCode.sessions);
   const ws = useApp((st) => findWorkspace(st.projects, wsId));
   const items = useMemo(() => (ws ? tasksForWorkspace(sessions, ws) : []), [sessions, ws?.id, ws?.path]);
-  return <BackgroundTasks items={items} layout="stack" empty="When your agent or one of its sub-agents starts something to run on its own here (a dev server, the full tests, a build) or keeps watch on something, it shows here, with its output as it comes." />;
+  return <BackgroundTasks items={items} layout="stack" empty={t('layout.backgroundTab.empty')} />;
 }

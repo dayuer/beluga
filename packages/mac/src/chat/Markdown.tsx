@@ -41,9 +41,11 @@ import { linkPaths, parsePathHref } from '@beluga/shared/render/path-refs.js';
 import { PathLink } from './PathLink.js';
 import s from './chat.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { t as tNow, useT } from '../i18n/index.js';
 
 
 function Code({ code, lang }: { code: string; lang?: string }) {
+  const t = useT();
   const [html, setHtml] = useState<string | undefined>();
   useEffect(() => {
     if (!lang) return;
@@ -58,18 +60,18 @@ function Code({ code, lang }: { code: string; lang?: string }) {
   }, [code, lang]);
   const { client, ui } = useBeluga();
   const say = (text: string): void => client.store.dispatch({ type: 'toast', text, level: 'success' });
-  const copy = (text: string, what: string): void => void copyText(text).then(() => say(`Copied ${what}`));
+  const copy = (text: string, what: string): void => void copyText(text).then(() => say(t('chat.messageMenu.copied', { what })));
   const fence = `\`\`\`${lang ?? ''}\n${code}\n\`\`\``;
   const items: ActionItem[] = [
-    { label: 'Copy Code', icon: 'copy', onSelect: () => copy(code, 'the code') },
-    { label: 'Copy as Markdown', onSelect: () => copy(fence, 'as Markdown') },
-    { label: 'Quote in Reply', icon: 'chat', separate: true, onSelect: () => quoteInBox(ui, fence) },
+    { label: t('chat.markdown.copyCode'), icon: 'copy', onSelect: () => copy(code, t('chat.markdown.theCode')) },
+    { label: t('chat.messageMenu.copyMarkdown'), onSelect: () => copy(fence, t('chat.messageMenu.asMarkdown')) },
+    { label: t('chat.messageMenu.quote'), icon: 'chat', separate: true, onSelect: () => quoteInBox(ui, fence) },
   ];
   return (
     <ActionsContext items={items}>
       <div className={s.codeBlock}>
-        <button type="button" className={s.copyCode} onClick={() => copy(code, 'the code')} aria-label="Copy code">
-          Copy
+        <button type="button" className={s.copyCode} onClick={() => copy(code, t('chat.markdown.theCode'))} aria-label={t('chat.markdown.copyCodeAria')}>
+          {t('chat.items.copy')}
         </button>
         {/* eslint-disable-next-line react/no-danger */}
         {html ? <div className={s.shiki} dangerouslySetInnerHTML={{ __html: html }} /> : <pre><code>{code}</code></pre>}
@@ -93,11 +95,12 @@ function targetOf(href: string): LinkTarget {
 /** An image in the text: a file on this Mac as a thumbnail (click for full size), else a quiet chip. */
 function MdImage({ src, alt, all, local }: { src: string; alt: string; all: readonly ChatImage[]; local: boolean }) {
   const actions = useActions();
+  const t = useT();
   const source = imageSource(src);
   // Someone else's message never makes this Mac read its own files (a path to your screenshot, say).
   if (source.kind === 'local' && !local) {
     return (
-      <span className={s.imageRef} title={`${source.path} (pictures on ${thisComputer()} show only in your own and your agent’s messages)`}>
+      <span className={s.imageRef} title={t('chat.markdown.localOnly', { path: source.path, computer: thisComputer() })}>
         <Icon name="image" size={11} />
         {alt || baseName(source.path)}
       </span>
@@ -118,7 +121,7 @@ function MdImage({ src, alt, all, local }: { src: string; alt: string; all: read
     );
   }
   return (
-    <span className={s.imageRef} title={`Can’t show ${src}`}>
+    <span className={s.imageRef} title={t('chat.markdown.cantShow', { src })}>
       <Icon name="image" size={11} />
       {alt || 'image'}
     </span>
@@ -279,7 +282,7 @@ export const Markdown = memo(function Markdown({ text, paths = false, localImage
       const image = parseAttachmentHref(href);
       if (image) {
         const label = /image \d+/.exec(String(children))?.[0] ?? 'image';
-        return <ImageChip href={href} label={label} title={`Open ${label}`} onClick={(e) => (e.preventDefault(), openLightbox([{ href, ...image, label }]))} />;
+        return <ImageChip href={href} label={label} title={tNow('chat.messageMenu.open', { name: label })} onClick={(e) => (e.preventDefault(), openLightbox([{ href, ...image, label }]))} />;
       }
       // A file or folder named in the words (shared/render/path-refs.ts): opens it, right-click for more.
       const path = parsePathHref(href);

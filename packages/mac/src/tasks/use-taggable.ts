@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { MentionWorld } from '../chat/mentions.js';
 import { useApp } from '../lib/beluga.js';
 import { usePeople } from './use-tasks.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Who "@" can name in a task's boxes (New Task, a comment): the project's team first (a task can
@@ -20,8 +21,8 @@ export function useTaggable(
     const team = mates.filter((m) => m.id !== selfId);
     const others = friends.filter((f) => f.peerId !== selfId && !team.some((m) => m.id === f.peerId));
     const people = [
-      ...team.map((m) => ({ name: m.name, hint: projectName ? `on ${projectName}` : 'on this project' })),
-      ...others.map((f) => ({ name: f.name, hint: 'a friend' })),
+      ...team.map((m) => ({ name: m.name, hint: projectName ? t('tasks.tag.onProject', { name: projectName }) : t('tasks.tag.onThisProject') })),
+      ...others.map((f) => ({ name: f.name, hint: t('tasks.tag.friend') })),
     ];
     const named = [...team.map((m) => ({ name: m.name, peerId: m.id })), ...others.map((f) => ({ name: f.name, peerId: f.peerId }))];
     const world: MentionWorld = { friends: named, peers: [], projects: [], workspaces: [] };

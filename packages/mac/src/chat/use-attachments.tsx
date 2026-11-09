@@ -10,6 +10,7 @@ import { keepPreview, openLightbox, pendingImage, previewOf } from './images.js'
 import { type ImageInText, type PathInfo, insertText, usePastePaths } from './paste-paths.js';
 import s from './composer.module.css';
 import img from './images.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * What goes with a message besides its words, the same in every message box (a conversation's
@@ -104,6 +105,7 @@ export interface Attachments {
  */
 export function useAttachments({ channel, box, text, setText }: { channel: string; box: RefObject<HTMLTextAreaElement | null>; text: () => string; setText: (text: string, cursor: number) => void }): Attachments {
   const { client } = useBeluga();
+  const t = useT();
   const api = useApi();
   const selfId = client.store.getState().selfId;
   const [images, setImagesState] = useState<readonly number[]>(() => waitingImages.get(channel) ?? []);
@@ -163,7 +165,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         if (added.file) imageFiles.set(added.n, added.file);
         keepPreview(added.n, file);
       } catch (err) {
-        toast(client, `Couldn't add ${file.name || 'the image'}: ${errorText(err)}`, 'error');
+        toast(client, t('chat.attach.addFailed', { name: file.name || t('chat.attach.theImage'), error: errorText(err) }), 'error');
         continue;
       }
       addWaiting(added.n);
@@ -182,7 +184,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
       addWaiting(added.n);
       return added.n;
     } catch (err) {
-      toast(client, `Couldn't add ${f.name}: ${errorText(err)}`, 'error');
+      toast(client, t('chat.attach.addFailed', { name: f.name, error: errorText(err) }), 'error');
       return undefined;
     }
   };
@@ -204,7 +206,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
    */
   const uploadOthers = async (picked: readonly File[]): Promise<void> => {
     const { uploadFiles } = await import('../lib/web-files.js');
-    const sent = await uploadFiles(picked.slice(0, MAX_DROPPED), (file, err) => toast(client, `Couldn't upload ${file.name}: ${errorText(err)}`, 'error'));
+    const sent = await uploadFiles(picked.slice(0, MAX_DROPPED), (file, err) => toast(client, t('chat.attach.uploadFailed', { name: file.name, error: errorText(err) }), 'error'));
     if (sent.length) await addPaths(sent.map((u) => ({ path: u.path, name: u.name, kind: 'file' as const, size: u.size, image: false })));
     box.current?.focus();
   };
@@ -215,10 +217,10 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
     try {
       infos = await api.local.statFiles(paths.slice(0, MAX_DROPPED));
     } catch (err) {
-      return toast(client, `Couldn't add what you dropped: ${errorText(err)}`, 'error');
+      return toast(client, t('chat.attach.dropFailed', { error: errorText(err) }), 'error');
     }
     const { files: picked, skipped } = droppedFiles(infos);
-    if (skipped) toast(client, picked.length ? `Only files go with a message: ${skipped} left out` : 'Only files go with a message (not folders)', 'warn');
+    if (skipped) toast(client, picked.length ? t('chat.attach.skipped', { n: skipped }) : t('chat.attach.onlyFiles'), 'warn');
     if (!picked.length) return;
     await addPaths(picked);
     box.current?.focus();
@@ -373,14 +375,14 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
   const waiting = (
     <>
       {pendingImages.length ? (
-        <div className={img.pending} role="group" aria-label="Images to send">
+        <div className={img.pending} role="group" aria-label={t('chat.attach.images')}>
           {pendingImages.map((n) => (
             <div key={n} className={img.pendingItem}>
-              <button type="button" className={img.pendingOpen} aria-label={`Open image ${shownOf(n)}`} onClick={() => openImages(n)}>
+              <button type="button" className={img.pendingOpen} aria-label={t('chat.attach.openImage', { name: shownOf(n) })} onClick={() => openImages(n)}>
                 <img src={previewOf(n)} alt={`image ${shownOf(n)}`} draggable={false} />
               </button>
               <span className={img.pendingLabel}>{shownOf(n)}</span>
-              <button type="button" className={img.pendingRemove} aria-label={`Remove image ${shownOf(n)}`} onClick={() => removeImage(n)}>
+              <button type="button" className={img.pendingRemove} aria-label={t('chat.attach.removeImage', { name: shownOf(n) })} onClick={() => removeImage(n)}>
                 <Icon name="x" size={9} />
               </button>
             </div>
@@ -388,12 +390,12 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         </div>
       ) : null}
       {files.length ? (
-        <div className={s.fileChips} role="list" aria-label="Files to send">
+        <div className={s.fileChips} role="list" aria-label={t('chat.attach.files')}>
           {files.map((f) => (
             <span key={f.path} role="listitem" className={s.fileChip} title={f.path}>
               <Icon name="file" size={11} />
               <span className={s.fileName}>{f.name}</span>
-              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((x) => x.path !== f.path))}>
+              <button type="button" aria-label={t('chat.attach.remove', { name: f.name })} onClick={() => setFiles(files.filter((x) => x.path !== f.path))}>
                 <Icon name="x" size={9} />
               </button>
             </span>
@@ -408,7 +410,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         <div className={s.dropTarget} style={{ left: dragOver.left, top: dragOver.top, width: dragOver.right - dragOver.left, height: dragOver.bottom - dragOver.top }} aria-hidden>
           <div className={s.dropTargetLabel}>
             <Icon name="image" size={16} />
-            Drop to attach
+            {t('chat.attach.drop')}
           </div>
         </div>,
         document.body,

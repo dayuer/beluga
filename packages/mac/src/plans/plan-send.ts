@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 /**
  * Sending a message from the plan chat: its "[image N]" references become links to the images
  * (Beluga keeps them) and it goes to the plan's Claude. Resolves when it went; rejects with what to
@@ -42,7 +44,7 @@ export async function sendPlanMessage(api: PlanSendApi, message: PlanMessage, ch
       try {
         full = await api.attachments.expand(full, channel, message.images && [...message.images], message.shown && [...message.shown]);
       } catch (err) {
-        throw new Error(`Couldn't send the images: ${errorText(err)}`);
+        throw new Error(t('plans.send.couldntImages', { error: errorText(err) }));
       }
     }
     message.expanded = full;
@@ -53,5 +55,5 @@ export async function sendPlanMessage(api: PlanSendApi, message: PlanMessage, ch
   } catch (err) {
     throw new Error(errorText(err));
   }
-  if (went === false) throw new Error("The agent can't be asked here");
+  if (went === false) throw new Error(t('plans.send.cantAsk'));
 }

@@ -11,6 +11,7 @@ import { Row } from './sidebar-parts.js';
 import { WorkspaceWithAgents } from './SubAgents.js';
 import side from './Sidebar.module.css';
 import s from './project-groups.module.css';
+import { useT } from '../i18n/index.js';
 
 /** When each of your conversations put off till later (Remind Me Later) reminds you, by id: from your records (core/triage). */
 export type Later = ReadonlyMap<string, number>;
@@ -43,6 +44,7 @@ export const notLater = (later: Later, w: Workspace): boolean => !later.has(w.id
  */
 export function LaterRows({ list, indent, foldKey }: { list: readonly Workspace[]; indent: number; foldKey: string }) {
   const actions = useActions();
+  const t = useT();
   const here = useApp((st) => (st.view.kind === 'workspace' ? st.view.id : undefined));
   const open = useUi((u) => u.collapsed.includes(foldKey));
   const later = useLater();
@@ -55,7 +57,7 @@ export function LaterRows({ list, indent, foldKey }: { list: readonly Workspace[
         indent={indent}
         className={side.fold}
         aria-expanded={open}
-        aria-label={`Later, ${list.length}`}
+        aria-label={t('layout.later.label', { count: list.length })}
         // The arrow in the gutter, as a worktree folding its sub-agents (the whole row folds).
         icon={
           <span className={side.foldIcon}>
@@ -65,8 +67,8 @@ export function LaterRows({ list, indent, foldKey }: { list: readonly Workspace[
             <Icon name="clock" size={14} />
           </span>
         }
-        label="Later"
-        detail={`${list.length === 1 ? 'One conversation' : `${list.length} conversations`} you asked to be reminded about${next ? `\nThe next one: ${next.replace(/^Reminds you /, '')}` : ''}`}
+        label={t('layout.later.title')}
+        detail={t('layout.later.detail', { count: list.length }) + (next ? t('layout.later.next', { when: next.replace(/^Reminds you /, '') }) : '')}
         trailing={<span className={s.count}>{list.length}</span>}
         onClick={() => actions.run({ type: 'toggle_fold', key: foldKey })}
       />

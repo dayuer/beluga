@@ -16,6 +16,7 @@ import { DotMark, nameClass, signalClass } from './signal-marks.js';
 import { triageItems } from './row-triage-actions.js';
 import { Row } from './sidebar-parts.js';
 import m from './signal.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * A plan under its project: one row for the plan, its conversation and all its task worktrees
@@ -26,6 +27,7 @@ import m from './signal.module.css';
  */
 export function PlanRow({ plan, indent }: { plan: Plan; indent: number }) {
   const view = usePlanView(plan)!;
+  const t = useT();
   const { open, openList } = usePlanActions();
   const uiPrefs = usePrefs();
   // Only what the row shows (not the whole state): drawn again when that changes (KLD-48).
@@ -40,15 +42,15 @@ export function PlanRow({ plan, indent }: { plan: Plan; indent: number }) {
   const working = view.active.some((t) => t.state === 'running') || inside.working;
   const next = nextWords(view.next);
   const why = planNeeds ? (next.detail ? `${next.title}: ${next.detail}` : next.title) : inside.level === 'needs' ? inside.tip : status.label;
-  const tip = [`${title}: ${why}`, view.total ? `${view.done} of ${view.total} tasks done` : '', unread ? `${unread} new message${unread === 1 ? '' : 's'}` : inside.inside && !needs ? 'New in its tasks' : ''].filter(Boolean).join(' · ');
+  const tip = [`${title}: ${why}`, view.total ? t('layout.planRow.done', { done: view.done, total: view.total }) : '', unread ? t('layout.attention.newMessages', { count: unread }) : inside.inside && !needs ? t('layout.attention.newInTasks') : ''].filter(Boolean).join(' · ');
   const signal = { level: needs ? 'needs' : unread ? 'unread' : working ? 'working' : 'idle', unread, working, tip } as const;
   const actions = useActions();
   const { client } = useBeluga();
   const items = (): ActionItem[] => [
-    { label: 'Open Plan', icon: 'chevronRight', onSelect: () => open(plan.id) },
+    { label: t('layout.toolbarActions.openPlan'), icon: 'chevronRight', onSelect: () => open(plan.id) },
     ...triageItems(client.store.getState(), `plan:${plan.id}`, actions.run, client),
     ...(plan.status === 'active' ? [taskChatsItem(plan.id, uiPrefs)] : []),
-    { label: 'All Plans', separate: true, onSelect: () => openList(plan.projectId) },
+    { label: t('layout.planRow.allPlans'), separate: true, onSelect: () => openList(plan.projectId) },
   ];
   return (
     <ActionsContext items={items}>

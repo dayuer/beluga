@@ -12,6 +12,7 @@ import { RunCommandSheet, addressTo } from './PeerSheets.js';
 import { presetShareWith } from './ShareFolderSheet.js';
 import m from '../../components/SpecMenu.module.css';
 import p from './person.module.css';
+import { useT } from '../../i18n/index.js';
 
 interface Item {
   readonly label: string;
@@ -24,6 +25,7 @@ interface Item {
  * what you can do with them. The same actions as their room card.
  */
 export function PersonContextMenu({ index, children }: { index: number; children: ReactNode }) {
+  const t = useT();
   const [removing, setRemoving] = useState<{ name: string; guest: boolean; run: () => void }>();
   const [running, setRunning] = useState(false);
   const peer = useApp((st) => st.peers[index]);
@@ -40,9 +42,9 @@ export function PersonContextMenu({ index, children }: { index: number; children
       {running && peer ? <RunCommandSheet peer={peer} close={() => setRunning(false)} /> : null}
       {removing ? (
         <Alert
-          title={`Remove ${removing.name}?`}
-          message={removing.guest ? 'They are disconnected and lose access to everything you invited them to.' : `${removing.name} is disconnected and the room’s invite link changes, so the old one stops working.`}
-          confirm="Remove"
+          title={t('dialogs.personMenu.removeTitle', { name: removing.name })}
+          message={removing.guest ? t('dialogs.personMenu.removeGuest') : t('dialogs.personMenu.removePeer', { name: removing.name })}
+          confirm={t('dialogs.personMenu.remove')}
           onCancel={() => setRemoving(undefined)}
           onConfirm={() => {
             setRemoving(undefined);
@@ -55,6 +57,7 @@ export function PersonContextMenu({ index, children }: { index: number; children
 }
 
 function Items({ index, onRemove, onRun }: { index: number; onRemove: (r: { name: string; guest: boolean; run: () => void }) => void; onRun: () => void }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { client, ui } = useBeluga();
@@ -71,18 +74,18 @@ function Items({ index, onRemove, onRun }: { index: number; onRemove: (r: { name
   const grant = state.granted[peer.peerId];
   const items: Item[] = me
     ? [
-        { label: `Ask My ${agentName(defaultAgentOf(peer))}`, run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: true, self: true }) },
-        { label: 'Share a Folder…', run: () => pick('share-folder') },
-        { label: 'Settings…', run: () => ui.patch({ settings: 'general' }) },
+        { label: t('dialogs.personMenu.askMy', { agent: agentName(defaultAgentOf(peer)) }), run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: true, self: true }) },
+        { label: t('dialogs.personMenu.shareFolder'), run: () => pick('share-folder') },
+        { label: t('dialogs.personMenu.settings'), run: () => ui.patch({ settings: 'general' }) },
       ]
     : [
-        { label: 'Message', run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: false }) },
-        ...(peer.agent ? [{ label: `Ask ${peer.name}’s ${agentName(defaultAgentOf(peer))}`, run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: true }) }] : []),
-        ...(!guest && canRunOn(grant?.level) ? [{ label: `Run a Command on ${peer.name}’s Computer…`, run: onRun }] : []),
-        ...(guest ? [] : [{ label: state.follow === peer.peerId ? `Stop Following ${peer.name}` : `Follow ${peer.name}`, run: () => pick(state.follow === peer.peerId ? 'unfollow' : 'follow') }]),
-        ...(!guest && peer.shares[0] ? [{ label: `Browse ${peer.name}’s Files`, run: () => pick('browse') }] : []),
-        ...(guest ? [] : [{ label: 'Invite to a Workspace…', run: () => pick('person-invite-ws') }]),
-        ...(guest ? [] : [{ label: `Share a Folder with ${peer.name}…`, run: () => (presetShareWith(peer.peerId), pick('person-share')) }]),
+        { label: t('dialogs.personMenu.message'), run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: false }) },
+        ...(peer.agent ? [{ label: t('dialogs.personMenu.askTheir', { name: peer.name, agent: agentName(defaultAgentOf(peer)) }), run: () => addressTo(ui, actions, state.view, { peerId: peer.peerId, name: peer.name, claude: true }) }] : []),
+        ...(!guest && canRunOn(grant?.level) ? [{ label: t('dialogs.personMenu.runCommand', { name: peer.name }), run: onRun }] : []),
+        ...(guest ? [] : [{ label: state.follow === peer.peerId ? t('dialogs.personMenu.stopFollowing', { name: peer.name }) : t('dialogs.personMenu.follow', { name: peer.name }), run: () => pick(state.follow === peer.peerId ? 'unfollow' : 'follow') }]),
+        ...(!guest && peer.shares[0] ? [{ label: t('dialogs.personMenu.browse', { name: peer.name }), run: () => pick('browse') }] : []),
+        ...(guest ? [] : [{ label: t('dialogs.personMenu.inviteWs'), run: () => pick('person-invite-ws') }]),
+        ...(guest ? [] : [{ label: t('dialogs.personMenu.shareWith', { name: peer.name }), run: () => (presetShareWith(peer.peerId), pick('person-share')) }]),
       ];
   const trust = trustOf(state, peer.peerId);
   const friend = state.network.friends.some((f) => f.peerId === peer.peerId);
@@ -90,24 +93,24 @@ function Items({ index, onRemove, onRun }: { index: number; onRemove: (r: { name
   return (
     <>
       <Context.Item className={m.item} onSelect={() => ui.openMenu(menu)}>
-        <span className={m.label}>{me ? 'Show My Card' : `Show ${peer.name}’s Card`}</span>
+        <span className={m.label}>{me ? t('dialogs.personMenu.myCard') : t('dialogs.personMenu.theirCard', { name: peer.name })}</span>
       </Context.Item>
       <Context.Separator className={m.separator} />
       {!me && !guest ? (
         <>
           {/* Trust is set in one place, their friend card (BLG-202): here it's only said. */}
           <Context.Item className={cx(m.item, p.subTrigger)} disabled>
-            <span className={m.label}>Trust</span>
+            <span className={m.label}>{t('dialogs.personMenu.trust')}</span>
             <span className={p.subValue}>{TRUST_INFO[trust].label}</span>
           </Context.Item>
           {friend ? (
             <Context.Item className={m.item} onSelect={() => openFriendCard(client, peer.peerId)}>
-              <span className={m.label}>Change in Their Card…</span>
+              <span className={m.label}>{t('dialogs.personMenu.changeInCard')}</span>
             </Context.Item>
           ) : (
             <Context.Item className={m.item} onSelect={() => void befriend(client, peer.peerId, peer.name)}>
-              <span className={m.label}>Add as Friend</span>
-              <span className={m.hint}>Trust is set on a friend’s card</span>
+              <span className={m.label}>{t('dialogs.personMenu.addFriend')}</span>
+              <span className={m.hint}>{t('dialogs.personMenu.trustHint')}</span>
             </Context.Item>
           )}
           <Context.Separator className={m.separator} />
@@ -122,7 +125,7 @@ function Items({ index, onRemove, onRun }: { index: number; onRemove: (r: { name
         <>
           <Context.Separator className={m.separator} />
           <Context.Item className={cx(m.item, m.danger)} onSelect={() => onRemove({ name: peer.name, guest: Boolean(guest), run: () => (guest ? void api.invites.remove(peer.peerId) : pick('person-remove')) })}>
-            <span className={m.label}>Remove {peer.name}…</span>
+            <span className={m.label}>{t('dialogs.personMenu.removeMore', { name: peer.name })}</span>
           </Context.Item>
         </>
       ) : null}

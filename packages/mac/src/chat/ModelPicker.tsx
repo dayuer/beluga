@@ -12,6 +12,7 @@ import { Icon } from '../components/Icon.js';
 import type { SelectEntry } from '../components/Select.js';
 import { cx } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
+import { t as tNow, useT } from '../i18n/index.js';
 import s from './picker.module.css';
 
 type Api = ReturnType<typeof useApi>;
@@ -71,28 +72,34 @@ export function agentEntries(options: readonly AgentOption[]): SelectEntry<strin
       .filter((o) => o.group === group)
       .map((o) => {
         const name = o.model ? o.label.slice(`${o.group} · `.length) || o.label : o.group;
-        const why = o.why ?? (o.model ? undefined : o.disabled ? undefined : 'Its own default model');
+        const why = o.why ?? (o.model ? undefined : o.disabled ? undefined : tNow('chat.modelPicker.ownDefault'));
         return { value: o.value, label: name, short: o.label, icon: o.mark, keywords: [o.group], ...(why ? { description: why } : {}), ...(o.disabled ? { disabled: true } : {}) };
       }),
   }));
 }
 
-/** Effort, in plain words, with what each level means (the same five steps for every agent). */
-export const EFFORT_INFO: Record<Effort, { label: string; detail: string }> = {
-  low: { label: 'Low', detail: 'Answers fast; best for small, clear asks' },
-  medium: { label: 'Medium', detail: 'Thinks enough for most everyday work' },
-  high: { label: 'High', detail: 'Takes its time on tricky changes' },
-  xhigh: { label: 'Extra High', detail: 'Works hard problems through carefully' },
-  max: { label: 'Max', detail: 'As much thinking as it can; slowest' },
-};
+/** Effort, in plain words, with what each level means (the same five steps for every agent). Read when shown, in the language shown then. */
+export const EFFORT_INFO: Readonly<Record<Effort, { readonly label: string; readonly detail: string }>> = Object.fromEntries(
+  EFFORTS.map((e) => [
+    e,
+    {
+      get label() {
+        return tNow(`chat.modelPicker.${e}Label`);
+      },
+      get detail() {
+        return tNow(`chat.modelPicker.${e}Detail`);
+      },
+    },
+  ]),
+) as Record<Effort, { readonly label: string; readonly detail: string }>;
 
 /** A friendlier word for a model, from its name (Opus is the most capable, Haiku the fastest). */
 function flavor(value: string, label: string, runtime: string): string {
   const v = `${value} ${label}`.toLowerCase();
-  if (v.includes('opus')) return 'Most capable';
-  if (v.includes('sonnet')) return 'Fast and capable';
-  if (v.includes('haiku')) return 'Fastest';
-  return value ? '' : `${runtime} chooses`;
+  if (v.includes('opus')) return tNow('chat.modelPicker.mostCapable');
+  if (v.includes('sonnet')) return tNow('chat.modelPicker.fastCapable');
+  if (v.includes('haiku')) return tNow('chat.modelPicker.fastest');
+  return value ? '' : tNow('chat.modelPicker.chooses', { runtime });
 }
 
 export const samePicker = (a: AgentPicker, b: AgentPicker): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -128,6 +135,7 @@ interface Move {
  */
 export function ModelPicker({ channel, draft, onDraft }: { channel: string; draft?: AgentRef; onDraft?: (agent: AgentRef | undefined) => void }) {
   const api = useApi();
+  const t = useT();
   // Only what the picker shows (not the whole state): not drawn again on every streamed event (KLD-48).
   const picker = useApp((st) => agentPicker(pickerState(st), channel, myRuntime(st.prefs), draft), samePicker);
   const effort = useApp((st) => st.prefs.effort);
@@ -159,7 +167,7 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
     else if (action?.kind === 'agent' && conversation) {
       // The new agent can't read this conversation: you choose how it goes on (BLG-592).
       const live = { sessionId: 'live', ...(carried.sessionRuntime ? { sessionRuntime: carried.sessionRuntime } : {}) };
-      if (carried.live && needsHandoff(live, g.runtime)) setMove({ agent: action.agent, to: g.label, from: groups.find((x) => x.current)?.label ?? 'Your agent' });
+      if (carried.live && needsHandoff(live, g.runtime)) setMove({ agent: action.agent, to: g.label, from: groups.find((x) => x.current)?.label ?? t('chat.modelPicker.yourAgent') });
       else void api.workbench.setAgent(conversation, action.agent);
     }
   };
@@ -168,7 +176,7 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
     setMove(undefined);
   };
   const rows = (g: PickerGroup) => (
-    <div className={s.models} role="radiogroup" aria-label={`${g.label} models`}>
+    <div className={s.models} role="radiogroup" aria-label={t('chat.modelPicker.models', { name: g.label })}>
       {g.models.map((m) => {
         const maker = foreignMark(m.value, g.runtime);
         return (
@@ -198,7 +206,7 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
   return (
     <Popover.Root onOpenChange={(open) => !open && setMove(undefined)}>
       <Popover.Trigger asChild>
-        <button type="button" className={s.chip} aria-label="Agent, model and effort" title={chip} data-shrink="">
+        <button type="button" className={s.chip} aria-label={t('chat.modelPicker.chipAria')} title={chip} data-shrink="">
           <Icon name={runtimeMark(picker.runtime)} size={12} />
           <span className={s.chipText}>{words}</span>
           <Icon name="chevronDown" size={9} />
@@ -212,15 +220,15 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
             <>
               <div className={s.heading}>
                 {home ? <Icon name={runtimeMark(home.runtime)} size={12} className={s.mark} /> : null}
-                {home?.label ?? 'Model'}
-                <span className={s.scope}>{conversation ? 'for this conversation' : onDraft ? 'for this worktree' : 'for new conversations'}</span>
+                {home?.label ?? t('chat.modelPicker.model')}
+                <span className={s.scope}>{conversation ? t('chat.modelPicker.forConversation') : onDraft ? t('chat.modelPicker.forWorktree') : t('chat.modelPicker.forNew')}</span>
               </div>
               {home ? (home.available ? rows(home) : <div className={s.why}>{home.why}</div>) : null}
               {rest.length ? (
                 <>
                   <button type="button" className={s.others} aria-expanded={others} onClick={() => setOthers(!others)}>
                     <Icon name={others ? 'chevronDown' : 'chevronRight'} size={10} />
-                    Other agents
+                    {t('chat.modelPicker.otherAgents')}
                   </button>
                   {others
                     ? rest.map((g) => (
@@ -236,14 +244,14 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
                 </>
               ) : null}
               <div className={s.heading}>
-                Thinking
-                <span className={s.scope}>for every conversation</span>
+                {t('chat.modelPicker.thinking')}
+                <span className={s.scope}>{t('chat.modelPicker.forEvery')}</span>
               </div>
               <div className={s.meterRow}>
                 <button type="button" role="radio" aria-checked={!effort} className={cx(s.auto, !effort && s.autoOn)} onClick={() => void api.session.setPrefs({ effort: null })}>
-                  Auto
+                  {t('chat.modelPicker.auto')}
                 </button>
-                <div className={s.meter} role="radiogroup" aria-label="Thinking effort">
+                <div className={s.meter} role="radiogroup" aria-label={t('chat.modelPicker.effortAria')}>
                   {EFFORTS.map((e, i) => {
                     const level = effort ? EFFORTS.indexOf(effort) : -1;
                     return (
@@ -256,7 +264,7 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
                 </div>
               </div>
               <div className={s.effortDetail}>
-                <strong>{effort ? EFFORT_INFO[effort].label : 'Auto'}</strong> · {effort ? EFFORT_INFO[effort].detail : 'Your agent decides how much to think, case by case'}
+                <strong>{effort ? EFFORT_INFO[effort].label : t('chat.modelPicker.auto')}</strong> · {effort ? EFFORT_INFO[effort].detail : t('chat.modelPicker.autoDetail')}
               </div>
             </>
           )}
@@ -272,25 +280,24 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
  * handoff note first, on its own plan. An agent at its plan limit can't write one.
  */
 function MoveChoice({ move, limited, onPick, onBack }: { move: Move; limited: boolean; onPick: (mode: HandoffMode) => void; onBack: () => void }) {
+  const t = useT();
   return (
     <>
       <div className={s.heading}>
-        <button type="button" className={s.back} aria-label="Back to the models" onClick={onBack}>
+        <button type="button" className={s.back} aria-label={t('chat.modelPicker.back')} onClick={onBack}>
           <Icon name="back" size={11} />
         </button>
-        Move to {move.to}
+        {t('chat.modelPicker.moveTo', { to: move.to })}
       </div>
-      <div className={s.why}>
-        {move.to} can’t read {move.from}’s conversation, so it needs to be told where things stand.
-      </div>
-      <div className={s.models} role="group" aria-label={`How to move to ${move.to}`}>
+      <div className={s.why}>{t('chat.modelPicker.cantRead', { to: move.to, from: move.from })}</div>
+      <div className={s.models} role="group" aria-label={t('chat.modelPicker.howToMove', { to: move.to })}>
         <button type="button" className={s.model} onClick={() => onPick('quiet')} autoFocus>
           <span className={s.choiceIcon}>
             <Icon name="arrowRight" size={12} />
           </span>
           <span className={s.modelText}>
-            <span className={s.modelName}>Just switch</span>
-            <span className={s.modelDesc}>Nothing runs now. {move.to} gets the recent conversation with your next message.</span>
+            <span className={s.modelName}>{t('chat.modelPicker.justSwitch')}</span>
+            <span className={s.modelDesc}>{t('chat.modelPicker.justSwitchDetail', { to: move.to })}</span>
           </span>
         </button>
         <button type="button" className={cx(s.model, limited && s.modelOff)} disabled={limited} onClick={() => onPick('note')}>
@@ -298,8 +305,8 @@ function MoveChoice({ move, limited, onPick, onBack }: { move: Move; limited: bo
             <Icon name="pencil" size={12} />
           </span>
           <span className={s.modelText}>
-            <span className={s.modelName}>Write a handoff note first</span>
-            <span className={s.modelDesc}>{limited ? `${move.from} is at its plan limit, so it can’t write one.` : `${move.from} sums up what’s done and what’s left, using your ${move.from} plan.`}</span>
+            <span className={s.modelName}>{t('chat.modelPicker.handoff')}</span>
+            <span className={s.modelDesc}>{limited ? t('chat.modelPicker.handoffLimited', { from: move.from }) : t('chat.modelPicker.handoffDetail', { from: move.from })}</span>
           </span>
         </button>
       </div>

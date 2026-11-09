@@ -6,6 +6,7 @@ import { macViewFor, needView } from '../../../../src/companion/open-on-mac.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
 import { ASSISTANT_TITLE } from '../../../../src/shared/assistant.js';
 import { findWorkspace } from '../../../../src/ui/workspace-models.js';
+import { type Key, t } from '../i18n/index.js';
 
 /**
  * The bell's "Waiting for you" (BLG-255): everything that waits on you, from the same list the
@@ -40,11 +41,11 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
   if (!view) return undefined;
   switch (view.kind) {
     case 'room':
-      return 'Room';
+      return t('layout.waiting.room');
     case 'assistant':
       return ASSISTANT_TITLE;
     case 'requests':
-      return 'Requests';
+      return t('layout.waiting.requests');
     case 'workspace': {
       const ws = findWorkspace(state.projects, view.id);
       const project = state.projects.find((p) => p.workspaces.some((w) => w.id === view.id));
@@ -59,29 +60,29 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
         return g ? `#${g.name}` : undefined;
       }
       const f = state.network.friends.find((x) => x.peerId === id);
-      return f ? `Chat with ${f.name}` : undefined;
+      return f ? t('layout.waiting.chatWith', { name: f.name }) : undefined;
     }
     case 'tasks': {
       const name = projectName(state, view.projectId);
-      return name ? `Tasks · ${name}` : 'Tasks';
+      return name ? t('layout.waiting.tasksOf', { name }) : t('layout.waiting.tasks');
     }
     case 'task': {
       const issue = state.board.issues.find((i) => i.id === view.id);
-      return issue ? `Tasks · ${issue.key}` : 'Tasks';
+      return issue ? t('layout.waiting.tasksOf', { name: issue.key }) : t('layout.waiting.tasks');
     }
     case 'plan': {
       const plan = state.plans.plans.find((p) => p.id === view.id);
-      return plan ? `Plan · ${planTitle(plan)}` : 'Plans';
+      return plan ? t('layout.waiting.planOf', { name: planTitle(plan) }) : t('layout.waiting.plans');
     }
     case 'team_plan':
-      return `Shared plan · ${state.team.plans.find((p) => p.owner === view.owner && p.id === view.id)?.title ?? 'from a teammate'}`;
+      return t('layout.waiting.sharedPlan', { name: state.team.plans.find((p) => p.owner === view.owner && p.id === view.id)?.title ?? t('layout.waiting.fromTeammate') });
     case 'sentinel':
-      return 'Sentinel';
+      return t('layout.waiting.sentinel');
     case 'sentinel_page':
-      return state.sentinel.items.find((i) => i.id === view.id)?.name ?? 'Sentinel';
+      return state.sentinel.items.find((i) => i.id === view.id)?.name ?? t('layout.waiting.sentinel');
     case 'sentinel_run': {
       const run = state.sentinel.runs.find((r) => r.id === view.runId);
-      return state.sentinel.items.find((i) => i.id === run?.sentinelId)?.name ?? 'Sentinel';
+      return state.sentinel.items.find((i) => i.id === run?.sentinelId)?.name ?? t('layout.waiting.sentinel');
     }
     case 'project':
       return projectName(state, view.id);
@@ -91,7 +92,7 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
 }
 
 /** Requests with no page of their own still say where they're answered. */
-const PLACE_BY_ID: ReadonlyArray<readonly [RegExp, string]> = [[/^friend:/, 'Friends']];
+const PLACE_BY_ID: ReadonlyArray<readonly [RegExp, Key]> = [[/^friend:/, 'layout.waiting.friends']];
 
 /**
  * One main action and its "no" on the row (Approve · Decline, Team Up · Not Now). A question
@@ -115,7 +116,8 @@ export function waitingList(state: DomainState): readonly Waiting[] {
     .sort((a, b) => at(b) - at(a))
     .map((item) => {
       const view = waitingView(state, item);
-      const place = placeOf(state, view) ?? PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1];
+      const byId = PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1];
+      const place = placeOf(state, view) ?? (byId ? t(byId) : undefined);
       return { item, ...(view ? { view } : {}), ...(place ? { place } : {}), ...splitActions(item.actions) };
     });
 }

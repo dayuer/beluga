@@ -40,6 +40,7 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * The sidebar's top: three places, always. The rest are a click away without a row of their
@@ -96,6 +97,7 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 
 export function Sidebar() {
   const actions = useActions();
+  const t = useT();
   const drop = useFolderDrop();
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
   const { tabs, liveChats, view, badges, categories } = useApp((state) => {
@@ -120,7 +122,7 @@ export function Sidebar() {
   const files = tabs.find((t) => t.kind === 'files');
   return (
     <SidebarChatSelection>
-    <nav ref={drop.ref} className={cx(s.sidebar, drop.over && s.dropping)} aria-label="Sidebar">
+    <nav ref={drop.ref} className={cx(s.sidebar, drop.over && s.dropping)} aria-label={t('layout.sidebar.label')}>
       <div className={s.titlebar} data-tauri-drag-region>
         {/* The traffic lights' place; in a browser, which has no menu bar, the menu bar's button (Settings and the rest). */}
         {inApp() ? (
@@ -131,7 +133,7 @@ export function Sidebar() {
           </span>
         )}
         <UsageButton />
-        <IconButton icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
+        <IconButton icon="sidebar" label={t('layout.sidebar.hide')} keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
       </div>
       <SidebarSearch>
       <div className={s.scroll}>
@@ -158,8 +160,8 @@ export function Sidebar() {
           {/* Files: folders friends share with you (over the network), and the room's (BLG-205). */}
           <Row
             icon={<Icon name="folder" size={14} />}
-            label="Files"
-            detail={files?.hint ?? 'Folders friends share with you'}
+            label={t('layout.sidebar.files')}
+            detail={files?.hint ?? t('layout.sidebar.filesDetail')}
             selected={view.kind === 'files'}
             onClick={() => actions.run({ type: 'view', view: { kind: 'files' } })}
             trailing={badges.files?.count ? <Badge count={badges.files.count} /> : null}
@@ -176,11 +178,11 @@ export function Sidebar() {
 
             <Section
               id="chats"
-              title="Chats"
+              title={t('layout.sidebar.chats')}
               action={
                 <>
                   <ChatsMenu />
-                  <IconButton icon="plus" label="New chat (not tied to a project)" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />
+                  <IconButton icon="plus" label={t('layout.categories.newChat')} onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />
                 </>
               }
             >
@@ -189,12 +191,12 @@ export function Sidebar() {
               ))}
               {/* Put off till later (Remind Me Later): folded at the bottom. */}
               <LaterRows list={laterOf(later, liveChats)} indent={0} foldKey="later:chats" />
-              {liveChats.length ? null : <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label="Talk to your agent about anything" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />}
+              {liveChats.length ? null : <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label={t('layout.categories.talk')} onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />}
             </Section>
           </>
         )}
 
-        <Section id="projects" title="Projects" action={<ProjectsAddMenu />}>
+        <Section id="projects" title={t('layout.sidebar.projects')} action={<ProjectsAddMenu />}>
           <Projects />
           {/* Housekeeping for every project's worktrees: after the projects, out of the daily places above. */}
           <WorktreesNav />
@@ -227,6 +229,7 @@ export function Sidebar() {
  */
 function UsageButton() {
   const actions = useActions();
+  const t = useT();
   const week = useApp((st) => {
     const u = usageFor(st.self, myRuntime(st.prefs));
     if (u?.week) return u.week.pct;
@@ -236,12 +239,13 @@ function UsageButton() {
   const selected = useApp((st) => st.view.kind === 'usage');
   return (
     <span className={s.usage} data-level={week === undefined ? undefined : week >= 90 ? 'high' : week >= 70 ? 'mid' : 'low'}>
-      <IconButton icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
+      <IconButton icon="gauge" label={t('layout.sidebar.usage')} keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
     </span>
   );
 }
 
 function SidebarFooter() {
+  const t = useT();
   const status = useApp((st) => st.status);
   const people = useApp((st) => st.peers.length);
   const room = useApp((st) => st.room);
@@ -253,7 +257,7 @@ function SidebarFooter() {
       <RoomStatus label={label} tone={tone} />
       <PhoneMark />
       <button type="button" className={s.invite} onClick={() => document.dispatchEvent(new CustomEvent('beluga:invite'))}>
-        Invite
+        {t('layout.sidebar.invite')}
       </button>
     </div>
   );

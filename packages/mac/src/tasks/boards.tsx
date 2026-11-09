@@ -9,6 +9,7 @@ import { openSheet } from '../lib/sheets.js';
 import { PickMenu } from './PickMenu.js';
 import { useBoard, useTaskActions } from './use-tasks.js';
 import t from './tasks.module.css';
+import { t as tNow, useT } from '../i18n/index.js';
 
 /**
  * Boards and repos, many to many: a board's mark (its repos' icons, a few stacked), the repo chip a
@@ -63,9 +64,10 @@ export function useSeveralRepos(issue: { readonly board?: string; readonly proje
 
 /** The repo a task runs in, on a card or a row of a board that covers several (its name too: an icon alone is easy to miss). */
 export function RepoChip({ projectId, compact }: { projectId: string; compact?: boolean }) {
-  const name = useApp((s) => s.projects.find((p) => p.id === projectId)?.name) ?? 'Repo';
+  const tr = useT();
+  const name = useApp((s) => s.projects.find((p) => p.id === projectId)?.name) ?? tr('tasks.prop.repo');
   return (
-    <span className={cx(t.repoChip, compact && t.repoChipCompact)} title={`Runs in ${name}`}>
+    <span className={cx(t.repoChip, compact && t.repoChipCompact)} title={tr('tasks.boards.runsIn', { name })}>
       <ProjectIcon id={projectId} name={name} size={12} />
       <span className={t.repoChipName}>{name}</span>
     </span>
@@ -93,12 +95,13 @@ export function OnBoardChip({ boardId, compact }: { boardId: string; compact?: b
   const names = (id: string): string | undefined => projects.find((p) => p.id === id)?.name;
   const name = boardName(board, boardId, names);
   const stop = (e: { stopPropagation: () => void }): void => e.stopPropagation();
+  const tr = useT();
   return (
     <button
       type="button"
       className={cx(t.repoChip, t.onBoardChip, compact && t.repoChipCompact)}
-      title={`On the ${name} board: open it`}
-      aria-label={`On the ${name} board`}
+      title={tr('tasks.boards.onBoardTip', { name })}
+      aria-label={tr('tasks.boards.onBoard', { name })}
       onPointerDown={stop}
       onClick={(e) => (stop(e), openList(boardId))}
     >
@@ -115,13 +118,14 @@ export function RepoPicker({ issue, children }: { issue: { readonly id: string; 
   const { api, act } = useTaskActions();
   const repos = [...new Set([...reposOf(board, boardOf(issue)), issue.projectId])].filter((r) => projects.some((p) => p.id === r && p.root));
   const name = (id: string): string => projects.find((p) => p.id === id)?.name ?? id;
+  const tr = useT();
   return (
     <PickMenu<string>
-      label="Repo"
+      label={tr('tasks.prop.repo')}
       choices={repos.map((r) => ({ value: r, label: name(r), mark: <ProjectIcon id={r} name={name(r)} size={16} /> }))}
       chosen={[issue.projectId]}
-      onPick={(r) => void act(() => api.update(issue.id, { projectId: r }), `It runs in ${name(r)} now`)}
-      actions={[{ label: 'Repos on This Board…', icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: boardOf(issue) }) }]}
+      onPick={(r) => void act(() => api.update(issue.id, { projectId: r }), tr('tasks.boards.toast.runsIn', { name: name(r) }))}
+      actions={[{ label: tr('tasks.view.reposOnBoard'), icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: boardOf(issue) }) }]}
       align="end"
     >
       {children}
@@ -137,18 +141,16 @@ export function useDeleteBoard(): (boardId: string) => void {
   const board = useBoard();
   const { api, act, openList } = useTaskActions();
   return (boardId) => {
-    const name = board.projects[boardId]?.name ?? 'this';
+    const name = board.projects[boardId]?.name ?? tNow('tasks.boards.this');
     const tasks = board.issues.filter((i) => boardOf(i) === boardId).length;
     openSheet({
       kind: 'confirm',
-      title: `Delete the ${name} board?`,
-      message: tasks
-        ? `Its ${tasks === 1 ? 'task goes' : `${tasks} tasks go`} back to the board of the repo ${tasks === 1 ? 'it runs' : 'each runs'} in, keys kept. The repos aren’t touched.`
-        : 'Nothing is on it. The repos it covered keep their own boards.',
-      confirm: 'Delete Board',
+      title: tNow('tasks.boards.deleteTitle', { name }),
+      message: tasks ? tNow('tasks.boards.deleteMessage', { n: tasks }) : tNow('tasks.boards.deleteEmpty'),
+      confirm: tNow('tasks.boards.deleteBoard'),
       destructive: true,
       run: () =>
-        void act(() => api.removeBoard(boardId), tasks ? `The board is gone: ${tasks === 1 ? 'its task is' : `its ${tasks} tasks are`} back on their repos’ boards` : 'The board is gone').then((moved) => {
+        void act(() => api.removeBoard(boardId), tasks ? tNow('tasks.boards.toast.goneMoved', { n: tasks }) : tNow('tasks.boards.toast.gone')).then((moved) => {
           if (moved !== undefined) openList();
         }),
     });
@@ -177,23 +179,24 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
   const toggle = (id: string): void => setRepos((now) => (now.includes(id) ? now.filter((r) => r !== id) : [...now, id]));
   const count = repos.length + (own ? 0 : 1);
   const canSubmit = (own ? Boolean(name.trim()) && repos.length > 0 : true) && (!prefix || /^[A-Za-z0-9]{2,6}$/.test(prefix));
+  const tr = useT();
   return (
     <FormSheet
-      title={editing ? `${saved?.name ?? repoName ?? 'Board'} Board` : 'New Board'}
+      title={editing ? tr('tasks.boards.nameBoard', { name: saved?.name ?? repoName ?? tr('tasks.view.board') }) : tr('tasks.boards.newBoard')}
       icon="columns"
       intro={
         editing
-          ? `Tasks here run in any of the repos it covers, each in the one it’s for. Keys start with ${saved?.prefix ?? '…'}-.`
-          : 'One board for work across a few repos: each task on it runs in one of them, and Start makes its worktree there.'
+          ? tr('tasks.boards.editIntro', { prefix: saved?.prefix ?? '…' })
+          : tr('tasks.boards.newIntro')
       }
-      submitLabel={editing ? 'Save' : 'Create Board'}
+      submitLabel={editing ? tr('plans.sheets.save') : tr('tasks.boards.create')}
       canSubmit={canSubmit}
       width={520}
       onCancel={close}
       footer={
         editing && own ? (
           <Button variant="quiet" size="small" onClick={() => deleteBoard(boardId)}>
-            Delete Board…
+            {tr('tasks.view.deleteBoard')}
           </Button>
         ) : null
       }
@@ -202,19 +205,19 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
           const id = await api.createBoard({ name: name.trim(), repos: [...repos], ...(prefix ? { prefix } : {}) });
           close();
           openList(id);
-          toast(client, `${name.trim()} is ready: new tasks there run in the repo you pick`, 'success');
+          toast(client, tr('tasks.boards.toast.ready', { name: name.trim() }), 'success');
           return;
         }
         await api.editBoard(boardId, { name: name.trim(), repos: [...repos] });
         close();
-        toast(client, count > 1 ? `The board covers ${count} repos` : 'Saved', 'success');
+        toast(client, count > 1 ? tr('tasks.boards.toast.covers', { n: count }) : tr('tasks.boards.toast.saved'), 'success');
       }}
     >
-      <Field label="Name" htmlFor="board-name" {...(own ? {} : { hint: `Empty: ${repoName ?? 'the project'}’s name` })}>
-        <TextInput id="board-name" value={name} onChange={setName} maxLength={60} placeholder={own ? 'Launch' : repoName} data-autofocus />
+      <Field label={tr('tasks.boards.name')} htmlFor="board-name" {...(own ? {} : { hint: tr('tasks.boards.nameHint', { name: repoName ?? tr('tasks.boards.theProject') }) })}>
+        <TextInput id="board-name" value={name} onChange={setName} maxLength={60} placeholder={own ? tr('tasks.boards.namePlaceholder') : repoName} data-autofocus />
       </Field>
-      <Field label="Repos" hint={own ? 'Tick the repos its tasks run in.' : 'Other repos whose tasks go on this board too.'}>
-        <div className={t.repoList} role="group" aria-label="Repos">
+      <Field label={tr('tasks.view.repos')} hint={own ? tr('tasks.boards.reposHint') : tr('tasks.boards.reposHintRepo')}>
+        <div className={t.repoList} role="group" aria-label={tr('tasks.view.repos')}>
           {projects.map((p) => {
             const self = p.id === boardId && !own;
             const on = self || repos.includes(p.id);
@@ -222,14 +225,14 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
               <button key={p.id} type="button" role="checkbox" aria-checked={on} disabled={self} className={cx(t.repoRow, on && t.repoRowOn)} onClick={() => toggle(p.id)}>
                 <ProjectIcon id={p.id} name={p.name} size={18} />
                 <span className={t.repoRowName}>{p.name}</span>
-                {self ? <span className={t.repoRowNote}>Its own</span> : <Icon name={on ? 'check' : 'plus'} size={12} />}
+                {self ? <span className={t.repoRowNote}>{tr('tasks.boards.itsOwn')}</span> : <Icon name={on ? 'check' : 'plus'} size={12} />}
               </button>
             );
           })}
         </div>
       </Field>
       {editing ? null : (
-        <Field label="Keys" htmlFor="board-prefix" hint="What its task keys start with. Empty: made from the name.">
+        <Field label={tr('tasks.boards.keys')} htmlFor="board-prefix" hint={tr('tasks.boards.keysHint')}>
           <TextInput id="board-prefix" value={prefix} onChange={(v) => setPrefix(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} mono placeholder="LNCH" />
         </Field>
       )}

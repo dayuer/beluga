@@ -7,6 +7,8 @@
  * Log, which opens a folder on the server) and what the toolbar already shows for the screen in
  * front (the Conversation and Workspace menus).
  */
+import { t } from '../i18n/index.js';
+
 export interface AppMenuRow {
   /** The menu-bar id it runs; none for a submenu. */
   readonly id?: string;
@@ -20,59 +22,62 @@ export type Appearance = 'system' | 'light' | 'dark';
 
 const row = (id: string, label: string, separate?: boolean): AppMenuRow => (separate ? { id, label, separate } : { id, label });
 
-const FILE: readonly AppMenuRow[] = [
-  row('new-chat', 'New Chat'),
-  row('new-worktree', 'New Worktree…'),
-  row('add-project', 'Add Project…'),
-  row('share-folder', 'Share a Folder…', true),
-  row('invite', 'Invite…'),
-  row('add-friend', 'Add a Friend…', true),
-  row('new-group', 'New Channel…'),
-  row('onboarding', 'Onboard Again…', true),
+const file = (): readonly AppMenuRow[] => [
+  row('new-chat', t('layout.appMenu.newChat')),
+  row('new-worktree', t('layout.appMenu.newWorktree')),
+  row('add-project', t('layout.appMenu.addProject')),
+  row('share-folder', t('layout.appMenu.shareFolder'), true),
+  row('invite', t('layout.appMenu.invite')),
+  row('add-friend', t('layout.appMenu.addFriend'), true),
+  row('new-group', t('layout.appMenu.newChannel')),
+  row('onboarding', t('layout.appMenu.onboarding'), true),
 ];
 
-const APPEARANCE: readonly AppMenuRow[] = [row('appearance-system', 'Match the System'), row('appearance-light', 'Light'), row('appearance-dark', 'Dark')];
+const appearance = (): readonly AppMenuRow[] => [row('appearance-system', t('layout.appMenu.matchSystem')), row('appearance-light', t('layout.appMenu.light')), row('appearance-dark', t('layout.appMenu.dark'))];
 
-const VIEW: readonly AppMenuRow[] = [
-  row('toggle-sidebar', 'Toggle Sidebar'),
-  row('toggle-inspector', 'Toggle Panel'),
-  row('toggle-dock', 'Toggle Terminal'),
-  { label: 'Appearance', separate: true, submenu: APPEARANCE },
-  row('zoom-in', 'Bigger Text'),
-  row('zoom-out', 'Smaller Text'),
-  row('zoom-reset', 'Actual Size'),
+const view = (): readonly AppMenuRow[] => [
+  row('toggle-sidebar', t('layout.appMenu.toggleSidebar')),
+  row('toggle-inspector', t('layout.appMenu.togglePanel')),
+  row('toggle-dock', t('layout.appMenu.toggleTerminal')),
+  { label: t('layout.appMenu.appearance'), separate: true, submenu: appearance() },
+  row('zoom-in', t('layout.appMenu.zoomIn')),
+  row('zoom-out', t('layout.appMenu.zoomOut')),
+  row('zoom-reset', t('layout.appMenu.zoomReset')),
 ];
 
-const GO: readonly AppMenuRow[] = [
-  row('go-overview', 'Overview'),
-  row('go-tasks', 'Tasks'),
-  row('go-issues', 'Issues'),
-  row('go-actions', 'Actions'),
-  row('go-sentinel', 'Sentinel'),
-  row('go-dashboard', 'Dashboard'),
-  row('go-room', 'Chat'),
-  row('go-search', 'Search'),
-  row('go-usage', 'Usage'),
-  row('go-terminal', 'Terminal'),
-  row('go-files', 'Shared Files'),
-  row('ws-prev', 'Previous Workspace', true),
-  row('ws-next', 'Next Workspace'),
-  row('inbox', 'Inbox', true),
+const go = (): readonly AppMenuRow[] => [
+  row('go-overview', t('layout.appMenu.overview')),
+  row('go-tasks', t('layout.appMenu.tasks')),
+  row('go-issues', t('layout.appMenu.issues')),
+  row('go-actions', t('layout.appMenu.actions')),
+  row('go-sentinel', t('layout.appMenu.sentinel')),
+  row('go-dashboard', t('layout.appMenu.dashboard')),
+  row('go-room', t('layout.appMenu.chat')),
+  row('go-search', t('layout.appMenu.search')),
+  row('go-usage', t('layout.appMenu.usage')),
+  row('go-terminal', t('layout.appMenu.terminal')),
+  row('go-files', t('layout.appMenu.sharedFiles')),
+  row('ws-prev', t('layout.appMenu.prevWorkspace'), true),
+  row('ws-next', t('layout.appMenu.nextWorkspace')),
+  row('inbox', t('layout.appMenu.inbox'), true),
 ];
 
-/** The whole menu: Settings and the two ways to find anything, then the menu bar's menus. */
-export const APP_MENU: readonly AppMenuRow[] = [
-  row('settings', 'Settings…'),
-  row('help-keys', 'Keys and Commands'),
-  row('palette', 'Everything You Can Do…'),
-  { label: 'File', separate: true, submenu: FILE },
-  { label: 'View', submenu: VIEW },
-  { label: 'Go', submenu: GO },
-  row('help-welcome', 'Welcome to Beluga', true),
+/** The whole menu, in the language shown now: Settings and the two ways to find anything, then the menu bar's menus. */
+export const appMenu = (): readonly AppMenuRow[] => [
+  row('settings', t('layout.appMenu.settings')),
+  row('help-keys', t('layout.appMenu.helpKeys')),
+  row('palette', t('layout.appMenu.palette')),
+  { label: t('layout.appMenu.file'), separate: true, submenu: file() },
+  { label: t('layout.appMenu.view'), submenu: view() },
+  { label: t('layout.appMenu.go'), submenu: go() },
+  row('help-welcome', t('layout.appMenu.welcome'), true),
 ];
+
+/** The menu as it read at import (the tests, in English); the window builds it with `appMenu()`. */
+export const APP_MENU: readonly AppMenuRow[] = appMenu();
 
 /** Every id the menu runs (a test keeps them in step with the menu bar's). */
-export const appMenuIds = (rows: readonly AppMenuRow[] = APP_MENU): string[] => rows.flatMap((r) => (r.submenu ? appMenuIds(r.submenu) : r.id ? [r.id] : []));
+export const appMenuIds = (rows: readonly AppMenuRow[] = appMenu()): string[] => rows.flatMap((r) => (r.submenu ? appMenuIds(r.submenu) : r.id ? [r.id] : []));
 
 /** The appearance a row picks, if it's one of View › Appearance's (it shows a check when it's yours). */
 export const appearanceOf = (id: string | undefined): Appearance | undefined => {

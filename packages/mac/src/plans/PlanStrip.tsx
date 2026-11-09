@@ -11,6 +11,7 @@ import { useStartWith } from '../components/agent-options.js';
 import { SplitButton } from '../components/SplitButton.js';
 import type { AgentRef } from '@beluga/protocol.js';
 import p from './plans.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Above a conversation that plans (a plan's home): the plan, its one sentence (who it waits
@@ -26,6 +27,7 @@ export function PlanStrip({ workspaceId }: { workspaceId: string }) {
   const view = usePlanView(home ?? part?.plan);
   const { api, act, open } = usePlanActions();
   const startWith = useStartWith();
+  const t = useT();
   // An empty draft has nothing to show yet (the box below says what this mode does).
   if (home && view && (home.body || view.milestones.length)) {
     const canApprove = (view.next.kind === 'approve' && view.milestones.length > 0) || view.next.kind === 'review_changes';
@@ -38,13 +40,13 @@ export function PlanStrip({ workspaceId }: { workspaceId: string }) {
           await api.approve(home.id);
           return true;
         },
-        home.body ? 'Changes applied' : 'Plan approved: its tasks are on the board',
+        home.body ? t('plans.page.toast.applied') : t('plans.page.toast.approved'),
       ).then((ok) => {
         if (ok && !home.body) open(home.id);
       });
     return (
       <div className={p.strip}>
-        <Tip label="Open the plan">
+        <Tip label={t('plans.strip.openPlan')}>
           <button type="button" className={p.stripMain} onClick={() => open(home.id)}>
             <Icon name="flag" size={12} />
             <span className={p.stripTitle}>{planTitle(home)}</span>
@@ -56,43 +58,43 @@ export function PlanStrip({ workspaceId }: { workspaceId: string }) {
         {canApprove ? (
           <>
             {/* The plan beside this same conversation: read it, ask about it, have it changed, then approve there. */}
-            <Tip label="See the whole plan, with this conversation beside it to talk it over">
+            <Tip label={t('plans.strip.reviewTip')}>
               <Button size="small" onClick={() => open(home.id)}>
-                Review Plan
+                {t('plans.strip.review')}
               </Button>
             </Tip>
             {home.body ? (
               <Button size="small" variant="primary" onClick={() => approve()}>
-                Apply Changes
+                {t('plans.model.next.apply')}
               </Button>
             ) : review === 'reviewing' ? (
               // A fresh agent verifies the draft, as you asked (BLG-772): its findings show on the plan.
               <Button size="small" variant="primary" disabled>
-                Verifying…
+                {t('plans.strip.verifying')}
               </Button>
             ) : review === 'findings' && !home.review?.fixAsked ? (
-              <Tip label="Verifying found things to fix in the plan: see them there">
+              <Tip label={t('plans.strip.foundTip')}>
                 <Button size="small" variant="primary" icon="wand" onClick={() => open(home.id)}>
-                  See What It Found
+                  {t('plans.strip.seeFound')}
                 </Button>
               </Tip>
             ) : (
               // Approve, worked by ▸ (BLG-506): who works its milestones and tasks, set as it's approved.
               <SplitButton
-                label="More ways to approve"
+                label={t('plans.page.moreWaysToApprove')}
                 items={[
                   // Verify, Then Approve (BLG-772): a fresh agent checks it holds together first.
                   {
-                    label: 'Verify, Then Approve',
+                    label: t('plans.page.verifyThenApprove'),
                     icon: 'eye',
                     onSelect: () => undefined,
-                    submenu: startWith(home.agent, (a) => void act(async () => (await api.setWorkAgent(home.id, a ?? null), api.verify(home.id, { thenApprove: true })), 'A fresh agent is verifying the plan: it’s approved once nothing needs fixing'), ''),
+                    submenu: startWith(home.agent, (a) => void act(async () => (await api.setWorkAgent(home.id, a ?? null), api.verify(home.id, { thenApprove: true })), t('plans.page.toast.verifyingThenApprove')), ''),
                   },
-                  ...startWith(home.agent, (a) => approve(a ?? null), 'Approve, worked by').map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
+                  ...startWith(home.agent, (a) => approve(a ?? null), t('plans.page.approveWorkedBy')).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
                 ]}
               >
                 <Button size="small" variant="primary" onClick={() => approve()}>
-                  Approve Plan
+                  {t('plans.model.next.approve')}
                 </Button>
               </SplitButton>
             )}
@@ -105,7 +107,7 @@ export function PlanStrip({ workspaceId }: { workspaceId: string }) {
   const line = view ? taskHeadline(view, part.task.id) : undefined;
   return (
     <div className={p.strip}>
-      <Tip label="Open the plan">
+      <Tip label={t('plans.strip.openPlan')}>
         <button type="button" className={p.stripMain} onClick={() => open(part.plan.id)}>
           <Icon name="flag" size={12} />
           <span className={p.stripTitle}>{planTitle(part.plan)}</span>

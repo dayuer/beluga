@@ -10,6 +10,7 @@ import { countRender } from '../../lib/render-count.js';
 import { type ImageRead, imageReadOf } from './image-read.js';
 import { StepDetail } from './StepDetail.js';
 import { useStepDetail } from './use-steps.js';
+import { useT } from '../../i18n/index.js';
 import s from './steps.module.css';
 
 /**
@@ -117,6 +118,7 @@ export const StepRow = memo(function StepRow({ step: given, open, onToggle, load
   const running = step.status === 'running' && live;
   const { record, loading, gone } = useStepDetail(() => load(step.id), open && canOpen, `${step.status}:${step.durationMs ?? ''}:${step.endedAt ?? ''}`);
   const time = thinking ? undefined : durationOf(step, now, live);
+  const tr = useT();
   const shown = words ?? wordsFor(step, current);
   const picture = imageReadOf(step, shown);
   const head = (
@@ -137,7 +139,7 @@ export const StepRow = memo(function StepRow({ step: given, open, onToggle, load
   return (
     <div className={cx(s.row, open && s.rowOpen, step.status === 'error' && s.rowError, current && s.rowCurrent)} data-step={step.id} data-current={current || undefined} data-step-kind={thinking ? 'thinking' : toolFamily(step.tool)}>
       {canOpen ? (
-        <button type="button" className={s.head} aria-expanded={open} onClick={() => onToggle(step.id)} title={open ? 'Hide details' : 'Show what ran and what came back'}>
+        <button type="button" className={s.head} aria-expanded={open} onClick={() => onToggle(step.id)} title={open ? tr('chat.items.hideDetails') : tr('chat.stepRow.showWhat')}>
           {head}
         </button>
       ) : (
@@ -147,7 +149,7 @@ export const StepRow = memo(function StepRow({ step: given, open, onToggle, load
         record ? (
           <StepDetail record={record} />
         ) : (
-          <div className={cx(s.detail, s.quiet)}>{loading ? 'Loading…' : gone ? 'Beluga no longer has the details of this step.' : null}</div>
+          <div className={cx(s.detail, s.quiet)}>{loading ? tr('chat.stepRow.loading') : gone ? tr('chat.stepRow.gone') : null}</div>
         )
       ) : null}
     </div>

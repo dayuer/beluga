@@ -11,6 +11,7 @@ import { ago } from '../phone/phone-model.js';
 import p from '../phone/phone.module.css';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
+import { t, useT } from '../i18n/index.js';
 
 type WebApi = BelugaClient['api']['web'];
 type Status = Awaited<ReturnType<WebApi['sessions.list']>>;
@@ -26,9 +27,9 @@ const wayOf = (st: Status | undefined): Way => (st?.public ? 'public' : st?.tail
 
 /** What each way means, under the choice. */
 function wayDetail(way: Way, st: Status | undefined): string {
-  if (way === 'tailscale') return st?.tailscale?.login ? `Your own Tailscale login (${st.tailscale.login}) gets in without a link, on any of your devices. Others on your tailnet need one.` : 'Only your tailnet reaches it (Tailscale Serve, never Funnel). Each browser needs a link.';
-  if (way === 'public') return 'Anyone with a join link gets in, from anywhere, through a Cloudflare tunnel. The address alone shows only a page that asks for a link.';
-  return 'This computer’s browsers, or another computer through SSH: beluga connect you@this-computer. Nothing is opened to the network.';
+  if (way === 'tailscale') return st?.tailscale?.login ? t('settings.web.tailscaleLogin', { login: st.tailscale.login }) : t('settings.web.tailscale');
+  if (way === 'public') return t('settings.web.public');
+  return t('settings.web.local');
 }
 
 /**
@@ -40,6 +41,7 @@ function wayDetail(way: Way, st: Status | undefined): string {
  */
 export function WebAccessSettings() {
   const { client } = useBeluga();
+  const tr = useT();
   const [status, setStatus] = useState<Status>();
   const [ways, setWays] = useState<Ways>({});
   const [link, setLink] = useState<Link>();
@@ -89,14 +91,14 @@ export function WebAccessSettings() {
 
   const turn = (want: boolean): Promise<void> =>
     want
-      ? run('Opening…', async () => show(await client.api.web.link()))
-      : run('Closing…', async () => {
+      ? run(tr('settings.web.opening'), async () => show(await client.api.web.link()))
+      : run(tr('settings.web.closing'), async () => {
           show(undefined);
           await client.api.web.stop();
         });
 
   const choose = (next: Way): Promise<void> =>
-    run(next === 'public' ? 'Opening a public link (this can take a minute)…' : next === 'tailscale' ? 'Serving on your tailnet…' : 'Closing the other ways in…', async () => {
+    run(next === 'public' ? tr('settings.web.openingPublic') : next === 'tailscale' ? tr('settings.web.serving') : tr('settings.web.closingOthers'), async () => {
       show(undefined);
       if (way === 'tailscale' && next !== 'tailscale') await client.api.web.tailscale(false);
       if (way === 'public' && next !== 'public') await client.api.web.public(false);
@@ -105,42 +107,41 @@ export function WebAccessSettings() {
       else show(await client.api.web.link());
     });
 
-  const newLink = (): Promise<void> => run('Making a link…', async () => show(await client.api.web.link(way === 'local' ? undefined : { via: way })));
+  const newLink = (): Promise<void> => run(tr('settings.web.making'), async () => show(await client.api.web.link(way === 'local' ? undefined : { via: way })));
 
   const live = link && link.expiresAt > now ? link : undefined;
   const sessions = status?.sessions ?? [];
   const address = way === 'tailscale' ? status?.tailscale?.url : way === 'public' ? status?.public?.url : status?.url;
   const reopening = way === 'public' && status?.public && status.public.state !== 'on';
   const options = [
-    { value: 'local' as const, label: 'This computer only' },
+    { value: 'local' as const, label: tr('settings.web.localOnly') },
     ...(ways.tailscale || way === 'tailscale' ? [{ value: 'tailscale' as const, label: 'Tailscale' }] : []),
-    { value: 'public' as const, label: 'Public link' },
+    { value: 'public' as const, label: tr('settings.web.publicLink') },
   ];
-  const intro = 'The whole app in any browser: on this computer, over SSH, on your tailnet or through a public link.';
   return (
-    <Group title="Web access">
-      <Row label="Open Beluga in a browser" detail={manage ? `${intro} Each browser is let in once by its own link, and you can remove it any time.` : `${intro} Browsers are let in and removed from the Mac app, or with beluga web on the computer Beluga runs on.`}>
-        {manage ? <Switch on={on} onChange={(v) => void turn(v)} label="Open Beluga in a browser" /> : <span />}
+    <Group title={tr('settings.web.title')}>
+      <Row label={tr('settings.web.open')} detail={manage ? tr('settings.web.introManage') : tr('settings.web.introServed')}>
+        {manage ? <Switch on={on} onChange={(v) => void turn(v)} label={tr('settings.web.open')} /> : <span />}
       </Row>
       {manage && on ? (
         <>
-          <Row label="Reached from" detail={wayDetail(way, status)}>
-            <Select label="How browsers reach Beluga" value={way} options={options} disabled={!!busy} onChange={(v) => void choose(v)} />
+          <Row label={tr('settings.web.reached')} detail={wayDetail(way, status)}>
+            <Select label={tr('settings.web.how')} value={way} options={options} disabled={!!busy} onChange={(v) => void choose(v)} />
           </Row>
           {address ? (
-            <Row label="Address" detail={way === 'local' ? 'Only this computer reaches it.' : 'Without a link it shows only a page that asks for one.'}>
+            <Row label={tr('settings.web.address')} detail={way === 'local' ? tr('settings.web.addressLocal') : tr('settings.web.addressOther')}>
               <code className={s.webLink} title={address}>
                 {address}
               </code>
             </Row>
           ) : reopening ? (
-            <Row label="Address" detail="Cloudflare dropped the last one: a new address is on its way.">
+            <Row label={tr('settings.web.address')} detail={tr('settings.web.addressDropped')}>
               <span />
             </Row>
           ) : null}
-          <Row label="Let a browser in" detail="A link works once, for 10 minutes. Anyone with it can get in: send it only to yourself.">
+          <Row label={tr('settings.web.letIn')} detail={tr('settings.web.letInDetail')}>
             <Button variant={sessions.length ? 'plain' : 'primary'} icon="link" disabled={!!busy} onClick={() => void newLink()}>
-              New Link
+              {tr('settings.web.newLink')}
             </Button>
           </Row>
         </>
@@ -148,9 +149,9 @@ export function WebAccessSettings() {
       {busy ? <div className={s.webBusy}>{busy}</div> : null}
       {manage && on && live ? (
         <div className={s.webQr}>
-          <QrCode text={live.url} size={132} label="Scan to open Beluga in your phone's browser" />
+          <QrCode text={live.url} size={132} label={tr('settings.web.scan')} />
           <div className={s.webQrText}>
-            <span>Open this link in the browser, or scan it with your phone. It works once, until {new Date(live.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</span>
+            <span>{tr('settings.web.linkNote', { until: new Date(live.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })}</span>
             <span className={s.pictureRow}>
               <code className={s.webLink} title={live.url}>
                 {live.url}
@@ -165,7 +166,7 @@ export function WebAccessSettings() {
                   )
                 }
               >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? tr('settings.web.copied') : tr('settings.common.copy')}
               </Button>
             </span>
           </div>
@@ -173,9 +174,9 @@ export function WebAccessSettings() {
       ) : null}
       {error ? <div className={p.error}>{error}</div> : null}
       <div className={p.inSettings}>
-        <div className={p.devices} aria-label="Browsers let in" role="list">
+        <div className={p.devices} aria-label={tr('settings.web.browsers')} role="list">
           {sessions.length === 0 ? (
-            <div className={p.empty}>No browsers yet.</div>
+            <div className={p.empty}>{tr('settings.web.noBrowsers')}</div>
           ) : (
             sessions.map((b) => (
               <div key={b.id} className={p.device} role="listitem">
@@ -186,12 +187,12 @@ export function WebAccessSettings() {
                   <span className={p.deviceText}>
                     <span className={p.deviceName}>{b.name}</span>
                     <span className={p.dim}>
-                      Let in {ago(b.createdAt, now)} · seen {ago(b.lastSeenAt, now)}
+                      {tr('settings.web.letInSeen', { created: ago(b.createdAt, now), seen: ago(b.lastSeenAt, now) })}
                     </span>
                   </span>
                   {manage ? (
-                    <Button size="small" variant="quiet" disabled={!!busy} aria-label={`Remove ${b.name}`} onClick={() => void run('Removing…', () => client.api.web['sessions.revoke'](b.id))}>
-                      Remove
+                    <Button size="small" variant="quiet" disabled={!!busy} aria-label={tr('settings.env.removeRow', { what: b.name })} onClick={() => void run(tr('settings.web.removing'), () => client.api.web['sessions.revoke'](b.id))}>
+                      {tr('settings.common.remove')}
                     </Button>
                   ) : null}
                 </div>

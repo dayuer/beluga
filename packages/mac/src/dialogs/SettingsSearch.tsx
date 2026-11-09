@@ -3,10 +3,11 @@ import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { type SettingsPane, useApp } from '../lib/beluga.js';
 import { type PaneResults, SETTINGS_FIND_EVENT, type SettingHit, flatHits, hitAnchors, searchSettings } from '../lib/settings-search.js';
-import { PANES, SETTINGS, THREAD_LIMITS_GROUP } from './settings-index.js';
+import { type panes as settingsPanes, settingsIndex, threadLimitsGroup } from './settings-index.js';
+import { useT } from '../i18n/index.js';
 import s from './settings.module.css';
 
-type Pane = (typeof PANES)[number];
+type Pane = ReturnType<typeof settingsPanes>[number];
 type Hit = SettingHit<SettingsPane>;
 
 const LIST_ID = 'settings-search-results';
@@ -45,7 +46,11 @@ export function useSettingsSearch(panes: readonly Pane[], pane: SettingsPane, op
   const [jump, setJump] = useState<{ hit: Hit; at: number }>();
   // Thread limits show with agent threads on, in the pane and here.
   const threadsOn = useApp((st) => st.prefs.agentThreads ?? false);
-  const results = useMemo(() => searchSettings(query, threadsOn ? SETTINGS : SETTINGS.filter((e) => e.group !== THREAD_LIMITS_GROUP), panes), [query, panes, threadsOn]);
+  // The panes come again in a new language: the index is read again with them.
+  const results = useMemo(() => {
+    const all = settingsIndex();
+    return searchSettings(query, threadsOn ? all : all.filter((e) => e.group !== threadLimitsGroup()), panes);
+  }, [query, panes, threadsOn]);
   const hits = useMemo(() => flatHits(results), [results]);
   const matched = useMemo(() => new Set(results.map((r) => r.pane.id)), [results]);
 
@@ -142,6 +147,7 @@ export function revealSetting(container: HTMLElement, hit: Hit): () => void {
 /** The field at the top of Settings' sidebar: ↑/↓ move through the results, Return opens one. */
 export function SettingsSearchField({ search }: { search: SettingsSearch }) {
   const { field, query, showing, hits, active } = search;
+  const t = useT();
   return (
     <label className={s.search}>
       <Icon name="search" size={12} />
@@ -149,12 +155,12 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
         ref={field}
         type="text"
         role="combobox"
-        aria-label="Search settings"
+        aria-label={t('settings.search.field')}
         aria-autocomplete="list"
         aria-expanded={showing}
         aria-controls={LIST_ID}
         {...(showing && hits[active] ? { 'aria-activedescendant': optionId(active) } : {})}
-        placeholder="Search"
+        placeholder={t('settings.window.search')}
         spellCheck={false}
         autoComplete="off"
         value={query}
@@ -172,7 +178,7 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
         }}
       />
       {query ? (
-        <button type="button" className={s.searchClear} aria-label="Clear the search" onClick={search.clear}>
+        <button type="button" className={s.searchClear} aria-label={t('settings.search.clear')} onClick={search.clear}>
           <Icon name="x" size={10} />
         </button>
       ) : null}
@@ -189,20 +195,21 @@ export function SettingsSearchResults({ search, panes }: { search: SettingsSearc
     list.current?.querySelector(`#${optionId(active)}`)?.scrollIntoView({ block: 'nearest' });
   }, [active]);
   const count = hits.length;
+  const t = useT();
   return (
     <>
       {/* Read out as it changes: how many were found, or (shown too) that nothing matches. */}
       <div className={count ? s.srOnly : s.searchEmpty} role="status">
         {count ? (
-          `${count} ${count === 1 ? 'setting' : 'settings'} found`
+          t('settings.search.found', { count })
         ) : (
           <>
             <Icon name="search" size={18} />
-            No settings match “{query.trim()}”
+            {t('settings.search.none', { query: query.trim() })}
           </>
         )}
       </div>
-      <div ref={list} id={LIST_ID} role="listbox" aria-label="Settings found" className={s.results} hidden={!count}>
+      <div ref={list} id={LIST_ID} role="listbox" aria-label={t('settings.search.results')} className={s.results} hidden={!count}>
         {results.map((r) => {
           const icon = panes.find((p) => p.id === r.pane.id)?.icon ?? 'gear';
           const headId = `${LIST_ID}-${r.pane.id}`;

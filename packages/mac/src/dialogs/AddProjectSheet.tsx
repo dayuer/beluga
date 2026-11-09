@@ -11,6 +11,7 @@ import { useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { pickFolders } from '../lib/projects.js';
 import s from './add-project.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { t, useT } from '../i18n/index.js';
 
 interface Found {
   readonly path: string;
@@ -20,10 +21,10 @@ interface Found {
 
 const ago = (ts: number): string => {
   const d = Math.max(0, (Date.now() - ts) / 1000);
-  if (d < 3600) return 'just now';
-  if (d < 86_400) return `${Math.floor(d / 3600)}h ago`;
-  if (d < 86_400 * 30) return `${Math.floor(d / 86_400)}d ago`;
-  return `${Math.floor(d / (86_400 * 30))}mo ago`;
+  if (d < 3600) return t('dialogs.add.justNow');
+  if (d < 86_400) return t('dialogs.add.hoursAgo', { n: Math.floor(d / 3600) });
+  if (d < 86_400 * 30) return t('dialogs.add.daysAgo', { n: Math.floor(d / 86_400) });
+  return t('dialogs.add.monthsAgo', { n: Math.floor(d / (86_400 * 30)) });
 };
 
 type Mode = 'add' | 'new';
@@ -39,6 +40,7 @@ const NEWEST = 24;
  * git projects already on this Mac (most recently worked on first). Or start a new one.
  */
 export function AddProjectSheet() {
+  const t = useT();
   const { ui } = useBeluga();
   const api = useApi();
   const asked = useUi((u) => u.addProject ?? false);
@@ -127,7 +129,7 @@ export function AddProjectSheet() {
   }, [found, filter, roots, rows, hiddenSet, revealed]);
 
   const choose = async (): Promise<void> => {
-    const picked = await pickFolders('Add projects');
+    const picked = await pickFolders(t('dialogs.add.chooseTitle'));
     if (picked) await add(picked);
   };
 
@@ -138,20 +140,20 @@ export function AddProjectSheet() {
         <Dialog.Overlay className={s.overlay} />
         <Dialog.Content className={s.sheet} aria-describedby={undefined} onOpenAutoFocus={(e) => (e.preventDefault(), mode === 'add' && filterBox.current?.focus())}>
           <div className={s.head}>
-            <Dialog.Title className={s.title}>{mode === 'new' ? 'New project' : 'Add projects'}</Dialog.Title>
-            <Dialog.Close className={s.close} aria-label="Close">
+            <Dialog.Title className={s.title}>{mode === 'new' ? t('dialogs.add.newTitle') : t('dialogs.add.addTitle')}</Dialog.Title>
+            <Dialog.Close className={s.close} aria-label={t('dialogs.add.close')}>
               <Icon name="x" size={11} />
             </Dialog.Close>
           </div>
 
           <div className={s.modes}>
             <Segmented<Mode>
-              label="Add or start a project"
+              label={t('dialogs.add.mode')}
               value={mode}
               onChange={setMode}
               options={[
-                { value: 'add', label: 'Add existing', icon: 'folder' },
-                { value: 'new', label: 'Start new', icon: 'plus' },
+                { value: 'add', label: t('dialogs.add.existing'), icon: 'folder' },
+                { value: 'new', label: t('dialogs.add.startNew'), icon: 'plus' },
               ]}
             />
           </div>
@@ -167,31 +169,31 @@ export function AddProjectSheet() {
               >
                 <Icon name="folder" size={22} />
                 <div className={s.dropText}>
-                  <strong>{webServed() ? 'Choose a project folder where Beluga runs' : 'Drop project folders here'}</strong>
-                  <span>A git project, or a folder full of them (new ones in it show up too).</span>
+                  <strong>{webServed() ? t('dialogs.add.chooseWeb') : t('dialogs.add.drop')}</strong>
+                  <span>{t('dialogs.add.dropDetail')}</span>
                 </div>
                 {canPickFolders() ? (
                   <Button variant="primary" onClick={() => void choose()}>
-                    Choose Folders…
+                    {t('dialogs.add.chooseFolders')}
                   </Button>
                 ) : null}
               </div>
 
               <div className={s.listHead}>
-                <span>On {thisComputer()}</span>
-                <input ref={filterBox} className={s.filter} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter" aria-label={`Filter projects on ${thisComputer()}`} />
+                <span>{t('dialogs.add.on', { computer: thisComputer() })}</span>
+                <input ref={filterBox} className={s.filter} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('dialogs.add.filter')} aria-label={t('dialogs.add.filterOn', { computer: thisComputer() })} />
               </div>
               <div className={s.list} role="list">
                 {found === undefined ? (
-                  <div className={s.note}>Looking in your code folders…</div>
+                  <div className={s.note}>{t('dialogs.add.looking')}</div>
                 ) : shown.length === 0 ? (
-                  <div className={s.note}>{filter ? `Nothing called “${filter}”.` : 'No other git projects in ~/Projects, ~/Developer, ~/code and the like.'}</div>
+                  <div className={s.note}>{filter ? t('dialogs.add.nothingCalled', { filter }) : t('dialogs.add.noOther')}</div>
                 ) : (
                   shown.map((f) => {
                     const row = rows.get(f.path);
                     const done = row?.kind === 'added' || revealed.has(f.path);
                     const wasHidden = hiddenSet.has(f.path) || revealed.has(f.path);
-                    const when = wasHidden ? 'hidden' : f.changed ? ago(f.changed) : undefined;
+                    const when = wasHidden ? t('dialogs.add.hidden') : f.changed ? ago(f.changed) : undefined;
                     return (
                       <div key={f.path} className={s.item} role="listitem" onDoubleClick={() => !done && !row && void (wasHidden ? show(f.path) : add([f.path]))}>
                         <ProjectIcon id={`path:${f.path}`} name={f.name} size={26} />
@@ -210,23 +212,23 @@ export function AddProjectSheet() {
                         </span>
                         {row?.kind === 'adding' ? (
                           <span className={s.adding}>
-                            <DotMatrix size={12} /> {row.init ? 'Setting up git…' : 'Adding…'}
+                            <DotMatrix size={12} /> {row.init ? t('dialogs.add.settingUp') : t('dialogs.add.adding')}
                           </span>
                         ) : done ? (
                           <span className={s.added}>
-                            <Icon name="check" size={12} /> {wasHidden ? 'Showing' : 'Added'}
+                            <Icon name="check" size={12} /> {wasHidden ? t('dialogs.add.showing') : t('dialogs.add.added')}
                           </span>
                         ) : wasHidden ? (
-                          <Button size="small" onClick={() => void show(f.path)} aria-label={`Show ${f.name}`}>
-                            Show
+                          <Button size="small" onClick={() => void show(f.path)} aria-label={t('dialogs.add.showName', { name: f.name })}>
+                            {t('dialogs.add.show')}
                           </Button>
                         ) : row?.kind === 'failed' && row.canInit ? (
-                          <Button size="small" onClick={() => void initGit(f.path)} aria-label={`Set up git in ${f.name}`}>
-                            Set Up Git
+                          <Button size="small" onClick={() => void initGit(f.path)} aria-label={t('dialogs.add.setUpGitIn', { name: f.name })}>
+                            {t('dialogs.add.setUpGit')}
                           </Button>
                         ) : (
                           <Button size="small" onClick={() => void add([f.path])}>
-                            {row?.kind === 'failed' ? 'Try Again' : 'Add'}
+                            {row?.kind === 'failed' ? t('dialogs.add.tryAgain') : t('dialogs.add.add')}
                           </Button>
                         )}
                       </div>
@@ -244,13 +246,13 @@ export function AddProjectSheet() {
                   setTyped('');
                 }}
               >
-                <input className={s.path} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Or type a path, like ~/code/app" aria-label="Folder path" spellCheck={false} />
+                <input className={s.path} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('dialogs.add.typePath')} aria-label={t('dialogs.add.folderPath')} spellCheck={false} />
                 <Button size="small" type="submit" disabled={!typed.trim()}>
-                  Add
+                  {t('dialogs.add.add')}
                 </Button>
                 <span className={s.flex} />
                 <Button variant={rows.size || revealed.size ? 'primary' : 'quiet'} onClick={close}>
-                  {rows.size || revealed.size ? 'Done' : 'Cancel'}
+                  {rows.size || revealed.size ? t('dialogs.add.done') : t('dialogs.add.cancel')}
                 </Button>
               </form>
             </>
@@ -265,6 +267,7 @@ const errorText = (err: unknown): string => (err instanceof Error ? err.message 
 
 /** Start new: a name and where it goes; Beluga makes the folder, git and a first commit, then opens a worktree draft in it. */
 function NewProject({ onDone }: { onDone: () => void }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const home = useApp((st) => st.home);
@@ -284,7 +287,7 @@ function NewProject({ onDone }: { onDone: () => void }) {
   }, []);
 
   const change = async (): Promise<void> => {
-    const picked = await pickFolders('Where the new project goes');
+    const picked = await pickFolders(t('dialogs.add.whereTitle'));
     if (picked?.[0]) setParent(picked[0]);
   };
 
@@ -313,36 +316,36 @@ function NewProject({ onDone }: { onDone: () => void }) {
       }}
     >
       <label className={s.field}>
-        <span>Name</span>
-        <input ref={nameBox} className={s.nameInput} value={name} onChange={(e) => (setName(e.target.value), setError(undefined))} placeholder="my-app" aria-label="Project name" spellCheck={false} autoComplete="off" />
+        <span>{t('dialogs.add.name')}</span>
+        <input ref={nameBox} className={s.nameInput} value={name} onChange={(e) => (setName(e.target.value), setError(undefined))} placeholder="my-app" aria-label={t('dialogs.add.projectName')} spellCheck={false} autoComplete="off" />
       </label>
       <div className={s.field}>
-        <span>In</span>
+        <span>{t('dialogs.add.in')}</span>
         <div className={s.whereRow}>
           {canPickFolders() ? (
             <>
               <span className={s.whereText}>
-                <Icon name="folder" size={13} /> {parent ? short(parent) : 'Your code folder'}
+                <Icon name="folder" size={13} /> {parent ? short(parent) : t('dialogs.add.codeFolder')}
               </span>
               <Button size="small" onClick={() => void change()}>
-                Change…
+                {t('dialogs.add.change')}
               </Button>
             </>
           ) : (
-            <input className={s.path} value={parent ? short(parent) : ''} onChange={(e) => setParent(e.target.value)} aria-label="Where the new project goes" spellCheck={false} />
+            <input className={s.path} value={parent ? short(parent) : ''} onChange={(e) => setParent(e.target.value)} aria-label={t('dialogs.add.whereTitle')} spellCheck={false} />
           )}
         </div>
       </div>
       <p className={error ? s.newError : s.newNote} role={error ? 'alert' : undefined}>
-        {error ?? (where ? `Makes ${where} with git and a first commit, ready for worktrees.` : 'Makes the folder with git and a first commit, ready for worktrees.')}
+        {error ?? (where ? t('dialogs.add.makes', { where }) : t('dialogs.add.makesFolder'))}
       </p>
       <div className={s.pathRow}>
         <span className={s.flex} />
         <Button variant="quiet" onClick={onDone}>
-          Cancel
+          {t('dialogs.add.cancel')}
         </Button>
         <Button variant="primary" type="submit" disabled={!name.trim() || busy}>
-          {busy ? 'Creating…' : 'Create Project'}
+          {busy ? t('dialogs.add.creating') : t('dialogs.add.create')}
         </Button>
       </div>
     </form>

@@ -11,6 +11,7 @@ import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { chordLabel, keyPlatform } from '../lib/shortcuts-model.js';
 import { microphoneSettings, osName, systemSettingsName, thisComputer, yourComputer } from '../lib/os-words.js';
+import { useT } from '../i18n/index.js';
 
 /**
  * Settings › Voice (BLG-146): speaking instead of typing. The microphone it listens to (BLG-766),
@@ -20,6 +21,7 @@ import { microphoneSettings, osName, systemSettingsName, thisComputer, yourCompu
 export function VoiceSettings() {
   const api = useApi();
   const prefs = usePrefs();
+  const tr = useT();
   const [models, setModels] = useState<VoiceMacView | undefined>();
   const [recording, setRecording] = useState(false);
   const [bad, setBad] = useState<string | undefined>();
@@ -58,7 +60,7 @@ export function VoiceSettings() {
       if (e.key === 'Escape') return setRecording(false);
       const accel = accelOf(e);
       if (!accel) return;
-      if (!parseAccel(accel)) return setBad(`${accelLabel(accel)} would type: add ${keyPlatform() === 'mac' ? '⌘, ⌃ or ⌥' : 'Ctrl or Alt'}`);
+      if (!parseAccel(accel)) return setBad(tr('settings.voice.wouldType', { keys: accelLabel(accel), mods: keyPlatform() === 'mac' ? tr('settings.voice.modsMac') : tr('settings.voice.modsOther') }));
       setBad(undefined);
       setPrefs({ voiceShortcut: accel });
       setRecording(false);
@@ -67,37 +69,37 @@ export function VoiceSettings() {
     return () => window.removeEventListener('keydown', down, true);
   }, [recording]);
 
-  const label = (id: 'whisper-turbo' | 'parakeet'): string => (id === 'parakeet' ? 'Parakeet: fastest' : 'Whisper Turbo: every language');
+  const label = (id: 'whisper-turbo' | 'parakeet'): string => (id === 'parakeet' ? tr('settings.voice.parakeet') : tr('settings.voice.whisper'));
   const keys = prefs.voiceShortcut ? accelLabel(prefs.voiceShortcut) : undefined;
   return (
     <>
-      <Group title="Writing it down">
+      <Group title={tr('settings.voice.writing')}>
         <MicrophoneRow mics={mics} />
         <Row
-          label="Model"
+          label={tr('settings.voice.model')}
           detail={
             prefs.voiceModel === 'suggested'
-              ? `Suggested for ${prefs.voiceLanguage === 'en' ? 'English' : 'your language'}: ${VOICE_MODELS[suggested].label}. ${suggested === 'parakeet' ? 'As exact as Whisper in English, and faster.' : 'Knows every language, Turkish too, and tells which you speak.'}`
+              ? tr('settings.voice.suggestedFor', { lang: prefs.voiceLanguage === 'en' ? tr('settings.voice.english') : tr('settings.voice.yourLanguage'), model: VOICE_MODELS[suggested].label, why: suggested === 'parakeet' ? tr('settings.voice.whyParakeet') : tr('settings.voice.whyWhisper') })
               : using !== prefs.voiceModel
-                ? `Parakeet doesn’t know that language: Whisper Turbo writes it instead.`
+                ? tr('settings.voice.notKnown')
                 : using === 'parakeet'
-                  ? 'English and 24 European languages (no Turkish). The fastest.'
-                  : 'Every language. A moment slower than Parakeet.'
+                  ? tr('settings.voice.parakeetDetail')
+                  : tr('settings.voice.whisperDetail')
           }
         >
           <Select
-            label="Model"
+            label={tr('settings.voice.model')}
             value={prefs.voiceModel}
             onChange={(v) => setPrefs({ voiceModel: v })}
             options={[
-              { value: 'suggested', label: `Suggested (${VOICE_MODELS[suggested].label})` },
+              { value: 'suggested', label: tr('settings.voice.suggested', { model: VOICE_MODELS[suggested].label }) },
               { value: 'whisper-turbo', label: label('whisper-turbo') },
               { value: 'parakeet', label: label('parakeet') },
             ]}
           />
         </Row>
-        <Row label="Language" detail={prefs.voiceLanguage === 'auto' ? 'The model tells which you speak.' : 'Only this one: a little more exact.'}>
-          <Select label="Language" value={prefs.voiceLanguage} onChange={(v) => setPrefs({ voiceLanguage: v })} options={VOICE_LANGUAGES.map((l) => ({ value: l.code, label: l.label }))} />
+        <Row label={tr('settings.voice.language')} detail={prefs.voiceLanguage === 'auto' ? tr('settings.voice.languageAuto') : tr('settings.voice.languageOne')}>
+          <Select label={tr('settings.voice.language')} value={prefs.voiceLanguage} onChange={(v) => setPrefs({ voiceLanguage: v })} options={VOICE_LANGUAGES.map((l) => ({ value: l.code, label: l.label }))} />
         </Row>
         {(models?.models ?? []).map((m) => (
           <Row
@@ -105,41 +107,41 @@ export function VoiceSettings() {
             label={VOICE_MODELS[m.model].label}
             detail={
               m.ready
-                ? `On ${thisComputer()} · ${voiceSize(m.bytes)}${m.model === using ? ' · in use' : ''}`
+                ? tr('settings.voice.onComputer', { computer: thisComputer(), size: voiceSize(m.bytes), inUse: m.model === using ? tr('settings.voice.inUse') : '' })
                 : m.progress !== undefined
-                  ? `Getting it · ${Math.round(m.progress * 100)}% of ${voiceSize(m.bytes)}`
-                  : (m.error ?? `${voiceSize(m.bytes)}, once. It comes by itself the first time you speak${m.model === using ? '' : ' with it'}.`)
+                  ? tr('settings.voice.getting', { pct: Math.round(m.progress * 100), size: voiceSize(m.bytes) })
+                  : (m.error ?? tr('settings.voice.once', { size: voiceSize(m.bytes), withIt: m.model === using ? '' : tr('settings.voice.withIt') }))
             }
           >
             {m.ready ? null : m.progress !== undefined ? null : (
               <Button disabled={!voiceKnows(m.model, prefs.voiceLanguage) && m.model === 'parakeet'} onClick={() => void api.voice.prepare(m.model).then((v) => setModels(v as VoiceMacView), () => undefined)}>
-                Get Now
+                {tr('settings.voice.getNow')}
               </Button>
             )}
           </Row>
         ))}
       </Group>
 
-      <Group title="Talk shortcut">
+      <Group title={tr('settings.voice.talk')}>
         <Row
-          label="Shortcut"
+          label={tr('settings.voice.shortcut')}
           detail={
             bad ??
             (recording ? (
-              'Press the keys you want (esc to stop)'
+              tr('settings.voice.pressWanted')
             ) : keys ? (
               <>
-                Hold <Kbd>{keys}</Kbd> and talk, let go to write it in. Or tap it, talk, and press <Kbd>↩</Kbd>. <Kbd>esc</Kbd> throws it away.
+                {tr('settings.voice.holdA')}<Kbd>{keys}</Kbd>{tr('settings.voice.holdB')}<Kbd>↩</Kbd>{tr('settings.voice.holdC')}<Kbd>esc</Kbd>{tr('settings.voice.holdD')}
               </>
             ) : (
-              'None: use the microphone beside Send.'
+              tr('settings.voice.none')
             ))
           }
         >
-          <Button onClick={() => (setBad(undefined), setRecording((r) => !r))}>{recording ? 'Press Keys…' : (keys ?? 'Set…')}</Button>
+          <Button onClick={() => (setBad(undefined), setRecording((r) => !r))}>{recording ? tr('settings.voice.pressKeys') : (keys ?? tr('settings.voice.set'))}</Button>
           {prefs.voiceShortcut && !recording ? (
             <Button variant="quiet" onClick={() => setPrefs({ voiceShortcut: '' })}>
-              Clear
+              {tr('settings.voice.clear')}
             </Button>
           ) : null}
           {!prefs.voiceShortcut && !recording ? (
@@ -149,15 +151,15 @@ export function VoiceSettings() {
           ) : null}
         </Row>
         {inApp() ? (
-          <Row label="From any app" detail="The shortcut brings Beluga forward and listens, wherever you are. It writes into the chat you were last in.">
-            <Switch label="From any app" on={prefs.voiceAnyApp} onChange={(v) => setPrefs({ voiceAnyApp: v })} />
+          <Row label={tr('settings.voice.anyApp')} detail={tr('settings.voice.anyAppDetail')}>
+            <Switch label={tr('settings.voice.anyApp')} on={prefs.voiceAnyApp} onChange={(v) => setPrefs({ voiceAnyApp: v })} />
           </Row>
         ) : null}
-        <Row label="Send right away" detail={prefs.voiceSend ? 'Written down, it’s sent. Your words don’t wait in the box.' : `Written down, it waits in the box to read over. ${chordLabel('Cmd+Enter')} sends it at once.`}>
-          <Switch label="Send right away" on={prefs.voiceSend} onChange={(v) => setPrefs({ voiceSend: v })} />
+        <Row label={tr('settings.voice.sendNow')} detail={prefs.voiceSend ? tr('settings.voice.sendOn') : tr('settings.voice.sendOff', { keys: chordLabel('Cmd+Enter') })}>
+          <Switch label={tr('settings.voice.sendNow')} on={prefs.voiceSend} onChange={(v) => setPrefs({ voiceSend: v })} />
         </Row>
       </Group>
-      <p className={s.note}>What you say is written down on {thisComputer()}, on its GPU, and the recording is deleted at once. Nothing leaves {yourComputer()}. Your phone uses the same models when it’s set to On your Mac.</p>
+      <p className={s.note}>{tr('settings.voice.note', { here: thisComputer(), yours: yourComputer() })}</p>
     </>
   );
 }
@@ -175,6 +177,7 @@ interface Microphones {
 function useMicrophones(): Microphones {
   const [all, setAll] = useState<readonly MediaDeviceInfo[]>([]);
   const [error, setError] = useState<string | undefined>();
+  const tr = useT();
   const load = (): Promise<void> =>
     (navigator.mediaDevices?.enumerateDevices() ?? Promise.resolve([])).then(
       (d) => setAll(d),
@@ -192,7 +195,7 @@ function useMicrophones(): Microphones {
       setError(undefined);
     } catch (e) {
       const denied = e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-      setError(denied ? `Beluga can’t use the microphone: allow it in ${microphoneSettings()}` : 'Couldn’t list the microphones');
+      setError(denied ? tr('settings.voice.micDenied', { where: microphoneSettings() }) : tr('settings.voice.micCantList'));
     }
     await load();
   };
@@ -204,27 +207,28 @@ function useMicrophones(): Microphones {
 function MicrophoneRow({ mics }: { readonly mics: Microphones }) {
   const prefs = usePrefs();
   const picked = prefs.voiceMic;
+  const tr = useT();
   const gone = Boolean(picked) && mics.named && !mics.list.some((m) => m.id === picked);
   const detail =
     mics.error ??
     (!mics.named
-      ? `Show them by name to pick one. Until then, it listens to the one ${osName()} uses.`
+      ? tr('settings.voice.micUnnamed', { os: osName() })
       : gone
-        ? `The one you picked isn’t plugged in: it listens to the one ${osName()} uses until it’s back.`
+        ? tr('settings.voice.micGone', { os: osName() })
         : picked
-          ? 'Dictation listens to this one. Calls pick their own, beside Mute.'
-          : `The one set in ${systemSettingsName()} › Sound. Calls pick their own, beside Mute.`);
+          ? tr('settings.voice.micPicked')
+          : tr('settings.voice.micSystem', { settings: systemSettingsName() }));
   return (
-    <Row label="Microphone" detail={detail}>
+    <Row label={tr('settings.voice.mic')} detail={detail}>
       {mics.named ? (
         <Select
-          label="Microphone"
+          label={tr('settings.voice.mic')}
           value={gone ? '' : picked}
           onChange={(v) => setPrefs({ voiceMic: v })}
-          options={[{ value: '', label: `Same as ${osName()}` }, ...mics.list.map((m) => ({ value: m.id, label: m.label }))]}
+          options={[{ value: '', label: tr('settings.voice.sameAs', { os: osName() }) }, ...mics.list.map((m) => ({ value: m.id, label: m.label }))]}
         />
       ) : (
-        <Button onClick={() => void mics.reveal()}>Show Microphones</Button>
+        <Button onClick={() => void mics.reveal()}>{tr('settings.voice.showMics')}</Button>
       )}
     </Row>
   );

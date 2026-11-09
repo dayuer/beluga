@@ -10,6 +10,7 @@ import { type CheckTone, reviewMerge } from '../../lib/merge-review.js';
 import { askBeforeWork } from '../../lib/work-confirm.js';
 import { timeAgo } from '../../views/history/history-model.js';
 import s from './merge-review.module.css';
+import { useT } from '../../i18n/index.js';
 
 /**
  * Merge, the careful way: before anything changes, where it goes (this branch → main, in your
@@ -18,7 +19,6 @@ import s from './merge-review.module.css';
  */
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 const SHOWN_COMMITS = 5;
 
 const TONE_ICON: Record<CheckTone, IconName> = { ok: 'check', info: 'info', block: 'alert' };
@@ -42,11 +42,12 @@ function usePreview(wsId: string): { preview?: MergePreview; error?: string } {
 }
 
 function Flow({ preview, home }: { preview: MergePreview; home: string }) {
+  const t = useT();
   const folder = home && preview.folder.startsWith(home) ? `~${preview.folder.slice(home.length)}` : preview.folder;
   return (
-    <div className={s.flow} aria-label={`From ${preview.from} into ${preview.into}`}>
+    <div className={s.flow} aria-label={t('dialogs.merge.flow', { from: preview.from, into: preview.into })}>
       <div className={s.end}>
-        <span className={s.endLabel}>From this worktree</span>
+        <span className={s.endLabel}>{t('dialogs.merge.fromWorktree')}</span>
         <span className={s.branch} title={preview.from}>
           <Icon name="branch" size={12} />
           <span className={s.branchName}>{preview.from}</span>
@@ -56,8 +57,8 @@ function Flow({ preview, home }: { preview: MergePreview; home: string }) {
         <Icon name="arrowRight" size={14} />
       </span>
       <div className={s.end}>
-        <span className={s.endLabel}>Into your main folder</span>
-        <span className={cx(s.branch, s.target)} title={`${preview.into} in ${folder}`}>
+        <span className={s.endLabel}>{t('dialogs.merge.intoMain')}</span>
+        <span className={cx(s.branch, s.target)} title={t('dialogs.merge.inFolder', { into: preview.into, folder })}>
           <Icon name="branch" size={12} />
           <span className={s.branchName}>{preview.into}</span>
         </span>
@@ -70,16 +71,17 @@ function Flow({ preview, home }: { preview: MergePreview; home: string }) {
 }
 
 function Commits({ preview }: { preview: MergePreview }) {
+  const t = useT();
   if (!preview.commitCount) return null;
   const more = preview.commitCount - Math.min(preview.commits.length, SHOWN_COMMITS);
   return (
-    <section className={s.section} aria-label="What merges">
+    <section className={s.section} aria-label={t('dialogs.merge.what')}>
       <div className={s.summary}>
-        <strong>{plural(preview.commitCount, 'commit')}</strong>
+        <strong>{t('dialogs.n.commit', { n: preview.commitCount })}</strong>
         {preview.files ? (
           <>
             <span className={s.dot}>·</span>
-            {plural(preview.files, 'file')}
+            {t('dialogs.n.file', { n: preview.files })}
             <span className={s.added}>+{preview.insertions.toLocaleString()}</span>
             <span className={s.removed}>−{preview.deletions.toLocaleString()}</span>
           </>
@@ -93,12 +95,13 @@ function Commits({ preview }: { preview: MergePreview }) {
           </li>
         ))}
       </ul>
-      {more > 0 ? <div className={s.more}>and {plural(more, 'earlier commit')}</div> : null}
+      {more > 0 ? <div className={s.more}>{t('dialogs.merge.earlier', { n: more })}</div> : null}
     </section>
   );
 }
 
 function Body({ ws, close, children }: { ws: Workspace; close: () => void; children: (title: ReactNode, body: ReactNode, buttons: ReactNode) => ReactNode }) {
+  const t = useT();
   const api = useApi();
   const home = useApp((st) => st.home);
   const { preview, error } = usePreview(ws.id);
@@ -114,38 +117,38 @@ function Body({ ws, close, children }: { ws: Workspace; close: () => void; child
     else void api.workspaces.askClaudeToMerge(ws.id);
   };
   const into = preview?.into ?? 'main';
-  const title = `Merge into ${into}`;
+  const title = t('dialogs.merge.title', { into });
   const body = error ? (
-    <p className={s.error}>Couldn’t look at this branch: {error}</p>
+    <p className={s.error}>{t('dialogs.merge.couldnt', { error })}</p>
   ) : !preview || !review ? (
-    <p className={s.loading}>Checking what would merge…</p>
+    <p className={s.loading}>{t('dialogs.merge.checking')}</p>
   ) : (
     <>
       <Flow preview={preview} home={home} />
       <Commits preview={preview} />
-      <ul className={s.checks} aria-label="Checks">
+      <ul className={s.checks} aria-label={t('dialogs.merge.checks')}>
         {review.checks.map((c) => (
           <li key={c.id} className={cx(s.check, s[c.tone])} data-check={c.id} data-tone={c.tone}>
             <Icon name={TONE_ICON[c.tone]} size={13} className={s.checkIcon} />
             <span className={s.checkText}>{c.text}</span>
             {c.fix ? (
               <Button size="small" onClick={() => fix(c.fix!)}>
-                {c.fix === 'commit' ? 'Commit…' : 'Ask Your Agent…'}
+                {c.fix === 'commit' ? t('dialogs.merge.commit') : t('dialogs.merge.askAgent')}
               </Button>
             ) : null}
           </li>
         ))}
       </ul>
-      <p className={s.note}>A merge commit is made in your main folder, so its files change. Nothing is pushed.</p>
+      <p className={s.note}>{t('dialogs.merge.note')}</p>
     </>
   );
   const buttons = (
     <div className={s.buttons}>
       <Button size="small" onClick={close}>
-        Cancel
+        {t('dialogs.merge.cancel')}
       </Button>
       <Button size="small" variant="merge" icon="merge" disabled={!review?.canMerge} onClick={go} data-merge-confirm>
-        {review?.confirm ?? 'Merge'}
+        {review?.confirm ?? t('dialogs.merge.merge')}
       </Button>
     </div>
   );
@@ -153,6 +156,7 @@ function Body({ ws, close, children }: { ws: Workspace; close: () => void; child
 }
 
 export function MergeReview({ ws, anchor, close }: { ws: Workspace; anchor: HTMLElement | null; close: () => void }) {
+  const t = useT();
   const head = (title: ReactNode, Title: typeof Dialog.Title | typeof Popover.Title) => (
     <div className={s.head}>
       <span className={s.icon} aria-hidden="true">
@@ -191,7 +195,7 @@ export function MergeReview({ ws, anchor, close }: { ws: Workspace; anchor: HTML
           align="end"
           sideOffset={6}
           collisionPadding={12}
-          aria-label="Merge"
+          aria-label={t('dialogs.merge.merge')}
           // Its own button pressed again closes it (see askBeforeWork), instead of closing and reopening.
           onPointerDownOutside={(e) => (anchor.contains(e.target as Node) ? e.preventDefault() : undefined)}
         >

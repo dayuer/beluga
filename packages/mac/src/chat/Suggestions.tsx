@@ -4,6 +4,7 @@ import { type IssueStatus, STATUS_INFO } from '@beluga/core/board/model.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { StatusIcon } from '../tasks/marks.js';
+import { t } from '../i18n/index.js';
 import s from './composer.module.css';
 
 /** Suggestions listed under / and @ at most (Beluga's commands and every one of Claude's skills). */
@@ -25,9 +26,9 @@ const KIND_ICON: Record<SuggestionKind, IconName> = {
 
 /** A section's heading above its first row: Claude's skills, tasks, other projects' tasks. */
 export function sectionOf(sug: Suggestion, prev: Suggestion | undefined): string | undefined {
-  if (sug.task?.elsewhere && !prev?.task?.elsewhere) return 'In other projects, not this one';
-  if (sug.task && !sug.task.elsewhere && !prev?.task) return 'Tasks';
-  if (sug.kind === 'skill' && prev?.kind !== 'skill') return 'Your agent’s skills and commands';
+  if (sug.task?.elsewhere && !prev?.task?.elsewhere) return t('chat.suggestions.elsewhere');
+  if (sug.task && !sug.task.elsewhere && !prev?.task) return t('chat.suggestions.tasks');
+  if (sug.kind === 'skill' && prev?.kind !== 'skill') return t('chat.suggestions.skills');
   return undefined;
 }
 
@@ -97,7 +98,7 @@ export function useSuggestions<T extends Suggestion>(items: readonly T[], text: 
     return true;
   };
   const list = listed ? (
-    <div ref={ref} className={s.suggestions} role="listbox" aria-label="Suggestions">
+    <div ref={ref} className={s.suggestions} role="listbox" aria-label={t('chat.suggestions.aria')}>
       {shown.slice(0, MAX_LISTED).map((sug, i, all) => (
         <Fragment key={`${sug.value}:${sug.label}:${i}`}>
           {/* Tasks ("@BLG-24") and Claude's skills come as their own sections, under a heading. */}

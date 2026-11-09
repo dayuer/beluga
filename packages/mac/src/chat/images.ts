@@ -3,6 +3,7 @@ import { ATTACHMENT_SCHEME } from '@beluga/core/attachment-share.js';
 import type { LinkedImage } from '@beluga/shared/attachment-links.js';
 import type { Location } from '@beluga/core/store.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Images linked in chat messages, fetched through the core (yours from disk, a friend's through
@@ -268,9 +269,9 @@ export async function copyImage(url: string): Promise<void> {
             canvas.width = img.naturalWidth;
             canvas.height = img.naturalHeight;
             canvas.getContext('2d')?.drawImage(img, 0, 0);
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't convert the image"))), 'image/png');
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('chat.images.convertFailed')))), 'image/png');
           };
-          img.onerror = () => reject(new Error("Couldn't read the image"));
+          img.onerror = () => reject(new Error(t('chat.images.readFailed')));
           img.src = url;
         });
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);

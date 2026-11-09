@@ -6,6 +6,7 @@ import { ACCENTS, type UiPrefs, pickTheme, useChosenPrefs } from '../lib/prefs.j
 import { type AppTheme, type ThemeBase, THEMES, themeFor } from '../lib/themes.js';
 import { Group } from './settings-controls.js';
 import t from './themes.module.css';
+import { useT } from '../i18n/index.js';
 
 /** The accent a theme shows with your Accent: its own while that's System or Theme, else yours. */
 const accentFor = (theme: AppTheme, accent: UiPrefs['accent']): string => (accent === 'system' || accent === 'theme' ? (theme.accent ?? 'AccentColor') : ACCENTS[accent]);
@@ -51,10 +52,11 @@ function ThemeCard({ theme, on, accent }: { readonly theme: AppTheme; readonly o
 }
 
 function ThemeGrid({ base, prefs }: { readonly base: ThemeBase; readonly prefs: UiPrefs }) {
+  const tr = useT();
   const picked = themeFor(base, prefs).id;
   const list = THEMES.filter((th) => th.base === base);
   return (
-    <div className={t.grid} role="radiogroup" aria-label={base === 'dark' ? 'Dark theme' : 'Light theme'}>
+    <div className={t.grid} role="radiogroup" aria-label={base === 'dark' ? tr('dialogs.theme.dark') : tr('dialogs.theme.light')}>
       {list.map((th) => (
         <ThemeCard key={th.id} theme={th} on={th.id === picked} accent={accentFor(th, prefs.accent)} />
       ))}
@@ -67,13 +69,14 @@ function ThemeGrid({ base, prefs }: { readonly base: ThemeBase; readonly prefs: 
  * them. The one showing now comes first; picking one from the other shows it at once.
  */
 export function ThemeGroups() {
+  const tr = useT();
   const prefs = useChosenPrefs();
   const showing = useDocTheme();
   const order: readonly ThemeBase[] = showing === 'dark' ? ['dark', 'light'] : ['light', 'dark'];
   return (
     <>
       {order.map((base) => (
-        <Group key={base} title={base === 'dark' ? 'Dark theme' : 'Light theme'}>
+        <Group key={base} title={base === 'dark' ? tr('dialogs.theme.dark') : tr('dialogs.theme.light')}>
           <ThemeGrid base={base} prefs={prefs} />
         </Group>
       ))}

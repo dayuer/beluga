@@ -49,6 +49,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { revealTerminal } from '../lib/panel.js';
 import { claimShell } from '../lib/ws-shells.js';
 import { globalShellId, globalShellNumber, isGlobalShell } from '@beluga/shared/terminal-keys.js';
+import { useT } from '../i18n/index.js';
 
 type AgentItem = Extract<LogItem, { type: 'agent' }>;
 type ChatItem = Extract<LogItem, { type: 'chat' }>;
@@ -88,6 +89,7 @@ export const PaneLook = createContext<{ readonly fold?: boolean; readonly quietW
 /** A long message folded to three lines until you open it (only where FoldLongMessages is on). */
 function Folding({ children }: { children: ReactNode }) {
   const { fold } = useContext(PaneLook);
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -103,7 +105,7 @@ function Folding({ children }: { children: ReactNode }) {
       </div>
       {long || open ? (
         <button type="button" className={s.showAll} aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? 'Show less' : 'Show all'}
+          {open ? t('chat.items.showLess') : t('chat.items.showAll')}
         </button>
       ) : null}
     </>
@@ -119,22 +121,23 @@ function SteerWaiting({ steer, channel }: { steer: SteeredMessage; channel: stri
   const { client, ui } = useBeluga();
   const stopping = steer.waiting === 'stopping';
   const agent = useMyAgentName();
+  const t = useT();
   return (
     <div className={s.steerWaiting} data-steer-waiting={steer.waiting} role="status">
       <Icon name="clock" size={11} />
-      <span>{stopping ? `Sent · ${agent} is stopping its step to read it` : `Sent · ${agent} reads it after its current step`}</span>
+      <span>{stopping ? t('chat.items.steerStopping', { agent }) : t('chat.items.steerAfterStep', { agent })}</span>
       {stopping ? null : (
         <>
-          <Tip label={`Stop ${agent}’s current step so it reads this now`} keys={shortcutKeys('composer-send-now')}>
+          <Tip label={t('chat.items.sendNowTip', { agent })} keys={shortcutKeys('composer-send-now')}>
             <button type="button" className={s.steerNow} onClick={() => sendSteerNow(client, steer.request)}>
               <Icon name="send" size={10} />
-              Send now
+              {t('chat.items.sendNow')}
             </button>
           </Tip>
-          <Tip label={`Take it back before ${agent} reads it: its words go back in the box`}>
+          <Tip label={t('chat.items.cancelSteerTip', { agent })}>
             <button type="button" className={s.steerNow} data-steer-cancel onClick={() => cancelSteer({ client, ui }, steer.request, channel)}>
               <Icon name="x" size={10} />
-              Cancel
+              {t('chat.items.cancel')}
             </button>
           </Tip>
         </>
@@ -148,16 +151,17 @@ function SteerWaiting({ steer, channel }: { steer: SteeredMessage; channel: stri
  * back), then says it was delivered. Nothing for messages that went at once.
  */
 function Delivery({ request, channel }: { request: string; channel: string }) {
+  const t = useT();
   const state = useApp((st) => st.delivery[request]);
   const owner = useApp((st) => {
     const w = st.shared.find((x) => `ws:${x.id}` === channel);
-    return w ? (st.network.friends.find((f) => f.peerId === w.owner)?.name ?? 'their') : 'their';
+    return w ? st.network.friends.find((f) => f.peerId === w.owner)?.name : undefined;
   });
   if (!state) return null;
   return (
     <div className={s.steerWaiting} data-delivery={state} role="status">
       <Icon name={state === 'waiting' ? 'clock' : 'check'} size={11} />
-      <span>{state === 'waiting' ? `Waiting for ${owner}'s computer · it goes when it's back` : 'Delivered'}</span>
+      <span>{state === 'waiting' ? (owner ? t('chat.items.deliveryWaiting', { name: owner }) : t('chat.items.deliveryWaitingTheir')) : t('chat.items.delivered')}</span>
     </div>
   );
 }
@@ -165,6 +169,7 @@ function Delivery({ request, channel }: { request: string; channel: string }) {
 /** A message from a person (or a Claude speaking in the chat). `continued`: same author, shortly after. `steer`: steered in, not read yet. */
 export const ChatRow = memo(function ChatRow({ item, continued, ends = true, mine, steer }: { item: ChatItem; continued: boolean; ends?: boolean; mine: boolean; steer?: SteeredMessage | undefined }) {
   countRender(`chat:${item.id}`);
+  const t = useT();
   const prefs = usePrefs();
   // Screenshots and other images sent with the message show as pictures, under its words.
   const { text, images } = useMemo(() => splitImages(item.text), [item.text]);
@@ -187,7 +192,7 @@ export const ChatRow = memo(function ChatRow({ item, continued, ends = true, min
   // Your own words: a tinted bubble on the right, no name or picture (it's plainly you).
   if (own)
     return (
-      <ActionsContext items={() => messageItems({ ...menu, text, images, openImage: (img) => openLightbox(images, images.indexOf(img)), ...(editable ? { lead: [{ label: 'Edit Message', icon: 'pencil', onSelect: () => setEditing(true) }] } : {}) })}>
+      <ActionsContext items={() => messageItems({ ...menu, text, images, openImage: (img) => openLightbox(images, images.indexOf(img)), ...(editable ? { lead: [{ label: t('chat.items.editMessage'), icon: 'pencil', onSelect: () => setEditing(true) }] } : {}) })}>
         <div ref={row} className={cx(s.message, s.own, r.reactable, continued && s.continued, steer && s.unread)} data-mine="true" data-steer={steer ? 'waiting' : undefined} data-chat={item.id}>
           {editing ? null : reactions.button}
           <div className={s.body}>
@@ -197,8 +202,8 @@ export const ChatRow = memo(function ChatRow({ item, continued, ends = true, min
               <div className={s.bubbleRow}>
                 {editable ? (
                   <span className={s.ownActions}>
-                    <Tip label="Edit: rewind to here, or fork from here">
-                      <Button size="small" variant="quiet" icon="pencil" aria-label="Edit message" onClick={() => setEditing(true)} />
+                    <Tip label={t('chat.items.editTip')}>
+                      <Button size="small" variant="quiet" icon="pencil" aria-label={t('chat.items.editAria')} onClick={() => setEditing(true)} />
                     </Tip>
                   </span>
                 ) : null}
@@ -261,7 +266,7 @@ export const ChatRow = memo(function ChatRow({ item, continued, ends = true, min
           {continued ? null : (
             <div className={s.meta}>
               {sender ? (
-                <span className={l.sentBy} data-sent-by="">{`Sent by ${sender}’s agent`}</span>
+                <span className={l.sentBy} data-sent-by="">{t('chat.items.sentBy', { name: sender })}</span>
               ) : (
                 <>
                   <span className={cx(s.author, item.byAgent && s.claudeName)} style={item.byAgent && claudeColor(item.from) ? { color: claudeColor(item.from) } : undefined}>
@@ -306,30 +311,27 @@ export const SystemRow = memo(function SystemRow({ item }: { item: SystemItem })
   );
 });
 
-/** What a steered message's card says once Claude read it: the turn's answer comes after it (see live-tail.ts). */
-const STEERED_BELOW = 'The agent read this while it worked; the answer below covers it.';
-
 /** The card's header status, when there's one to say (working is said by the working line at the bottom). */
-function statusOf(item: AgentItem): { label: string; tone: 'claude' | 'ok' | 'error' | 'warn' | 'muted' } {
+function statusOf(item: AgentItem, t: ReturnType<typeof useT>): { label: string; tone: 'claude' | 'ok' | 'error' | 'warn' | 'muted' } {
   switch (item.status) {
     case 'awaiting_approval':
-      return { label: `Waiting for ${item.ownerName} to approve`, tone: 'warn' };
+      return { label: t('chat.items.waitingApprove', { name: item.ownerName }), tone: 'warn' };
     case 'queued':
-      return { label: item.slotWait ? `Waiting for a free ${agentName(item.agent)}` : 'Queued', tone: 'muted' };
+      return { label: item.slotWait ? t('chat.items.waitingFree', { agent: agentName(item.agent) }) : t('chat.items.queued'), tone: 'muted' };
     case 'done':
       // The answer itself says it's done: no "Done in 3m" on every message.
       return { label: '', tone: 'ok' };
     case 'error':
-      if (decodeFailure(item.text)?.kind === 'usage_limit') return { label: 'Paused', tone: 'warn' };
+      if (decodeFailure(item.text)?.kind === 'usage_limit') return { label: t('chat.items.paused'), tone: 'warn' };
       // Stopping or taking a message back is something you did, not a problem.
-      if (/^(Taken out of the queue|Cancelled before it started)/.test(item.text)) return { label: 'Not sent', tone: 'muted' };
-      if (/^(Stopped by you|Interrupted by a newer message|Stopped by owner)/.test(item.text)) return { label: 'Stopped', tone: 'muted' };
-      return { label: 'Stopped', tone: 'error' };
+      if (/^(Taken out of the queue|Cancelled before it started)/.test(item.text)) return { label: t('chat.items.notSent'), tone: 'muted' };
+      if (/^(Stopped by you|Interrupted by a newer message|Stopped by owner)/.test(item.text)) return { label: t('chat.items.stopped'), tone: 'muted' };
+      return { label: t('chat.items.stopped'), tone: 'error' };
     case 'denied':
-      return { label: 'Declined', tone: 'warn' };
+      return { label: t('chat.items.declined'), tone: 'warn' };
     case 'interrupted':
       // Beluga stopped while it ran (quit, a crash): not a problem to flag, just where it was left.
-      return { label: 'Interrupted', tone: 'muted' };
+      return { label: t('chat.items.interrupted'), tone: 'muted' };
     default:
       return { label: '', tone: 'claude' };
   }
@@ -342,13 +344,14 @@ function statusOf(item: AgentItem): { label: string; tone: 'claude' | 'ok' | 'er
  */
 function WorkingLine({ item, quiet }: { item: AgentItem; quiet: boolean }) {
   const now = useNow(true);
+  const t = useT();
   const phase = workingPhase(item);
   if (phase === undefined) return null;
   return (
-    <div className={s.working} data-working="true" title={phase ? `Working · ${phase}` : 'Working'}>
+    <div className={s.working} data-working="true" title={phase ? `${t('chat.items.working')} · ${phase}` : t('chat.items.working')}>
       <Dot tone="claude" live />
       <span className={s.workingWords}>
-        <Shimmer>Working</Shimmer>
+        <Shimmer>{t('chat.items.working')}</Shimmer>
         {phase ? <span className={s.workingPhase}> · {phase}</span> : null}
       </span>
       {quiet ? null : <span className={s.workingTime}>{formatDuration(Math.max(0, now - item.ts))}</span>}
@@ -362,6 +365,7 @@ function WorkingLine({ item, quiet }: { item: AgentItem; quiet: boolean }) {
  */
 function TurnHead({ item, part, mine }: { item: AgentItem; part: TurnPart; mine: boolean }) {
   const prefs = usePrefs();
+  const t = useT();
   const steps = useDisclosure(`${item.channel}/${item.id}`);
   const running = isRunning(item.status) && item.status !== 'queued';
   const folded = item.status === 'done' && Boolean(item.text) && prefs.doneSteps === 'fold' && !steps.shown;
@@ -375,7 +379,7 @@ function TurnHead({ item, part, mine }: { item: AgentItem; part: TurnPart; mine:
       <div className={s.body}>
         <div className={s.meta}>
           <span className={cx(s.author, s.claudeName)} style={claudeColor(item.owner) ? { color: claudeColor(item.owner) } : undefined}>
-            {mine ? agentName(item.agent) : `${item.ownerName}'s ${agentName(item.agent)}`}
+            {mine ? agentName(item.agent) : t('chat.items.ownersAgent', { name: item.ownerName, agent: agentName(item.agent) })}
           </span>
           <AgentBadge agent={item.agent} />
         </div>
@@ -384,7 +388,7 @@ function TurnHead({ item, part, mine }: { item: AgentItem; part: TurnPart; mine:
         </StepsFold>
         <div className={s.continues}>
           <Icon name="chevronDown" size={11} />
-          {running ? 'Still working · continues below' : 'Continued below'}
+          {running ? t('chat.items.stillWorking') : t('chat.items.continuedBelow')}
         </div>
       </div>
     </div>
@@ -455,7 +459,8 @@ function TurnCard({
   // A steered message's card waiting for Claude's next step (or for its step to stop) isn't a turn at work: a note.
   const waitingNote = item.text === READS_AFTER_STEP || item.text === STOPPING_FOR;
   const running = isRunning(item.status) && item.status !== 'queued' && !waitingNote;
-  const st = statusOf(item);
+  const t = useT();
+  const st = statusOf(item, t);
   const { quietWorking } = useContext(PaneLook);
   const forSomeoneElse = item.requesterName !== item.ownerName;
   const mine = item.owner === selfId;
@@ -492,9 +497,9 @@ function TurnCard({
   const hasSteps = item.steps.length > 0 || item.subagents.length > 0;
   const folded = answered && prefs.doneSteps === 'fold' && !steps.shown;
   const lead: ActionItem[] = stoppable
-    ? [{ label: `Stop ${agentName(item.agent)}`, icon: 'stop', ...(shortcutKeys('conv-stop') ? { keys: shortcutKeys('conv-stop') } : {}), onSelect: stop }]
+    ? [{ label: t('chat.items.stopAgent', { agent: agentName(item.agent) }), icon: 'stop', ...(shortcutKeys('conv-stop') ? { keys: shortcutKeys('conv-stop') } : {}), onSelect: stop }]
     : answered && hasSteps && prefs.doneSteps === 'fold'
-      ? [{ label: steps.shown ? 'Hide Steps' : 'Show Steps', icon: 'rows', onSelect: () => steps.setShown(!steps.shown) }]
+      ? [{ label: steps.shown ? t('chat.items.hideSteps') : t('chat.items.showSteps'), icon: 'rows', onSelect: () => steps.setShown(!steps.shown) }]
       : [];
   return (
     <ActionsContext items={() => messageItems({ ...menu, text: item.text, lead })}>
@@ -505,22 +510,22 @@ function TurnCard({
         <div className={s.body}>
           <div className={s.meta}>
             <span className={cx(s.author, s.claudeName)} style={claudeColor(item.owner) ? { color: claudeColor(item.owner) } : undefined}>
-              {mine ? agentName(item.agent) : `${item.ownerName}'s ${agentName(item.agent)}`}
+              {mine ? agentName(item.agent) : t('chat.items.ownersAgent', { name: item.ownerName, agent: agentName(item.agent) })}
             </span>
             <AgentBadge agent={item.agent} />
-            {forSomeoneElse ? <span className={s.time}>for {item.requesterName}</span> : null}
+            {forSomeoneElse ? <span className={s.time}>{t('chat.items.forName', { name: item.requesterName })}</span> : null}
             {!running && item.text && item.status === 'done' && !steeredIn ? (
               <span className={s.hoverActions}>
                 {/* Folded: anyone's steps show again; kept showing, only your own Claude's open further. */}
                 {hasSteps && (prefs.doneSteps === 'fold' || (mine && item.steps.length > 0)) ? <StepsToggle item={item} /> : null}
-                <Button size="small" variant="quiet" icon="copy" onClick={() => void copyText(item.text).then(() => menu.toast('Copied the answer'))}>
-                  Copy
+                <Button size="small" variant="quiet" icon="copy" onClick={() => void copyText(item.text).then(() => menu.toast(t('chat.items.copiedAnswer')))}>
+                  {t('chat.items.copy')}
                 </Button>
               </span>
             ) : stoppable ? (
               <span className={s.hoverActions}>
-                <Button size="small" variant="quiet" icon="stop" onClick={stop} title={`Stop ${agentName(item.agent)} here${shortcutKeys('conv-stop') ? ` (${shortcutKeys('conv-stop')})` : ''}`}>
-                  Stop
+                <Button size="small" variant="quiet" icon="stop" onClick={stop} title={shortcutKeys('conv-stop') ? t('chat.items.stopHereKeys', { agent: agentName(item.agent), keys: shortcutKeys('conv-stop') ?? '' }) : t('chat.items.stopHere', { agent: agentName(item.agent) })}>
+                  {t('chat.items.stop')}
                 </Button>
               </span>
             ) : null}
@@ -542,7 +547,7 @@ function TurnCard({
             </div>
           ))}
           {steeredIn ? (
-            <div className={s.idle}>{item.text === STEERED_IN ? STEERED_BELOW : item.text}</div>
+            <div className={s.idle}>{item.text === STEERED_IN ? t('chat.items.steeredBelow') : item.text}</div>
           ) : failure ? (
             <FailureNotice failure={failure} />
           ) : item.text ? (
@@ -552,33 +557,33 @@ function TurnCard({
             <SlotWaitNotice wait={item.slotWait} requestId={mine && item.requester === selfId ? item.requestId : undefined} />
           ) : item.status === 'queued' ? (
             // Sending it now, editing or moving it: the queue above the box.
-            <div className={s.idle}>Starts when the current task finishes.</div>
+            <div className={s.idle}>{t('chat.items.startsWhen')}</div>
           ) : null}
           {/* Sign In runs Claude Code's own login: only for a Claude run (Codex says how to sign in on its card). */}
           {limited && failure?.kind === 'signed_out' && (failure.runtime ?? 'claude') === 'claude' ? (
             <div className={s.limitActions}>
               <ActionsDropdown items={signInChoices(signIn, (url) => void openExternal(url))} align="start">
-                <Button size="small" icon="person" title="Sign in to Claude Code again; then the run picks up where it stopped">
-                  Sign In
+                <Button size="small" icon="person" title={t('chat.items.signInClaudeTip')}>
+                  {t('chat.items.signIn')}
                 </Button>
               </ActionsDropdown>
             </div>
           ) : limited && failure?.kind === 'signed_out' && failure.runtime === 'opencode' ? (
             // OpenCode's model provider said no (a key expired, none set up): add one in Terminal (`opencode auth login`), then Continue.
             <div className={s.limitActions}>
-              <Button size="small" icon="person" onClick={() => void client.api.workbench.agentSignIn('opencode').catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))} title="Add or renew a model provider in Terminal (opencode auth login), then Continue">
-                Sign In
+              <Button size="small" icon="person" onClick={() => void client.api.workbench.agentSignIn('opencode').catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))} title={t('chat.items.signInOpencodeTip')}>
+                {t('chat.items.signIn')}
               </Button>
-              <Button size="small" icon="play" onClick={resume} title={`Send “continue”: ${agentName(item.agent)} picks up where it stopped`}>
-                Continue
+              <Button size="small" icon="play" onClick={resume} title={t('chat.items.continueTip', { agent: agentName(item.agent) })}>
+                {t('chat.items.continue')}
               </Button>
             </div>
           ) : limited && failure?.kind === 'usage_limit' ? (
             <LimitResume channel={item.channel} failure={failure} stoppedAt={item.endTs ?? item.lastAt ?? item.ts} agent={item.agent} onContinue={resume} />
           ) : limited ? (
             <div className={s.limitActions}>
-              <Button size="small" icon="play" onClick={resume} title={`Send “continue”: ${agentName(item.agent)} picks up where it stopped`}>
-                Continue
+              <Button size="small" icon="play" onClick={resume} title={t('chat.items.continueTip', { agent: agentName(item.agent) })}>
+                {t('chat.items.continue')}
               </Button>
             </div>
           ) : null}
@@ -596,6 +601,7 @@ function TurnCard({
  */
 function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { channel: string; failure: RunFailure; stoppedAt: number; agent: AgentRef | undefined; onContinue: () => void }) {
   const { client } = useBeluga();
+  const t = useT();
   const prefs = useApp((st) => st.prefs);
   const now = useNow(true, 15_000);
   const at = limitResumeAt(failure, stoppedAt);
@@ -610,31 +616,29 @@ function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { chann
   const when = resetWords(at, now);
   if (auto.kind === 'scheduled') {
     const dontSend: ActionItem[] = [
-      { label: 'For This Session', icon: 'pause', hint: 'Every chat, until this limit resets', onSelect: () => set({ autoContinueSkip: sessionSkip(at) }, `Nothing continues on its own until ${when}`) },
-      { label: 'Never in This Chat', icon: 'chat', onSelect: () => set({ autoContinueOff: chatsOff(prefs.autoContinueOff, channel, true) }, 'This chat waits for you to press Continue') },
-      { label: 'Everywhere', icon: 'x', separate: true, hint: 'Settings › Agent › Usage limits', onSelect: () => set({ autoContinue: false }, 'Turned off: agents wait for you to press Continue') },
+      { label: t('chat.items.forSession'), icon: 'pause', hint: t('chat.items.forSessionHint'), onSelect: () => set({ autoContinueSkip: sessionSkip(at) }, t('chat.items.nothingUntil', { when })) },
+      { label: t('chat.items.neverInChat'), icon: 'chat', onSelect: () => set({ autoContinueOff: chatsOff(prefs.autoContinueOff, channel, true) }, t('chat.items.chatWaits')) },
+      { label: t('chat.items.everywhere'), icon: 'x', separate: true, hint: t('chat.items.everywhereHint'), onSelect: () => set({ autoContinue: false }, t('chat.items.turnedOff')) },
     ];
     return (
       <div className={cx(s.limitActions, s.limitResume)}>
         <Icon name="clock" size={13} />
         <span className={s.limitResumeText}>
           {now < at ? (
-            <>
-              Sends “{CONTINUE_PROMPT}” at {when}, when your limit resets
-            </>
+            <>{t('chat.items.sendsAt', { prompt: CONTINUE_PROMPT, when })}</>
           ) : (
-            <>Your limit reset: telling {agentName(agent)} to continue…</>
+            <>{t('chat.items.limitReset', { agent: agentName(agent) })}</>
           )}
         </span>
         {now < at ? (
           // The limit lifted sooner (a plan change, more usage): go on now.
-          <Button size="small" variant="quiet" icon="play" onClick={onContinue} title={`Send “continue” now: ${agentName(agent)} picks up where it stopped`}>
-            Continue Now
+          <Button size="small" variant="quiet" icon="play" onClick={onContinue} title={t('chat.items.continueNowTip', { agent: agentName(agent) })}>
+            {t('chat.items.continueNow')}
           </Button>
         ) : null}
         <ActionsDropdown items={dontSend} align="start">
-          <Button size="small" variant="quiet" title="Keep it from continuing on its own">
-            Don’t Send
+          <Button size="small" variant="quiet" title={t('chat.items.dontSendTip')}>
+            {t('chat.items.dontSend')}
           </Button>
         </ActionsDropdown>
       </div>
@@ -643,18 +647,18 @@ function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { chann
   // Off for this chat or this session, and still ahead: one click puts it back.
   const undo =
     now < at && auto.why === 'chat'
-      ? (): void => set({ autoContinueOff: chatsOff(prefs.autoContinueOff, channel, false) }, `Continues on its own at ${when}`)
+      ? (): void => set({ autoContinueOff: chatsOff(prefs.autoContinueOff, channel, false) }, t('chat.items.continuesAt', { when }))
       : now < at && auto.why === 'session'
-        ? (): void => set({ autoContinueSkip: 0 }, `Continues on its own at ${when}`)
+        ? (): void => set({ autoContinueSkip: 0 }, t('chat.items.continuesAt', { when }))
         : undefined;
   return (
     <div className={s.limitActions}>
-      <Button size="small" icon="play" onClick={onContinue} title={`Send “continue”: ${agentName(agent)} picks up where it stopped`}>
-        Continue
+      <Button size="small" icon="play" onClick={onContinue} title={t('chat.items.continueTip', { agent: agentName(agent) })}>
+        {t('chat.items.continue')}
       </Button>
       {undo ? (
-        <Button size="small" variant="quiet" icon="clock" onClick={undo} title="Beluga sends it on its own once your limit resets">
-          Send at {when}
+        <Button size="small" variant="quiet" icon="clock" onClick={undo} title={t('chat.items.sendAtTip')}>
+          {t('chat.items.sendAt', { when })}
         </Button>
       ) : null}
     </div>
@@ -663,13 +667,14 @@ function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { chann
 
 /** A failed turn in plain words (“Claude hit your usage limit · resets at 15:00”), the raw error a click away. */
 function FailureNotice({ failure }: { failure: RunFailure }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className={s.failure}>
       <div className={s.failureTitle}>{failureTitle(failure)}</div>
       {failure.kind === 'stopped' ? null : (
         <button type="button" className={s.failureToggle} onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? 'Hide details' : 'Show details'}
+          {open ? t('chat.items.hideDetails') : t('chat.items.showDetails')}
         </button>
       )}
       {open ? <pre className={s.failureDetail}>{failure.detail}</pre> : null}
@@ -681,22 +686,23 @@ function FailureNotice({ failure }: { failure: RunFailure }) {
 export const ShellCard = memo(function ShellCard({ item }: { item: ShellItem }) {
   const running = item.status === 'running' || item.status === 'waiting';
   const now = useNow(running);
+  const t = useT();
   const label =
     item.status === 'waiting'
-      ? `Waiting for ${item.ownerName} to approve`
+      ? t('chat.items.waitingApprove', { name: item.ownerName })
       : item.status === 'running'
-        ? `Running on ${item.ownerName}'s computer · ${formatDuration(now - (item.startTs ?? item.ts))}`
+        ? t('chat.items.shellRunning', { name: item.ownerName, time: formatDuration(now - (item.startTs ?? item.ts)) })
         : item.status === 'declined'
-          ? `${item.ownerName} declined`
+          ? t('chat.items.shellDeclined', { name: item.ownerName })
           : item.status === 'failed'
-            ? item.error ?? `Exit ${item.exitCode ?? '?'}`
-            : `Exit ${item.exitCode ?? 0}${item.endTs && item.startTs ? ` · ${formatDuration(item.endTs - item.startTs)}` : ''}`;
+            ? item.error ?? t('chat.items.exit', { code: item.exitCode ?? '?' })
+            : `${t('chat.items.exit', { code: item.exitCode ?? 0 })}${item.endTs && item.startTs ? ` · ${formatDuration(item.endTs - item.startTs)}` : ''}`;
   const tone = item.status === 'done' && (item.exitCode ?? 0) === 0 ? 'ok' : item.status === 'done' || item.status === 'failed' ? 'error' : item.status === 'declined' ? 'warn' : 'claude';
   const menu = useMenuContext();
-  const copy = (text: string, what: string): void => void copyText(text).then(() => menu.toast(`Copied ${what}`));
+  const copy = (text: string, what: string): void => void copyText(text).then(() => menu.toast(t('chat.messageMenu.copied', { what })));
   const items: ActionItem[] = [
-    { label: 'Copy Command', icon: 'copy', onSelect: () => copy(item.command, 'the command') },
-    ...(item.output ? [{ label: 'Copy Output', onSelect: () => copy(item.output ?? '', 'the output') }] : []),
+    { label: t('chat.items.copyCommand'), icon: 'copy', onSelect: () => copy(item.command, t('chat.items.theCommand')) },
+    ...(item.output ? [{ label: t('chat.items.copyOutput'), onSelect: () => copy(item.output ?? '', t('chat.items.theOutput')) }] : []),
   ];
   return (
     <ActionsContext items={items}>
@@ -709,7 +715,7 @@ export const ShellCard = memo(function ShellCard({ item }: { item: ShellItem }) 
         <div className={s.body}>
           <div className={s.meta}>
             <span className={s.author}>{item.by}</span>
-            <span className={s.time}>on {item.ownerName}'s computer{item.cwd ? ` · ${item.cwd}` : ''}</span>
+            <span className={s.time}>{t('chat.items.onComputer', { name: item.ownerName })}{item.cwd ? ` · ${item.cwd}` : ''}</span>
             <span className={cx(s.status, s[`tone_${tone}`])}>
               {running ? <Dot tone="claude" live /> : null}
               {label}
