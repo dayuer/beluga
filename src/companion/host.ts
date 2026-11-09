@@ -17,7 +17,7 @@ import { type DeviceBook, type DeviceRecord, deviceId } from './devices.js';
 import { type DocumentBytes, FileServer, RefTable, type Thumbnailer } from './files.js';
 import { ProjectIcons, type SmallIcon } from './icons.js';
 import type { MergeBook } from './merge.js';
-import { clientConv, clientHome, clientOlder } from './client-view.js';
+import { clientConv, clientHome, clientNudge, clientOlder } from './client-view.js';
 import { CLIENT_BLOCKED_FRAMES, clientRefusal, topicInProject } from './client-scope.js';
 import { DevicePairing, type PairStartOptions, type PairingInfo } from './pair.js';
 import { Uploads } from './uploads.js';
@@ -1137,17 +1137,22 @@ export class CompanionHost {
    * minutes) a nudge to a linked phone or a push to one that isn't. What needs you while you're at
    * the Mac is held, and told once you step away if it's still waiting (BLG-360).
    */
-  private async tell(nudges: readonly Nudge[], state: DomainState, idle: number | undefined): Promise<void> {
+  private async tell(nudges: readonly Nudge[], state: DomainState, idle: number | undefined, owner = false): Promise<void> {
     for (const record of this.phonesToTell()) {
+      const project = record.client?.project;
+      if (project !== undefined && owner) continue;
       const id = deviceId(record.cert);
       const linked = [...this.links].filter((l) => l.deviceId === id && l.hello);
       const onScreen = new Set<string>(linked.flatMap((l) => [...l.topics.keys()]));
       const inFront = linked.some((l) => l.inFront);
       const leaves = this.leavesFriends(linked);
-      for (const nudge of nudges) {
+      for (const original of nudges) {
+        // A customer's phone hears only its own project's cards, in its own words, wherever you are.
+        const nudge = project === undefined ? original : clientNudge(state, project, original);
+        if (!nudge) continue;
         if (nudge.away && (!linked.length || inFront)) continue;
         if (nudge.friends && leaves) continue;
-        const how: Delivery = deliver(nudge, { linked: linked.length > 0, onScreen, inFront, macFront: state.attention.front, canPush: Boolean(record.push), ...(idle !== undefined ? { macIdleMs: idle } : {}) });
+        const how: Delivery = deliver(nudge, { linked: linked.length > 0, onScreen, inFront, macFront: project === undefined && state.attention.front, canPush: Boolean(record.push), ...(idle !== undefined && project === undefined ? { macIdleMs: idle } : {}) });
         if (how === 'nudge') for (const l of linked) l.send({ t: 'nudge', kind: nudge.kind, title: nudge.title, body: nudge.body, ...(nudge.topic ? { topic: nudge.topic } : {}) });
         else if (how === 'push' && record.push) await (this.opts.pusher ?? NO_PUSH).push({ deviceId: id, ...record.push, box: record.cert.box }, nudge).catch((err: unknown) => this.logLine(`push failed: ${String(err)}`));
         else if (how === 'held') this.hold(nudge);
@@ -1207,7 +1212,7 @@ export class CompanionHost {
     const still = [...this.held].filter(([need]) => live.has(need)).map(([, n]) => n);
     this.held.clear();
     done();
-    if (still.length) await this.tell(still, state, idle);
+    if (still.length) await this.tell(still, state, idle, true);
   }
 
   /** The shared state's `companion` slice: the phones (who's linked, last seen) and the pairing. */

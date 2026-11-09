@@ -1,5 +1,6 @@
 import type { DomainState } from '../core/store.js';
 import { CLIENT_METHODS, channelInProject } from './client-scope.js';
+import type { Nudge } from './push.js';
 import { allNeeds } from './needs-you.js';
 import type { ClientCard, ClientConvView, ClientHomeView, ClientTurn, NeedsYou, OutputView, Topic, TurnView } from './protocol.js';
 import { convTurns, convView, type ViewContext } from './views.js';
@@ -94,4 +95,17 @@ export function clientConv(state: DomainState, ctx: ViewContext, project: string
   const safe = safeTurns(turns);
   const cards = clientCards(state, project).filter((c) => c.topic === topic);
   return { topic, title: full.title, turns: safe, more, working: full.working, canSend: full.canSend, cards: cards.slice(0, 20), images: (full.outputs ?? []).filter(isImage).slice(0, 100) };
+}
+
+/**
+ * A nudge as a customer may hear it, or none: only a card or an answer in its own project's
+ * conversations (never friends, mentions, the Mac's own notices), its topic the client's, its
+ * words without code. The customer is told whether or not you are at your Mac.
+ */
+export function clientNudge(state: DomainState, project: string, nudge: Nudge): Nudge | undefined {
+  if ((nudge.kind !== 'needsYou' && nudge.kind !== 'done') || nudge.friends || nudge.away || !nudge.topic?.startsWith('conv:')) return undefined;
+  const channel = nudge.topic.slice('conv:'.length);
+  if (!channelInProject(state, project, channel)) return undefined;
+  const plain = (t: string): string => t.replace(CODE_MARK, '').replace(/\(code\)/g, '').trim();
+  return { ...nudge, title: clip(plain(nudge.title), 200), body: clip(plain(nudge.body), 300), topic: clientTopic(channel) as Topic };
 }

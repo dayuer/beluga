@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clientConv, clientHome, clientOlder } from '../src/companion/client-view.js';
+import { CLIENT_METHODS } from '../src/companion/client-scope.js';
+import { clientCards, clientConv, clientHome, clientNudge, clientOlder } from '../src/companion/client-view.js';
 import { FileServer, RefTable } from '../src/companion/files.js';
 import { ChatsView, ChatView, ClientConvView, ClientHomeView, ConvView, DashboardView, HomeView, PeopleView, PlansView, PlanView, SentinelPageView, SentinelsView, TaskPageView, TasksView, type Topic, WidgetsView, WorkView, viewSchema } from '../src/companion/protocol.js';
 import { type ViewContext, convTurns, homeView, needsYou, sentinelDone, viewOf } from '../src/companion/views.js';
@@ -383,6 +384,21 @@ describe('the views of a known Mac', () => {
     expect(clientConv(state, ctx, 'other', 'client:w1')).toBeUndefined();
     expect(clientConv(state, ctx, 'p1', 'conv:ws:w1')).toBeUndefined();
     expect(() => clientOlder(state, ctx, 'other', 'client:w1', 'x')).toThrow();
+  });
+
+  it('a customer’s cards and nudges are its project’s alone, buttons within its list', () => {
+    const home = ClientHomeView.parse(clientHome(state, ctx, 'p1'));
+    const q1 = home.cards.find((c) => c.id === 'question:q1')!;
+    expect(q1).toMatchObject({ topic: 'client:w1', title: expect.any(String) });
+    for (const c of home.cards) for (const a of [...c.actions, ...(c.answer ? [c.answer] : [])]) expect(CLIENT_METHODS.has(a.method)).toBe(true);
+    expect(home.cards.every((c) => c.topic.startsWith('client:w'))).toBe(true);
+    expect(clientCards(state, 'other')).toEqual([]);
+    const nudge = { kind: 'needsYou' as const, title: 'Which store?', body: 'Pick: [[code:0]] now', topic: 'conv:ws:w1' as Topic, priority: 'high' as const };
+    expect(clientNudge(state, 'p1', nudge)).toMatchObject({ topic: 'client:w1', body: 'Pick:  now' });
+    expect(clientNudge(state, 'other', nudge)).toBeUndefined();
+    expect(clientNudge(state, 'p1', { ...nudge, kind: 'mentions' })).toBeUndefined();
+    expect(clientNudge(state, 'p1', { ...nudge, topic: 'chat:dm:bob' as Topic })).toBeUndefined();
+    expect(clientNudge(state, 'p1', { ...nudge, away: true })).toBeUndefined();
   });
 
   it('a conversation: code folded, steps in words, sub-agents with their outputs', () => {
