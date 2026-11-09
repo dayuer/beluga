@@ -1,0 +1,121 @@
+/**
+ * Auto route (fork): who works a task nobody picked an agent for. A task's own agent, its plan's,
+ * the one you start it with and its project's agent always win; without one, a hard task (the
+ * `hard` label, or urgent/high) goes to the strongest model and the rest to the cheapest, each the
+ * first of its list that runs on this Mac now. Worked out when the task starts (its labels are in
+ * by then), never kept on the task, so a teammate's Mac never sees an endpoint only yours has.
+ * Browser-safe: the daemon, the Mac app and the phone import it, so they all say the same agent.
+ */
+import { z } from 'zod';
+import type { AgentRef } from '../protocol.js';
+import type { RuntimeChoice } from './agent-runtimes.js';
+import { modelName } from './agent-label.js';
+
+/** A candidate, as the agent pickers value one: `runtime:model` ('' model: the runtime's default). */
+const CHOICE = /^[a-z][a-z0-9-]{0,19}:[\w.:/@[\]-]{0,120}$/;
+
+/** The label that marks a task as hard (a project's own label: add it in the project's labels). */
+export const HARD_LABEL = 'hard';
+
+/** Hard work: Opus on your API key first, then on your Claude subscription. */
+export const HARD_DEFAULT: readonly string[] = ['local:anthropic/claude-opus-5-5', 'claude:opus'];
+
+/** Everything else, cheapest first: GLM, DeepSeek, Haiku on your API key, Haiku on your subscription. */
+export const BUILD_DEFAULT: readonly string[] = ['local:bigmodel/glm-5.3[1m]', 'local:deepseek/deepseek-flash[1m]', 'local:anthropic/claude-haiku-5-5', 'claude:haiku'];
+
+/** Settings › Auto Route, kept in settings.json. Every field unset: its default. */
+export const AutoRoute = z.object({
+  /** Off: tasks without an agent go to your default agent, as before. Unset: on with a local model endpoint (autoRouteOn). */
+  on: z.boolean().optional(),
+  hardLabel: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/).optional(),
+  /** Urgent and high priority count as hard too. */
+  urgentIsHard: z.boolean().optional(),
+  hard: z.array(z.string().regex(CHOICE)).max(8).optional(),
+  build: z.array(z.string().regex(CHOICE)).max(8).optional(),
+});
+export type AutoRoute = z.infer<typeof AutoRoute>;
+
+export type AutoTier = 'hard' | 'build';
+
+/** What of a task routing looks at. */
+export interface Routable {
+  readonly labels: readonly string[];
+  readonly priority: string;
+}
+
+/**
+ * Whether it's on: as you set it; unset, on once this Mac has a local model endpoint (the cheap
+ * models it routes to), so a Mac with only Claude works as it always did until you turn it on.
+ */
+export const autoRouteOn = (route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[]): boolean => route?.on ?? runtimes.some((r) => r.id === 'local' && r.available);
+
+/** Which list a task draws from. */
+export function autoTierOf(task: Routable, route: AutoRoute | undefined): AutoTier {
+  const label = route?.hardLabel ?? HARD_LABEL;
+  if (task.labels.includes(label)) return 'hard';
+  if (route?.urgentIsHard !== false && (task.priority === 'urgent' || task.priority === 'high')) return 'hard';
+  return 'build';
+}
+
+/** A tier's candidates, in order (yours, else the defaults). */
+export const tierList = (tier: AutoTier, route: AutoRoute | undefined): readonly string[] => (tier === 'hard' ? (route?.hard ?? HARD_DEFAULT) : (route?.build ?? BUILD_DEFAULT));
+
+/** A candidate's runtime and model. */
+export function parseChoice(value: string): { readonly runtime: string; readonly model: string } | undefined {
+  const at = value.indexOf(':');
+  return at > 0 ? { runtime: value.slice(0, at), model: value.slice(at + 1) } : undefined;
+}
+
+/**
+ * Whether a candidate runs on this Mac now, by the pickers' own list: its runtime is set up, and a
+ * runtime that lists its models (a local endpoint) has that one and can use it (not greyed: its
+ * endpoint answers). Claude's models are Claude Code's aliases, so Claude being set up is enough.
+ */
+export function runsHere(runtimes: readonly RuntimeChoice[], runtime: string, model: string): boolean {
+  const r = runtimes.find((x) => x.id === runtime);
+  if (!r?.available) return false;
+  if (!model || runtime === 'claude' || !r.models) return true;
+  const m = r.models.find((x) => x.value === model);
+  return Boolean(m && !m.why);
+}
+
+/**
+ * The agent a task goes to when nobody picked one: the first of its tier's candidates that runs
+ * here. Undefined: auto route is off, someone chose one after all (`chosen`: its plan's agent, its
+ * project's: that one wins), or none of them runs here (your default agent then, as before).
+ */
+export function autoAgentFor(task: Routable, route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[], chosen?: AgentRef): AgentRef | undefined {
+  if (!autoRouteOn(route, runtimes) || chosen) return undefined;
+  for (const value of tierList(autoTierOf(task, route), route)) {
+    const c = parseChoice(value);
+    if (!c || !runsHere(runtimes, c.runtime, c.model)) continue;
+    const label = runtimes.find((r) => r.id === c.runtime)?.label ?? c.runtime;
+    return { runtime: c.runtime, label, ...(c.model ? { model: c.model } : {}) };
+  }
+  return undefined;
+}
+
+/** What of the app's state routing reads: the daemon's, the Mac app's and the phone views' alike. */
+export interface RouteState {
+  readonly prefs: { readonly autoRoute?: AutoRoute; readonly projectAgents?: Readonly<Record<string, AgentRef>> };
+  readonly runtimes: readonly RuntimeChoice[];
+  readonly projects: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  readonly plans: { readonly plans: ReadonlyArray<{ readonly id: string; readonly agent?: AgentRef }> };
+}
+
+/**
+ * Who auto route gives a task, everything considered: none when it has its own agent, its plan
+ * has one, or its project does (theirs work it); else autoAgentFor's pick. The one place the
+ * daemon (when it starts), the Mac app and the phone (what they show) ask.
+ */
+export function routedAgent(task: Routable & { readonly projectId: string; readonly agent?: AgentRef; readonly plan?: { readonly id: string } }, st: RouteState): AgentRef | undefined {
+  if (task.agent) return undefined;
+  const planAgent = task.plan ? st.plans.plans.find((p) => p.id === task.plan!.id)?.agent : undefined;
+  const project = st.projects.find((p) => p.id === task.projectId)?.name;
+  return autoAgentFor(task, st.prefs.autoRoute, st.runtimes, planAgent ?? (project ? st.prefs.projectAgents?.[project] : undefined));
+}
+
+/** A routed agent's short name for a task card: its model ("Opus 5.5", "Glm 5.3"), else its runtime. */
+export function autoAgentName(ref: AgentRef): string {
+  return ref.model ? modelName(ref.model).replace(/\[1m\]/gi, '').trim() : ref.label;
+}

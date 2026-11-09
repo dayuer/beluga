@@ -30,9 +30,11 @@ import { menu as enMenu } from './en/menu.js';
 import { menu as zhMenu } from './zh-CN/menu.js';
 import { machines as enMachines } from './en/machines.js';
 import { machines as zhMachines } from './zh-CN/machines.js';
+import { autoRoute as enAutoRoute } from './en/auto-route.js';
+import { autoRoute as zhAutoRoute } from './zh-CN/auto-route.js';
 
-const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines } as const;
-const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines };
+const EN = { ...enSettings, ...enDialogs, ...enLayout, ...enChat, ...enPlans, ...enCommon, ...enSentinel, ...enViews, ...enNetwork, ...enMisc, ...enMenu, ...enMachines, ...enAutoRoute } as const;
+const ZH = { ...zhSettings, ...zhDialogs, ...zhLayout, ...zhChat, ...zhPlans, ...zhCommon, ...zhSentinel, ...zhViews, ...zhNetwork, ...zhMisc, ...zhMenu, ...zhMachines, ...zhAutoRoute };
 
 export type Key = keyof typeof EN & string;
 const tOf = makeT(EN, { 'zh-CN': ZH });
