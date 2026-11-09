@@ -51,7 +51,7 @@ describe('what the phone may call', () => {
       version: '1',
       thumbsDir: dir,
     });
-    const link = { clientId: 'phone:test' } as never;
+    const link = { clientId: 'phone:test', device: {} } as never;
     for (const m of METHODS.filter((x) => PHONE[x] === 'mac')) {
       const out = await host.phoneCall(link, m, []);
       expect(out).toEqual({ ok: false, error: `${m} is only on your Mac` });

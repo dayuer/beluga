@@ -228,7 +228,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `files.save` | ✓ Edit in a file's header (files open read-only), then Save or ⌘S; asks before overwriting a change made since |
 | `files.formatter` | ✓ whether a file's Format button is on (the project's Prettier), and why not in its tooltip |
 | `files.format` | ✓ Format (the wand) in a file's header: the project's Prettier lays out the text you're editing (Save writes it) |
-| `companion.pair.start` | ✓ the sidebar footer's phone mark › Pair a Phone…: a one-time pairing (QR and code, 10 minutes, one phone) |
+| `companion.pair.start` | ✓ the sidebar footer's phone mark › Pair a Phone…: a one-time pairing (QR and code, 10 minutes, one phone); with `{project, ttlMs}` it is a client invite (BLG-14): 1 day by default, 7 at most, and the phone that pairs is that project's client, shown in the device list with its project and revocable like any device |
 | `companion.pair.approve` | ✓ the Phone popover's “Pair Kayra's Pixel 9?” with the four-picture fingerprint › Pair |
 | `companion.pair.cancel` | ✓ the Phone popover's Cancel while a pairing is open (a waiting phone hears no) |
 | `companion.devices.remove` | ✓ the Phone popover › a phone › Remove (its link drops at once, its key is refused from then on) |
