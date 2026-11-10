@@ -5,12 +5,25 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import { alwaysAllow, handleStudioRequest, internalAuthOf, type Effect, type HubReply, type StudioDeps } from '../../../src/net/studio/handler.js';
+import {
+  alwaysAllow,
+  handleStudioRequest,
+  internalAuthOf,
+  onAppOpen,
+  onDaemonClose,
+  onDaemonMessage,
+  onDaemonOpen,
+  verifyDaemonConnect,
+  type Effect,
+  type HubReply,
+  type StudioDeps,
+} from '../../../src/net/studio/handler.js';
 import { expire, prune } from '../../../src/net/studio/queue.js';
 import { DAY_MS, sha256Hex } from '../../../src/net/studio/store.js';
 import { D1HubStore } from './d1.js';
 import { DoStudioStore } from './do-store.js';
 import { jsonOf, responseOf } from './reply.js';
+import { type AppAttachment, type DaemonAttachment, appTags, attachmentOf, daemonTags } from './ws.js';
 
 export interface Env {
   readonly DB: D1Database;
@@ -91,6 +104,8 @@ export class StudioHub extends DurableObject<Env> {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     for (const statement of TABLES) this.sql.exec(statement);
+    // Application-level keepalive: answered without waking the object.
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     void ctx.storage.setAlarm(Date.now() + DAY_MS);
   }
 
@@ -117,11 +132,74 @@ export class StudioHub extends DurableObject<Env> {
   async fetch(req: Request): Promise<Response> {
     const auth = internalAuthOf(req.headers.get('x-studio-auth'));
     if (!auth) return jsonOf({ error: 'not-yours' }, 403);
-    // The hibernation sockets are BLG-65; the HTTP routes are complete here.
-    if (req.headers.get('upgrade') === 'websocket') return jsonOf({ error: 'websocket-not-implemented' }, 501);
+    const url = new URL(req.url);
+    const socketRoute = url.pathname === '/v1/daemon/ws' ? 'daemon' : /^\/v1\/app\/projects\/[^/]+\/ws$/.test(url.pathname) ? 'app' : undefined;
+
+    if ((req.headers.get('upgrade') ?? '').toLowerCase() === 'websocket') {
+      if (socketRoute === undefined) return jsonOf({ error: 'not-found' }, 404);
+      const deps = await this.deps();
+      if (socketRoute === 'daemon') return this.acceptDaemon(req, auth, deps);
+      if (auth.role !== 'app') return jsonOf({ error: 'not-yours' }, 403);
+      return this.acceptApp(auth, deps);
+    }
+    if (socketRoute !== undefined) return jsonOf({ error: 'upgrade-required' }, 400);
+
     const reply: HubReply = await handleStudioRequest(req, await this.deps(), auth);
     await this.apply(reply.effects ?? []);
     return responseOf(reply);
+  }
+
+  /** The daemon signed in §3.3; hand it the socket, after requeueing what the old one took. */
+  private async acceptDaemon(req: Request, auth: { role: string; daemonId?: string }, deps: StudioDeps): Promise<Response> {
+    if (auth.role !== 'daemon' || auth.daemonId === undefined) return jsonOf({ error: 'not-yours' }, 403);
+    const daemonId = auth.daemonId;
+    const at = Number(req.headers.get('x-studio-at'));
+    const sig = req.headers.get('x-studio-sig') ?? '';
+    const check = await verifyDaemonConnect({ daemonId, at, sig }, deps);
+    if (!check.ok) return jsonOf({ error: check.error }, check.status);
+
+    await deps.studio.requeueTaken(daemonId);
+    for (const old of this.ctx.getWebSockets(`daemon:${daemonId}`)) old.close(4002, 'replaced');
+
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1], daemonTags(daemonId));
+    pair[1].serializeAttachment({ role: 'daemon', daemonId, at } satisfies DaemonAttachment);
+    await deps.studio.putConn({ daemonId, lastAt: at, connectedAt: deps.now, lastSeenAt: deps.now, synced: false });
+    await this.apply(await onDaemonOpen(daemonId, deps));
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  /** A customer's project socket: membership was checked by the Worker and is checked again. */
+  private async acceptApp(auth: AppAttachment, deps: StudioDeps): Promise<Response> {
+    if (!(await deps.hub.canAccess(auth.customerId, auth.projectId))) return jsonOf({ error: 'not-yours' }, 403);
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1], appTags(auth.customerId, auth.projectId, auth.sessionHash));
+    pair[1].serializeAttachment({ role: 'app', customerId: auth.customerId, projectId: auth.projectId, ...(auth.sessionHash !== undefined ? { sessionHash: auth.sessionHash } : {}) } satisfies AppAttachment);
+    for (const effect of await onAppOpen(auth.customerId, auth.projectId, deps)) {
+      if (effect.to === 'app') pair[1].send(JSON.stringify(effect.frame));
+      else if (effect.to === 'close') pair[1].close(effect.code, effect.reason);
+    }
+    return new Response(null, { status: 101, webSocket: pair[0], headers: { 'Sec-WebSocket-Protocol': 'synon.v1' } });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    const att = attachmentOf(ws);
+    if (att?.role !== 'daemon') return; // customers act over HTTP only
+    const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    await this.apply(await onDaemonMessage(att.daemonId, raw, await this.deps()));
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
+    const att = attachmentOf(ws);
+    if (att?.role === 'daemon') await this.apply(await onDaemonClose(att.daemonId, att.at, await this.deps()));
+    ws.close(code, reason);
+  }
+
+  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+    void error;
+    const att = attachmentOf(ws);
+    if (att?.role === 'daemon') await this.apply(await onDaemonClose(att.daemonId, att.at, await this.deps()));
+    ws.close(1011, 'internal');
   }
 
   private async apply(effects: readonly Effect[]): Promise<void> {

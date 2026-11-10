@@ -10,9 +10,9 @@
 import { z } from 'zod';
 import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, type AppFrame } from '../../studio/protocol.js';
 import { addMember, bindProject, createProject, customerLoginLink, inviteCustomer, listCustomers, removeCustomer, removeMember, revokeDaemon, studioDetail, unbindProject } from './accounts.js';
-import { enqueue, take } from './queue.js';
+import { ack, enqueue, take } from './queue.js';
 import { authCustomer, bearerOf, logout as logoutSession, requestLogin, verifyLogin } from './session.js';
-import { listPlans, readView, turnsBefore } from './views.js';
+import { ingestGone, ingestPlan, listPlans, readView, turnsBefore } from './views.js';
 import {
   ALERTS_KEEP,
   CLOCK_SKEW_MS,
@@ -611,10 +611,110 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
     }
 
     default: {
-      // Customer routes not built yet (the app WebSocket is BLG-65). The internal identity still
-      // has to be an app one for this project, and a member.
+      // Customer routes not built yet. The internal identity still has to be an app one for this
+      // project, and a member.
       const no = await appGuard(auth, route.params.pid, deps);
       return no ?? notImplemented();
     }
   }
+}
+
+// --- The WebSocket side (docs/studio-hub.md §10, §11) ---
+
+/** Deliver whatever is waiting; the shell turns each into a `deliver` frame on the daemon socket. */
+async function delivery(daemonId: string, deps: StudioDeps): Promise<Effect[]> {
+  const taken = await take(daemonId, deps);
+  const effects: Effect[] = [];
+  for (const expired of taken.expired) effects.push({ to: 'app', projectId: expired.projectId, frame: expired.receipt });
+  for (const item of taken.deliver) effects.push({ to: 'daemon', daemonId, msg: { t: 'deliver', seq: item.seq, project: item.daemonProjectId, action: item.action } });
+  return effects;
+}
+
+/** A daemon socket was accepted: keep its last-seen; nothing is sent until it says `hello`. */
+export async function onDaemonOpen(daemonId: string, deps: StudioDeps): Promise<Effect[]> {
+  const conn = await deps.studio.conn(daemonId);
+  if (conn) await deps.studio.putConn({ ...conn, lastSeenAt: deps.now });
+  return [];
+}
+
+/**
+ * One daemon frame (already authenticated by the connection). The fixed order is: `hello` →
+ * full `for` snapshots → `synced`, and only then deliveries. A bad frame is alerted and ignored,
+ * never closes the socket (a version difference must not start a reconnect storm).
+ */
+export async function onDaemonMessage(daemonId: string, raw: string, deps: StudioDeps): Promise<Effect[]> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    await deps.studio.alert(daemonId, 'bad-frame', deps.now);
+    return [];
+  }
+
+  // M3's incremental frame is reserved: ask for a full snapshot instead (docs/studio-hub.md §15).
+  if ((parsed as { t?: unknown } | null)?.t === 'patch') {
+    const patch = parsed as { readonly project?: unknown; readonly planRef?: unknown };
+    await deps.studio.alert(daemonId, 'patched-early', deps.now);
+    return typeof patch.project === 'string' ? [{ to: 'daemon', daemonId, msg: { t: 'resync', project: patch.project, ...(typeof patch.planRef === 'string' ? { planRef: patch.planRef } : {}) } }] : [];
+  }
+
+  const frame = DaemonUp.safeParse(parsed);
+  if (!frame.success) {
+    await deps.studio.alert(daemonId, 'bad-frame', deps.now);
+    return [];
+  }
+
+  const conn = await deps.studio.conn(daemonId);
+  if (!conn) return [{ to: 'close', tag: `daemon:${daemonId}`, code: 4003, reason: 'not-hello' }];
+  await deps.studio.putConn({ ...conn, lastSeenAt: deps.now });
+
+  switch (frame.data.t) {
+    case 'hello': {
+      if (frame.data.daemon !== daemonId) return [{ to: 'close', tag: `daemon:${daemonId}`, code: 4003, reason: 'not-hello' }];
+      if (frame.data.proto.major !== STUDIO_PROTO.major) {
+        return [{ to: 'daemon', daemonId, msg: { t: 'outdated' } }, { to: 'close', tag: `daemon:${daemonId}`, code: 4001, reason: 'outdated' }];
+      }
+      await deps.hub.replaceDaemonProjects(daemonId, frame.data.projects, deps.now);
+      return [{ to: 'daemon', daemonId, msg: { t: 'welcome', studio: deps.studioId, proto: STUDIO_PROTO } }];
+    }
+
+    case 'for': {
+      const result = frame.data.frame.t === 'plan'
+        ? await ingestPlan(daemonId, { project: frame.data.project, frame: frame.data.frame }, deps)
+        : await ingestGone(daemonId, { project: frame.data.project, planRef: frame.data.frame.planRef }, deps);
+      return [...result.effects];
+    }
+
+    case 'receipt': {
+      const result = await ack(daemonId, frame.data, deps);
+      if (!result.ok) return [];
+      return [{ to: 'app', projectId: result.projectId, frame: result.receipt }, ...(await delivery(daemonId, deps))];
+    }
+
+    case 'synced': {
+      await deps.studio.putConn({ ...conn, lastSeenAt: deps.now, synced: true });
+      return delivery(daemonId, deps);
+    }
+  }
+  return [];
+}
+
+/** A daemon socket closed. A replaced one leaves the connection to its successor (see §7.4). */
+export async function onDaemonClose(daemonId: string, at: number, deps: StudioDeps): Promise<Effect[]> {
+  const conn = await deps.studio.conn(daemonId);
+  if (!conn || conn.lastAt !== at) return [];
+  await deps.studio.putConn({ daemonId, lastAt: conn.lastAt, lastSeenAt: deps.now, synced: false });
+  await deps.studio.requeueTaken(daemonId);
+  return [];
+}
+
+/** A customer socket was accepted: send the last full view of every cached plan (only to it). */
+export async function onAppOpen(customerId: string, projectId: string, deps: StudioDeps): Promise<Effect[]> {
+  if (!(await deps.hub.canAccess(customerId, projectId))) return [{ to: 'close', tag: `app:${projectId}`, code: 4004, reason: 'not-yours' }];
+  const effects: Effect[] = [];
+  for (const row of await deps.studio.listViews(projectId)) {
+    const shown = await readView(projectId, row.planRef, deps);
+    if (shown) effects.push({ to: 'app', projectId, frame: { t: 'plan', rev: row.rev, view: shown.view } });
+  }
+  return effects;
 }
