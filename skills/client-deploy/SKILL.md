@@ -36,3 +36,16 @@ skills/client-deploy/pack.sh [--ref <tag>] [项目目录] [输出目录]
 - [ ] 在全新目录按说明部署成功,有手机尺寸截图
 - [ ] 包里没有密钥,变量只列了名字
 - [ ] 已把 tar.gz 和截图发回客户
+
+# 版本检查点与回退
+
+`skills/client-deploy/versions.sh`(`PROJECT=<项目目录>`,默认当前目录)。每个版本 = git tag + 部署包 + 手机截图,存在 `delivery/versions/<tag>/`(不进 git)。
+
+| 时机 | 命令 |
+|---|---|
+| 客户说"可以"(确认版本)后 | `versions.sh checkpoint round-N test-results/*.png`:建 tag(已有则复用)、打包、存截图 |
+| 客户问"有哪些版本/我之前的版本" | `versions.sh list`,用白话把每版的日期、说明发回,并用 `send_file` 把该版 `screenshots/` 里的图一起发(手机上就是"版本列表 + 截图") |
+| 客户说"回到上一版/回到第 N 版" | 先确认是哪一版(选择题,附该版截图),再 `versions.sh rollback <tag>`:拿到该版部署包 + `回退说明.md`,用 `send_file` 发给客户,告诉他交给运维按说明重新部署 |
+| 同时也要让源码回到那一版 | 加 `--git`:恢复文件并新增一个"回退到 <tag>"提交,历史不改,之后新改动继续往下打 tag |
+
+规则:回退前确认客户选的版本;不删 tag、不改历史;客户有数据库时提醒先备份。
