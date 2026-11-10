@@ -11,6 +11,27 @@
  * explicitly: nothing here reads the clock.
  */
 
+// --- Limits and lifetimes (docs/studio-hub.md §2); here so no rule module imports another ---
+
+export const STUDIO_LABEL = 'synon-studio-v1';
+export const LINK_CODE_TTL_MS = 15 * 60_000;
+export const CLOCK_SKEW_MS = 5 * 60_000;
+export const LOGIN_TOKEN_TTL_MS = 15 * 60_000;
+export const LOGIN_PER_EMAIL_PER_HOUR = 5;
+export const SESSION_TTL_MS = 30 * 86_400_000;
+export const QUEUE_TTL_MS = 7 * 86_400_000;
+export const TURNS_KEEP = 500;
+export const TURNS_PAGE = 50;
+export const VIEW_TURNS = 50;
+export const DELIVER_MAX = 50;
+export const RATE_PER_MIN = 20;
+export const RATE_PER_DAY = 300;
+export const RATE_CHARS_PER_DAY = 50_000;
+export const PREVIEW_TTL_MS = 15 * 60_000;
+export const OUTBOX_TTL_MS = 15 * 60_000;
+export const ALERTS_KEEP = 200;
+export const DAY_MS = 86_400_000;
+
 // --- Web Crypto helpers (no Node imports: the Worker and the browser run this) ---
 
 const enc = new TextEncoder();
@@ -284,6 +305,7 @@ export interface StudioStore {
 
   /** Mark queued/taken items older than `before` expired; returns what changed. */
   expire(before: number, now: number): Promise<readonly QueueItem[]>;
+
   /** Drop terminal queue and op rows older than `before`. */
   prune(before: number): Promise<void>;
 }
@@ -551,15 +573,13 @@ export function memoryStudio(limits: RateLimits = { perMinute: 20, perDay: 300, 
     },
     alerts: async (limit) => [...alerts].reverse().slice(0, limit),
 
-    expire: async (before, now) => {
+    expire: async (before) => {
       const out: QueueItem[] = [];
       for (let i = 0; i < queue.length; i++) {
         const q = queue[i]!;
         if ((q.state === 'queued' || q.state === 'taken') && q.enqueuedAt < before) {
           queue[i] = { ...q, state: 'expired' };
           out.push(queue[i]!);
-          const op = ops.get(q.opKey);
-          if (op) ops.set(q.opKey, { ...op, state: 'expired', updatedAt: now });
         }
       }
       return out;

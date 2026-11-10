@@ -224,11 +224,11 @@ describe('a daemon connection is signed', () => {
     const headers = { 'x-studio-daemon': daemonId, 'x-studio-at': String(at), 'x-studio-sig': signText(identity, STUDIO_LABEL, `connect:${daemonId}:${at}`) };
     const upgrade = request('GET', '/v1/daemon/ws', { headers });
 
-    const ok = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio }, { role: 'daemon', daemonId });
+    const ok = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio, studioId: 'st_test' }, { role: 'daemon', daemonId });
     expect(ok.status).toBe(200);
-    const wrong = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio }, { role: 'daemon', daemonId: 'B'.repeat(32) });
+    const wrong = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio, studioId: 'st_test' }, { role: 'daemon', daemonId: 'B'.repeat(32) });
     expect(wrong.status).toBe(403);
-    const notDaemon = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio }, { role: 'operator' });
+    const notDaemon = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio, studioId: 'st_test' }, { role: 'operator' });
     expect(notDaemon.status).toBe(403);
   });
 });

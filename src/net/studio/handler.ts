@@ -9,28 +9,57 @@
 
 import { z } from 'zod';
 import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, type AppFrame } from '../../studio/protocol.js';
-import { b64url, equalBytes, fromB64, sha256Hex, type Daemon, type HubStore, type StudioStore } from './store.js';
+import { enqueue, take } from './queue.js';
+import {
+  ALERTS_KEEP,
+  CLOCK_SKEW_MS,
+  DAY_MS,
+  DELIVER_MAX,
+  LINK_CODE_TTL_MS,
+  LOGIN_PER_EMAIL_PER_HOUR,
+  LOGIN_TOKEN_TTL_MS,
+  OUTBOX_TTL_MS,
+  PREVIEW_TTL_MS,
+  QUEUE_TTL_MS,
+  RATE_CHARS_PER_DAY,
+  RATE_PER_DAY,
+  RATE_PER_MIN,
+  SESSION_TTL_MS,
+  STUDIO_LABEL,
+  TURNS_KEEP,
+  TURNS_PAGE,
+  VIEW_TURNS,
+  b64url,
+  equalBytes,
+  fromB64,
+  sha256Hex,
+  type Daemon,
+  type HubStore,
+  type StudioStore,
+} from './store.js';
 
-// --- Limits and lifetimes (docs/studio-hub.md §2) ---
-
-export const STUDIO_LABEL = 'synon-studio-v1';
-export const LINK_CODE_TTL_MS = 15 * 60_000;
-export const CLOCK_SKEW_MS = 5 * 60_000;
-export const LOGIN_TOKEN_TTL_MS = 15 * 60_000;
-export const LOGIN_PER_EMAIL_PER_HOUR = 5;
-export const SESSION_TTL_MS = 30 * 86_400_000;
-export const QUEUE_TTL_MS = 7 * 86_400_000;
-export const TURNS_KEEP = 500;
-export const TURNS_PAGE = 50;
-export const VIEW_TURNS = 50;
-export const DELIVER_MAX = 50;
-export const RATE_PER_MIN = 20;
-export const RATE_PER_DAY = 300;
-export const RATE_CHARS_PER_DAY = 50_000;
-export const PREVIEW_TTL_MS = 15 * 60_000;
-export const OUTBOX_TTL_MS = 15 * 60_000;
-export const ALERTS_KEEP = 200;
-export const DAY_MS = 86_400_000;
+// Re-exported for the shell, the tests and the other rule modules; they live in store.ts so no
+// rule module has to import this one just for a constant.
+export {
+  ALERTS_KEEP,
+  CLOCK_SKEW_MS,
+  DAY_MS,
+  DELIVER_MAX,
+  LINK_CODE_TTL_MS,
+  LOGIN_PER_EMAIL_PER_HOUR,
+  LOGIN_TOKEN_TTL_MS,
+  OUTBOX_TTL_MS,
+  PREVIEW_TTL_MS,
+  QUEUE_TTL_MS,
+  RATE_CHARS_PER_DAY,
+  RATE_PER_DAY,
+  RATE_PER_MIN,
+  SESSION_TTL_MS,
+  STUDIO_LABEL,
+  TURNS_KEEP,
+  TURNS_PAGE,
+  VIEW_TURNS,
+};
 
 // --- Shared shapes (docs/studio-hub.md §1.1) ---
 
@@ -59,7 +88,7 @@ export interface Deps {
   readonly previewSecret?: string;
 }
 
-export type StudioDeps = Deps & { readonly studio: StudioStore };
+export type StudioDeps = Deps & { readonly studio: StudioStore; readonly studioId: string };
 
 /** What the shell executes after a WebSocket or an HTTP call. */
 export type Effect =
@@ -461,6 +490,24 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
         daemons: conns.map((c) => ({ id: c.daemonId, online: c.connectedAt !== undefined, synced: c.synced, connectedAt: c.connectedAt ?? null, lastSeenAt: c.lastSeenAt })),
         alerts: await deps.studio.alerts(50),
       });
+    }
+
+    case 'app-actions': {
+      if (auth.role !== 'app') return failure(403, 'not-yours');
+      if (route.params.pid !== auth.projectId) return failure(403, 'not-yours');
+      if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
+      const result = await enqueue(await readJson(req), { studio: deps.studioId, projectId: auth.projectId, customerId: auth.customerId }, deps);
+      if (!result.ok) return failure(result.status, result.error);
+      const effects: Effect[] = [];
+      if (result.receipt.state === 'queued') {
+        const project = await deps.hub.project(auth.projectId);
+        if (project?.daemonId) {
+          const taken = await take(project.daemonId, deps);
+          for (const e of taken.expired) effects.push({ to: 'app', projectId: e.projectId, frame: e.receipt });
+          for (const d of taken.deliver) effects.push({ to: 'daemon', daemonId: project.daemonId, msg: { t: 'deliver', seq: d.seq, project: d.daemonProjectId, action: d.action } });
+        }
+      }
+      return { status: 200, body: { receipt: result.receipt }, effects };
     }
 
     default: {
