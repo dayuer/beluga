@@ -1014,6 +1014,31 @@
   text-transform: uppercase;
   color: var(--text-3);
 }
+/* A milestone's design (from the plan's architect): folded to its heading until opened. */
+.designFold > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: default;
+  list-style: none;
+}
+.designFold > summary::-webkit-details-marker {
+  display: none;
+}
+.designFold > summary::before {
+  content: '▸';
+  font-size: 10px;
+  color: var(--text-3);
+}
+.designFold[open] > summary::before {
+  content: '▾';
+}
+.designFold > summary h4 {
+  margin: 0;
+}
+.designFold > summary span {
+  font-size: 12px;
+}
 .checks,
 .plainList {
   list-style: none;

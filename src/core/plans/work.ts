@@ -13,14 +13,14 @@ import { coherenceWarnings, warningsText } from './coherence.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerAgentOf, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, architectOf, checkerAgentOf, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { PlanMover } from './move-work.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
 import { liveFrom } from './progress.js';
 import { type PlanGit, planGitOf } from './plan-git.js';
 import { type Plans, UNTITLED } from './plans.js';
-import { checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
+import { architectBrief, checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
 
 /**
  * Plans at work: making a plan (its own conversation, in the project's main folder where Claude
@@ -127,6 +127,12 @@ export class PlansWork {
               return ws?.id;
             },
             retireChat: (id) => void deps.controller!.archive(id, false, { quiet: true }).catch(() => undefined),
+            // Each milestone's design, before its work starts: on the plan's agent for its architecture.
+            architectChat: async (plan, milestone) => {
+              const ws = await deps.controller!.newChat(plan.projectId, `Design: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
+              if (ws && plan.archAgent) deps.controller!.manager.setAgent(ws.id, plan.archAgent);
+              return ws?.id;
+            },
           }
         : {}),
       ...(deps.alive ? { alive: deps.alive } : {}),
@@ -378,6 +384,15 @@ export class PlansWork {
     return agent ? `${agentName(agent, { model: true })} checks this plan’s milestones and reviews its drafts` : 'The agent for its work checks this plan’s milestones';
   }
 
+  /**
+   * Who writes each milestone's technical design before its work starts: `agent`, or nobody (null:
+   * milestones start right away, as before). Milestones already at work keep going. → in words.
+   */
+  setArchAgent(id: string, agent: AgentRef | null): string {
+    this.plans.setArchAgent(id, agent ?? undefined, this.me());
+    return agent ? `${agentName(agent, { model: true })} designs each of this plan’s milestones before its work starts` : 'This plan’s milestones start without a design';
+  }
+
   pass(id: string, milestone: string): Plan {
     return this.pilot.pass(id, milestone, this.me());
   }
@@ -486,6 +501,14 @@ export class PlansWork {
       const m = view.milestones.find((x) => x.milestone.id === checking.milestone);
       return m ? { tools: this.checkerTools(checking.plan.id, m.milestone.id), brief: checkerBrief(view, m), checker: true } : undefined;
     }
+    // A milestone's architect: its brief, and only plan_get and plan_design (it reads code, changes none).
+    const designing = architectOf(this.plans.state(), channel);
+    if (designing) {
+      if (designing.plan.status !== 'active' || !designing.plan.body || designing.plan.movedTo) return undefined;
+      const view = this.pilot.view(designing.plan);
+      const m = view.milestones.find((x) => x.milestone.id === designing.milestone);
+      return m && !m.run.passedAt ? { tools: this.architectTools(designing.plan.id, m.milestone.id), brief: architectBrief(view, m), checker: true } : undefined;
+    }
     const plan = planForHome(this.plans.state(), channel);
     if (!plan) return undefined;
     const board = this.deps.store.getState().board;
@@ -563,6 +586,36 @@ export class PlansWork {
         this.deps.store.dispatch({ type: 'system', channel: plan.home, text: `“${m.title}” didn’t pass its check: ${first}`, level: 'info' });
         this.deps.askClaude(checkFailedPrompt(m.title, notes, auto), plan.home, false);
         return 'Recorded as failed. The plan’s Claude adds the fix tasks from your notes. Your check is done: end your turn.';
+      },
+    };
+  }
+
+  /**
+   * A milestone's architect: it reads the plan (and the code) and records that milestone's design,
+   * nothing more. Recording it says so in the plan's conversation, and the milestone's work starts.
+   */
+  private architectTools(planId: string, milestoneId: string): PlanTools {
+    const full = this.toolsFor(planId);
+    const refuse = (): never => {
+      throw new Error('You design this milestone: only plan_get and plan_design are yours here');
+    };
+    return {
+      only: ['plan_get', 'plan_design'],
+      get: full.get,
+      write: refuse,
+      update: refuse,
+      gate: refuse,
+      start: async () => refuse(),
+      message: refuse,
+      design: (milestone, design) => {
+        const plan = this.plans.need(planId);
+        const m = plan.body?.milestones.find((x) => x.id === milestoneId);
+        if (!m) throw new Error('That milestone isn’t in the approved plan any more: nothing to record');
+        if (milestone !== m.id && milestone.toLowerCase() !== m.title.toLowerCase()) throw new Error(`You design “${m.title}” only (id ${m.id})`);
+        const started = Boolean(plan.runs[m.id]?.agent);
+        this.plans.recordDesign(planId, m.id, design, this.claude());
+        this.deps.store.dispatch({ type: 'system', channel: plan.home, text: started ? `“${m.title}”’s design is written: its agent was already at work.` : `“${m.title}”’s design is written: its work starts next.`, level: 'info' });
+        return 'Recorded. Your design is done: end your turn.';
       },
     };
   }
