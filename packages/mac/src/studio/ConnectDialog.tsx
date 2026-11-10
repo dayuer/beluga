@@ -6,6 +6,7 @@ import { Button } from '../components/ui.js';
 import { Group, Row, Switch } from '../dialogs/settings-controls.js';
 import { type Key, useT } from '../i18n/index.js';
 import { useApi } from '../lib/beluga.js';
+import { useClock } from '../lib/window-active.js';
 import { closeStudioDialog, openStudioDialog, setStudioLinked, useStudioDialog, useStudioLinked } from './studio-dialog.js';
 
 /**
@@ -69,30 +70,26 @@ function StudioBody({ projectId }: { projectId?: string }) {
   const [showHub, setShowHub] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [trouble, setTrouble] = useState<string>();
-  const [now, setNow] = useState(() => Date.now());
+  // Every two seconds while the dialog is open and you're looking at the window: the clock rests
+  // otherwise (lib/window-active, KLD-40), so a dialog left open in another Space asks nothing.
+  const now = useClock(true, 2_000);
 
   useEffect(() => {
     let alive = true;
-    const refresh = async (): Promise<void> => {
+    void (async () => {
       try {
         const next = await api.studio.status();
         if (!alive) return;
         setStatus(next);
         setStudioLinked(next.linked);
       } catch {
-        // The daemon may be restarting; the next poll says.
+        // The daemon may be restarting; the next tick says.
       }
-    };
-    void refresh();
-    const timer = setInterval(() => {
-      setNow(Date.now());
-      void refresh();
-    }, 2_000);
+    })();
     return () => {
       alive = false;
-      clearInterval(timer);
     };
-  }, [api]);
+  }, [api, now]);
 
   const reason = (error: string): string => {
     const key = ERROR_KEYS[error];

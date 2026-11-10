@@ -25,6 +25,8 @@ export type GateAnswerResult = { readonly ok: true; readonly state: 'approved' |
 
 export interface GateRecord {
   readonly id: string;
+  /** The studio that asked: a Gate left over from another studio must never surface to this one. */
+  readonly studio: string;
   readonly planId: string;
   readonly planRef: string;
   readonly projectId: string;
@@ -55,13 +57,15 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 
 function recordOf(raw: unknown): GateRecord | undefined {
   if (!isRecord(raw)) return undefined;
-  const { id, planId, planRef, projectId, kind, state, draftRev, opId, askedAt, by, reason, settledAt } = raw;
+  const { id, studio, planId, planRef, projectId, kind, state, draftRev, opId, askedAt, by, reason, settledAt } = raw;
   if (typeof id !== 'string' || typeof planId !== 'string' || typeof planRef !== 'string' || typeof projectId !== 'string') return undefined;
   if (kind !== 'start' && kind !== 'changes') return undefined;
   if (state !== 'pending' && state !== 'approved' && state !== 'declined' && state !== 'void') return undefined;
   if (typeof draftRev !== 'number' || !Number.isFinite(draftRev) || typeof opId !== 'string' || typeof askedAt !== 'number' || !Number.isFinite(askedAt)) return undefined;
   return {
     id,
+    // A file written before the studio id was kept has none: read it as this studio's once.
+    studio: typeof studio === 'string' ? studio : '',
     planId,
     planRef,
     projectId,
@@ -109,21 +113,29 @@ export class StudioGates {
   /** A start or change request from the inbox: a Gate, or the code that says why not. */
   request(plan: Plan, kind: 'start' | 'changes', draftRev: number, opId: string, by?: string): 'not-open' | 'not-allowed' | undefined {
     const cfg = this.config();
-    if (!cfg) return 'not-allowed';
+    if (!cfg || !cfg.projects[plan.projectId]) return 'not-allowed';
     if (kind === 'start') {
       const draft = plan.draft ?? plan.body;
       // Nothing to start without milestones; and a fresh agent's review is already on its way (BLG-772).
       if (!draft?.milestones.length || reviewState(plan) === 'reviewing') return 'not-open';
+    } else if (!plan.draft) {
+      // An "apply the changes" Gate without a draft has nothing to apply (it would fail on approve).
+      return 'not-open';
     }
     // One Gate at a time per plan: the same draft keeps the card the operator already has.
     const pending = this.records.find((g) => g.planId === plan.id && g.state === 'pending');
     if (pending && pending.draftRev === draftRev) return undefined;
     if (pending) pending.state = 'void';
 
-    let id = `g-${opId.slice(0, 8)}`;
-    if (this.records.some((g) => g.id === id && g.opId !== opId)) id = `g-${opId.slice(0, 12)}`;
+    // The opId is scoped to a plan, so the same opId may legally name a request on two plans (the
+    // hub keys them separately). A Gate id must still be unique across every card: the operator
+    // answers by it, and a collision would start the other plan (audit F2).
+    const base = `g-${opId.slice(0, 8)}`;
+    let id = base;
+    for (let n = 1; this.records.some((g) => g.id === id); n++) id = `${base}-${n}`;
     const record: GateRecord = {
       id,
+      studio: cfg.studioId,
       planId: plan.id,
       planRef: refOf(cfg.refKey, 'plan', plan.id),
       projectId: plan.projectId,
@@ -145,6 +157,13 @@ export class StudioGates {
     const gate = this.records.find((g) => g.id === gateId);
     if (!gate || gate.state === 'void') return { ok: false, error: 'gone' };
     if (gate.state !== 'pending') return { ok: false, error: 'settled' };
+    const cfg = this.config();
+    // The project was unshared, or this Gate was another studio's: it can't start anything here.
+    if (!cfg || !cfg.projects[gate.projectId] || (gate.studio && gate.studio !== cfg.studioId)) {
+      gate.state = 'void';
+      this.changed(gate.planId);
+      return { ok: false, error: 'gone' };
+    }
     const plan = this.plan(gate.planId);
     if (!plan) {
       gate.state = 'void';
@@ -202,9 +221,12 @@ export class StudioGates {
 
   /** The pending Gates as cards (the store's `studio.gates`). */
   needs(): readonly StudioGateNeed[] {
+    const cfg = this.config();
+    if (!cfg) return [];
+    const shared = new Set(Object.keys(cfg.projects));
     const state = this.store.getState();
     return this.records
-      .filter((g) => g.state === 'pending')
+      .filter((g) => g.state === 'pending' && shared.has(g.projectId) && (!g.studio || g.studio === cfg.studioId))
       .flatMap((g): StudioGateNeed[] => {
         const plan = this.plan(g.planId);
         if (!plan) return [];
@@ -304,11 +326,18 @@ export class StudioGates {
     // Keep settled Gates long enough for a client to read the answer; pending ones always.
     const cut = this.now() - OPID_KEEP_MS;
     this.records = this.records.filter((g) => g.state === 'pending' || g.settledAt === undefined || g.settledAt >= cut);
+    // A file from another studio (unlinked without a clean unlink, or a key that had to be thrown
+    // away): its Gates stay out. A record with no studio in the file is this one's.
+    const studio = this.config()?.studioId;
+    if (studio) this.records = this.records.filter((g) => !g.studio || g.studio === studio);
   }
 
-  /** Unlinked: whatever waited on you is void (it can't start anything any more). */
+  /**
+   * Unlinked: every Gate is void. The plan may be shared with another studio later, and a settled
+   * answer (or a decline reason) was that studio's, not the next one's.
+   */
   unlink(): void {
-    for (const gate of this.records) if (gate.state === 'pending') gate.state = 'void';
+    for (const gate of this.records) gate.state = 'void';
   }
 
   // --- helpers ---

@@ -367,6 +367,14 @@ export function planView(plan: Plan, board: BoardState, live: Live = NOBODY_LIVE
   return { ...view, next: nextStep(plan, view) };
 }
 
+/**
+ * A milestone that can be passed now: it's at its gate, and there is something to go on — Claude's
+ * check came back, or there is nothing to check. A milestone whose check hasn't run yet isn't
+ * passable, by the operator or a Studio customer (docs/studio-gates.md §5).
+ */
+export const passable = (m: MilestoneView): boolean =>
+  m.state === 'gate' && (Boolean(m.run.check) || !m.milestone.criteria.length) && !(m.autonomy === 'autopilot' && m.milestone.criteria.length);
+
 function nextStep(plan: Plan, v: Omit<PlanView, 'next'>): NextStep {
   if (plan.status === 'done') {
     if (plan.draft) return { kind: 'review_changes' };
@@ -388,7 +396,7 @@ function nextStep(plan: Plan, v: Omit<PlanView, 'next'>): NextStep {
   if (merging?.merging) return { kind: 'merging', milestone: merging, text: mergingText(merging.merging, merging.milestone.title, plan.branch) };
   // Yours to pass only once there's something to go on: Claude's check came back (or there's
   // nothing to check). While the head Claude checks, on every mode, the plan waits on Claude.
-  const yoursToPass = v.open.find((m) => m.state === 'gate' && (m.run.check || !m.milestone.criteria.length) && !(m.autonomy === 'autopilot' && m.milestone.criteria.length));
+  const yoursToPass = v.open.find(passable);
   if (yoursToPass) return { kind: 'pass', milestone: yoursToPass };
   const autonomyOfTask = new Map(v.open.map((m) => [m.milestone.id, m.autonomy]));
   // Tasks for you, or (step by step) every task, wait for your click.

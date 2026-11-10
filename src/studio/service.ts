@@ -1,5 +1,7 @@
 import { dirname, join } from 'node:path';
 import os from 'node:os';
+import { customerTurns } from '../core/plans/customer-turns.js';
+import { parseDecisionQid } from '../core/plans/decisions.js';
 import type { Autonomy } from '../core/plans/model.js';
 import { needPlans } from '../core/plans/registry.js';
 import type { Store } from '../core/store.js';
@@ -82,11 +84,22 @@ export function plansExec(session: object): InboxExec {
       await plans().verify(planId, false);
     },
     pass: (planId, milestoneId) => void plans().pass(planId, milestoneId),
-    sendBack: (planId, milestoneId, wrappedNote) => void plans().sendBack(planId, milestoneId, wrappedNote),
+    sendBack: (planId, milestoneId, wrappedNote) => void plans().sendBack(planId, milestoneId, wrappedNote, { customerTurn: true }),
     discard: (planId) => void plans().discard(planId),
     answer: (qid, a) => {
       if (!questions) throw new Error('This daemon has no questions store');
-      questions.answer(qid, a);
+      // The answer is a customer's (the inbox only runs customer actions): the head Claude's turn
+      // that follows it is limited too, exactly like a chat message (docs/studio-gates.md §5.3). If
+      // no run comes, customer-turns drops the marker after its grace.
+      const decision = parseDecisionQid(qid);
+      const plan = decision ? plans().plans.get(decision.plan) : undefined;
+      if (plan) customerTurns.begin(plan.home);
+      try {
+        questions.answer(qid, a);
+      } catch (err) {
+        if (plan) customerTurns.end(plan.home);
+        throw err;
+      }
     },
   };
 }

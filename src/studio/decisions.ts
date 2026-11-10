@@ -17,7 +17,7 @@ import type { CustomerDecision, PlanFacts } from './actions.js';
 
 /** Accounts, keys, money and the things only the operator holds (matched on the question and options). */
 export const SENSITIVE =
-  /(密钥|秘钥|token|密码|口令|账号|帐号|账户|付款|支付|银行卡|信用卡|证书|域名|商店后台|后台账号|api[\s_-]*key|password|passphrase|secret|credential|billing|payment|card number|certificate|keystore|private key)/i;
+  /(密钥|秘钥|token|密码|口令|账号|帐号|账户|付款|支付|银行卡|信用卡|证书|域名|商店后台|后台账号|api[\s_-]*key|password|passphrase|secret|credential|billing|payment|card number|certificate|keystore|private key|account|domain|console|payout|invoice|app store connect|\bkeys?\b)/i;
 
 const wordsOf = (task: PlanTask): string => {
   const d = task.decision;
@@ -55,7 +55,9 @@ function eligible(view: PlanView): Eligible[] {
     .flatMap((m, i) =>
       m.tasks.flatMap((t, j): Eligible[] => {
         const task = t.task;
-        if (!task.decision || operatorOnly(task)) return [];
+        // A decision is a task of yours (assignee "me"): a question on an agent task is never
+        // posed, so answering one here would be recorded nowhere (audit F10).
+        if (task.assignee !== 'me' || !task.decision || operatorOnly(task)) return [];
         return [
           {
             task,

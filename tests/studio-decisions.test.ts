@@ -185,6 +185,30 @@ describe('which decisions reach the customer (BLG-79)', () => {
     expect(closed).toMatchObject({ ok: false, code: 'not-open' });
   });
 
+  it('the sensitive fallback knows English accounts, domains and keys too', () => {
+    const decide = (question: string) =>
+      operatorOnly({ id: 'x', title: 't', acceptance: [], blockedBy: [], assignee: 'me', audience: 'customer', decision: { question, options: [{ label: 'A' }] } });
+    expect(decide('Which App Store Connect account should publish it?')).toBe(true);
+    expect(decide('Which domain should the site use?')).toBe(true);
+    expect(decide('Which key do we use?')).toBe(true);
+    expect(decide('Which colour?')).toBe(false);
+  });
+
+  it('a decision on an agent task is never the customer’s (it is never posed)', () => {
+    const body: PlanBody = {
+      ...BODY,
+      milestones: [
+        {
+          ...BODY.milestones[0]!,
+          tasks: [...BODY.milestones[0]!.tasks, { id: 't5', title: 'Build it', acceptance: [], blockedBy: [], assignee: 'claude', audience: 'customer', decision: { question: 'Which?', options: [{ label: 'A' }] } }],
+        },
+      ],
+    };
+    const { view } = world({ body });
+    expect(customerDecisions(view)['d-m0-t5']).toBeUndefined();
+    expect(Object.keys(customerDecisions(view))).toEqual(['d-m0-t0', 'd-m0-t3']);
+  });
+
   it('carries the audience through the plan writer', () => {
     const body = normalizeBody({
       title: 'Shop',

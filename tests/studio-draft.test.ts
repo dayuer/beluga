@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { Actor } from '../src/core/board/model.js';
 import type { Plan, PlanBody, PlanTask } from '../src/core/plans/model.js';
+import { Plans } from '../src/core/plans/plans.js';
 import { planView } from '../src/core/plans/progress.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { Project } from '../src/workspaces/types.js';
@@ -172,6 +174,24 @@ describe('the draft a customer sees and applies (BLG-80)', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(receipts[4]).toMatchObject({ state: 'refused', code: 'not-allowed' });
     expect(discarded).toEqual(['pl1']);
+  });
+
+  it('a rename moves the draft revision a Gate is bound to', () => {
+    const store = storeWith([]);
+    const plans = new Plans({ store, dir: null });
+    const me: Actor = { kind: 'person', id: 'me', name: 'Kay' };
+    const plan = plans.create({ projectId: 'p1', home: 'ws:home' }, me);
+    plans.writeDraft(plan.id, { title: 'Shop', goal: 'Go', milestones: [{ title: 'M', criteria: ['works'], tasks: [{ title: 'T' }] }] }, me);
+    const before = store.getState().plans.plans[0]!.draftRev;
+    plans.retitle(plan.id, 'Shop, renamed', me);
+    expect(store.getState().plans.plans[0]!.draftRev).toBe(before + 1);
+  });
+
+  it('refuses an “apply the changes” Gate when there is no draft to apply', () => {
+    const store = storeWith([planOf({ draft: undefined })]);
+    const gates = new StudioGates({ store, config, approve: () => undefined, persist: () => undefined, touch: () => undefined, now: () => 1_000 });
+    expect(gates.request(store.getState().plans.plans[0]!, 'changes', 5, crypto.randomUUID())).toBe('not-open');
+    expect(gates.needs()).toEqual([]);
   });
 
   it('raises an “apply the changes” Gate with the added numbers, and one that a moved draft never approves', () => {

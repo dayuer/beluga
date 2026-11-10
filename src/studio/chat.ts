@@ -100,9 +100,14 @@ export class StudioChat {
     this.unsub();
   }
 
-  /** Unlinked: what waited for a studio that is gone is not sent when another one links. */
+  /**
+   * Unlinked: what waited for that studio is not sent, and what it said (either side's words) does
+   * not become the next studio's conversation. The plan may be shared again elsewhere.
+   */
   unlink(): void {
     this.pending = [];
+    this.sent = [];
+    this.said = [];
     this.persist();
   }
 
@@ -159,12 +164,14 @@ export class StudioChat {
   // --- the file's chat section (the inbox owns the file) ---
 
   dump(): unknown {
-    return { pending: [...this.pending], sent: this.sent.slice(-KEEP), said: this.said.slice(-KEEP) };
+    return { studio: this.config()?.studioId, pending: [...this.pending], sent: this.sent.slice(-KEEP), said: this.said.slice(-KEEP) };
   }
 
   restore(rows: unknown): void {
-    const raw = rows as { pending?: unknown; sent?: unknown; said?: unknown } | null;
+    const raw = rows as { studio?: unknown; pending?: unknown; sent?: unknown; said?: unknown } | null;
     if (!raw || typeof raw !== 'object') return;
+    // A file written before the studio id was kept is this studio's; one with another id is not.
+    if (typeof raw.studio === 'string' && raw.studio !== this.config()?.studioId) return;
     this.pending = Array.isArray(raw.pending) ? raw.pending.filter(isMessage).slice(-KEEP) : [];
     this.sent = Array.isArray(raw.sent) ? raw.sent.filter(isMessage).slice(-KEEP) : [];
     this.said = Array.isArray(raw.said) ? raw.said.filter(isSaid).slice(-KEEP) : [];

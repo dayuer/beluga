@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Plan } from '../core/plans/model.js';
-import { planView, type PlanView } from '../core/plans/progress.js';
+import { passable, planView, type PlanView } from '../core/plans/progress.js';
 import type { Store, StudioGateNeed } from '../core/store.js';
 import type { DaemonUp } from '../net/studio/handler.js';
 import { OPID_KEEP_MS, OpLog, callRefusal, checkAction, opIdOf, opKey, wrapCustomerText, type ActionContext, type InternalCall, type PlanFacts } from './actions.js';
@@ -300,6 +300,10 @@ export class StudioInbox {
     const by = typeof (f as Deliver & { by?: unknown }).by === 'string' ? (f as Deliver & { by: string }).by.slice(0, 100) : undefined;
     if ('gate' in verdict && verdict.gate) {
       // A start or a change request: the Gate is the only thing it produces. No plans.* call here.
+      // The pending marker goes down first: a crash between the Gate and its receipt must not raise
+      // a second Gate on a redelivery (the Gate may be settled by then, so the reuse check misses it).
+      this.pending.set(key, { at: this.now() });
+      this.persist();
       const code = this.plugs.gates.request(plan!, verdict.gate.kind, verdict.gate.draftRev, opId, by);
       this.finish(key, code ? refused(opId, code) : done(opId, planRef));
       return;
@@ -398,7 +402,7 @@ export class StudioInbox {
   private factsOf(plan: Plan, view: PlanView): PlanFacts {
     const milestones: Record<string, { id: string; awaitingReview: boolean }> = {};
     view.milestones.forEach((m, i) => {
-      milestones[`m${i}`] = { id: m.milestone.id, awaitingReview: m.state === 'gate' };
+      milestones[`m${i}`] = { id: m.milestone.id, awaitingReview: passable(m) };
     });
     return {
       id: plan.id,

@@ -3,6 +3,7 @@ import { decideTool } from '../src/agent/policy.js';
 import { Board } from '../src/core/board/board.js';
 import { BoardWork } from '../src/core/board/work.js';
 import { customerTurns } from '../src/core/plans/customer-turns.js';
+import { attachPlans } from '../src/core/plans/registry.js';
 import type { Plan, PlanBody } from '../src/core/plans/model.js';
 import { Plans } from '../src/core/plans/plans.js';
 import { planView } from '../src/core/plans/progress.js';
@@ -12,6 +13,7 @@ import type { WorkspaceController } from '../src/core/workspace-controller.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 import { CUSTOMER_OPEN } from '../src/studio/actions.js';
 import { StudioChat, type StudioChatSession } from '../src/studio/chat.js';
+import { plansExec } from '../src/studio/service.js';
 import type { StudioConfig } from '../src/studio/keys.js';
 import { StudioAction } from '../src/studio/protocol.js';
 import { studioPlanView } from '../src/studio/view.js';
@@ -210,6 +212,16 @@ describe('the customer’s conversation (BLG-78)', () => {
     expect(decideTool('Bash', { command: 'ls' }, policy)).toBe('deny');
   });
 
+  it('unlink drops the conversation with that studio (a plan shared elsewhere starts clean)', () => {
+    const w = world();
+    w.chat.accept(w.plan, opId(), 'Hello');
+    w.chat.say('pl1', 'Hi there');
+    expect(w.chat.extras('pl1').turns?.length).toBeGreaterThan(0);
+    w.chat.unlink();
+    expect(w.chat.extras('pl1').turns).toEqual([]);
+    expect(w.chat.extras('pl1').typing).toBe(false);
+  });
+
   it('puts the operator’s own words in the turns as “名字 · Synon Studio”', () => {
     const w = world();
     expect(w.chat.say('pl1', 'We will start on Monday.')).toEqual({ ok: true });
@@ -272,5 +284,34 @@ describe('the customer turn’s tools (BLG-78)', () => {
     expect(t.activeOf()).toBe(true);
     expect(customerTurns.active('ws:c1')).toBe(true);
     customerTurns.end('ws:c1');
+  });
+
+  it('a milestone sent back by the customer limits the turn it starts', () => {
+    const t = setup();
+    const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.boardWork.myClaude());
+    t.plans.writeDraft(
+      plan.id,
+      { title: 'Shop', goal: 'Go', milestones: [{ title: 'M', criteria: ['works'], tasks: [{ title: 'T' }] }] },
+      t.boardWork.myClaude(),
+    );
+    t.work.approve(plan.id);
+    const milestone = t.plans.get(plan.id)!.body!.milestones[0]!.id;
+    t.work.sendBack(plan.id, milestone, 'Make it blue', { customerTurn: true });
+    expect(t.activeOf()).toBe(true);
+    expect(customerTurns.active('ws:main')).toBe(true);
+    expect(t.work.forRun('ws:main', 'p-me')?.customerTurn).toBe(true);
+    customerTurns.end('ws:main');
+  });
+
+  it('a customer’s decision answer limits the turn it starts', () => {
+    const t = setup();
+    const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.boardWork.myClaude());
+    const answered: unknown[] = [];
+    const session = { questions: { answer: (...args: unknown[]) => void answered.push(args) } };
+    attachPlans(session, t.work);
+    plansExec(session).answer(`decide:${plan.id}:t1`, { kind: 'answers', answers: { Q: 'A' } });
+    expect(answered).toHaveLength(1);
+    expect(customerTurns.active('ws:main')).toBe(true);
+    customerTurns.end('ws:main');
   });
 });

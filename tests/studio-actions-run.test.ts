@@ -284,6 +284,18 @@ describe('the studio inbox (BLG-73)', () => {
     expect(w.sent[0]).toMatchObject({ opId: a.opId, state: 'refused', code: 'already-done' });
   });
 
+  it('answers already-done for a start request a restart interrupted, and raises no Gate', async () => {
+    const file = join(tempDir(), 'studio-inbox.json');
+    const a = action('plan.requestStart', { draftRev: 3 }, PLAN_REF);
+    const key = opKey({ studio: 'st1', project: PROJECT_REF, plan: PLAN_REF }, a.opId as string);
+    writeFileSync(file, JSON.stringify({ v: 1, ops: [], pending: [[key, { at: 1_000 }]], gates: [], chat: [] }));
+    const w = world({ file });
+    w.deliver(a);
+    await until(() => w.sent.length === 1);
+    expect(w.sent[0]).toMatchObject({ opId: a.opId, state: 'refused', code: 'already-done' });
+    expect(w.gates.requests).toEqual([]);
+  });
+
   it('replays on day 13 but has pruned the receipt by day 15', async () => {
     const file = join(tempDir(), 'studio-inbox.json');
     const a = action('plan.verify', {}, PLAN_REF);

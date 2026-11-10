@@ -160,8 +160,9 @@ BLG-73 交付的插件桩：`gates.request` / `chat.accept` 一律返回 `'not-a
 - 加载时 `prune`：`ops` 与 `pending` 都按 14 天清；`gates` 里**待批的永远保留**，已结（approved/declined/void）且 `settledAt` 超过 14 天的清掉（见 §3.5）。
 - `pending` 是文件里独立的一段（不是 `OpLog`）：设计稿的 `{v:1, ops, gates, chat}` 少了它，重启后「执行到一半」
   就无法和「没执行过」区分。这是对设计稿的一处补充。
-- **解绑（`studio.unlink`）**：待批的 Gate 记 `void`，`studio` slice 清空，opLog 保留（键里有 studio id，重绑一个
-  新工作室不会撞），文件保留。
+- **解绑（`studio.unlink`）**：**所有** Gate 记 `void`（已结的批/驳理由也是上一家工作室的），对话的
+  pending/sent/said 清空（旧客户的对话不回放给下一家），`studio` slice 清空；opLog 保留（键里有 studio id，
+  重绑一个新工作室不会撞），文件保留。Gate 记录带 `studio`，`restore` 丢掉别的工作室的。
 
 ### 2.6 store slice（core，browser-safe）
 
@@ -204,7 +205,8 @@ StudioGateNeed = {
 
 ```ts
 export interface GateRecord {
-  id: string;                  // 'g-' + opId 前 8 位
+  id: string;                  // 'g-' + opId 前 8 位，撞了加 '-1'、'-2' 直到全局唯一
+  studio: string;              // 产生它的工作室：换绑后旧 Gate 不出现、也不能答
   planId: string; planRef: string; projectId: string;
   kind: 'start' | 'changes';
   state: 'pending' | 'approved' | 'declined' | 'void';
@@ -260,10 +262,13 @@ stateDiagram-v2
 ### 3.3 请求
 
 - `start`：草稿必须有里程碑；`reviewState(plan) !== 'reviewing'`（复审中不出卡，和原生 approve 卡一致）；否则
-  `not-open`。`changes`：只要求 `draftRev` 一致（收件箱已经查过 `plan.started`）。
+  `not-open`。`changes`：要有草稿、`draftRev` 一致（收件箱已经查过 `plan.started`）。项目不在当前共享列表里
+  （刚取消共享）→ `not-allowed`。
+- `id = 'g-' + opId 前 8 位`；opId 的作用域含计划，所以同一个 opId 可以在两个计划上各请求一次——两张卡**必须**
+  不同 id，撞了就加 `-1`、`-2` 直到全局唯一（`answer` 只按 id 找唯一一条）。
 - 同一计划已有 pending：`draftRev` 相同就沿用这一张（返回 `undefined`，收件箱回执 `done`，不重复出卡）；不同就
   把旧的记 `void`、新建一张。这样客户改完再确认时，Mac 上不会有第二张旧卡。
-- `id = 'g-' + opId.slice(0, 8)`；`askedAt = now()`；`by` 有就用，没有就用项目名（`state.projects` 的名字）。
+- `askedAt = now()`；`by` 有就用，没有就用项目名（`state.projects` 的名字）。
 - 写盘、`dispatch studio_state`、`touch(planId)`；`PlanView` 的 `gate` 字段由 `viewGate` 提供。
 
 ### 3.4 批准
@@ -284,6 +289,10 @@ stateDiagram-v2
 `approve` 的注入点只有 `service.ts` 一行（`approve: (planId) => plansWork.approve(planId)`）。测试用 spy 记录
 每一次 `approve` 和 `verify` 的参数；grep 只在 `src/studio/` 里查 `\.approve\(|plans\.approve`，允许出现的只有
 `gates.ts` 的这一次调用（`needs-you.ts` 的原生卡在共享计划上不出，见 §3.6）。
+
+**外部 agent**（`actingVia()` 非空）对共享计划的 `plans.approve` 与 `plans.verify {thenApprove}` 直接被
+`PlansWork` 拒绝：它可能先改草稿（`plans.update` 没有卡）再请主人批一张不含客户 rev 的卡。运营方自己的 Mac/
+手机/`machines` 原生批准仍在，按设计 §3.3 由 `reconcile` 回收成 `approved`（客户不会看到未确认的 rev，见风险）。
 
 ### 3.5 驳回与 reconcile
 
@@ -466,8 +475,12 @@ stateDiagram-v2
 - 实现：`PlanWork.forRun(channel, from)` 发现 `customerTurns.active(channel)` 时只给 `plan_get` /
   `plan_write` / `plan_update`（照 checker 的 `only: [...]` 写法）；运行时把 `customerTurn: true` 放进
   `PolicyContext`，`decideTool` 按上表判。
+- **三条入口都受限**，不只是聊天：客户消息（chat）、`milestone.sendBack` 的原因、客户对决策的自由回答，都在
+  `askClaude`/`questions.answer` 之前 `customerTurns.begin(home)`。sendBack 与决策回答由 `plansExec` 传
+  `{customerTurn:true}` / 在答案前 begin；决策回答可能不产生 run，`customer-turns.ts` 的 30 秒宽限（unref 计时器）
+  会在没有 run 时撤掉标记，免得限制到运营方下一轮。
 - `PlanWork.create(..., { customerTurn: true })` 在 `askClaude` **之前**就 `begin`，所以首轮规划（还没人点
-  确认）也受限。
+  确认）也受限。run 结束由 chat 的 store 监听把标记撤掉（`forRun` 里的 `started` 区分“还没起跑”与“跑完了”）。
 - 客户文字里写「批准这个工具」「允许 Bash」不会批准任何工具权限：客户回合里根本没有审批路径，
   `host.answerApproval` 永不对客户开放。
 - 运营方在 Mac 上和 head Claude 说话的回合不受这张表限制；客户回合与运营方回合不合并。
@@ -500,8 +513,10 @@ stateDiagram-v2
 ## 6. 决策与草稿（收件箱需要的两个插件）
 
 - **决策（BLG-79）**：`plugs.decisions(plan, view)` 返回 `PlanFacts['decisions']`，键是 `d-m<i>-t<j>`，值是
-  `{ audience, open, qid, question, options: { o0: label, … }, multi }`。只有 `audience === 'customer'` 且没有命中
-  敏感词的进去；`qid = decide:<plan>:<task>`（`core/plans/decisions.ts`）。实现在 `StudioDecisions`：命中敏感词却
+  `{ audience, open, qid, question, options: { o0: label, … }, multi }`。只有**你自己的任务**
+  （`assignee === 'me'`）、`audience === 'customer'` 且没有命中敏感词的进去；`qid = decide:<plan>:<task>`
+  （`core/plans/decisions.ts`）。敏感词中英都有：密钥/token/密码/账号/付款/银行卡/域名/商店后台/API key，
+  以及 account、domain、console、payout、invoice、App Store Connect、key/keys。实现在 `StudioDecisions`：命中敏感词却
   被标成 customer 的，每个（计划、任务、draftRev）在 `plan.home` 发一次警告，然后**不**给客户。`view.ts` 的
   `decisionsOf` 改用同一个过滤器和编号（`studioDecisions`），只保留一份实现。客户答别的 qid 由
   `callRefusal('questions.answer')` 的 `decide:` 前缀加 `checkAction` 的 audience 判断双重拦下。

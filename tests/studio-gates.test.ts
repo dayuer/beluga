@@ -1,10 +1,12 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { asActingAgent } from '../src/core/acting-agent.js';
 import { Board } from '../src/core/board/board.js';
 import { BoardWork } from '../src/core/board/work.js';
 import type { Autonomy, Plan, PlanBody } from '../src/core/plans/model.js';
 import { Plans } from '../src/core/plans/plans.js';
+import { passable } from '../src/core/plans/progress.js';
 import { PlansWork } from '../src/core/plans/work.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController } from '../src/core/workspace-controller.js';
@@ -282,6 +284,20 @@ describe('the start Gate (BLG-74)', () => {
     expect(store.getState().plans.plans.find((p) => p.id === plan.id)?.autonomy).toBe('gated');
   });
 
+  it('an external agent can’t approve, or verify-then-approve, a shared plan', async () => {
+    const store = new Store(initialState('room'));
+    store.dispatch({ type: 'projects', projects: [project('api', 'bob-api', [ws('main', 'bob-api')])] });
+    const controller = { onWorktree: () => () => undefined } as unknown as WorkspaceController;
+    const board = new Board({ store, dir: null, projectName: () => 'bob-api' });
+    const boardWork = new BoardWork({ store, board, controller, selfId: () => 'p-me', selfName: () => 'Kay', askClaude: () => undefined });
+    const plans = new Plans({ store, dir: null });
+    const work = new PlansWork({ store, plans, board: boardWork, git: null, askClaude: () => 'ask', intend: () => undefined, delayMs: 0 });
+    const plan = plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'gated' }, boardWork.myClaude());
+    store.dispatch({ type: 'studio_state', shared: ['api'], gates: [] });
+    await expect(work.verify(plan.id, true)).rejects.toThrow(/Synon Studio/);
+    expect(() => asActingAgent({ id: 'ext', name: 'Ext' }, () => work.approve(plan.id))).toThrow(/Synon Studio/);
+  });
+
   it('replaces the native approve card in Needs You with the studio card (the pass card stays)', () => {
     const h = harness();
     const op = opId();
@@ -307,6 +323,65 @@ describe('the start Gate (BLG-74)', () => {
     const native = allNeeds(h.store.getState()).find((n) => n.id === 'plan:pl1:approve:3');
     expect(native).toBeDefined();
     expect(native?.actions.some((a) => a.method === 'plans.approve')).toBe(true);
+  });
+
+  it('gives two plans’ Gates different ids even when one opId names both, and answers the right plan', () => {
+    const store = new Store(initialState('room'));
+    store.dispatch({ type: 'projects', projects: [project('p1', 'shop')] });
+    store.dispatch({ type: 'plans_init', state: { enabled: true, plans: [planOf(), planOf({ id: 'pl2', home: 'ws:home2' })], style: '' } });
+    const approved: string[] = [];
+    const gates = new StudioGates({ store, config: () => config(), approve: (id) => void approved.push(id), persist: () => undefined, touch: () => undefined, now: () => 1_000 });
+    const op = crypto.randomUUID();
+    expect(gates.request(store.getState().plans.plans.find((p) => p.id === 'pl1')!, 'start', 3, op)).toBeUndefined();
+    expect(gates.request(store.getState().plans.plans.find((p) => p.id === 'pl2')!, 'start', 3, op)).toBeUndefined();
+    const cards = gates.needs();
+    expect(cards.map((c) => c.planId)).toEqual(['pl1', 'pl2']);
+    expect(cards[0]!.id).not.toBe(cards[1]!.id);
+    const second = cards.find((c) => c.planId === 'pl2')!;
+    expect(gates.answer(second.id, { approve: true })).toEqual({ ok: true, state: 'approved' });
+    expect(approved).toEqual(['pl2']);
+    expect(gates.viewGate('pl1')).toMatchObject({ state: 'pending' });
+  });
+
+  it('drops the cards of a project that is no longer shared, and starts nothing from them', () => {
+    const store = new Store(initialState('room'));
+    store.dispatch({ type: 'projects', projects: [project('p1', 'shop')] });
+    store.dispatch({ type: 'plans_init', state: { enabled: true, plans: [planOf()], style: '' } });
+    const shared = ['p1'];
+    const approved: string[] = [];
+    const gates = new StudioGates({ store, config: () => config(shared), approve: (id) => void approved.push(id), persist: () => undefined, touch: () => undefined, now: () => 1_000 });
+    const op = crypto.randomUUID();
+    gates.request(store.getState().plans.plans[0]!, 'start', 3, op);
+    expect(gates.needs()).toHaveLength(1);
+    shared.length = 0;
+    expect(gates.needs()).toEqual([]);
+    expect(gates.answer(`g-${op.slice(0, 8)}`, { approve: true })).toEqual({ ok: false, error: 'gone' });
+    expect(approved).toEqual([]);
+  });
+
+  it('never shows or answers a Gate left by another studio', () => {
+    const store = new Store(initialState('room'));
+    store.dispatch({ type: 'projects', projects: [project('p1', 'shop')] });
+    store.dispatch({ type: 'plans_init', state: { enabled: true, plans: [planOf()], style: '' } });
+    const other = () => ({ ...config(), studioId: 'st2' });
+    const first = new StudioGates({ store, config: () => config(), approve: () => undefined, persist: () => undefined, touch: () => undefined, now: () => 1_000 });
+    const op = crypto.randomUUID();
+    first.request(store.getState().plans.plans[0]!, 'start', 3, op);
+    const saved = first.dump() as Array<{ id: string }>;
+    const second = new StudioGates({ store, config: other, approve: () => undefined, persist: () => undefined, touch: () => undefined, now: () => 1_000 });
+    second.restore(saved);
+    expect(second.needs()).toEqual([]);
+    expect(second.answer(saved[0]!.id, { approve: true })).toEqual({ ok: false, error: 'gone' });
+  });
+});
+
+describe('a milestone is passable (BLG-77)', () => {
+  it('only once its check came back, or when there is nothing to check', () => {
+    const milestone = (over: Record<string, unknown>) => ({ state: 'gate', milestone: { criteria: ['works'] }, run: {}, autonomy: 'gated', ...over }) as never;
+    expect(passable(milestone({}))).toBe(false);
+    expect(passable(milestone({ run: { check: {} } }))).toBe(true);
+    expect(passable(milestone({ milestone: { criteria: [] } }))).toBe(true);
+    expect(passable(milestone({ state: 'checking' }))).toBe(false);
   });
 });
 
