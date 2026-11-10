@@ -43,3 +43,40 @@ git add -A && git commit -m "初始化:从 ios-app 模板建立"
 - [ ] `sim.sh all` 成功,并亲眼看过截图
 - [ ] 截图已 send_file 发回,并给了选择题
 - [ ] 没提交 `build/`、`*.xcodeproj`、截图
+
+# 发布到 TestFlight(客户要装到自己手机上时)
+
+先读 `asc-basics` 和 `testflight-publish` skill。用的是**所有者的 Apple 开发者账号**。脚本:`testflight.sh check | archive | upload`。
+**上传、把构建发给测试者都是对外动作:必须先问所有者并得到同意**;没同意就停在 `archive`(本机产出 .ipa)。
+
+## 准备(所有者的事,缺了就告诉他,别自己建)
+
+- 已安装并登录 `asc`;App Store Connect 里已有这个 App(建 App 要先问所有者)→ 得到 `APP_ID`。
+- 钥匙串里有该团队的 Apple Distribution 证书 → `TEAM_ID`。**不要自己创建或吊销证书。**
+- **Bundle ID 要换成真的**,模板的 `com.example.app` 是占位,Apple 不会让你注册。命名用以后可转移的、不绑定个人的反向域名,如 `com.<公司或品牌>.<应用>`,不要用个人名字或临时测试名;一旦上传就别改。
+- 版本号改 `project.yml` 的 `MARKETING_VERSION`;构建号由脚本向 asc 要下一个,不能重复。
+
+## 步骤
+
+1. 模拟器自测通过、已提交(上面的流程)。
+2. `APP_ID=… TEAM_ID=… testflight.sh check` ——只读,确认证书和构建号。
+3. `APP_ID=… TEAM_ID=… testflight.sh archive` ——签名归档并导出 `build/testflight/export/App.ipa`。签名/描述文件失败:把错误如实告诉所有者,停。
+4. 问所有者(选择题):"现在上传这个版本到 TestFlight 吗?(是/稍后)"。同意后:
+   `CONFIRM_UPLOAD=yes APP_ID=… GROUP="<测试组>" testflight.sh upload`
+5. **外部测试链接**:外部测试者需要 Beta App 审核(通常要等),只有所有者同意、并提供审核联系人(以及应用有登录时的演示账号)后才加 `EXTERNAL=yes`。链接在 App Store Connect 的测试组里开启"公开链接"后得到,再用 `asc` 或网页读出,**经所有者确认后**发给客户。
+6. 发给客户的话(白话):装 TestFlight → 打开链接 → 接受邀请 → 安装。附上版本号和构建号。
+
+## 交付说明里要写清:App 转移的前提
+
+以后把 App 转给客户自己的开发者账号时(App Store Connect 的 App 转移):
+
+- 转移后 Bundle ID 随 App 走,所以上面强调不要用个人化命名。
+- Apple 对转移有限制:例如使用了部分能力(如 iCloud 容器/某些 Apple Pay、关联域名、推送密钥、App Group 等与团队绑定的服务)可能不能直接转,需要先重新配置;有 TestFlight 外部测试进行中、订阅/内购、App 在审核中等情况也有额外要求。具体以 Apple 当时的文档为准,转移前先让所有者核对。
+- 证书和描述文件属于旧团队,转移后由新团队重新签发;客户之后自己发布需要自己的开发者账号(付费会员)。
+
+## 自检清单
+
+- [ ] Bundle ID 不是 `com.example.*`,命名可转移
+- [ ] 上传前得到所有者明确同意
+- [ ] 外部测试没有未经同意就提交审核
+- [ ] 交付说明写了转移前提

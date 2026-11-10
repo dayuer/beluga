@@ -28,3 +28,20 @@ describe("client-ios", () => {
     expect(existsSync(shot) && statSync(shot).size > 10000).toBe(true);
   }, 400_000);
 });
+
+describe("testflight.sh", () => {
+  const tf = join(root, "skills", "client-ios", "testflight.sh");
+  const run = (args: string[], env: Record<string, string> = {}) =>
+    spawnSync("bash", [tf, ...args], { encoding: "utf8", cwd: tmp, env: { ...process.env, PROJECT: tmp, ...env } });
+
+  it("没有 CONFIRM_UPLOAD=yes 时拒绝上传", () => {
+    const r = run(["upload"], { APP_ID: "1", GROUP: "g" });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain("先问所有者");
+  });
+
+  it("check 缺 APP_ID/TEAM_ID 时给出明确提示", () => {
+    const r = run(["check"], { PATH: `${tmp}/bin:/usr/bin:/bin` });
+    expect(r.status).not.toBe(0);
+  });
+});
