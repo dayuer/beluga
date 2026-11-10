@@ -13,7 +13,8 @@ export const STUDIO_PROTO = { major: 1, minor: 0 } as const;
 
 export const LIMITS = { ref: 64, title: 200, text: 4000, line: 400, answer: 2000 } as const;
 
-const ref = z.string().min(1).max(LIMITS.ref);
+/** An opaque name (m0, m0-t1, d-m0-t1, a planRef): letters, digits, `-` and `_` only. */
+const ref = z.string().min(1).max(LIMITS.ref).regex(/^[A-Za-z0-9_-]+$/);
 const title = z.string().max(LIMITS.title);
 const text = z.string().max(LIMITS.text);
 const line = z.string().max(LIMITS.line);

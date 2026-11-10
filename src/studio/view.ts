@@ -67,6 +67,9 @@ const optText = (s: string | undefined): { goal?: string } => {
   return t ? { goal: t } : {};
 };
 
+/** A task of yours not marked for the customer. */
+const operatorOnly = (t: PlanTask): boolean => t.assignee === 'me' && (t as StudioTask).audience !== 'customer';
+
 function milestoneOf(m: MilestoneView, i: number): StudioMilestone {
   return {
     ref: `m${i}`,
@@ -74,13 +77,20 @@ function milestoneOf(m: MilestoneView, i: number): StudioMilestone {
     ...optText(m.milestone.goal),
     criteria: lines(m.milestone.criteria, 20),
     status: MILESTONE_STATUS[m.state],
-    tasks: m.tasks.slice(0, 60).map((t, j) => ({
-      ref: `m${i}-t${j}`,
-      title: sanitizeLine(t.task.title, 200),
-      ...optText(t.task.goal),
-      acceptance: lines(t.task.acceptance, 20),
-      status: taskStatus(t.state),
-    })),
+    // Yours that aren't the customer's (accounts, keys, payments) aren't in their list at all, not even by title.
+    tasks: m.tasks.slice(0, 60).flatMap((t, j) =>
+      operatorOnly(t.task)
+        ? []
+        : [
+            {
+              ref: `m${i}-t${j}`,
+              title: sanitizeLine(t.task.title, 200),
+              ...optText(t.task.goal),
+              acceptance: lines(t.task.acceptance, 20),
+              status: taskStatus(t.state),
+            },
+          ],
+    ),
   };
 }
 
@@ -161,7 +171,7 @@ function turnOf(t: StudioTurn, roles: Readonly<Record<string, string>> | undefin
     const c = x ? sanitizeLine(x, 200) : '';
     return c === OMITTED ? '' : c;
   };
-  const role = said(t.role ? (roles?.[t.role] ?? t.role) : undefined);
+  const role = said(t.role ? (roles && Object.hasOwn(roles, t.role) ? roles[t.role] : t.role) : undefined);
   const name = said(t.name);
   return { id: t.id, who: t.who, ...(role ? { role } : {}), ...(name ? { name } : {}), text: sanitizeText(t.text), at: t.at, ...(t.opId ? { opId: t.opId } : {}) };
 }

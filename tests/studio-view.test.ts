@@ -132,7 +132,8 @@ describe('studioPlanView: a draft', () => {
     expect(v.milestones[0]!.title).toContain('核心');
     expect(v.milestones[0]!.goal).toContain('然后交付');
     expect(v.milestones[0]!.tasks[0]!.title).toBe('登录页');
-    expect(v.milestones[0]!.tasks.map((t) => t.ref)).toEqual(['m0-t0', 'm0-t1', 'm0-t2', 'm0-t3']);
+    // The operator's and the unmarked decisions aren't listed as tasks either.
+    expect(v.milestones[0]!.tasks.map((t) => t.ref)).toEqual(['m0-t0', 'm0-t1']);
   });
 
   it('only the customer’s decisions, never the operator’s, the unmarked or the plan’s own', () => {
@@ -149,6 +150,19 @@ describe('studioPlanView: a draft', () => {
   it('is pure: the same input, the same output', () => {
     expect(studioPlanView({ planRef: 'p1', view: planView(plan(), {} as BoardState) })).toEqual(v);
   });
+});
+
+it('an operator task is not in the customer’s task list, not even by title (audit S-8)', () => {
+  const b = body();
+  const aws = { ...decisionTask('aws-keys', 'operator'), title: '填 AWS 密钥和银行卡号' } as PlanTask;
+  const p = plan({ draft: { ...b, milestones: [{ ...b.milestones[0]!, tasks: [dirtyTask('a'), aws] }] } });
+  const v = studioPlanView({ planRef: 'p1', view: planView(p, {} as BoardState) });
+  expect(JSON.stringify(v)).not.toMatch(/AWS|银行卡/);
+});
+
+it('role names from the prototype don’t break the view (audit S-3)', () => {
+  for (const role of ['constructor', 'toString', '__proto__'])
+    expect(() => studioPlanView({ planRef: 'p1', view: planView(plan(), {} as BoardState), turns: [{ id: 't1', who: 'ai', role, text: 'hi', at: 1 }], roles: { Engineering: '工程' } })).not.toThrow();
 });
 
 describe('studioPlanView: running, at its gate', () => {
