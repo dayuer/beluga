@@ -40,6 +40,8 @@ const ENTRIES = [
   'src/machines/words.ts',
   'src/machines/look.ts',
   'src/shared/machine-kinds.ts',
+  // Synon Studio: shared by the daemon, the hub (a Worker) and the customer app.
+  'src/studio/protocol.ts',
 ];
 // Pure packages that run anywhere (string-width measures text the same way in both clients).
 const ALLOWED_PACKAGES = new Set(['zod', 'string-width']);
