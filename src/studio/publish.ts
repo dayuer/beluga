@@ -277,6 +277,15 @@ export class StudioPublisher {
   }
 
   /**
+   * Something the publisher can't see in the store changed: the chat's turns or a plan's Gate
+   * (`extras`). Rebuild and send what moved; the plans it doesn't name are re-diffed too, and an
+   * unchanged one sends nothing. `planId` is accepted for a later, narrower refresh.
+   */
+  touch(_planId?: string): void {
+    this.refresh();
+  }
+
+  /**
    * Unlinking: one last `plan-gone` per published plan, best effort, so nothing of this daemon stays
    * on the customer's side after its file is gone (docs/studio-daemon.md §7.1).
    */

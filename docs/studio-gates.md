@@ -36,8 +36,18 @@ export interface InboxExec {            // 没有 approve：收件箱在类型�
 }
 
 export interface InboxPlugs {
-  gates: { request(p: Plan, kind: 'start' | 'changes', draftRev: number, opId: string, by?: string): RefusalCode | undefined };
-  chat: { accept(p: Plan, opId: string, text: string): RefusalCode | undefined };  // 只收原文，不收包好的
+  gates: {
+    request(p: Plan, kind: 'start' | 'changes', draftRev: number, opId: string, by?: string): RefusalCode | undefined;
+    view?(planId): StudioGate | undefined;      // 客户视图里的 gate
+    needs?(): readonly StudioGateNeed[];        // store 的 studio.gates
+    unlink?(): void;                            // 解绑：pending 的 Gate 作废
+    dump?(): unknown; restore?(rows): void;     // 收件箱那一个文件里的 gates/chat 两段
+  };
+  chat: {
+    accept(p: Plan, opId: string, text: string): RefusalCode | undefined;  // 只收原文，不收包好的
+    extras?(planId): Pick<StudioExtras, 'turns' | 'typing' | 'moreTurns'>;
+    dump?(): unknown; restore?(rows): void;
+  };
   decisions: (p: Plan, view: PlanView) => PlanFacts['decisions'];
 }
 

@@ -171,7 +171,11 @@ export class PlansWork {
    * the code there and changes nothing), and the plan's page. Claude starts planning from `goal`.
    */
   /** `quiet`: started from elsewhere (Your Mac), so the Mac's window stays where it is. */
-  async create(input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef }, opts: { readonly quiet?: boolean } = {}): Promise<Plan> {
+  async create(
+    input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef },
+    // `customerTurn`: this turn is a Studio customer's (BLG-78 limits its tools, including this first one).
+    opts: { readonly quiet?: boolean; readonly customerTurn?: boolean } = {},
+  ): Promise<Plan> {
     const controller = this.deps.controller;
     if (!controller) throw new Error('Plans need a project folder');
     const goal = input.goal.trim();

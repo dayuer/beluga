@@ -49,6 +49,9 @@ export interface StudioConfig {
 
 export const studioPath = (): string => path.join(belugaHome(), 'studio.json');
 
+/** The customer actions handled, the Gates raised and the chat queued (docs/studio-gates.md §2.5). */
+export const studioInboxPath = (): string => path.join(belugaHome(), 'studio-inbox.json');
+
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** A parsed file, checked field by field; anything off means "not linked" (a hand-edited or old file). */

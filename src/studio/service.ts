@@ -1,6 +1,9 @@
+import { dirname, join } from 'node:path';
 import os from 'node:os';
+import { needPlans } from '../core/plans/registry.js';
 import type { Store } from '../core/store.js';
 import { identityPem, type Identity } from '../net/crypto.js';
+import { StudioInbox, type InboxExec, type InboxPlugs } from './inbox.js';
 import { identityOf, loadStudioConfig, newRefKey, newStudioIdentity, removeStudioConfig, saveStudioConfig, studioPath, type StudioConfig } from './keys.js';
 import { StudioLink, defaultHub, hubUrl, registerWithCode, type LinkState, type LinkTimers, type WsFactory } from './link.js';
 import { StudioPublisher } from './publish.js';
@@ -39,6 +42,51 @@ export type StudioLinkResult = { readonly ok: true; readonly status: StudioStatu
 
 const machineName = (): string => os.hostname().trim().slice(0, 80) || 'Beluga';
 
+/** A service built without a session (the demo, a link-only test): an action can't run anything. */
+const MISSING_EXEC: InboxExec = {
+  createPlan: async () => {
+    throw new Error('Studio has no plans to run here');
+  },
+  verify: async () => {
+    throw new Error('Studio has no plans to run here');
+  },
+  pass: () => {
+    throw new Error('Studio has no plans to run here');
+  },
+  sendBack: () => {
+    throw new Error('Studio has no plans to run here');
+  },
+  discard: () => {
+    throw new Error('Studio has no plans to run here');
+  },
+  answer: () => {
+    throw new Error('Studio has no plans to run here');
+  },
+};
+
+/** How the inbox runs a customer's action: the daemon's own plans, as the customer, never as the operator. */
+export function plansExec(session: object): InboxExec {
+  const plans = () => needPlans(session);
+  const questions = (session as { questions?: { answer(qid: string, a: { kind: 'answers'; answers: Record<string, string> }): void } }).questions;
+  return {
+    async createPlan(projectId, wrappedGoal) {
+      // The operator's defaults, never the customer's: gated autonomy, quiet, and a restricted first turn.
+      const plan = await plans().create({ projectId, goal: wrappedGoal, autonomy: 'gated' }, { quiet: true, customerTurn: true });
+      return { planId: plan.id };
+    },
+    async verify(planId) {
+      await plans().verify(planId, false);
+    },
+    pass: (planId, milestoneId) => void plans().pass(planId, milestoneId),
+    sendBack: (planId, milestoneId, wrappedNote) => void plans().sendBack(planId, milestoneId, wrappedNote),
+    discard: (planId) => void plans().discard(planId),
+    answer: (qid, a) => {
+      if (!questions) throw new Error('This daemon has no questions store');
+      questions.answer(qid, a);
+    },
+  };
+}
+
 export class StudioService {
   private readonly store: Store;
   private readonly demo: boolean;
@@ -47,27 +95,52 @@ export class StudioService {
   private readonly ws?: WsFactory;
   private readonly timers?: LinkTimers;
   private readonly now: () => number;
+  /** What a customer's action runs (the daemon's plans); tests and the demo can leave it out. */
+  private readonly exec?: InboxExec;
+  private readonly plugs?: Partial<InboxPlugs>;
+  private readonly inboxFile?: string;
+  private readonly log?: (line: string) => void;
   private config: StudioConfig | undefined;
   private identity: Identity | undefined;
   private connection: StudioLink | undefined;
   private publisher: StudioPublisher | undefined;
+  private inbox: StudioInbox | undefined;
   /** A link is registering right now: two screens can't start two registrations. */
   private linking = false;
 
-  constructor(d: { readonly store: Store; readonly demo?: boolean; readonly file?: string; readonly ws?: WsFactory; readonly timers?: LinkTimers; readonly now?: () => number }) {
+  constructor(d: {
+    readonly store: Store;
+    readonly demo?: boolean;
+    readonly file?: string;
+    readonly ws?: WsFactory;
+    readonly timers?: LinkTimers;
+    readonly now?: () => number;
+    readonly exec?: InboxExec;
+    readonly plugs?: Partial<InboxPlugs>;
+    readonly inboxFile?: string;
+    readonly log?: (line: string) => void;
+  }) {
     this.store = d.store;
     this.demo = Boolean(d.demo);
     this.file = d.file ?? studioPath();
     if (d.ws) this.ws = d.ws;
     if (d.timers) this.timers = d.timers;
     this.now = d.now ?? Date.now;
+    if (d.exec) this.exec = d.exec;
+    if (d.plugs) this.plugs = d.plugs;
+    if (d.inboxFile) this.inboxFile = d.inboxFile;
+    if (d.log) this.log = d.log;
   }
 
   /** Read the link's file (if any) and start connecting. Demo runs never read or write it. */
   start(): void {
     if (this.demo || this.connection) return;
     const cfg = loadStudioConfig(this.file);
-    if (!cfg) return;
+    if (!cfg) {
+      // No link: the shared state still says so (the Mac's bell reads it).
+      this.dispatchStudio();
+      return;
+    }
     let identity: Identity;
     try {
       identity = identityOf(cfg);
@@ -78,6 +151,7 @@ export class StudioService {
       } catch {
         // Leave it; the person can remove it.
       }
+      this.dispatchStudio();
       return;
     }
     this.config = cfg;
@@ -145,6 +219,9 @@ export class StudioService {
     this.publisher = undefined;
     this.identity = undefined;
     this.config = undefined;
+    // Pending Gates go void; the opId receipts stay (an opId is scoped to the studio that made it).
+    this.inbox?.unlink();
+    this.dispatchStudio();
     let removed = true;
     try {
       removeStudioConfig(this.file);
@@ -190,6 +267,7 @@ export class StudioService {
     saveStudioConfig(next, this.file);
     this.config = next;
     this.publisher?.projectsChanged();
+    this.dispatchStudio();
     return this.status();
   }
 
@@ -202,12 +280,27 @@ export class StudioService {
     const cfg = this.config;
     const identity = this.identity;
     if (!cfg || !identity || this.connection) return;
+    // The inbox keeps what an opId already did and the Gates raised, in its own file next to the key.
+    if (!this.inbox) {
+      this.inbox = new StudioInbox({
+        store: this.store,
+        config: () => this.config,
+        exec: this.exec ?? MISSING_EXEC,
+        ...(this.plugs ? { plugs: this.plugs } : {}),
+        send: (frame) => this.connection?.send(frame) ?? false,
+        file: this.inboxFile ?? join(dirname(this.file), 'studio-inbox.json'),
+        now: this.now,
+        ...(this.log ? { log: this.log } : {}),
+      });
+    }
     this.publisher = new StudioPublisher({
       store: this.store,
       config: () => this.config,
       send: (frame) => this.connection?.send(frame) ?? false,
       // What the hub was told about, kept in the file: a plan deleted while we were off is retracted.
       remember: (projectId, refs) => this.rememberPublished(projectId, refs),
+      // The chat's turns and a plan's Gate are not in the store: the publisher has to be told to look again.
+      extras: (planId) => this.inbox!.extras(planId),
     });
     const link = new StudioLink({
       config: cfg,
@@ -217,10 +310,21 @@ export class StudioService {
       ...(this.timers ? { timers: this.timers } : {}),
       // The hub refuses an `at` it has already seen, and its record survives our restarts.
       onAt: (at) => this.rememberAt(at),
+      // Deliveries only begin after the full snapshot and `synced` (M3's link), then run one at a time.
+      onDeliver: (f) => this.inbox!.deliver(f),
     });
     this.connection = link;
     this.publisher.start();
     link.start();
+    this.dispatchStudio();
+  }
+
+  /** The shared state a screen reads: the projects shared and the Gates waiting on you (docs/studio-gates.md §2.6). */
+  private dispatchStudio(): void {
+    const state = this.store.getState();
+    const known = new Set(state.projects.map((project) => project.id));
+    const shared = this.config ? Object.keys(this.config.projects).filter((id) => known.has(id)).slice(0, 500) : [];
+    this.store.dispatch({ type: 'studio_state', shared, gates: (this.inbox?.gateNeeds() ?? []).slice(0, 50) });
   }
 
   /** The refs the hub was told about, kept in the file so a later run can retract them. */
@@ -279,7 +383,12 @@ export function studioOf(session: object): StudioService {
 
 /** Start Studio for the daemon: a no-op in the demo, otherwise whatever the link file holds. */
 export function launchStudio(d: { readonly session: object; readonly store: Store; readonly demo: boolean }): () => void {
-  const service = new StudioService({ store: d.store, demo: d.demo });
+  const service = new StudioService({
+    store: d.store,
+    demo: d.demo,
+    exec: plansExec(d.session),
+    log: (line) => console.error(`[studio] ${line}`),
+  });
   attachStudio(d.session, service);
   service.start();
   return () => service.stop();
