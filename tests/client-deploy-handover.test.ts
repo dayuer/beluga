@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const script = join(__dirname, "..", "skills", "client-deploy", "handover.sh");
 let root: string, proj: string;
-const git = (...a: string[]) => execFileSync("git", ["-C", proj, ...a], { stdio: "pipe", encoding: "utf8" });
+// Its own author: CI's git has no user.name, and the commits here must not depend on yours.
 const env = { ...process.env, GIT_AUTHOR_NAME: "a", GIT_AUTHOR_EMAIL: "a@b", GIT_COMMITTER_NAME: "a", GIT_COMMITTER_EMAIL: "a@b" };
+const git = (...a: string[]) => execFileSync("git", ["-C", proj, ...a], { stdio: "pipe", encoding: "utf8", env });
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "ho-"));
