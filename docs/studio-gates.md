@@ -291,8 +291,10 @@ stateDiagram-v2
 `gates.ts` 的这一次调用（`needs-you.ts` 的原生卡在共享计划上不出，见 §3.6）。
 
 **外部 agent**（`actingVia()` 非空）对共享计划的 `plans.approve` 与 `plans.verify {thenApprove}` 直接被
-`PlansWork` 拒绝：它可能先改草稿（`plans.update` 没有卡）再请主人批一张不含客户 rev 的卡。运营方自己的 Mac/
-手机/`machines` 原生批准仍在，按设计 §3.3 由 `reconcile` 回收成 `approved`（客户不会看到未确认的 rev，见风险）。
+`PlansWork` 拒绝：它可能先改草稿（`plans.update` 没有卡）再请主人批一张不含客户 rev 的卡。已开工且没有草稿的
+计划上，`plans.update`（`PlansWork.edit` 的 direct 路径）会在写草稿**之前**就被拒，不再留下“草稿写了一半、
+approve 被拒”的半成功状态。运营方自己的 Mac/手机/`machines` 原生批准仍在，按设计 §3.3 由 `reconcile` 回收成
+`approved`（客户不会看到未确认的 rev，见风险）。
 
 ### 3.5 驳回与 reconcile
 

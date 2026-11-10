@@ -339,6 +339,12 @@ export class PlansWork {
       return this.structure(named.id);
     }
     const direct = Boolean(plan.body) && !plan.draft;
+    // On a started plan with no draft, this edit would be applied at once through `approve` — which
+    // an external agent may not do on a Synon Studio plan. Check before `editDraft` writes anything:
+    // otherwise the draft would stay behind a refused approve (audit F3's half-success state).
+    if (direct && actingVia() && this.isStudioPlan(plan)) {
+      throw new Error('A plan shared with Synon Studio starts from its Gate: an external agent can’t apply changes to it.');
+    }
     const next = this.plans.editDraft(id, ops, this.me());
     this.syncHomeTask(next);
     return direct && next.draft ? this.approve(id) : next;

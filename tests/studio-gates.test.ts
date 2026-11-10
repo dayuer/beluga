@@ -293,9 +293,15 @@ describe('the start Gate (BLG-74)', () => {
     const plans = new Plans({ store, dir: null });
     const work = new PlansWork({ store, plans, board: boardWork, git: null, askClaude: () => 'ask', intend: () => undefined, delayMs: 0 });
     const plan = plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'gated' }, boardWork.myClaude());
+    plans.writeDraft(plan.id, DRAFT, boardWork.myClaude());
+    work.approve(plan.id);
     store.dispatch({ type: 'studio_state', shared: ['api'], gates: [] });
     await expect(work.verify(plan.id, true)).rejects.toThrow(/Synon Studio/);
     expect(() => asActingAgent({ id: 'ext', name: 'Ext' }, () => work.approve(plan.id))).toThrow(/Synon Studio/);
+    // The direct-edit path (body, no draft) would apply at once: it is refused before writing a draft.
+    const taskId = plans.get(plan.id)!.body!.milestones[0]!.tasks[0]!.id;
+    expect(() => asActingAgent({ id: 'ext', name: 'Ext' }, () => work.edit(plan.id, [{ op: 'update_task', id: taskId, patch: { title: 'Changed' } }]))).toThrow(/Synon Studio/);
+    expect(plans.get(plan.id)!.draft).toBeUndefined();
   });
 
   it('replaces the native approve card in Needs You with the studio card (the pass card stays)', () => {
