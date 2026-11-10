@@ -3,8 +3,11 @@
   z-index: 88;
   min-width: 220px;
   max-width: 380px;
-  max-height: min(70vh, 560px);
-  overflow: auto;
+  /* Shown whole: no height of its own (FitContent picks the side it fits on). Only a menu taller
+     than the window itself scrolls, and then without a bar. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  scrollbar-width: none;
   padding: 5px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
@@ -13,6 +16,9 @@
   box-shadow: var(--shadow-pop);
   animation: appear var(--dur-fast) var(--ease-out);
   transform-origin: var(--radix-dropdown-menu-content-transform-origin, var(--radix-context-menu-content-transform-origin));
+}
+.menu::-webkit-scrollbar {
+  display: none;
 }
 @keyframes appear {
   from {

@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { FitContent } from '../../components/SpecMenu.js';
 import { type ReactNode, useState } from 'react';
 import type { Guest } from '@beluga/core/collab-store.js';
 import { TRUST_INFO, canRunOn, trustOf } from '@beluga/core/trust.js';
@@ -282,7 +283,7 @@ export function GuestCard({ peer, guest, close, confirm }: CardProps & { guest: 
                 </button>
               </Dropdown.Trigger>
               <Dropdown.Portal>
-                <Dropdown.Content className={m.menu} align="start" sideOffset={4}>
+                <FitContent className={m.menu} align="start">
                   {more.map((x) => (
                     <Dropdown.Item key={x.id} className={m.item} onSelect={() => void api.invites.change(peer.peerId, { addProject: x.id })}>
                       <span className={m.label}>{x.name}</span>
@@ -293,7 +294,7 @@ export function GuestCard({ peer, guest, close, confirm }: CardProps & { guest: 
                     <span className={m.label}>{t('dialogs.person.everything')}</span>
                     <span className={m.hint}>{t('dialogs.person.everythingHint')}</span>
                   </Dropdown.Item>
-                </Dropdown.Content>
+                </FitContent>
               </Dropdown.Portal>
             </Dropdown.Root>
           ) : null}

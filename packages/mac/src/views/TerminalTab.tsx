@@ -97,7 +97,7 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
       <Context.Trigger asChild>{tab}</Context.Trigger>
       <Context.Portal>
         {/* Focus stays with the name field Rename… opens, instead of going back to the tab. */}
-        <Context.Content className={m.menu} style={{ minWidth: 160 }} onCloseAutoFocus={(e) => e.preventDefault()}>
+        <Context.Content sticky="always" collisionPadding={8} className={m.menu} style={{ minWidth: 160 }} onCloseAutoFocus={(e) => e.preventDefault()}>
           {renamable ? (
             <Context.Item className={m.item} onSelect={() => setEditing(true)}>
               <span className={m.label}>{t('views.terminal.rename')}</span>

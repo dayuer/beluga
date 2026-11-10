@@ -57,6 +57,12 @@ export const tIn = (locale: Locale): ((key: Key, vars?: Vars) => string) => tOf(
 /** Words in the language shown now (outside React: read at the call). */
 export const t = (key: Key, vars?: Vars): string => tOf(currentLocale())(key, vars);
 
+/**
+ * A menu item's words as menus show them: in Chinese without the trailing "…" (the English keeps
+ * the Mac's convention for an item that asks something first).
+ */
+export const menuText = (label: string, locale: Locale = currentLocale()): string => (locale === 'zh-CN' ? label.replace(/\s*(…|\.\.\.)$/u, '') : label);
+
 /** The language shown, kept up to date as Settings changes it. */
 export function useLocale(): Locale {
   return resolveLocale(usePrefs().language, systemLanguages());
