@@ -231,6 +231,14 @@ export class StudioPublisher {
     }
   }
 
+  /**
+   * Unlinking: one last `plan-gone` per published plan, best effort, so nothing of this daemon stays
+   * on the customer's side after its file is gone (docs/studio-daemon.md §7.1).
+   */
+  leave(): void {
+    for (const [planId, base] of [...this.baseline]) this.sendGone(base.projectRef, base.planRef, planId);
+  }
+
   /** `studio.setProject` changed the set: tell the hub the new project list, then the plans that moved. */
   projectsChanged(): void {
     const cfg = this.config();

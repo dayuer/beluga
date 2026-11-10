@@ -322,6 +322,13 @@ export const PHONE: Record<Method, Side> = {
   'revenuecat.refresh': 'mac',
   'revenuecat.setApps': 'mac',
 
+  // Synon Studio: publishing plans to customers is a person's choice, at the Mac (docs/studio-daemon.md §7.2).
+  'studio.link': 'mac',
+  'studio.unlink': 'mac',
+  'studio.status': 'mac',
+  'studio.setProject': 'mac',
+  'studio.reconnect': 'mac',
+
   // ---- supporting Beluga: the star and coffee asks are the Mac's (they open web pages there)
   'support.answer': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)

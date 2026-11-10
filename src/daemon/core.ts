@@ -32,6 +32,7 @@ import { launchCalls } from '../core/calls/launch.js';
 import { launchGateway } from '../core/gateway/launch.js';
 import { launchFriendShares } from '../core/friend-share/launch.js';
 import { launchEarnings } from '../core/stripe-launch.js';
+import { launchStudio } from '../studio/service.js';
 import { launchRevenueCat } from '../core/revenuecat-launch.js';
 import { launchSupport } from '../core/merge-counter.js';
 import { launchStats } from '../core/stats/counter.js';
@@ -395,6 +396,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
   let stopAssistant = (): void => undefined;
   let stopThreads = (): void => undefined;
   let stopCompanion = async (): Promise<void> => undefined;
+  let stopStudio = (): void => undefined;
   let stopExternal = async (): Promise<void> => undefined;
   const start = (): void => {
     session.start();
@@ -448,6 +450,8 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     if (opts.network) stopCompanion = launchCompanion({ session, store, identity: you.identity, you, terminals, demo: Boolean(demo), log: (line) => console.warn(line) });
     // External agents (GrokBot, a Claude Code in your terminal): their own port, off until you turn it on.
     if (opts.network) stopExternal = launchExternal({ session, log: (line) => console.warn(line) });
+    // Synon Studio (docs/studio-daemon.md): the outbound link and the customer view of shared plans; nothing until linked.
+    if (opts.network) stopStudio = launchStudio({ session, store, demo: Boolean(demo) });
     if (config.mode === 'host' && config.inviteNow) void publish(config, room, session, () => closing);
     if (!demo) return;
     // A pretend friend and a fake invite so every part of the UI has something to show.
@@ -501,6 +505,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     stopRevenueCat();
     stopSupport();
     stopStats();
+    stopStudio();
     stopClaudeCode();
     await session.stop();
     terminals.closeAll();

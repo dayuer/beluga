@@ -521,6 +521,11 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `revenuecat.disconnect` | Mac only: the Earnings sheet's RevenueCat section › Disconnect |
 | `revenuecat.refresh` | Mac only: Refresh Now in the Earnings sheet (the daemon also looks again every 10 minutes by itself) |
 | `revenuecat.setApps` | Mac only: the Earnings sheet's RevenueCat section › Choose apps… (Count revenue from) |
+| `studio.link` | Mac only (and `beluga studio link <code>`): a project's ⋯ menu › Connect to Studio…, or Settings › Advanced › Synon Studio: the studio's binding code from its admin page, then Connect |
+| `studio.unlink` | Mac only: the Synon Studio dialog › Disconnect (tells Studio its plans are gone, closes the link, forgets the key) |
+| `studio.status` | Mac only: the Synon Studio dialog (it asks every 2 seconds while open), and `beluga studio status [--json]` |
+| `studio.setProject` | Mac only: the Synon Studio dialog › Share this project, and `beluga studio share &#124; unshare [path]` |
+| `studio.reconnect` | Mac only: the Synon Studio dialog's Reconnect while it is offline, and `beluga studio status` after a hub restart |
 | `diagnostics.report` | ✓ Settings › About › Report a Problem: makes the report, shows it in Finder and opens a GitHub issue to attach it to |
 | `diagnostics.windowProblem` | ✓ by itself: a part of the window that stalled or failed to load (a view, the file reader) is noted in the black box, so Report a Problem shows which and when |
 | `support.answer` | ✓ the Star sheet after your first merge (Star on GitHub / Maybe Later) and the coffee sheet after your fifth (an amount, Not Now, Don't Ask Again) |

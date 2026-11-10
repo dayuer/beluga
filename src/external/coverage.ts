@@ -32,6 +32,7 @@ const PREVIEW = 'A live preview is built for a window\'s frame and drawn there: 
 const SAVE_PANEL = 'It writes a file where a person chose in the Save panel.';
 const COMPUTERS = 'It manages your other computers, or moves work between them: a person does that from the app.';
 const NO_TOOL = 'No tool reaches it yet: a tool for it comes with its own decision.';
+const STUDIO_PUBLISH = 'A person links Studio with the admin page’s code and chooses what customers see: no agent publishes a plan.';
 
 export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.submit': 'covered',
@@ -562,6 +563,11 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stats.get': { refused: STATS },
   'stats.note': { refused: STATS },
   'stats.saveImage': { refused: SAVE_PANEL },
+  'studio.link': { refused: STUDIO_PUBLISH },
+  'studio.unlink': { refused: STUDIO_PUBLISH },
+  'studio.status': 'ui_only',
+  'studio.setProject': { refused: STUDIO_PUBLISH },
+  'studio.reconnect': 'ui_only',
   'preview.open': { refused: PREVIEW },
   'preview.snapshot': { refused: PREVIEW },
   'files.readRange': { refused: NO_TOOL },
