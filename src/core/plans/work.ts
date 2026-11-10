@@ -1,5 +1,6 @@
 import type { PlanTools } from '../../agent/types.js';
 import type { AgentRef } from '../../protocol.js';
+import { actingVia } from '../acting-agent.js';
 import { autoAutonomy, autoChecker } from '../../shared/auto-route.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
@@ -10,6 +11,7 @@ import type { LogItem, Store } from '../store.js';
 import type { WorkspaceController } from '../workspace-controller.js';
 import { ApplyError, applyDraft } from './apply.js';
 import { coherenceWarnings, warningsText } from './coherence.js';
+import { customerTurns } from './customer-turns.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
@@ -171,7 +173,11 @@ export class PlansWork {
    * the code there and changes nothing), and the plan's page. Claude starts planning from `goal`.
    */
   /** `quiet`: started from elsewhere (Your Mac), so the Mac's window stays where it is. */
-  async create(input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef }, opts: { readonly quiet?: boolean } = {}): Promise<Plan> {
+  async create(
+    input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef },
+    // `customerTurn`: this turn is a Studio customer's (BLG-78 limits its tools, including this first one).
+    opts: { readonly quiet?: boolean; readonly customerTurn?: boolean } = {},
+  ): Promise<Plan> {
     const controller = this.deps.controller;
     if (!controller) throw new Error('Plans need a project folder');
     const goal = input.goal.trim();
@@ -181,7 +187,11 @@ export class PlansWork {
     const home = `${WS}${chat.id}`;
     const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
-    this.deps.askClaude(goal, home, true);
+    // A Studio customer's first turn is limited too (docs/studio-gates.md §5.3): the marker is up
+    // before the run starts, and down again if no run could start.
+    if (opts.customerTurn) customerTurns.begin(home);
+    const asked = this.deps.askClaude(goal, home, true);
+    if (opts.customerTurn && asked === undefined) customerTurns.end(home);
     // Named in a moment by a quick model (your message is never its name); Claude's plan_write names it after that.
     void this.deps
       .titlePlan?.(goal)
@@ -244,6 +254,8 @@ export class PlansWork {
   /** Approve the draft: its tasks go on the board, and the plan runs (or carries on with the changes). */
   approve(id: string, by: Actor = this.me()): Plan {
     const plan = this.plans.need(id);
+    // A Studio plan starts from its Gate; an external agent (a tool call under its grant) never.
+    if (actingVia() && this.isStudioPlan(plan)) throw new Error('A plan shared with Synon Studio starts from its Gate: an external agent can’t approve it.');
     let applied: ReturnType<typeof applyDraft>;
     try {
       applied = applyDraft(plan, this.deps.board.board, { by, me: this.deps.board.me() });
@@ -274,8 +286,16 @@ export class PlansWork {
   }
 
   /** Verify the draft with a fresh agent (`thenApprove`: approve it once it reads well). */
-  verify(id: string, thenApprove = false): Promise<Plan> {
+  async verify(id: string, thenApprove = false): Promise<Plan> {
+    const plan = this.plans.get(id);
+    // A Studio plan starts only from its Gate: "verify, then approve" would start it without one.
+    if (thenApprove && plan && this.isStudioPlan(plan)) throw new Error('A plan shared with Synon Studio starts from its Gate: no verify-then-approve.');
     return this.reviewer.verify(id, thenApprove);
+  }
+
+  /** The plans a studio's customers may see: the operator's start Gate is their only way in. */
+  private isStudioPlan(plan: Plan): boolean {
+    return this.deps.store.getState().studio.shared.includes(plan.projectId);
   }
 
   /** A draft's reviewer is done with (the plan was approved, or thrown away): its conversation archived. */
@@ -319,15 +339,26 @@ export class PlansWork {
       return this.structure(named.id);
     }
     const direct = Boolean(plan.body) && !plan.draft;
+    // On a started plan with no draft, this edit would be applied at once through `approve` — which
+    // an external agent may not do on a Synon Studio plan. Check before `editDraft` writes anything:
+    // otherwise the draft would stay behind a refused approve (audit F3's half-success state).
+    if (direct && actingVia() && this.isStudioPlan(plan)) {
+      throw new Error('A plan shared with Synon Studio starts from its Gate: an external agent can’t apply changes to it.');
+    }
     const next = this.plans.editDraft(id, ops, this.me());
     this.syncHomeTask(next);
     return direct && next.draft ? this.approve(id) : next;
   }
 
   setAutonomy(id: string, autonomy: Autonomy, milestone?: string): Plan {
-    const plan = this.plans.setAutonomy(id, autonomy, this.me(), milestone);
+    const plan = this.plans.need(id);
+    // Synon Studio: a customer's start Gate and verdicts are the only way in (docs/studio-gates.md §3.6).
+    if (autonomy === 'autopilot' && this.deps.store.getState().studio.shared.includes(plan.projectId)) {
+      throw new Error('A plan shared with Synon Studio can’t use autopilot: it runs gated.');
+    }
+    const next = this.plans.setAutonomy(id, autonomy, this.me(), milestone);
     this.pilot.schedule();
-    return plan;
+    return next;
   }
 
   setPaused(id: string, paused: boolean): Plan {
@@ -377,15 +408,25 @@ export class PlansWork {
     return this.pilot.tidyUp(id, yes, this.me());
   }
 
-  /** Not yet: what's missing goes to the head Claude, which adds the work to the plan. */
-  sendBack(id: string, milestone: string, note: string): Plan {
+  /**
+   * Not yet: what's missing goes to the head Claude, which adds the work to the plan. `customerTurn`:
+   * the note is a Synon Studio customer's (or an answer of theirs), so that run is limited like any
+   * other customer turn (docs/studio-gates.md §5.3) — wrapped text alone is not a boundary.
+   */
+  sendBack(id: string, milestone: string, note: string, opts: { readonly customerTurn?: boolean } = {}): Plan {
     const plan = this.plans.need(id);
     const m = plan.body?.milestones.find((x) => x.id === milestone);
     if (!m) throw new Error('That milestone isn’t in the approved plan');
     const text = note.trim();
     if (!text) throw new Error('Say what’s missing');
     this.plans.note(id, 'failed', `sent “${m.title}” back: ${text}`, this.me());
-    this.deps.askClaude(`Milestone “${m.title}” isn't done yet: ${text}\n\nAdd the tasks that fix it to this milestone with plan_update (the user approves them), or tell me what you need.`, plan.home, true);
+    if (opts.customerTurn) customerTurns.begin(plan.home);
+    const asked = this.deps.askClaude(
+      `Milestone “${m.title}” isn't done yet: ${text}\n\nAdd the tasks that fix it to this milestone with plan_update (the user approves them), or tell me what you need.`,
+      plan.home,
+      true,
+    );
+    if (opts.customerTurn && asked === undefined) customerTurns.end(plan.home);
     return this.plans.need(id);
   }
 
@@ -462,7 +503,18 @@ export class PlansWork {
   // ------------------------------------------------------------------ for Claude
 
   /** A run in a plan's home conversation (yours): the plan's tools, and how to plan or run it. */
-  forRun(channel: string, from: string): { readonly tools?: PlanTools; readonly brief?: string; readonly checker?: boolean } | undefined {
+  forRun(channel: string, from: string): { readonly tools?: PlanTools; readonly brief?: string; readonly checker?: boolean; readonly customerTurn?: boolean } | undefined {
+    // A customer's turn (Synon Studio): whatever the plan's autonomy, its changes only reach the
+    // draft, and it gets those three tools and nothing else (the runtime's policy refuses the rest).
+    if (customerTurns.active(channel)) {
+      const theirPlan = planForHome(this.plans.state(), channel);
+      if (!theirPlan) return undefined;
+      customerTurns.started(channel);
+      const board = this.deps.store.getState().board;
+      const view = this.pilot.view(theirPlan);
+      const brief = theirPlan.body ? headBrief(view) + planningBrief(theirPlan, board, this.plans.planningStyle) : planningBrief(theirPlan, board, this.plans.planningStyle);
+      return { tools: this.customerTools(theirPlan.id), brief, customerTurn: true };
+    }
     const me = this.deps.board.me();
     if (me.kind !== 'person' || from !== me.id) return undefined;
     // A milestone's checker: its brief, and only plan_get and plan_gate.
@@ -563,6 +615,15 @@ export class PlansWork {
    */
   toolsForAgent(planId: string, agent: ExternalActor): PlanTools {
     return { ...this.toolsFor(planId, this.deps.board.agentActor(agent)), only: ['plan_get', 'plan_write', 'plan_update', 'plan_start_task', 'plan_pause'] };
+  }
+
+  /**
+   * A Synon Studio customer's turn: reading the plan, and changes that only reach the draft
+   * (always, whatever the autonomy). No task tools, no gate, no starting or pausing.
+   */
+  private customerTools(planId: string): PlanTools {
+    const external: ExternalActor = { id: 'synon-studio-customer', name: 'a Synon Studio customer' };
+    return { ...this.toolsForAgent(planId, external), only: ['plan_get', 'plan_write', 'plan_update'] };
   }
 
   /** The chat of a plan's started task (its id, or its board key): the worktree it works in. */

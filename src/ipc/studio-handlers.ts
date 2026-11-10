@@ -13,4 +13,6 @@ export const STUDIO_HANDLERS = {
   'studio.status': (s) => studioOf(s).status(),
   'studio.setProject': (s, projectId, shared) => studioOf(s).setProject(projectId, shared),
   'studio.reconnect': (s) => studioOf(s).reconnect(),
+  'studio.answerGate': (s, gateId, answer) => studioOf(s).answerGate(gateId, answer),
+  'studio.say': (s, planId, text) => studioOf(s).say(planId, text),
 } satisfies StudioHandlers;

@@ -328,6 +328,11 @@ export const PHONE: Record<Method, Side> = {
   'studio.status': 'mac',
   'studio.setProject': 'mac',
   'studio.reconnect': 'mac',
+  // A Gate is a NeedsYou: approving the start of a plan from the phone is the same answer as on the
+  // Mac, bound to the same draftRev (docs/studio-gates.md §3.8).
+  'studio.answerGate': 'phone',
+  // Saying something to a customer is the operator's own words: the phone never writes them for you.
+  'studio.say': 'mac',
 
   // ---- supporting Beluga: the star and coffee asks are the Mac's (they open web pages there)
   'support.answer': 'mac',

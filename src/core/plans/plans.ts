@@ -196,7 +196,16 @@ export class Plans {
     const plan = this.need(id);
     const clean = title.replace(/\s+/g, ' ').trim().slice(0, 200);
     if (!clean) throw new PlanError('A plan needs a title');
-    return this.change(plan, { ...(plan.draft ? { draft: { ...plan.draft, title: clean } } : {}), ...(plan.body ? { body: { ...plan.body, title: clean } } : {}) }, [event(by, 'note', `renamed the plan to “${clean}”`, this.now())]);
+    // A draft's title is part of what a Synon Studio customer confirms: renaming it moves the
+    // revision, so a Gate bound to the old one goes stale (docs/studio-gates.md §3).
+    return this.change(
+      plan,
+      {
+        ...(plan.draft ? { draft: { ...plan.draft, title: clean }, draftRev: plan.draftRev + 1 } : {}),
+        ...(plan.body ? { body: { ...plan.body, title: clean } } : {}),
+      },
+      [event(by, 'note', `renamed the plan to “${clean}”`, this.now())],
+    );
   }
 
   /** The quick name for a new plan: only while it has none (Claude's plan_write, or you, named it first otherwise). */

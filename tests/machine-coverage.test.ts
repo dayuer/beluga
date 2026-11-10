@@ -60,10 +60,13 @@ describe('the table of what your app may do on a computer', () => {
         'external.setRoute',
         'session.quit',
         'daemon.stop',
-        // Publishing a plan to customers is the computer's own choice (docs/studio-daemon.md §7.2).
+        // Publishing a plan to customers is the computer's own choice (docs/studio-daemon.md §7.2),
+        // and answering a start Gate is the operator's own (docs/studio-gates.md §3.8).
         'studio.link',
         'studio.unlink',
         'studio.setProject',
+        'studio.answerGate',
+        'studio.say',
       ].sort(),
     );
   });
