@@ -10,6 +10,8 @@
 import { z } from 'zod';
 import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, type AppFrame } from '../../studio/protocol.js';
 import { enqueue, take } from './queue.js';
+import { authCustomer, bearerOf, logout as logoutSession, requestLogin, verifyLogin } from './session.js';
+import { listPlans, readView, turnsBefore } from './views.js';
 import {
   ALERTS_KEEP,
   CLOCK_SKEW_MS,
@@ -439,10 +441,23 @@ export async function handleHubRequest(req: Request, deps: Deps): Promise<HubRep
     }
 
     case 'login':
+      return method(req, 'POST') ? requestLogin(await readJson(req), deps) : failure(405, 'method-not-allowed');
+
     case 'login-verify':
+      return method(req, 'POST') ? verifyLogin(await readJson(req), deps) : failure(405, 'method-not-allowed');
+
     case 'logout':
-    case 'app-projects':
-      return notImplemented();
+      return method(req, 'POST') ? logoutSession(bearerOf(req), deps) : failure(405, 'method-not-allowed');
+
+    case 'app-projects': {
+      if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
+      const auth = await authCustomer(bearerOf(req), deps);
+      if (!auth.ok) return failure(auth.status, auth.error);
+      const projects = await deps.hub.projectsOfCustomer(auth.customer.id);
+      const out: Array<{ id: string; studioId: string; studioName: string; name: string }> = [];
+      for (const p of projects) out.push({ id: p.id, studioId: p.studioId, studioName: (await deps.hub.studio(p.studioId))?.name ?? '', name: p.name });
+      return reply(200, { projects: out });
+    }
 
     default:
       return failure(404, 'not-found');
@@ -452,6 +467,13 @@ export async function handleHubRequest(req: Request, deps: Deps): Promise<HubRep
 // --- The studio DO's routes ---
 
 const CloseBody = z.object({ role: z.enum(['daemon', 'customer', 'session']), id: z.string().min(1).max(200) }).strict();
+
+/** A customer route: the internal identity is an app one for this project, and still a member. */
+async function appGuard(auth: InternalAuth, pid: string | undefined, deps: StudioDeps): Promise<HubReply | undefined> {
+  if (auth.role !== 'app' || pid === undefined || auth.projectId !== pid) return failure(403, 'not-yours');
+  if (!(await deps.hub.canAccess(auth.customerId, auth.projectId))) return failure(403, 'not-yours');
+  return undefined;
+}
 
 export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: InternalAuth): Promise<HubReply> {
   const route = routeOf(req.method, new URL(req.url).pathname);
@@ -493,8 +515,9 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
     }
 
     case 'app-actions': {
+      const no = await appGuard(auth, route.params.pid, deps);
+      if (no) return no;
       if (auth.role !== 'app') return failure(403, 'not-yours');
-      if (route.params.pid !== auth.projectId) return failure(403, 'not-yours');
       if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
       const result = await enqueue(await readJson(req), { studio: deps.studioId, projectId: auth.projectId, customerId: auth.customerId }, deps);
       if (!result.ok) return failure(result.status, result.error);
@@ -510,12 +533,41 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
       return { status: 200, body: { receipt: result.receipt }, effects };
     }
 
+    case 'app-plans': {
+      const no = await appGuard(auth, route.params.pid, deps);
+      if (no) return no;
+      if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
+      return reply(200, { plans: await listPlans(route.params.pid!, deps) });
+    }
+
+    case 'app-plan': {
+      const no = await appGuard(auth, route.params.pid, deps);
+      if (no) return no;
+      if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
+      const shown = await readView(route.params.pid!, route.params.ref!, deps);
+      return shown ? reply(200, { view: shown.view, updatedAt: shown.updatedAt }) : failure(404, 'unknown-plan');
+    }
+
+    case 'app-turns': {
+      const no = await appGuard(auth, route.params.pid, deps);
+      if (no) return no;
+      if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
+      const url = new URL(req.url);
+      const limit = Number(url.searchParams.get('limit') ?? String(TURNS_PAGE));
+      return reply(200, await turnsBefore(route.params.pid!, route.params.ref!, url.searchParams.get('before') ?? undefined, limit, deps));
+    }
+
+    case 'app-preview': {
+      const no = await appGuard(auth, route.params.pid, deps);
+      if (no) return no;
+      return failure(403, 'not-delivered');
+    }
+
     default: {
-      // Customer routes. The Worker has already authenticated; membership is checked again here.
-      if (auth.role !== 'app') return failure(403, 'not-yours');
-      const pid = route.params.pid;
-      if (pid !== undefined && pid !== auth.projectId) return failure(403, 'not-yours');
-      return notImplemented();
+      // Customer routes not built yet (the app WebSocket is BLG-65). The internal identity still
+      // has to be an app one for this project, and a member.
+      const no = await appGuard(auth, route.params.pid, deps);
+      return no ?? notImplemented();
     }
   }
 }

@@ -171,6 +171,8 @@ export interface HubStore {
   createCustomer(input: { readonly id: string; readonly email: string; readonly name: string; readonly now: number }): Promise<Customer | 'email-taken'>;
   /** Tombstone the account and clear its memberships, tokens, sessions and outbox. */
   removeCustomer(id: string, now: number): Promise<void>;
+  /** An invited customer who logged in once is active (the admin page shows "signed in"). */
+  activateCustomer(id: string): Promise<void>;
 
   project(id: string): Promise<Project | undefined>;
   projectsOfStudio(studioId: string): Promise<readonly Project[]>;
@@ -278,6 +280,7 @@ export interface StudioStore {
   putTurns<T extends { readonly id: string; readonly at: number }>(projectId: string, planRef: string, turns: readonly T[], keep: number): Promise<void>;
   turnsBefore(projectId: string, planRef: string, before: string | undefined, limit: number): Promise<readonly TurnRow[]>;
   turnCount(projectId: string, planRef: string): Promise<number>;
+  deleteTurns(projectId: string, planRef: string): Promise<void>;
 
   /** `undefined` when `opKey` is already in the queue (the caller returns the existing receipt). */
   enqueue(item: Omit<QueueItem, 'seq' | 'state' | 'takenBy' | 'takenAt'>): Promise<number | undefined>;
@@ -391,6 +394,10 @@ export function memoryHub(): HubStore {
       for (const [hash, s] of sessions) if (s.customerId === cid) sessions.set(hash, { ...s, revokedAt: now });
       for (const [hash, t] of loginTokens) if (t.customerId === cid) loginTokens.delete(hash);
       for (const [oid, o] of outbox) if (o.customerId === cid) outbox.delete(oid);
+    },
+    activateCustomer: async (cid) => {
+      const c = customers.get(cid);
+      if (c && c.status === 'invited') customers.set(cid, { ...c, status: 'active' });
     },
 
     project: async (pid) => projects.get(pid),
@@ -506,6 +513,9 @@ export function memoryStudio(limits: RateLimits = { perMinute: 20, perDay: 300, 
       return all.slice(Math.max(0, cut - limit), cut);
     },
     turnCount: async (projectId, planRef) => [...turns.values()].filter((t) => t.projectId === projectId && t.planRef === planRef).length,
+    deleteTurns: async (projectId, planRef) => {
+      for (const [key, t] of turns) if (t.projectId === projectId && t.planRef === planRef) turns.delete(key);
+    },
 
     enqueue: async (item) => {
       if (queue.some((q) => q.opKey === item.opKey)) return undefined;
