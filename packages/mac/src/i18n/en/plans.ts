@@ -369,6 +369,8 @@ export const plans = {
   'plans.details.task': 'Task',
   'plans.details.forYou': 'For you',
   'plans.details.now': 'Now: {what}',
+  'plans.page.decidePaused': "Plan paused: it asks for your decisions once it's resumed",
+  'plans.page.decideNotYet': 'Not its turn yet: it waits on the tasks or milestone before it',
   'plans.details.decide': 'Decide…',
   'plans.details.start': 'Start',
   'plans.details.answer': 'Answer',

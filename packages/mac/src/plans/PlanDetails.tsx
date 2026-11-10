@@ -213,7 +213,7 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
       {t.why && (t.state === 'blocked' || t.state === 'later') ? <p className={p.muted}>{t.why}</p> : null}
       <div className={p.detailsActions}>
         {canStart && t.forYou ? (
-          <Button size="small" variant="primary" icon="hand" onClick={() => openDecision()}>
+          <Button size="small" variant="primary" icon="hand" onClick={() => openDecision(view.plan.id, t.task.id)}>
             {tr('plans.details.decide')}
           </Button>
         ) : canStart ? (

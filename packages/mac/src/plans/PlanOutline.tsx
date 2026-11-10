@@ -116,7 +116,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
   const menu = (): ActionItem[] => [
     ...(canStart
       ? t.forYou
-        ? [{ label: tr('plans.details.decide'), icon: 'hand' as const, onSelect: openDecision }]
+        ? [{ label: tr('plans.details.decide'), icon: 'hand' as const, onSelect: () => openDecision(plan.id, t.task.id) }]
         : [
             { label: tr('plans.details.start'), icon: 'play' as const, onSelect: () => startIt() },
             { label: tr('plans.outline.startWith'), icon: 'play' as const, submenu: startWith(own, (a) => startIt(a ?? (own ? mine : undefined)), ''), onSelect: () => undefined },
@@ -144,7 +144,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
           {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
           {t.forYou ? <Icon name="person" size={12} className={p.forYou} /> : null}
           {canStart ? (
-            <button type="button" className={p.startButton} onClick={() => (t.forYou ? openDecision() : void act(() => api.startTask(plan.id, t.task.id)))}>
+            <button type="button" className={p.startButton} onClick={() => (t.forYou ? openDecision(plan.id, t.task.id) : void act(() => api.startTask(plan.id, t.task.id)))}>
               <Icon name={t.forYou ? 'hand' : 'play'} size={9} />
               {t.forYou ? tr('plans.details.decide') : tr('plans.details.start')}
             </button>
