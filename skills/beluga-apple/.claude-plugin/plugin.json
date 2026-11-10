@@ -1,0 +1,7 @@
+{
+  "name": "beluga-apple",
+  "version": "0.1.0",
+  "description": "Ship iOS apps from Beluga: build and verify in the simulator, publish to TestFlight, watch App Review and answer rejections with your approval, daily App Store reports, and how a Beluga team of agents works together.",
+  "author": { "name": "dayuer" },
+  "license": "MIT"
+}
