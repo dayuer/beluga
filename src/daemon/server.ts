@@ -47,6 +47,8 @@ const EXTERNAL_MANAGERS: ReadonlySet<string> = new Set(['mac', 'cli', 'test']);
 export const mayCall = (kind: string, method: string): boolean => !method.startsWith('external.') || EXTERNAL_MANAGERS.has(kind);
 /** What only the Mac app and the command line may do: managing browsers' access (BLG-653). */
 export const WEB_ADMIN: ReadonlySet<string> = new Set(['web.link', 'web.sessions.revoke', 'web.stop', 'web.public', 'web.tailscale']);
+/** Publishing a project to a studio's customers is a person's choice at the Mac (docs/studio-daemon.md §7.2). */
+export const WEB_STUDIO: ReadonlySet<string> = new Set(['studio.link', 'studio.unlink', 'studio.setProject']);
 
 /** A computer's screen asked for one: who gets it (src/machines/door.ts). The hello's token was checked. */
 export type MachineRoute = (id: string, ws: WebSocket, hello: Extract<ReturnType<typeof parseClientFrame>, { t: 'hello' }>) => void;
@@ -403,6 +405,8 @@ export class DaemonServer {
     if (!mayCall(client.kind, method)) return { t: 'result', id, ok: false, error: 'External agents are managed from the Mac app or `beluga mcp` on the computer Beluga runs on' };
     // A browser's session can't mint, revoke or move browser sessions: a stolen cookie can't outlive its revoke.
     if (client.kind === 'web' && WEB_ADMIN.has(method)) return { t: 'result', id, ok: false, error: 'Browsers are let in and revoked from the Mac app or `beluga web` on the computer Beluga runs on' };
+    // A stolen browser cookie can't publish plans to customers, nor unlink the studio.
+    if (client.kind === 'web' && WEB_STUDIO.has(method)) return { t: 'result', id, ok: false, error: 'Studio is connected and shared from the Mac app or `beluga studio` on the computer Beluga runs on' };
     // Your app driving this computer: what src/machines/coverage.ts refuses it (BLG-776).
     if (client.kind === 'machine' && machineRefuses(method)) return { t: 'result', id, ok: false, error: MACHINE_REFUSED };
     return { t: 'result', id, ...(await dispatchCall(this.session, client.id, method, raw)) };

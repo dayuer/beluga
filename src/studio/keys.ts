@@ -40,6 +40,11 @@ export interface StudioConfig {
   readonly lastAt?: number;
   /** Beluga project ids shared with Studio. */
   readonly projects: Readonly<Record<string, StudioProjectShare>>;
+  /**
+   * Per shared project, the plan refs the hub was told about. Refs only (never ids): a plan deleted
+   * while this Mac was off still gets its `plan-gone` on the next connection (docs/studio-daemon.md §5).
+   */
+  readonly published?: Readonly<Record<string, readonly string[]>>;
 }
 
 export const studioPath = (): string => path.join(belugaHome(), 'studio.json');
@@ -73,7 +78,17 @@ function configOf(raw: unknown): StudioConfig | undefined {
     if (!isObject(share) || typeof share['since'] !== 'number' || !Number.isFinite(share['since'])) return undefined;
     projects[id] = { since: share['since'] };
   }
-  return { v: 1, hub, studioId, daemonId, name, key, refKey, linkedAt, ...(lastAt !== undefined ? { lastAt } : {}), projects };
+  const publishedRaw = raw['published'];
+  let published: Record<string, string[]> | undefined;
+  if (publishedRaw !== undefined) {
+    if (!isObject(publishedRaw)) return undefined;
+    published = {};
+    for (const [projectId, refs] of Object.entries(publishedRaw)) {
+      if (!Array.isArray(refs) || refs.length > 500 || !refs.every((r) => typeof r === 'string' && r.length > 0 && r.length <= 64)) return undefined;
+      published[projectId] = refs as string[];
+    }
+  }
+  return { v: 1, hub, studioId, daemonId, name, key, refKey, linkedAt, ...(lastAt !== undefined ? { lastAt } : {}), projects, ...(published ? { published } : {}) };
 }
 
 /** The file's owner-only mode, repaired when something copied it wider (best effort; Windows has none). */
@@ -116,14 +131,27 @@ export function saveStudioConfig(cfg: StudioConfig, file: string = studioPath())
   }
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(cfg)}\n`, { mode: 0o600 });
-  renameSync(tmp, file);
+  // `mode` only applies to a file created just now; a leftover tmp with a wider mode would keep it.
+  try {
+    if (process.platform !== 'win32') chmodSync(tmp, 0o600);
+    renameSync(tmp, file);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // Nothing more to do; the error below is the one that matters.
+    }
+    throw err;
+  }
 }
 
+/** Delete the link's file. Already gone is fine; a file we may not delete (read-only, in use) throws. */
 export function removeStudioConfig(file: string = studioPath()): void {
   try {
     unlinkSync(file);
-  } catch {
-    // Already gone: unlinking twice is the same as unlinking once.
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw err;
   }
 }
 

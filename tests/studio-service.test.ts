@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -114,6 +114,19 @@ describe('StudioService', () => {
     expect(again).toEqual({ ok: false, error: 'already-linked' });
     t.service.stop();
     rmSync(t.dir, { recursive: true, force: true });
+  });
+
+  it('removes a corrupt key file too when unlinked', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'beluga-studio-corrupt-'));
+    const file = path.join(dir, 'studio.json');
+    writeFileSync(file, '{"v":1,"hub":');
+    const service = new StudioService({ store: new Store(initialState('room')), file });
+    service.start();
+    expect(service.status().linked).toBe(false);
+    const status = service.unlink();
+    expect(status).toMatchObject({ linked: false, state: 'unlinked' });
+    expect(() => statSync(file)).toThrow();
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('is an empty service in a demo', async () => {

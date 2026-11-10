@@ -43,6 +43,9 @@ export const DEBOUNCE_MS = 250;
 export const MAX_WAIT_MS = 750;
 /** A full snapshot asked for again this soon after the last is dropped: never a patch→resync loop. */
 export const RESYNC_MIN_MS = 5_000;
+/** At most RESYNC_MAX answers to `resync` in any RESYNC_WINDOW_MS: a hub can't make us work for free. */
+export const RESYNC_WINDOW_MS = 10_000;
+export const RESYNC_MAX = 100;
 
 /** Keys in a fixed order, so two views made by the same builder compare by what they say, not by key order. */
 function stable(value: unknown, depth = 0): string {
@@ -81,6 +84,7 @@ function lostField(prev: StudioPlanView, next: StudioPlanView): boolean {
 }
 
 interface Baseline {
+  readonly projectId: string;
   readonly planRef: string;
   readonly projectRef: string;
   view: StudioPlanView;
@@ -92,6 +96,8 @@ export class StudioPublisher {
   private readonly config: () => StudioConfig | undefined;
   private readonly send: (frame: DaemonUp) => boolean;
   private readonly extras?: (planId: string) => StudioExtras;
+  /** Where the refs the hub was told about are kept, so a plan deleted while we were off is retracted. */
+  private readonly remember?: (projectId: string, planRefs: readonly string[]) => void;
   private readonly debounceMs: number;
   private readonly maxWaitMs: number;
   private readonly timers: PublishTimers;
@@ -100,6 +106,8 @@ export class StudioPublisher {
   private readonly baseline = new Map<string, Baseline>();
   private readonly revs = new Map<string, number>();
   private readonly lastResync = new Map<string, number>();
+  private readonly lastProjectResync = new Map<string, number>();
+  private resyncWindow = { at: 0, n: 0 };
   private plansRef: unknown;
   private boardRef: unknown;
   private unsub: (() => void) | undefined;
@@ -115,6 +123,7 @@ export class StudioPublisher {
     readonly config: () => StudioConfig | undefined;
     readonly send: (frame: DaemonUp) => boolean;
     readonly extras?: (planId: string) => StudioExtras;
+    readonly remember?: (projectId: string, planRefs: readonly string[]) => void;
     readonly debounceMs?: number;
     readonly maxWaitMs?: number;
     readonly timers?: PublishTimers;
@@ -124,6 +133,7 @@ export class StudioPublisher {
     this.config = d.config;
     this.send = d.send;
     if (d.extras) this.extras = d.extras;
+    if (d.remember) this.remember = d.remember;
     this.debounceMs = d.debounceMs ?? DEBOUNCE_MS;
     this.maxWaitMs = d.maxWaitMs ?? MAX_WAIT_MS;
     this.timers = d.timers ?? realTimers;
@@ -171,27 +181,49 @@ export class StudioPublisher {
     if (!cfg) return [];
     const frames: DaemonUpFor[] = [];
     const visible = this.visible(cfg);
-    for (const [planId, { plan, projectRef }] of visible) {
+    /** projectId → the plan refs this snapshot publishes. */
+    const sent = new Map<string, Set<string>>();
+    for (const [planId, { plan, projectId, projectRef }] of visible) {
       let view: StudioPlanView;
       try {
         view = this.build(plan, cfg);
       } catch {
+        // It can't be shown this time: its old view at the hub goes with the retraction below.
         this.badView();
+        this.baseline.delete(planId);
         continue;
       }
       // A plan that changed project (import, a moved plan) still has its old project's view at the
       // hub: say it's gone there before the new full frame.
       const was = this.baseline.get(planId);
-      if (was && was.projectRef !== projectRef) frames.push({ t: 'for', project: was.projectRef, frame: { t: 'plan-gone', planRef: was.planRef } });
+      if (was && was.projectRef !== projectRef) {
+        frames.push({ t: 'for', project: was.projectRef, frame: { t: 'plan-gone', planRef: was.planRef } });
+        this.unremember(was.projectId, was.planRef);
+        this.revs.delete(was.planRef);
+      }
       const rev = this.nextRev(view.planRef);
       frames.push({ t: 'for', project: projectRef, frame: { t: 'plan', rev, view } });
-      this.baseline.set(planId, { planRef: view.planRef, projectRef, view, rev });
+      this.baseline.set(planId, { projectId, planRef: view.planRef, projectRef, view, rev });
+      this.rememberRef(projectId, view.planRef);
+      const list = sent.get(projectId) ?? new Set<string>();
+      list.add(view.planRef);
+      sent.set(projectId, list);
     }
-    // Gone while we were offline: the hub still holds it, so say so. A plan that merely failed to
-    // build above is still shared: its old snapshot stays until it builds again.
+    // What this run doesn't publish any more (a plan deleted or unshared while we were off, a plan
+    // that can't build): the hub has no TTL, so say so now or the customer keeps seeing it.
+    for (const [projectId, refs] of Object.entries(cfg.published ?? {})) {
+      const projectRef = refOf(cfg.refKey, 'project', projectId);
+      const keep = sent.get(projectId) ?? new Set<string>();
+      for (const planRef of refs) {
+        if (keep.has(planRef)) continue;
+        frames.push({ t: 'for', project: projectRef, frame: { t: 'plan-gone', planRef } });
+        this.unremember(projectId, planRef);
+        this.revs.delete(planRef);
+      }
+    }
+    // Gone from this run's baseline too (a plan that was published, then deleted): nothing more to do.
     for (const [planId, base] of [...this.baseline]) {
       if (visible.has(planId)) continue;
-      frames.push({ t: 'for', project: base.projectRef, frame: { t: 'plan-gone', planRef: base.planRef } });
       this.baseline.delete(planId);
     }
     this.online = true;
@@ -204,6 +236,15 @@ export class StudioPublisher {
     const cfg = this.config();
     if (!cfg) return;
     const now = this.now();
+    // A hub that asks far too often doesn't get to make us scan the whole baseline each time.
+    if (now - this.resyncWindow.at > RESYNC_WINDOW_MS) this.resyncWindow = { at: now, n: 0 };
+    this.resyncWindow.n++;
+    if (this.resyncWindow.n > RESYNC_MAX) return;
+    if (planRef === undefined) {
+      const last = this.lastProjectResync.get(project);
+      if (last !== undefined && now - last < RESYNC_MIN_MS) return;
+      this.lastProjectResync.set(project, now);
+    }
     const targets = [...this.baseline].filter(([, base]) => base.projectRef === project && (planRef === undefined || base.planRef === planRef));
     if (targets.length === 0) return;
     const visible = this.visible(cfg);
@@ -213,7 +254,7 @@ export class StudioPublisher {
       this.lastResync.set(base.planRef, now);
       const plan = visible.get(planId)?.plan;
       if (!plan) {
-        this.sendGone(base.projectRef, base.planRef, planId);
+        this.sendGone(base.projectId, base.projectRef, base.planRef, planId);
         continue;
       }
       let view: StudioPlanView;
@@ -223,7 +264,7 @@ export class StudioPublisher {
         this.badView();
         continue;
       }
-      this.sendFull(planId, base.projectRef, view);
+      this.sendFull(planId, base.projectId, base.projectRef, view);
     }
   }
 
@@ -240,7 +281,16 @@ export class StudioPublisher {
    * on the customer's side after its file is gone (docs/studio-daemon.md §7.1).
    */
   leave(): void {
-    for (const [planId, base] of [...this.baseline]) this.sendGone(base.projectRef, base.planRef, planId);
+    for (const [planId, base] of [...this.baseline]) this.sendGone(base.projectId, base.projectRef, base.planRef, planId);
+    // Refs the hub was told about that this run never published (a plan deleted while we were off).
+    const cfg = this.config();
+    if (!cfg) return;
+    for (const [projectId, refs] of Object.entries(cfg.published ?? {})) {
+      const projectRef = refOf(cfg.refKey, 'project', projectId);
+      for (const planRef of refs) {
+        if (this.push({ t: 'for', project: projectRef, frame: { t: 'plan-gone', planRef } })) this.unremember(projectId, planRef);
+      }
+    }
   }
 
   /** `studio.setProject` changed the set: tell the hub the new project list, then the plans that moved. */
@@ -255,7 +305,7 @@ export class StudioPublisher {
     // What is no longer shared is gone from the customer's side, even if the hub's mapping stays.
     for (const [planId, base] of [...this.baseline]) {
       if (shared.has(base.projectRef)) continue;
-      if (!this.sendGone(base.projectRef, base.planRef, planId)) return;
+      if (!this.sendGone(base.projectId, base.projectRef, base.planRef, planId)) return;
     }
     this.refresh();
   }
@@ -299,9 +349,9 @@ export class StudioPublisher {
     const visible = this.visible(cfg);
     for (const [planId, base] of [...this.baseline]) {
       if (visible.has(planId)) continue;
-      if (!this.sendGone(base.projectRef, base.planRef, planId)) return;
+      if (!this.sendGone(base.projectId, base.projectRef, base.planRef, planId)) return;
     }
-    for (const [planId, { plan, projectRef }] of visible) {
+    for (const [planId, { plan, projectId, projectRef }] of visible) {
       let view: StudioPlanView;
       try {
         view = this.build(plan, cfg);
@@ -312,16 +362,16 @@ export class StudioPublisher {
       const base = this.baseline.get(planId);
       if (base && base.projectRef !== projectRef) {
         // It moved project: the old project's cached view has to go, then the new one is full.
-        if (!this.sendGone(base.projectRef, base.planRef, planId)) return;
+        if (!this.sendGone(base.projectId, base.projectRef, base.planRef, planId)) return;
       }
       if (!base || base.planRef !== view.planRef || base.projectRef !== projectRef) {
-        this.sendFull(planId, projectRef, view);
+        this.sendFull(planId, projectId, projectRef, view);
         continue;
       }
       // A field that went away can't be expressed as a patch (the hub merges), so check before the
       // diff: `diffView` only looks at what the new view has.
       if (lostField(base.view, view)) {
-        this.sendFull(planId, projectRef, view);
+        this.sendFull(planId, projectId, projectRef, view);
         continue;
       }
       const diff = diffView(base.view, view);
@@ -339,19 +389,20 @@ export class StudioPublisher {
       }
       base.view = view;
       base.rev = rev;
+      this.rememberRef(projectId, view.planRef);
       this.pushedAt = this.now();
     }
   }
 
-  private visible(cfg: StudioConfig): Map<string, { plan: Plan; projectRef: string }> {
+  private visible(cfg: StudioConfig): Map<string, { plan: Plan; projectId: string; projectRef: string }> {
     const state = this.store.getState();
     const refs = new Map<string, string>();
     for (const projectId of Object.keys(cfg.projects)) refs.set(projectId, refOf(cfg.refKey, 'project', projectId));
-    const out = new Map<string, { plan: Plan; projectRef: string }>();
+    const out = new Map<string, { plan: Plan; projectId: string; projectRef: string }>();
     for (const plan of state.plans.plans) {
       const projectRef = refs.get(plan.projectId);
       if (projectRef === undefined) continue;
-      out.set(plan.id, { plan, projectRef });
+      out.set(plan.id, { plan, projectId: plan.projectId, projectRef });
     }
     return out;
   }
@@ -375,17 +426,21 @@ export class StudioPublisher {
     return frame.data.view;
   }
 
-  private sendFull(planId: string, projectRef: string, view: StudioPlanView): void {
+  private sendFull(planId: string, projectId: string, projectRef: string, view: StudioPlanView): void {
     const rev = this.nextRev(view.planRef);
     const frame: DaemonUpFor = { t: 'for', project: projectRef, frame: { t: 'plan', rev, view } };
     if (!this.push(frame)) return;
-    this.baseline.set(planId, { planRef: view.planRef, projectRef, view, rev });
+    this.baseline.set(planId, { projectId, planRef: view.planRef, projectRef, view, rev });
+    this.rememberRef(projectId, view.planRef);
   }
 
-  private sendGone(projectRef: string, planRef: string, planId: string): boolean {
+  private sendGone(projectId: string, projectRef: string, planRef: string, planId: string): boolean {
     const frame: DaemonUpFor = { t: 'for', project: projectRef, frame: { t: 'plan-gone', planRef } };
     if (!this.push(frame)) return false;
     this.baseline.delete(planId);
+    this.revs.delete(planRef);
+    this.lastResync.delete(planRef);
+    this.unremember(projectId, planRef);
     return true;
   }
 
@@ -417,6 +472,19 @@ export class StudioPublisher {
 
   private badView(): void {
     this.lastError = 'bad-view';
+  }
+
+  /** The hub was told about this ref: keep it where a later run can retract it. */
+  private rememberRef(projectId: string, planRef: string): void {
+    const refs = this.config()?.published?.[projectId] ?? [];
+    if (refs.includes(planRef)) return;
+    this.remember?.(projectId, [...refs, planRef]);
+  }
+
+  private unremember(projectId: string, planRef: string): void {
+    const refs = this.config()?.published?.[projectId];
+    if (!refs?.includes(planRef)) return;
+    this.remember?.(projectId, refs.filter((r) => r !== planRef));
   }
 }
 

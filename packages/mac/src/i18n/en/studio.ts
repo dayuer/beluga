@@ -53,6 +53,8 @@ export const studio = {
   'studio.disconnect.title': 'Disconnect from Synon Studio?',
   'studio.disconnect.message': 'This Mac’s plans stop going to the studio and its customers, the link closes, and the key it made is forgotten. You can connect again with a new code.',
   'studio.disconnect.confirm': 'Disconnect',
+  'studio.disconnect.offline': 'The studio hub is offline right now, so it may keep showing the old views until the studio’s operator unbinds this Mac.',
+  'studio.disconnect.cannotRemove': 'Disconnected, but the key file could not be removed: ~/.beluga/studio.json is still on this Mac.',
   'studio.status.retry': 'trying again in {seconds}s',
   'studio.state.unlinked': 'Not connected',
   'studio.state.connecting': 'Connecting…',

@@ -354,6 +354,36 @@ describe('StudioPublisher', () => {
     h.publisher.stop();
   });
 
+  it('retracts what it published before a restart, and keeps what it still publishes', () => {
+    const store = world();
+    const planRef = refOf(REF_KEY, 'plan', 'pl1');
+    const stale = refOf(REF_KEY, 'plan', 'deleted-while-off');
+    const h = harness(store, { ...config(['p1']), published: { p1: [stale, planRef] } });
+    const gones = h.full.filter((f) => f.t === 'for' && f.frame.t === 'plan-gone').map((f) => (f as Extract<DaemonUp, { t: 'for' }>).frame.t === 'plan-gone' ? (f as { frame: { planRef: string } }).frame.planRef : '');
+    expect(gones).toEqual([stale]);
+    expect(h.full.some((f) => f.t === 'for' && f.frame.t === 'plan' && f.frame.view.planRef === planRef)).toBe(true);
+    h.publisher.stop();
+  });
+
+  it('remembers each ref it publishes', () => {
+    const store = world();
+    const time = clock();
+    const calls: Array<{ projectId: string; refs: readonly string[] }> = [];
+    const publisher = new StudioPublisher({
+      store,
+      config: () => config(['p1']),
+      send: () => true,
+      timers: time.timers,
+      now: time.now,
+      remember: (projectId, refs) => void calls.push({ projectId, refs }),
+    });
+    publisher.start();
+    const frames = publisher.snapshot();
+    expect(frames).toHaveLength(1);
+    expect(calls.at(-1)).toEqual({ projectId: 'p1', refs: [refOf(REF_KEY, 'plan', 'pl1')] });
+    publisher.stop();
+  });
+
   it('takes the project’s board prefixes with it', () => {
     const prefixes = keyPrefixesOf({ enabled: true, issues: [], projects: { p1: { prefix: 'BOB', next: 1 }, both: { prefix: 'TWO', next: 1, repos: ['p1', 'p2'] } }, autoTasks: false }, 'p1');
     expect(prefixes.sort()).toEqual(['BOB', 'TWO']);

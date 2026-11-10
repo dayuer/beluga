@@ -68,6 +68,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
   const [hub, setHub] = useState('');
   const [showHub, setShowHub] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [trouble, setTrouble] = useState<string>();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -137,6 +138,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
             <TextInput id="studio-hub" value={hub} onChange={setHub} mono placeholder="http://localhost:8787" />
           </Field>
         ) : null}
+        {trouble ? <div className={f.hint}>{trouble}</div> : null}
       </FormSheet>
     );
   }
@@ -145,7 +147,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
     return (
       <Alert
         title={t('studio.disconnect.title')}
-        message={t('studio.disconnect.message')}
+        message={status?.state === 'online' ? t('studio.disconnect.message') : `${t('studio.disconnect.message')} ${t('studio.disconnect.offline')}`}
         tone="danger"
         confirm={{
           label: t('studio.disconnect.confirm'),
@@ -154,6 +156,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
             void api.studio.unlink().then((next) => {
               setStatus(next);
               setStudioLinked(next.linked);
+              setTrouble(next.lastError === 'cannot-remove' ? t('studio.disconnect.cannotRemove') : undefined);
               setDisconnecting(false);
             });
           },

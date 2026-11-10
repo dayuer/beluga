@@ -55,6 +55,8 @@ export const studio: Translation<typeof en> = {
   'studio.disconnect.title': '与 Synon Studio 断开？',
   'studio.disconnect.message': '这台 Mac 的计划将不再送往工作室及其客户，连接会关闭，连接时生成的密钥会被忘记。你可以用新的绑定码重新连接。',
   'studio.disconnect.confirm': '断开',
+  'studio.disconnect.offline': '工作室中台现在离线，它可能仍会显示旧视图，直到工作室运营者在管理页解绑这台 Mac。',
+  'studio.disconnect.cannotRemove': '已断开，但密钥文件没能删除：~/.beluga/studio.json 仍在这台 Mac 上。',
   'studio.status.retry': '{seconds} 秒后重试',
   'studio.state.unlinked': '未连接',
   'studio.state.connecting': '正在连接…',

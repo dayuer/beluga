@@ -51,6 +51,8 @@ export class StudioService {
   private identity: Identity | undefined;
   private connection: StudioLink | undefined;
   private publisher: StudioPublisher | undefined;
+  /** A link is registering right now: two screens can't start two registrations. */
+  private linking = false;
 
   constructor(d: { readonly store: Store; readonly demo?: boolean; readonly file?: string; readonly ws?: WsFactory; readonly timers?: LinkTimers; readonly now?: () => number }) {
     this.store = d.store;
@@ -70,8 +72,12 @@ export class StudioService {
     try {
       identity = identityOf(cfg);
     } catch {
-      // A corrupt key is no key: unlinked until someone links again.
-      removeStudioConfig(this.file);
+      // A corrupt key is no key: unlinked until someone links again (a file we can't remove still blocks a re-link, which unlink reports).
+      try {
+        removeStudioConfig(this.file);
+      } catch {
+        // Leave it; the person can remove it.
+      }
       return;
     }
     this.config = cfg;
@@ -90,12 +96,24 @@ export class StudioService {
   async link(code: string, hub?: string, name?: string): Promise<StudioLinkResult> {
     if (this.demo) return { ok: false, error: 'demo-mode' };
     if (this.config) return { ok: false, error: 'already-linked' };
+    if (this.linking) return { ok: false, error: 'already-linking' };
+    this.linking = true;
+    try {
+      return await this.register(code, hub, name);
+    } finally {
+      this.linking = false;
+    }
+  }
+
+  private async register(code: string, hub: string | undefined, name: string | undefined): Promise<StudioLinkResult> {
     const base = hubUrl(hub?.trim() || defaultHub());
     if (!base) return { ok: false, error: 'bad-hub' };
     const who = (name?.trim() || machineName()).slice(0, 80);
     const identity = newStudioIdentity();
     const registered = await registerWithCode({ hub: base, code, name: who, identity });
     if (!registered.ok) return registered;
+    // A link or unlink happened while we were waiting: this registration is not ours to keep.
+    if (this.config) return { ok: false, error: 'already-linked' };
     const cfg: StudioConfig = {
       v: 1,
       hub: base,
@@ -118,9 +136,8 @@ export class StudioService {
     return { ok: true, status: this.status() };
   }
 
-  /** Say `plan-gone` for what was published, close the link, delete the key. */
+  /** Say `plan-gone` for what was published, close the link, delete the key (even when the link was corrupt). */
   unlink(): StudioStatus {
-    if (!this.config) return this.status();
     this.publisher?.leave();
     this.publisher?.stop();
     this.connection?.stop();
@@ -128,8 +145,15 @@ export class StudioService {
     this.publisher = undefined;
     this.identity = undefined;
     this.config = undefined;
-    removeStudioConfig(this.file);
-    return this.status();
+    let removed = true;
+    try {
+      removeStudioConfig(this.file);
+    } catch {
+      // A key file we couldn't delete stays; the person has to be told (status.lastError below).
+      removed = false;
+    }
+    const status = this.status();
+    return removed ? status : { ...status, lastError: 'cannot-remove' };
   }
 
   status(): StudioStatus {
@@ -178,7 +202,13 @@ export class StudioService {
     const cfg = this.config;
     const identity = this.identity;
     if (!cfg || !identity || this.connection) return;
-    this.publisher = new StudioPublisher({ store: this.store, config: () => this.config, send: (frame) => this.connection?.send(frame) ?? false });
+    this.publisher = new StudioPublisher({
+      store: this.store,
+      config: () => this.config,
+      send: (frame) => this.connection?.send(frame) ?? false,
+      // What the hub was told about, kept in the file: a plan deleted while we were off is retracted.
+      remember: (projectId, refs) => this.rememberPublished(projectId, refs),
+    });
     const link = new StudioLink({
       config: cfg,
       identity,
@@ -191,6 +221,24 @@ export class StudioService {
     this.connection = link;
     this.publisher.start();
     link.start();
+  }
+
+  /** The refs the hub was told about, kept in the file so a later run can retract them. */
+  private rememberPublished(projectId: string, planRefs: readonly string[]): void {
+    const cfg = this.config;
+    if (!cfg) return;
+    const published: Record<string, readonly string[]> = { ...(cfg.published ?? {}) };
+    if (planRefs.length === 0) delete published[projectId];
+    else published[projectId] = [...planRefs];
+    const written = { ...cfg } as StudioConfig & { published?: Record<string, readonly string[]> };
+    delete written.published;
+    if (Object.keys(published).length > 0) written.published = published;
+    this.config = written;
+    try {
+      saveStudioConfig(written, this.file);
+    } catch {
+      // This run's copy is current; the file catches up on the next change.
+    }
   }
 
   private rememberAt(at: number): void {

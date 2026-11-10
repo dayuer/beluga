@@ -75,6 +75,7 @@ interface StudioConfig {
   refKey: string;                         // 32 字节 base64url，用来算 ref
   lastAt?: number;                        // 最后一次连接用的 at（毫秒）；见 §4.4（本文新增）
   projects: Record<string, { since: number }>;  // 共享给 Studio 的 Beluga projectId
+  published?: Record<string, string[]>;    // 每个项目已告诉中台的 planRef（只有 ref，没有计划 id）
 }
 
 loadStudioConfig(file?): StudioConfig | undefined   // 坏文件、缺字段、v 不对：一律当作未绑定，不抛
@@ -366,6 +367,11 @@ studioPlanView({
 
 **`projectsChanged()`**：先 `send(hello)` 重发项目表，然后：新共享的项目全体全量；取消共享的项目，其基线里
 每个计划发 `plan-gone` 并删基线。调用方是 `service.setProject`。
+
+**离线期间删掉的计划（M3 审计 A1）**：中台的视图缓存没有 TTL，只靠内存基线会漏。每个成功推出（全量、patch
+或 `plan-gone`）的 `planRef` 都写进 `studio.json` 的 `published`（只有 ref，没有计划 id、没有项目 id）；`snapshot()`
+先推出当前全量，再对 `published` 里这次不再推出的 ref 发 `plan-gone` 并从 `published` 划掉。「计划发布过 → 关机
+→ 删掉计划 → 再连上」因此也能撤回。
 
 ## 6. 中台接线（BLG-68 一并做）
 

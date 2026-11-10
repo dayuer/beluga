@@ -106,6 +106,8 @@ export async function runStudio(c: StudioCommands, projects: readonly Project[],
       const status = await c.unlink();
       const shared = before.projects.filter((p) => p.shared);
       io.out(shared.length > 0 ? `Disconnected. ${shared.length} project${shared.length === 1 ? '' : 's'} no longer shared.\n` : 'Disconnected.\n');
+      if (before.state !== 'online') io.err('The studio hub was offline, so it may keep showing the old views until the studio\u2019s operator unbinds this Mac.\n');
+      if (status.lastError === 'cannot-remove') io.err('The key file could not be removed: ~/.beluga/studio.json is still on this Mac.\n');
       return show(status);
     }
     case 'share':

@@ -119,7 +119,7 @@ export type WsFactory = (url: string, o: { readonly headers: Readonly<Record<str
 
 /** The real one: the `ws` package, because Node's global WebSocket cannot send headers. */
 export const nodeSocket: WsFactory = (url, o) => {
-  const ws = new WebSocket(url, { headers: o.headers, handshakeTimeout: 10_000, perMessageDeflate: false });
+  const ws = new WebSocket(url, { headers: o.headers, handshakeTimeout: 10_000, perMessageDeflate: false, maxPayload: MAX_INBOUND_BYTES });
   const h: {
     open?: () => void;
     message?: (data: string) => void;
@@ -203,6 +203,13 @@ export interface SnapshotSource {
   onOnline(): void;
 }
 
+/** A hub frame bigger than this is refused before it is parsed (a hub can't make us allocate freely). */
+export const MAX_INBOUND_BYTES = 512 * 1024;
+/** Being online this long is what earns a fresh backoff; a hub that drops us right after `synced` doesn't. */
+export const STABLE_ONLINE_MS = 30_000;
+/** The codes a hub may name in `{error}`: anything else is shown as the status code, never echoed. */
+const KNOWN_ERRORS: ReadonlySet<string> = new Set(['clock-skew', 'unknown-daemon', 'bad-signature', 'revoked', 'replayed', 'not-yours', 'bad-args', 'upgrade-required', 'not-found', 'unknown-studio', 'bad-or-expired-code', 'key-taken', 'over-limit', 'hub-origin-missing']);
+
 export const WELCOME_MS = 10_000;
 export const PING_MS = 25_000;
 export const SILENCE_MS = 60_000;
@@ -232,6 +239,7 @@ export class StudioLink {
   private lastAt: number;
   private replayedRetry = false;
   private onlineAt: number | undefined;
+  private onlineSince: number | undefined;
   private retryAt: number | undefined;
   private lastError: string | undefined;
   private droppedCount = 0;
@@ -429,6 +437,11 @@ export class StudioLink {
   // --- Reading the hub's frames ---
 
   private onData(gen: number, data: string): void {
+    if (data.length > MAX_INBOUND_BYTES) {
+      // Bigger than any frame the hub has business sending: counted, not parsed.
+      this.droppedCount++;
+      return;
+    }
     // The hub answers a bare `ping` itself, without waking the object; it is not JSON.
     if (data === 'pong') {
       this.heard(gen);
@@ -515,7 +528,11 @@ export class StudioLink {
       return;
     }
     this.phase = 'online';
-    this.attempt = 0;
+    // A hub that says welcome, takes the snapshot and drops us would otherwise pin reconnect at
+    // 250-1000ms forever: only a connection that stays up a while earns a fresh backoff.
+    const lasted = this.onlineSince !== undefined ? this.now() - this.onlineSince : Number.POSITIVE_INFINITY;
+    if (lasted >= STABLE_ONLINE_MS) this.attempt = 0;
+    this.onlineSince = this.now();
     this.replayedRetry = false;
     this.lastError = undefined;
     this.retryAt = undefined;
@@ -600,7 +617,8 @@ export class StudioLink {
     } catch {
       error = undefined;
     }
-    this.lastError = error ?? String(status);
+    // Only a code this hub protocol knows is kept as it is; a crafted string never reaches a status line.
+    this.lastError = error !== undefined && KNOWN_ERRORS.has(error) ? error : String(status);
     const socket = this.retire();
     if (socket) {
       try {
