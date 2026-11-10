@@ -268,7 +268,7 @@ GET {hub → ws}/v1/daemon/ws
 | 网络错、1006、1011、握手超时、`hello` 超时、pong 超时 | `offline`，按退避重连 |
 | 握手 401 `clock-skew` | `clock-skew`，继续按退避（上限 60 秒）重试 |
 | 握手 409 `replayed` | 立刻用 `at + 1` 重试一次；再失败按普通退避 |
-| 握手 401 `unknown-daemon`、403 `revoked`、关闭码 4005 | `revoked`，**停下**（要重新 link） |
+| 握手 401 `unknown-daemon`、401 `bad-signature`、403 `revoked`、关闭码 4005 | `revoked`，**停下**（要重新 link；签名与中台记录不符时重试永远不会成功） |
 | 关闭码 4001 / `outdated` | `outdated`，**停下** |
 | 关闭码 4002 `replaced` | 至少等 5 秒再按退避重连（同一把钥匙从另一处连上了） |
 | 关闭码 4003 `not-hello` / 4004 | `offline`，按退避重连（本地状态可能坏了，重来一遍握手） |
