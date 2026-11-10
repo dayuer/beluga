@@ -157,7 +157,7 @@ BLG-73 交付的插件桩：`gates.request` / `chat.accept` 一律返回 `'not-a
 
 - 每处理完一条写一次：先写同目录临时文件再 `rename` 原子替换；写失败只记日志，不打断连接（内存里的记录仍有效，
   下次成功时补上）。
-- 加载时 `prune`：`ops` 与 `pending` 都按 14 天清。`gates` 不按时间清，按状态清（见 §3.5）。
+- 加载时 `prune`：`ops` 与 `pending` 都按 14 天清；`gates` 里**待批的永远保留**，已结（approved/declined/void）且 `settledAt` 超过 14 天的清掉（见 §3.5）。
 - `pending` 是文件里独立的一段（不是 `OpLog`）：设计稿的 `{v:1, ops, gates, chat}` 少了它，重启后「执行到一半」
   就无法和「没执行过」区分。这是对设计稿的一处补充。
 - **解绑（`studio.unlink`）**：待批的 Gate 记 `void`，`studio` slice 清空，opLog 保留（键里有 studio id，重绑一个
@@ -216,7 +216,7 @@ export interface GateRecord {
 }
 
 export class StudioGates {
-  constructor(d: { store; approve: (planId: string) => void; persist; touch; now? });
+  constructor(d: { store; config; approve: (planId: string) => void; setAutonomy?; persist; touch; now? });
   // 全仓库只有这一处拿到 approve；收件箱的 InboxExec 里没有 approve。
   request(p: Plan, kind: 'start' | 'changes', draftRev: number, opId: string, by?: string): RefusalCode | undefined;
   answer(gateId: string, a: { approve: true } | { approve: false; reason?: string }):

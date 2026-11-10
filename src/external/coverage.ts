@@ -33,6 +33,7 @@ const SAVE_PANEL = 'It writes a file where a person chose in the Save panel.';
 const COMPUTERS = 'It manages your other computers, or moves work between them: a person does that from the app.';
 const NO_TOOL = 'No tool reaches it yet: a tool for it comes with its own decision.';
 const STUDIO_PUBLISH = 'A person links Studio with the admin page’s code and chooses what customers see: no agent publishes a plan.';
+const STUDIO_GATE = 'Starting a customer’s plan is the operator’s own answer: no agent approves a start Gate.';
 
 export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.submit': 'covered',
@@ -568,6 +569,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'studio.status': 'ui_only',
   'studio.setProject': { refused: STUDIO_PUBLISH },
   'studio.reconnect': 'ui_only',
+  'studio.answerGate': { refused: STUDIO_GATE },
   'preview.open': { refused: PREVIEW },
   'preview.snapshot': { refused: PREVIEW },
   'files.readRange': { refused: NO_TOOL },

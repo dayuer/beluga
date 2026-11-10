@@ -323,6 +323,8 @@ export const MACHINE: Record<Method, MachineSide> = {
   'studio.status': 'drive',
   'studio.setProject': 'refuse',
   'studio.reconnect': 'drive',
+  // The answer to a customer's start Gate is the operator's own, not another computer's.
+  'studio.answerGate': 'refuse',
   // ---- support
   'support.answer': 'drive',
   // ---- stats

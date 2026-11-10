@@ -526,6 +526,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `studio.status` | Mac only: the Synon Studio dialog (it asks every 2 seconds while open), and `beluga studio status [--json]` |
 | `studio.setProject` | Mac only: the Synon Studio dialog › Share this project, and `beluga studio share &#124; unshare [path]` |
 | `studio.reconnect` | Mac only: the Synon Studio dialog's Reconnect while it is offline, and `beluga studio status` after a hub restart |
+| `studio.answerGate` | ✓ Synon Studio's start card in Needs You (the Mac's bell and the phone): Approve, or Decline with a sentence the customer reads (it binds the answer to the draft they confirmed) |
 | `diagnostics.report` | ✓ Settings › About › Report a Problem: makes the report, shows it in Finder and opens a GitHub issue to attach it to |
 | `diagnostics.windowProblem` | ✓ by itself: a part of the window that stalled or failed to load (a view, the file reader) is noted in the black box, so Report a Problem shows which and when |
 | `support.answer` | ✓ the Star sheet after your first merge (Star on GitHub / Maybe Later) and the coffee sheet after your fifth (an amount, Not Now, Don't Ask Again) |

@@ -242,15 +242,19 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
 }
 
 /** What a plan waits for from you: approving its draft, passing a milestone at its gate, or what it couldn't move on itself. */
-function planItems(plan: Plan, progress: PlanProgress): NeedsYou[] {
+function planItems(state: DomainState, plan: Plan, progress: PlanProgress): NeedsYou[] {
   const title = clip(planTitle(plan), 200);
   const topic = planTopic(plan.id);
   const at = { ...(topic ? { topic } : {}), from: 'your plan' };
-  return [...gateItems(plan, progress, title, at), ...stuckItems(plan, progress, at)];
+  return [...gateItems(state, plan, progress, title, at), ...stuckItems(plan, progress, at)];
 }
 
-function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<NeedsYou, 'topic' | 'from'>): NeedsYou[] {
+function gateItems(state: DomainState, plan: Plan, progress: PlanProgress, title: string, at: Pick<NeedsYou, 'topic' | 'from'>): NeedsYou[] {
   const next = progress.next;
+  // A plan shared with Synon Studio starts from its Gate, not from a native Approve card: the
+  // studio-start card (studioGateItems) replaces approve, review and "Approve anyway". Passing a
+  // milestone stays yours to do here (a customer's verdict does not go through a Gate).
+  if (state.studio.shared.includes(plan.projectId) && next.kind !== 'pass') return [];
   // Claude is still writing the first plan: nothing to approve yet (the Mac's Approve Plan waits too).
   if (next.kind === 'approve' && !progress.body?.milestones.length) return [];
   // A fresh agent is verifying the draft, as you asked (BLG-772): the Mac's Approve Plan waits for it too.
@@ -570,6 +574,44 @@ function dialogueItems(state: DomainState): NeedsYou[] {
   });
 }
 
+/**
+ * Synon Studio's own Gate (docs/studio-gates.md §3.7): a customer confirmed a plan (or a change to
+ * one), and it starts only once you say so here — on the Mac or the phone. The card's buttons call
+ * `studio.answerGate`; no `plans.*` call is ever on it.
+ */
+function studioGateItems(state: DomainState): NeedsYou[] {
+  return state.studio.gates.map((g): NeedsYou => {
+    const title = `“${clip(g.title, 200)}”`;
+    const added = g.added;
+    const detail =
+      g.kind === 'start'
+        ? `${g.milestones} milestone${g.milestones === 1 ? '' : 's'} · ${g.points} pts`
+        : `+${added?.milestones ?? 0} milestones · +${added?.tasks ?? 0} tasks · +${added?.points ?? 0} pts`;
+    return {
+      id: `studio:${g.id}`,
+      kind: 'studio-start',
+      title: clip(g.kind === 'start' ? `Approve start of ${title}?` : `Approve the changes to ${title}?`, 500),
+      detail,
+      from: g.by ? clip(g.by, 100) : 'a customer',
+      askedAt: g.askedAt,
+      gate: {
+        kind: g.kind,
+        plan: g.title,
+        milestones: g.milestones,
+        points: g.points,
+        ...(g.by ? { by: g.by } : {}),
+        ...(added ? { added } : {}),
+      },
+      actions: [
+        { label: 'Approve', tone: 'main', method: 'studio.answerGate', args: [g.id, { approve: true }] },
+        { label: 'Decline', tone: 'danger', method: 'studio.answerGate', args: [g.id, { approve: false }] },
+      ],
+      // Decline with a sentence: the customer reads it (sanitized) in their plan's `gate.reason`.
+      answer: { method: 'studio.answerGate', args: [g.id, { approve: false, reason: '' }], slot: [1, 'reason'], text: true, picks: false, label: 'Decline' },
+    };
+  });
+}
+
 /** Everything waiting for you, in no order and uncut (needsYou sorts and keeps 50), minus what you dismissed. */
 export function allNeeds(state: DomainState): NeedsYou[] {
   const dismissed = state.dismissedNeeds ?? [];
@@ -583,7 +625,8 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...state.approvals.map((a) => approvalItem(state, a)),
     ...state.questions.map((q) => questionItem(state, q)),
     ...state.gateway.tasks.flatMap((t) => gatewayItems(state, t)),
-    ...state.plans.plans.filter((p) => p.status !== 'done').flatMap((p) => planItems(p, progressOf(state, p))),
+    ...state.plans.plans.filter((p) => p.status !== 'done').flatMap((p) => planItems(state, p, progressOf(state, p))),
+    ...studioGateItems(state),
     ...knockItems(state),
     ...joinItems(state),
     ...offerItems(state),

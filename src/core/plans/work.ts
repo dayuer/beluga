@@ -329,9 +329,14 @@ export class PlansWork {
   }
 
   setAutonomy(id: string, autonomy: Autonomy, milestone?: string): Plan {
-    const plan = this.plans.setAutonomy(id, autonomy, this.me(), milestone);
+    const plan = this.plans.need(id);
+    // Synon Studio: a customer's start Gate and verdicts are the only way in (docs/studio-gates.md §3.6).
+    if (autonomy === 'autopilot' && this.deps.store.getState().studio.shared.includes(plan.projectId)) {
+      throw new Error('A plan shared with Synon Studio can’t use autopilot: it runs gated.');
+    }
+    const next = this.plans.setAutonomy(id, autonomy, this.me(), milestone);
     this.pilot.schedule();
-    return plan;
+    return next;
   }
 
   setPaused(id: string, paused: boolean): Plan {
