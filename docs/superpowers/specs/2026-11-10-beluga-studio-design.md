@@ -114,7 +114,10 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 
 落地规则：
 
-- **角色**：运营者（建工作室的人）和客户。管理页（中台自带，`GET /`）只有运营者能进。
+- **角色**：运营者（建工作室的人）和客户。管理页（中台自带，`GET /`）只有运营者能进；运营者怎么认证（部署时的
+  环境变量令牌，或 D1 里的运营者账号）由 M2 `m2-design` 定，P1 默认用环境变量令牌。
+- **daemon 上报项目列表**：daemon 连上后把本机可绑定的项目（id 与名字）报给中台，管理页从中选；daemon 收到动作时再
+  检查"这个 Studio 项目映射到本机哪个项目"，映射不存在就拒。
 - **运营者在管理页做的事**：新建工作室、拿一次性绑定码、看已连接的 daemon、**邀请客户邮箱**、**把客户加进
   项目**、**把 Studio 项目映射到 daemon 的项目 id**（从该 daemon 上报的项目列表里选，不手填）。
 - **登录**：邮箱魔法链接（发送方式由 `m5-login-choice` 决定）。**只发给已被邀请的邮箱**；没有开放注册，
@@ -158,7 +161,7 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 
 | 动作 `kind` | 允许的参数（之外的字段一律拒，zod `.strict()`） | daemon 调用 | 额外校验 |
 |---|---|---|---|
-| `plan.create` | `goal`（≤ 4000 字）、`platforms`（枚举数组） | `plans.create`，`projectId` 由绑定推出，`autonomy`/`agent`/`testsAt`/`checkAgent` 用运营方默认 | 请求里带 `autonomy`、`agent`、`testsAt`、`projectId` 等任何其他字段 → **拒**（不是悄悄丢弃） |
+| `plan.create` | `goal`（≤ 4000 字）、`platforms`（枚举数组） | `plans.create`，`projectId` 由绑定推出，`autonomy`/`agent`/`testsAt`/`checkAgent` 用运营方默认；`plans.create` 没有 `platforms` 参数，P1 由 daemon 把平台拼成目标末尾的一行"涉及平台：iOS、Web"，不改 core | 请求里带 `autonomy`、`agent`、`testsAt`、`projectId` 等任何其他字段 → **拒**（不是悄悄丢弃） |
 | `chat.send` | `planRef`、`text`（≤ 4000 字） | `session.submit`，频道固定为该计划的 `plan.home`，由 daemon 推出 | 频道必须属于该项目（`channelInProject`）；频率上限（§3.5） |
 | `plan.verify` | `planRef` | `plans.verify`，**不带** `thenApprove` | 请求里带 `thenApprove`（无论真假）→ **拒** |
 | `plan.requestStart` | `planRef`、`draftRev` | **不调用任何 `plans.*`**，只产生一张 `studio-start` Gate（§3.3） | `draftRev` 必须等于当前草稿版本 |
@@ -166,10 +169,15 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 | `milestone.pass` | `planRef`、`milestoneRef`、`draftRev` | `plans.pass` | 该里程碑在待验收；`draftRev` 一致 |
 | `milestone.sendBack` | `planRef`、`milestoneRef`、`draftRev`、`reason`（≤ 4000 字） | `plans.sendBack` | 同上；`reason` 按不可信文字处理（§3.5） |
 | `draft.apply` | `planRef`、`draftRev` | **不直接调用**，产生 `studio-start` Gate（"应用改动"类） | `draftRev` 一致 |
-| `draft.discard` | `planRef`、`draftRev` | 丢弃草稿 | `draftRev` 一致 |
+| `draft.discard` | `planRef`、`draftRev` | `plans.discard` | `draftRev` 一致；**只能用在已开工的计划**（`plan.body` 存在），否则 `not-allowed`——对没开工的计划，丢弃草稿等于删掉整个计划 |
 
-永不开放：`plans.approve`（只从 Gate 批准路径调用）、`host.answerApproval`、`questions.pick` 之外的问答方法、
-其余全部 `plans.*` 与任何非 `plans.*` 方法。测试遍历 `src/ipc` 的 `plans.*` 方法表证明白名单外全部被拒，
+验收类动作（`milestone.pass`、`milestone.sendBack`）也绑 `draftRev`（决策 `opid-and-order`）。客户在对话里提了修改、
+草稿因此加了版本后，再点"通过"会得到 `stale`：这是预期行为，客户端收到 `stale` 自动刷新视图，提示"计划刚更新过，请再看一眼"，
+客户确认后再点一次。
+
+问答方法只开放 `questions.answer`（选项题需要时加 `questions.pick`），而且只能经 `decision.answer` 间接调用，
+客户不能直接点名。永不开放：`plans.approve`（只从 Gate 批准路径调用）、`host.answerApproval`、其余全部 `plans.*`
+与任何其他方法。测试遍历 `src/ipc` 的 `plans.*` 方法表证明白名单外全部被拒，
 `questions.answer` 另有独立测试（§10）。
 
 中台和 daemon 各校验一次，用同一个 `src/studio/actions.ts`。daemon 拒绝时回给客户的是**客户语言的错误码**
@@ -190,6 +198,17 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 - Gate 卡片绑定客户确认时的 `draftRev`。批准时 daemon 比对当前 `draftRev`：不一致就不调用
   `plans.approve`，Gate 自动作废，客户看到"计划有变化，请重新确认"。这样批准的内容就是客户确认的内容。
   运营方在手机（companion）上批准同样比对 `draftRev`。
+- 比对 `draftRev` 和调用 `plans.approve` 在 daemon 的同一个同步段里做，中间草稿不会被改。
+- **绑定了 Studio 的计划不能用 autopilot**（计划级和里程碑级都算）。autopilot 下规划 agent 的 `plan_update` 会让改动立即
+  上板、任务开工，并在检查通过后自动通过里程碑，这会绕过"应用改动"Gate 和客户验收。所以：绑定时计划的 autonomy 至少是
+  `gated`；之后 `plans.setAutonomy` 对 Studio 计划设 `autopilot` 被拒（Mac 上该选项置灰并说明原因）；daemon 发布视图前再检查
+  一次，发现是 autopilot 就降为 `gated` 并在 Mac 上提示。里程碑由客户点"通过"（`pass-no-gate`），不由 pilot 自动通过。
+- **运营方自己的草稿**：一个计划只有一份草稿。运营方在 Mac 上改的草稿同样出现在客户的差异卡里，客户可以应用（仍要过 Gate）或
+  丢弃。这是有意的：客户看到的永远是将要上板的内容。运营方不想让客户看到的改动，先不要放进草稿。
+- **和原生批准卡的协调**：Beluga 本来对有草稿的计划就会给运营方一张"批准计划 / 改动"卡（`needs-you.ts`，含
+  `plans.approve`、`plans.verify {thenApprove}`、`plans.discard`）。绑定了 Studio 的计划不再出原生卡，由 `studio-start`
+  卡代替；运营方若从别的路径（如 Mac 计划页的按钮）批准了，`gates.ts` 监听 `plans.approved` 事件，把对应 Gate 记成
+  approved，客户视图的 `gate` 不会停在 pending。
 - 驳回时运营方写一句原因，客户收到原因（过净化器）。
 - 超出权益（P3）时 Gate 上提示，由运营方决定；P1 不强制权益。
 - 测试：没有 Gate 批准前，动作结果里绝不出现 `plans.approve`；`draftRev` 过时的批准被拒。
@@ -207,6 +226,11 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 - 规划 agent 的 prompt 要求把涉及账号、密钥、付款、商店后台、域名的决策标为 operator；daemon 发布前再按关键字
   （密钥、token、密码、账号、付款、银行卡、API key、证书等）兜底：命中就当 operator，哪怕被标成 customer。
 - 只有 audience 为 customer 的决策进 `StudioPlanView`，客户也只能回答这些（`decision.answer` 白名单）。
+- **计划级决策（`plan.decisions`，`{id, text, terms}`）不进客户视图**：它们是运营方的内部约定，会写模型名、工作区情况。
+  客户视图的 `decisions[]` 只来自带决策且 `audience: 'customer'` 的计划任务。agent 在对话外提的问题（`questions`）在 P1
+  一律算 operator。
+- 落点要改 core：`src/core/plans/model.ts` 的任务模型、`src/ipc/plans-api.ts` 的 task schema、`src/agent/plan-tools.ts`
+  让规划 agent 能设置 `audience`，以及规划 prompt（M4 `m4-decisions`）。
 - 现有决策的 qid 是 `decide:<plan>:<task>`，客户视图里不出现 qid，只出现不透明的 `decisionId`，由 daemon 映射回去。
 
 ### 3.5 客户输入的信任模型
@@ -223,11 +247,35 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
   伪造结束。
 - **长度和频率**：对话消息与"还不行…"原因 ≤ 4000 字、决策自由回答 ≤ 2000 字；每个客户每分钟 ≤ 10 条
   消息、每天对话总字数 ≤ 50 000 字（中台入队时限，daemon 再限一次）。超了返回 `rate-limited`。
-- **规划阶段的 agent 只读**，并且不允许读 `isSecretPath` 判为密钥的路径。
 - **工具权限请求只发给运营方的 NeedsYou**，不进客户视图；`host.answerApproval` 对客户永不开放。
 - **agent 给客户的回复**走 §4.2 的净化器才进 turns。这是兜底：prompt 里也要求"对客户的发言不写路径、分支、
   模型"，但 prompt 不当防线。
 - 附件（P2）里的指令（PDF、图片里的文字）同样按不可信处理，P2 设计时再展开。
+
+#### 客户回合的工具策略（边界）
+
+`plan.home` 的 head Claude 在开工前规划、开工后运行计划；开工后它有 `plan_message_task`、`plan_start_task` 等
+不弹权限确认的工具，能借有写权限的任务 agent 做事。所以**边界不是 prompt，也不是"规划阶段"，而是客户回合的工具集**：
+
+- **执行点**：daemon 的 `src/studio/chat.ts` 提交客户消息时，给**这一轮**（直到这一轮回复结束）挂一套受限工具集，
+  做法照 `src/core/plans/work.ts` 里 checker 的 `only: [...]`；由 `src/agent/policy.ts` 对这一轮的每次工具调用再判一次。
+  不靠 prompt。
+- **规划中和已开工两个阶段用同一张表**：
+
+| 工具 | 客户回合 | 说明 |
+|---|---|---|
+| `plan_get` | 允许 | 读计划 |
+| `plan_write` / `plan_update` | 允许，**只改草稿**：客户回合里不管计划的 autonomy 是什么，改动都不直接上板 | 草稿上板仍要过 §3.3 的 Gate |
+| 对话回复 | 允许 | 回复过净化器才进 turns |
+| Read / Grep / Glob | 允许，但**只限本项目目录**（main 文件夹和它的 worktree）；`isSecretPath`、`isDotenvPath` 命中的路径一律拒；`policy.ts` 对这一轮给出的 `ask` 或 `secret` 一律当拒，不产生权限请求 | 让 agent 能看本 repo 回答需求问题，读不到同一台 daemon 上别的客户的 repo 或运营方自己的文件 |
+| `plan_message_task`、`plan_start_task`、`plan_stop_task`、`plan_gate`、`plan_pause` | **禁** | 不能借任务 agent 或改运行状态 |
+| Bash、写文件、编辑文件、网络、其他 MCP 工具 | **禁** | |
+
+- 客户早先夹带的指令可能在之后运营方的完整权限回合里被 agent 提起（例如要读 `.env`）。现有 policy 对这类读会先问运营方；
+  运营方对来源是客户对话的这类请求应当拒绝（§11）。
+- 客户回合里调用被禁工具直接返回拒绝（不产生权限请求，也就不会出现在任何人的 NeedsYou 里）。
+- 运营方自己在 Mac 上和 head Claude 说话的回合不受这张表限制。客户回合与运营方回合不会合并：客户消息排队到上一轮结束后才提交。
+- 测试见 §10 `tests/studio-chat.test.ts`：开工前、开工后各一组。
 
 ### 3.6 对话通道
 
@@ -246,6 +294,11 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 - 客户端的聊天组件只读 `turns`，不另开数据源；客户自己刚发的消息在回执前显示为"发送中 / 已排队"（本地状态），
   回执 `done` 后被视图里的正式 turn 替换（按 opId 对上）。
 - 工具调用、步骤、文件、代码不进 turns（`ClientConvView` 也是这么做的）。
+- 客户自己的 turn 显示原话：§3.5 的包裹标记只在交给 agent 时加，进 turns 前去掉。
+- **运营方的发言**：`plan.home` 也是运营方在 Mac 上和 head Claude 说话的地方，那里的内部指示（价格、对客户的评价、
+  技术安排）**不进 turns**。运营方要对客户说话，在 Mac 计划对话里切到"发给客户"再发，只有这样的消息才以
+  "名字 · Synon Studio"进 turns；绑定了 Studio 的计划，Mac 的计划对话输入框旁常驻这个切换和"客户可见"标记。
+- agent 的回复只有回应客户回合的那些进 turns；回应运营方回合的不进。
 
 ## 4. 客户视图（`StudioPlanView`）
 
@@ -266,7 +319,7 @@ Synon Studio 是一个给**客户**用的独立 App（P1 只做手机优先的 W
 | `waitingOn` | customer / studio / ai，供"在等谁"状态行 | 推出 | — |
 | `headline`、`progress` | 一句话进度、完成数与总数 | 计划进度 | 是（headline） |
 | `milestones[]` | 标题、目标、通过标准、状态、可否验收；`tasks[]`：**标题（不带 KEY，取 `t.task.title`）**、目标、验收标准、状态 | 计划正文 | 是 |
-| `decisions[]` | 只有 audience 为 customer 的：`decisionId`、问题、选项、是否已答、答案 | 计划决策与 `forYou` 里标为 customer 的任务 | 是 |
+| `decisions[]` | 只有 audience 为 customer 的：`decisionId`、问题、选项、是否已答、答案 | 只来自 `audience: 'customer'` 的决策任务；计划级 `plan.decisions` 不进（§3.4） | 是 |
 | `turns[]`、`typing` | 对话轮次（§4.4） | 对话通道 | 是 |
 | `activity[]` | 客户语言的动态（"开始做：登录页""完成：支付里程碑"） | 计划动态，只取类别和标题 | 是 |
 | `review` | 待验收里程碑的 checker 结论（一句话加要点） | checker 结果 | 是 |
@@ -286,14 +339,18 @@ AI 角色名（Product / Design / Engineering…）先作为 `view.ts` 的可传
 
 1. 先调 `stripCode`（去围栏代码块），再自己去掉 `~~~` 围栏和未闭合的围栏。
 2. 去掉行内代码（整段 `` `…` `` 连内容一起去）。
-3. 去掉路径形态：绝对路径、`~/`、`./`、`../`、含 `/` 或 `\` 的片段、带源码或配置扩展名的文件名
-   （`.ts`、`.tsx`、`.js`、`.json`、`.env`、`.swift`、`.kt`、`.py`、`.md` 等）。
-4. 去掉分支与 id：`plan/<slug>`、`beluga/<…>`、`ws:`、`conv:`、worktree id、长 hex / base64 串。
-5. 去掉任务 KEY（`[A-Z]{2,}-\d+`）和已知的 agent、运行时、模型名（claude、opus、sonnet、haiku、fable、codex、
-   gpt…，大小写不敏感）。
+3. 去掉路径形态：绝对路径（`/x/y`、`C:\`）、`~/`、`./`、`../`、至少三段的 `a/b/c` 或 `a\b\c`、以源码或配置扩展名
+   结尾的文件名（`.ts`、`.tsx`、`.js`、`.json`、`.env`、`.swift`、`.kt`、`.py`、`.md` 等）以及点开头的文件名（`.env`）。
+   两段的普通写法（"iOS/Android""3/8""和/或""11/10"）不算路径，原样保留。
+4. 去掉分支与 id：`plan/<slug>`、`beluga/<…>`、`feature/…` 这类"已知分支前缀加斜杠"、`ws:`、`conv:`、worktree id、
+   长 hex / base64 串。
+5. 去掉任务 KEY（`[A-Z]{2,}-\d+`，但不碰常见非 KEY 词，如 `COVID-19`、`ISO-8601`、`UTF-8`，有一张允许表）和已知的
+   agent、运行时、模型名（claude、opus、sonnet、haiku、fable、codex、gpt…，大小写不敏感）。
 6. 去掉疑似密钥（`sk-`、`ghp_`、`AKIA`、`Bearer …`、`KEY=…`）、URL 里的 token 和 query；markdown 链接只留
    文字，图片整段去掉（含 alt）。
-7. 一句话被去掉大半、读不通时，整句换成占位语（"（技术细节已省略）"）。
+7. 没有围栏的代码：连续两行以上像代码的段落（行首缩进加 `{`、`}`、`;`、`=>`、`import `、`function `、`const `、`<div`、
+   `def `、`return ` 等符号或关键字占多数）整段换成"（代码已省略）"；单行里出现三个以上代码符号组合的也一样。
+8. 一句话被去掉大半、读不通时，整句换成占位语（"（技术细节已省略）"）。
 
 干净的普通文字原样保留，不误伤。对抗样例（行内代码、绝对和相对路径、文件名、分支、worktree id、模型名、KEY、
 `~~~` 围栏、大小写混写、中文夹路径、`.env` 内容、链接与图片 alt）是 `tests/studio-sanitize.test.ts` 和
@@ -401,7 +458,9 @@ P1 没有推送（推送在 P2）。客户的通知方式：
 - 运营方（你和你授权的人）能读对话，条款里要写明。
 - **预览产物会带前端代码**（P2）：Web 预览的 JS 包就是前端源代码，APK 可以反编译。预览是交付物，是客户买的
   app 本身，不属于"永远拿不到源代码"的范围；条款和 P2 设计要写明这一点。
-- 删除账号：客户在设置里发起，运营方确认后中台清除该账号的数据；daemon 上的 repo 由运营方按合同处理。
+- 删除账号：P1 由客户联系运营方，运营方在管理页删除，中台清除该账号的数据；P2 起客户也能在设置屏自己发起
+  （iOS 审核要求）。daemon 上的 repo 由运营方按合同处理。
+- 预览链接（P2）：P1 中台只留一个总是拒绝的签发函数，交付 Gate 在 P2 才接上。
 
 ### 5.7 版本与出错
 
@@ -435,7 +494,7 @@ P1 没有推送（推送在 P2）。客户的通知方式：
 | 新需求 | 目标输入框、勾选平台 | 开始规划 |
 | 计划页 | 状态行、headline、进度条；大纲 / 图 / 动态；对话在手机上是底部抽屉，在 Web 宽屏上停靠在右侧 | 随阶段变化：确认计划 / 回答 / 验收 / 应用改动 |
 | 待办 | 跨项目汇总要客户处理的事：决策、验收、草稿改动 | 卡片自带按钮 |
-| 设置 | 个人资料、通知说明、订阅状态（只读）、**删除账号** | — |
+| 设置（P2） | 个人资料、通知说明、订阅状态（只读）、**删除账号** | — |
 | 预览（P2） | 按里程碑分组的预览卡片 | 打开 / 安装 |
 
 ### 6.3 手机交互规则（P1 门槛）
@@ -509,7 +568,12 @@ P1 的前置条件：Cloudflare 账号（或 `m2-deploy` 选定的部署方式�
 - `tests/studio-protocol.test.ts`：schema 的好用例与坏用例、长度上限。
 - `tests/studio-link.test.ts`：签名认证；断线重连后先推全量快照再取队列；daemon 离线时动作排队、上线后执行。
 - `tests/studio-chat.test.ts`：客户消息只能进该计划的 `plan.home`；包裹标记不能被客户文字伪造结束；回复过净化器后成为
-  turns；频率上限。
+  turns；频率上限；客户自己的 turn 不带包裹标记；运营方没标"发给客户"的发言不进 turns。**客户回合的工具策略**（§3.5），
+  开工前和开工后各一组：调用 `plan_message_task`、`plan_start_task`、`plan_stop_task`、`plan_gate`、`plan_pause`、Bash、
+  写文件都被拒；Read `.env` 和 `isSecretPath` 命中的路径被拒；Read 本项目目录之外的文件（另一个项目、`~` 下的文件）被拒，
+  且不产生权限请求；`plan_get`、改草稿可用；在 autonomy 为 `autopilot` 的已开工计划上（模拟被绕过的情形），客户回合的 `plan_update` 也只改草稿，不上板；客户回合里带 `autonomy` 字段的里程碑操作被拒；判断"是否在本项目目录内"用解析后的真实路径（`realOf`），项目里指向外面的符号链接被拒。
+- `tests/studio-gates.test.ts`：Studio 计划设 `autopilot` 被拒；发布前发现 autopilot 会降为 `gated`；pilot 不自动通过 Studio 计划的里程碑。
+- `draft.discard` 对没开工的计划被拒（`tests/studio-actions.test.ts`）。
 - `tests/team/studio-hub*.test.ts`（参照 mailbox）：权限、跨项目读视图和发动作被拒、未邀请邮箱拿不到魔法链接、队列 7 天
   过期、opId 第 8 天重放不再执行（去重不短于 14 天）、中台对多余字段的视图整帧拒绝。
 - 端到端 soak：假 hub 加假 agent，把一个计划从提需求跑到验收，中途断一次 daemon。
@@ -526,7 +590,9 @@ P1 的前置条件：Cloudflare 账号（或 `m2-deploy` 选定的部署方式�
   - 审核备注说明服务的归类：这是真人加 AI 的代开发服务，在 App 之外交付和消费（Guideline 3.1.3(e)），不是 App 内的
     数字内容；App 里没有价格、购买入口或外链。
   - 订阅过期文案："订阅已过期，请联系你的工作室"，不带链接。
-- **提示注入**：客户文字进有工具权限的 agent（§3.5）。净化器和包裹标记都是兜底，规划阶段只读、密钥路径不可读才是边界。
+- **提示注入**：客户文字进有工具权限的 agent（§3.5）。净化器和包裹标记都是兜底，**客户回合的工具策略**（daemon 挂受限
+  工具集，规划和开工后都一样，读文件只限本项目目录）才是边界。客户夹带的指令可能在运营方之后的回合里被 agent 提起：
+  运营方对来源是客户对话的读密钥、读别处文件这类权限请求应当拒绝。
 - **运维**：中台是一个要长期维护的服务，需要监控和告警（Cloudflare 本身成本很低）。
 - **可用性**：客户的体验取决于 daemon 是否在线，所以客户项目要放在常开的机器上；离线时靠队列和缓存（§5.4）。
 
@@ -550,6 +616,36 @@ P1 的前置条件：Cloudflare 账号（或 `m2-deploy` 选定的部署方式�
 | 12 | 测试增补 | §10 |
 | 13 | 计划新增任务 | 计划已有：对话通道（`m4-chat`）、决策 audience（`m4-decisions`）、草稿差异（`m4-draft-diff`、`m6-draft-diff`）、净化器（`m1-sanitize`）、客户邀请与项目授权（`m2-handler-accounts`、`m2-admin-page`）、WSS 单列（`m2-ws`）。通知按本文 §5.5 改为应用内圆点加手动通知，不建邮件任务。共用组件渲染探针放进 `m6-extract` 的开头（§6.3）。 |
 
+复审（`docs/reports/studio-design-recheck.md` 第一版）的 B3 与矛盾 C1–C15 的落点：B3 → §3.5 客户回合的工具策略、§10、§11；
+C1 → §3.2；C6 → §6.2、§5.6；C7 → §3.2 `plan.create`；C8 → §3.4、§4.1；C9 → §4.2；C10 → §3.6；C11 → §3.3；C12 → §3.2；
+C13 → §5.6；C14 → §2.2；C15 → §3.2。C2–C5 是计划里的文字，见 §13。
+
 重要项 I1–I10：I1 → §2.1；I2 → §3.4；I3 → §3.3、§5.3；I4 → §11；I5 → §5.2、§5.4；I6 → §4.5；I7 → §5.6；
 I8 → §5.5；I9 → §6；I10 → §6.3。建议 S1 → §2；S2 → §5.7；S4 → §3.2（错误码）、§8（browser-safe、手机批准比对
 `draftRev`）、§2.2（多人先到先得）。S3 是计划层面的排期意见，由计划处理。
+
+## 13. 计划需要补的任务与修正
+
+复审第四节列出的、本文要求了但计划任务还没覆盖的实施。由计划负责人补进对应任务（本文不改计划）：
+
+| # | 要补的 | 归到 |
+|---|---|---|
+| 1 | 客户回合的工具策略与测试（§3.5），touches 加 `src/agent/policy.ts`、`src/core/plans/work.ts`；`m4-audit` 覆盖 | M4 `m4-chat`（或新开 `m4-chat-policy`） |
+| 2 | 任务模型加 `audience`，规划 agent 工具与 prompt 能设置它（§3.4），touches 加 `src/core/plans/model.ts`、`src/ipc/plans-api.ts`、`src/agent/plan-tools.ts` | M4 `m4-decisions` |
+| 3 | `platforms` 拼进目标（§3.2） | M1 `m1-design` 写定，M4 `m4-inbox` 实施 |
+| 4 | daemon 上报项目列表；daemon 侧检查项目映射（§2.2） | M3 `m3-link`/`m3-publish`、M4 `m4-inbox`、M2 `m2-handler-accounts` |
+| 5 | 魔法链接只发给已邀请邮箱的验收 | M2 `m2-handler-views` |
+| 6 | 中台入队时的频率上限（§3.5） | M2 `m2-handler-queue` |
+| 7 | turns 分页路由、`typing`、turns 增量推送（§3.6、§4.4） | M2 `m2-handler-views`、M3 `m3-publish` 或 M4 `m4-chat` |
+| 8 | 回执用客户语言错误码，不"原样返回原因"（§3.2、§5.7） | M1 `m1-actions`、M2 `m2-handler-queue`、M4 `m4-inbox` 与 M4 通过标准 |
+| 9 | 管理页显示"哪个客户有几件事在等"、daemon 离线 15 分钟标红；Mac 显示"Studio 已断开"（§5.4、§5.5） | M2 `m2-admin-page`、M3 `m3-mac-dialog` |
+| 10 | Gate 与原生批准卡的协调、比对与批准同段执行（§3.3） | M4 `m4-gate-core` |
+| 11 | `draft.discard` 只能用在已开工计划（§3.2） | M1 `m1-actions`、M4 `m4-draft-diff` |
+| 12 | 中台日志不记正文；删账号或项目时清数据（§5.6） | M2 `m2-handler-accounts` 或 `m2-shell` |
+| 13 | 客户 turn 去掉包裹标记；运营方"发给客户"切换与"客户可见"标记（§3.6） | M4 `m4-chat`，Mac 侧放在 M4 `m4-mac-card` 或新任务 |
+| 14 | 计划里的文字：落款写"名字 · Synon Studio"（`m4-chat`、`m6-chat`）；动作用 kind 名而不是 `plans.*`（M1 通过标准、`m1-actions`、`m5-home-new`、M5 通过标准）；`m4-phone-card` 的"粉彩风格"改成"与 companion 现有卡片一致（theme.ts token）" | 对应任务 |
+| 15 | Studio 计划禁 autopilot（`plans.setAutonomy` 拒、发布前降级、Mac 置灰）；pilot 不自动通过 Studio 计划的里程碑；客户回合的 `plan_update` 只改草稿（§3.3、§3.5） | M4 `m4-gate-core` 与 `m4-chat`，touches 加 `src/core/plans/pilot.ts`、`src/agent/plan-tools.ts` |
+| 16 | 客户回合读文件只限本项目目录（按真实路径判断，防符号链接），`ask`/`secret` 当拒；客户回合不能在草稿里写 `autonomy`，`gates.ts` 批准前再把草稿里的 autopilot 改回 gated（§3.5） | M4 `m4-chat`（与 #1 同一处），touches `src/agent/policy.ts` |
+| 17 | 净化器的"无围栏代码"规则（§4.2 第 7 条） | M1 `m1-sanitize` |
+
+本里程碑 M1 的动作测试按 kind 名写，同时保留"白名单外的 `plans.*` 全部被拒"的遍历测试，两种说法都满足。
