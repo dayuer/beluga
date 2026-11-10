@@ -6,7 +6,7 @@
 
 ## 1. 版本
 
-`STUDIO_PROTO = { major: 1, minor: 0 }`。
+`STUDIO_PROTO = { major: 1, minor: 1 }`（M3 加了 `patch`，只做加法）。
 
 - 同一个 `major` 内只做加法：新字段都是可选的，新 `kind`、新回执码只追加。
 - 中台入口对 daemon 发来的视图用 `.strict()`，所以**中台先升级，daemon 后升级**；daemon 在 `hello` 里报自己的
@@ -101,10 +101,13 @@ daemon → 中台：
 - `hello`：`{ t, proto: { major, minor }, daemon: REF, projects: [{ id: REF, name: TITLE }] }`（签名在传输层，M3 定）。
 - `plan`：`{ t, rev: int, view: StudioPlanView }` 全量。
 - `plan-gone`：`{ t, planRef }`。
+- `patch`（M3 追加，`minor = 1`）：`{ t, project: REF, planRef: REF, rev: int, set?: {顶层字段}, turns?: StudioTurn[] (≤50) }`。
+  `set` 只放 `StudioPlanView` 顶层里变了的字段；中台要求 `rev === 缓存 rev + 1`，合并后整份再过 strict schema。
+  线上的外层信封（`{t:'for', project, frame}` 等）见 `docs/studio-hub.md` §10，本文只列内层帧。
 - `receipt`：见下。
 
-中台 → daemon：`action`（见下）。中台 → 客户端：`plan`、`receipt`。客户端 → 中台：`action`。
-（增量帧在 M3 `m3-design` 里追加，作为新的 `t`。）
+中台 → daemon：`action`、`resync`、`welcome`、`outdated`（信封见 `docs/studio-hub.md` §10）。中台 → 客户端：
+`plan`、`plan-gone`、`receipt`。客户端 → 中台：`action`。
 
 ### 4.1 动作帧
 

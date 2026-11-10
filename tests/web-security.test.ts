@@ -7,7 +7,7 @@ import WebSocket from 'ws';
 import { parseConfig } from '../src/config.js';
 import { clearDaemonInfo, releaseLock } from '../src/daemon/files.js';
 import { type RunningDaemon, startDaemon } from '../src/daemon/main.js';
-import { WEB_ADMIN } from '../src/daemon/server.js';
+import { WEB_ADMIN, WEB_STUDIO } from '../src/daemon/server.js';
 import { WEB_HELLO_TOKEN, checkBind, privateBind, splitWebArgs } from '../src/daemon/web.js';
 import { readWebConfig, webConfigPath } from '../src/daemon/web-access.js';
 import { safeName, sweepUploads, uploadsDir } from '../src/daemon/web-files.js';
@@ -66,6 +66,14 @@ describe('a browser can use Beluga but not decide who gets in', () => {
     await expect.poll(() => frames.filter((f) => f.t === 'result').length).toBe(1 + WEB_ADMIN.size);
     expect(resultOf(frames, 'list')).toMatchObject({ ok: true });
     for (let i = 0; i < WEB_ADMIN.size; i++) expect(resultOf(frames, `admin${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Mac app or `beluga web`/) });
+    ws.close();
+  });
+
+  it('may not connect or publish a project to Synon Studio (M3 audit)', async () => {
+    const { send, frames, ws } = await browserIn();
+    for (const [i, method] of [...WEB_STUDIO].entries()) send({ t: 'call', id: `studio${i}`, method, args: method === 'studio.setProject' ? ['p1', true] : method === 'studio.link' ? ['ABCD-EFGH'] : [] });
+    await expect.poll(() => frames.filter((f) => f.t === 'result').length).toBe(WEB_STUDIO.size);
+    for (let i = 0; i < WEB_STUDIO.size; i++) expect(resultOf(frames, `studio${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Mac app or `beluga studio`/) });
     ws.close();
   });
 

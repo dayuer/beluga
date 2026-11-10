@@ -52,6 +52,16 @@ export async function run(cmd: ParsedCommand, io: Io): Promise<Exit> {
       if (sub === 'remove') return attached(io, (client) => removeProject(projectLinkOf(client), rest.join(' ') || undefined, io));
       throw new UsageError(`\`beluga project\` can add, list or remove; there's no \`${sub}\`.`, 'project');
     }
+    case 'studio': {
+      const [sub = 'status', ...rest] = cmd.positionals;
+      const { runStudio, studioCommandsOf } = await import('./studio.js');
+      const flags = {
+        json: cmd.flags.json === true,
+        ...(typeof cmd.flags.hub === 'string' ? { hub: cmd.flags.hub } : {}),
+        ...(typeof cmd.flags.name === 'string' ? { name: cmd.flags.name } : {}),
+      };
+      return attached(io, (client) => runStudio(studioCommandsOf(client), client.store.getDomain().projects, sub, rest, flags, io));
+    }
     case 'web': {
       const { web } = await import('./web.js');
       return web(cmd.positionals, io);

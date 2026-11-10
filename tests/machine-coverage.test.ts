@@ -60,6 +60,10 @@ describe('the table of what your app may do on a computer', () => {
         'external.setRoute',
         'session.quit',
         'daemon.stop',
+        // Publishing a plan to customers is the computer's own choice (docs/studio-daemon.md §7.2).
+        'studio.link',
+        'studio.unlink',
+        'studio.setProject',
       ].sort(),
     );
   });

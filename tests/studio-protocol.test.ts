@@ -23,7 +23,8 @@ export const sampleView = (): StudioPlanView => ({
 
 describe('STUDIO_PROTO', () => {
   it('has a major and a minor', () => {
-    expect(STUDIO_PROTO).toEqual({ major: 1, minor: 0 });
+    // Minor 1 is M3's `patch` frame: additive, so the major stays.
+    expect(STUDIO_PROTO).toEqual({ major: 1, minor: 1 });
   });
 
   it('imports nothing but zod', () => {

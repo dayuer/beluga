@@ -40,6 +40,7 @@ import { VoiceSettings } from './VoiceSettings.js';
 import { KeyboardSettings } from './KeyboardSettings.js';
 import { ExperimentalSettings } from './ExperimentalSettings.js';
 import { WebAccessSettings } from './WebAccessSettings.js';
+import { StudioSettings } from '../studio/ConnectDialog.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import { panes as settingsPanes } from './settings-index.js';
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './SettingsSearch.js';
@@ -710,6 +711,7 @@ function Advanced() {
   return (
     <>
       <WebAccessSettings />
+      <StudioSettings />
       <AgentThreadsSettings />
     </>
   );

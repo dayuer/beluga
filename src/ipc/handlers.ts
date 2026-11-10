@@ -20,6 +20,7 @@ import { SUGGEST_ALL, chooseProjectIcon, readProjectIcon, suggestProjects } from
 import type { Args, Method } from './api.js';
 import { NETWORK_HANDLERS } from './network-handlers.js';
 import { STRIPE_HANDLERS } from './stripe-handlers.js';
+import { STUDIO_HANDLERS } from './studio-handlers.js';
 import { REVENUECAT_HANDLERS } from './revenuecat-handlers.js';
 import { SUPPORT_HANDLERS } from './support-handlers.js';
 import { STATS_HANDLERS } from './stats-handlers.js';
@@ -444,6 +445,7 @@ export const HANDLERS = {
   'local.statFiles': (_s, paths) => paths.map(pathInfo),
   ...NETWORK_HANDLERS,
   ...STRIPE_HANDLERS,
+  ...STUDIO_HANDLERS,
   ...REVENUECAT_HANDLERS,
   ...SUPPORT_HANDLERS,
   ...STATS_HANDLERS,

@@ -9,7 +9,7 @@ import { z } from 'zod';
  * Additive within a major: new fields optional, new kinds and codes appended. The hub upgrades
  * before daemons (it parses strictly); the app parses with the loose view (unknown fields dropped).
  */
-export const STUDIO_PROTO = { major: 1, minor: 0 } as const;
+export const STUDIO_PROTO = { major: 1, minor: 1 } as const;
 
 export const LIMITS = { ref: 64, title: 200, text: 4000, line: 400, answer: 2000 } as const;
 

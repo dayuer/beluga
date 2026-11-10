@@ -154,6 +154,20 @@ export default {
 
     const reply = await handleHubRequest(req, deps);
 
+    // A project was just mapped: the daemon doesn't know (the mapping is D1), so ask the DO to tell it
+    // to push that project's full views now. A failure only means the mapping takes effect on the
+    // daemon's next connection (docs/studio-daemon.md §6.2).
+    if (route.name === 'admin-project-daemon' && req.method === 'PUT' && reply.status === 200) {
+      const project = (reply.body as { project?: { studioId?: string; daemonId?: string; daemonProjectId?: string } }).project;
+      if (project?.studioId && project.daemonId && project.daemonProjectId) {
+        try {
+          await callDo(env, project.studioId, '/v1/internal/resync', 'POST', { daemonId: project.daemonId, project: project.daemonProjectId });
+        } catch {
+          // The admin page still has its mapping; the daemon pushes everything when it reconnects.
+        }
+      }
+    }
+
     // The admin detail: D1 from the handler, online state and alerts from the studio's DO.
     if (route.name === 'admin-studio' && req.method === 'GET' && reply.status === 200) {
       const studioId = route.params.sid!;

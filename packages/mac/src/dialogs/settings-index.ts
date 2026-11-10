@@ -332,6 +332,7 @@ export const settingsIndex = (): readonly Entry[] => [
     [t('settings.web.letIn'), t('settings.find.webLetIn'), 'link browser login 链接 浏览器 登录'],
   ]),
   ...rows('advanced', t('settings.threads.title'), [[t('settings.threads.let'), t('settings.find.threads'), 'threads child sub-agent family orchestrate 线程 子聊天']]),
+  ...rows('advanced', t('studio.settings.title'), [[t('studio.settings.label'), t('studio.settings.detail'), 'synon studio connect binding code customers share a project 工作室 绑定码 客户 共享']]),
 
   // Experimental: one group per experiment, its switch the row (made from shared/experiments.ts).
   ...EXPERIMENTS.flatMap((id) => rows('experimental', tl('EXPERIMENT_INFO', id, 'title', EXPERIMENT_INFO[id].title), [[tl('EXPERIMENT_INFO', id, 'title', EXPERIMENT_INFO[id].title), tl('EXPERIMENT_INFO', id, 'summary', EXPERIMENT_INFO[id].summary), `${id} experimental early ${EXPERIMENT_INFO[id].keywords} 实验`]])),
