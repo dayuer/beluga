@@ -397,9 +397,10 @@ export class StudioService {
 
   /** The shared state a screen reads: the projects shared and the Gates waiting on you (docs/studio-gates.md §2.6). */
   private dispatchStudio(): void {
-    const state = this.store.getState();
-    const known = new Set(state.projects.map((project) => project.id));
-    const shared = this.config ? Object.keys(this.config.projects).filter((id) => known.has(id)).slice(0, 500) : [];
+    // The config is the truth: the store's project list is filled asynchronously at daemon start,
+    // so a `known` filter here could write an empty list after a late project scan (the e2e run found
+    // that: the bell kept the native approve cards of Studio plans).
+    const shared = this.config ? Object.keys(this.config.projects).slice(0, 500) : [];
     this.store.dispatch({ type: 'studio_state', shared, gates: (this.inbox?.gateNeeds() ?? []).slice(0, 50) });
   }
 

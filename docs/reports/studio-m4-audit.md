@@ -135,6 +135,11 @@
 §3.3 保留并写进 §3。它同时确认了 §2 的多数“已挡住”项（客户拿不到 approve、thenApprove 路径、跨项目 planRef、
 opId 重放、包裹标记、autopilot 降级、视图白名单），与实施代理结论一致。
 
+另外，BLG-111 在本地中台上真跑链路时又抓到 4 个静态审计没看到的实现问题（Gate 插件缺 `view`、`studio.shared`
+被异步项目列表冲空、铃铛的 `sameDeep` 深度导致白屏、daemon 关机时 `plans_off` 把 pending Gate 作废），
+均已修复并有回归测试，详见 `docs/reports/studio-m4-run.md` §4。它们不改变 §0 的结论：没有客户可用的绕过，
+F1 的边界在修复后覆盖了全部四条客户文字入口与四个运行时。
+
 ## 5. 复现与验证
 
 ```

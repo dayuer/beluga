@@ -240,6 +240,18 @@ describe('the start Gate (BLG-74)', () => {
     expect(h.approved).toEqual([]);
   });
 
+  it('a pending Gate survives plans being switched off (a daemon shutting down), and goes when the plan is really gone', () => {
+    const h = harness();
+    const op = opId();
+    h.gates.request(h.plan(), 'start', 3, op);
+    h.store.dispatch({ type: 'plans_off' });
+    expect(h.gates.viewGate('pl1')).toMatchObject({ state: 'pending' });
+    // Plans back on, without this plan: now it's really gone.
+    h.store.dispatch({ type: 'plans_init', state: { enabled: true, plans: [], style: '' } });
+    expect(h.gates.viewGate('pl1')).toBeUndefined();
+    expect(h.gates.answer(`g-${op.slice(0, 8)}`, { approve: true })).toEqual({ ok: false, error: 'gone' });
+  });
+
   it('voids a Gate whose plan is gone', () => {
     const h = harness();
     const op = opId();
@@ -247,6 +259,12 @@ describe('the start Gate (BLG-74)', () => {
     h.store.dispatch({ type: 'plans_init', state: { ...h.store.getState().plans, plans: [] } });
     expect(h.gates.viewGate('pl1')).toBeUndefined();
     expect(h.gates.answer(`g-${op.slice(0, 8)}`, { approve: true })).toEqual({ ok: false, error: 'gone' });
+  });
+
+  it('the publisher’s plug sees the Gate (view is viewGate)', () => {
+    const h = harness();
+    h.gates.request(h.plan(), 'start', 3, opId());
+    expect(h.gates.view('pl1')).toMatchObject({ kind: 'start', state: 'pending', draftRev: 3 });
   });
 
   it('shows the plan as the customer view’s gate, and hides a void one', () => {

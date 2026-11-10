@@ -246,8 +246,10 @@ function Center({ close }: { close: () => void }) {
   const { ui, client } = useBeluga();
   const inbox = useApp((st) => st.inbox);
   const notify = useApp((st) => st.prefs.notify);
-  // What waits for you, drawn again only when it changes (not on every streamed step).
-  const waiting = useApp(waitingList, sameDeep);
+  // What waits for you, drawn again only when it changes (not on every streamed step). NeedsYou's
+  // action arguments are plain objects under a list under a card: deeper than the default 6, or
+  // useSyncExternalStore sees a new snapshot every render and loops.
+  const waiting = useApp(waitingList, (a, b) => sameDeep(a, b, 20));
   const [filter, setFilter] = useState<NoticeFilter>('all');
   const now = useNow();
   const unread = inbox.filter((n) => !n.read).length;

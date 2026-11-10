@@ -219,6 +219,11 @@ export class StudioGates {
     return { kind: gate.kind, state: gate.state, draftRev: gate.draftRev, ...(gate.reason ? { reason: gate.reason } : {}) };
   }
 
+  /** The inbox plug's name for `viewGate` (the publisher merges what it returns into the plan view). */
+  view(planId: string): StudioGate | undefined {
+    return this.viewGate(planId);
+  }
+
   /** The pending Gates as cards (the store's `studio.gates`). */
   needs(): readonly StudioGateNeed[] {
     const cfg = this.config();
@@ -254,6 +259,9 @@ export class StudioGates {
    * a discarded one is declined; a shared plan that is autopilot is brought back to gated.
    */
   reconcile(): void {
+    // Plans off is a daemon shutting down (core/board/launch dispatches plans_off): the plan list
+    // being empty there says nothing about the plan being gone, so a pending Gate must stay.
+    if (!this.store.getState().plans.enabled) return;
     if (this.reconciling) return;
     this.reconciling = true;
     try {
