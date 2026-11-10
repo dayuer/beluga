@@ -183,3 +183,10 @@ id、`pl_`/`ws_` 这类 id、≥ 16 位 hex、≥ 24 位 base64 → 任务 KEY�
    Gate 批准路径不经过这个函数。`host.answerApproval` 永远拒。其余返回"不在客户白名单里"。
 
 Gate 批准（M4 `gates.ts`）调用 `plans.approve` 前比对 `draftRev`，不在本文范围。
+
+## 7. 调用方的义务（M1 审计结论）
+
+- **客户端按纯文本渲染**视图里的所有文字（不当 markdown，不当 HTML）。净化器不处理 `cla****ude`、`&shy;`、`&#60;img…&#62;` 这类只有按 markdown/HTML 渲染才会还原的写法；M5/M6 的客户端测试要断言这一点。
+- **daemon 构造视图时传入本工作室的任务 KEY 前缀**（`studioPlanView({ keyPrefixes })`，内部传给 `sanitizeText(text, max, { keyPrefixes })`）：不传时，小写的 `blg-52` 与看着像普通词的 `PM-12` 会保留。
+- **净化器挡不住故意伪装**（`c(l(a(u(d(e)))))`、`s r c / a u t h`、小型大写字母、用话念出路径）。边界是客户回合的受限工具集（设计 §3.5），不是净化器。
+- 客户文字交给 agent 一律用 `wrapCustomerText`（`actions.ts`）：开头是标记，`@` 换成全角，不可见字符与仿写的尖括号去掉；`callRefusal` 只放行包好的文字。

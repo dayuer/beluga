@@ -59,7 +59,12 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\bBearer\s+[\w.~+/=-]{1,4000}/gi, ''],
   [/\b(?:sk|pk|rk)[-_](?:live[-_]|test[-_]|ant[-_]|proj[-_])?[\w-]{3,400}/g, ''],
   [/((?:密码|口令|密钥|私钥|令牌|秘钥)\s{0,3}(?:是|为|:|：)?\s{0,3})[!-~]{3,200}/g, '$1'],
-  [/((?:密码|口令|密钥|私钥|令牌|秘钥|password|passwd|pwd|secret|token|passphrase)[^\n]{0,16}?)(?<![!-~])(?=[!-~]{0,200}[\d!@#$%^&*])[!-~]{4,200}/gi, '$1'],
+  // A secret said in a sentence: after its word, in the same clause. Right after 是 / 改成 / is / : / = any value goes; further on, one with a digit or a symbol.
+  [/((?:密码|口令|密钥|私钥|令牌|秘钥|验证码|pin码?|passcode|password|passwd|pwd|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)[^，。；;！？\n]{0,40}?(?:是|为|改成了?|改为|设为|设成了?|设置为|换成了?|\bis|\bwas|=|:|：)\s{0,3})(?:"[^"\n]{0,200}"|'[^'\n]{0,200}'|[!-~]{4,200})/gi, '$1'],
+  [/((?:密码|口令|密钥|私钥|令牌|秘钥|验证码|pin码?|passcode|password|passwd|pwd|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)[^，。；;！？\n]{0,40}?)(?<![!-~])(?=[!-~]{0,200}[\d!@#$%^&*])[!-~]{4,200}/gi, '$1'],
+  // Account and password pairs, password flags.
+  [/((?:账号|帐号|用户名|测试账号|\b(?:account|username|user)\b)[^，。；;\n]{0,20}?)[!-~]{2,100}\s{0,2}[/／:：]\s{0,2}[!-~]{3,200}/gi, '$1'],
+  [/(?<=\s|^)(?:-p|--pass(?:word)?[=\s]|--token[=\s]|--secret[=\s])\s?[^\s，。]{3,200}/gm, ''],
   [/\b[\w.-]{1,100}:[^\s@:]{3,200}@[\w.-]{1,200}/g, ''],
   [/\b(?:whsec|npm|hf|dop_v1|shpat|shpss|sq0atp)_[\w-]{8,400}/g, ''],
   [/\b(?:SG|ya29)\.[\w.-]{8,400}/g, ''],
@@ -68,7 +73,7 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\bAKIA[0-9A-Z]{8,40}/g, ''],
   [/\bAIza[\w-]{20,60}/g, ''],
   [/\beyJ[\w-]{8,4000}(?:\.[\w-]{0,4000}){0,2}/g, ''],
-  [/["']?\b[\w-]{0,40}(?:key|token|secret|passwd|password|pwd|credential|auth)[\w-]{0,40}["']?\s*[:=]\s*(?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|[^\s,，;；}、。]{1,2000})/gi, ''],
+  [/["']?\b[\w-]{0,40}(?:key|token|secret|passwd|password|pwd|credential|auth|session|cookie|pin|passcode)[\w-]{0,40}["']?\s*[:=]\s*(?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|[^\s,，;；}、。]{1,2000})/gi, ''],
   [/\b[A-Z][A-Z0-9_]{2,60}\s*=\s*(?:"[^"\n]{0,2000}"|'[^'\n]{0,2000}'|\S{1,2000})/g, ''],
   // Remotes and URLs: git@host:path, any URL with a login or a token, other schemes; http(s) keeps only its host.
   [/\b[\w.-]{1,100}@[\w.-]{1,200}:[\w./~-]{1,500}/g, ''],
@@ -90,7 +95,7 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   // Internal method names (plans.approve, session.submit…).
   [/\b(?:plans|session|questions|host|companion|board|files|git|studio|views|voice|sentinel|workspace|worktree|issues|tasks)\.[a-z][\w]{1,60}(?:\.[a-z]\w{0,60}){0,3}\b/g, ''],
   // Shell commands.
-  [/\b(?:npm|npx|yarn|pnpm|bun|git|pip3?|brew|curl|wget|sudo|docker|kubectl|cargo|mysql|psql|mongo|mongosh|redis-cli|sqlcmd|aws|gcloud|az|gh|openssl|xcodebuild|gradlew?|pod|tsc|vitest|jest|node|python3?|deno|wrangler|expo|eas|fastlane|asc|beluga|rm|mkdir|chmod|cd|export|ssh|scp)\s+[-\w:@./=~]{1,200}(?:\s+[-\w:@./=~]{1,200}){0,4}/g, ''],
+  [/\b(?:npm|npx|yarn|pnpm|bun|git|pip3?|brew|curl|wget|sudo|sshpass|docker|kubectl|cargo|mysql|psql|mongo|mongosh|redis-cli|sqlcmd|aws|gcloud|az|gh|openssl|xcodebuild|gradlew?|pod|tsc|vitest|jest|node|python3?|deno|wrangler|expo|eas|fastlane|asc|beluga|rm|mkdir|chmod|cd|export|ssh|scp)\s+[-\w:@./=~]{1,200}(?:\s+[-\w:@./=~]{1,200}){0,4}/g, ''],
   [/\s*(?:&&|\|\|)\s*/g, ' '],
   // Branches.
   [/\b(?:plan|beluga|feature|feat|fix|bugfix|hotfix|release|chore|refs\/heads|origin|claude|codex|spike|refactor|dev|wip|exp|experiment|docs|test|tests|ci|perf|deps|renovate|dependabot)\/[\w./-]{1,200}/gi, ''],

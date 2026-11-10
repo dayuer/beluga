@@ -188,3 +188,16 @@ describe('the M1 audit recheck (R-1 to R-3)', () => {
       expect(sanitizeText(s)).toBe(s);
   });
 });
+
+describe('the M1 audit, second recheck (R-4)', () => {
+  const leaks: Record<string, [string, RegExp]> = {
+    apiKey: ['我们的 API key 是 abcd1234efgh5678，登录页面可以用了', /abcd1234/],
+    pin: ['PIN 是 4821，验证码 482913，passcode: 9931，sessionid=abc123xyz789', /4821|482913|9931|abc123/],
+    noDigits: ['密码改成了 correcthorse，登录页面可以用了', /correcthorse/],
+    far: ['密码我已经按照你昨天说的那样全部都改成了 hunter2，登录页面可以用了', /hunter2/],
+    english: ['the password for the admin account on staging is hunter2', /hunter2/],
+    flags: ['用 sshpass -p hunter2 ssh 上去，或者 --pass hunter2 也行', /hunter2/],
+    pair: ['测试账号 admin / hunter2，登录页面可以用了', /hunter2/],
+  };
+  for (const [name, [input, re]] of Object.entries(leaks)) it(name, () => expect(sanitizeText(input)).not.toMatch(re));
+});
