@@ -49,6 +49,7 @@ export default function Plan() {
   const [howOpen, setHowOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [pickingCheck, setPickingCheck] = useState(false);
+  const [pickingArch, setPickingArch] = useState(false);
   // Who works its milestones and tasks (1.35, BLG-498): its own pick, else your default; changed from ⋯.
   const defaultGroup = p?.agents?.groups.find((g) => g.isDefault);
   const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
@@ -64,6 +65,14 @@ export default function Plan() {
   const setCheckAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanCheckAgent(id ?? '', agent, label)).then(
       (said) => store.toast({ text: typeof said === 'string' ? said : `${label} checks this plan`, tone: 'ok' }),
+      (e: Error) => store.toast({ text: e.message, tone: 'error' }),
+    );
+  };
+  // Who designs each milestone before its work starts (1.53): none, the milestones start right away.
+  const archWords = p?.archAgent ? agentName(p.archAgent, { model: true }) : 'No architect';
+  const setArchAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
+    void store.call<string>(calls.setPlanArchAgent(id ?? '', agent, label)).then(
+      (said) => store.toast({ text: typeof said === 'string' ? said : `${label} designs this plan's milestones`, tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
@@ -100,6 +109,7 @@ export default function Plan() {
         options={[
           { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Agent for its work', sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
           { Icon: markIcon(runtimeMark(p?.checkAgent?.runtime ?? agentRuntime)), label: 'Agent for its checks', sub: checkWords, tone: 'lavender', hidden: !p?.agents || !store.supports('checkAgent'), onPress: () => setPickingCheck(true) },
+          { Icon: markIcon(runtimeMark(p?.archAgent?.runtime ?? agentRuntime)), label: 'Agent for its architecture', sub: archWords, tone: 'lavender', hidden: !p?.agents || !store.supports('archAgent'), onPress: () => setPickingArch(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
@@ -120,6 +130,15 @@ export default function Plan() {
         onClose={() => setPickingCheck(false)}
         yours={{ on: !p?.checkAgent, onPick: () => setCheckAgent(null, 'Same as its work'), label: 'Same as its work', caption: `Whoever works it checks it too (${agentWords})` }}
         onPick={(g, value, label) => setCheckAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
+      />
+      <AgentChoiceSheet
+        title="Agent for its architecture"
+        caption="Writes each milestone's design before its work starts: its agent follows it, its checker checks against it"
+        picker={p?.agents}
+        visible={pickingArch}
+        onClose={() => setPickingArch(false)}
+        yours={{ on: !p?.archAgent, onPick: () => setArchAgent(null, 'No architect'), label: 'No architect', caption: 'Each milestone starts right away, without a design' }}
+        onPick={(g, value, label) => setArchAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
       />
       <Options
         visible={howOpen}
@@ -290,6 +309,8 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
     if (picked) setOpen(true);
   }, [picked]);
   const [task, setTask] = useState<string | undefined>();
+  // Its design from the plan's architect (1.53), folded until tapped.
+  const [designOpen, setDesignOpen] = useState(false);
   const tone = toneOf(m.state);
   const running = m.state === 'running';
   const done = m.state === 'done';
@@ -313,7 +334,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
             </T>
           </View>
           <T v="caption" c={toneInk(tone)} style={{ fontWeight: "600", marginTop: 2, textTransform: "capitalize" }}>
-            {m.state === 'gate' ? 'Waiting for you to pass it' : m.state}
+            {m.designing ? 'The architect is designing it' : m.state === 'gate' ? 'Waiting for you to pass it' : m.state}
           </T>
           {m.agentNow ? (
             // Its agent at work right now, even between tasks (1.40): a tap opens its conversation.
@@ -347,6 +368,28 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                   </T>
                 ))}
               </View>
+            ) : null}
+            {m.design ? (
+              <Press scaleTo={0.98} onPress={() => setDesignOpen((o) => !o)} accessibilityLabel={designOpen ? 'Hide its design' : 'Show its design'}>
+                <View style={{ gap: 6, padding: 12, borderRadius: 14, backgroundColor: toneBg('lavender') }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {designOpen ? <ChevronDown color={toneInk('lavender')} size={15} /> : <ChevronRight color={toneInk('lavender')} size={15} />}
+                    <T v="caption" c={toneInk('lavender')} style={{ fontWeight: '700', flex: 1 }}>
+                      Design
+                    </T>
+                    <T v="caption" c={color.text3}>
+                      From its architect
+                    </T>
+                  </View>
+                  {designOpen ? (
+                    <Animated.View entering={FadeIn.duration(180)}>
+                      <T v="caption" c={color.text2}>
+                        {m.design}
+                      </T>
+                    </Animated.View>
+                  ) : null}
+                </View>
+              </Press>
             ) : null}
             <Card r={16}>
               {m.tasks.map((t, ti) => {

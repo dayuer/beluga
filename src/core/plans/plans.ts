@@ -18,6 +18,7 @@ import {
   DEFAULT_PARALLEL,
   type GateCheck,
   KEEP_PLAN_ACTIVITY,
+  MAX_DESIGN,
   MAX_PARALLEL,
   type MilestoneAgent,
   type MilestoneRun,
@@ -94,6 +95,7 @@ const SavedPlan = z
     // Who works it (BLG-497): one that doesn't read is let go (your default works it).
     agent: AgentRef.optional().catch(undefined),
     checkAgent: AgentRef.optional().catch(undefined),
+    archAgent: AgentRef.optional().catch(undefined),
     body: Body.optional().catch(undefined),
     draft: Body.optional().catch(undefined),
     paused: z.boolean().default(false),
@@ -284,6 +286,42 @@ export class Plans {
     if (sameAgent(plan.checkAgent, agent)) return plan;
     const text = agent ? `gave its checks to ${agentName(agent, { model: true })} from here on` : 'gave its checks back to the agent for its work';
     return this.change(plan, { checkAgent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
+  }
+
+  /**
+   * The agent that writes each milestone's technical design before its work starts, from here on;
+   * undefined: no architect step (milestones start right away, as before).
+   */
+  setArchAgent(id: string, agent: AgentRef | undefined, by: Actor): Plan {
+    const plan = this.need(id);
+    if (sameAgent(plan.archAgent, agent)) return plan;
+    const text = agent ? `gave its milestones’ designs to ${agentName(agent, { model: true })} from here on: each one is designed before its work starts` : 'starts its milestones without a design from here on';
+    return this.change(plan, { archAgent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
+  }
+
+  /** The conversation that designs a milestone (undefined: none, it was archived). */
+  setArchitect(id: string, milestone: string, architect: string | undefined): Plan {
+    const plan = this.need(id);
+    const { architect: _was, ...rest } = plan.runs[milestone] ?? {};
+    if (_was === architect) return plan;
+    return this.change(plan, { runs: { ...plan.runs, [milestone]: architect ? { ...rest, architect } : rest } }, []);
+  }
+
+  /** The architect was asked for a milestone's design. */
+  designAsked(id: string, milestone: string): Plan {
+    const plan = this.need(id);
+    return this.change(plan, { runs: withRun(plan, milestone, { designAsked: this.now() }) }, [event({ kind: 'beluga' }, 'note', `asked the architect for ${milestoneName(plan, milestone)}’s design: its work starts once it’s written`, this.now())]);
+  }
+
+  /** A milestone's technical design, written by its architect (`plan_design`). */
+  recordDesign(id: string, milestone: string, text: string, by: Actor): Plan {
+    const plan = this.need(id);
+    if (!(plan.body?.milestones ?? []).some((m) => m.id === milestone)) throw new PlanError(`There's no milestone "${milestone}" in the approved plan`);
+    if (plan.runs[milestone]?.passedAt) throw new PlanError('That milestone has already passed');
+    const design = text.trim().slice(0, MAX_DESIGN);
+    if (!design) throw new PlanError('The design is empty');
+    const at = this.now();
+    return this.change(plan, { runs: withRun(plan, milestone, { design: { text: design, at, by } }) }, [event(by, 'note', `wrote the design of ${milestoneName(plan, milestone)}`, at)]);
   }
 
   /** The head Claude was asked to check a milestone (a new round of checking). */

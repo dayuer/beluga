@@ -10,7 +10,7 @@ import { type Plan, type PlanMerge, type PlanMilestone, allTasks, openMilestones
 import type { PlanGit } from './plan-git.js';
 import type { Plans } from './plans.js';
 import { FINISHED, type MilestoneView, type PlanView, type TaskState, type TaskView, agentTasks, agentsAtWork, liveFrom, planView, startable, tidyOffer, waitingOnYou } from './progress.js';
-import { checkFailedPrompt, checkNudgePrompt, checkPrompt, criteriaNeedCheck, fixupPrompt, mainFixupPrompt, mergeFixupPrompt, milestoneNextPrompt, milestonePrompt, recapPrompt, stuckPrompt } from './prompt.js';
+import { checkFailedPrompt, checkNudgePrompt, checkPrompt, criteriaNeedCheck, designNudgePrompt, designPrompt, fixupPrompt, mainFixupPrompt, mergeFixupPrompt, milestoneNextPrompt, milestonePrompt, recapPrompt, stuckPrompt } from './prompt.js';
 import { TaskWatchdog } from './watchdog.js';
 import { PLAN_PR_FAST_MS, PLAN_PR_FOCUS_FRESH_MS, planPrCadence } from './pr-cadence.js';
 import { pace } from '../power-saver.js';
@@ -76,8 +76,14 @@ export interface PilotDeps {
    * free and milestones are checked side by side. Without it, the head Claude checks (as before).
    */
   readonly checkerChat?: (plan: Plan, milestone: PlanMilestone) => Promise<string | undefined>;
-  /** A checker's conversation is no longer needed (its milestone passed): archived, what was said kept. */
+  /** A checker's (or an architect's) conversation is no longer needed (its milestone passed): archived, what was said kept. */
   readonly retireChat?: (workspaceId: string) => void;
+  /**
+   * A conversation of its own for a milestone's architect (its workspace id), on the plan's agent
+   * for its architecture: it writes the milestone's design before its work starts. Without it there's
+   * no architect step (milestones start right away).
+   */
+  readonly architectChat?: (plan: Plan, milestone: PlanMilestone) => Promise<string | undefined>;
   /**
    * Tasks only you can do came up (ready, in an open milestone), each once: the hook for asking you
    * (the plan's chat). A milestone's Claude skips them, and what builds on them waits.
@@ -208,7 +214,7 @@ export function plansByChannel(plans: readonly Plan[], board: BoardState): Map<s
   const out = new Map<string, Set<string>>();
   const add = (channel: string, planId: string): void => void (out.get(channel) ?? out.set(channel, new Set()).get(channel)!).add(planId);
   for (const plan of plans) add(plan.home, plan.id);
-  for (const plan of plans) for (const run of Object.values(plan.runs ?? {})) if (run?.checker) add(`${WS_PREFIX}${run.checker}`, plan.id);
+  for (const plan of plans) for (const run of Object.values(plan.runs ?? {})) for (const ws of [run?.checker, run?.architect]) if (ws) add(`${WS_PREFIX}${ws}`, plan.id);
   for (const issue of board.issues) {
     const planId = planOfIssue.get(issue.id);
     if (planId) for (const ws of issue.worktrees) add(`${WS_PREFIX}${ws}`, planId);
@@ -275,6 +281,14 @@ export class PlanPilot {
   private readonly checkNudged = new Map<string, 'asked' | 'told'>();
   /** Milestones whose check moved from the head Claude to a checker this session (`plan:milestone`): once. */
   private readonly handedOver = new Set<string>();
+  /** An architect's design of a milestone under way (`plan:milestone` → its request). */
+  private readonly designRuns = new Map<string, string>();
+  /** Designs whose conversation is being made now (`plan:milestone`). */
+  private readonly askingDesign = new Set<string>();
+  /** Design rounds (`plan:milestone:asked`) whose turn ended without a design: asked once more (when). */
+  private readonly designNudged = new Map<string, number>();
+  /** Milestones whose architect didn't write a design (twice): their work starts without one, this session. */
+  private readonly designSkipped = new Set<string>();
   /** Since when each plan has had nothing running and nothing of it yours (see rescue). */
   private readonly quietSince = new Map<string, number>();
   /** Plans whose epics were made or caught up this session. */
@@ -501,6 +515,9 @@ export class PlanPilot {
     // Its checker is done: archived (what it said is kept, and the plan still knows it).
     const checker = after.runs[milestoneId]?.checker;
     if (checker) this.deps.retireChat?.(checker);
+    // Its architect too.
+    const architect = after.runs[milestoneId]?.architect;
+    if (architect) this.deps.retireChat?.(architect);
     const next = openMilestones(after)
       .filter((id) => !wasOpen.has(id))
       .map((id) => after.body!.milestones.find((m) => m.id === id)!);
@@ -624,6 +641,7 @@ export class PlanPilot {
     if (m) {
       if (m.agent) channels.add(`${WS_PREFIX}${m.agent.worktree}`);
       if (m.run.checker) channels.add(`${WS_PREFIX}${m.run.checker}`);
+      if (m.run.architect) channels.add(`${WS_PREFIX}${m.run.architect}`);
       for (const t of m.tasks) for (const w of t.issue?.worktrees ?? []) channels.add(`${WS_PREFIX}${w}`);
       // The head Claude works on it for these (a merge's fix-up, fix tasks, its check before checkers).
       if (kind === 'merging' || kind === 'failed' || (kind === 'checking' && !m.run.checker)) channels.add(plan.home);
@@ -635,7 +653,7 @@ export class PlanPilot {
     const key = (id: string): string => `${plan.id}:${id}`;
     if (m) {
       const k = key(m.milestone.id);
-      if (this.launching.has(k) || this.askingCheck.has(k) || this.mergingNow.has(k)) return true;
+      if (this.launching.has(k) || this.askingCheck.has(k) || this.askingDesign.has(k) || this.mergingNow.has(k)) return true;
       if (m.tasks.some((t) => t.issue && this.starting.has(t.issue.id))) return true;
     }
     return this.branching.has(plan.id);
@@ -785,6 +803,8 @@ export class PlanPilot {
       // Not begun anywhere (one already under way in a worktree of its own stays there).
       const unbegun = todo.filter((t) => t.state === 'ready' || t.state === 'blocked');
       if (!agent) {
+        // Its architect writes its design first (the plan has one): its work starts once that's in.
+        if (todo.length && this.waitsForDesign(plan, m)) continue;
         const ready = todo.some((t) => t.state === 'ready' && !this.failed.has(t.issue!.id));
         if (m.autonomy === 'step' || !ready || room <= 0) continue;
         room--;
@@ -817,6 +837,107 @@ export class PlanPilot {
       this.sentOn.set(key, { sig, ...this.after(channel), count: sent?.sig === sig ? sent.count + 1 : 1 });
       this.deps.plans.note(plan.id, 'note', `sent the agent doing “${m.milestone.title}” on to ${ready[0]!.issue!.key} “${ready[0]!.task.title}”`, { kind: 'beluga' });
     }
+  }
+
+  // ------------------------------------------------------------------ a milestone's architect
+
+  /**
+   * A milestone not started yet, on a plan with an agent for its architecture: its design is asked
+   * (once a round, in a conversation of its own; the architect isn't counted against the plan's
+   * limit), and its work waits until it's written. It never stalls on it: a turn that ends without a
+   * design is asked once more, then its work starts without one. True: it waits for its design.
+   * A step-by-step milestone is designed too, but your Start doesn't wait for it.
+   */
+  private waitsForDesign(plan: Plan, m: MilestoneView): boolean {
+    const key = `${plan.id}:${m.milestone.id}`;
+    if (!plan.archAgent || !this.deps.architectChat || m.run.design || this.designSkipped.has(key)) return false;
+    if (m.run.designAsked === undefined) {
+      if (this.askingDesign.has(key)) return true;
+      this.askingDesign.add(key);
+      void this.askDesign(plan.id, m.milestone)
+        .catch((err: unknown) => {
+          this.designSkipped.add(key);
+          this.deps.plans.note(plan.id, 'problem', `couldn’t ask the architect for “${m.milestone.title}”’s design (${err instanceof Error ? err.message : String(err)}): its work starts without one`, { kind: 'beluga' });
+        })
+        .finally(() => {
+          this.askingDesign.delete(key);
+          this.schedule();
+        });
+      return true;
+    }
+    return this.watchDesign(plan, m);
+  }
+
+  /** Ask a milestone's architect for its design: in its own conversation (made once, on the plan's agent for its architecture). */
+  private async askDesign(planId: string, milestone: PlanMilestone): Promise<void> {
+    const key = `${planId}:${milestone.id}`;
+    const channel = await this.architectChannel(planId, milestone);
+    const plan = this.deps.plans.need(planId);
+    const run = plan.runs[milestone.id];
+    // Started, designed or passed while its conversation was being made.
+    if (run?.passedAt || run?.design || run?.agent || run?.designAsked !== undefined || plan.status !== 'active' || !plan.archAgent) return;
+    if (!channel) {
+      this.designSkipped.add(key);
+      this.deps.plans.note(plan.id, 'problem', `couldn’t make a conversation for the architect of “${milestone.title}”: its work starts without a design`, { kind: 'beluga' });
+      return;
+    }
+    const view = this.view(plan);
+    const m = view.milestones.find((x) => x.milestone.id === milestone.id);
+    if (!m) return;
+    const id = this.deps.askClaude(designPrompt(view, m), channel, false);
+    if (id) this.designRuns.set(key, id);
+    this.deps.plans.designAsked(plan.id, milestone.id);
+    this.deps.system(plan.home, `An architect of its own is writing the design of “${milestone.title}”: its work starts once it’s written.`);
+  }
+
+  /** The conversation that designs a milestone: the one it had (still there), or a new one. */
+  private async architectChannel(planId: string, milestone: PlanMilestone): Promise<string | undefined> {
+    const was = this.deps.plans.need(planId).runs[milestone.id]?.architect;
+    const ws = was ? this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === was) : undefined;
+    if (ws && !ws.archived) return `${WS_PREFIX}${ws.id}`;
+    const made = await this.deps.architectChat?.(this.deps.plans.need(planId), milestone);
+    if (!made) return undefined;
+    this.deps.plans.setArchitect(planId, milestone.id, made);
+    return `${WS_PREFIX}${made}`;
+  }
+
+  /**
+   * A design asked and not written: still waiting (true) while its architect works. Its turn ending
+   * without one, it's asked once more; ending without one again, the plan says so and the
+   * milestone's work starts without a design (false).
+   */
+  private watchDesign(plan: Plan, m: MilestoneView): boolean {
+    const asked = m.run.designAsked!;
+    const key = `${plan.id}:${m.milestone.id}`;
+    const round = `${key}:${asked}`;
+    const title = m.milestone.title;
+    const skip = (): false => {
+      this.designSkipped.add(key);
+      this.designRuns.delete(key);
+      this.deps.plans.note(plan.id, 'problem', `the architect didn’t write a design for “${title}”: its work starts without one`, { kind: 'beluga' });
+      return false;
+    };
+    if (!m.run.architect) return skip();
+    const channel = `${WS_PREFIX}${m.run.architect}`;
+    const state = this.deps.store.getState();
+    const id = this.designRuns.get(key);
+    const nudged = this.designNudged.get(round);
+    let ended: boolean;
+    if (id) {
+      const item = state.log.find((l) => l.type === 'agent' && l.requestId === id);
+      ended = item?.type === 'agent' && !RUNNING.has(item.status);
+    } else {
+      // Asked before a restart (or the ask had no id): nothing has run there for a while.
+      ended = !liveFrom(state).busy(channel) && !this.deps.alive?.(channel) && (this.deps.now?.() ?? Date.now()) - (nudged ?? asked) > CHECK_QUIET_MS;
+    }
+    if (!ended) return true;
+    if (nudged !== undefined) return skip();
+    this.designNudged.set(round, this.deps.now?.() ?? Date.now());
+    const again = this.deps.askClaude(designNudgePrompt(title), channel, false);
+    if (again) this.designRuns.set(key, again);
+    else this.designRuns.delete(key);
+    this.deps.plans.note(plan.id, 'note', `the architect of “${title}” ended its turn without a design: asked for it again`, { kind: 'beluga' });
+    return true;
   }
 
   /** Its conversation's last run now (what a reply has to come after). */

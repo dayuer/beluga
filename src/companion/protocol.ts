@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 52 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 53 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -140,8 +140,12 @@ export const COMPANION_PROTO = { major: 1, minor: 52 } as const;
  * with `plans.setCheckAgent`. An older Mac leaves it out (the agent for its work checks).
  * 1.52 (fork, auto route): a task nobody picked an agent for carries the one auto route gives it
  * (`TaskPageView.agent`) with `autoAgent`, and the phone says "auto" beside it. An older Mac sends neither.
+ * 1.53 (fork): a plan says who designs each milestone before its work starts (`archAgent`), changed
+ * with `plans.setArchAgent` (SINCE.archAgent), and a milestone carries its design (`design`, its
+ * code taken out) and that it's being designed (`designing`). An older Mac sends none of them, and
+ * an older phone shows the milestone without its design.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, checkAgent: 51, autoAgent: 52 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, checkAgent: 51, autoAgent: 52, archAgent: 53 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -742,6 +746,9 @@ export const PlanView = z.object({
         checker: Topic.optional(),
         /** 1.40: its agent at work right now (“Working on BLG-12 · Edit README.md”), and its conversation. */
         agentNow: z.object({ text: z.string().max(300), asking: z.boolean().optional(), topic: Topic.optional() }).optional(),
+        /** 1.53 (fork): its technical design from the plan's architect (code taken out), and that the architect is writing it now. */
+        design: z.string().max(12000).optional(),
+        designing: z.boolean().optional(),
       }),
     )
     .max(50),
@@ -756,6 +763,8 @@ export const PlanView = z.object({
   agents: AgentPickerView.optional(),
   /** 1.51 (fork): who checks its milestones and reviews its drafts (none: the agent for its work); changed with `plans.setCheckAgent` from the same list. */
   checkAgent: AgentRefView.optional(),
+  /** 1.53 (fork): who writes each milestone's design before its work starts (none: no architect step); changed with `plans.setArchAgent` from the same list. */
+  archAgent: AgentRefView.optional(),
   /** 1.45 (BLG-772): what the plan has decided, in order (a replaced one marked), and its draft's review before approval. */
   decisions: z.array(z.object({ text: z.string().max(1000), replaced: z.boolean().optional() })).max(60).optional(),
   review: z

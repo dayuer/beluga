@@ -399,6 +399,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'plans.setTestsAt': 'covered',
   'plans.setWorkAgent': 'covered',
   'plans.setCheckAgent': 'covered',
+  'plans.setArchAgent': 'covered',
   'plans.tidyUp': 'covered',
   'plans.pass': 'covered',
   'plans.recheck': 'covered',

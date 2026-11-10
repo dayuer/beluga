@@ -26,7 +26,7 @@ import { sentinelGraph } from '../core/sentinel/workflow.js';
 import { widgetSnapshot } from '../core/sentinel/widgets.js';
 import { COMPARE, changeText, deltaOf, formatMetric } from '../core/sentinel/metrics.js';
 import type { Workspace } from '../workspaces/types.js';
-import { type MilestoneView, type PlanView as PlanProgress, agentNowWords, liveFrom, planView } from '../core/plans/progress.js';
+import { type MilestoneView, type PlanView as PlanProgress, agentNowWords, designing, liveFrom, planView } from '../core/plans/progress.js';
 import { triageFacts } from '../core/triage/facts.js';
 import { categoryOf, triageKey } from '../core/triage/model.js';
 import { shortVersion } from '../net/mesh/features.js';
@@ -943,6 +943,9 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
       ...(m.autonomy !== plan.autonomy ? { autonomy: m.autonomy } : {}),
       ...checkerOfMilestone(state, m.run.checker),
       ...agentNowOf(m),
+      // 1.53 (fork): its design (no code on the phone), and that its architect is writing it.
+      ...(m.run.design ? { design: clip(stripCode(m.run.design.text).text.replace(/\[\[code(?::\d+)?\]\]/g, '(code)'), 12000) } : {}),
+      ...(designing(plan, m) ? { designing: true } : {}),
     })),
     autonomy: plan.autonomy,
     ...(plan.paused ? { paused: true } : {}),
@@ -955,6 +958,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
     // 1.35 (BLG-498): who works its milestones and tasks (none: your default), and the list to change it from.
     ...(plan.agent ? { agent: agentRefView(plan.agent) } : {}),
     ...(plan.checkAgent ? { checkAgent: agentRefView(plan.checkAgent) } : {}),
+    ...(plan.archAgent ? { archAgent: agentRefView(plan.archAgent) } : {}),
     ...(plan.status !== 'done' ? { agents: workPicker(state, plan.agent) } : {}),
     // 1.45 (BLG-772): its decisions, and its draft's review.
     ...decisionsAndReview(state, plan),
