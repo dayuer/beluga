@@ -37,6 +37,8 @@ export interface LinkState {
   readonly detail?: string;
   readonly mac?: { name: string; version: string };
   readonly me?: { name: string; peerId: string };
+  /** A customer's phone (a client device): its project. Set, the app shows the customer screens only. */
+  readonly client?: { project: string; name: string };
   /** The two sides can't talk: whose update would fix it. */
   readonly outdated?: 'mac' | 'app';
   /** The Mac's protocol version (its minor says what it has: SINCE). */
@@ -183,7 +185,7 @@ class Store {
       this.views.set(topic, { ...v, stale: true });
     }
     if (mode === 'demo' || (mode === 'bare' && pairing)) this.use(mode, pairing);
-    this.setState({ ready: true });
+    this.setState({ ready: true, client: kv.get<{ project: string; name: string } | null>('client') ?? undefined });
     this.active = AppState.currentState === 'active';
     AppState.addEventListener('change', (s) => this.onAppState(s));
     // Opened by a link (or a notification's) while in the background: back in front, so link now.
@@ -671,7 +673,8 @@ class Store {
         const ok = compatible(COMPANION_PROTO, f.v, f.min);
         const outdated = ok ? undefined : COMPANION_PROTO.major < f.min.major ? ('app' as const) : ('mac' as const);
         const older = this.state.proto?.minor !== f.v.minor;
-        this.setState({ mac: f.mac, me: f.me, outdated, proto: f.v });
+        this.setState({ mac: f.mac, me: f.me, outdated, proto: f.v, client: f.client });
+        kv.set('client', f.client ?? null);
         this.keepRelay(f.relay);
         // What's on screen again, now that it's known what this Mac has (an older one drops a `sub` naming a topic it doesn't know).
         if (older) this.transport?.send({ t: 'sub', topics: this.topics() });

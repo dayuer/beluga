@@ -31,6 +31,14 @@ describe('matching', () => {
     expect(settingAnchor('Read .env files without asking')).toBe('read-env-files-without-asking');
   });
 
+  it('finds Invite a customer (BLG-36), by its name or in Chinese, and goes to its group', () => {
+    for (const q of ['invite a customer', '邀请客户']) {
+      const hit = top(q);
+      expect(hit, q).toMatchObject({ pane: 'phone', label: 'Invite a customer' });
+    }
+    expect(flatHits(search('link valid')).map((h) => h.label)).toContain('Link valid for');
+  });
+
   it('finds nothing for an empty query or nonsense', () => {
     expect(search('')).toEqual([]);
     expect(search('   ')).toEqual([]);

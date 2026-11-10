@@ -25,7 +25,7 @@ type CompanionMethod = Extract<Method, `companion.${string}`>;
 type CompanionHandlers = { readonly [M in CompanionMethod]: (s: Session, ...args: Args<M>) => unknown };
 
 export const COMPANION_HANDLERS = {
-  'companion.pair.start': (s) => needCompanion(s).pairStart(),
+  'companion.pair.start': (s, opts) => needCompanion(s).pairStart(opts),
   'companion.pair.approve': (s) => needCompanion(s).pairApprove(),
   'companion.pair.cancel': (s) => needCompanion(s).pairCancel(),
   'companion.devices.remove': (s, id) => needCompanion(s).removeDevice(id),

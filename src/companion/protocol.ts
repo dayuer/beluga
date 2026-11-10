@@ -198,6 +198,9 @@ export const Topic = z.union([
   z.string().regex(/^dashboard:[\w.-]{1,200}$/),
   /** 1.26: every board tile, for the phone's Home-screen widgets. */
   z.literal('widgets'),
+  /** A customer's phone (a client device): its project's overview, and one of its conversations. */
+  z.literal('client'),
+  z.string().regex(/^client:[\w.-]{1,200}$/),
 ]);
 export type Topic = z.infer<typeof Topic>;
 
@@ -1524,6 +1527,8 @@ export const MacFrame = z.discriminatedUnion('t', [
     me: z.object({ name: z.string().max(64), peerId: id }),
     /** The Mac's relay now (the phone keeps it for next time). */
     relay: RelayUrl.optional(),
+    /** A customer's phone only: its project. The app shows the customer screens and nothing else. */
+    client: z.object({ project: z.string().max(200), name: z.string().max(200) }).optional(),
   }),
   z.object({ t: z.literal('view'), topic: Topic, rev: z.number().int().min(0), data: z.unknown() }),
   z.object({ t: z.literal('result'), id: z.number().int().min(0), ok: z.boolean(), value: z.unknown().optional(), error: z.string().max(2000).optional() }),
@@ -1548,6 +1553,56 @@ export const MacFrame = z.discriminatedUnion('t', [
 ]);
 export type MacFrame = z.infer<typeof MacFrame>;
 
+// ---- a customer's phone (BLG-16): words, cards and pictures, never code, files or terminals
+
+/** A card the customer answers with one tap (or one sentence). */
+export const ClientCard = z.object({
+  id,
+  kind: z.string().max(40),
+  title: z.string().max(500),
+  detail: z.string().max(4000).optional(),
+  /** The conversation it belongs to (`client:<workspace id>`). */
+  topic: z.string().max(220),
+  askedAt: ts.optional(),
+  choices: z.array(Choice).max(12).optional(),
+  freeText: z.boolean().optional(),
+  actions: NeedsYou.shape.actions,
+  answer: NeedsYou.shape.answer,
+});
+export type ClientCard = z.infer<typeof ClientCard>;
+
+export const ClientTurn = z.object({
+  id,
+  who: z.enum(['you', 'claude', 'friend', 'system']),
+  name: z.string().max(100),
+  text: z.string().max(20_000),
+  ts,
+  working: z.boolean().optional(),
+  images: z.array(OutputView).max(20),
+  links: z.array(z.string().max(500)).max(5),
+});
+export type ClientTurn = z.infer<typeof ClientTurn>;
+
+export const ClientHomeView = z.object({
+  project: z.object({ id, name: z.string().max(200) }),
+  conversations: z.array(z.object({ topic: z.string().max(220), title: z.string().max(300), working: z.boolean(), cards: z.number().int().min(0) })).max(100),
+  cards: z.array(ClientCard).max(50),
+});
+export type ClientHomeView = z.infer<typeof ClientHomeView>;
+
+export const ClientConvView = z.object({
+  topic: z.string().max(220),
+  title: z.string().max(300),
+  turns: z.array(ClientTurn).max(200),
+  more: z.boolean(),
+  working: z.boolean(),
+  canSend: z.boolean(),
+  cards: z.array(ClientCard).max(20),
+  /** Every picture this project made, newest first (screenshots). */
+  images: z.array(OutputView).max(100),
+});
+export type ClientConvView = z.infer<typeof ClientConvView>;
+
 /** Which view type a topic carries. */
 export function viewSchema(topic: Topic): z.ZodType {
   if (topic === 'home') return HomeView;
@@ -1563,6 +1618,8 @@ export function viewSchema(topic: Topic): z.ZodType {
   if (topic.startsWith('sentinel:')) return SentinelPageView;
   if (topic.startsWith('dashboard:')) return DashboardView;
   if (topic === 'widgets') return WidgetsView;
+  if (topic === 'client') return ClientHomeView;
+  if (topic.startsWith('client:')) return ClientConvView;
   return ChatView;
 }
 
@@ -1716,6 +1773,8 @@ export interface DeviceView {
   readonly path?: LinkPath;
   /** That in words, when it's worth saying ("couldn't connect directly on its network; it used the relay"). */
   readonly note?: string;
+  /** A customer's phone: the one project it may see (absent for your own devices). */
+  readonly client?: { readonly project: string };
   /** Claude using it (BLG-150): what you allow on the Mac, what the phone allows, and how it's reached now (the host fills this in; an older slice won't have it). */
   readonly control?: PhoneControlView;
 }
@@ -1782,5 +1841,5 @@ export interface CableView {
 
 export interface CompanionSlice {
   /** `relay`: how phones on other networks reach this Mac now (reach.ts), for Settings › Phone (BLG-126). */
-  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
+  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly project?: string; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
 }
