@@ -49,6 +49,7 @@ const replacers: ReadonlyArray<readonly [RegExp, string]> = [
   [/(?:\.{1,2}\\|\b[\w.@-]+\\)[\w.@-]+(?:\\[\w.@-]+)*/g, ''],
   [/\b[\w.@-]+(?:\/[\w.@-]+){2,}\/?/g, ''],
   // File names: with a known extension, or a dot file.
+  [new RegExp(`\\b[\\w.@-]+/[\\w.@-]+\\.(?:${EXT})\\b`, 'gi'), ''],
   [new RegExp(`\\b[\\w@-]+(?:\\.[\\w@-]+)*\\.(?:${EXT})\\b`, 'gi'), ''],
   [/(?:^|(?<=[\s(（"'“‘：:，,、；;。]))\.[A-Za-z][\w.-]*/g, ''],
   [/\b(?:Podfile|Gemfile|Dockerfile|Makefile|Procfile|Brewfile|Rakefile)\b(?:\.lock)?/g, ''],

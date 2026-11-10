@@ -44,6 +44,7 @@ const ENTRIES = [
   'src/studio/protocol.ts',
   'src/studio/actions.ts',
   'src/studio/sanitize.ts',
+  'src/studio/view.ts',
 ];
 // Pure packages that run anywhere (string-width measures text the same way in both clients).
 const ALLOWED_PACKAGES = new Set(['zod', 'string-width']);
