@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `wrangler dev` (never commit that file).
+OPERATOR_TOKEN=dev-operator-token
+# console: print login links in the dev log; outbox: keep them in D1 for the admin page.
+MAIL_MODE=outbox
+HUB_ORIGIN=http://localhost:8787
+# P1 never signs preview links; P2 sets this.
+PREVIEW_SECRET=
