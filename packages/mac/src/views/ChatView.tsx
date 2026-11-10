@@ -14,6 +14,7 @@ import { LiveStrip } from '../claude-code/Live.js';
 import { SharedStrip } from '../layout/PeopleHere.js';
 import { EnvStrip } from './project/EnvAsks.js';
 import { TaskStrip } from '../tasks/TaskStrip.js';
+import { DrivenStrip } from '../chat/DrivenStrip.js';
 import { PrStrip } from '../chat/PrStrip.js';
 import { PlanStrip } from '../plans/PlanStrip.js';
 import { useWorktreeFlag } from './worktree-info-state.js';
@@ -25,7 +26,7 @@ import { DrivingBanner } from '../agent-term/DrivingBanner.js';
 import { computerWord, yourComputer } from '../lib/os-words.js';
 import { type Key, useT } from '../i18n/index.js';
 
-/** A conversation and the box to add to it: the room, a workspace, a shared workspace, a draft. */
+/** A conversation and the box to add to it: the room's group chat, a workspace, a shared workspace, a draft. */
 /** One-click ways to begin, under an empty conversation. */
 function Starters() {
   const actions = useActions();
@@ -97,7 +98,6 @@ const ASK_STARTERS = [starter('explain', 'eye'), starter('lately', 'clock'), sta
 export function ChatView() {
   const view = useApp((st) => st.view);
   const t = useT();
-  const solo = useApp((st) => st.peers.length <= 1);
   const channel = channelOf(view);
   const ws = useApp((st) => (view.kind === 'workspace' ? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === view.id) : undefined));
   const projectName = useApp((st) => st.projects.find((p) => p.root && (view.kind === 'draft' ? p.id === view.projectId : p.workspaces.some((w) => w.id === ws?.id)))?.name);
@@ -115,7 +115,7 @@ export function ChatView() {
     ) : view.kind === 'assistant' ? (
       <Empty icon="laptop" title={t('views.chat.askComputer', { computer: yourComputer() })} detail={t('views.chat.assistantDetail', { computer: computerWord() })} action={<AssistantStarters />} />
     ) : view.kind === 'room' ? (
-      <Empty icon="claude" title={solo ? t('views.chat.talk') : t('views.chat.sayHi')} detail={solo ? t('views.chat.talkDetail') : t('views.chat.sayHiDetail')} action={<Starters />} />
+      <Empty icon="claude" title={t('views.chat.sayHi')} detail={t('views.chat.sayHiDetail')} action={<Starters />} />
     ) : (
       <Empty icon="chat" title={t('views.chat.tell')} detail={t('views.chat.tellDetail')} action={<Starters />} />
     );
@@ -139,6 +139,7 @@ export function ChatView() {
       {view.kind === 'assistant' ? <AssistantTabs /> : null}
       {view.kind === 'workspace' ? <PlanStrip workspaceId={view.id} /> : null}
       {view.kind === 'workspace' ? <TaskStrip workspaceId={view.id} /> : null}
+      {view.kind === 'workspace' ? <DrivenStrip workspaceId={view.id} /> : null}
       {view.kind === 'workspace' ? <PrStrip workspaceId={view.id} /> : null}
       {view.kind === 'workspace' ? <SharedStrip wsId={view.id} /> : null}
       {view.kind === 'workspace' ? <EnvStrip workspaceId={view.id} /> : null}

@@ -563,6 +563,7 @@ export const chat: Translation<typeof en> = {
   'chat.mention.file': '文件',
   'chat.mention.task': '任务',
   'chat.mention.image': '图片',
+  'chat.mention.worktree': '工作树',
 
   // MentionedTasks
   'chat.mentioned.one': '提到的任务',

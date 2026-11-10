@@ -52,7 +52,6 @@ const go = (): readonly AppMenuRow[] => [
   row('go-actions', t('layout.appMenu.actions')),
   row('go-sentinel', t('layout.appMenu.sentinel')),
   row('go-dashboard', t('layout.appMenu.dashboard')),
-  row('go-room', t('layout.appMenu.chat')),
   row('go-search', t('layout.appMenu.search')),
   row('go-usage', t('layout.appMenu.usage')),
   row('go-terminal', t('layout.appMenu.terminal')),

@@ -4,12 +4,14 @@ import { shortcutKeys } from './shortcuts.js';
 import { t } from '../i18n/index.js';
 
 /**
- * The Mac app's places: Overview, Tasks and Chat (the sidebar's top), then Search, Usage,
- * Terminal and Shared files (the toolbar, the sidebar's top icons, the right panel). ⌘1…7, the
- * Go menu, ⌃Tab and the palette follow this order; each keeps its key even when it's absent.
+ * The Mac app's places: Overview and Tasks (the sidebar's top), then Search, Usage, Terminal and
+ * Shared files (the toolbar, the sidebar's top icons, the right panel). ⌘1…7, the Go menu, ⌃Tab
+ * and the palette follow this order; each keeps its key even when it's absent. The room's chat is
+ * no place of its own (BLG-871): it's a channel in the sidebar while someone else is in the room,
+ * so ⌘3 is free.
  */
 
-export type PlaceKind = TopTab['kind'] | 'tasks';
+export type PlaceKind = Exclude<TopTab['kind'], 'room'> | 'tasks';
 
 export interface Place extends Omit<TopTab, 'kind'> {
   readonly kind: PlaceKind;
@@ -17,7 +19,10 @@ export interface Place extends Omit<TopTab, 'kind'> {
   readonly key: number;
 }
 
-export const GO_ORDER: readonly PlaceKind[] = ['overview', 'tasks', 'room', 'search', 'usage', 'terminal', 'files'];
+/** Each place with its ⌘ key. */
+const KEYS: Readonly<Record<PlaceKind, number>> = { overview: 1, tasks: 2, search: 4, usage: 5, terminal: 6, files: 7 };
+
+export const GO_ORDER: readonly PlaceKind[] = ['overview', 'tasks', 'search', 'usage', 'terminal', 'files'];
 
 /** A hint ending with the place's key (yours: Settings › Keyboard). */
 function withKeys(hint: string, kind: PlaceKind): string {
@@ -28,8 +33,8 @@ function withKeys(hint: string, kind: PlaceKind): string {
 /** The places there are now, in order, each hint ending with its key. */
 export function macTabs(state: AppState): Place[] {
   const tabs = topTabs(state);
-  return GO_ORDER.flatMap((kind, i): Place[] => {
-    const key = i + 1;
+  return GO_ORDER.flatMap((kind): Place[] => {
+    const key = KEYS[kind];
     if (kind === 'tasks') return state.board.enabled ? [{ kind, key, label: t('common.go.tasks'), short: t('common.go.tasks'), hint: withKeys(t('common.go.tasksHint'), kind), badge: 0 }] : [];
     const tab = tabs.find((x) => x.kind === kind);
     return tab ? [{ ...tab, ...placeWords(tab, state.peers.length <= 1), kind, key, hint: withKeys(placeWords(tab, state.peers.length <= 1).hint, kind) }] : [];

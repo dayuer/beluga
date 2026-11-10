@@ -20,6 +20,7 @@ export const panes = (): ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName
   { id: 'environment', label: t('settings.pane.environment'), icon: 'lock', keywords: 'env .env variables secrets api keys 环境变量 密钥' },
   { id: 'people', label: t('settings.pane.people'), icon: 'people', keywords: 'friends trust network permissions 好友 信任 网络 权限' },
   { id: 'phone', label: t('settings.pane.phone'), icon: 'phone', keywords: 'android iphone mobile companion 手机 安卓' },
+  { id: 'external', label: t('more.sync.pane.external'), icon: 'bot', keywords: 'mcp grokbot claude code codex pairing code token oauth remote 外部 智能体 配对 令牌' },
   { id: 'computers', label: t('settings.pane.computers'), icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair 电脑 服务器 云 远程 配对' },
   { id: 'voice', label: t('settings.pane.voice'), icon: 'mic', keywords: 'dictation speech microphone talk transcribe 语音 听写 麦克风' },
   { id: 'keyboard', label: t('settings.pane.keyboard'), icon: 'command', keywords: 'shortcuts keys hotkeys bindings 键盘 快捷键' },
@@ -260,6 +261,28 @@ export const settingsIndex = (): readonly Entry[] => [
     [t('settings.people.takeNew'), t('settings.find.takeNew'), 'room open closed join knock 房间 开放 加入 敲门'],
     [t('settings.people.invite'), undefined, 'invite copy link new link 邀请 链接 复制'],
   ]),
+
+  // External agents
+  ...rows('external', undefined, [
+    [t('more.ext.connect'), t('more.ext.find.connect'), 'mcp server listener on off 外部 连接 服务器 开关'],
+    [t('more.ext.pause'), t('more.ext.pauseDetail'), 'pause refuse 暂停 拒绝'],
+    [t('more.ext.mcpUrl'), t('more.ext.find.mcpUrl'), 'url copy address 地址 复制 链接'],
+  ]),
+  group('external', t('more.ext.connectGroup'), t('more.ext.find.connectGroup'), 'pair pairing code connect 配对 配对码 连接'),
+  ...rows('external', t('more.ext.connectGroup'), [
+    [t('more.ext.outside'), t('more.ext.find.outside'), 'remote hosted tailscale public 远程 托管 公网'],
+    [t('more.ext.mayDo'), t('more.ext.find.mayDo'), 'level trust 级别 信任'],
+    [t('more.ext.fullForCode'), t('more.ext.find.full'), 'remote full warning 远程 完全信任 警告'],
+    [t('more.ext.allProjects'), t('more.ext.find.allProjects'), 'projects reach scope 项目 范围 访问'],
+    [t('more.ext.standalone'), t('more.ext.find.standalone'), 'chats standalone 聊天 独立'],
+    [t('more.ext.dms'), t('more.ext.find.dms'), 'dm messages friends 私信 消息 好友'],
+    [t('more.ext.groups'), t('more.ext.find.groups'), 'groups 群组'],
+    [t('more.ext.code'), t('more.ext.find.code'), 'code 配对码'],
+  ]),
+  group('external', t('more.ext.connected'), t('more.ext.find.connected'), 'revoke stop agents grants 撤销 停止 授权'),
+  ...rows('external', t('more.ext.connected'), [[t('more.ext.stopAll'), t('more.ext.find.stopAll'), 'stop all 全部停止']]),
+  group('external', t('more.ext.activity'), t('more.ext.showDetail'), 'audit log activity 审计 日志 动态'),
+  ...rows('external', t('more.ext.activity'), [[t('more.ext.showLabel'), t('more.ext.find.show'), 'filter 筛选']]),
 
   // Phone
   group('computers', t('settings.computers.whereTitle'), t('settings.find.whereRuns'), 'run new work machine best available 运行 新工作 电脑 最合适的'),

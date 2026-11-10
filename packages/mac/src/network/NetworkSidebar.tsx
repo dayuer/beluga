@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.js';
 import { type ActionItem, ActionsContext } from '../components/SpecMenu.js';
 import { Avatar, Badge, Button, IconButton, Tip, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
+import { groupChatOpen } from '../lib/group-chat.js';
 import { copyText } from '../lib/copy.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { setPrefs, usePrefs } from '../lib/prefs.js';
@@ -401,16 +402,66 @@ function MainRow() {
   );
 }
 
-/** Channels you're in (your main one first; ones you left, dimmed, with their history). */
+/**
+ * The room's group chat (BLG-871): everyone in your room and their agents, and its call. Only
+ * while someone else is in the room; alone, there's no one to chat with there.
+ */
+function RoomChatRow() {
+  useT();
+  const actions = useActions();
+  const { ui } = useBeluga();
+  // Someone at the door: their card is in this chat (chat/Attention.tsx), so it counts here.
+  const { room, people, unread, selected, host, door } = useApp(
+    (st) => ({ room: st.room, people: st.peers.length, unread: st.unread.room ?? 0, selected: st.view.kind === 'room', host: st.isHost, door: st.knocks.some((k) => st.peers.some((p) => p.peerId === k.peerId)) }),
+    sameDeep,
+  );
+  const count = unread + (door ? 1 : 0);
+  const open = (): void => actions.run({ type: 'view', view: { kind: 'room' } });
+  return (
+    <ActionsContext
+      items={() => [
+        { label: t('more.up.room.open'), icon: 'chat', onSelect: open },
+        { label: t('more.up.room.clear'), icon: 'x', separate: true, onSelect: () => ui.openMenu({ kind: 'clear', channel: 'room', host }) },
+      ]}
+    >
+      <Row
+        data-room-chat
+        selected={selected}
+        icon={
+          <span className={s.mainIcon}>
+            <Icon name="chat" size={12} />
+          </span>
+        }
+        aria-label={`${t('more.sync.groupChat')}${door ? t('more.up.room.ariaDoor') : ''}${unread ? t('more.up.room.ariaUnread', { count: unread }) : ''}`}
+        label={<span className={cx(s.whoName, count > 0 && s.unreadName)}>{t('more.sync.groupChat')}</span>}
+        detail={door ? t('more.up.room.door') : `${room ? `${room} · ` : ''}${t('more.up.room.people', { count: people })}`}
+        onClick={open}
+        trailing={count ? <Badge count={count} urgent /> : null}
+      />
+    </ActionsContext>
+  );
+}
+
+/** Channels you're in (the room's group chat while there's one, then your main one; ones you left, dimmed, with their history). */
 export function GroupsSection() {
   useT();
   const net = useNetwork();
-  if (!net.enabled) return null;
+  const roomChat = useApp(groupChatOpen);
+  if (!net.enabled) {
+    return roomChat ? (
+      <Section id="net-groups" title={t('network.sidebar.channels')}>
+        <div className={s.sidebarList}>
+          <RoomChatRow />
+        </div>
+      </Section>
+    ) : null;
+  }
   const groups = sortGroups(net.groups).filter((g) => g.id !== net.main);
   const main = net.main ? net.groups.find((g) => g.id === net.main) : undefined;
   return (
     <Section id="net-groups" title={t('network.sidebar.channels')} action={<IconButton icon="plus" label={t('network.sidebar.newChannel')} onClick={() => openNet({ kind: 'new_group' })} />}>
       <div className={s.sidebarList}>
+        {roomChat ? <RoomChatRow /> : null}
         {main ? <GroupRow g={main} /> : <MainRow />}
         {groups.map((g) => (
           <GroupRow key={g.id} g={g} />

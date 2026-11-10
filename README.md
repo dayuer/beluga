@@ -374,7 +374,7 @@ beluga web --off
 
 引擎（项目、agent、终端、好友）在你电脑的后台运行，应用是通往它的窗口。Claude 通过 [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview) 运行。
 
-了解更多（英文）：[工作原理](docs/how-it-works.md) · [安全](docs/security.md) · [点对点连接](docs/p2p.md) · [更新](docs/updates.md) · [每个操作及其位置](docs/parity.md) · [收入](docs/earnings.md)
+了解更多（英文）：[工作原理](docs/how-it-works.md) · [安全](docs/security.md) · [外部 Agent](docs/external-agents.md) · [点对点连接](docs/p2p.md) · [更新](docs/updates.md) · [每个操作及其位置](docs/parity.md) · [收入](docs/earnings.md)
 
 ## 开发
 
