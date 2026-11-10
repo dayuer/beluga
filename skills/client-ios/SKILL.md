@@ -66,6 +66,14 @@ git add -A && git commit -m "初始化:从 ios-app 模板建立"
 5. **外部测试链接**:外部测试者需要 Beta App 审核(通常要等),只有所有者同意、并提供审核联系人(以及应用有登录时的演示账号)后才加 `EXTERNAL=yes`。链接在 App Store Connect 的测试组里开启"公开链接"后得到,再用 `asc` 或网页读出,**经所有者确认后**发给客户。
 6. 发给客户的话(白话):装 TestFlight → 打开链接 → 接受邀请 → 安装。附上版本号和构建号。
 
+## 上架前常见拒收(模板已处理,改工程时别删)
+
+- App 图标:`App/Assets.xcassets/AppIcon.appiconset` 要有 1024 图标(模板是纯色占位,正式交付前换成客户的图标)。
+- 只支持 iPhone(`TARGETED_DEVICE_FAMILY: "1"`),否则 iPad 要求全部方向和 iPad 图标。
+- 出口合规:模板写了 `ITSAppUsesNonExemptEncryption: NO`;如果应用用了自有加密,必须改并按 Apple 要求申报。
+- 外部测试提交审核还需要:Beta 应用描述(`asc testflight app-localizations create`)、审核联系人(姓名/邮箱/电话,`asc testflight review edit`);缺了 `asc testflight review submit` 会报 Missing required information。
+- 构建号每次上传(包括失败的)都会被占用,用 `testflight.sh` 自动取下一个。
+
 ## 交付说明里要写清:App 转移的前提
 
 以后把 App 转给客户自己的开发者账号时(App Store Connect 的 App 转移):

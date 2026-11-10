@@ -13,6 +13,7 @@ IPA="$OUT/export/$SCHEME.ipa"
 
 die() { echo "错误: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "缺 $1($2)"; }
+next_build() { asc builds next-build-number --app "$APP_ID" --version "$(version)" | sed -nE 's/.*"nextBuildNumber":"([0-9]+)".*/\1/p'; }
 # 占位 Bundle ID(模板默认值、com.example.* 等)Apple 不会让你注册,提前拦下
 require_real_bundle_id() {
   [[ -n "${BUNDLE_ID:-}" ]] || die "请设 BUNDLE_ID,例如 BUNDLE_ID=com.<公司或品牌>.<应用>(要真实、以后可转移的命名)"
@@ -22,7 +23,7 @@ require_real_bundle_id() {
   esac
   [[ "$BUNDLE_ID" =~ ^[A-Za-z0-9.-]+\.[A-Za-z0-9.-]+$ ]] || die "BUNDLE_ID=$BUNDLE_ID 格式不对(只能字母数字 . -,至少两段)"
 }
-version() { grep -E 'MARKETING_VERSION' project.yml | head -1 | sed -E 's/.*"?([0-9.]+)"?.*/\1/'; }
+version() { grep -E 'MARKETING_VERSION' project.yml | head -1 | sed -E 's/.*MARKETING_VERSION: *"?([0-9.]+)"?.*/\1/'; }
 
 cmd_check() {
   require_real_bundle_id
@@ -32,7 +33,7 @@ cmd_check() {
   [[ -n "${TEAM_ID:-}" ]] || die "请设 TEAM_ID(security find-identity -v -p codesigning 里括号内的团队号)"
   security find-identity -v -p codesigning | grep -q "Apple Distribution.*($TEAM_ID)" \
     || die "钥匙串里没有团队 $TEAM_ID 的 Apple Distribution 证书。不要自己创建/吊销证书,告诉所有者缺什么"
-  echo "版本 $(version),下一个构建号: $(asc builds next-build-number --app "$APP_ID" --version "$(version)")"
+  echo "版本 $(version),下一个构建号: $(next_build)"
 }
 
 cmd_archive() {
@@ -40,7 +41,7 @@ cmd_archive() {
   need xcodebuild "需要 Xcode"; [[ -n "${TEAM_ID:-}" ]] || die "请设 TEAM_ID"
   local n="${BUILD_NUMBER:-}"
   if [[ -z "$n" ]]; then need asc "或手动设 BUILD_NUMBER"; [[ -n "${APP_ID:-}" ]] || die "请设 APP_ID"
-    n="$(asc builds next-build-number --app "$APP_ID" --version "$(version)" | grep -oE '[0-9]+' | tail -1)"; fi
+    n="$(next_build)"; fi
   [[ -n "$n" ]] || die "拿不到构建号"
   command -v xcodegen >/dev/null && [[ -f project.yml ]] && xcodegen generate -q
   rm -rf "$OUT"; mkdir -p "$OUT"
