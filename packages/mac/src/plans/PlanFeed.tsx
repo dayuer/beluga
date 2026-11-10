@@ -8,7 +8,6 @@ import { ago } from '../tasks/tasks-model.js';
 import { ActorMark } from './marks.js';
 import { type FeedKind, feedOf } from './plans-model.js';
 import p from './plans.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * What the plan did, newest first: tasks started and finished, milestones checked, merged and
@@ -40,12 +39,11 @@ export function PlanFeed({ plan }: { plan: Plan }) {
   const selfId = useApp((s) => s.selfId);
   const items = useMemo(() => feedOf(plan.activity), [plan.activity]);
   const [all, setAll] = useState(false);
-  const t = useT();
-  if (!items.length) return <p className={p.muted}>{t('plans.feed.empty')}</p>;
+  if (!items.length) return <p className={p.muted}>Nothing has happened yet. What the plan does shows here.</p>;
   const shown = all ? items : items.slice(0, SHOWN);
   return (
     <>
-      <ol className={p.feed} aria-label={t('plans.details.whatHappened')}>
+      <ol className={p.feed} aria-label="What happened">
         {shown.map((e) => (
           <li key={e.id} className={cx(p.feedItem, p[`feed_${e.kind}`])} data-kind={e.kind} title={e.count > 1 ? e.texts.join('\n') : undefined}>
             <ActorMark by={e.by} />
@@ -62,7 +60,7 @@ export function PlanFeed({ plan }: { plan: Plan }) {
       </ol>
       {!all && items.length > SHOWN ? (
         <button type="button" className={p.feedMore} onClick={() => setAll(true)}>
-          {t('plans.feed.showEarlier', { n: items.length - SHOWN })}
+          Show {items.length - SHOWN} earlier
         </button>
       ) : null}
     </>

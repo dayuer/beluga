@@ -4,7 +4,6 @@ import { openNet } from '../network/net-sheets.js';
 import { inviteFor } from './invite-model.js';
 import type { UiStore } from './beluga.js';
 import { shareWithFriend } from './share-with-friend.js';
-import { t } from '../i18n/index.js';
 
 /**
  * `/invite` typed in any of the Mac's message boxes (BLG-203): on its own, Add a Friend; with
@@ -24,7 +23,7 @@ export async function runInvite(client: SocketClient, ui: UiStore, route: Invite
     case 'new_channel':
       // Offered, not done: the New Channel sheet with them ticked, ready to name.
       openNet({ kind: 'new_group', with: route.with.map((f) => f.peerId) });
-      return say(client, t('common.inviteCommand.nameIt', { line: newChannelLine(route.with) }), 'info');
+      return say(client, `${newChannelLine(route.with)}: name it and press Create`, 'info');
     case 'add_members': {
       const added: string[] = [];
       for (const f of route.friends) {
@@ -32,10 +31,10 @@ export async function runInvite(client: SocketClient, ui: UiStore, route: Invite
           await client.api.network['groups.addMember'](route.groupId, f.peerId);
           added.push(f.name);
         } catch (err) {
-          say(client, t('common.inviteCommand.cantAdd', { name: f.name, error: failed(err) }), 'error');
+          say(client, `Couldn’t add ${f.name}: ${failed(err)}`, 'error');
         }
       }
-      if (added.length) say(client, t('common.inviteCommand.added', { names: namesLine(added), group: route.group }), 'success');
+      if (added.length) say(client, `Added ${namesLine(added)} to ${route.group}`, 'success');
       return;
     }
     case 'share': {
@@ -46,10 +45,10 @@ export async function runInvite(client: SocketClient, ui: UiStore, route: Invite
           if (done === 'sheet') return;
           how.push(f.name);
         } catch (err) {
-          say(client, t('common.inviteCommand.cantShare', { where: route.where, name: f.name, error: failed(err) }), 'error');
+          say(client, `Couldn’t share ${route.where} with ${f.name}: ${failed(err)}`, 'error');
         }
       }
-      if (how.length) say(client, t('common.inviteCommand.shared', { where: route.where, names: namesLine(how) }), 'success');
+      if (how.length) say(client, `Shared ${route.where} with ${namesLine(how)}`, 'success');
       return;
     }
   }

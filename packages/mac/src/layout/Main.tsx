@@ -16,7 +16,6 @@ import s from './Shell.module.css';
 import side from './Sidebar.module.css';
 import { SharedPlanPage } from '../team/SharedPlans.js';
 import { CallRoom } from '../call/CallRoom.js';
-import { useT } from '../i18n/index.js';
 import { StartingThere } from '../machines/StartingThere.js';
 import { useStarting } from '../machines/start-there.js';
 
@@ -51,18 +50,17 @@ const PhoneView = lazyView('phone/PhoneView', () => import('../phone/PhoneView.j
  * conversation when git is done.
  */
 function MakingWorktree() {
-  const t = useT();
   const ws = useApp((st) => (st.view.kind === 'workspace' ? findWorkspace(st.projects, st.view.id) : undefined));
   const asked = useApp((st) => (ws ? st.log.some((l) => l.channel === `ws:${ws.id}`) : false));
   if (!ws) return null;
-  const from = ws.base ?? t('layout.workspaceRow.latestOrigin');
+  const from = ws.base ?? 'the latest origin';
   if (!asked) {
     return (
       <Empty
         icon="branch"
         mark={<span className={side.making} style={{ width: 18, height: 18 }} aria-hidden="true" />}
-        title={t('layout.main.making', { name: ws.name })}
-        detail={t('layout.main.makingDetail', { from })}
+        title={`Making ${ws.name}…`}
+        detail={`A new worktree from ${from}. Its conversation opens here in a moment; anything you asked your agent starts then.`}
       />
     );
   }
@@ -71,7 +69,7 @@ function MakingWorktree() {
       <ChatLog key={ws.id} channel={`ws:${ws.id}`} />
       <div className={s.makingLine} role="status">
         <span className={side.making} aria-hidden="true" />
-        {t('layout.main.makingLine', { name: ws.name, from })}
+        Making {ws.name} from {from}. Your agent starts as soon as its folder is ready.
       </div>
     </div>
   );

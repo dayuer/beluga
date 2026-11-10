@@ -5,7 +5,6 @@ import { useActions } from './actions.js';
 import { useBeluga } from './beluga.js';
 import { pageAlive } from './nav-pages.js';
 import { chunk, isChunkLoadError, onChunkProblem, prefetchChunks, reportChunkProblem } from './chunks-model.js';
-import { t } from '../i18n/index.js';
 
 /**
  * A view in its own chunk (lib/chunks-model.ts): it gives up instead of waiting for good, and it's
@@ -38,11 +37,11 @@ export class ViewBoundary extends Component<{ children: ReactNode; at: string },
       return (
         <Empty
           icon="alert"
-          title={t('common.lazyView.notLoaded')}
-          detail={t('common.lazyView.notLoadedDetail')}
+          title="This view didn’t finish loading"
+          detail="Reloading the window brings it back. Your agents and terminals keep running."
           action={
             <Button size="small" onClick={reloadWindow}>
-              {t('common.lazyView.reload')}
+              Reload
             </Button>
           }
         />
@@ -51,11 +50,11 @@ export class ViewBoundary extends Component<{ children: ReactNode; at: string },
     return (
       <Empty
         icon="alert"
-        title={t('common.lazyView.problem')}
+        title="This view ran into a problem"
         detail={error.message}
         action={
           <Button size="small" onClick={() => this.setState({ error: undefined })}>
-            {t('common.lazyView.tryAgain')}
+            Try Again
           </Button>
         }
       />

@@ -8,7 +8,6 @@ import { openSheet } from '../../lib/sheets.js';
 import type { NativeMenuProps } from './index.js';
 import { usePick } from './pick.js';
 import s from './menus.module.css';
-import { useT } from '../../i18n/index.js';
 
 /** A template's prompt with its blanks (two spaces, ": .", "# ", a trailing space) shown as "…". */
 export const withBlanks = (prompt: string): string =>
@@ -27,7 +26,6 @@ const PICKER = { kind: 'templates' } as const;
  * In "manage" your own ones can be removed; New Template… makes one.
  */
 export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
-  const t = useT();
   const { ui } = useBeluga();
   const pick = usePick(menu);
   const use = usePick(PICKER);
@@ -39,9 +37,9 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
       <Alert
         icon="wand"
         tone="caution"
-        title={t('dialogs.templates.removeTitle', { name: removing.name })}
-        message={t('dialogs.templates.removeMessage')}
-        confirm={{ label: t('dialogs.templates.remove'), destructive: true, onClick: () => (setRemoving(undefined), pick(`tpl-del:${removing.id}`)) }}
+        title={`Remove the template “${removing.name}”?`}
+        message="It’s gone from the list for good. Workspaces you started with it are not affected."
+        confirm={{ label: 'Remove', destructive: true, onClick: () => (setRemoving(undefined), pick(`tpl-del:${removing.id}`)) }}
         onCancel={() => setRemoving(undefined)}
       />
     );
@@ -49,46 +47,46 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
   const footer = (
     <>
       <button type="button" className={f.linkButton} onClick={() => (close(), openSheet({ kind: 'template' }))}>
-        {t('dialogs.templates.new')}
+        New Template…
       </button>
       {manage ? null : (
         <button type="button" className={f.linkButton} onClick={() => ui.openMenu({ kind: 'templates', manage: true })}>
-          {t('dialogs.templates.manage')}
+          Manage
         </button>
       )}
     </>
   );
   return (
     <FormSheet
-      title={manage ? t('dialogs.templates.templates') : t('dialogs.templates.startFrom')}
+      title={manage ? 'Templates' : 'Start from a Template'}
       icon="wand"
-      intro={manage ? t('dialogs.templates.introManage') : t('dialogs.templates.intro')}
+      intro={manage ? 'Ways to start a task. Click one to use it; your own ones can be removed.' : 'It fills the message box, ready to finish and send.'}
       submitLabel=""
       hideSubmit
-      cancelLabel={manage ? t('dialogs.templates.done') : t('dialogs.templates.cancel')}
+      cancelLabel={manage ? 'Done' : 'Cancel'}
       onSubmit={() => undefined}
       onCancel={close}
       footer={footer}
       width={560}
     >
-      <div className={s.templates} role="list" aria-label={t('dialogs.templates.templates')}>
-        {templates.map((tpl) => (
-          <div key={tpl.id} role="listitem" style={{ display: 'flex', alignItems: 'flex-start' }}>
-            <button type="button" className={s.template} onClick={() => use(`tpl:${tpl.id}`)} data-autofocus={tpl === templates[0] ? true : undefined}>
+      <div className={s.templates} role="list" aria-label="Templates">
+        {templates.map((t) => (
+          <div key={t.id} role="listitem" style={{ display: 'flex', alignItems: 'flex-start' }}>
+            <button type="button" className={s.template} onClick={() => use(`tpl:${t.id}`)} data-autofocus={t === templates[0] ? true : undefined}>
               <span className={s.templateIcon} aria-hidden="true">
                 <Icon name="wand" size={15} />
               </span>
               <span className={s.templateText}>
                 <span className={s.templateName}>
-                  {tpl.name}
-                  {tpl.plan ? <span className={s.badge}>{t('dialogs.templates.plansFirst')}</span> : null}
-                  {tpl.builtIn ? null : <span className={`${s.badge} ${s.badgeMuted}`}>{t('dialogs.templates.yours')}</span>}
+                  {t.name}
+                  {t.plan ? <span className={s.badge}>Plans first</span> : null}
+                  {t.builtIn ? null : <span className={`${s.badge} ${s.badgeMuted}`}>Yours</span>}
                 </span>
-                <span className={s.templatePrompt}>{withBlanks(tpl.prompt)}</span>
+                <span className={s.templatePrompt}>{withBlanks(t.prompt)}</span>
               </span>
             </button>
-            {manage && !tpl.builtIn ? (
-              <button type="button" className={s.remove} aria-label={t('dialogs.templates.removeName', { name: tpl.name })} title={t('dialogs.templates.remove')} onClick={() => setRemoving(tpl)}>
+            {manage && !t.builtIn ? (
+              <button type="button" className={s.remove} aria-label={`Remove ${t.name}`} title="Remove" onClick={() => setRemoving(t)}>
                 <Icon name="x" size={11} />
               </button>
             ) : null}
@@ -101,20 +99,19 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
 
 /** Save a new template: its name, what Claude should do, and whether it plans first. */
 export function TemplateEditorSheet({ close }: { close: () => void }) {
-  const t = useT();
   const api = useApi();
   const names = useApp((st) => st.templates);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [plan, setPlan] = useState(false);
-  const taken = names.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+  const taken = names.find((t) => t.name.toLowerCase() === name.trim().toLowerCase());
   const builtIn = taken?.builtIn === true;
   return (
     <FormSheet
-      title={t('dialogs.templates.newTitle')}
+      title="New Template"
       icon="wand"
-      intro={t('dialogs.templates.newIntro')}
-      submitLabel={taken && !builtIn ? t('dialogs.templates.replace') : t('dialogs.templates.save')}
+      intro="A way to start a task you do often. It shows up when you start a worktree or a chat."
+      submitLabel={taken && !builtIn ? 'Replace' : 'Save Template'}
       canSubmit={Boolean(name.trim() && prompt.trim()) && !builtIn}
       onSubmit={() => {
         // The core reads "name: prompt"; a colon in the name would end it early.
@@ -124,14 +121,14 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
       onCancel={close}
       width={560}
     >
-      <Field label={t('dialogs.templates.name')} htmlFor="tpl-name" error={builtIn ? t('dialogs.templates.builtInName') : undefined} hint={taken ? t('dialogs.templates.taken') : undefined}>
-        <TextInput id="tpl-name" value={name} onChange={setName} placeholder={t('dialogs.templates.namePlaceholder')} maxLength={60} invalid={builtIn} />
+      <Field label="Name" htmlFor="tpl-name" error={builtIn ? 'A built-in template has this name. Pick another one.' : undefined} hint={taken ? 'You have a template with this name: saving replaces it.' : undefined}>
+        <TextInput id="tpl-name" value={name} onChange={setName} placeholder="Fix a flaky test" maxLength={60} invalid={builtIn} />
       </Field>
-      <Field label={t('dialogs.templates.prompt')} htmlFor="tpl-prompt" hint={t('dialogs.templates.promptHint')}>
-        <TextArea id="tpl-prompt" value={prompt} onChange={setPrompt} rows={5} placeholder={t('dialogs.templates.promptPlaceholder')} />
+      <Field label="Prompt" htmlFor="tpl-prompt" hint="What your agent should do. Leave two spaces where the details go: the cursor starts there.">
+        <TextArea id="tpl-prompt" value={prompt} onChange={setPrompt} rows={5} placeholder="Find out why this test fails now and then, make it reliable, and run it 20 times to be sure." />
       </Field>
       <Field label="">
-        <Checkbox checked={plan} onChange={setPlan} label={t('dialogs.templates.planFirst')} detail={t('dialogs.templates.planFirstDetail')} />
+        <Checkbox checked={plan} onChange={setPlan} label="Plan first" detail="Your agent shows you a plan and waits for your OK before changing anything" />
       </Field>
     </FormSheet>
   );

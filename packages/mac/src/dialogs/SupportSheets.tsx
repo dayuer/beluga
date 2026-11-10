@@ -11,8 +11,6 @@ import { COFFEE_AMOUNTS, COFFEE_LINKS, COFFEE_WORDS, type CoffeeAmount, GITHUB_U
 import { openExternal } from '../lib/system.js';
 import { useClock, windowActive } from '../lib/window-active.js';
 import s from './support.module.css';
-import { rich } from './native/pick.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * The two asks merged work brings (core/support-store.ts): a star on GitHub after the first merge,
@@ -56,9 +54,8 @@ function useCalmMoment(waiting: boolean): boolean {
 
 /** The maker, as a GitHub chip: their avatar and handle; it opens their profile. */
 export function MaintainerChip() {
-  const t = useT();
   return (
-    <button type="button" className={s.chip} onClick={() => void openExternal(MAINTAINER.url)} title={t('dialogs.support.onGithub', { login: MAINTAINER.login })}>
+    <button type="button" className={s.chip} onClick={() => void openExternal(MAINTAINER.url)} title={`${MAINTAINER.login} on GitHub`}>
       <img src={avatar} alt="" className={s.chipAvatar} draggable={false} />
       <span>{MAINTAINER.login}</span>
       <GitHubMark className={s.mark} />
@@ -113,13 +110,14 @@ function Promises({ items }: { items: ReadonlyArray<[IconName, string]> }) {
 }
 
 function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
-  const t = useT();
   return (
     <>
       <Confetti />
-      <SupportShell tone="star" art={<StarArt />} title={t('dialogs.support.starTitle')} label={t('dialogs.support.maybeLater')} onClose={() => onAnswer('later')}>
-        <p className={s.lead}>{rich(t('dialogs.support.starLead'), { chip: <MaintainerChip /> })}</p>
-        <p className={s.why}>{t('dialogs.support.starWhy')}</p>
+      <SupportShell tone="star" art={<StarArt />} title="Your first merge with Beluga!" label="Maybe later" onClose={() => onAnswer('later')}>
+        <p className={s.lead}>
+          Work you made in Beluga just landed. Beluga is free software and a passion project by <MaintainerChip />
+        </p>
+        <p className={s.why}>Stars are how other people find Beluga, and every single one truly matters. If it has helped you, a star would mean a lot.</p>
         <button
           type="button"
           data-main
@@ -130,11 +128,11 @@ function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
           }}
         >
           <Icon name="star" size={14} />
-          {t('dialogs.support.star')}
+          Star Beluga on GitHub
         </button>
         <div className={s.quiet}>
           <button type="button" className={s.quietButton} onClick={() => onAnswer('later')}>
-            {t('dialogs.support.maybeLater')}
+            Maybe later
           </button>
         </div>
       </SupportShell>
@@ -143,26 +141,25 @@ function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
 }
 
 function CoffeeSheet({ merges, byHand, onAnswer }: { merges: number; byHand: boolean; onAnswer: (a: SupportAnswer) => void }) {
-  const t = useT();
   const [amount, setAmount] = useState<CoffeeAmount>(10);
   const give = (link: string): void => {
     void openExternal(link);
     onAnswer('yes');
   };
   return (
-    <SupportShell tone="coffee" art={<CupArt />} title={t('dialogs.support.coffeeTitle')} label={byHand ? t('dialogs.support.close') : t('dialogs.support.notNow')} onClose={() => onAnswer('later')}>
+    <SupportShell tone="coffee" art={<CupArt />} title="Keep Beluga brewing" label={byHand ? 'Close' : 'Not now'} onClose={() => onAnswer('later')}>
       <p className={s.lead}>
-        {byHand || merges < 2 ? '' : t('dialogs.support.shipped', { n: merges })}
-        {rich(t('dialogs.support.coffeeLead'), { chip: <MaintainerChip /> })}
+        {byHand || merges < 2 ? '' : `You’ve shipped ${merges} pieces of work with Beluga. `}
+        Beluga is a passion project, built and maintained by <MaintainerChip />
       </p>
       <Promises
         items={[
-          ['heart', t('dialogs.support.free')],
-          ['branch', t('dialogs.support.open')],
-          ['check', t('dialogs.support.noAds')],
+          ['heart', 'Free, always'],
+          ['branch', 'Open source'],
+          ['check', 'No ads, no paywalls'],
         ]}
       />
-      <div className={s.amounts} role="radiogroup" aria-label={t('dialogs.support.amount')}>
+      <div className={s.amounts} role="radiogroup" aria-label="Amount">
         {COFFEE_AMOUNTS.map((a) => (
           <button
             key={a}
@@ -180,25 +177,25 @@ function CoffeeSheet({ merges, byHand, onAnswer }: { merges: number; byHand: boo
       </div>
       <button type="button" data-main className={s.main} onClick={() => give(COFFEE_LINKS[amount])}>
         <Icon name="cup" size={15} />
-        {t('dialogs.support.buy', { amount })}
+        Buy a coffee · ${amount}
       </button>
       <button type="button" className={s.other} onClick={() => give(COFFEE_LINKS.other)}>
-        {t('dialogs.support.other')}
+        Or choose your own amount
         <Icon name="arrowRight" size={11} />
       </button>
       <div className={s.fine}>
         <Icon name="lock" size={11} />
-        {exactLink(amount) ? t('dialogs.support.secure') : t('dialogs.support.secureEnter', { amount })}
+        {exactLink(amount) ? 'Secure checkout by Stripe, in your browser' : `Secure checkout by Stripe: enter $${amount} there`}
       </div>
       <div className={s.quiet}>
         <button type="button" className={s.quietButton} onClick={() => onAnswer('later')}>
-          {byHand ? t('dialogs.support.close') : t('dialogs.support.notNow')}
+          {byHand ? 'Close' : 'Not now'}
         </button>
         {byHand ? null : (
           <>
             <span className={s.dot} aria-hidden="true" />
             <button type="button" className={s.quietButton} onClick={() => onAnswer('never')}>
-              {t('dialogs.support.never')}
+              Don’t ask again
             </button>
           </>
         )}

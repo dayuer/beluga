@@ -26,7 +26,6 @@ import { agentOfToolUse, allSubAgents } from '../../claude-code/subagents-model.
 import { openSubAgent } from '../../layout/SubAgents.js';
 import { waitState, waitTone, waitedLabel, waitingFor } from './waiting.js';
 import c from '../chat.module.css';
-import { useT } from '../../i18n/index.js';
 import s from './steps.module.css';
 
 type AgentItem = Extract<LogItem, { type: 'agent' }>;
@@ -77,7 +76,6 @@ function spanOf(steps: readonly StepSummary[]): string | undefined {
  */
 export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: which }: { item: AgentItem; running: boolean; part?: TurnPart | undefined; subs?: 'running' | 'settled' | undefined }) {
   const selfId = useApp((st) => st.selfId);
-  const t = useT();
   const detail = useApp((st) => st.prefs.subagents);
   const mine = item.owner === selfId;
   const change = `${item.status}:${item.steps.length}:${item.steps.at(-1) ?? ''}:${item.subagents.map((x) => `${x.steps.length}${x.status}`).join(',')}`;
@@ -179,7 +177,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
 
   return (
     <>
-      <div className={s.list} role="list" aria-label={t('chat.steps.aria')}>
+      <div className={s.list} role="list" aria-label="The agent's steps">
         {/* One keyed list with the step Claude is on: when it finishes it stays the same row (no
             remount, so nothing blinks or restarts) and only changes how it reads. A row leaving the
             last few closes up into the fold above it, whose count ticks up (KLD-51). */}
@@ -188,14 +186,14 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
             <Slot key="fold" still={still}>
               <div className={s.bar}>
                 {earlier ? (
-                  <button type="button" className={s.fold} onClick={() => setEarlier(false)} aria-expanded="true" aria-label={t('chat.steps.hideEarlierAria', { n: split.older.length })}>
+                  <button type="button" className={s.fold} onClick={() => setEarlier(false)} aria-expanded="true" aria-label={`Hide ${split.older.length} earlier steps`}>
                     <span className={cx(s.chev, s.chevOpen)}>
                       <Icon name="chevronRight" size={9} />
                     </span>
-                    {t('chat.steps.hideEarlier')}
+                    Hide earlier steps
                   </button>
                 ) : (
-                  <button type="button" className={s.fold} onClick={() => setEarlier(true)} aria-expanded="false" aria-label={t('chat.steps.showEarlierAria', { n: olderWork })} data-folded-count={olderWork}>
+                  <button type="button" className={s.fold} onClick={() => setEarlier(true)} aria-expanded="false" aria-label={`Show ${olderWork} earlier steps`} data-folded-count={olderWork}>
                     <span className={s.chev}>
                       <Icon name="chevronRight" size={9} />
                     </span>
@@ -207,7 +205,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
                         {olderWork}
                       </span>
                     </span>
-                    {t('chat.steps.stepWord', { n: olderWork })}{span ? ` · ${span}` : ''}
+                    {olderWork === 1 ? 'step' : 'steps'}{span ? ` · ${span}` : ''}
                   </button>
                 )}
               </div>
@@ -227,7 +225,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
         {detail === 'hidden' && item.subagents.length && part?.side !== 'head' ? (
           <div className={c.step}>
             <Icon name="claude" size={11} />
-            {t('chat.steps.subagents', { n: item.subagents.length })}
+            {item.subagents.length} sub-agent{item.subagents.length === 1 ? '' : 's'}
           </div>
         ) : null}
       </div>
@@ -288,18 +286,17 @@ function useStill(): boolean {
  */
 export function StepsToggle({ item }: { item: AgentItem }) {
   const prefs = usePrefs();
-  const t = useT();
   const open = useDisclosure(`${item.channel}/${item.id}`);
   if (prefs.doneSteps === 'fold') {
     return (
       <Button size="small" variant="quiet" icon={open.shown ? 'chevronUp' : 'chevronDown'} onClick={() => open.setShown(!open.shown)}>
-        {open.shown ? t('chat.items.hideSteps') : t('chat.items.showSteps')}
+        {open.shown ? 'Hide Steps' : 'Show Steps'}
       </Button>
     );
   }
   return (
     <Button size="small" variant="quiet" icon={open.any ? 'chevronUp' : 'chevronDown'} onClick={() => open.setAllOpen(!open.any)}>
-      {open.any ? t('chat.steps.collapseAll') : t('chat.steps.expandAll')}
+      {open.any ? 'Collapse all' : 'Expand all'}
     </Button>
   );
 }
@@ -337,7 +334,6 @@ export function StepsFold({ folded, children }: { folded: boolean; children: Rea
 /** Claude waits on a friend's Claude (or Mac): who, where their side is, for how long; Cancel. */
 function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | undefined; now: number }) {
   const { client } = useBeluga();
-  const t = useT();
   const api = useApi();
   const person = task?.peerName ?? step.person;
   const personId = usePersonId(person);
@@ -348,13 +344,13 @@ function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | u
       <span className={s.waitAvatar}>{person ? <Avatar name={person} id={personId} size={22} /> : <Icon name="clock" size={14} />}</span>
       <span className={s.waitText}>
         <span className={s.waitTitle}>{waitingFor(task)}</span>
-        <span className={s.waitState}>{task ? waitState(task) : t('chat.steps.answerHere')}</span>
+        <span className={s.waitState}>{task ? waitState(task) : 'Their answer comes back here'}</span>
       </span>
       <span className={s.waitEnd}>
         <span className={s.time}>{formatDuration(Math.max(0, now - since))}</span>
         {task && !isFinal(task.state) ? (
           <button type="button" className={s.waitCancel} onClick={() => void api.gateway.cancel(task.id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))}>
-            {t('chat.items.cancel')}
+            Cancel
           </button>
         ) : null}
       </span>
@@ -365,7 +361,6 @@ function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | u
 /** Follow one of this conversation's sub-agents on its own page (live: thinking, tools, its worktree). */
 function WatchAgent({ id }: { id: string }) {
   const { client } = useBeluga();
-  const t = useT();
   const actions = useActions();
   const sessions = useApp((st) => st.claudeCode.sessions);
   // The chat knows a sub-agent by the call that started it (or, in the background, by its agent id).
@@ -377,7 +372,7 @@ function WatchAgent({ id }: { id: string }) {
       role="button"
       tabIndex={0}
       className={s.watch}
-      aria-label={t('chat.steps.watchAria', { name: sub.agent.description })}
+      aria-label={`Watch ${sub.agent.description} live`}
       onClick={(e) => (e.stopPropagation(), openSubAgent(client, actions, sub))}
       onKeyDown={(e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -387,7 +382,7 @@ function WatchAgent({ id }: { id: string }) {
       }}
     >
       <Icon name="eye" size={11} />
-      {t('chat.steps.watch')}
+      Watch
     </span>
   );
 }
@@ -413,7 +408,6 @@ interface SubAgentRowProps {
  */
 const SubAgentRow = memo(function SubAgentRow({ sub, own, detail, toggle, load, live, open: isOpen, opened, now }: SubAgentRowProps) {
   countRender(`sub:${sub.id}`);
-  const t = useT();
   const key = `sub:${sub.id}`;
   const running = sub.status === 'running';
   const canOpen = own.length > 0;
@@ -425,8 +419,8 @@ const SubAgentRow = memo(function SubAgentRow({ sub, own, detail, toggle, load, 
         </span>
       ) : null}
       {running ? <Dot tone={sub.kind === 'background' ? 'claude' : 'subagent'} live /> : <Icon name={sub.status === 'failed' ? 'x' : 'check'} size={11} className={sub.status === 'failed' ? c.subFailed : c.subDone} />}
-      <span className={c.subTitle}>{sub.kind === 'background' ? `${t('chat.steps.background')} · ${sub.title}` : sub.title}</span>
-      {sub.steps.length ? <span className={c.time}>{t('chat.steps.nSteps', { n: sub.steps.length })}</span> : null}
+      <span className={c.subTitle}>{sub.kind === 'background' ? `Background · ${sub.title}` : sub.title}</span>
+      {sub.steps.length ? <span className={c.time}>{sub.steps.length} steps</span> : null}
       <WatchAgent id={sub.id} />
     </>
   );

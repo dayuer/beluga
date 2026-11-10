@@ -2,8 +2,6 @@
 import type { DomainState } from '../../../../src/core/store.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
 import type { MachineView } from '../../../../src/machines/machines.js';
-import { t as tr } from '../i18n/index.js';
-import { ago } from './model.js';
 
 /**
  * Every computer's work in this app's lists (BLG-785), as plain data: what each computer has
@@ -85,8 +83,13 @@ export const remoteDashboards = (sources: readonly RemoteSource[]) => sources.fl
 export function whereLine(t: Pick<Tagged<unknown>, 'machine' | 'offline' | 'at'>, now = Date.now()): string {
   if (!t.offline) return t.machine.name;
   const seen = t.machine.lastSeen ?? t.at;
-  return seen ? tr('machines.remote.offlineSeen', { name: t.machine.name, ago: ago(now - seen) }) : tr('machines.remote.offline', { name: t.machine.name });
+  return seen ? `${t.machine.name} · offline, seen ${ago(now - seen)} ago` : `${t.machine.name} · offline`;
 }
+
+const ago = (ms: number): string => {
+  const min = Math.round(ms / 60_000);
+  return min < 1 ? 'just now' : min < 60 ? `${min} min` : min < 60 * 24 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} d`;
+};
 
 /** A computer's short name for a tag: its first word or two, at most 14 characters. */
 export function shortName(name: string): string {

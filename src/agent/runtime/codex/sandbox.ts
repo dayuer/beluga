@@ -154,6 +154,28 @@ export function codexConfinement(origin: RunOrigin, scope: 'folder' | 'full', pl
 }
 
 /**
+ * Codex refusing a profile that denies reads (#425): its unelevated Windows sandbox (a restricted
+ * token, on a standard account without MXC or the elevated sandbox's setup) fences writes but
+ * can't hide a file, and says so (codex-rs/sandboxing/src/windows.rs) when it opens a thread whose
+ * project docs it must read, or runs a command.
+ */
+export function readsUndeniable(err: unknown): boolean {
+  return err instanceof Error && /restricted-token sandbox cannot enforce (deny-read|split filesystem read) restrictions/.test(err.message);
+}
+
+/**
+ * The run's confinement for that sandbox: the same folders, written only where they were, with
+ * nothing denied to read (`.env` files and credential stores read as they would by Codex outside
+ * Beluga). Only your own run gets it; anyone else's needs its denials, so undefined: it doesn't run.
+ */
+export function withoutReadDenials(c: CodexConfinement): CodexConfinement | undefined {
+  if (c.row.origin !== 'own') return undefined;
+  const profile = c.config[`permissions.${PROFILE}`] as { filesystem: Record<string, string> };
+  const filesystem = Object.fromEntries(Object.entries(profile.filesystem).filter(([, access]) => access !== 'deny'));
+  return { ...c, config: { ...c.config, [`permissions.${PROFILE}`]: { ...profile, filesystem } } };
+}
+
+/**
  * A side call's confinement (codex/complete.ts): read only, as tight as a friend's task (your home
  * and its secret stores out of reach, `.env` files denied, none of your own Codex tools), whatever
  * asked for it: what a chat answer reads can come from a friend. The network is on only for a call

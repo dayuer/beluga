@@ -7,9 +7,6 @@ import { CodeEditor } from '../components/markdown/CodeEditor.js';
 import { Select } from '../components/Select.js';
 import { Button, IconButton } from '../components/ui.js';
 import { useDraft } from './use-draft.js';
-import { useT } from '../i18n/index.js';
-
-type Tr = ReturnType<typeof useT>;
 import s from './sentinel.module.css';
 
 /**
@@ -18,37 +15,37 @@ import s from './sentinel.module.css';
  * unit, and which way is good. A unit of Rows keeps a table instead.
  */
 
-const fromChoices = (tr: Tr): ReadonlyArray<{ readonly value: MeasureFrom; readonly label: string; readonly description: string }> => [
-  { value: 'previous', label: tr('sentinel.measure.from.previous'), description: tr('sentinel.measure.from.previousDetail') },
-  { value: 'source', label: tr('sentinel.measure.from.source'), description: tr('sentinel.measure.from.sourceDetail') },
-  { value: 'claude', label: tr('sentinel.measure.from.claude'), description: tr('sentinel.measure.from.claudeDetail') },
+const FROM: ReadonlyArray<{ readonly value: MeasureFrom; readonly label: string; readonly description: string }> = [
+  { value: 'previous', label: 'The step before', description: 'A number, JSON, CSV or “name: value” lines' },
+  { value: 'source', label: 'A source', description: 'A database query, a command or a request, run here as you' },
+  { value: 'claude', label: 'What the agent keeps', description: 'The agent step before calls sentinel_measure for each one' },
 ];
 
 type UnitChoice = MetricUnit | 'rows' | 'series' | 'output';
-const unitChoices = (tr: Tr): ReadonlyArray<{ readonly value: UnitChoice; readonly label: string }> => [
-  { value: 'count', label: tr('sentinel.measure.unit.count') },
-  { value: 'currency:USD', label: tr('sentinel.measure.unit.usd') },
-  { value: 'currency:EUR', label: tr('sentinel.measure.unit.eur') },
-  { value: 'currency:GBP', label: tr('sentinel.measure.unit.gbp') },
-  { value: 'percent', label: tr('sentinel.measure.unit.percent') },
-  { value: 'ms', label: tr('sentinel.measure.unit.ms') },
-  { value: 'bytes', label: tr('sentinel.measure.unit.bytes') },
-  { value: 'plain', label: tr('sentinel.measure.unit.plain') },
-  { value: 'rows', label: tr('sentinel.measure.unit.rows') },
-  { value: 'series', label: tr('sentinel.measure.unit.series') },
-  { value: 'output', label: tr('sentinel.measure.unit.output') },
+const UNITS: ReadonlyArray<{ readonly value: UnitChoice; readonly label: string }> = [
+  { value: 'count', label: 'A count' },
+  { value: 'currency:USD', label: 'Dollars' },
+  { value: 'currency:EUR', label: 'Euros' },
+  { value: 'currency:GBP', label: 'Pounds' },
+  { value: 'percent', label: 'A percent' },
+  { value: 'ms', label: 'Milliseconds' },
+  { value: 'bytes', label: 'Bytes' },
+  { value: 'plain', label: 'A plain number' },
+  { value: 'rows', label: 'Rows (a table)' },
+  { value: 'series', label: 'A series (a whole array)' },
+  { value: 'output', label: 'The output itself' },
 ];
-const betterChoices = (tr: Tr): ReadonlyArray<{ readonly value: Better; readonly label: string; readonly description: string }> => [
-  { value: 'up', label: tr('sentinel.measure.better.up'), description: tr('sentinel.measure.better.upDetail') },
-  { value: 'down', label: tr('sentinel.measure.better.down'), description: tr('sentinel.measure.better.downDetail') },
-  { value: 'none', label: tr('sentinel.measure.better.none'), description: tr('sentinel.measure.better.noneDetail') },
+const BETTER: ReadonlyArray<{ readonly value: Better; readonly label: string; readonly description: string }> = [
+  { value: 'up', label: 'Up is good', description: 'A rise shows green' },
+  { value: 'down', label: 'Down is good', description: 'A drop shows green: failed payments, load time' },
+  { value: 'none', label: 'Neither', description: 'Changes show grey' },
 ];
-const sourceKinds = (tr: Tr): ReadonlyArray<{ readonly value: Source['kind']; readonly label: string }> => [
-  { value: 'postgres', label: tr('sentinel.measure.source.postgres') },
-  { value: 'sqlite', label: tr('sentinel.measure.source.sqlite') },
-  { value: 'command', label: tr('sentinel.cards.aCommand') },
-  { value: 'http', label: tr('sentinel.measure.source.http') },
-  { value: 'file', label: tr('sentinel.measure.source.file') },
+const SOURCE_KINDS: ReadonlyArray<{ readonly value: Source['kind']; readonly label: string }> = [
+  { value: 'postgres', label: 'Postgres query' },
+  { value: 'sqlite', label: 'SQLite query' },
+  { value: 'command', label: 'A command' },
+  { value: 'http', label: 'A web request' },
+  { value: 'file', label: 'A file' },
 ];
 const KEEP = [20, 50, 100, ROWS_KEPT] as const;
 
@@ -70,29 +67,27 @@ function newSource(kind: Source['kind']): Source {
 }
 
 export function MeasureFields({ step, change }: { step: MeasureStep; change: (patch: Partial<MeasureStep>) => void }) {
-  const tr = useT();
-  const FROM = fromChoices(tr);
   const from = FROM.find((f) => f.value === step.from);
   const setMetric = (i: number, patch: Partial<MetricSpec>): void => change({ metrics: step.metrics.map((m, n) => (n === i ? clean({ ...m, ...patch }) : m)) });
   const rows = step.metrics.some((m) => m.kind === 'rows');
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.measure.reads')}</span>
-        <Select label={tr('sentinel.measure.whatItReads')} size="small" value={step.from} options={FROM} onChange={(f) => change(f === 'source' ? { from: f, source: step.source ?? newSource('postgres') } : { from: f })} />
+        <span className={s.controlLabel}>Reads</span>
+        <Select label="What it reads" size="small" value={step.from} options={FROM} onChange={(f) => change(f === 'source' ? { from: f, source: step.source ?? newSource('postgres') } : { from: f })} />
       </div>
-      {from ? <p className={s.hint}>{tr('sentinel.cards.sentenceEnd', { text: from.description })}</p> : null}
+      {from ? <p className={s.hint}>{from.description}.</p> : null}
       {step.from === 'source' && step.source ? <SourceFields source={step.source} change={(source) => change({ source })} /> : null}
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.measure.numbersItKeeps')}</span>
+        <span className={s.fieldLabel}>Numbers it keeps</span>
         {step.metrics.length ? (
-          <div className={s.headers} role="list" aria-label={tr('sentinel.measure.numbersItKeeps')}>
+          <div className={s.headers} role="list" aria-label="Numbers it keeps">
             {step.metrics.map((m, i) => (
               <MetricRow key={`${m.name}-${i}`} m={m} index={i} from={step.from} change={(patch) => setMetric(i, patch)} remove={() => change({ metrics: step.metrics.filter((_, n) => n !== i) })} />
             ))}
           </div>
         ) : (
-          <p className={s.hint}>{step.from === 'claude' ? tr('sentinel.measure.emptyClaude') : tr('sentinel.measure.emptyOther')}</p>
+          <p className={s.hint}>{step.from === 'claude' ? 'Every number the agent keeps, as it names them.' : 'Every top-level number it finds, by its name.'} Add one to name, label and format it.</p>
         )}
         <div>
           <Button
@@ -105,15 +100,15 @@ export function MeasureFields({ step, change }: { step: MeasureStep; change: (pa
               change({ metrics: [...step.metrics, { name, label: '', unit: 'count', better: 'up' }] });
             }}
           >
-            {tr('sentinel.measure.addNumber')}
+            Add a Number
           </Button>
         </div>
-        <span className={s.help}>{step.from === 'claude' ? tr('sentinel.measure.nameHelp') : tr('sentinel.measure.pickHelp')}</span>
+        <span className={s.help}>{step.from === 'claude' ? 'Its name is what the agent passes to sentinel_measure.' : 'Where: a JSON path ($.items[0].statistics.subscriberCount, rows[0].count) or a column; empty: its name.'}</span>
       </div>
       {rows ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.measure.rowsKept')}</span>
-          <Select label={tr('sentinel.measure.rowsKeptEachRun')} size="small" value={String(step.keep ?? ROWS_KEPT)} options={KEEP.map((k) => ({ value: String(k), label: tr('sentinel.numbers.rows', { n: k }) }))} onChange={(v) => change({ keep: Number(v) })} />
+          <span className={s.controlLabel}>Rows kept</span>
+          <Select label="Rows kept each run" size="small" value={String(step.keep ?? ROWS_KEPT)} options={KEEP.map((k) => ({ value: String(k), label: `${k} rows` }))} onChange={(v) => change({ keep: Number(v) })} />
         </div>
       ) : null}
     </>
@@ -140,25 +135,23 @@ function MetricRow({ m, index, from, change, remove }: { m: MetricSpec; index: n
     if (next !== m.name) change({ name: next });
   });
   const unit = unitOf(m);
-  const tr = useT();
-  const UNITS = unitChoices(tr);
   return (
     <div className={s.metricRow} role="listitem" data-metric={m.name}>
-      <TextInput value={label.text} onChange={label.change} onBlur={label.flush} placeholder={tr('sentinel.measure.labelPlaceholder')} aria-label={tr('sentinel.measure.numberLabel', { n: index + 1 })} />
+      <TextInput value={label.text} onChange={label.change} onBlur={label.flush} placeholder="Label, like Subscribers" aria-label={`Number ${index + 1}’s label`} />
       {from === 'claude' ? (
-        <TextInput value={name.text} onChange={name.change} onBlur={name.flush} mono placeholder={tr('sentinel.measure.namePlaceholder')} aria-label={tr('sentinel.measure.numberName', { n: index + 1 })} />
+        <TextInput value={name.text} onChange={name.change} onBlur={name.flush} mono placeholder="name" aria-label={`Number ${index + 1}’s name`} />
       ) : (
-        <TextInput value={pick.text} onChange={pick.change} onBlur={pick.flush} mono placeholder={m.name} aria-label={tr('sentinel.measure.numberWhere', { n: index + 1 })} />
+        <TextInput value={pick.text} onChange={pick.change} onBlur={pick.flush} mono placeholder={m.name} aria-label={`Where number ${index + 1} is`} />
       )}
       <Select<UnitChoice>
-        label={tr('sentinel.measure.numberUnit', { n: index + 1 })}
+        label={`Number ${index + 1}’s unit`}
         size="small"
         value={unit}
         options={UNITS.some((u) => u.value === unit) ? UNITS : [...UNITS, { value: unit, label: unit }]}
         onChange={(u) => change(u === 'rows' || u === 'output' ? { kind: u, unit: undefined, better: 'none' } : u === 'series' ? { kind: 'series', unit: undefined } : { kind: undefined, unit: u })}
       />
-      {m.kind === 'rows' || m.kind === 'output' ? <span /> : <Select<Better> label={tr('sentinel.measure.numberBetter', { n: index + 1 })} size="small" value={m.better ?? 'up'} options={betterChoices(tr)} onChange={(better) => change({ better })} />}
-      <IconButton icon="x" label={tr('sentinel.cards.removeHeader', { what: m.label || m.name })} onClick={remove} />
+      {m.kind === 'rows' || m.kind === 'output' ? <span /> : <Select<Better> label={`Which way number ${index + 1} is good`} size="small" value={m.better ?? 'up'} options={BETTER} onChange={(better) => change({ better })} />}
+      <IconButton icon="x" label={`Remove ${m.label || m.name}`} onClick={remove} />
     </div>
   );
 }
@@ -169,8 +162,6 @@ function SourceFields({ source, change }: { source: Source; change: (s: Source) 
     if (v === text || !v.trim()) return;
     change(source.kind === 'postgres' || source.kind === 'sqlite' ? { ...source, query: v } : source.kind === 'command' ? { ...source, command: v } : source.kind === 'http' ? { ...source, url: v } : { ...source, path: v });
   });
-  const tr = useT();
-  const SOURCE_KINDS = sourceKinds(tr);
   const second = source.kind === 'postgres' ? (source.env ?? '') : source.kind === 'sqlite' ? source.path : undefined;
   const other = useDraft(second ?? '', (v) => {
     if (second === undefined || v === second || !v.trim()) return;
@@ -179,25 +170,25 @@ function SourceFields({ source, change }: { source: Source; change: (s: Source) 
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.measure.source')}</span>
-        <Select<Source['kind']> label={tr('sentinel.measure.source')} size="small" value={source.kind} options={SOURCE_KINDS.some((k) => k.value === source.kind) ? SOURCE_KINDS : [...SOURCE_KINDS, { value: source.kind, label: source.kind }]} onChange={(k) => k !== source.kind && change(newSource(k))} />
+        <span className={s.controlLabel}>Source</span>
+        <Select<Source['kind']> label="Source" size="small" value={source.kind} options={SOURCE_KINDS.some((k) => k.value === source.kind) ? SOURCE_KINDS : [...SOURCE_KINDS, { value: source.kind, label: source.kind }]} onChange={(k) => k !== source.kind && change(newSource(k))} />
       </div>
       {second !== undefined ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{source.kind === 'postgres' ? tr('sentinel.measure.connectionIn') : tr('sentinel.measure.databaseFile')}</span>
-          <TextInput value={other.text} onChange={other.change} onBlur={other.flush} mono placeholder={source.kind === 'postgres' ? 'DATABASE_URL' : 'data.db'} aria-label={source.kind === 'postgres' ? tr('sentinel.measure.connectionVar') : tr('sentinel.measure.theDatabaseFile')} />
+          <span className={s.controlLabel}>{source.kind === 'postgres' ? 'Connection in' : 'Database file'}</span>
+          <TextInput value={other.text} onChange={other.change} onBlur={other.flush} mono placeholder={source.kind === 'postgres' ? 'DATABASE_URL' : 'data.db'} aria-label={source.kind === 'postgres' ? 'The variable with the connection string' : 'The database file'} />
         </div>
       ) : null}
       <div className={s.field}>
-        <span className={s.fieldLabel}>{source.kind === 'postgres' || source.kind === 'sqlite' ? tr('sentinel.measure.query') : source.kind === 'command' ? tr('sentinel.cards.command') : source.kind === 'http' ? tr('sentinel.event.address') : tr('sentinel.measure.path')}</span>
+        <span className={s.fieldLabel}>{source.kind === 'postgres' || source.kind === 'sqlite' ? 'Query' : source.kind === 'command' ? 'Command' : source.kind === 'http' ? 'Address' : 'Path'}</span>
         {source.kind === 'postgres' || source.kind === 'sqlite' ? (
-          <CodeEditor value={main.text} onChange={main.change} onBlur={main.flush} lang="sql" minRows={4} aria-label={tr('sentinel.measure.query')} />
+          <CodeEditor value={main.text} onChange={main.change} onBlur={main.flush} lang="sql" minRows={4} aria-label="Query" />
         ) : source.kind === 'command' ? (
-          <CodeEditor value={main.text} onChange={main.change} onBlur={main.flush} lang="bash" single aria-label={tr('sentinel.measure.source')} />
+          <CodeEditor value={main.text} onChange={main.change} onBlur={main.flush} lang="bash" single aria-label="Source" />
         ) : (
-          <TextInput value={main.text} onChange={main.change} onBlur={main.flush} mono aria-label={tr('sentinel.measure.source')} />
+          <TextInput value={main.text} onChange={main.change} onBlur={main.flush} mono aria-label="Source" />
         )}
-        <span className={s.help}>{source.kind === 'postgres' ? tr('sentinel.measure.connectionNote') : ''}{tr('sentinel.measure.runAsYou')}</span>
+        <span className={s.help}>{source.kind === 'postgres' ? 'The connection string stays in Settings › Environment or the project’s .env, never here; ' : ''}Run as you, with your environment, each run. A query that returns rows keeps them too.</span>
       </div>
     </>
   );

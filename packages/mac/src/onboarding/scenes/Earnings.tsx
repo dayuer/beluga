@@ -1,4 +1,3 @@
-import { useT } from '../../i18n/index.js';
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon } from '../../components/Icon.js';
 import { EASE_OUT, SPRING, Ticker } from '../fx.js';
@@ -32,7 +31,6 @@ function Spark({ points }: { readonly points: readonly number[] }) {
 export function Earnings() {
   // Beats: the month so far, then a new sale for web.
   const beat = useBeats([2600, 2800], 1);
-  const t = useT();
   const sold = beat === 1;
   const total = PROJECTS.reduce((sum, p) => sum + p.amount, 0) + (sold ? SALE : 0);
   return (
@@ -40,14 +38,14 @@ export function Earnings() {
       <motion.div className={s.earnings} initial={{ rotateX: 10, rotateY: -14 }} animate={{ rotateX: 10, rotateY: -14 }}>
         <div className={s.earnHead}>
           <div>
-            <span className={s.dim}>{t('onboarding.scene.thisMonth')}</span>
+            <span className={s.dim}>This month</span>
             <strong className={s.total}>
               {/* When the sale lands it counts on from the month so far, not from zero. */}
               <Ticker key={sold ? 'after' : 'before'} value={total} from={sold ? total - SALE : 0} format={money} duration={sold ? 0.6 : 1.6} />
             </strong>
           </div>
           <span className={s.stripe}>
-            <span className={s.stripeDot} /> {t('more.tour.earnings.stripe')}
+            <span className={s.stripeDot} /> Stripe connected
           </span>
         </div>
         {PROJECTS.map((p, i) => {
@@ -71,7 +69,7 @@ export function Earnings() {
               <span>
                 <strong>{money(SALE)}</strong> new subscription · web
               </span>
-              <span className={s.dim}>{t('phone.model.justNow')}</span>
+              <span className={s.dim}>just now</span>
             </motion.div>
           ) : null}
         </AnimatePresence>

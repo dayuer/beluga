@@ -25,7 +25,6 @@ import s from './issues.module.css';
 import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * One GitHub issue: what it says and what people said since, and what Claude should do about it.
@@ -36,7 +35,6 @@ import { useT } from '../i18n/index.js';
  */
 export function IssuePage({ projectId, number }: { projectId: string; number: number }) {
   const { data, error, loading, refresh } = useIssue(projectId, number);
-  const tr = useT();
   const actions = useActions();
   const late = useLateArrival(`${projectId}#${number}`, data !== undefined);
   if (!data) {
@@ -44,27 +42,26 @@ export function IssuePage({ projectId, number }: { projectId: string; number: nu
       return (
         <Empty
           icon="alert"
-          title={tr('issues.page.cantRead', { n: number })}
+          title={`Couldn’t read #${number}`}
           detail={error}
           action={
             <EmptyActions>
-              <Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>
+              <Button onClick={refresh}>Try Again</Button>
               <Button variant="quiet" onClick={() => actions.run({ type: 'view', view: issueWayBack(projectId) })}>
-                {tr('issues.page.back')}
+                Back
               </Button>
             </EmptyActions>
           }
         />
       );
     }
-    return <Empty icon="issue" title={tr('issues.view.asking')} detail={tr('issues.page.forIssue', { n: number })} />;
+    return <Empty icon="issue" title="Asking GitHub…" detail={`For issue #${number}`} />;
   }
   return <Page projectId={projectId} repo={data.repo} issue={data.issue} loading={loading} refresh={refresh} late={late} />;
 }
 
 function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: string; repo: GitHubRepo; issue: GhIssueFull; loading: boolean; refresh: () => void; late: boolean }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const tr = useT();
   const actions = useActions();
   const back = (): void => actions.run({ type: 'view', view: issueWayBack(projectId) });
   const swipe = useSwipeBack(wrap, back);
@@ -78,15 +75,15 @@ function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: s
   const post: ActionItem[] = found
     ? [
         {
-          label: tr('issues.page.postFindings'),
+          label: 'Post the Findings on GitHub…',
           icon: 'send',
-          hint: tr('issues.page.postFindingsHint', { n: issue.number }),
+          hint: `As a comment from you on #${issue.number}`,
           onSelect: () =>
             openSheet({
               kind: 'confirm',
-              title: tr('issues.page.postFindingsTitle', { n: issue.number }),
-              message: tr('issues.page.postFindingsMessage', { found: found.length > 600 ? `${found.slice(0, 600)}…` : found }),
-              confirm: tr('issues.page.postComment'),
+              title: `Post the findings on #${issue.number}?`,
+              message: `What the agent found goes on GitHub as a comment from you, for everyone who can see the issue.\n\n${found.length > 600 ? `${found.slice(0, 600)}…` : found}`,
+              confirm: 'Post Comment',
               run: () => void a.comment(projectId, issue.number, `**Findings**\n\n${found}`).then((url) => url && refresh()),
             }),
         },
@@ -97,18 +94,18 @@ function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: s
       <SwipeBackEdge progress={swipe} />
       <div className={t.page}>
         <div className={t.pageMain}>
-          <nav className={t.crumbs} aria-label={tr('issues.page.where')}>
-            <IconButton icon="back" label={tr('issues.page.back')} keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
+          <nav className={t.crumbs} aria-label="Where this issue is">
+            <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
             <button type="button" className={t.crumb} onClick={() => a.openList(projectId)}>
-              {tr('issues.page.issues')}
+              Issues
             </button>
             <Icon name="chevronRight" size={10} />
             <span className={t.crumbPlain}>{project?.name ?? repoSlug(repo)}</span>
             <span className={t.grow} />
             <span className={t.pageKey}>#{issue.number}</span>
-            <IconButton icon="refresh" label={loading ? tr('issues.view.asking') : tr('issues.view.askAgain')} className={cx(loading && s.spinning)} onClick={refresh} />
+            <IconButton icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
             <ActionsDropdown items={[...post, ...menu(issue, stage, { open: false })]}>
-              <IconButton icon="more" label={tr('issues.page.more')} />
+              <IconButton icon="more" label="More" />
             </ActionsDropdown>
           </nav>
           <header className={t.pageHead}>
@@ -119,20 +116,20 @@ function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: s
                 {state.label}
               </span>
               <span>
-                {issue.author ? <strong>{issue.author}</strong> : tr('issues.page.someone')}{tr('issues.page.openedThis', { when: agoWords(issue.createdAt) })}
+                {issue.author ? <strong>{issue.author}</strong> : 'Someone'} opened this {agoWords(issue.createdAt)}
                 {issue.comments ? ` · ${comments(issue.comments)}` : ''}
               </span>
             </div>
             <NextStep projectId={projectId} issue={issue} stage={stage} />
           </header>
-          <section className={s.thread} aria-label={tr('issues.page.thread')}>
-            <Post author={issue.author} at={issue.createdAt} what={tr('issues.page.openedThisWhat')} body={issue.body} url={issue.url} />
+          <section className={s.thread} aria-label="The issue and its comments">
+            <Post author={issue.author} at={issue.createdAt} what="opened this" body={issue.body} url={issue.url} />
             {issue.thread.map((c, i) => (
-              <Post key={`${c.url}-${i}`} author={c.author} at={c.createdAt} what={tr('issues.page.commented')} body={c.body} url={c.url} />
+              <Post key={`${c.url}-${i}`} author={c.author} at={c.createdAt} what="commented" body={c.body} url={c.url} />
             ))}
             {issue.moreComments || issue.thread.length < issue.comments ? (
               <button type="button" className={s.moreComments} onClick={() => actions.openLink({ kind: 'url', url: issue.url })}>
-                {tr('issues.pulls.moreOnGitHub', { n: issue.comments - issue.thread.length })}
+                {issue.comments - issue.thread.length} more on GitHub
                 <Icon name="external" size={11} />
               </button>
             ) : null}
@@ -169,7 +166,6 @@ function useFindings(stage: IssueStage): string | undefined {
 /** What to do next, or how it's going: the one place on the page that changes as Claude works. */
 function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIssueFull; stage: IssueStage }) {
   const a = useIssueActions();
-  const tr = useT();
   const [fixing, setFixing] = useState(false);
   const fix = async (): Promise<void> => {
     setFixing(true);
@@ -188,24 +184,24 @@ function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIss
   const task = stage.task;
   const taskButton = (
     <Button size="small" icon="task" onClick={() => a.openTask(task.id)}>
-      {tr('issues.parts.openKey', { key: task.key })}
+      Open {task.key}
     </Button>
   );
   const chatButton = (primary: boolean) =>
     ws ? (
       <Button size="small" variant={primary ? 'primary' : 'plain'} icon="chat" onClick={() => a.openWorktree(ws.id)}>
-        {tr('issues.page.openConversation')}
+        Open the Conversation
       </Button>
     ) : null;
   const where = ws ? (
     <span className={t.nextInfo}>
-      {tr('issues.page.in')}<span className={t.mono}>{ws.name}</span>
+      in <span className={t.mono}>{ws.name}</span>
     </span>
   ) : null;
 
   if (stage.kind === 'investigating') {
     return (
-      <Status icon={<LiveDot />} title={tr('issues.page.investigatingTitle')} where={where} tone="claude" text={tr('issues.page.investigatingText', { key: task.key })}>
+      <Status icon={<LiveDot />} title="The agent is investigating" where={where} tone="claude" text={`Finding out why it happens and reproducing it. What it finds goes into ${task.key}’s brief; nothing is fixed yet.`}>
         <div className={s.statusActions}>
           {chatButton(true)}
           {taskButton}
@@ -216,14 +212,14 @@ function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIss
 
   if (stage.kind === 'investigated') {
     return (
-      <Status icon={<Icon name="search" size={13} />} title={tr('issues.page.investigatedTitle')} where={where} tone="info" text={found ? undefined : tr('issues.page.reportInConversation')}>
+      <Status icon={<Icon name="search" size={13} />} title="The agent investigated" where={where} tone="info" text={found ? undefined : 'Its report is in the conversation.'}>
         {found ? <Report text={found} /> : null}
         <div className={s.statusActions}>
           <Button variant="primary" size="small" icon="wrench" disabled={fixing} onClick={() => void fix()}>
-            {fixing ? tr('issues.taskBits.asking') : tr('issues.parts.fixIt')}
+            {fixing ? 'Asking the agent…' : 'Fix It'}
           </Button>
-          <Tip label={tr('issues.page.sameWorktree', { n })}>
-            <span className={s.statusHint}>{tr('issues.page.sameWorktree', { n })}</span>
+          <Tip label={`In the same worktree, with a pull request that closes #${n}`}>
+            <span className={s.statusHint}>In the same worktree, with a pull request that closes #{n}</span>
           </Tip>
           {chatButton(false)}
           {taskButton}
@@ -236,10 +232,10 @@ function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIss
     return (
       <Status
         icon={stage.working ? <LiveDot /> : <Icon name="wrench" size={13} />}
-        title={stage.working ? tr('issues.page.fixingTitle') : tr('issues.page.stoppedTitle')}
+        title={stage.working ? 'The agent is fixing it' : 'The agent stopped before a pull request'}
         where={where}
         tone="claude"
-        text={stage.working ? tr('issues.page.fixingText', { n }) : said ? undefined : tr('issues.page.stoppedText')}
+        text={stage.working ? `Its pull request closes #${n} when it merges.` : said ? undefined : 'See what it said in the conversation: it may need you, or it may not be a bug.'}
       >
         {said ? <Report text={said} /> : null}
         <div className={s.statusActions}>
@@ -253,11 +249,11 @@ function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIss
   if (stage.kind === 'review') {
     const pr = task.pr;
     return (
-      <Status icon={<StatusIcon status="in_review" size={13} />} title={pr ? tr('issues.page.prOpen') : tr('issues.page.inReview')} tone="info" text={tr('issues.page.reviewText', { n, key: task.key })}>
+      <Status icon={<StatusIcon status="in_review" size={13} />} title={pr ? 'Its pull request is open' : 'In review'} tone="info" text={`Merging it closes #${n} and finishes ${task.key}.`}>
         <div className={s.statusActions}>
           {pr ? (
             <Button variant="primary" size="small" icon="pr" onClick={() => a.openOnGitHub(pr.url)}>
-              {tr('issues.page.openPr', { n: pr.number })}
+              Open Pull Request #{pr.number}
             </Button>
           ) : null}
           {pr ? <PrChip pr={pr} /> : null}
@@ -269,7 +265,7 @@ function NextStep({ projectId, issue, stage }: { projectId: string; issue: GhIss
   }
 
   return (
-    <Status icon={<StatusIcon status={task.status} size={13} />} title={task.status === 'done' ? tr('issues.page.doneIn', { key: task.key }) : tr('issues.page.canceled', { key: task.key })} tone={task.status === 'done' ? 'ok' : 'muted'} text={task.status === 'done' ? (issue.state === 'open' ? tr('issues.page.doneText') : undefined) : tr('issues.page.canceledText')}>
+    <Status icon={<StatusIcon status={task.status} size={13} />} title={task.status === 'done' ? `Done in ${task.key}` : `${task.key} was canceled`} tone={task.status === 'done' ? 'ok' : 'muted'} text={task.status === 'done' ? (issue.state === 'open' ? 'Its pull request closes the issue on GitHub when it merges, or close it there.' : undefined) : 'Reopen it on its page to work on the issue again.'}>
       <div className={s.statusActions}>
         {task.pr ? <PrChip pr={task.pr} /> : null}
         <span className={t.grow} />
@@ -296,7 +292,6 @@ function Status({ icon, title, where, tone, text, children }: { icon: React.Reac
 
 /** What Claude said (its report, or the task's context), folded when it's long. */
 function Report({ text }: { text: string }) {
-  const tr = useT();
   const [open, setOpen] = useState(false);
   const long = text.length > 900 || text.split('\n').length > 16;
   return (
@@ -306,7 +301,7 @@ function Report({ text }: { text: string }) {
       </div>
       {long ? (
         <button type="button" className={s.findingsMore} onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? tr('issues.page.showLess') : tr('issues.page.showAll')}
+          {open ? 'Show Less' : 'Show All'}
         </button>
       ) : null}
     </>
@@ -316,23 +311,22 @@ function Report({ text }: { text: string }) {
 /** The issue's description or a comment: who, when, and what they wrote. */
 function Post({ author, at, what, body, url }: { author: string | undefined; at: number; what: string; body: string; url: string }) {
   const actions = useActions();
-  const tr = useT();
   return (
     <article className={s.post}>
       <header className={s.postHead}>
         <Avatar name={author ?? '?'} id={`gh:${author ?? ''}`} size={20} />
-        <strong>{author ?? tr('issues.page.someone')}</strong>
+        <strong>{author ?? 'Someone'}</strong>
         <span>
           {what} {agoWords(at)}
         </span>
         <span className={t.grow} />
-        <Tip label={tr('issues.parts.openOnGitHub')}>
-          <button type="button" className={s.postLink} aria-label={tr('issues.parts.openOnGitHub')} onClick={() => actions.openLink({ kind: 'url', url })}>
+        <Tip label="Open on GitHub">
+          <button type="button" className={s.postLink} aria-label="Open on GitHub" onClick={() => actions.openLink({ kind: 'url', url })}>
             <Icon name="external" size={11} />
           </button>
         </Tip>
       </header>
-      <div className={s.postBody}>{body.trim() ? <Markdown text={body} html /> : <p className={s.none}>{tr('issues.page.noDescription')}</p>}</div>
+      <div className={s.postBody}>{body.trim() ? <Markdown text={body} html /> : <p className={s.none}>No description.</p>}</div>
     </article>
   );
 }
@@ -340,47 +334,46 @@ function Post({ author, at, what, body, url }: { author: string | undefined; at:
 /** The right column: the issue's facts, and its task. */
 function Properties({ repo, issue, stage }: { repo: GitHubRepo; issue: GhIssueFull; stage: IssueStage }) {
   const a = useIssueActions();
-  const tr = useT();
   const task = stage.kind === 'new' ? undefined : stage.task;
   const state = stateOf(issue);
   return (
-    <aside className={t.props} aria-label={tr('issues.page.properties')}>
-      <Prop label={tr('issues.page.state')}>
+    <aside className={t.props} aria-label="Properties">
+      <Prop label="State">
         <span className={cx(t.propStatic, s.propState, s[`propState_${state.tone}`])}>
           <IssueStateIcon issue={issue} size={13} />
           {state.label}
         </span>
       </Prop>
-      <Prop label={tr('issues.page.task')}>
+      <Prop label="Task">
         {task ? (
           <button type="button" className={t.propValue} onClick={() => a.openTask(task.id)}>
             <StatusIcon status={task.status} />
             <span className={t.ellipsis}>{task.key}</span>
           </button>
         ) : (
-          <span className={t.propStatic}>{tr('issues.page.noneYet')}</span>
+          <span className={t.propStatic}>None yet</span>
         )}
       </Prop>
-      <Prop label={tr('issues.page.labels')}>
-        <div className={t.propLabels}>{issue.labels.length ? issue.labels.map((l) => <GhLabelChip key={l.name} label={l} />) : <span className={t.propStatic}>{tr('issues.page.none')}</span>}</div>
+      <Prop label="Labels">
+        <div className={t.propLabels}>{issue.labels.length ? issue.labels.map((l) => <GhLabelChip key={l.name} label={l} />) : <span className={t.propStatic}>None</span>}</div>
       </Prop>
-      <Prop label={tr('issues.page.assignees')}>
-        <span className={t.propStatic}>{issue.assignees.length ? issue.assignees.join(', ') : tr('issues.page.noOne')}</span>
+      <Prop label="Assignees">
+        <span className={t.propStatic}>{issue.assignees.length ? issue.assignees.join(', ') : 'No one'}</span>
       </Prop>
       <div className={t.propsRule} />
-      <Prop label={tr('issues.page.opened')} quiet>
+      <Prop label="Opened" quiet>
         <span className={t.propStatic}>{agoWords(issue.createdAt)}</span>
       </Prop>
-      <Prop label={tr('issues.page.updated')} quiet>
+      <Prop label="Updated" quiet>
         <span className={t.propStatic}>{agoWords(issue.updatedAt)}</span>
       </Prop>
       {issue.closedAt ? (
-        <Prop label={tr('issues.page.closed')} quiet>
+        <Prop label="Closed" quiet>
           <span className={t.propStatic}>{agoWords(issue.closedAt)}</span>
         </Prop>
       ) : null}
       <Prop label="GitHub" quiet>
-        <Tip label={tr('issues.taskBits.openNOnGitHub', { n: issue.number })}>
+        <Tip label={`Open #${issue.number} on GitHub`}>
           <button type="button" className={t.propValue} onClick={() => a.openOnGitHub(issue.url)}>
             <span className={cx(t.mono, t.ellipsis)}>
               {repoSlug(repo)}#{issue.number}

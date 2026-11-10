@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { useRef, useState } from 'react';
 import { ResizeHandle } from '../layout/panel/ResizeHandle.js';
 import { useApp } from '../lib/beluga.js';
@@ -19,7 +18,6 @@ export const useTerminalCapable = (wsId: string | undefined): boolean => useApp(
  */
 export function ConvoCenter({ wsId }: { readonly wsId: string }) {
   const prefs = usePrefs();
-  const t = useT();
   const capable = useTerminalCapable(wsId);
   const turnRunning = useApp((st) => activityOf(st.log, `ws:${wsId}`).running);
   const driving = useApp((st) => Boolean(st.agentTerms[wsId]));
@@ -46,7 +44,7 @@ export function ConvoCenter({ wsId }: { readonly wsId: string }) {
       </div>
       <ResizeHandle
         axis="x"
-        label={t('agentTerm.resizeChat')}
+        label="Resize the chat beside the terminal"
         className={s.bothEdge}
         onMove={(x) => {
           const r = box.current?.getBoundingClientRect();

@@ -1,4 +1,3 @@
-import { shownRuntimes } from '../lib/prefs-words.js';
 import { useCallback, useMemo } from 'react';
 import type { AgentRef } from '@beluga/protocol.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
@@ -6,7 +5,6 @@ import { runtimeMark } from '@beluga/shared/agent-marks.js';
 import { agentName } from '@beluga/shared/agent-label.js';
 import { useApp } from '../lib/beluga.js';
 import { useMyAgent } from '../lib/agent-words.js';
-import { t as tNow, useT } from '../i18n/index.js';
 import type { SelectEntry, SelectOption } from './select-parts.js';
 import type { ActionItem } from './SpecMenu.js';
 
@@ -23,12 +21,10 @@ export function useAgentEntries(): SelectEntry<string>[] {
   const runtimes = useApp((s) => s.runtimes);
   const models = useApp((s) => s.models);
   const mine = useMyAgent();
-  const t = useT();
   return useMemo(() => {
-    // Names in the language shown (picking still goes through the engine's own runtimes: agentForChoice).
-    const options = agentChoices(shownRuntimes(runtimes), models);
+    const options = agentChoices(runtimes, models);
     const groups = [...new Set(options.map((o) => o.group))];
-    const yours: SelectOption<string> = { value: YOUR_AGENT, label: t('chat.agentOptions.yourAgent', { agent: agentName(mine) }), icon: runtimeMark(mine.runtime), description: t('chat.agentOptions.yourAgentDetail') };
+    const yours: SelectOption<string> = { value: YOUR_AGENT, label: `Your agent (${agentName(mine)})`, icon: runtimeMark(mine.runtime), description: 'Whatever your default agent is when the work starts' };
     return [
       yours,
       ...groups.map((group) => ({
@@ -38,7 +34,7 @@ export function useAgentEntries(): SelectEntry<string>[] {
           .map((o): SelectOption<string> => ({ value: o.value, label: o.label, icon: o.mark, ...(o.disabled ? { disabled: true } : {}), ...(o.why ? { description: o.why } : {}) })),
       })),
     ];
-  }, [runtimes, models, mine, t]);
+  }, [runtimes, models, mine]);
 }
 
 /**
@@ -68,11 +64,9 @@ export function agentMenuItems(entries: readonly SelectEntry<string>[], current:
 export function useStartWith(): (current: AgentRef | undefined, pick: (agent: AgentRef | undefined) => void, verb?: string) => ActionItem[] {
   const entries = useAgentEntries();
   const runtimes = useApp((s) => s.runtimes);
-  const mine = useMyAgent();
   return useCallback(
-    (current, pick, verb = tNow('chat.agentOptions.startWith')) =>
-      // The first row is always your agent (useAgentEntries puts it first).
-      agentMenuItems(entries, current, (v) => pick(v === YOUR_AGENT ? undefined : agentForChoice(v, runtimes))).map((it, i) => (verb ? { ...it, label: tNow('chat.agentOptions.verbAgent', { verb, agent: i === 0 ? tNow('chat.agentOptions.yourAgentLower', { agent: agentName(mine) }) : it.label }) } : it)),
-    [entries, runtimes, mine],
+    (current, pick, verb = 'Start with') =>
+      agentMenuItems(entries, current, (v) => pick(v === YOUR_AGENT ? undefined : agentForChoice(v, runtimes))).map((it) => (verb ? { ...it, label: `${verb} ${it.label.startsWith('Your agent') ? `y${it.label.slice(1)}` : it.label}` } : it)),
+    [entries, runtimes],
   );
 }

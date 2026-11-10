@@ -6,7 +6,6 @@ import type { MenuKind } from '@beluga/ui/menus.js';
 import { onWindowActive, windowActive } from './window-active.js';
 import { SAVING_DRAW_MS, powerSaving } from './power.js';
 import type { SettingsPane } from './settings-search.js';
-import { t } from '../i18n/index.js';
 import { WINDOW_UI_KEYS, scopedKey, splitUiPatch } from '../machines/pane-model.js';
 
 /**
@@ -47,7 +46,7 @@ export interface Recipient {
 export const recipientPrefix = (to: Recipient): string => (to.claude ? (to.self ? '@claude ' : `@claude:${to.name} `) : `@${to.name} `);
 
 /** "bob's Claude", "your Claude", "bob". */
-export const recipientLabel = (to: Recipient): string => (to.claude ? (to.self ? t('common.beluga.yourAgent') : t('common.beluga.theirAgent', { name: to.name })) : to.name);
+export const recipientLabel = (to: Recipient): string => (to.claude ? (to.self ? 'your agent' : `${to.name}’s agent`) : to.name);
 
 export type { SettingsPane };
 

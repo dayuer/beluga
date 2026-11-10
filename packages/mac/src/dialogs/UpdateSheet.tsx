@@ -11,7 +11,6 @@ import { openExternal } from '../lib/system.js';
 import { idleLine, lastCheckedLabel, shortVersion } from '../lib/update-model.js';
 import { checkForUpdates, closeUpdateSheet, dismissNews, restartNow, setUpdateMode, startUpdates, updateLater, updateWhenIdle, useUpdates } from '../lib/updates.js';
 import s from '../components/update.module.css';
-import { useT } from '../i18n/index.js';
 
 /** Links in release notes open in the browser, never in the window. */
 const NOTE_PARTS: Components = {
@@ -29,10 +28,9 @@ const NOTE_PARTS: Components = {
 };
 
 function Notes({ text }: { text: string | null | undefined }) {
-  const t = useT();
   if (!text?.trim()) return null;
   return (
-    <div className={cx(s.notes, 'selectable')} aria-label={t('dialogs.update.whatsNew')}>
+    <div className={cx(s.notes, 'selectable')} aria-label="What’s new">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={NOTE_PARTS}>
         {text}
       </ReactMarkdown>
@@ -41,7 +39,6 @@ function Notes({ text }: { text: string | null | undefined }) {
 }
 
 function Head({ icon, title, sub }: { icon: IconName; title: string; sub?: string }) {
-  const t = useT();
   return (
     <div className={s.head}>
       <span className={s.mark}>
@@ -51,7 +48,7 @@ function Head({ icon, title, sub }: { icon: IconName; title: string; sub?: strin
         <Dialog.Title className={s.title}>{title}</Dialog.Title>
         {sub ? <div className={s.sub}>{sub}</div> : null}
       </div>
-      <Dialog.Close className={s.close} aria-label={t('dialogs.update.close')}>
+      <Dialog.Close className={s.close} aria-label="Close">
         <Icon name="x" size={12} />
       </Dialog.Close>
     </div>
@@ -59,8 +56,8 @@ function Head({ icon, title, sub }: { icon: IconName; title: string; sub?: strin
 }
 
 const day = (date: string | null | undefined): string | undefined => {
-  const ms = date ? Date.parse(date) : NaN;
-  return Number.isFinite(ms) ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : undefined;
+  const t = date ? Date.parse(date) : NaN;
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : undefined;
 };
 
 type Behind = { readonly id: string; readonly name: string; readonly version?: string };
@@ -70,7 +67,6 @@ type Behind = { readonly id: string; readonly name: string; readonly version?: s
  * new version's. Each gets Update … First (it updates once nothing runs there).
  */
 function LeftBehind({ ipc }: { ipc: number | null | undefined }) {
-  const t = useT();
   const beluga = useMaybeBeluga();
   const [behind, setBehind] = useState<readonly Behind[]>([]);
   const [said, setSaid] = useState<Record<string, string>>({});
@@ -95,10 +91,10 @@ function LeftBehind({ ipc }: { ipc: number | null | undefined }) {
     <div className={cx(s.line, s.warn)} data-left-behind>
       {behind.map((m) => (
         <p key={m.id}>
-          {said[m.id] ?? t('dialogs.update.leftBehind', { name: m.name, version: m.version ?? '' })}{' '}
+          {said[m.id] ?? `${m.name} runs an older Beluga${m.version ? ` (${m.version})` : ''}: after this update your app can't work there until it's updated too.`}{' '}
           {said[m.id] ? null : (
             <Button size="small" onClick={() => update(m)}>
-              {t('dialogs.update.updateFirst', { name: m.name })}
+              Update {m.name} First
             </Button>
           )}
         </p>
@@ -109,37 +105,38 @@ function LeftBehind({ ipc }: { ipc: number | null | undefined }) {
 
 /** A downloaded update: what's in it, and when it goes in. */
 function Ready() {
-  const t = useT();
   const { state, claude } = useUpdates();
   const available = state.available!;
   const installing = state.phase === 'installing';
   const released = day(available.date);
   return (
     <>
-      <Head icon="download" title={t('dialogs.update.readyTitle', { version: shortVersion(available.version) })} sub={`${t('dialogs.update.youHave', { current: state.current })}${released ? t('dialogs.update.released', { date: released }) : ''}`} />
+      <Head icon="download" title={`Beluga ${shortVersion(available.version)} is ready`} sub={`You have ${state.current}${released ? ` · released ${released}` : ''}`} />
       <Notes text={available.notes} />
       {!installing ? <LeftBehind ipc={available.ipc} /> : null}
       {claude > 0 && !installing ? (
-        <p className={cx(s.line, s.warn)}>{t('dialogs.update.working', { n: claude })}</p>
+        <p className={cx(s.line, s.warn)}>
+          Your agent is working ({claude} {claude === 1 ? 'run' : 'runs'}). Restart Now stops it; Update When Idle waits until it’s done.
+        </p>
       ) : null}
       {state.choice === 'idle' && !installing ? <p className={s.line}>{idleLine(state.waitingOn)}</p> : null}
       {state.error ? <p className={cx(s.line, s.error)}>{state.error}</p> : null}
       {state.mode !== 'off' && !installing ? (
         <label className={s.always}>
           <input type="checkbox" checked={state.mode === 'idle'} onChange={(e) => void setUpdateMode(e.target.checked ? 'idle' : 'ask')} />
-          {t('dialogs.update.auto')}
+          Update automatically from now on
         </label>
       ) : null}
       <div className={s.foot}>
-        <Button variant="quiet" onClick={() => void updateLater()} disabled={installing} title={t('dialogs.update.laterTip')}>
-          {t('dialogs.update.later')}
+        <Button variant="quiet" onClick={() => void updateLater()} disabled={installing} title="Installs the next time you quit Beluga">
+          Later
         </Button>
         <span className={s.spacer} />
-        <Button onClick={() => void updateWhenIdle()} disabled={installing} title={t('dialogs.update.idleTip')}>
-          {t('dialogs.update.idle')}
+        <Button onClick={() => void updateWhenIdle()} disabled={installing} title="Installs once you step away and nothing is running, then reopens in the background">
+          Update When Idle
         </Button>
         <Button variant="primary" onClick={() => void restartNow()} disabled={installing}>
-          {installing ? t('dialogs.update.restarting') : t('dialogs.update.restart')}
+          {installing ? 'Restarting…' : 'Restart Now'}
         </Button>
       </div>
     </>
@@ -148,16 +145,15 @@ function Ready() {
 
 /** After an update installed: what changed. */
 function News() {
-  const t = useT();
   const { state } = useUpdates();
   const news = state.news!;
   return (
     <>
-      <Head icon="check" title={t('dialogs.update.nowTitle', { version: shortVersion(news.version) })} sub={t('dialogs.update.whileAway')} />
+      <Head icon="check" title={`Beluga is now ${shortVersion(news.version)}`} sub="Updated while you were away." />
       <Notes text={news.notes} />
       <div className={s.foot}>
         <Button variant="primary" onClick={() => void dismissNews()}>
-          {t('dialogs.update.ok')}
+          OK
         </Button>
       </div>
     </>
@@ -166,29 +162,28 @@ function News() {
 
 /** Looking, downloading, up to date, or couldn't. */
 function Status() {
-  const t = useT();
   const { state } = useUpdates();
   const busy = state.phase === 'checking' || state.phase === 'downloading';
   const head: Record<string, [IconName, string]> = {
-    checking: ['refresh', t('dialogs.update.checking')],
-    downloading: ['download', t('dialogs.update.downloading')],
-    error: ['alert', t('dialogs.update.error')],
+    checking: ['refresh', 'Checking for updates…'],
+    downloading: ['download', 'Downloading the update…'],
+    error: ['alert', 'Couldn’t check for updates'],
   };
-  const [icon, title] = head[state.phase] ?? ['check', t('dialogs.update.upToDate')];
+  const [icon, title] = head[state.phase] ?? ['check', 'Beluga is up to date'];
   return (
     <>
-      <Head icon={icon} title={title} sub={t('dialogs.update.lastChecked', { current: state.current, when: lastCheckedLabel(state.lastCheck).toLowerCase() })} />
+      <Head icon={icon} title={title} sub={`Beluga ${state.current} · last checked ${lastCheckedLabel(state.lastCheck).toLowerCase()}`} />
       {state.phase === 'downloading' ? (
         <div className={s.bar} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((state.progress ?? 0) * 100)}>
           <div className={s.barFill} style={{ width: `${Math.round((state.progress ?? 0) * 100)}%` }} />
         </div>
       ) : null}
-      {state.phase === 'downloading' ? <p className={s.line}>{t('dialogs.update.background')}</p> : null}
+      {state.phase === 'downloading' ? <p className={s.line}>It downloads in the background; you can close this.</p> : null}
       {state.phase === 'error' && state.error ? <p className={cx(s.line, s.error)}>{state.error}</p> : null}
       <div className={s.foot}>
-        {state.phase === 'error' ? <Button onClick={() => void checkForUpdates()}>{t('dialogs.update.tryAgain')}</Button> : null}
+        {state.phase === 'error' ? <Button onClick={() => void checkForUpdates()}>Try Again</Button> : null}
         <Button variant="primary" onClick={closeUpdateSheet}>
-          {busy ? t('dialogs.update.hide') : t('dialogs.update.ok')}
+          {busy ? 'Hide' : 'OK'}
         </Button>
       </div>
     </>

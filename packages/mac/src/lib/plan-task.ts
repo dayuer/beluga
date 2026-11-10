@@ -5,7 +5,6 @@ import { planOwnerOf } from '../../../../src/core/plans/owner.js';
 import type { UiAction } from '../../../../src/ui/workspace-models.js';
 import { confirmMerge } from './plan-merge.js';
 import { openSheet } from './sheets.js';
-import { t } from '../i18n/index.js';
 
 /** A plan's task worktree: open its task or its plan, or merge it by hand after a warning. */
 export type PlanAction = 'open_task' | 'open_plan' | 'merge_anyway';
@@ -24,9 +23,9 @@ export function runPlanAction(state: AppState, wsId: string, action: PlanAction,
   const name = planTitle(owner.plan);
   openSheet({
     kind: 'confirm',
-    title: t('common.planTask.title', { key: owner.issue.key }),
-    message: t('common.planTask.message', { name, milestone: owner.milestone.title }),
-    confirm: t('common.planTask.confirm'),
+    title: `Merge ${owner.issue.key} by hand?`,
+    message: `It’s part of “${name}”: when “${owner.milestone.title}” passes, Beluga merges it into the plan’s branch, and the plan opens one PR at the end. Merging it yourself skips the plan’s checks.`,
+    confirm: 'Merge Anyway',
     run: () => {
       confirmMerge(wsId);
       run({ type: 'ws', id: wsId, action: merge });

@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { Icon } from '../components/Icon.js';
 import { Button } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
@@ -14,14 +13,13 @@ import s from './agent-term.module.css';
 export function TurnWaitBanner({ wsId }: { readonly wsId: string }) {
   const { client, ui } = useBeluga();
   const actions = useActions();
-  const t = useT();
-  const label = useApp((st) => st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? t('call.yourAgent'));
+  const label = useApp((st) => st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? 'Your agent');
   return (
     <div className={s.waiting} role="status" data-turn-wait="">
       <Icon name="terminal" size={14} />
-      <span className={s.drivingText}>{t('agentTerm.turnWait', { name: label })}</span>
+      <span className={s.drivingText}>{label} is on a turn in the chat. Its terminal opens here when the turn ends.</span>
       <Button size="small" icon="stop" onClick={() => stopClaude({ client, ui, actions }, `ws:${wsId}`)}>
-        {t('agentTerm.stopOpen')}
+        Stop and Open
       </Button>
     </div>
   );

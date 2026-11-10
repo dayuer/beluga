@@ -10,7 +10,6 @@ import { type Size, fittedHeight, inlineHeight } from './graph-model.js';
 import { cachedLayout } from './layout-cache.js';
 import { GraphGlyph } from './marks.js';
 import g from './graph.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * A ```beluga-graph block wherever Markdown is drawn (answers, reports, documents): a card with
@@ -23,21 +22,20 @@ const FlowGraph = lazy(() => import('./FlowGraph.js'));
 
 export const GraphBlock = memo(function GraphBlock({ code, live = false, localImages = false, shapeKey }: { code: string; live?: boolean; localImages?: boolean; /** See FlowGraph: the graph changes in place while this stays the same. */ shapeKey?: string }) {
   const parsed = useMemo(() => parseGraph(code), [code]);
-  const t = useT();
   if (!parsed.ok) {
     if (parsed.incomplete && live) {
       return (
-        <figure className={g.block} data-state="drawing" aria-label={t('common.graph.graph')}>
+        <figure className={g.block} data-state="drawing" aria-label="Graph">
           <div className={g.drawing}>
             <GraphGlyph size={14} />
-            {t('common.graph.drawing')}
+            Drawing a graph…
           </div>
         </figure>
       );
     }
     return (
       <figure className={g.blockError} data-state="error">
-        <figcaption>{t('common.graph.cantDraw', { error: parsed.error })}</figcaption>
+        <figcaption>Can’t draw this graph: {parsed.error}</figcaption>
         <CodeLines text={code} lang="json" />
       </figure>
     );
@@ -64,37 +62,36 @@ function useWidth(): [React.RefObject<HTMLElement | null>, number] {
 
 function GraphCard({ graph, code, warnings, localImages, shapeKey }: { graph: Graph; code: string; warnings: readonly string[]; localImages: boolean; shapeKey?: string }) {
   const { client } = useBeluga();
-  const t = useT();
   const [full, setFull] = useState(false);
   const [ref, width] = useWidth();
   const [laid, setLaid] = useState<Size | undefined>(() => cachedLayout(shapeKey ?? code, 'inline')?.bounds);
   const height = laid ? fittedHeight(laid, width) : inlineHeight(graph, width);
   const parts = graph.nodes.filter((n) => n.type !== 'group').length;
-  const copy = (): void => void copyText(JSON.stringify(JSON.parse(code), null, 2)).then(() => toast(client, t('common.graph.copied'), 'success'));
+  const copy = (): void => void copyText(JSON.stringify(JSON.parse(code), null, 2)).then(() => toast(client, 'Copied the graph as JSON', 'success'));
   const items: ActionItem[] = [
-    { label: t('common.viewBlock.fullWindow'), icon: 'expand', onSelect: () => setFull(true) },
-    { label: t('common.viewBlock.copyJson'), icon: 'copy', onSelect: copy },
+    { label: 'Open in Full Window', icon: 'expand', onSelect: () => setFull(true) },
+    { label: 'Copy as JSON', icon: 'copy', onSelect: copy },
   ];
-  const meta = [t('common.graph.parts', { n: parts }), graph.steps.length ? t('common.graph.steps', { n: graph.steps.length }) : ''].filter(Boolean).join(' · ');
+  const meta = [`${parts} ${parts === 1 ? 'part' : 'parts'}`, graph.steps.length ? `${graph.steps.length} ${graph.steps.length === 1 ? 'step' : 'steps'}` : ''].filter(Boolean).join(' · ');
   return (
     <>
       <ActionsContext items={items}>
-      <figure ref={ref} className={g.block} data-state="ready" aria-label={graph.title ? t('common.graph.titled', { title: graph.title }) : t('common.graph.graph')}>
+      <figure ref={ref} className={g.block} data-state="ready" aria-label={graph.title ? `Graph: ${graph.title}` : 'Graph'}>
         <figcaption className={g.blockHead}>
           <span className={g.blockGlyph} aria-hidden="true">
             <GraphGlyph size={13} />
           </span>
-          <span className={g.blockTitles} title={graph.summary ? `${graph.title ?? t('common.graph.graph')}\n${graph.summary}` : undefined}>
-            <span className={g.blockTitle}>{graph.title ?? t('common.graph.graph')}</span>
+          <span className={g.blockTitles} title={graph.summary ? `${graph.title ?? 'Graph'}\n${graph.summary}` : undefined}>
+            <span className={g.blockTitle}>{graph.title ?? 'Graph'}</span>
             {graph.summary ? <span className={g.blockSummary}>{graph.summary}</span> : null}
           </span>
           <span className={g.blockMeta} title={warnings.length ? warnings.join('\n') : undefined}>
             {meta}
-            {warnings.length ? ` · ${t('common.viewBlock.leftOut', { n: warnings.length })}` : ''}
+            {warnings.length ? ` · ${warnings.length} left out` : ''}
           </span>
         </figcaption>
         <div className={g.inlineFrame} style={{ height }}>
-          <Suspense fallback={<div className={g.overlayNote}>{t('common.graph.layingOut')}</div>}>
+          <Suspense fallback={<div className={g.overlayNote}>Laying out…</div>}>
             <FlowGraph graph={graph} mode="inline" localImages={localImages} onExpand={() => setFull(true)} onCopy={copy} onLaidOut={setLaid} cacheKey={shapeKey ?? code} {...(shapeKey ? { shapeKey } : {})} />
           </Suspense>
         </div>
@@ -107,7 +104,6 @@ function GraphCard({ graph, code, warnings, localImages, shapeKey }: { graph: Gr
 
 /** The graph in the whole window: a minimap, zoom buttons and room for its details. Esc closes. */
 function FullWindow({ graph, code, localImages, onClose, onCopy, shapeKey }: { graph: Graph; code: string; localImages: boolean; onClose: () => void; onCopy: () => void; shapeKey?: string }) {
-  const t = useT();
   return (
     <Dialog.Root open onOpenChange={(open) => (open ? undefined : onClose())}>
       <Dialog.Portal>
@@ -117,15 +113,15 @@ function FullWindow({ graph, code, localImages, onClose, onCopy, shapeKey }: { g
             <span className={g.blockIcon} aria-hidden="true">
               <GraphGlyph size={14} />
             </span>
-            <Dialog.Title className={g.fullTitle}>{graph.title ?? t('common.graph.graph')}</Dialog.Title>
+            <Dialog.Title className={g.fullTitle}>{graph.title ?? 'Graph'}</Dialog.Title>
             {graph.summary ? <span className={g.blockSummary}>{graph.summary}</span> : null}
             <span className={g.grow} />
             <Dialog.Close asChild>
-              <IconButton icon="x" label={t('common.ui.close')} keys="esc" />
+              <IconButton icon="x" label="Close" keys="esc" />
             </Dialog.Close>
           </header>
           <div className={g.fullFrame}>
-            <Suspense fallback={<div className={g.overlayNote}>{t('common.graph.layingOut')}</div>}>
+            <Suspense fallback={<div className={g.overlayNote}>Laying out…</div>}>
               <FlowGraph graph={graph} mode="full" localImages={localImages} onCopy={onCopy} cacheKey={code} {...(shapeKey ? { shapeKey } : {})} />
             </Suspense>
           </div>

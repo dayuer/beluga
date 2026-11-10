@@ -11,10 +11,10 @@ import { type Box, MAX_DROPPED, dropHits, droppedFiles, sameBox } from './drop-m
 import { imageLinksIn } from '@beluga/shared/attachment-links.js';
 import { type RefKey, boxRef, plainRefs, refKey, referencedImages, withoutRef } from './image-refs.js';
 import { keepPreview, openLightbox, pendingImage, previewOf } from './images.js';
+import { plainWorktrees, toBox, worktreeNamesOf } from './worktree-box.js';
 import { type ImageInText, type PathInfo, insertText, usePastePaths } from './paste-paths.js';
 import s from './composer.module.css';
 import img from './images.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * What goes with a message besides its words, the same in every message box (a conversation's
@@ -111,7 +111,6 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
   // What waits in the box is kept per computer too (BLG-784): `channel` stays what the computer calls it.
   const memo = useScopedKey(channel);
   const { client } = useBeluga();
-  const t = useT();
   const api = useApi();
   const selfId = client.store.getState().selfId;
   const [images, setImagesState] = useState<readonly number[]>(() => waitingImages.get(memo) ?? []);
@@ -175,7 +174,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         if (added.file) imageFiles.set(added.n, added.file);
         keepPreview(added.n, file);
       } catch (err) {
-        toast(client, t('chat.attach.addFailed', { name: file.name || t('chat.attach.theImage'), error: errorText(err) }), 'error');
+        toast(client, `Couldn't add ${file.name || 'the image'}: ${errorText(err)}`, 'error');
         continue;
       }
       addWaiting(added.n);
@@ -194,7 +193,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
       addWaiting(added.n);
       return added.n;
     } catch (err) {
-      toast(client, t('chat.attach.addFailed', { name: f.name, error: errorText(err) }), 'error');
+      toast(client, `Couldn't add ${f.name}: ${errorText(err)}`, 'error');
       return undefined;
     }
   };
@@ -216,7 +215,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
    */
   const uploadOthers = async (picked: readonly File[]): Promise<void> => {
     const { uploadFiles } = await import('../lib/web-files.js');
-    const sent = await uploadFiles(picked.slice(0, MAX_DROPPED), (file, err) => toast(client, t('chat.attach.uploadFailed', { name: file.name, error: errorText(err) }), 'error'));
+    const sent = await uploadFiles(picked.slice(0, MAX_DROPPED), (file, err) => toast(client, `Couldn't upload ${file.name}: ${errorText(err)}`, 'error'));
     if (sent.length) await addPaths(sent.map((u) => ({ path: u.path, name: u.name, kind: 'file' as const, size: u.size, image: false })));
     box.current?.focus();
   };
@@ -230,33 +229,33 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
     try {
       infos = await home.call('local.statFiles', paths.slice(0, MAX_DROPPED));
     } catch (err) {
-      return toast(client, t('chat.attach.dropFailed', { error: errorText(err) }), 'error');
+      return toast(client, `Couldn't add what you dropped: ${errorText(err)}`, 'error');
     }
     const { files: picked, skipped } = droppedFiles(infos);
-    if (skipped) toast(client, picked.length ? t('chat.attach.skipped', { n: skipped }) : t('chat.attach.onlyFiles'), 'warn');
+    if (skipped) toast(client, picked.length ? `Only files go with a message: ${skipped} left out` : 'Only files go with a message (not folders)', 'warn');
     if (!picked.length) return;
     // The env send's rules (BLG-854): keys and credential folders stay here; an env file asks first.
     let checks: readonly DropVerdict[];
     try {
       checks = await home.call('machines.upload.check', picked.map((f) => f.path));
     } catch (err) {
-      return toast(client, t('chat.attach.dropFailed', { error: errorText(err) }), 'error');
+      return toast(client, `Couldn't add what you dropped: ${errorText(err)}`, 'error');
     }
     const plan = planDrop(picked, checks);
-    for (const r of plan.refused) toast(client, t('chat.attach.staysHere', { name: r.name, reason: r.reason }), 'warn');
+    for (const r of plan.refused) toast(client, `${r.name} stays on this Mac: ${r.reason}`, 'warn');
     const go = async (files: readonly PathInfo[], env: boolean): Promise<void> => {
       const arrived = await sendFiles(
         (machine, n, file, off) => home.call('machines.upload.send', machine, n, file, off, env ? { env: true } : undefined),
         there,
         files,
         setSending,
-        (f, err) => toast(client, t('chat.attach.sendFailed', { name: f.name, error: errorText(err) }), 'error'),
+        (f, err) => toast(client, `Couldn't send ${f.name}: ${errorText(err)}`, 'error'),
       );
       if (arrived.length) await addPaths(arrived);
       box.current?.focus();
     };
     if (plan.send.length) await go(plan.send, false);
-    if (plan.ask.length) openSheet(envAsk(plan.ask, currentMachines().find((m) => m.id === there)?.name ?? t('chat.attach.thatComputer'), () => void go(plan.ask, true)));
+    if (plan.ask.length) openSheet(envAsk(plan.ask, currentMachines().find((m) => m.id === there)?.name ?? 'that computer', () => void go(plan.ask, true)));
   };
 
   /** Paths dropped from Finder: the files among them go as a paste of their paths would. */
@@ -266,10 +265,10 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
     try {
       infos = await api.local.statFiles(paths.slice(0, MAX_DROPPED));
     } catch (err) {
-      return toast(client, t('chat.attach.dropFailed', { error: errorText(err) }), 'error');
+      return toast(client, `Couldn't add what you dropped: ${errorText(err)}`, 'error');
     }
     const { files: picked, skipped } = droppedFiles(infos);
-    if (skipped) toast(client, picked.length ? t('chat.attach.skipped', { n: skipped }) : t('chat.attach.onlyFiles'), 'warn');
+    if (skipped) toast(client, picked.length ? `Only files go with a message: ${skipped} left out` : 'Only files go with a message (not folders)', 'warn');
     if (!picked.length) return;
     await addPaths(picked);
     box.current?.focus();
@@ -395,10 +394,13 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         out += sent.slice(link.start, link.end);
       }
     }
-    return out + sent.slice(at);
+    // Worktrees' links back short, as they were typed.
+    return toBox(out + sent.slice(at), worktreeNamesOf(client.store.getState().projects));
   };
 
-  const take = (typed: string): { text: string; images: readonly number[]; shown: readonly number[]; putBack: () => void } => {
+  const take = (boxed: string): { text: string; images: readonly number[]; shown: readonly number[]; putBack: () => void } => {
+    // Worktrees' links written short in the box go out whole ("worktree:wt-…").
+    const typed = plainWorktrees(boxed, worktreeNamesOf(client.store.getState().projects));
     if (typed.startsWith('/')) return { text: typed, images: [], shown: [], putBack: () => undefined };
     const pictures = pendingImages;
     const placed = referencedImages(typed);
@@ -424,14 +426,14 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
   const waiting = (
     <>
       {pendingImages.length ? (
-        <div className={img.pending} role="group" aria-label={t('chat.attach.images')}>
+        <div className={img.pending} role="group" aria-label="Images to send">
           {pendingImages.map((n) => (
             <div key={n} className={img.pendingItem}>
-              <button type="button" className={img.pendingOpen} aria-label={t('chat.attach.openImage', { name: shownOf(n) })} onClick={() => openImages(n)}>
-                <img src={previewOf(n)} alt={t('more.chat.imageN', { n: shownOf(n) })} draggable={false} />
+              <button type="button" className={img.pendingOpen} aria-label={`Open image ${shownOf(n)}`} onClick={() => openImages(n)}>
+                <img src={previewOf(n)} alt={`image ${shownOf(n)}`} draggable={false} />
               </button>
               <span className={img.pendingLabel}>{shownOf(n)}</span>
-              <button type="button" className={img.pendingRemove} aria-label={t('chat.attach.removeImage', { name: shownOf(n) })} onClick={() => removeImage(n)}>
+              <button type="button" className={img.pendingRemove} aria-label={`Remove image ${shownOf(n)}`} onClick={() => removeImage(n)}>
                 <Icon name="x" size={9} />
               </button>
             </div>
@@ -439,8 +441,8 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         </div>
       ) : null}
       {sending ? (
-        <div className={s.fileChips} role="status" aria-label={t('chat.attach.sending', { name: sending.name })}>
-          <span className={cx(s.fileChip, s.fileSending)} title={t('chat.attach.sendingTo', { name: sending.name })}>
+        <div className={s.fileChips} role="status" aria-label={`Sending ${sending.name}`}>
+          <span className={cx(s.fileChip, s.fileSending)} title={`Sending ${sending.name} to the computer this chat runs on`}>
             <Icon name="up" size={11} />
             <span className={s.fileName}>{sending.name}</span>
             <span className={s.fileProgress}>{sentShare(sending)}</span>
@@ -448,12 +450,12 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         </div>
       ) : null}
       {files.length ? (
-        <div className={s.fileChips} role="list" aria-label={t('chat.attach.files')}>
+        <div className={s.fileChips} role="list" aria-label="Files to send">
           {files.map((f) => (
             <span key={f.path} role="listitem" className={s.fileChip} title={f.path}>
               <Icon name="file" size={11} />
               <span className={s.fileName}>{f.name}</span>
-              <button type="button" aria-label={t('chat.attach.remove', { name: f.name })} onClick={() => setFiles(files.filter((x) => x.path !== f.path))}>
+              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((x) => x.path !== f.path))}>
                 <Icon name="x" size={9} />
               </button>
             </span>
@@ -468,7 +470,7 @@ export function useAttachments({ channel, box, text, setText }: { channel: strin
         <div className={s.dropTarget} style={{ left: dragOver.left, top: dragOver.top, width: dragOver.right - dragOver.left, height: dragOver.bottom - dragOver.top }} aria-hidden>
           <div className={s.dropTargetLabel}>
             <Icon name="image" size={16} />
-            {t('chat.attach.drop')}
+            Drop to attach
           </div>
         </div>,
         document.body,

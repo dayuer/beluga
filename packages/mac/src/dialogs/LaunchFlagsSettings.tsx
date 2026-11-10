@@ -6,11 +6,10 @@ import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
 import t from './terminal-settings.module.css';
-import { type Key, useT } from '../i18n/index.js';
 
-const FLAGS: ReadonlyArray<{ readonly runtime: ArgsRuntime; readonly field: 'claudeArgs' | 'codexArgs'; readonly label: string; readonly example: string; readonly detail: Key }> = [
-  { runtime: 'claude', field: 'claudeArgs', label: 'Claude Code', example: '--dangerously-skip-permissions', detail: 'settings.flags.claudeDetail' },
-  { runtime: 'codex', field: 'codexArgs', label: 'Codex', example: '-c key=value', detail: 'settings.flags.codexDetail' },
+const FLAGS: ReadonlyArray<{ readonly runtime: ArgsRuntime; readonly field: 'claudeArgs' | 'codexArgs'; readonly label: string; readonly example: string; readonly detail: string }> = [
+  { runtime: 'claude', field: 'claudeArgs', label: 'Claude Code', example: '--dangerously-skip-permissions', detail: 'In the chat and in its terminal.' },
+  { runtime: 'codex', field: 'codexArgs', label: 'Codex', example: '-c key=value', detail: 'Before app-server. Beluga still sets each turn’s sandbox.' },
 ];
 
 /**
@@ -19,9 +18,8 @@ const FLAGS: ReadonlyArray<{ readonly runtime: ArgsRuntime; readonly field: 'cla
  * trust) still come first.
  */
 export function LaunchFlagsSettings() {
-  const tr = useT();
   return (
-    <Group title={tr('settings.flags.title')}>
+    <Group title="Launch flags">
       {FLAGS.map((f) => (
         <FlagsRow key={f.runtime} {...f} />
       ))}
@@ -32,7 +30,6 @@ export function LaunchFlagsSettings() {
 function FlagsRow({ runtime, field, label, example, detail }: (typeof FLAGS)[number]) {
   const api = useApi();
   const saved = useApp((st) => st.prefs[field]);
-  const tr = useT();
   const [text, setText] = useState(joinArgs(saved));
   useEffect(() => setText(joinArgs(saved)), [saved]);
   const args = splitArgs(text).slice(0, MAX_AGENT_ARGS);
@@ -41,14 +38,14 @@ function FlagsRow({ runtime, field, label, example, detail }: (typeof FLAGS)[num
     if (!problem && joinArgs(args) !== joinArgs(saved)) void api.session.setPrefs({ [field]: args });
   };
   return (
-    <Row label={label} detail={problem ?? tr('settings.flags.detail', { detail: tr(detail) })}>
+    <Row label={label} detail={problem ?? `${detail} Your own runs only.`}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        <input className={cx(s.text, t.mono)} aria-label={tr('settings.flags.aria', { label })} aria-invalid={Boolean(problem)} value={text} placeholder={example} spellCheck={false} onChange={(e) => setText(e.target.value)} onBlur={save} />
+        <input className={cx(s.text, t.mono)} aria-label={`${label} launch flags`} aria-invalid={Boolean(problem)} value={text} placeholder={example} spellCheck={false} onChange={(e) => setText(e.target.value)} onBlur={save} />
       </form>
     </Row>
   );

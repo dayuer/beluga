@@ -1,4 +1,3 @@
-import { t as tNow, useT } from '../i18n/index.js';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { CallView } from '@beluga/shared/calls.js';
 import type { MessageView } from '@beluga/net/mesh/views.js';
@@ -26,7 +25,7 @@ const MAX_SIDE = 1800;
 export async function capture(video: HTMLVideoElement, region: Region, ink: Ink, colorOf: (peerId: string) => string): Promise<Blob> {
   const W = video.videoWidth;
   const H = video.videoHeight;
-  if (!W || !H) throw new Error(tNow('more.call.screenNotShowing'));
+  if (!W || !H) throw new Error('The screen isn’t showing yet');
   const full = document.createElement('canvas');
   full.width = W;
   full.height = H;
@@ -47,7 +46,7 @@ export async function capture(video: HTMLVideoElement, region: Region, ink: Ink,
   out.width = Math.round(sw * scale);
   out.height = Math.round(sh * scale);
   out.getContext('2d')!.drawImage(full, sx, sy, sw, sh, 0, 0, out.width, out.height);
-  return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error(tNow('more.call.couldntTakePicture')))), 'image/png'));
+  return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Couldn’t take the picture'))), 'image/png'));
 }
 
 const base64 = async (blob: Blob): Promise<string> => {
@@ -61,7 +60,6 @@ const base64 = async (blob: Blob): Promise<string> => {
 export function AskBox({ call, region, anchor, video, ink, sharer, done }: { call: CallView; region: Region; anchor: CSSProperties; video: HTMLVideoElement | null; ink: Ink; sharer: string; done: () => void }) {
   const { client } = useBeluga();
   const engine = useCallEngine();
-  const t = useT();
   const me = useApp((st) => st.network.self?.peerId ?? '');
   const agent = useMyAgentName();
   const [text, setText] = useState('');
@@ -74,16 +72,14 @@ export function AskBox({ call, region, anchor, video, ink, sharer, done }: { cal
     setBusy(true);
     try {
       const blob = await capture(video, region, ink, personColor);
-      const who = sharer.replace(/’s$/, '');
-      const file = await client.api.network['files.addData'](sharer === 'your' ? t('more.call.yourScreenFile') : t('more.call.theirScreenFile', { name: who }), await base64(blob));
-      const words = text.trim() || (whole ? t('more.call.askWhole') : t('more.call.askPart'));
-      const about = sharer === 'your' ? t('more.call.aboutYourScreen') : t('more.call.aboutTheirScreen', { name: who });
-      const sent = (await client.api.network.post(call.conversation, { text: `${words}\n\n${about}`, files: [file as never], ask: [me] })) as MessageView;
+      const file = await client.api.network['files.addData'](`${sharer === 'your' ? 'Your' : sharer.replace(/’s$/, '')} screen.png`, await base64(blob));
+      const words = text.trim() || (whole ? 'What’s on this screen? Anything that looks wrong?' : 'What’s this part of the screen? Anything that looks wrong?');
+      const sent = (await client.api.network.post(call.conversation, { text: `${words}\n\n_About ${sharer} shared screen, in the call._`, files: [file as never], ask: [me] })) as MessageView;
       engine.stageSend({ k: 'asked', by: me, ask: sent.id, box: [region.x, region.y, region.w, region.h] });
       done();
     } catch (err) {
       setBusy(false);
-      client.store.dispatch({ type: 'toast', text: t('call.couldntAsk', { error: err instanceof Error ? err.message : String(err) }), level: 'error' });
+      client.store.dispatch({ type: 'toast', text: `Couldn’t ask: ${err instanceof Error ? err.message : String(err)}`, level: 'error' });
     }
   };
   const top = Number(anchor.top ?? 0) + Number(anchor.height ?? 0) + 8;
@@ -110,10 +106,10 @@ export function AskBox({ call, region, anchor, video, ink, sharer, done }: { cal
             done();
           }
         }}
-        placeholder={whole ? t('call.askAboutScreen', { agent }) : t('call.askAboutPart', { agent })}
-        aria-label={t('call.askAgent', { agent })}
+        placeholder={whole ? `Ask ${agent} about this screen…` : `Ask ${agent} about this part…`}
+        aria-label={`Ask ${agent}`}
       />
-      <button type="submit" className={c.askSend} disabled={busy} aria-label={t('call.ask')}>
+      <button type="submit" className={c.askSend} disabled={busy} aria-label="Ask">
         {busy ? <span className={c.spinner} aria-hidden="true" /> : <Icon name="send" size={13} />}
       </button>
     </form>
@@ -126,7 +122,6 @@ export function AskBox({ call, region, anchor, video, ink, sharer, done }: { cal
  */
 export function AskCard({ call }: { call: CallView }) {
   const live = useCallLive();
-  const t = useT();
   const agent = useMyAgentName();
   const [closed, setClosed] = useState<readonly string[]>([]);
   const ask = [...live.asks].reverse().find((id) => !closed.includes(id));
@@ -135,14 +130,13 @@ export function AskCard({ call }: { call: CallView }) {
   if (!ask) return null;
   const question = messages?.find((m) => m.id === ask);
   const answer = messages?.findLast((m) => m.claude?.for === ask);
-  const mine = question?.mine === true;
-  const asker = question ? (mine ? t('call.you') : question.name) : t('call.someone');
+  const asker = question ? (question.mine ? 'You' : question.name) : 'Someone';
   return (
-    <aside className={cx(c.askCard, answer && c.askCardDone)} aria-live="polite" aria-label={t('call.agentAboutScreen')}>
+    <aside className={cx(c.askCard, answer && c.askCardDone)} aria-live="polite" aria-label="Your agent about the screen">
       <header className={c.askHead}>
         <Icon name="claude" size={13} />
-        <span>{answer ? t('call.agentFor', { agent, who: mine ? t('call.youLower') : asker }) : thinking ? t('call.agentLooking', { agent }) : t('call.askedAgent', { who: asker, agent })}</span>
-        <button type="button" className={c.askClose} aria-label={t('call.close')} onClick={() => setClosed((x) => [...x, ask])}>
+        <span>{answer ? `${agent}, for ${asker === 'You' ? 'you' : asker}` : thinking ? `${agent} is looking…` : `${asker} asked ${agent}`}</span>
+        <button type="button" className={c.askClose} aria-label="Close" onClick={() => setClosed((x) => [...x, ask])}>
           <Icon name="x" size={12} />
         </button>
       </header>

@@ -7,9 +7,9 @@ import { dndActive } from '@beluga/shared/quiet.js';
 import { planOfChannel } from '@beluga/core/notify.js';
 import { NOTIFICATION_TAP, macNoticeTarget } from '../lib/notices.js';
 import { popupPublisher } from './popup-bridge.js';
-import { t } from '../i18n/index.js';
 import { type PopupItem, type PopupNeed, isNeedId, isPreviewId, popupNeeds, popupRequests, previewItems } from './popup-model.js';
 import { REQUEST_NOTIFICATION, type RequestAction, outsideStep, parseRequestMenuId, trayRequests } from './request-actions.js';
+import { t as translate } from '../i18n/index.js';
 
 /**
  * Friends' requests outside the window: the floating pop-up (Allow / Allow Always / Decline,
@@ -55,14 +55,14 @@ export async function runRequestAction(client: SocketClient, action: RequestActi
   if (isPreviewId(approval)) {
     // The preview's buttons: nothing was asked, so nothing is answered.
     stopPreview();
-    return void client.store.dispatch({ type: 'toast', text: t('gateway.native.preview'), level: 'info' });
+    return void client.store.dispatch({ type: 'toast', text: 'That was a preview: nothing was asked, and nothing was sent', level: 'info' });
   }
   if (isNeedId(approval)) return openNeed(client, approval!);
   const approvals = client.store.getState().approvals;
   const known = approvals.find((a) => a.id === approval) ?? (task ? approvals.find((a) => a.task === task) : undefined);
   const say = (text: string, level: 'info' | 'success' | 'error' = 'info'): void => void client.store.dispatch({ type: 'toast', text, level });
   const step = outsideStep(action, known, task);
-  if (step.kind === 'gone') return say(t('gateway.native.answered'));
+  if (step.kind === 'gone') return say('That request was already answered');
   if (step.kind === 'review') {
     if (step.task) openRequest(step.task);
     // Your own Claude's approval: the conversation it holds up, where its card is.
@@ -74,10 +74,10 @@ export async function runRequestAction(client: SocketClient, action: RequestActi
     if (step.kind === 'decide') await client.api.gateway.decide(step.task, step.decision);
     else await client.api.host.answerApproval(step.answer, step.id);
     const answer = step.kind === 'decide' ? step.decision.answer : step.answer;
-    const always = step.kind === 'decide' && step.decision.expiry === 'never' ? t('gateway.native.allowedNever') : t('gateway.native.allowedWeek');
-    say(answer === 'no' ? t('gateway.native.declined') : answer === 'always' ? always : t('gateway.native.approved'), answer === 'no' ? 'info' : 'success');
+    const always = step.kind === 'decide' && step.decision.expiry === 'never' ? 'Allowed; requests like it run without asking (Settings › People & access)' : 'Approved; requests like it run without asking for a week';
+    say(answer === 'no' ? 'Declined' : answer === 'always' ? always : 'Approved', answer === 'no' ? 'info' : 'success');
   } catch (err) {
-    say(t('gateway.native.couldnt', { error: message(err) }), 'error');
+    say(`Couldn't answer it: ${message(err)}`, 'error');
   }
 }
 
@@ -218,7 +218,7 @@ export function useRequestNative(client: SocketClient): void {
       .catch(() => undefined);
     let last = '';
     const update = (): void => {
-      const requests = trayRequests(client.store.getState().approvals);
+      const requests = trayRequests(client.store.getState().approvals).map((r) => ({ ...r, title: translate(r.title) }));
       const key = JSON.stringify(requests);
       if (key === last) return;
       last = key;

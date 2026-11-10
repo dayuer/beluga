@@ -14,11 +14,9 @@ import { type ReaderMode, hasRenderedLook, initialMode } from './reader/reader-m
 import { SearchField, SearchResults } from './SharedSearch.js';
 import s from './files.module.css';
 import { revealLabel } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
 import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
 import { groupChatOpen } from '../lib/group-chat.js';
 import { ReaderContent } from './reader/reader-lazy.js';
-import { localRootLabel } from '../lib/engine-words.js';
 
 export { LANG, ext } from './reader/reader-model.js';
 
@@ -45,7 +43,6 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
   const api = useApi();
   const { client } = useBeluga();
   const [mode, setMode] = useState<ReaderMode>(() => initialMode(viewer));
-  const t = useT();
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setMode(initialMode(viewer));
@@ -59,24 +56,24 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
       <div className={s.viewerHead}>
         <Icon name="file" size={14} />
         <span className={s.viewerName}>{name}</span>
-        {viewer.by ? <span className={s.following}>{t('views.files.following', { name: viewer.by })}</span> : null}
+        {viewer.by ? <span className={s.following}>following {viewer.by}</span> : null}
         <span className={s.flex} />
         {markdown ? (
           <Segmented
-            label={t('views.files.showAs')}
+            label="Show as"
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'rendered', label: t('views.diff.preview') },
-              { value: 'source', label: t('views.files.source') },
+              { value: 'rendered', label: 'Preview' },
+              { value: 'source', label: 'Source' },
             ]}
           />
         ) : null}
-        <IconButton icon="download" label={t('views.files.saveCopyAria')} onClick={() => void saveFile(client, viewer)} />
-        <IconButton icon="x" label={t('views.peek.close')} onClick={() => void api.files.closeViewer()} />
+        <IconButton icon="download" label="Save a copy…" onClick={() => void saveFile(client, viewer)} />
+        <IconButton icon="x" label="Close" onClick={() => void api.files.closeViewer()} />
       </div>
       <div ref={body} className={cx(s.viewerBody, 'selectable')} tabIndex={0} {...{ [SCROLL_ROOT]: '' }}>
-        <Suspense fallback={<div className={s.loading}>{t('views.diff.opening')}</div>}>
+        <Suspense fallback={<div className={s.loading}>Opening…</div>}>
           <FileContent viewer={viewer} variant="page" mode={mode} onMode={setMode} wrap={false} onOpenInEditor={local ? () => void openWithDefaultApp(client, local) : undefined} onSaveCopy={() => void saveFile(client, viewer)} />
         </Suspense>
       </div>
@@ -91,9 +88,8 @@ export function useRowItems(): (row: BrowserRow, onOpen: () => void) => ActionIt
   const revealFile = useRevealFileLabel();
   const revealFolder = useRevealLabel();
   const actions = useActions();
-  const t = useT();
   return (row, onOpen) => {
-    if (row.target === 'up') return [{ label: t('views.files.back'), icon: 'back', onSelect: onOpen }];
+    if (row.target === 'up') return [{ label: 'Back', icon: 'back', onSelect: onOpen }];
     const at = row.target;
     const state = client.store.getState();
     const local = localPathOf(state, at);
@@ -114,11 +110,11 @@ export function useRowItems(): (row: BrowserRow, onOpen: () => void) => ActionIt
       }, 60);
     };
     return [
-      { label: row.dir ? t('views.files.openFolder') : t('views.sync.open'), icon: row.dir ? 'folder' : 'file', onSelect: onOpen },
+      { label: row.dir ? 'Open Folder' : 'Open', icon: row.dir ? 'folder' : 'file', onSelect: onOpen },
       ...(local ? [{ label: row.dir ? revealFolder : revealFile, icon: 'folder' as const, onSelect: () => void revealInFinder(client, local) }] : []),
-      { label: t('views.diff.copyPath'), icon: 'copy', separate: true, onSelect: () => void copyText(local ?? mentionOf(state, at)).then(() => say(t('views.diff.copiedPath'))) },
-      { label: t('views.diff.mention'), icon: 'chat', onSelect: mention },
-      ...(row.dir ? [] : [{ label: t('views.files.saveCopy'), icon: 'download' as const, separate: true, onSelect: () => void saveFile(client, at) }]),
+      { label: 'Copy Path', icon: 'copy', separate: true, onSelect: () => void copyText(local ?? mentionOf(state, at)).then(() => say('Copied the path')) },
+      { label: 'Mention in Chat', icon: 'chat', onSelect: mention },
+      ...(row.dir ? [] : [{ label: 'Save a Copy…', icon: 'download' as const, separate: true, onSelect: () => void saveFile(client, at) }]),
     ];
   };
 }
@@ -126,13 +122,12 @@ export function useRowItems(): (row: BrowserRow, onOpen: () => void) => ActionIt
 function Row({ row, selected, onOpen }: { row: BrowserRow; selected: boolean; onOpen: () => void }) {
   const up = row.target === 'up';
   const items = useRowItems();
-  const t = useT();
   return (
     <ActionsContext items={() => items(row, onOpen)}>
-    <div role="option" aria-selected={selected} tabIndex={-1} className={cx(s.row, selected && s.rowOn)} onClick={onOpen} title={row.group ? localRootLabel(row.label) : row.label}>
+    <div role="option" aria-selected={selected} tabIndex={-1} className={cx(s.row, selected && s.rowOn)} onClick={onOpen} title={row.label}>
       <Icon name={up ? 'up' : row.dir ? 'folder' : 'file'} size={14} className={row.dir ? s.dirIcon : s.fileIcon} />
       {/* Under its owner's name, a folder goes by its own name. */}
-      <span className={s.rowName}>{up ? t('views.files.back') : row.group && row.label.startsWith(`${row.group} · `) ? localRootLabel(row.label.slice(row.group.length + 3)) : row.label}</span>
+      <span className={s.rowName}>{up ? 'Back' : row.group && row.label.startsWith(`${row.group} · `) ? row.label.slice(row.group.length + 3) : row.label}</span>
       {!row.dir && row.size !== undefined ? <span className={s.size}>{row.size < 1024 ? `${row.size} B` : formatBytes(row.size)}</span> : null}
       {row.dir && !up ? <Icon name="chevronRight" size={10} className={s.chev} /> : null}
     </div>
@@ -144,7 +139,6 @@ function Row({ row, selected, onOpen }: { row: BrowserRow; selected: boolean; on
 export function FilesView() {
   const api = useApi();
   const { client, ui } = useBeluga();
-  const t = useT();
   const home = useApp((st) => st.home);
   const myShares = useApp((st) => st.myShares);
   const view = useApp((st) => st.view);
@@ -178,14 +172,14 @@ export function FilesView() {
     client.store.dispatch({ type: 'browser_cursor', delta: i - browser.cursor });
     void api.files.enter(i);
   };
-  const crumbs = browser.at ? [browser.at.share.startsWith('ws-') ? (shared.find((w) => w.share === browser.at!.share)?.name ?? t('views.files.thisWorkspace')) : browser.at.share, ...browser.at.path.split('/').filter(Boolean)] : [t('views.files.sharedWithYou')];
+  const crumbs = browser.at ? [browser.at.share.startsWith('ws-') ? (shared.find((w) => w.share === browser.at!.share)?.name ?? 'This workspace') : browser.at.share, ...browser.at.path.split('/').filter(Boolean)] : ['Folders shared with you'];
 
   return (
     <div className={s.files}>
-      <section className={s.browser} aria-label={t('views.diff.filesAria')}>
+      <section className={s.browser} aria-label="Files">
         {sharedWs ? <SearchField value={typed} onChange={setTyped} onSearch={setSearch} /> : null}
         <div className={s.crumbs}>
-          {(sharedWs && search ? [t('views.files.resultsFor', { search })] : crumbs).map((c, i) => (
+          {(sharedWs && search ? [`Results for “${search}”`] : crumbs).map((c, i) => (
             <span key={i} className={s.crumb}>
               {i ? <Icon name="chevronRight" size={9} /> : null}
               {/* Every folder above this one is a click away. */}
@@ -208,7 +202,7 @@ export function FilesView() {
           className={s.list}
           role="listbox"
           tabIndex={0}
-          aria-label={t('views.diff.filesAria')}
+          aria-label="Files"
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
@@ -237,12 +231,12 @@ export function FilesView() {
               </Fragment>
             ))
           ) : browser.loading ? null : (
-            <Empty icon="folder" title={browser.at ? t('views.files.emptyFolder') : t('views.files.nothingShared')} detail={browser.at ? undefined : t('views.files.nothingSharedDetail')} action={browser.at ? undefined : <Button onClick={() => ui.openMenu({ kind: 'share_folder', launchDir: home, mine: myShares })}>{t('views.files.shareFolder')}</Button>} />
+            <Empty icon="folder" title={browser.at ? 'This folder is empty' : 'Nothing shared yet'} detail={browser.at ? undefined : 'When friends (or people in your room) share folders with you, they show up here.'} action={browser.at ? undefined : <Button onClick={() => ui.openMenu({ kind: 'share_folder', launchDir: home, mine: myShares })}>Share a folder…</Button>} />
           )}
         </div>
         )}
       </section>
-      {viewer ? <Viewer viewer={viewer} /> : <div className={s.noViewer}><Empty icon="file" title={t('views.files.pick')} detail={t('views.files.pickDetail')} /></div>}
+      {viewer ? <Viewer viewer={viewer} /> : <div className={s.noViewer}><Empty icon="file" title="Pick a file to open it" detail="Markdown shows formatted, code with colors, images as they are. Files update live when they change." /></div>}
     </div>
   );
 }

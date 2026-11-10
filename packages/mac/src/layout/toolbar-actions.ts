@@ -1,4 +1,4 @@
-import { type BranchState, branchState, notOnPr, onGitHub, prBlocker } from '@beluga/core/branch-state.js';
+import { type BranchState, branchState, notOnPr, notOnPrLabel, onGitHub, prBlocker } from '@beluga/core/branch-state.js';
 import type { AppState } from '@beluga/core/store.js';
 import { type PlanOwner, planOwnerOf } from '@beluga/core/plans/owner.js';
 import { planTitle } from '@beluga/core/plans/model.js';
@@ -11,8 +11,6 @@ import { mergeTargetOf } from '../lib/merge-review.js';
 import type { PlanAction } from '../lib/plan-task.js';
 import { asksBeforeWork } from '../lib/work-confirm.js';
 import { revealLabel, thisComputer } from '../lib/os-words.js';
-import { type Key, t } from '../i18n/index.js';
-import { localButton, localNotOnPr } from '../lib/engine-words.js';
 
 /**
  * A workspace's toolbar, the Mac way: one prominent button for what this workspace needs next
@@ -40,13 +38,10 @@ export interface ToolAction {
 }
 
 // Never a bare "Resolve" or "Fix": next to a PR's number they read as its review comments (BLG-753).
-const SHORT: Partial<Record<ToolAction['action'], Key>> = { merge_claude: 'layout.toolbarActions.short.mergeClaude', resolve_pr: 'layout.toolbarActions.short.resolvePr', fix_checks: 'layout.toolbarActions.short.fixChecks', pr: 'layout.toolbarActions.short.pr', open_plan: 'layout.toolbarActions.short.openPlan', open_task: 'layout.toolbarActions.short.openTask', stop_run: 'layout.toolbarActions.short.stopRun', merge_anyway: 'layout.toolbarActions.short.mergeAnyway', review_claude: 'layout.toolbarActions.short.reviewClaude', continue_after_merge: 'layout.toolbarActions.short.continueAfterMerge' };
+const SHORT: Partial<Record<ToolAction['action'], string>> = { merge_claude: 'Solve Conflict', resolve_pr: 'Resolve Conflicts', fix_checks: 'Fix Checks', pr: 'PR', open_plan: 'Plan', open_task: 'Task', stop_run: 'Stop', merge_anyway: 'Merge', review_claude: 'Review', continue_after_merge: 'Continue' };
 
 /** An action in one word, for the folded toolbar ("PR", "Fix", "Merge"): its icon alone didn't say enough. */
-export const shortOf = (a: ToolAction): string => {
-  const short = SHORT[a.action];
-  return a.label.startsWith('PR #') ? a.label : short ? t(short) : a.label.replace(/…$/, '').split(' ')[0]!;
-};
+export const shortOf = (a: ToolAction): string => (a.label.startsWith('PR #') ? a.label : SHORT[a.action] ?? a.label.replace(/…$/, '').split(' ')[0]!);
 
 /** A pull request's next steps that ask before Claude or git does them (see work-confirm.ts). */
 export type PrStep = 'fix_checks' | 'resolve_pr' | 'continue_after_merge';
@@ -107,29 +102,29 @@ function keysOf(action: WorkspaceAction): { keys?: string } {
 function labelOf(b: WorkspaceButton, pr: boolean): string {
   switch (b.action) {
     case 'pr':
-      return pr ? b.label : t('layout.toolbarActions.createPr');
+      return pr ? b.label : 'Create PR';
     case 'review_claude':
-      return t('layout.toolbarActions.review');
+      return 'Ask Your Agent to Review…';
     case 'commit':
-      return t('layout.toolbarActions.commit');
+      return 'Commit…';
     case 'merge':
-      return t('layout.toolbarActions.mergeLocally');
+      return 'Merge Locally…';
     case 'compact':
-      return t('layout.toolbarActions.compact');
+      return 'Compact…';
     case 'finder':
       return revealLabel();
     case 'fork':
-      return t('layout.toolbarActions.fork');
+      return 'Fork…';
     case 'archive':
-      return t('layout.toolbarActions.archive');
+      return 'Archive…';
     case 'delete':
-      return t('layout.toolbarActions.delete');
+      return 'Delete…';
     case 'handoff':
-      return t('layout.toolbarActions.handOff');
+      return 'Hand Off…';
     case 'share':
       return b.label.endsWith('…') ? b.label : `${b.label}…`;
     case 'merge_claude':
-      return t('layout.toolbarActions.solveConflict');
+      return 'Solve Conflict…';
     default:
       return b.label;
   }
@@ -137,13 +132,11 @@ function labelOf(b: WorkspaceButton, pr: boolean): string {
 
 /** Tooltips for the icons that ask first: what they'd do, ending in "…" (they ask before doing it). */
 function tipOf(b: WorkspaceButton): string | undefined {
-  if (b.action === 'review_claude') return t('layout.toolbarActions.reviewTip');
+  if (b.action === 'review_claude') return 'Ask your agent to review this worktree…';
   return asksBeforeWork(b.action) && !b.disabled ? `${b.hint}…` : undefined;
 }
 
-const toAction = (shared: WorkspaceButton, pr: boolean): ToolAction => toLocalAction(localButton(shared), pr);
-
-const toLocalAction = (b: WorkspaceButton, pr: boolean): ToolAction => ({
+const toAction = (b: WorkspaceButton, pr: boolean): ToolAction => ({
   id: b.action,
   label: labelOf(b, pr),
   hint: b.hint,
@@ -169,28 +162,28 @@ export function pickPrimary(state: AppState, ws: Workspace, all: readonly ToolAc
   const blocker = pr ? prBlocker(pr, ws) : undefined;
   // GitHub can't merge a PR that conflicts with its base: resolving that comes first.
   if (pr && blocker === 'resolve_pr') {
-    return { id: 'resolve_pr', label: t('layout.toolbarActions.resolvePr'), hint: t('layout.toolbarActions.resolvePrHint', { number: pr.number, into: mergeTargetOf(state, ws) }), icon: 'merge', action: 'resolve_pr', tone: 'error' };
+    return { id: 'resolve_pr', label: 'Resolve Conflicts…', hint: `PR #${pr.number} conflicts with ${mergeTargetOf(state, ws)}: your agent merges it in here, resolves the conflicts and pushes`, icon: 'merge', action: 'resolve_pr', tone: 'error' };
   }
   // Still running (even with one failed already) isn't a red Fix yet: PR #n below says where it stands.
   if (pr && blocker === 'fix_checks') {
-    return { id: 'fix_checks', label: t('layout.toolbarActions.fixChecks'), hint: t('layout.toolbarActions.fixChecksHint', { number: pr.number }), icon: 'wand', action: 'fix_checks', tone: 'error' };
+    return { id: 'fix_checks', label: 'Fix Checks…', hint: `PR #${pr.number}'s checks failed: your agent reads the logs and fixes them`, icon: 'wand', action: 'fix_checks', tone: 'error' };
   }
   // On GitHub, a branch's next step is its pull request (Claude commits anything left as it opens it):
   // there its checks run live and it merges into origin. Merge Locally stays under ⋯.
   const create = !pr && onGitHub(state, ws) ? by('pr') : undefined;
-  if (create) return { ...create, label: t('layout.toolbarActions.createPull'), hint: t('layout.toolbarActions.createPullHint', { branch: ws.branch ?? t('layout.toolbarActions.thisBranch'), into: mergeTargetOf(state, ws) }) };
+  if (create) return { ...create, label: 'Create Pull Request…', hint: `Pushes ${ws.branch ?? 'this branch'} and opens a pull request into ${mergeTargetOf(state, ws)}, with your agent or straight away; its checks show here as they run` };
   const commit = by('commit');
   if (commit) return commit;
   if (pr?.state === 'OPEN') {
     const open = by('pr');
     // Never a bare "PR #n" while commits here aren't on it (BLG-840): merging it would leave them out.
     const gap = notOnPr(pr, ws);
-    if (open && gap) return { ...open, label: t('layout.toolbarActions.notPushed', { number: pr.number, count: gap.count }), hint: t('layout.toolbarActions.notPushedHint', { gap: localNotOnPr(gap) }), tone: 'info' };
+    if (open && gap) return { ...open, label: `PR #${pr.number} · ${gap.count} Not Pushed`, hint: `${notOnPrLabel(gap)}: push them before you merge it`, tone: 'info' };
     if (open) return { ...open, label: `PR #${pr.number}` };
   }
   if (pr?.state === 'MERGED') {
     const archive = all.find((x) => x.action === 'archive');
-    if (archive) return { ...archive, label: t('layout.toolbarActions.archiveWorktree'), danger: false, hint: t('layout.toolbarActions.archiveWorktreeHint', { number: pr.number }) };
+    if (archive) return { ...archive, label: 'Archive Worktree', danger: false, hint: `PR #${pr.number} is merged: put this worktree away (the branch and conversation are kept)` };
   }
   // Part of a plan: Beluga merges it into the plan, so the next thing is the plan, never Merge.
   const plan = all.find((x) => x.action === 'open_plan');
@@ -198,7 +191,7 @@ export function pickPrimary(state: AppState, ws: Workspace, all: readonly ToolAc
   const merge = by('merge');
   if (merge) {
     const into = mergeTargetOf(state, ws);
-    return { ...merge, label: t('layout.toolbarActions.mergeInto', { into }), hint: t('layout.toolbarActions.mergeIntoHint', { into, computer: thisComputer() }) };
+    return { ...merge, label: `Merge Locally into ${into}`, hint: `Shows what would merge into ${into} on ${thisComputer()} and checks it first; nothing changes until you confirm` };
   }
   const run = all.find((x) => x.action === 'run' || x.action === 'stop_run');
   return run;
@@ -221,7 +214,7 @@ const SECTIONS: ReadonlyArray<readonly ToolAction['action'][]> = [
 const NONE: ToolbarActions = { icons: [], more: [] };
 
 /** Delete…, beside Archive… (Archive keeps everything; Delete is for what you don't want back). */
-const deleteAction = (): ToolAction => ({ id: 'delete', label: t('layout.toolbarActions.delete'), hint: t('layout.toolbarActions.deleteHint'), icon: ICON.delete, action: 'delete', danger: true });
+const DELETE: ToolAction = { id: 'delete', label: 'Delete…', hint: 'Delete it for good: the folder, its branch and the conversation', icon: ICON.delete, action: 'delete', danger: true };
 
 export function toolbarActions(state: AppState, ws: Workspace): ToolbarActions {
   if (ws.pending) return NONE;
@@ -231,9 +224,9 @@ export function toolbarActions(state: AppState, ws: Workspace): ToolbarActions {
   const withDelete = !ws.archived && ws.kind !== 'main' && !ws.external && !buttons.some((b) => b.action === 'delete') && !state.prefs.hiddenButtons.includes('delete');
   const own = [...buttons.map((b) => {
     // While the run script runs, its button stops it.
-    if (b.action === 'run' && runRunning(state, ws.id)) return { ...toAction(b, pr), id: 'stop_run', action: 'stop_run' as const, label: t('layout.toolbarActions.stopRunning'), icon: 'stop' as const, hint: t('layout.toolbarActions.stopRunningHint'), ...keysOf('stop_run') };
+    if (b.action === 'run' && runRunning(state, ws.id)) return { ...toAction(b, pr), id: 'stop_run', action: 'stop_run' as const, label: 'Stop Running', icon: 'stop' as const, hint: 'Stop the run script', ...keysOf('stop_run') };
     return toAction(b, pr);
-  }), ...(withDelete ? [ws.kind === 'worktree' ? deleteAction() : { ...deleteAction(), hint: t('layout.toolbarActions.removeHint') }] : [])];
+  }), ...(withDelete ? [ws.kind === 'worktree' ? DELETE : { ...DELETE, hint: 'Remove it from Beluga and delete the conversation' }] : [])];
   const owner = ws.archived ? undefined : planOwnerOf(state.plans, state.board, ws.id);
   const all = owner ? asPlanTask(own, owner, pr) : own;
   const branch = branchState(state, ws, { planned: Boolean(owner) });
@@ -265,15 +258,15 @@ export function inSections(list: readonly ToolAction[]): ToolAction[][] {
 function asPlanTask(all: readonly ToolAction[], owner: PlanOwner, pr: boolean): ToolAction[] {
   const name = planTitle(owner.plan);
   const lead: ToolAction[] = [
-    { id: 'open_plan', label: t('layout.toolbarActions.openPlan'), hint: t('layout.toolbarActions.openPlanHint', { name, milestone: owner.milestone.title }), icon: 'flag', action: 'open_plan' },
-    { id: 'open_task', label: t('layout.toolbarActions.openTask'), hint: t('layout.toolbarActions.openTaskHint', { key: owner.issue.key }), icon: 'task', action: 'open_task' },
+    { id: 'open_plan', label: 'Open Plan', hint: `Part of “${name}”: Beluga merges it into the plan when “${owner.milestone.title}” passes`, icon: 'flag', action: 'open_plan' },
+    { id: 'open_task', label: 'Open Task', hint: `The task this worktree does (${owner.issue.key})`, icon: 'task', action: 'open_task' },
   ];
   const rest = all.flatMap((a): ToolAction[] => {
     if (a.action === 'pr' && !pr) return [];
     // Solving a conflict finishes a local merge: it stays, but says so and warns first (actions.run).
-    if (a.action === 'merge_claude') return [{ ...a, hint: t('layout.toolbarActions.solveInPlanHint', { name }) }];
+    if (a.action === 'merge_claude') return [{ ...a, hint: `Your agent finishes this merge by hand, which skips “${name}”: Beluga merges it into the plan itself` }];
     if (a.action !== 'merge') return [a];
-    return [{ ...a, id: 'merge_anyway', label: t('layout.toolbarActions.mergeAnyway'), action: 'merge_anyway', hint: t('layout.toolbarActions.mergeAnywayHint', { name }) }];
+    return [{ ...a, id: 'merge_anyway', label: 'Merge Anyway…', action: 'merge_anyway', hint: `Beluga merges this into “${name}” itself; merging it by hand skips the plan` }];
   });
   return [...lead, ...rest];
 }

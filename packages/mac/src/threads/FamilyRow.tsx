@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import type { ThreadState } from '@beluga/shared/threads.js';
 import { Icon } from '../components/Icon.js';
 import { Dot } from '../components/ui.js';
@@ -29,17 +28,15 @@ export function FamilyMark({ row }: { row: ThreadFamilyRow }) {
 
 /** Its title; a native sub-agent says so, quietly. */
 export function FamilyTitle({ row }: { row: ThreadFamilyRow }) {
-  const t = useT();
   return (
     <span className={s.titleLine}>
       <span className={s.title}>{row.title}</span>
-      {row.kind === 'agent' ? <span className={s.kind}>{t('threads.subAgentLower')}</span> : null}
+      {row.kind === 'agent' ? <span className={s.kind}>sub-agent</span> : null}
     </span>
   );
 }
 
 /** Its timer while it works, else its last word. */
 export function FamilyEnd({ row, now }: { row: ThreadFamilyRow; now: number }) {
-  useT();
   return <span className={s.time}>{rowEnd(row, now)}</span>;
 }

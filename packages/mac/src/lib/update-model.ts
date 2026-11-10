@@ -1,6 +1,5 @@
 import type { LogItem, View } from '../../../../src/core/store.js';
 import { isRunning } from '../../../../src/ui/format.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Beluga's own updates, as the window shows them: what the app shell (src-tauri/src/updater.rs)
@@ -64,9 +63,9 @@ export function shortVersion(version: string): string {
 /** Whether there's something to show in the sidebar: a downloaded update, or what just changed. */
 export function pillOf(state: UpdateState): { readonly label: string; readonly kind: 'ready' | 'news' } | undefined {
   if (state.available) {
-    return { label: state.phase === 'installing' ? t('common.updateModel.updating') : t('common.updateModel.ready', { version: shortVersion(state.available.version) }), kind: 'ready' };
+    return { label: state.phase === 'installing' ? 'Updating Beluga…' : `Beluga ${shortVersion(state.available.version)} is ready`, kind: 'ready' };
   }
-  if (state.news) return { label: t('common.updateModel.news', { version: shortVersion(state.news.version) }), kind: 'news' };
+  if (state.news) return { label: `Updated to ${shortVersion(state.news.version)} · What’s new`, kind: 'news' };
   return undefined;
 }
 
@@ -75,51 +74,50 @@ const DAY = 24 * 60 * MINUTE;
 
 /** "Never", "Just now", "12 minutes ago", "Today at 9:41", "Yesterday at 18:02", "3 Oct". */
 export function lastCheckedLabel(lastCheck: number | null | undefined, now: number = Date.now(), locale?: string): string {
-  if (!lastCheck) return t('common.updateModel.never');
+  if (!lastCheck) return 'Never';
   const ago = now - lastCheck;
-  if (ago < MINUTE) return t('common.updateModel.justNow');
+  if (ago < MINUTE) return 'Just now';
   if (ago < 60 * MINUTE) {
     const m = Math.floor(ago / MINUTE);
-    return t('common.updateModel.minutesAgo', { m });
+    return `${m} minute${m === 1 ? '' : 's'} ago`;
   }
   const at = new Date(lastCheck);
   const time = at.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
   const startOfToday = new Date(now).setHours(0, 0, 0, 0);
-  if (lastCheck >= startOfToday) return t('common.updateModel.todayAt', { time });
-  if (lastCheck >= startOfToday - DAY) return t('common.updateModel.yesterdayAt', { time });
+  if (lastCheck >= startOfToday) return `Today at ${time}`;
+  if (lastCheck >= startOfToday - DAY) return `Yesterday at ${time}`;
   return at.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
-const BLOCKER_WORDS = (): Record<UpdateBlocker, string> => ({
-  claude: t('common.updateModel.waitClaude'),
-  terminal: t('common.updateModel.waitTerminal'),
-  room: t('common.updateModel.waitRoom'),
-  you: t('common.updateModel.waitYou'),
-});
+const BLOCKER_WORDS: Record<UpdateBlocker, string> = {
+  claude: 'your agent to finish',
+  terminal: 'programs in your terminals to finish',
+  room: 'friends to leave your room (or you to leave theirs)',
+  you: 'you to step away for 10 minutes',
+};
 
 /** "Installs when you step away", or what it still waits for. */
 export function idleLine(waitingOn: readonly UpdateBlocker[]): string {
-  if (!waitingOn.length) return t('common.updateModel.installsIdle');
-  const blockers = BLOCKER_WORDS();
-  const words = waitingOn.map((b) => blockers[b]);
-  const list = words.length > 1 ? `${words.slice(0, -1).join(t('common.updateModel.comma'))}${t('common.updateModel.and')}${words.at(-1)}` : words[0];
-  return t('common.updateModel.waitingFor', { list: list ?? '' });
+  if (!waitingOn.length) return 'Installs as soon as you step away. Beluga reopens in the background.';
+  const words = waitingOn.map((b) => BLOCKER_WORDS[b]);
+  const list = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0];
+  return `Waiting for ${list}.`;
 }
 
 /** What the Settings row says about updates right now. */
 export function statusLine(state: UpdateState): string {
   switch (state.phase) {
     case 'checking':
-      return t('common.updateModel.checking');
+      return 'Checking…';
     case 'downloading':
-      return state.progress ? t('common.updateModel.downloadingPct', { pct: Math.round(state.progress * 100) }) : t('common.updateModel.downloading');
+      return `Downloading${state.progress ? ` · ${Math.round(state.progress * 100)}%` : '…'}`;
     case 'installing':
-      return t('common.updateModel.installing');
+      return 'Installing…';
     case 'error':
-      return state.error ?? t('common.updateModel.cantCheck');
+      return state.error ?? 'Couldn’t check for updates.';
     default:
-      if (state.available) return t(state.choice === 'idle' ? 'common.updateModel.readyIdle' : 'common.updateModel.readyQuit', { version: shortVersion(state.available.version) });
-      return state.phase === 'current' ? t('common.updateModel.upToDate') : '';
+      if (state.available) return `Beluga ${shortVersion(state.available.version)} is ready${state.choice === 'idle' ? ' · installs when you’re idle' : ' · installs when you quit'}`;
+      return state.phase === 'current' ? 'Beluga is up to date.' : '';
   }
 }
 

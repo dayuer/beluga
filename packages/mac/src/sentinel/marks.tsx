@@ -8,10 +8,8 @@ import { useMyAgent } from '../lib/agent-words.js';
 import { agentMark } from '@beluga/shared/agent-marks.js';
 import { TonePill } from '../plans/marks.js';
 import { STEP_ICON, TRIGGER_ICON, iconOf } from './sentinel-model.js';
-import { tl, useT } from '../i18n/index.js';
 import r from '../tasks/task-ref.module.css';
 import s from './sentinel.module.css';
-import { localSchedule } from '../lib/ci-sentinel-words.js';
 
 /** Sentinel's small marks: an icon in a tinted circle, the steps as chips, a run's state as a pill, and the inline pill. */
 
@@ -32,12 +30,11 @@ export function TriggerDisc({ kind, paused, size }: { kind: TriggerKind; paused?
 
 /** The steps, in order, as small icon chips (each named in its tooltip). */
 export function StepChips({ steps }: { steps: ReadonlyArray<{ readonly kind: StepKind; readonly name: string }> }) {
-  const t = useT();
-  if (!steps.length) return <span className={s.noSteps}>{t('sentinel.model.noSteps')}</span>;
+  if (!steps.length) return <span className={s.noSteps}>No steps yet</span>;
   return (
-    <span className={s.chips} role="list" aria-label={t('sentinel.marks.steps')}>
+    <span className={s.chips} role="list" aria-label="Steps">
       {steps.map((st, i) => (
-        <Tip key={`${st.kind}:${i}`} label={`${i + 1}. ${st.name} · ${tl('STEP_INFO', st.kind, 'label', STEP_INFO[st.kind].label)}`}>
+        <Tip key={`${st.kind}:${i}`} label={`${i + 1}. ${st.name} · ${STEP_INFO[st.kind].label}`}>
           <span className={s.chip} role="listitem" aria-label={st.name} data-kind={st.kind}>
             <Icon name={STEP_ICON[st.kind]} size={11} />
           </span>
@@ -59,11 +56,10 @@ export function ClaudeMark() {
 
 /** A run's state as a pill (Running breathes with the live clock). */
 export function RunPill({ state }: { state: RunState }) {
-  useT();
   const info = RUN_STATE_INFO[state];
   return (
     <TonePill tone={info.tone} live={isLive(state) && state !== 'needs-you'}>
-      {tl('RUN_STATE_INFO', state, 'label', info.label)}
+      {info.label}
     </TonePill>
   );
 }
@@ -72,22 +68,21 @@ export function RunPill({ state }: { state: RunState }) {
 export function SentinelChip({ id }: { id: string }) {
   const item = useApp((st) => st.sentinel.items.find((x) => x.id === id));
   const actions = useActions();
-  const t = useT();
   if (!item) {
     return (
-      <Tip label={t('sentinel.marks.missingTip', { id })}>
+      <Tip label={`No sentinel ${id} here: deleted, or on someone else’s computer`}>
         <span className={r.missing}>
           <span className={r.key}>{id}</span>
-          <span>{t('sentinel.marks.notFound')}</span>
+          <span>not found</span>
         </span>
       </Tip>
     );
   }
   return (
-    <Tip label={item.paused ? t('sentinel.marks.chipTipPaused', { when: localSchedule(item.trigger) }) : t('sentinel.marks.chipTip', { when: localSchedule(item.trigger) })}>
-      <button type="button" className={r.chip} onClick={() => actions.run({ type: 'view', view: { kind: 'sentinel_page', id } })} aria-label={item.paused ? t('sentinel.marks.chipLabelPaused', { name: item.name }) : t('sentinel.marks.chipLabel', { name: item.name })}>
+    <Tip label={`${scheduleSentence(item.trigger)}${item.paused ? ' · paused' : ''}. Click to open`}>
+      <button type="button" className={r.chip} onClick={() => actions.run({ type: 'view', view: { kind: 'sentinel_page', id } })} aria-label={`Sentinel ${item.name}${item.paused ? ', paused' : ''}`}>
         <Icon name={iconOf(item.icon)} size={12} />
-        <span className={r.key}>{t('sentinel.marks.sentinel')}</span>
+        <span className={r.key}>Sentinel</span>
         <span className={cx(r.chipTitle)}>{item.name}</span>
         <Icon name="arrowRight" size={10} className={r.chipGo} />
       </button>

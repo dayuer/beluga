@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import type { Intent } from '@beluga/core/intents.js';
 import { type CallView, type ShareMode, type StageMessage, CLIP_PART, HEARTBEAT_MS, SHARE_KBPS, parseStage, shareChildren, shareTreeBy, sharerOf } from '@beluga/shared/calls.js';
@@ -51,7 +50,7 @@ export interface CallLive {
   readonly theater: boolean;
   /** Face to face: cameras over the whole window (theirs big, yours in a corner; a group as a collage). */
   readonly faces: boolean;
-  /** Background noise out of your voice (BLG-744): on in every call until you turn it off for it; `none`: this window can't. */
+  /** Background noise out of your voice (BLG-744): off unless you turned it on (kept on this Mac); `none`: this window can't. */
   readonly quiet: 'on' | 'off' | 'none';
   /** Your words go in the call's notes (`off`: you paused it; `none`: nobody in the call has a voice model). */
   readonly notes: 'on' | 'off' | 'none';
@@ -59,7 +58,10 @@ export interface CallLive {
   readonly scribing: { readonly writers: Readonly<Record<string, VoiceModelId>>; readonly language?: string };
 }
 
-const EMPTY: CallLive = { speaking: new Set(), lines: {}, asks: [], cameras: {}, mode: 'sharp', theater: false, faces: false, quiet: 'on', notes: 'none', scribing: { writers: {} } };
+const EMPTY: CallLive = { speaking: new Set(), lines: {}, asks: [], cameras: {}, mode: 'sharp', theater: false, faces: false, quiet: 'off', notes: 'none', scribing: { writers: {} } };
+
+/** How long a line may take to connect before the strip says it can't reach them. */
+const LINE_PATIENCE_MS = 12_000;
 
 /** A picture from someone: its track, and whether frames are coming. */
 interface Incoming {
@@ -114,6 +116,15 @@ export class CallEngine {
   /** The microphone and speaker you picked (BLG-737), remembered on this Mac; undefined: macOS's own. */
   private micId: string | undefined = readPref(MIC_PREF);
   private speakerId: string | undefined = readPref(SPEAKER_PREF);
+  /**
+   * Noise Removal, as you left it on this Mac (off at first). Its voice is made by Web Audio, and
+   * since it went on in every call (#362) friends stopped hearing each other: the line sends the
+   * microphone itself unless you turn it on.
+   */
+  private quietWanted = readPref(QUIET_PREF) === 'on';
+  /** When each line started, and whether the strip says it can't reach someone now. */
+  private readonly lineSince = new Map<string, number>();
+  private unreachableSaid = false;
   private micAsked: Promise<MediaStream | undefined> | undefined;
   /** Bumped when a call ends: a microphone that opens after that is stopped at once, not kept. */
   private micToken = 0;
@@ -154,7 +165,7 @@ export class CallEngine {
   async devices(): Promise<AudioDevices> {
     const all = await navigator.mediaDevices?.enumerateDevices().catch(() => []) ?? [];
     const named = (kind: MediaDeviceKind): AudioDevice[] =>
-      all.filter((d) => d.kind === kind && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').map((d, i) => ({ id: d.deviceId, label: d.label || (kind === 'audioinput' ? t('call.micN', { n: i + 1 }) : t('call.speakerN', { n: i + 1 })) }));
+      all.filter((d) => d.kind === kind && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').map((d, i) => ({ id: d.deviceId, label: d.label || (kind === 'audioinput' ? `Microphone ${i + 1}` : `Speaker ${i + 1}`) }));
     return {
       mics: named('audioinput'),
       speakers: named('audiooutput'),
@@ -164,18 +175,34 @@ export class CallEngine {
     };
   }
 
-  /** Background noise out of your voice for this call, or kept (the next call starts with it on again). */
-  setQuiet(on: boolean): void {
+  /** Background noise out of your voice, or not, from now on (this Mac remembers): every line switches at once. */
+  async setQuiet(on: boolean): Promise<void> {
     if (this.live.quiet === 'none') return;
-    if (this.filter) this.filter.enabled = on;
+    this.quietWanted = on;
+    writePref(QUIET_PREF, on ? 'on' : undefined);
     this.patch({ quiet: on ? 'on' : 'off' });
+    const raw = this.raw;
+    if (!raw || !this.view) return;
+    if (!on) {
+      const old = this.filter;
+      this.filter = undefined;
+      this.useVoice(raw);
+      old?.stop();
+      return;
+    }
+    if (this.filter) return;
+    const filter = await this.startFilter(raw);
+    // Turned off again, or another microphone picked, while the filter started.
+    if (!filter || raw !== this.raw || !this.quietWanted || this.filter) return filter?.stop();
+    this.filter = filter;
+    this.useVoice(filter.stream);
   }
 
-  /** The noise filter over this microphone, set as the call wants it (undefined: it can't run here). */
+  /** The noise filter over this microphone when you want it (undefined: you don't, or it can't run here). */
   private async startFilter(raw: MediaStream): Promise<NoiseFilter | undefined> {
+    if (!this.quietWanted) return undefined;
     const filter = await NoiseFilter.start(raw, () => this.filterBroke(filter));
-    if (filter) filter.enabled = this.live.quiet !== 'off';
-    else this.patch({ quiet: 'none' });
+    if (!filter) this.patch({ quiet: 'none' });
     return filter;
   }
 
@@ -220,7 +247,7 @@ export class CallEngine {
       oldFilter?.stop();
       oldRaw?.getTracks().forEach((t) => t.stop());
     } catch {
-      this.patch({ problem: t('call.problemMicSwitch') });
+      this.patch({ problem: 'Couldn’t switch to that microphone. Check it’s plugged in, then pick it again.' });
     }
   }
 
@@ -228,7 +255,8 @@ export class CallEngine {
   pickSpeaker(id: string | undefined): void {
     this.speakerId = id;
     writePref(SPEAKER_PREF, id);
-    for (const el of this.audio.values()) sink(el, id);
+    // Back to macOS's own is the only time the default is asked for by name.
+    for (const el of this.audio.values()) sink(el, id ?? '');
   }
 
   /** Start a call here, leaving any other one first. */
@@ -282,7 +310,7 @@ export class CallEngine {
       this.reconcile();
     } catch (err) {
       const name = err instanceof Error ? err.name : '';
-      if (name !== 'NotAllowedError' && name !== 'AbortError') this.patch({ problem: t('call.problemShare') });
+      if (name !== 'NotAllowedError' && name !== 'AbortError') this.patch({ problem: 'Couldn’t share your screen. Check Screen Recording in System Settings › Privacy & Security.' });
     }
   }
 
@@ -467,7 +495,7 @@ export class CallEngine {
       this.reconcile();
     } catch {
       this.cam = undefined;
-      this.patch({ problem: t('call.problemCamera') });
+      this.patch({ problem: 'Beluga can’t use your camera. Allow it in System Settings › Privacy & Security › Camera.' });
     }
   }
 
@@ -537,7 +565,7 @@ export class CallEngine {
       })
       .catch(() => {
         this.micAsked = undefined;
-        this.patch({ problem: t('call.problemMic') });
+        this.patch({ problem: 'Beluga can’t hear your microphone. Allow it in System Settings › Privacy & Security › Microphone.' });
         return undefined;
       });
     return this.micAsked;
@@ -559,7 +587,7 @@ export class CallEngine {
   }
 
   private async begin(call: CallView): Promise<void> {
-    this.patch({ ...EMPTY, want: undefined, overlayBy: undefined, conversation: call.conversation, call: call.id });
+    this.patch({ ...EMPTY, want: undefined, overlayBy: undefined, quiet: this.quietWanted ? 'on' : 'off', conversation: call.conversation, call: call.id });
     // This window makes your side of the call: say so now, and every few seconds while it does.
     const keep = (): void => {
       const c = this.live.conversation;
@@ -572,7 +600,7 @@ export class CallEngine {
     if (this.view?.id !== call.id) return;
     if (mic) this.levels.watch(this.me, mic);
     // The microphone opened before the call's state was fresh: say again whether the filter runs.
-    if (mic) this.patch({ quiet: this.filter ? (this.filter.enabled ? 'on' : 'off') : 'none' });
+    if (mic) this.patch({ quiet: this.filter ? 'on' : this.quietWanted ? 'none' : 'off' });
     this.reconcile();
   }
 
@@ -612,6 +640,8 @@ export class CallEngine {
     this.stopBeat = this.stopStats = undefined;
     for (const p of this.peers.values()) p.close();
     this.peers.clear();
+    this.lineSince.clear();
+    this.unreachableSaid = false;
     for (const a of this.audio.values()) {
       a.srcObject = null;
       a.remove();
@@ -673,6 +703,7 @@ export class CallEngine {
       if (ids.has(id)) continue;
       peer.close();
       this.peers.delete(id);
+      this.lineSince.delete(id);
       this.dropAudio(id);
       this.incoming.delete(id);
       this.kinds.delete(id);
@@ -770,6 +801,7 @@ export class CallEngine {
   private line(call: CallView, peerId: string): Peer {
     const conversation = call.conversation;
     const mic = this.mic?.getAudioTracks()[0];
+    this.lineSince.set(peerId, Date.now());
     return new Peer(
       {
         me: this.me,
@@ -826,6 +858,10 @@ export class CallEngine {
         },
         onState: (state) => {
           this.patch({ lines: { ...this.live.lines, [peerId]: { ...this.live.lines[peerId], state } } });
+          // Connected: it's fine. Dropped later: patience again from now.
+          if (state === 'connected') this.lineSince.delete(peerId);
+          else if (!this.lineSince.has(peerId)) this.lineSince.set(peerId, Date.now());
+          if (state === 'connected' && this.unreachableSaid) this.watchLines();
           // Someone who just joined hears how your screen is sent, and how you show their camera.
           if (state === 'connected' && this.screen) this.peers.get(peerId)?.sendStage(JSON.stringify({ k: 'mode', by: this.me, mode: this.live.mode }));
           if (state === 'connected') this.peers.get(peerId)?.sendStage(JSON.stringify({ k: 'view', by: this.me, big: this.myView.big, visible: this.myView.visible }));
@@ -859,8 +895,15 @@ export class CallEngine {
       this.audio.set(peerId, el);
     }
     el.srcObject = stream;
-    sink(el, this.speakerId);
-    void el.play().catch(() => undefined);
+    // A voice plays where macOS plays sound, as before speakers could be picked (BLG-737), unless you picked one.
+    if (this.speakerId) sink(el, this.speakerId);
+    const voice = el;
+    void voice.play().catch(() => {
+      // Refused without a click: it plays on your next click or key in this window.
+      const retry = (): void => void voice.play().catch(() => undefined);
+      document.addEventListener('pointerdown', retry, { once: true, capture: true });
+      document.addEventListener('keydown', retry, { once: true, capture: true });
+    });
   }
 
   private dropAudio(peerId: string): void {
@@ -871,7 +914,29 @@ export class CallEngine {
     this.audio.delete(peerId);
   }
 
+  /**
+   * A line that doesn't connect is a call where nobody hears anything, while the notes still come
+   * (they go between the daemons): the strip says so, by name, until it connects.
+   */
+  private watchLines(): void {
+    const now = Date.now();
+    const stuck = [...this.peers.keys()].filter((id) => now - (this.lineSince.get(id) ?? now) > LINE_PATIENCE_MS);
+    const said = this.unreachableSaid && this.live.problem;
+    if (!stuck.length) {
+      if (said) this.patch({ problem: undefined });
+      this.unreachableSaid = false;
+      return;
+    }
+    if (this.live.problem && !said) return;
+    const names = stuck.map((id) => this.view?.people.find((p) => p.peerId === id)?.name ?? 'them');
+    const who = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+    const problem = `Can’t reach ${who} for sound: your Macs can’t connect directly. A VPN like Cloudflare WARP can block calls.`;
+    this.unreachableSaid = true;
+    if (problem !== this.live.problem) this.patch({ problem });
+  }
+
   private async measure(): Promise<void> {
+    this.watchLines();
     const entries = await Promise.all([...this.peers].map(async ([id, p]) => [id, await p.health()] as const));
     let changed = false;
     const lines = { ...this.live.lines };
@@ -958,6 +1023,7 @@ export interface AudioDevices {
 
 const MIC_PREF = 'beluga.call.mic';
 const SPEAKER_PREF = 'beluga.call.speaker';
+const QUIET_PREF = 'beluga.call.quiet';
 
 function readPref(key: string): string | undefined {
   try {
@@ -985,10 +1051,10 @@ function micConstraints(id: string | undefined): MediaTrackConstraints {
   return { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48_000, ...(id ? { deviceId: { ideal: id } } : {}) };
 }
 
-/** Send a voice to a speaker, where WebKit allows it. */
-function sink(el: HTMLMediaElement, id: string | undefined): void {
+/** Send a voice to a speaker ('' : macOS's own), where WebKit allows it. */
+function sink(el: HTMLMediaElement, id: string): void {
   const media = el as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
-  if (typeof media.setSinkId === 'function') void media.setSinkId(id ?? '').catch(() => undefined);
+  if (typeof media.setSinkId === 'function') void media.setSinkId(id).catch(() => undefined);
 }
 
 let engine: CallEngine | undefined;

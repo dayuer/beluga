@@ -61,8 +61,8 @@ export async function pickFolders(title: string, opts: { machine?: string | unde
   if (opts.machine) {
     const [{ browseFolder }, { machineClientOf }, { currentMachines }] = await Promise.all([import('../dialogs/FolderBrowser.js'), import('../machines/pane-clients.js'), import('../machines/use-machines.js')]);
     const client = machineClientOf(opts.machine);
-    if (!client) throw new Error(t('common.projects.unreachable'));
-    const name = currentMachines().find((m) => m.id === opts.machine)?.name ?? t('common.remoteOpen.yourComputer');
+    if (!client) throw new Error('That computer can’t be reached right now');
+    const name = currentMachines().find((m) => m.id === opts.machine)?.name ?? 'your computer';
     const picked = await browseFolder(title, { on: { name, browse: (dir) => client.api.local.browse(dir) } });
     return picked ? [picked] : undefined;
   }
@@ -73,7 +73,7 @@ export async function pickFolders(title: string, opts: { machine?: string | unde
     return picked ? [picked] : undefined;
   }
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ directory: true, multiple: true, title });
+  const picked = await open({ directory: true, multiple: true, title: t(title) });
   if (!picked) return undefined;
   return Array.isArray(picked) ? picked : [picked];
 }
@@ -87,6 +87,6 @@ export async function pickImage(title: string): Promise<string | undefined> {
     return file ? (await uploadFile(file)).path : undefined;
   }
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ multiple: false, title, filters: [{ name: t('common.projects.images'), extensions: ['png', 'svg', 'jpg', 'jpeg', 'webp', 'ico'] }] });
+  const picked = await open({ multiple: false, title: t(title), filters: [{ name: 'Images', extensions: ['png', 'svg', 'jpg', 'jpeg', 'webp', 'ico'] }] });
   return typeof picked === 'string' ? picked : undefined;
 }

@@ -8,7 +8,6 @@ import { chordLabel } from '../../lib/shortcuts-model.js';
 import { type EditSession, editSession, isDirty, markSaved, setDraft, startEditing, stopEditing, textToSave, updateSession, useEditSession } from './edit-store.js';
 import { hasText } from './reader-model.js';
 import r from './reader.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * Edit, Format and Save for a file you're reading: in the header of the panel's preview and of the
@@ -45,7 +44,6 @@ function useFormatter(wsId: string, path: string, enabled: boolean): FormatterIn
 export const canEdit = (viewer: ViewerState, selfId: string | undefined): boolean => viewer.owner === selfId && !viewer.loading && !viewer.truncated && hasText(viewer);
 
 export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: ViewerState; wsId: string; selfId: string | undefined; compact?: boolean }) {
-  const t = useT();
   const { client } = useBeluga();
   const session = useEditSession(viewer);
   const editable = canEdit(viewer, selfId);
@@ -68,7 +66,7 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
       }
     } catch (err) {
       updateSession(now.key, { busy: undefined, error: errorText(err) });
-      toast(t('views.reader.saveFailed', { path: now.path, error: errorText(err) }));
+      toast(`Couldn’t save ${now.path}: ${errorText(err)}`);
     }
   };
 
@@ -83,8 +81,8 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
       if (!latest) return;
       updateSession(latest.key, { busy: undefined });
       // You kept typing while it ran: keep what you typed.
-      if (latest.draft !== now.draft) return toast(t('views.reader.changedWhileFormatting'), 'info');
-      if (out.replace(/\r\n/g, '\n') === now.draft) return toast(t('views.reader.alreadyFormatted'), 'info');
+      if (latest.draft !== now.draft) return toast('The file changed while Prettier ran; format it again', 'info');
+      if (out.replace(/\r\n/g, '\n') === now.draft) return toast('Already formatted', 'info');
       setDraft(latest.key, out);
     } catch (err) {
       updateSession(now.key, { busy: undefined });
@@ -113,7 +111,7 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
 
   if (!session && !editable) return null;
 
-  const formatLabel = !formatter ? t('views.reader.format') : formatter.available ? `${t('views.reader.format')}${formatter.version ? ` ${formatter.version}` : ''}` : (formatter.reason ?? t('views.reader.noPrettier'));
+  const formatLabel = !formatter ? 'Format with Prettier' : formatter.available ? `Format with Prettier${formatter.version ? ` ${formatter.version}` : ''}` : (formatter.reason ?? 'Prettier isn’t available');
   const formatBtn = <IconButton icon="wand" label={formatLabel} aria-disabled={!formatter?.available || Boolean(session?.busy)} className={cx(!formatter?.available && r.toolOff)} onClick={() => void format()} />;
 
   return (
@@ -121,16 +119,16 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
       {session ? (
         <span className={r.editState} role="status">
           {session.busy === 'saving' ? (
-            t('views.wt.saving')
+            'Saving…'
           ) : session.busy === 'formatting' ? (
-            t('views.reader.formatting')
+            'Formatting…'
           ) : dirty ? (
             <>
-              <span className={r.dirtyDot} aria-hidden="true" title={t('views.reader.notSaved')} />
-              {compact ? <span className="visually-hidden">{t('views.reader.edited')}</span> : t('views.reader.notSaved')}
+              <span className={r.dirtyDot} aria-hidden="true" title="Not saved" />
+              {compact ? <span className="visually-hidden">Edited</span> : 'Not saved'}
             </>
           ) : (
-            t('views.reader.editing')
+            'Editing'
           )}
         </span>
       ) : null}
@@ -138,31 +136,31 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
       {session || !compact ? formatBtn : null}
       {session ? (
         <>
-          <Tip label={t('views.reader.save')} keys={chordLabel('Cmd+S')}>
+          <Tip label="Save" keys={chordLabel('Cmd+S')}>
             <Button size="small" variant={dirty ? 'primary' : 'quiet'} disabled={!dirty || Boolean(session.busy)} onClick={() => void save()}>
-              {t('views.reader.save')}
+              Save
             </Button>
           </Tip>
-          <Tip label={t('views.reader.stopEditing')}>
+          <Tip label="Stop editing (back to read-only)">
             <Button size="small" variant="quiet" onClick={done}>
-              {t('views.peek.done')}
+              Done
             </Button>
           </Tip>
         </>
       ) : (
-        <Tip label={t('views.reader.editTip')}>
+        <Tip label="Edit this file (it opens read-only)">
           <Button size="small" variant="quiet" icon="pencil" className={r.editButton} onClick={() => startEditing(viewer, wsId, viewer.content)}>
-            {t('views.reader.edit')}
+            Edit
           </Button>
         </Tip>
       )}
       {asking === 'discard' && session ? (
         <Alert
-          title={t('views.reader.discardTitle', { name: viewer.path.split('/').pop() ?? '' })}
-          message={t('views.reader.discardMessage')}
+          title={`Discard your changes to ${viewer.path.split('/').pop()}?`}
+          message="What you typed and didn’t save will be lost."
           tone="danger"
-          confirm={{ label: t('views.reader.discard'), destructive: true, onClick: () => (setAsking(undefined), stopEditing(session.key)) }}
-          alternative={{ label: t('views.reader.save'), onClick: () => (setAsking(undefined), void save().then(() => !isDirty(editSession(viewer)) && stopEditing(session.key))) }}
+          confirm={{ label: 'Discard', destructive: true, onClick: () => (setAsking(undefined), stopEditing(session.key)) }}
+          alternative={{ label: 'Save', onClick: () => (setAsking(undefined), void save().then(() => !isDirty(editSession(viewer)) && stopEditing(session.key))) }}
           onCancel={() => setAsking(undefined)}
         />
       ) : null}
@@ -172,13 +170,12 @@ export function EditTools({ viewer, wsId, selfId, compact = false }: { viewer: V
 }
 
 function ConflictAlert({ session, onCancel, onOverwrite }: { session: EditSession; onCancel: () => void; onOverwrite: () => void }) {
-  const t = useT();
   return (
     <Alert
-      title={t('views.reader.conflictTitle', { name: session.path.split('/').pop() ?? '' })}
-      message={t('views.reader.conflictMessage')}
+      title={`${session.path.split('/').pop()} changed since you started editing`}
+      message="Someone (or an agent) saved it in the meantime. Saving yours replaces their changes."
       tone="caution"
-      confirm={{ label: t('views.reader.saveAnyway'), destructive: true, onClick: onOverwrite }}
+      confirm={{ label: 'Save Anyway', destructive: true, onClick: onOverwrite }}
       onCancel={onCancel}
     />
   );

@@ -1,7 +1,6 @@
 import type { GraphNode, GraphStatus, NodeKind } from '@beluga/shared/graph-spec.js';
 import { KIND_ICON, STATUS_INFO } from './graph-model.js';
 import g from './graph.module.css';
-import { tl, useT } from '../../i18n/index.js';
 
 /** A kind's icon and a status pill: small marks shared by nodes, the details panel and the card (no React Flow here). */
 
@@ -81,11 +80,10 @@ export function StatusMark({ status }: { status: GraphStatus }) {
 
 export function StatusPill({ status }: { status: NonNullable<GraphNode['status']> }) {
   const info = STATUS_INFO[status];
-  useT();
   return (
     <span className={cx(g.status, g[`tone_${info.tone}`])} data-status={status}>
       <StatusMark status={status} />
-      {tl('GRAPH_STATUS_INFO', status, 'label', info.label)}
+      {info.label}
     </span>
   );
 }

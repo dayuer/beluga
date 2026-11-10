@@ -1,18 +1,17 @@
 import { Fragment, useState } from 'react';
-import { AUTONOMIES, type Plan } from '@beluga/core/plans/model.js';
+import { AUTONOMIES, AUTONOMY_INFO, type Plan } from '@beluga/core/plans/model.js';
 import type { MilestoneView, PlanView, TaskView } from '@beluga/core/plans/progress.js';
 import { Icon } from '../components/Icon.js';
 import { ActionsContext, ActionsDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { IconButton, cx } from '../components/ui.js';
 import { openSheet } from '../lib/sheets.js';
-import { MILESTONE_STATE, TASK_STATE, autonomyInfo, changeMarks, milestoneLabel, milestoneRows, taskWords } from './plans-model.js';
+import { MILESTONE_STATE, TASK_STATE, changeMarks, milestoneLabel, milestoneRows, taskWords } from './plans-model.js';
 import { TaskChatMark, TaskStateIcon } from './marks.js';
 import { openDecision } from './plan-ask-model.js';
 import { useCheckerChat, useClock, usePlanActions } from './use-plans.js';
 import { useStartWith } from '../components/agent-options.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import type { AgentRef } from '@beluga/protocol.js';
-import { useT } from '../i18n/index.js';
 
 /** A change you make to a plan (as the API takes it). */
 type PlanOp = Parameters<ReturnType<typeof usePlanActions>['api']['edit']>[1][number];
@@ -27,7 +26,6 @@ export function PlanOutline({ view, keys, selected, onSelect, startable }: { vie
   const marks = changeMarks(view.plan);
   // Milestones that run side by side share a row; a row starts once what it waits on has passed.
   const rows = milestoneRows(view.body ?? view.plan.draft);
-  const t = useT();
   return (
     <div className={p.outline}>
       {view.body?.goal ? <p className={p.outlineGoal}>{view.body.goal}</p> : null}
@@ -37,9 +35,9 @@ export function PlanOutline({ view, keys, selected, onSelect, startable }: { vie
         return (
           <Fragment key={row.join()}>
             {i > 0 ? (
-              <div className={p.oAfter} aria-label={t('plans.outline.thenOnceAria', { list: after.map((m) => m.milestone.title).join(t('plans.model.and')), n: after.length })}>
+              <div className={p.oAfter} aria-label={`Then, once ${after.map((m) => m.milestone.title).join(' and ')} ${after.length === 1 ? 'passes' : 'pass'}`}>
                 <Icon name="arrowRight" size={11} className={p.oAfterArrow} />
-                {after.length ? t('plans.outline.once', { list: after.map((m) => `“${m.milestone.title}”`).join(t('plans.model.and')), n: after.length }) : t('plans.outline.then')}
+                {after.length ? `Once ${after.map((m) => `“${m.milestone.title}”`).join(' and ')} ${after.length === 1 ? 'passes' : 'pass'}` : 'Then'}
               </div>
             ) : null}
             <div className={p.oRow} data-parallel={ms.length > 1 ? ms.length : undefined} style={{ '--cols': ms.length } as React.CSSProperties}>
@@ -59,26 +57,25 @@ function Milestone({ view, plan, m, keys, marks, selected, onSelect, startable }
   const edit = (ops: PlanOp[]): void => void act(() => api.edit(plan.id, ops));
   const info = MILESTONE_STATE[m.state];
   const checker = useCheckerChat(m);
-  const t = useT();
   const menu: ActionItem[] = [
-    ...(checker ? [{ label: m.state === 'checking' ? t('plans.page.watchCheck') : t('plans.details.openCheck'), onSelect: () => openWorktree(checker) }] : []),
-    { label: t('plans.outline.runs'), submenu: AUTONOMIES.map((a) => ({ label: autonomyInfo(a).label, hint: autonomyInfo(a).hint, checked: m.autonomy === a, onSelect: () => void act(() => api.setAutonomy(plan.id, a, m.milestone.id)) })), onSelect: () => undefined },
-    ...(m.state === 'gate' || m.state === 'failed' || m.state === 'checking' ? [{ label: t('plans.page.notYet'), onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: m.milestone.id }) }] : []),
-    { label: t('plans.outline.removeMilestone'), danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: t('plans.outline.removeTitle', { title: m.milestone.title }), message: plan.body ? t('plans.outline.removeMessage') : t('plans.outline.removeDraftMessage'), confirm: t('plans.outline.remove'), destructive: true, run: () => edit([{ op: 'remove_milestone', id: m.milestone.id }]) }) },
+    ...(checker ? [{ label: m.state === 'checking' ? 'Watch the Check' : 'Open the Check', onSelect: () => openWorktree(checker) }] : []),
+    { label: 'Runs', submenu: AUTONOMIES.map((a) => ({ label: AUTONOMY_INFO[a].label, hint: AUTONOMY_INFO[a].hint, checked: m.autonomy === a, onSelect: () => void act(() => api.setAutonomy(plan.id, a, m.milestone.id)) })), onSelect: () => undefined },
+    ...(m.state === 'gate' || m.state === 'failed' || m.state === 'checking' ? [{ label: 'Not Yet…', onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: m.milestone.id }) }] : []),
+    { label: 'Remove Milestone', danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: `Remove “${m.milestone.title}”?`, message: plan.body ? 'Its tasks are taken out of the plan (unfinished ones are canceled on the board).' : 'Its tasks go with it.', confirm: 'Remove', destructive: true, run: () => edit([{ op: 'remove_milestone', id: m.milestone.id }]) }) },
   ];
   return (
     <section className={cx(p.oMilestone, p[`ms_${m.state}`])} aria-label={m.milestone.title}>
       <header className={p.oHead}>
         <span className={p.msIndex}>{m.state === 'passed' ? <Icon name="check" size={11} /> : m.index + 1}</span>
-        <Rename value={m.milestone.title} className={p.oTitle} label={t('plans.outline.milestoneName')} onDone={(title) => edit([{ op: 'update_milestone', id: m.milestone.id, title }])} />
+        <Rename value={m.milestone.title} className={p.oTitle} label="Milestone name" onDone={(title) => edit([{ op: 'update_milestone', id: m.milestone.id, title }])} />
         <span className={cx(p.msState, p[`tone_${info.tone}`])}>{milestoneLabel(view, m)}</span>
-        {m.autonomy !== plan.autonomy ? <span className={p.msAuto}>{autonomyInfo(m.autonomy).label}</span> : null}
+        {m.autonomy !== plan.autonomy ? <span className={p.msAuto}>{AUTONOMY_INFO[m.autonomy].label}</span> : null}
         <span className={p.grow} />
         <span className={p.msCount}>
           {m.state === 'draft' ? `${m.milestone.tasks.length} tasks` : `${m.finished}/${m.total}`}
         </span>
         <ActionsDropdown items={menu}>
-          <IconButton icon="more" label={t('plans.outline.options', { title: m.milestone.title })} />
+          <IconButton icon="more" label={`${m.milestone.title} Options`} />
         </ActionsDropdown>
       </header>
       {m.milestone.goal ? <p className={p.oGoal}>{m.milestone.goal}</p> : null}
@@ -91,9 +88,9 @@ function Milestone({ view, plan, m, keys, marks, selected, onSelect, startable }
       {m.milestone.criteria.length ? (
         <button type="button" className={cx(p.oGate, selected === `gate:${m.milestone.id}` && p.oGateSelected)} onClick={() => onSelect(`gate:${m.milestone.id}`)}>
           <Icon name="flag" size={12} />
-          <span className={p.oGateLabel}>{t('plans.details.passesWhen')}</span>
+          <span className={p.oGateLabel}>Passes when</span>
           <span className={p.oCriteria}>{m.milestone.criteria.join(' · ')}</span>
-          {m.run.check ? <span className={cx(p.gateCheck, m.run.check.verdict === 'pass' ? p.tone_ok : p.tone_error)}>{m.run.check.verdict === 'pass' ? t('plans.outline.agentPasses') : t('plans.outline.agentNotYet')}</span> : null}
+          {m.run.check ? <span className={cx(p.gateCheck, m.run.check.verdict === 'pass' ? p.tone_ok : p.tone_error)}>{m.run.check.verdict === 'pass' ? 'Agent: passes' : 'Agent: not yet'}</span> : null}
         </button>
       ) : null}
     </section>
@@ -112,21 +109,20 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
   // Its own agent, else the plan's: who Start uses. Start with ▸ (BLG-506): another, this start only.
   const own = t.issue?.agent ?? plan.agent;
   const startIt = (agent?: AgentRef): void => void act(() => api.startTask(plan.id, t.task.id, agent));
-  const tr = useT();
   const menu = (): ActionItem[] => [
     ...(canStart
       ? t.forYou
-        ? [{ label: tr('plans.details.decide'), icon: 'hand' as const, onSelect: () => openDecision(plan.id, t.task.id) }]
+        ? [{ label: 'Decide…', icon: 'hand' as const, onSelect: () => openDecision(plan.id, t.task.id) }]
         : [
-            { label: tr('plans.details.start'), icon: 'play' as const, onSelect: () => startIt() },
-            { label: tr('plans.outline.startWith'), icon: 'play' as const, submenu: startWith(own, (a) => startIt(a ?? (own ? mine : undefined)), ''), onSelect: () => undefined },
+            { label: 'Start', icon: 'play' as const, onSelect: () => startIt() },
+            { label: 'Start with', icon: 'play' as const, submenu: startWith(own, (a) => startIt(a ?? (own ? mine : undefined)), ''), onSelect: () => undefined },
           ]
       : []),
-    ...(t.worktree ? [{ label: tr('plans.details.openWorktree'), onSelect: () => openWorktree(t.worktree!) }] : []),
-    ...(t.issue ? [{ label: tr('plans.details.openTask'), onSelect: () => openTask(t.issue!.id) }] : []),
-    ...(others.length ? [{ label: tr('plans.outline.moveTo'), separate: true, submenu: others.map((m) => ({ label: m.title, onSelect: () => edit([{ op: 'move_task', id: t.task.id, milestone: m.id }]) })), onSelect: () => undefined }] : []),
-    { label: t.task.assignee === 'me' ? tr('plans.outline.giveToAgent') : tr('plans.outline.doItMyself'), onSelect: () => edit([{ op: 'update_task', id: t.task.id, patch: { assignee: t.task.assignee === 'me' ? 'claude' : 'me' } }]) },
-    { label: tr('plans.outline.takeOut'), danger: true, separate: true, onSelect: () => edit([{ op: 'remove_task', id: t.task.id }]) },
+    ...(t.worktree ? [{ label: 'Open Worktree', onSelect: () => openWorktree(t.worktree!) }] : []),
+    ...(t.issue ? [{ label: 'Open Task', onSelect: () => openTask(t.issue!.id) }] : []),
+    ...(others.length ? [{ label: 'Move to', separate: true, submenu: others.map((m) => ({ label: m.title, onSelect: () => edit([{ op: 'move_task', id: t.task.id, milestone: m.id }]) })), onSelect: () => undefined }] : []),
+    { label: t.task.assignee === 'me' ? 'Give It to the Agent' : 'I’ll Do It Myself', onSelect: () => edit([{ op: 'update_task', id: t.task.id, patch: { assignee: t.task.assignee === 'me' ? 'claude' : 'me' } }]) },
+    { label: 'Take Out of the Plan', danger: true, separate: true, onSelect: () => edit([{ op: 'remove_task', id: t.task.id }]) },
   ];
   return (
     <ActionsContext items={menu}>
@@ -134,9 +130,9 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
         <div role="button" tabIndex={0} className={p.oTaskMain} onClick={onSelect} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())} aria-label={`${t.task.title}, ${info.label}`}>
           <TaskStateIcon state={t.state} />
           {k ? <span className={p.taskKey}>{k}</span> : null}
-          <Rename value={t.task.title} className={p.oTaskTitle} label={tr('plans.outline.taskName')} onDone={(title) => edit([{ op: 'update_task', id: t.task.id, patch: { title } }])} />
-          {mark ? <span className={p.markChip}>{mark === 'added' ? tr('plans.canvas.new') : tr('plans.canvas.changed')}</span> : null}
-          {t.task.parent ? <span className={p.muted}>{tr('plans.outline.subTask')}</span> : null}
+          <Rename value={t.task.title} className={p.oTaskTitle} label="Task name" onDone={(title) => edit([{ op: 'update_task', id: t.task.id, patch: { title } }])} />
+          {mark ? <span className={p.markChip}>{mark === 'added' ? 'New' : 'Changed'}</span> : null}
+          {t.task.parent ? <span className={p.muted}>sub-task</span> : null}
           <TaskChatMark {...(t.worktree ? { worktree: t.worktree } : {})} />
         </div>
         <span className={p.oTaskMeta}>
@@ -146,7 +142,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
           {canStart ? (
             <button type="button" className={p.startButton} onClick={() => (t.forYou ? openDecision(plan.id, t.task.id) : void act(() => api.startTask(plan.id, t.task.id)))}>
               <Icon name={t.forYou ? 'hand' : 'play'} size={9} />
-              {t.forYou ? tr('plans.details.decide') : tr('plans.details.start')}
+              {t.forYou ? 'Decide…' : 'Start'}
             </button>
           ) : (
             <span className={cx(p.taskState, p[`tone_${info.tone}`])}>{info.label}</span>
@@ -161,7 +157,6 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
 function Rename({ value, onDone, className, label }: { value: string; onDone: (next: string) => void; className?: string; label: string }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(value);
-  const t = useT();
   if (!editing) {
     return (
       <span
@@ -171,7 +166,7 @@ function Rename({ value, onDone, className, label }: { value: string; onDone: (n
           setText(value);
           setEditing(true);
         }}
-        title={t('plans.outline.doubleClickRename')}
+        title="Double-click to rename"
       >
         {value}
       </span>

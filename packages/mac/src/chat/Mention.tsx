@@ -8,7 +8,6 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { useActions } from '../lib/actions.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { type MentionKind, type MentionRef, type MentionWorld } from './mentions.js';
-import { useT } from '../i18n/index.js';
 import s from './mention.module.css';
 
 /**
@@ -18,8 +17,7 @@ import s from './mention.module.css';
  */
 
 const ICON: Readonly<Record<MentionKind, IconName>> = { friend: 'person', claude: 'claude', project: 'grid', workspace: 'branch', folder: 'folder', file: 'file', task: 'task', image: 'image', worktree: 'branch' };
-/** A mention's kind in words: its key. */
-const WHAT = (kind: MentionKind): `chat.mention.${MentionKind}` => `chat.mention.${kind}`;
+const WHAT: Readonly<Record<MentionKind, string>> = { friend: 'Friend', claude: 'Agent', project: 'Project', workspace: 'Worktree', folder: 'Folder', file: 'File', task: 'Task', image: 'Image', worktree: 'Worktree' };
 
 /** The worktree a conversation is in ("ws:<id>"), if it is one. */
 export const worktreeOf = (channel: string | undefined): string | undefined => (channel?.startsWith('ws:') ? channel.slice(3) : undefined);
@@ -75,7 +73,6 @@ export function MentionPill({ mention }: { mention: MentionRef }) {
 function Pill({ mention }: { mention: MentionRef }) {
   const { client } = useBeluga();
   const actions = useActions();
-  const t = useT();
   const open = (): void => {
     const go = (view: Parameters<typeof client.store.dispatch>[0] & { type: 'view' }): void => void client.store.dispatch(view);
     if (mention.kind === 'friend' && mention.id) go({ type: 'view', view: { kind: 'conversation', id: `dm:${mention.id}` } });
@@ -85,7 +82,7 @@ function Pill({ mention }: { mention: MentionRef }) {
   };
   const clickable = mention.kind !== 'claude';
   return (
-    <button type="button" className={s.pill} data-kind={mention.kind} disabled={!clickable} title={`${t(WHAT(mention.kind))}: ${mention.label}`} aria-label={`${t(WHAT(mention.kind))} ${mention.label}`} onClick={open}>
+    <button type="button" className={s.pill} data-kind={mention.kind} disabled={!clickable} title={`${WHAT[mention.kind]}: ${mention.label}`} aria-label={`${WHAT[mention.kind]} ${mention.label}`} onClick={open}>
       <Icon name={ICON[mention.kind]} size={11} />
       <span>{mention.label}</span>
     </button>

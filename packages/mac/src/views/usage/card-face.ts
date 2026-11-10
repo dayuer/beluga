@@ -5,7 +5,6 @@
  * and your pass number. The strap: Beluga's name and the beluga along it. Each a PNG data URL.
  */
 import { BELUGA } from '../../components/beluga-path.js';
-import { t } from '../../i18n/index.js';
 
 /** The card is 1.6 × 2.25 (components/reactbits/Lanyard.tsx): drawn at this size. */
 export const CARD_W = 1024;
@@ -200,7 +199,7 @@ export function drawFront(f: CardFace): string {
   // The pass's kind, in a pill at the right.
   ctx.font = `700 26px ${FONT}`;
   ctx.letterSpacing = '4px';
-  const tag = t('views.pass.tag');
+  const tag = 'USAGE PASS';
   const tw = ctx.measureText(tag).width + 44;
   ctx.fillStyle = 'rgba(255,255,255,0.22)';
   roundRect(ctx, W - 72 - tw, 145, tw, 50, 25);
@@ -254,7 +253,7 @@ export function drawFront(f: CardFace): string {
   ctx.fillStyle = SOFT;
   ctx.font = `600 23px ${FONT}`;
   ctx.textAlign = 'left';
-  ctx.fillText(t('views.pass.week'), 72, 1364);
+  ctx.fillText('YOUR WEEK, HOUR BY HOUR', 72, 1364);
   ctx.textAlign = 'right';
   ctx.fillText(f.since.toUpperCase(), W - 72, 1364);
   return c.toDataURL('image/png');
@@ -296,7 +295,7 @@ export function drawBack(f: CardFace): string {
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = `600 28px ${FONT}`;
   ctx.letterSpacing = '6px';
-  ctx.fillText(t('views.pass.serial', { n: f.serial }), W / 2 + 3, 664);
+  ctx.fillText(`PASS Nº ${f.serial}`, W / 2 + 3, 664);
   ctx.letterSpacing = '0px';
   // Your year: 52 weeks across, 7 days down, a dot a day.
   const weeks = f.year.length || 1;
@@ -313,9 +312,9 @@ export function drawBack(f: CardFace): string {
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.font = `600 24px ${FONT}`;
-  ctx.fillText(t('views.pass.year'), 72, top + 7 * step * 1.5 + 24);
+  ctx.fillText('YOUR YEAR, A DOT A DAY', 72, top + 7 * step * 1.5 + 24);
   ctx.textAlign = 'right';
-  ctx.fillText(t('views.pass.activeDays', { n: f.active.toLocaleString() }), W - 72, top + 7 * step * 1.5 + 24);
+  ctx.fillText(`${f.active.toLocaleString()} ACTIVE DAYS`, W - 72, top + 7 * step * 1.5 + 24);
   // Who carries it.
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffffff';
@@ -333,7 +332,7 @@ export function drawBack(f: CardFace): string {
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.font = `600 22px ${FONT}`;
   ctx.letterSpacing = '4px';
-  ctx.fillText(t('views.pass.grab'), 72, 1352);
+  ctx.fillText('GRAB ME · SWING ME · CLICK TO FLIP', 72, 1352);
   ctx.letterSpacing = '0px';
   return c.toDataURL('image/png');
 }

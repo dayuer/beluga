@@ -17,7 +17,6 @@ import { useStats } from './usage/use-stats.js';
 import { StorageCard } from './usage/StorageCard.js';
 import { type SortKey, cleanups, projectRows } from './usage/usage-model.js';
 import s from './usage/usage.module.css';
-import { t as tNow, useT } from '../i18n/index.js';
 
 const SORT_KEY = 'beluga.usage.sort';
 const isSort = (v: unknown): v is SortKey => v === 'size' || v === 'tokens' || v === 'recent';
@@ -52,7 +51,7 @@ function useMeasure(): { measuring: boolean; measure: () => void } {
     setMeasuring(true);
     api.workbench
       .measureDisk()
-      .catch((err: unknown) => toast(client, tNow('views.usage.measureFailed', { error: err instanceof Error ? err.message : String(err) }), 'warn'))
+      .catch((err: unknown) => toast(client, `Couldn’t measure disk space: ${err instanceof Error ? err.message : String(err)}`, 'warn'))
       .finally(() => setMeasuring(false));
   }, [api, client]);
   useEffect(measure, [measure]);
@@ -72,7 +71,6 @@ function planLimits(state: AppState): PlanLimit[] {
  */
 export function UsageView() {
   const actions = useActions();
-  const t = useT();
   const state = useApp((st) => st);
   const [sort, setSort] = useSort();
   const { measuring, measure } = useMeasure();
@@ -85,12 +83,12 @@ export function UsageView() {
     return (
       <Empty
         icon="gauge"
-        title={t('views.usage.nothing')}
-        detail={t('views.usage.nothingDetail')}
+        title="Nothing to measure yet"
+        detail="Add your projects: the disk their worktrees take and what your agent uses in them show up here."
         action={
           <EmptyActions>
             <Button variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-              {t('views.overview.addProjects')}
+              Add Projects…
             </Button>
           </EmptyActions>
         }
@@ -101,7 +99,7 @@ export function UsageView() {
     <div className={s.page}>
       <div className={s.inner}>
         {got.stats ? <YourCard state={state} stats={got.stats} now={got.at} /> : <div className={s.heroWait} aria-hidden />}
-        <Chapter title={t('views.usage.rightNow')} sub={t('views.usage.rightNowSub')}>
+        <Chapter title="Right now" sub="Your plans and how much is left, your agents this week, and what your projects earned.">
           <div className={s.summaryFit}>
             <div className={s.summary}>
               <PlanCard state={state} now={now} />
@@ -112,7 +110,7 @@ export function UsageView() {
           </div>
         </Chapter>
         <StatsSection state={state} got={got} />
-        <Chapter title={t('views.usage.disk')} sub={t('views.usage.diskSub')}>
+        <Chapter title="Your disk" sub="The room your worktrees take, what’s safe to put away, and every project side by side.">
           <StorageCard rows={rows} measuring={measuring} measured={measured} onMeasure={measure} />
           {measured ? <CleanupCard items={cleanups(state, rows, now)} state={state} onDone={measure} /> : null}
           <Breakdown state={state} rows={rows} sort={sort} onSort={setSort} measured={measured} now={now} />

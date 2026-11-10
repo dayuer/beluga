@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GhRunFull, GhWorkflow, RunsList } from '@beluga/core/ci/model.js';
 import { isLive, pollEvery } from '@beluga/core/ci/model.js';
@@ -125,9 +124,9 @@ export function useCiActions() {
       }
     };
     return {
-      rerun: (projectId: string, id: number, failed: boolean) => act(() => api.ci.rerun(projectId, id, failed ? { failed: true } : undefined), failed ? t('ci.use.rerunningFailed') : t('ci.use.rerunning')),
+      rerun: (projectId: string, id: number, failed: boolean) => act(() => api.ci.rerun(projectId, id, failed ? { failed: true } : undefined), failed ? 'Running the failed jobs again' : 'Running it again'),
       cancel: (projectId: string, id: number, title: string, then?: () => void): void =>
-        openSheet({ kind: 'confirm', title: t('ci.use.cancelTitle'), message: t('ci.use.cancelMessage', { title }), confirm: t('ci.use.cancelRun'), destructive: true, run: () => void act(() => api.ci.cancel(projectId, id), t('ci.use.cancelling')).then((ok) => ok && then?.()) }),
+        openSheet({ kind: 'confirm', title: 'Cancel this run?', message: `“${title}” stops where it is. You can run it again later.`, confirm: 'Cancel Run', destructive: true, run: () => void act(() => api.ci.cancel(projectId, id), 'Cancelling the run').then((ok) => ok && then?.()) }),
       log: (projectId: string, jobId: number): Promise<string> => api.ci.log(projectId, jobId),
       openRun: (projectId: string, runId: number): void => actions.run({ type: 'view', view: { kind: 'gh_run', projectId, runId } }),
       openList: (projectId?: string, page?: 'workflows'): void => actions.run({ type: 'view', view: { kind: 'actions', ...(projectId ? { projectId } : {}), ...(page ? { page } : {}) } }),

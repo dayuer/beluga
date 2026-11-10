@@ -4,7 +4,6 @@
  * and Beluga's logo. Drawn on a canvas; nothing leaves the Mac unless you send it.
  */
 import { drawBeluga, drawLogo, shade } from './card-face.js';
-import { t } from '../../i18n/index.js';
 
 export const SHARE_W = 1080;
 export const SHARE_H = 1350;
@@ -24,7 +23,7 @@ function load(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(t('views.pass.cantDraw')));
+    img.onerror = () => reject(new Error('The pass couldn’t be drawn'));
     img.src = url;
   });
 }
@@ -127,6 +126,6 @@ export async function drawShare(x: ShareInput): Promise<string> {
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = `600 26px ${FONT}`;
   ctx.textAlign = 'center';
-  ctx.fillText(t('views.pass.madeWith'), SHARE_W / 2, SHARE_H - 44);
+  ctx.fillText('Made with Beluga · your agents, side by side', SHARE_W / 2, SHARE_H - 44);
   return c.toDataURL('image/png');
 }

@@ -22,7 +22,6 @@ import { channelName, isMain } from './chat-model.js';
 import { openMain } from './ChatTabs.js';
 import side from '../layout/Sidebar.module.css';
 import s from './network.module.css';
-import { t, useT } from '../i18n/index.js';
 
 /**
  * The sidebar's Friends and Groups: who's around (with their status), the groups you're in,
@@ -31,7 +30,6 @@ import { t, useT } from '../i18n/index.js';
 
 /** Turn on talking with friends: what it is in two lines, and one button. */
 function Welcome() {
-  useT();
   const { client } = useBeluga();
   const prefs = usePrefs();
   const [busy, setBusy] = useState(false);
@@ -48,20 +46,20 @@ function Welcome() {
     }
   };
   return (
-    <div className={s.welcome} role="group" aria-label={t('network.sidebar.talk')}>
+    <div className={s.welcome} role="group" aria-label="Talk with friends">
       <div className={s.welcomeArt} aria-hidden="true">
         <Avatar name="A" id="welcome-a" size={22} />
         <Avatar name="J" id="welcome-b" size={22} />
         <Avatar name="M" id="welcome-c" size={22} />
       </div>
-      <div className={s.welcomeTitle}>{t('network.sidebar.talkTitle')}</div>
-      <div className={s.welcomeText}>{t('network.sidebar.talkText')}</div>
+      <div className={s.welcomeTitle}>Talk with friends directly</div>
+      <div className={s.welcomeText}>Messages and groups go straight from computer to computer, end-to-end encrypted. No server, no account.</div>
       <div className={s.welcomeButtons}>
         <Button variant="primary" size="small" disabled={busy} onClick={() => void turnOn()}>
-          {busy ? t('network.sidebar.turningOn') : t('network.sidebar.turnOn')}
+          {busy ? 'Turning On…' : 'Turn On'}
         </Button>
         <Button variant="quiet" size="small" onClick={() => setPrefs({ folded: [...prefs.folded.filter((f) => f !== 'friends'), 'friends'] })}>
-          {t('network.sidebar.notNow')}
+          Not Now
         </Button>
       </div>
       {error ? (
@@ -83,30 +81,29 @@ interface RoomCtx {
 function friendItems(f: FriendView, groups: readonly GroupView[], ctx: { open: () => void; card: () => void; say: (t: string) => void; addTo: (g: GroupView) => void; room?: RoomCtx | undefined }): ActionItem[] {
   const mine = sortGroups(groups).filter((g) => g.active && g.admin && !g.members.some((m) => m.peerId === f.peerId));
   return [
-    { label: t('network.sidebar.message'), icon: 'chat', onSelect: ctx.open },
-    { label: t('network.sidebar.card', { name: f.name }), icon: 'person', onSelect: ctx.card },
+    { label: 'Message', icon: 'chat', onSelect: ctx.open },
+    { label: `${f.name}’s Card…`, icon: 'person', onSelect: ctx.card },
     ...(ctx.room
       ? [
-          { label: ctx.room.bits.following ? t('network.sidebar.stopFollowing', { name: f.name }) : t('network.sidebar.follow', { name: f.name }), icon: 'eye' as const, separate: true, onSelect: ctx.room.follow },
-          { label: t('network.sidebar.inRoom'), icon: 'people' as const, onSelect: ctx.room.roomCard },
+          { label: ctx.room.bits.following ? `Stop Following ${f.name}` : `Follow ${f.name}’s Screen`, icon: 'eye' as const, separate: true, onSelect: ctx.room.follow },
+          { label: 'In This Room…', icon: 'people' as const, onSelect: ctx.room.roomCard },
         ]
       : []),
     {
-      label: t('network.sidebar.addToChannel'),
+      label: 'Add to Channel',
       icon: 'people',
       onSelect: () => undefined,
       submenu: [
         ...mine.map((g) => ({ label: g.name, onSelect: () => ctx.addTo(g) })),
-        { label: t('network.sidebar.newChannelWith', { name: f.name }), separate: mine.length > 0, onSelect: () => openNet({ kind: 'new_group', with: [f.peerId] }) },
+        { label: `New Channel with ${f.name}…`, separate: mine.length > 0, onSelect: () => openNet({ kind: 'new_group', with: [f.peerId] }) },
       ],
     },
-    { label: t('network.sidebar.copyName'), icon: 'copy', separate: true, onSelect: () => void copyText(f.name).then(() => ctx.say(t('network.sidebar.copiedName', { name: f.name }))) },
-    { label: t('network.sidebar.remove', { name: f.name }), danger: true, separate: true, onSelect: () => openNet({ kind: 'remove_friend', peerId: f.peerId }) },
+    { label: 'Copy Name', icon: 'copy', separate: true, onSelect: () => void copyText(f.name).then(() => ctx.say(`Copied “${f.name}”`)) },
+    { label: `Remove ${f.name}…`, danger: true, separate: true, onSelect: () => openNet({ kind: 'remove_friend', peerId: f.peerId }) },
   ];
 }
 
 function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] }) {
-  useT();
   const { client, ui } = useBeluga();
   const actions = useActions();
   const say = useSay();
@@ -118,7 +115,7 @@ function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] 
   const emoji = state !== 'offline' ? f.presence.emoji?.trim() : undefined;
   const addTo = (g: GroupView): void => {
     client.api.network['groups.addMember'](g.id, f.peerId).then(
-      () => say(t('network.sidebar.added', { name: f.name, group: g.name })),
+      () => say(`Added ${f.name} to ${g.name}`),
       () => undefined,
     );
   };
@@ -133,7 +130,7 @@ function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] 
         roomCard: () => openPerson(ui, bits.index),
       }
     : undefined;
-  const roomLine = bits ? `${t('network.sidebar.inYourRoom')}${bits.claude ? t('network.sidebar.agentOn') : ''}${bits.following ? t('network.sidebar.youFollow') : ''}` : '';
+  const roomLine = bits ? ` · in your room${bits.claude ? ' · agent on' : ''}${bits.following ? ' · you follow their screen' : ''}` : '';
   return (
     <ActionsContext items={() => friendItems(f, groups, { open: () => openDm(client, f.peerId), card: () => openFriendCard(client, f.peerId), say, addTo, room })}>
       <Row
@@ -145,7 +142,7 @@ function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] 
             <PersonAvatar name={f.name} id={f.peerId} state={state} size={18} />
           </PersonButton>
         }
-        aria-label={`${f.name}, ${presenceLine(f)}${f.unread ? t('network.sidebar.unread', { n: f.unread }) : ''}`}
+        aria-label={`${f.name}, ${presenceLine(f)}${f.unread ? `, ${f.unread} unread` : ''}`}
         label={
           <span className={s.who}>
             <span className={cx(s.whoName, f.unread > 0 && s.unreadName)}>{f.name}</span>
@@ -157,22 +154,22 @@ function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] 
             {note ? <span className={s.whoNote}>{note}</span> : null}
           </span>
         }
-        detail={`${f.name} · ${presenceLine(f)}${f.via === 'relay' ? t('network.sidebar.viaRelay') : ''}${roomLine}`}
+        detail={`${f.name} · ${presenceLine(f)}${f.via === 'relay' ? ' · connected through another computer' : ''}${roomLine}`}
         onClick={() => openDm(client, f.peerId)}
         trailing={
           <>
             {bits?.following ? (
-              <Tip label={t('network.sidebar.following')}>
+              <Tip label="Following their screen">
                 <Icon name="eye" size={12} />
               </Tip>
             ) : null}
             {bits?.claude ? (
-              <Tip label={t('network.sidebar.agentHere', { name: f.name })}>
+              <Tip label={`${f.name}’s agent is on in this room`}>
                 <Icon name="claude" size={12} className={side.claudeMark} />
               </Tip>
             ) : null}
             {f.via === 'relay' && f.online ? (
-              <Tip label={t('network.sidebar.relayTip')}>
+              <Tip label="Connected through another member’s computer (still end-to-end encrypted)">
                 <span className={s.relay}>
                   <Icon name="link" size={11} />
                 </span>
@@ -188,7 +185,6 @@ function FriendRow({ f, groups }: { f: FriendView; groups: readonly GroupView[] 
 
 /** Rename a group in place (Return keeps it, Esc puts it back). */
 function RenameField({ g, done }: { g: GroupView; done: () => void }) {
-  useT();
   const { client } = useBeluga();
   const [name, setName] = useState(g.name);
   const ref = useRef<HTMLInputElement>(null);
@@ -206,7 +202,7 @@ function RenameField({ g, done }: { g: GroupView; done: () => void }) {
       ref={ref}
       className={s.rename}
       style={{ fontSize: 'inherit', textAlign: 'left', height: 22 }}
-      aria-label={t('network.sidebar.newName', { name: g.name })}
+      aria-label={`New name for ${g.name}`}
       value={name}
       maxLength={64}
       onChange={(e) => setName(e.target.value)}
@@ -223,25 +219,24 @@ function RenameField({ g, done }: { g: GroupView; done: () => void }) {
 
 function groupItems(g: GroupView, ctx: { open: () => void; rename: () => void; copyLink: () => void; read: () => void }): ActionItem[] {
   return [
-    { label: t('network.sidebar.open'), icon: 'chat', onSelect: ctx.open },
-    ...(g.unread ? [{ label: t('network.sidebar.markRead'), icon: 'check' as const, onSelect: ctx.read }] : []),
+    { label: 'Open', icon: 'chat', onSelect: ctx.open },
+    ...(g.unread ? [{ label: 'Mark as Read', icon: 'check' as const, onSelect: ctx.read }] : []),
     ...(g.active
       ? [
-          { label: t('network.sidebar.rename'), icon: 'pencil' as const, separate: true, onSelect: ctx.rename },
+          { label: 'Rename…', icon: 'pencil' as const, separate: true, onSelect: ctx.rename },
           ...(g.admin
             ? [
-                { label: t('network.sidebar.addPeople'), icon: 'plus' as const, onSelect: () => openNet({ kind: 'add_people', groupId: g.id }) },
-                { label: t('network.sidebar.copyInvite'), icon: 'link' as const, onSelect: ctx.copyLink },
+                { label: 'Add People…', icon: 'plus' as const, onSelect: () => openNet({ kind: 'add_people', groupId: g.id }) },
+                { label: 'Copy Invite Link', icon: 'link' as const, onSelect: ctx.copyLink },
               ]
             : []),
-          { label: t('network.sidebar.leaveChannel'), danger: true, separate: true, onSelect: () => openNet({ kind: 'leave_group', groupId: g.id }) },
+          { label: 'Leave Channel…', danger: true, separate: true, onSelect: () => openNet({ kind: 'leave_group', groupId: g.id }) },
         ]
-      : [{ label: t('network.sidebar.deleteChannel'), danger: true, separate: true, onSelect: () => openNet({ kind: 'delete_group', groupId: g.id }) }]),
+      : [{ label: 'Delete Channel…', danger: true, separate: true, onSelect: () => openNet({ kind: 'delete_group', groupId: g.id }) }]),
   ];
 }
 
 function GroupRow({ g }: { g: GroupView }) {
-  useT();
   const { client } = useBeluga();
   const say = useSay();
   const net = useNetwork();
@@ -252,7 +247,7 @@ function GroupRow({ g }: { g: GroupView }) {
   const copyLink = async (): Promise<void> => {
     const open = openGroupInvitation(invitations, g.id) ?? (await client.api.network['groups.invite'](g.id));
     await copyText(open.link);
-    say(t('network.sidebar.copiedInvite', { name: g.name }));
+    say(`Copied the invite link to ${g.name}`);
   };
   const requests = g.admin ? g.requests.length : 0;
   return (
@@ -262,15 +257,15 @@ function GroupRow({ g }: { g: GroupView }) {
         selected={selected}
         className={g.active ? undefined : s.left}
         icon={main ? <span className={s.mainIcon}><Icon name="people" size={12} /></span> : <GroupAvatar name={g.name} id={g.id} size={18} muted={!g.active} />}
-        aria-label={`${t('network.sidebar.channelLabel', { name: channelName(net, g) })}${g.unread ? t('network.sidebar.unread', { n: g.unread }) : ''}`}
+        aria-label={`Channel ${channelName(net, g)}${g.unread ? `, ${g.unread} unread` : ''}`}
         label={renaming ? <RenameField g={g} done={() => setRenaming(false)} /> : <span className={cx(s.whoName, g.unread > 0 && g.active && s.unreadName)}>{channelName(net, g)}</span>}
-        detail={main ? t('network.sidebar.mainDetail', { members: membersLine(g.members) }) : g.active ? `${g.name} · ${membersLine(g.members)}` : t('network.sidebar.leftDetail', { name: g.name })}
+        detail={main ? `Your main channel: all your friends · ${membersLine(g.members)}` : g.active ? `${g.name} · ${membersLine(g.members)}` : `${g.name} · you’re no longer in this channel`}
         onClick={() => (renaming ? undefined : openGroup(client, g.id))}
         onDoubleClick={() => g.active && !main && setRenaming(true)}
         trailing={
           <>
             {requests ? (
-              <Tip label={t('network.sidebar.askToJoin', { n: requests })}>
+              <Tip label={`${requests} ${requests === 1 ? 'person asks' : 'people ask'} to join`}>
                 <span className={s.requests}>{requests}</span>
               </Tip>
             ) : null}
@@ -284,25 +279,24 @@ function GroupRow({ g }: { g: GroupView }) {
 
 /** Someone in your room asks to be friends: one main action (Accept); Not Now on right-click. */
 function OfferRow({ o }: { o: FriendOfferView }) {
-  useT();
   const { client } = useBeluga();
   return (
     <ActionsContext
       items={() => [
-        { label: t('network.sidebar.accept'), icon: 'check', onSelect: () => void answerOffer(client, o.peerId, o.name, true) },
-        { label: t('network.sidebar.notNow'), icon: 'x', separate: true, onSelect: () => void answerOffer(client, o.peerId, o.name, false) },
+        { label: 'Accept', icon: 'check', onSelect: () => void answerOffer(client, o.peerId, o.name, true) },
+        { label: 'Not Now', icon: 'x', separate: true, onSelect: () => void answerOffer(client, o.peerId, o.name, false) },
       ]}
     >
       <Row
         data-offer-row={o.peerId}
         icon={<Avatar name={o.name} id={o.peerId} size={18} />}
-        aria-label={o.via ? t('network.sidebar.offerVia', { name: o.name, team: o.via }) : t('network.sidebar.offer', { name: o.name })}
-        label={<span className={s.whoName}>{t('network.sidebar.wantsToAdd', { name: o.name })}</span>}
-        detail={o.via ? t('network.sidebar.offerViaDetail', { name: o.name, team: o.via }) : t('network.sidebar.offerDetail', { name: o.name })}
+        aria-label={o.via ? `${o.name} from the ${o.via} team wants to add you as a friend` : `${o.name} wants to add you as a friend`}
+        label={<span className={s.whoName}>{o.name} wants to add you</span>}
+        detail={o.via ? `${o.name} is on the ${o.via} team with you and asks to be friends on the Beluga network` : `${o.name} is in your room and asks to be friends on the Beluga network`}
         onClick={() => void answerOffer(client, o.peerId, o.name, true)}
         trailing={
           <Button size="small" variant="primary" onClick={(e) => (e.stopPropagation(), void answerOffer(client, o.peerId, o.name, true))}>
-            {t('network.sidebar.accept')}
+            Accept
           </Button>
         }
       />
@@ -312,7 +306,6 @@ function OfferRow({ o }: { o: FriendOfferView }) {
 
 /** Someone in your room who isn't a friend yet: their room card on click, and one action, Add as Friend. */
 function RoomPersonRow({ p, sent }: { p: RoomPerson & { index: number }; sent: boolean }) {
-  useT();
   const { client, ui } = useBeluga();
   return (
     <PersonContextMenu index={p.index}>
@@ -320,17 +313,17 @@ function RoomPersonRow({ p, sent }: { p: RoomPerson & { index: number }; sent: b
         data-person-row={p.peerId}
         icon={<Avatar name={p.name} id={p.peerId} size={18} />}
         label={<span className={s.whoName}>{p.name}</span>}
-        detail={`${t('network.sidebar.roomDetail', { name: p.name })}${p.agent ? t('network.sidebar.agentOn') : ''}${sent ? t('network.sidebar.requestSent') : ''}`}
+        detail={`${p.name} · in your room${p.agent ? ' · agent on' : ''}${sent ? ' · friend request sent' : ''}`}
         onClick={() => openPerson(ui, p.index, document.querySelector<HTMLElement>(`[data-person-row="${CSS.escape(p.peerId)}"]`))}
         trailing={
           sent ? (
-            <Tip label={t('network.sidebar.waitingAccept')}>
+            <Tip label="Waiting for them to accept">
               <Icon name="clock" size={12} />
             </Tip>
           ) : (
-            <Tip label={t('network.sidebar.addAsFriend', { name: p.name })}>
-              <Button size="small" variant="quiet" icon="plus" aria-label={t('network.sidebar.addAsFriend', { name: p.name })} onClick={(e) => (e.stopPropagation(), void befriend(client, p.peerId, p.name))}>
-                {t('network.sidebar.add')}
+            <Tip label={`Add ${p.name} as a friend`}>
+              <Button size="small" variant="quiet" icon="plus" aria-label={`Add ${p.name} as a friend`} onClick={(e) => (e.stopPropagation(), void befriend(client, p.peerId, p.name))}>
+                Add
               </Button>
             </Tip>
           )
@@ -342,13 +335,12 @@ function RoomPersonRow({ p, sent }: { p: RoomPerson & { index: number }; sent: b
 
 /** Friends: everyone you've added, with their status; or the card that turns the network on. Then people in your room who aren't friends yet. */
 export function FriendsSection() {
-  useT();
   const net = useNetwork();
   const friends = sortFriends(net.friends);
   const offers = incomingOffers(net.offers);
   const strangers = useApp((st) => notFriendsYet(st.peers, { selfId: st.self?.peerId, friends: st.network.friends, guests: st.guests }), sameDeep);
   return (
-    <Section id="friends" title={t('network.sidebar.friends')} action={net.enabled ? <IconButton icon="plus" label={t('network.sidebar.addFriend')} onClick={() => openNet({ kind: 'add_friend' })} /> : undefined}>
+    <Section id="friends" title="Friends" action={net.enabled ? <IconButton icon="plus" label="Add a friend" onClick={() => openNet({ kind: 'add_friend' })} /> : undefined}>
       <div className={s.sidebarList}>
         {offers.map((o) => (
           <OfferRow key={o.peerId} o={o} />
@@ -360,16 +352,16 @@ export function FriendsSection() {
             {friends.map((f) => (
               <FriendRow key={f.peerId} f={f} groups={net.groups} />
             ))}
-            {friends.length || strangers.length ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label={t('network.sidebar.addFriendRow')} detail={t('network.sidebar.addFriendDetail')} onClick={() => openNet({ kind: 'add_friend' })} />}
+            {friends.length || strangers.length ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label="Add a friend…" detail="Send them a link or a code; they’re a friend once they use it" onClick={() => openNet({ kind: 'add_friend' })} />}
             {net.pendingJoins.map((p) => (
-              <Row key={p.groupId} className={side.hintRow} icon={<Icon name="clock" size={13} />} label={t('network.sidebar.askedJoin', { name: p.name })} detail={t('network.sidebar.askedJoinDetail')} />
+              <Row key={p.groupId} className={side.hintRow} icon={<Icon name="clock" size={13} />} label={`Asked to join ${p.name}`} detail="Waiting for an admin of the group to let you in" />
             ))}
           </>
         )}
         {strangers.length ? (
           <>
             <div className={s.subhead} role="presentation">
-              {t('network.sidebar.notFriendsYet')}
+              Not friends yet
             </div>
             {strangers.map((p) => (
               <RoomPersonRow key={p.peerId} p={p} sent={offerSent(net.offers, p.peerId)} />
@@ -383,7 +375,6 @@ export function FriendsSection() {
 
 /** Your main channel before it exists: one click makes it, with all your friends. */
 function MainRow() {
-  useT();
   const { client } = useBeluga();
   const say = useSay();
   return (
@@ -394,9 +385,9 @@ function MainRow() {
           <Icon name="people" size={12} />
         </span>
       }
-      aria-label={t('network.sidebar.mainLabel')}
-      label={<span className={s.whoName}>{t('network.chat.allFriends')}</span>}
-      detail={t('network.sidebar.mainRowDetail')}
+      aria-label="Channel All Friends"
+      label={<span className={s.whoName}>All Friends</span>}
+      detail="Your main channel: everyone you’ve added, in one conversation"
       onClick={() => void openMain(client).catch((err) => say(errorText(err), 'error'))}
     />
   );
@@ -407,7 +398,6 @@ function MainRow() {
  * while someone else is in the room; alone, there's no one to chat with there.
  */
 function RoomChatRow() {
-  useT();
   const actions = useActions();
   const { ui } = useBeluga();
   // Someone at the door: their card is in this chat (chat/Attention.tsx), so it counts here.
@@ -420,8 +410,8 @@ function RoomChatRow() {
   return (
     <ActionsContext
       items={() => [
-        { label: t('more.up.room.open'), icon: 'chat', onSelect: open },
-        { label: t('more.up.room.clear'), icon: 'x', separate: true, onSelect: () => ui.openMenu({ kind: 'clear', channel: 'room', host }) },
+        { label: 'Open', icon: 'chat', onSelect: open },
+        { label: 'Clear the Group Chat…', icon: 'x', separate: true, onSelect: () => ui.openMenu({ kind: 'clear', channel: 'room', host }) },
       ]}
     >
       <Row
@@ -432,9 +422,9 @@ function RoomChatRow() {
             <Icon name="chat" size={12} />
           </span>
         }
-        aria-label={`${t('more.sync.groupChat')}${door ? t('more.up.room.ariaDoor') : ''}${unread ? t('more.up.room.ariaUnread', { count: unread }) : ''}`}
-        label={<span className={cx(s.whoName, count > 0 && s.unreadName)}>{t('more.sync.groupChat')}</span>}
-        detail={door ? t('more.up.room.door') : `${room ? `${room} · ` : ''}${t('more.up.room.people', { count: people })}`}
+        aria-label={`Group chat${door ? ', someone at the door' : ''}${unread ? `, ${unread} unread` : ''}`}
+        label={<span className={cx(s.whoName, count > 0 && s.unreadName)}>Group chat</span>}
+        detail={door ? 'Someone is at the door: let them in from the chat' : `${room ? `${room} · ` : ''}${people} people in your room · everyone’s agent can join in`}
         onClick={open}
         trailing={count ? <Badge count={count} urgent /> : null}
       />
@@ -444,12 +434,11 @@ function RoomChatRow() {
 
 /** Channels you're in (the room's group chat while there's one, then your main one; ones you left, dimmed, with their history). */
 export function GroupsSection() {
-  useT();
   const net = useNetwork();
   const roomChat = useApp(groupChatOpen);
   if (!net.enabled) {
     return roomChat ? (
-      <Section id="net-groups" title={t('network.sidebar.channels')}>
+      <Section id="net-groups" title="Channels">
         <div className={s.sidebarList}>
           <RoomChatRow />
         </div>
@@ -459,14 +448,14 @@ export function GroupsSection() {
   const groups = sortGroups(net.groups).filter((g) => g.id !== net.main);
   const main = net.main ? net.groups.find((g) => g.id === net.main) : undefined;
   return (
-    <Section id="net-groups" title={t('network.sidebar.channels')} action={<IconButton icon="plus" label={t('network.sidebar.newChannel')} onClick={() => openNet({ kind: 'new_group' })} />}>
+    <Section id="net-groups" title="Channels" action={<IconButton icon="plus" label="New channel" onClick={() => openNet({ kind: 'new_group' })} />}>
       <div className={s.sidebarList}>
         {roomChat ? <RoomChatRow /> : null}
         {main ? <GroupRow g={main} /> : <MainRow />}
         {groups.map((g) => (
           <GroupRow key={g.id} g={g} />
         ))}
-        {groups.length ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label={t('network.sidebar.newChannelRow')} detail={t('network.sidebar.newChannelDetail')} onClick={() => openNet({ kind: 'new_group' })} />}
+        {groups.length ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label="New channel…" detail="A conversation with several friends, kept on everyone’s computer" onClick={() => openNet({ kind: 'new_group' })} />}
       </div>
     </Section>
   );

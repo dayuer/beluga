@@ -1,5 +1,4 @@
 import type { Capabilities } from '@beluga/ipc/socket-client.js';
-import { late, say } from './late-words.js';
 import { SocketClient } from '@beluga/ipc/socket-client.js';
 import { brandNotice, isTestNotice } from './brand.js';
 import type { SoundChoice } from '@beluga/shared/notify-sound.js';
@@ -7,6 +6,7 @@ import { MESSAGE_BANNER, NOTIFICATION_TAP } from './notices.js';
 import { REQUEST_NOTIFICATION, notificationActions } from '../gateway/request-actions.js';
 import { version } from '../../src-tauri/tauri.conf.json';
 import { machineSocketUrl } from '../machines/pane-model.js';
+import { t } from '../i18n/index.js';
 
 /** Running inside the Tauri shell (otherwise: a browser, while developing). */
 export const inApp = (): boolean => '__TAURI_INTERNALS__' in globalThis;
@@ -32,9 +32,6 @@ export const WEB_HELLO_TOKEN = 'browser-session-cookie';
 /** The socket of the page's own origin (the daemon's web port, src/daemon/web.ts). */
 export const webSocketUrl = (loc: Pick<Location, 'protocol' | 'host'>): string => `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${loc.host}/ws`;
 
-/** The daemon isn't there (in the language shown once it's loaded). */
-const notRunning = (): string => late('Beluga is not running', (w) => w.t('more.boot.notRunning'));
-
 /**
  * Where the daemon is: the app's own sidecar (asked through Tauri), the daemon's web port that
  * served this page (`beluga web`: same origin, its session cookie), or the dev server's bridge.
@@ -49,15 +46,15 @@ export async function endpoint(): Promise<Endpoint> {
   // This browser was revoked (or never let in): the page itself becomes the Ask for a link page.
   if (res.status === 401 && body.signedOut) {
     location.reload();
-    throw new Error(late('This browser is signed out of Beluga', (w) => w.t('more.boot.signedOut')));
+    throw new Error('This browser is signed out of Beluga');
   }
-  if (!res.ok || body.error) throw new Error(body.error ?? notRunning());
+  if (!res.ok || body.error) throw new Error(body.error ?? 'Beluga is not running');
   if (body.web) {
     served = true;
     document.documentElement.dataset.web = 'true';
     return { url: webSocketUrl(location), token: WEB_HELLO_TOKEN };
   }
-  if (!body.url || !body.token) throw new Error(notRunning());
+  if (!body.url || !body.token) throw new Error('Beluga is not running');
   return { url: body.url, token: body.token };
 }
 
@@ -100,7 +97,7 @@ export function capabilities(setZoom: (dir: 'in' | 'out' | 'reset') => { ok: boo
         // A real sound name ("default" isn't one on macOS: it was silent). See lib/sounds/native.ts.
         const { sound, fallback }: { sound?: string; fallback?: () => void } = test ? {} : await notificationSound(n);
         // An approval on its own gets Approve / Decline (and Always for a friend's request) on the notification.
-        sendNotification({ title: n.title, body: n.body, ...(sound ? { sound } : {}), ...notificationActions(n), extra: { ...(n.channel ? { channel: n.channel } : {}), ...(n.approval ? { approval: n.approval } : {}), ...(n.task ? { task: n.task } : {}) } });
+        sendNotification({ title: t(n.title), body: t(n.body), ...(sound ? { sound } : {}), ...notificationActions(n), extra: { ...(n.channel ? { channel: n.channel } : {}), ...(n.approval ? { approval: n.approval } : {}), ...(n.task ? { task: n.task } : {}) } });
         fallback?.();
         return;
       }
@@ -155,7 +152,7 @@ const MACHINE_CAPS = ['copyText', 'openExternal', 'readClipboardImage', 'notify'
  */
 export async function connectMachine(id: string, caps: Capabilities): Promise<SocketClient> {
   const { url, token } = await endpoint();
-  if (webServed()) throw new Error(say('common.boot.computersInApp'));
+  if (webServed()) throw new Error('Your computers open in the Beluga app');
   const allowed: Capabilities = Object.fromEntries(MACHINE_CAPS.flatMap((k) => (caps[k] ? [[k, caps[k]]] : [])));
   return SocketClient.connect({ url: machineSocketUrl(url, id), token, kind: 'mac', version: APP_VERSION, caps: allowed, timeoutMs: 20_000 });
 }

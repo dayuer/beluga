@@ -9,7 +9,6 @@ import { WorkspaceWithAgents } from './SubAgents.js';
 import { notLater, useLater } from './later-rows.js';
 import { isAgentWorktree } from '../claude-code/subagents-model.js';
 import o from './other-worktrees.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * A project's worktrees made outside Beluga, listed after Beluga's own as ordinary rows: each
@@ -18,7 +17,6 @@ import { useT } from '../i18n/index.js';
  */
 export function OutsideWorktrees({ p, indent }: { p: Project; indent: number }) {
   const actions = useActions();
-  const t = useT();
   const log = useApp((st) => st.log);
   const here = useApp((st) => (st.view.kind === 'workspace' ? st.view.id : undefined));
   const key = `outside-more:${p.id}`;
@@ -47,8 +45,8 @@ export function OutsideWorktrees({ p, indent }: { p: Project; indent: number }) 
           className={o.more}
           aria-expanded={expanded}
           icon={<Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={10} />}
-          label={expanded ? t('layout.otherWorktrees.showFewer') : t('layout.otherWorktrees.showMore', { count: hidden.length })}
-          detail={expanded ? t('layout.otherWorktrees.showFewerDetail') : t('layout.otherWorktrees.showMoreDetail', { count: hidden.length })}
+          label={expanded ? 'Show Fewer' : `Show ${hidden.length} more`}
+          detail={expanded ? 'Show only the most recent worktrees made outside Beluga' : `${hidden.length} more worktree${hidden.length === 1 ? '' : 's'} made outside Beluga, less recently active`}
           onClick={toggle}
         />
       ) : null}

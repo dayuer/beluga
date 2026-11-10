@@ -12,8 +12,6 @@ import { useBoard } from './use-tasks.js';
 import s from './SyncSheet.module.css';
 import { thisComputer } from '../lib/os-words.js';
 
-import { useT } from '../i18n/index.js';
-
 interface Team {
   readonly id: string;
   readonly key: string;
@@ -29,8 +27,7 @@ export function SyncSheet({ projectId, close }: { projectId: string; close: () =
   const sync = useBoard().sync?.[projectId];
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const [changing, setChanging] = useState(false);
-  const t = useT();
-  if (!project) return <FormSheet title={t('tasks.sync.title')} intro={t('tasks.sync.gone')} submitLabel={t('plans.sheets.ok')} hideSubmit onSubmit={close} onCancel={close} />;
+  if (!project) return <FormSheet title="Sync with Linear" intro="That project is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
   if (sync && !changing) return <Connected projectId={projectId} name={project.name} sync={sync} onChange={() => setChanging(true)} close={close} />;
   return <ConnectForm projectId={projectId} name={project.name} close={close} onBack={sync ? () => setChanging(false) : undefined} />;
 }
@@ -46,22 +43,21 @@ function ConnectForm({ projectId, name, close, onBack }: { projectId: string; na
   const [pushExisting, setPushExisting] = useState(false);
   const trimmed = key.trim();
   const problem = trimmed ? linearKeyProblem(trimmed) : undefined;
-  const t = useT();
   return (
     <FormSheet
-      title={onBack ? t('tasks.sync.change', { name }) : t('tasks.sync.syncName', { name })}
+      title={onBack ? `Change how ${name} syncs` : `Sync ${name} with Linear`}
       icon="refresh"
-      intro={<p>{t('tasks.sync.intro', { computer: thisComputer() })}</p>}
-      submitLabel={found ? t('tasks.sync.connect') : t('tasks.sync.checkKey')}
+      intro={<p>Issues in a Linear team show up here as tasks, and tasks made here show up in Linear. A change on either side follows to the other. The key stays on {thisComputer()}.</p>}
+      submitLabel={found ? 'Connect' : 'Check Key'}
       canSubmit={Boolean(trimmed) && !problem && (!found || Boolean(team))}
-      cancelLabel={onBack ? t('tasks.page.back') : t('tasks.sync.cancel')}
+      cancelLabel={onBack ? 'Back' : 'Cancel'}
       onCancel={onBack ?? close}
       width={560}
       onSubmit={async () => {
         if (!found) {
           const r = await api.board.syncTeams('linear', trimmed);
           if (!r.ok) return r.error;
-          if (!r.teams.length) return t('tasks.sync.noTeams');
+          if (!r.teams.length) return 'This key sees no teams in Linear';
           setFound({ ...(r.workspace ? { workspace: r.workspace } : {}), teams: r.teams });
           setTeam(r.teams[0]!.id);
           return undefined;
@@ -75,12 +71,12 @@ function ConnectForm({ projectId, name, close, onBack }: { projectId: string; na
       }}
     >
       <Field
-        label={t('tasks.sync.apiKey')}
+        label="API key"
         htmlFor="linear-key"
         error={problem && touched ? problem : undefined}
-        hint={found ? (found.workspace ? t('tasks.sync.checkedIn', { workspace: found.workspace }) : t('tasks.sync.checked')) : t('tasks.sync.keyHint')}
+        hint={found ? `Checked${found.workspace ? `: ${found.workspace}` : ''}.` : 'Starts with lin_api_. Linear › Settings › Security & access › Personal API keys.'}
         aside={
-          <button type="button" className={s.reveal} aria-label={reveal ? t('tasks.sync.hideKey') : t('tasks.sync.showKey')} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
+          <button type="button" className={s.reveal} aria-label={reveal ? 'Hide key' : 'Show key'} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
             <Icon name="eye" size={13} />
           </button>
         }
@@ -104,19 +100,19 @@ function ConnectForm({ projectId, name, close, onBack }: { projectId: string; na
       </Field>
       {found ? (
         <>
-          <Field label={t('tasks.sync.team')} htmlFor="linear-team" hint={t('tasks.sync.teamHint')}>
-            <Popup id="linear-team" label={t('tasks.sync.team')} value={team} options={found.teams.map((x) => ({ value: x.id, label: `${x.name} (${x.key})` }))} onChange={setTeam} />
+          <Field label="Team" htmlFor="linear-team" hint="Its issues and this project’s tasks are kept in step.">
+            <Popup id="linear-team" label="Team" value={team} options={found.teams.map((t) => ({ value: t.id, label: `${t.name} (${t.key})` }))} onChange={setTeam} />
           </Field>
           <div className={s.options}>
-            <Checkbox checked={auto} onChange={setAuto} label={t('tasks.sync.autosync')} detail={t('tasks.sync.autosyncDetail')} />
-            <Checkbox checked={pushExisting} onChange={setPushExisting} label={t('tasks.sync.pushExisting')} detail={t('tasks.sync.pushExistingDetail')} />
+            <Checkbox checked={auto} onChange={setAuto} label="Autosync" detail="Every minute, and moments after a change here" />
+            <Checkbox checked={pushExisting} onChange={setPushExisting} label="Also send this project’s open tasks" detail="Otherwise only tasks made from now on go to Linear" />
           </div>
         </>
       ) : (
         <div className={s.howto}>
-          <span>{t('tasks.sync.noKey')}</span>
+          <span>Don’t have a key yet?</span>
           <button type="button" className={f.linkButton} onClick={() => void openExternal(LINEAR_KEY_URL)}>
-            {t('tasks.sync.createKey')}
+            Create one in Linear
             <Icon name="forward" size={10} />
           </button>
         </div>
@@ -128,15 +124,14 @@ function ConnectForm({ projectId, name, close, onBack }: { projectId: string; na
 function Connected({ projectId, name, sync, onChange, close }: { projectId: string; name: string; sync: ProjectSync; onChange: () => void; close: () => void }) {
   const api = useApi();
   const [confirm, setConfirm] = useState(false);
-  const t = useT();
   if (confirm) {
     return (
       <Alert
-        title={t('tasks.sync.stopTitle', { name })}
-        message={t('tasks.sync.stopMessage')}
+        title={`Stop syncing ${name} with Linear?`}
+        message="Beluga forgets the key, and tasks here stay as they are, unlinked. Nothing in Linear changes."
         tone="danger"
         confirm={{
-          label: t('tasks.sync.disconnect'),
+          label: 'Disconnect',
           destructive: true,
           onClick: () => {
             void api.board.syncDisconnect(projectId);
@@ -149,7 +144,7 @@ function Connected({ projectId, name, sync, onChange, close }: { projectId: stri
   }
   return (
     <FormSheet
-      title={t('tasks.sync.syncsWith', { name })}
+      title={`${name} syncs with Linear`}
       icon="refresh"
       intro={
         <span className={s.team}>
@@ -157,31 +152,31 @@ function Connected({ projectId, name, sync, onChange, close }: { projectId: stri
           {sync.team} <span className={s.teamKey}>{sync.teamKey}</span>
         </span>
       }
-      submitLabel={t('plans.ask.done')}
+      submitLabel="Done"
       hideSubmit
-      cancelLabel={t('plans.ask.done')}
+      cancelLabel="Done"
       width={480}
       onSubmit={() => undefined}
       onCancel={close}
       footer={
         <>
           <button type="button" className={f.linkDanger} onClick={() => setConfirm(true)}>
-            {t('tasks.sync.disconnectMenu')}
+            Disconnect…
           </button>
           <button type="button" className={f.linkButton} onClick={onChange}>
-            {t('tasks.sync.changeTeam')}
+            Change Team or Key…
           </button>
         </>
       }
     >
       <div className={cx(s.status, sync.syncing && s.busy)} aria-live="polite">
         <span className={s.count}>
-          {t('tasks.sync.linked', { n: sync.linked })}
+          {sync.linked} {sync.linked === 1 ? 'task' : 'tasks'} linked
         </span>
         <span className={s.meta}>
-          {sync.syncing ? t('tasks.sync.syncing') : sync.syncedAt ? t('tasks.sync.synced', { when: ago(sync.syncedAt) }) : t('tasks.sync.notYet')}
+          {sync.syncing ? 'Syncing…' : sync.syncedAt ? `Synced ${ago(sync.syncedAt)}` : 'Not synced yet'}
           <button type="button" className={f.linkButton} disabled={sync.syncing} onClick={() => void api.board.syncNow(projectId)}>
-            {t('tasks.view.syncNow')}
+            Sync Now
           </button>
         </span>
       </div>
@@ -191,13 +186,13 @@ function Connected({ projectId, name, sync, onChange, close }: { projectId: stri
           <span>{sync.error.message}</span>
           {sync.error.code === 'auth' ? (
             <button type="button" className={f.linkButton} onClick={onChange}>
-              {t('tasks.sync.newKey')}
+              Connect a New Key…
             </button>
           ) : null}
         </div>
       ) : null}
-      <Checkbox checked={sync.auto} onChange={(on) => void api.board.syncAuto(projectId, on)} label={t('tasks.sync.autosync')} detail={t('tasks.sync.autosyncDetailOff')} />
-      <div className={s.note}>{t('tasks.sync.note')}</div>
+      <Checkbox checked={sync.auto} onChange={(on) => void api.board.syncAuto(projectId, on)} label="Autosync" detail="Every minute, and moments after a change here. Off: only when you press Sync Now." />
+      <div className={s.note}>Kept in step: title, status, priority, labels, estimate, due date, parent, and the brief as the description. When both sides change the same thing, the newer change wins.</div>
     </FormSheet>
   );
 }

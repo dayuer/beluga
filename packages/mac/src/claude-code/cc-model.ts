@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import { baseName } from '@beluga/shared/os-path.js';
 import type { AppState } from '@beluga/core/store.js';
 import type { CcAgent, CcAgentStatus, CcSession } from '@beluga/core/claude-code/model.js';
@@ -13,13 +12,7 @@ import { tildePath } from '../lib/brand.js';
 
 export type Tone = 'claude' | 'ok' | 'error' | 'warn' | 'muted';
 
-const LABEL: Readonly<Record<CcAgentStatus, string>> = {
-  get running() { return t('claudeCode.model.running'); },
-  get finished() { return t('claudeCode.model.finished'); },
-  get failed() { return t('claudeCode.model.failed'); },
-  get stopped() { return t('claudeCode.model.stopped'); },
-  get idle() { return t('claudeCode.model.idle'); },
-};
+const LABEL: Readonly<Record<CcAgentStatus, string>> = { running: 'Running', finished: 'Finished', failed: 'Failed', stopped: 'Stopped', idle: 'Idle' };
 const TONE: Readonly<Record<CcAgentStatus, Tone>> = { running: 'claude', finished: 'ok', failed: 'error', stopped: 'muted', idle: 'warn' };
 
 export const agentLabel = (a: Pick<CcAgent, 'status'>): string => LABEL[a.status];
@@ -40,10 +33,10 @@ export const agentElapsed = (a: CcAgent, now: number): string => since((a.status
 /** "Working · 12m", "Waiting for you", "Idle · 8m ago". */
 export function sessionLabel(s: CcSession, now: number): { label: string; tone: Tone } {
   const running = s.agents.filter((a) => a.status === 'running').length;
-  if (s.status === 'working') return { label: running ? t('claudeCode.model.workingRunning', { n: running }) : t('claudeCode.model.working'), tone: 'claude' };
-  if (running) return { label: t('claudeCode.model.waitingAgents', { n: running }), tone: 'claude' };
-  if (s.status === 'waiting') return { label: t('claudeCode.model.waitingYou'), tone: 'ok' };
-  return { label: t('claudeCode.model.quietFor', { time: since(now - s.lastAt) }), tone: 'muted' };
+  if (s.status === 'working') return { label: running ? `Working · ${plural(running, 'agent')} running` : 'Working', tone: 'claude' };
+  if (running) return { label: `Waiting for ${running} agent${running === 1 ? '' : 's'}`, tone: 'claude' };
+  if (s.status === 'waiting') return { label: 'Waiting for you', tone: 'ok' };
+  return { label: `Quiet for ${since(now - s.lastAt)}`, tone: 'muted' };
 }
 
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
@@ -52,9 +45,9 @@ export const plural = (n: number, one: string, many = `${one}s`): string => `${n
 export function activitySummary(sessions: readonly CcSession[]): string {
   const running = sessions.reduce((n, s) => n + s.agents.filter((a) => a.status === 'running').length, 0);
   const live = sessions.filter(sessionLive).length;
-  if (running) return live > 1 ? t('claudeCode.model.agentsRunningIn', { n: running, m: live }) : t('claudeCode.model.agentsRunning', { n: running });
-  if (live) return t('claudeCode.model.sessionsWorking', { n: live });
-  return sessions.length ? t('claudeCode.model.nothingRunning') : t('claudeCode.model.noSessions');
+  if (running) return `${plural(running, 'agent')} running${live > 1 ? ` in ${plural(live, 'session')}` : ''}`;
+  if (live) return `${plural(live, 'session')} working`;
+  return sessions.length ? 'Nothing running right now' : 'No Claude Code sessions lately';
 }
 
 /** "~/code/api/madrid" for a path under your home folder. */
@@ -63,7 +56,7 @@ export const tildify = (state: Pick<AppState, 'home'>, p: string): string => til
 /** Where it runs, in Beluga's words: the workspace's name, else the folder. */
 export function placeLabel(state: Pick<AppState, 'projects' | 'home'>, s: CcSession): string {
   const ws = s.workspaceId ? state.projects.flatMap((p) => p.workspaces).find((w) => w.id === s.workspaceId) : undefined;
-  return ws ? ws.name : tildify(state, s.cwd) || t('claudeCode.model.unknownFolder');
+  return ws ? ws.name : tildify(state, s.cwd) || 'Unknown folder';
 }
 
 export interface ProjectGroup {
@@ -80,7 +73,7 @@ export function groupByProject(state: Pick<AppState, 'projects'>, sessions: read
   for (const s of sessions) {
     const project = s.projectId ? state.projects.find((p) => p.id === s.projectId) : undefined;
     const key = project ? `p:${project.id}` : `d:${s.cwd}`;
-    const name = project?.name ?? (baseName(s.cwd) || t('claudeCode.model.other'));
+    const name = project?.name ?? (baseName(s.cwd) || 'Other');
     const g = groups.get(key) ?? { ...(project ? { projectId: project.id } : {}), name, sessions: [] };
     g.sessions.push(s);
     groups.set(key, g);
@@ -99,7 +92,7 @@ export function openActivity(client: SocketClient, session?: string, agent?: str
 
 /** "general-purpose" → "General", "typescript-reviewer" → "TypeScript reviewer". */
 export function typeLabel(type: string): string {
-  if (type === 'general-purpose') return t('claudeCode.model.general');
+  if (type === 'general-purpose') return 'General';
   const words = type.split(/[-_]/).filter(Boolean);
   const fix = (w: string): string => ({ typescript: 'TypeScript', javascript: 'JavaScript', e2e: 'E2E', tdd: 'TDD', ui: 'UI', api: 'API' })[w.toLowerCase()] ?? w;
   return words.map((w, i) => (i === 0 ? fix(w).replace(/^./, (c) => c.toUpperCase()) : fix(w))).join(' ') || type;

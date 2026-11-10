@@ -23,7 +23,6 @@ import s from './panel.module.css';
 import k from './scratch.module.css';
 import { everyWhileShown } from '../../lib/window-active.js';
 import { revealLabel } from '../../lib/os-words.js';
-import { useT } from '../../i18n/index.js';
 import { useRevealFileLabel, useRevealLabel } from '../../lib/remote-open.js';
 
 /**
@@ -191,7 +190,6 @@ function useFollowEnd(body: RefObject<HTMLDivElement | null>, content: RefObject
 
 function Preview({ of, file, list, onClose }: { of: ScratchOf; file: ScratchEntry; list: Listing; onClose: () => void }) {
   const api = useApi();
-  const t = useT();
   const { client } = useBeluga();
   // On a computer's page: Download for a file, Copy Path for a folder (BLG-852).
   const revealFile = useRevealFileLabel();
@@ -221,11 +219,11 @@ function Preview({ of, file, list, onClose }: { of: ScratchOf; file: ScratchEntr
         </span>
         <span className={s.previewDir}>{timeAgo(file.mtime, Math.max(now, Date.now()))}</span>
         <span className={s.flex} />
-        {isViewable(file.path) ? null : <IconButton icon="toEnd" label={t('layout.scratch.followEnd')} active={follow} onClick={followEnd} />}
-        {owner ? null : <IconButton icon="external" label={t('layout.scratch.openWith')} onClick={() => void openWithDefaultApp(client, local)} />}
+        {isViewable(file.path) ? null : <IconButton icon="toEnd" label="Follow the End" active={follow} onClick={followEnd} />}
+        {owner ? null : <IconButton icon="external" label="Open With Its App" onClick={() => void openWithDefaultApp(client, local)} />}
         {owner ? null : <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, local)} />}
-        <IconButton icon="expand" label={t('layout.scratch.openFull')} keys={chordLabel('Cmd+Enter')} onClick={openFull} />
-        <IconButton icon="x" label={t('layout.scratch.close')} keys="Esc" onClick={onClose} />
+        <IconButton icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={openFull} />
+        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
       </div>
       <div ref={body} className={cx(s.previewBody, s.previewFile, 'selectable')} tabIndex={0} onScroll={onScroll}>
         {/* Kept as it is while the file changes (its text updated in place), so following doesn't flicker. */}
@@ -247,9 +245,8 @@ function useWorking(of: ScratchOf): boolean {
 }
 
 export function ScratchTab({ of }: { of: ScratchOf }) {
-  const t = useT();
   const { client } = useBeluga();
-  const revealFolder = useRevealLabel(t('common.formSheet.folder'));
+  const revealFolder = useRevealLabel('Folder');
   const prefs = usePrefs();
   const on = useApp((st) => st.prefs.scratchFolder);
   const owner = isMac(of) ? undefined : of.owner;
@@ -299,7 +296,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
 
   const state = scratchState(list);
   if (state === 'loading') return <ScratchSkeleton />;
-  if (state === 'missing' || !list) return <Empty icon="alert" title={t('layout.scratch.noFolder')} detail={t('layout.scratch.noFolderDetail')} />;
+  if (state === 'missing' || !list) return <Empty icon="alert" title="No folder to look in" detail="This workspace’s folder is missing." />;
   if (state === 'empty') return <ScratchEmpty working={working} off={!owner && !on} dir={list.dir} {...(owner ? {} : { onReveal: () => void revealInFinder(client, list.dir) })} />;
   const share = clampShare(prefs.panelSplit, SPLIT_MIN, SPLIT_MAX);
   const total = viewTotal(split, list.total);
@@ -315,12 +312,12 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
         {split.sent.length ? (
           <div className={k.views}>
             <Segmented
-              label={t('layout.notifications.show')}
+              label="Show"
               value={split.view}
               onChange={pickView}
               options={[
-                { value: 'claude', label: t('layout.scratch.fromAgent'), icon: 'bot', hint: t('layout.scratch.fromAgentHint'), ...(split.mine.length ? { count: split.mine.length } : {}) },
-                { value: 'sent', label: t('layout.scratch.sent'), icon: 'send', hint: t('layout.scratch.sentHint'), count: split.sent.length },
+                { value: 'claude', label: 'From Your Agent', icon: 'bot', hint: 'What your agent saved while it worked', ...(split.mine.length ? { count: split.mine.length } : {}) },
+                { value: 'sent', label: 'Sent by You', icon: 'send', hint: 'Copies of the images and files you sent your agent', count: split.sent.length },
               ]}
             />
           </div>
@@ -333,17 +330,17 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
             <span className={s.flex} />
             <ActionsDropdown
               items={[
-                { label: t('layout.scratch.newest'), icon: 'clock', checked: sort === 'newest', onSelect: () => setPrefs({ scratchSort: 'newest' }) },
-                { label: t('layout.scratch.viewable'), hint: t('layout.scratch.viewableHint'), icon: 'eye', checked: sort === 'viewable', onSelect: () => setPrefs({ scratchSort: 'viewable' }) },
+                { label: 'Newest First', icon: 'clock', checked: sort === 'newest', onSelect: () => setPrefs({ scratchSort: 'newest' }) },
+                { label: 'Viewable First', hint: 'Pictures, videos, PDFs and web pages on top', icon: 'eye', checked: sort === 'viewable', onSelect: () => setPrefs({ scratchSort: 'viewable' }) },
               ]}
             >
-              <IconButton icon={sort === 'viewable' ? 'eye' : 'clock'} label={sort === 'viewable' ? t('layout.scratch.sortedViewable') : t('layout.scratch.sortedNewest')} />
+              <IconButton icon={sort === 'viewable' ? 'eye' : 'clock'} label={sort === 'viewable' ? 'Sorted: viewable first' : 'Sorted: newest first'} />
             </ActionsDropdown>
             {owner ? null : <IconButton icon="folder" label={revealFolder} onClick={() => void revealInFinder(client, sentView ? joinPath(list.root, SENT_DIR) : list.dir)} />}
           </div>
         </div>
         {working && !sentView ? <NextFileRow /> : null}
-        <div ref={listRef} className={s.list} role="listbox" aria-label={sentView ? t('layout.scratch.filesSent') : t('layout.scratch.files')} tabIndex={0} onKeyDown={onKey}>
+        <div ref={listRef} className={s.list} role="listbox" aria-label={sentView ? 'Files you sent' : 'Scratch files'} tabIndex={0} onKeyDown={onKey}>
           {rows.map((f) => {
             const { root: folder, dir, name } = scratchPlace(f.path, sentView ? [SENT_DIR] : SHOWN_SCRATCH_DIRS);
             const sel = f.path === shown;
@@ -364,7 +361,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
                   {dir ? <span className={s.rowDir}>{dir}</span> : null}
                 </span>
                 {!sentView && folder !== SHOWN_SCRATCH_DIRS[0] ? <span className={k.folder}>{folder}</span> : null}
-                {fresh ? <span className={s.freshDot} aria-label={t('layout.scratch.new')} /> : null}
+                {fresh ? <span className={s.freshDot} aria-label="new" /> : null}
                 <span className={s.size}>{f.size < 1024 ? `${f.size} B` : formatBytes(f.size)}</span>
                 <span className={s.ago}>{timeAgo(f.mtime, Math.max(now, Date.now()))}</span>
               </div>
@@ -376,7 +373,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
         <>
           <ResizeHandle
             axis="y"
-            label={t('layout.scratch.resize')}
+            label="Resize the list"
             onMove={(y) => {
               const r = box.current?.getBoundingClientRect();
               if (r) setPrefs({ panelSplit: clampShare((y - r.top) / r.height, SPLIT_MIN, SPLIT_MAX) });

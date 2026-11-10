@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CcStep } from '@beluga/core/claude-code/model.js';
 import type { StepSummary } from '@beluga/shared/steps.js';
@@ -64,8 +63,7 @@ const ToolRow = memo(function ToolRow({ step, live, sessionId, agentId, open, no
 const MessageStep = memo(function MessageStep({ step, open }: { step: CcStep; open: Disclosure }) {
   const id = `msg:${step.seq}`;
   const isOpen = open.isOpen(id);
-  const t = useT();
-  const title = t(step.report ? 'claudeCode.transcript.reportFrom' : 'claudeCode.transcript.messageFrom', { who: step.who ?? step.from ?? t('claudeCode.transcript.anotherSession') });
+  const title = `${step.report ? 'Report' : 'Message'} from ${step.who ?? step.from ?? 'another session'}`;
   const preview = step.text.split('\n').find((l) => l.trim()) ?? '';
   return (
     <div className={cx(s.message, isOpen && s.messageOpen)} data-received-message={step.report ? 'report' : 'message'}>
@@ -97,12 +95,11 @@ const StepView = memo(function StepView({ step, who }: { step: CcStep; who: 'ses
     );
   }
   const user = step.kind === 'user';
-  const t = useT();
   return (
     <div className={cx(s.turn, user && s.turnUser)}>
       <div className={s.turnHead}>
         {/* agent-wording: claude */}
-        {user ? <span className={s.who}>{who === 'agent' ? t('claudeCode.transcript.task') : t('claudeCode.transcript.you')}</span> : <span className={cx(s.who, s.whoClaude)}>Claude</span>}
+        {user ? <span className={s.who}>{who === 'agent' ? 'Task' : 'You'}</span> : <span className={cx(s.who, s.whoClaude)}>Claude</span>}
         <span className={s.when}>{time(step.ts)}</span>
       </div>
       <div className={s.turnBody}>
@@ -114,7 +111,6 @@ const StepView = memo(function StepView({ step, who }: { step: CcStep; who: 'ses
 
 export function LiveTranscript({ sessionId, agentId, version, live, label }: { sessionId: string; agentId?: string; version: string; live: boolean; label: string }) {
   const { steps, more, missing, loading, error, loadEarlier } = useSteps(sessionId, agentId, version);
-  const t = useT();
   const open = useDisclosure(`cc:${sessionId}/${agentId ?? ''}`);
   const now = useClock(live);
   const scroller = useRef<HTMLDivElement>(null);
@@ -184,10 +180,10 @@ export function LiveTranscript({ sessionId, agentId, version, live, label }: { s
                 loadEarlier();
               }}
             >
-              {t('claudeCode.transcript.earlier')}
+              Show earlier steps
             </button>
           ) : steps.length ? (
-            <div className={s.earliest}>{t('claudeCode.transcript.newest')}</div>
+            <div className={s.earliest}>Beluga shows the newest part of this transcript</div>
           ) : null}
           {blocks(steps).map((b) =>
             b.kind === 'tools' ? (
@@ -209,13 +205,13 @@ export function LiveTranscript({ sessionId, agentId, version, live, label }: { s
               <Working />
             </div>
           ) : null}
-          {!steps.length && !loading ? <div className={s.quiet}>{missing ? t('claudeCode.transcript.missing') : error ? t('claudeCode.transcript.error', { error }) : t('claudeCode.transcript.nothing')}</div> : null}
+          {!steps.length && !loading ? <div className={s.quiet}>{missing ? 'Beluga isn’t watching this one any more (it went quiet).' : error ? `Couldn’t read it: ${error}` : 'Nothing written yet.'}</div> : null}
         </div>
       </div>
       {away ? (
         <div className={s.jump}>
           <Button size="small" icon="chevronDown" onClick={toBottom}>
-            {unseen ? t('claudeCode.transcript.newSteps', { n: unseen }) : t('claudeCode.outputs.latest')}
+            {unseen ? `${unseen} new step${unseen === 1 ? '' : 's'}` : 'Latest'}
           </Button>
         </div>
       ) : null}

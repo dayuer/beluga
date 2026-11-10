@@ -16,7 +16,6 @@ import s from './issues.module.css';
 import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { NoProjects } from '../work/NoProjects.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * Pull Requests: one project's open pull requests on GitHub at a time (anyone's, the switcher
@@ -25,7 +24,6 @@ import { useT } from '../i18n/index.js';
  */
 export function PullsView() {
   const view = useApp((st) => st.view);
-  const tr = useT();
   const allProjects = useApp((st) => st.projects);
   const projects = useMemo(() => allProjects.filter((p) => p.root && !p.error), [allProjects]);
   const tasksPrefs = useTasksPrefs();
@@ -38,7 +36,7 @@ export function PullsView() {
   // Nothing kept from last time: the list settles in once GitHub answers.
   const late = useLateArrival(projectId ?? '', list !== undefined);
 
-  if (!projects.length || !here || !projectId) return <NoProjects icon="pr" detail={tr('issues.pulls.noProjects')} />;
+  if (!projects.length || !here || !projectId) return <NoProjects icon="pr" detail="Pull requests come from a project’s GitHub repository. Add a project to see them here." />;
 
   const repo = list && list.kind !== 'none' ? list.repo : undefined;
   const onGitHub = (url: string): void => actions.openLink({ kind: 'url', url });
@@ -48,12 +46,12 @@ export function PullsView() {
       <div className={t.bar}>
         <div className={t.barGroup}>
           <PickMenu<string>
-            label={tr('issues.view.project')}
+            label="Project"
             choices={projects.map((p) => ({ value: p.id, label: p.name, mark: <ProjectIcon id={p.id} name={p.name} size={16} /> }))}
             chosen={[here.id]}
             onPick={openList}
           >
-            <button type="button" className={t.projectSwitch} aria-label={tr('issues.view.projectIs', { name: here.name })}>
+            <button type="button" className={t.projectSwitch} aria-label={`Project: ${here.name}`}>
               <ProjectIcon id={here.id} name={here.name} size={18} />
               <span className={t.projectName}>{here.name}</span>
               <Icon name="chevronDown" size={11} />
@@ -61,7 +59,7 @@ export function PullsView() {
           </PickMenu>
         </div>
         <div className={cx(t.barGroup, t.barActions)}>
-          <IconButton icon="refresh" label={loading ? tr('issues.view.asking') : tr('issues.view.askAgain')} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
+          <IconButton icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
           {repo ? (
             <Tip label={`${repo.url}/pulls`}>
               <Button size="small" icon="external" onClick={() => onGitHub(`${repo.url}/pulls`)}>
@@ -73,30 +71,30 @@ export function PullsView() {
       </div>
       <div className={t.body}>
         {error && !list ? (
-          <Empty icon="alert" title={tr('issues.pulls.cantRead')} detail={error} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
+          <Empty icon="alert" title="Couldn’t read the pull requests" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
         ) : !list ? (
-          <Empty icon="pr" title={tr('issues.view.asking')} detail={tr('issues.pulls.forPulls', { name: here.name })} />
+          <Empty icon="pr" title="Asking GitHub…" detail={`For ${here.name}’s pull requests`} />
         ) : list.kind === 'none' ? (
-          <Empty icon="pr" title={tr('issues.view.notOnGitHub')} detail={tr('issues.pulls.notOnGitHubDetail')} />
+          <Empty icon="pr" title="This project isn’t on GitHub" detail="Pull requests come from the GitHub repository a project’s origin remote points to. Push it to GitHub, or pick another project." />
         ) : list.kind === 'no_gh' ? (
           <Empty
             icon="pr"
-            title={tr('issues.view.connect')}
-            detail={tr('issues.pulls.connectDetail', { repo: repoSlug(list.repo) })}
+            title="Connect GitHub"
+            detail={`Beluga reads ${repoSlug(list.repo)}’s pull requests with GitHub’s command-line tool, signed in as you. Set it up once, then check again.`}
             action={
               <EmptyActions>
                 <Button variant="primary" onClick={() => setConnect(true)}>
-                  {tr('issues.view.connectButton')}
+                  Connect GitHub…
                 </Button>
               </EmptyActions>
             }
           />
         ) : list.kind === 'error' ? (
-          <Empty icon="alert" title={tr('issues.pulls.cantRead')} detail={list.message} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
+          <Empty icon="alert" title="Couldn’t read the pull requests" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
         ) : !list.pulls.length ? (
-          <Empty icon="pr" title={tr('issues.pulls.noOpen')} detail={tr('issues.pulls.nothingWaiting', { repo: repoSlug(list.repo) })} />
+          <Empty icon="pr" title="No open pull requests" detail={`Nothing waiting for review in ${repoSlug(list.repo)}.`} />
         ) : (
-          <div className={cx(s.list, late && arr.arrive)} role="list" aria-label={tr('issues.pulls.listLabel', { name: here.name })}>
+          <div className={cx(s.list, late && arr.arrive)} role="list" aria-label={`${here.name}’s open pull requests`}>
             {list.pulls.map((pull) => (
               <PullRow key={pull.number} projectId={projectId} pull={pull} />
             ))}
@@ -105,12 +103,12 @@ export function PullsView() {
       </div>
       {list?.kind === 'github' && list.pulls.length ? (
         <div className={t.foot}>
-          {tr('issues.pulls.foot', { count: list.pulls.length, repo: repoSlug(list.repo), when: ago(list.fetchedAt) })}
+          {list.pulls.length} open · {repoSlug(list.repo)} · from GitHub {ago(list.fetchedAt)}
           {list.total > list.pulls.length ? (
             <>
-              {tr('issues.pulls.footActive')}
+              {' · the most recently active: '}
               <button type="button" className={t.footLink} onClick={() => onGitHub(`${list.repo.url}/pulls`)}>
-                {tr('issues.pulls.moreOnGitHub', { n: list.total - list.pulls.length })}
+                {list.total - list.pulls.length} more on GitHub
               </button>
             </>
           ) : null}

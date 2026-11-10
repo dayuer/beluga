@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
@@ -35,7 +34,6 @@ function usePointerAwake(ms: number): boolean {
 /** A line to answer in, under the messages: it goes in the same chat. Shown while there's something to answer, you type, or the pointer moves. */
 function Reply({ conversation, place, dark, wanted }: { conversation: string; place: string; dark?: boolean; wanted: boolean }) {
   const { client } = useBeluga();
-  const t = useT();
   const actions = useActions();
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
@@ -47,7 +45,7 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
     if (conversation === 'room') return actions.submit(words);
     void client.api.network.post(conversation, { text: words }).catch((err: unknown) => {
       setText(words);
-      client.store.dispatch({ type: 'toast', text: t('call.couldntSend', { error: err instanceof Error ? err.message : String(err) }), level: 'error' });
+      client.store.dispatch({ type: 'toast', text: `Couldn’t send: ${err instanceof Error ? err.message : String(err)}`, level: 'error' });
     });
   };
   return (
@@ -72,8 +70,8 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
             setText('');
           }
         }}
-        placeholder={t('call.messagePlace', { place })}
-        aria-label={t('call.messagePlace', { place })}
+        placeholder={`Message ${place}`}
+        aria-label={`Message ${place}`}
         maxLength={8_000}
       />
     </form>
@@ -87,7 +85,6 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
  */
 export function CallChatPops({ conversation, place, dark, className }: { conversation: string; place: string; dark?: boolean; className?: string }) {
   useClock(true);
-  const t = useT();
   const log = useApp((st) => (conversation === 'room' ? st.log : undefined));
   const messages = useApp((st) => (conversation === 'room' ? undefined : st.network.messages[conversation]));
   const me = useApp((st) => st.self?.peerId);
@@ -99,7 +96,7 @@ export function CallChatPops({ conversation, place, dark, className }: { convers
   const pops = popsNow(clock.current.stamp(all, now), now);
   const awake = usePointerAwake(REPLY_IDLE_MS);
   return (
-    <div className={cx(s.chat, className)} role="complementary" aria-label={t('call.theChat')}>
+    <div className={cx(s.chat, className)} role="complementary" aria-label="The chat">
       <PopList pops={pops} now={now} dark={dark} />
       <Reply conversation={conversation} place={place} dark={dark} wanted={awake || pops.length > 0} />
     </div>

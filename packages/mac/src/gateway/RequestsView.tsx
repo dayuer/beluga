@@ -5,7 +5,6 @@ import { Avatar, Button, Dot, Empty, Segmented, cx } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { TaskCard } from './TaskCard.js';
 import s from './gateway.module.css';
-import { currentLocale, t, useT } from '../i18n/index.js';
 
 /**
  * Requests: tasks between Claudes in one place. Sent (what you and your Claude asked of others)
@@ -19,10 +18,10 @@ const message = (err: unknown): string => (err instanceof Error ? err.message : 
 
 function ago(ts: number, now: number): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return t('gateway.view.justNow');
-  if (s < 3600) return t('gateway.view.minAgo', { n: Math.floor(s / 60) });
-  if (s < 86_400) return t('gateway.view.hAgo', { n: Math.floor(s / 3600) });
-  return new Date(ts).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)} h ago`;
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 const needsYou = (t: TaskView): boolean => (t.direction === 'sent' && t.state === 'confirm') || (t.direction === 'received' && t.state === 'awaiting_approval');
@@ -34,16 +33,15 @@ const pending = (t: TaskView): boolean => !isFinal(t.state);
 export const waitingForYou = (tasks: readonly TaskView[]): number => tasks.filter(needsYou).length;
 
 function Row({ task, open, onToggle }: { task: TaskView; open: boolean; onToggle: () => void }) {
-  useT();
   const tone = stateTone(task);
-  const who = task.direction === 'sent' ? targetLabel(task) : task.by === 'agent' ? t('gateway.view.theirAgent', { name: task.peerName }) : task.peerName;
+  const who = task.direction === 'sent' ? targetLabel(task) : `${task.peerName}${task.by === 'agent' ? '’s agent' : ''}`;
   return (
     <>
       <div
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={t(task.direction === 'sent' ? 'gateway.view.rowTo' : 'gateway.view.rowFrom', { who, ask: oneLine(task.ask, 80), state: stateLabel(task) })}
+        aria-label={`${task.direction === 'sent' ? 'To' : 'From'} ${who}: ${oneLine(task.ask, 80)}, ${stateLabel(task)}`}
         className={cx(s.row, open && s.rowOn)}
         onClick={onToggle}
         onKeyDown={(e) => {
@@ -73,7 +71,6 @@ function Row({ task, open, onToggle }: { task: TaskView; open: boolean; onToggle
 
 /** Your "Ask me for…" note: what friends' Claudes see when they look for who can help. */
 function Note() {
-  useT();
   const api = useApi();
   const { client } = useBeluga();
   const saved = useApp((st) => st.gateway.note);
@@ -85,16 +82,16 @@ function Note() {
       .setNote(text)
       .then(() => {
         setText(undefined);
-        client.store.dispatch({ type: 'toast', text: t('gateway.view.saved'), level: 'success' });
+        client.store.dispatch({ type: 'toast', text: 'Saved. Friends’ agents see it on your card', level: 'success' });
       })
-      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: t('gateway.view.couldntSave', { error: message(err) }), level: 'error' }));
+      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't save it: ${message(err)}`, level: 'error' }));
   };
   return (
     <label className={s.note}>
-      <span>{t('gateway.view.askMeFor')}</span>
+      <span>Ask me for</span>
       <input
-        aria-label={t('gateway.view.askMeFor')}
-        placeholder={t('gateway.view.notePlaceholder')}
+        aria-label="Ask me for"
+        placeholder="what your agent is good for here (friends’ agents see this)"
         value={value}
         maxLength={280}
         onChange={(e) => setText(e.target.value)}
@@ -107,7 +104,6 @@ function Note() {
 
 /** Ask someone's Claude yourself (it goes straight to them: you're the one asking). */
 function Compose({ onDone }: { onDone: () => void }) {
-  useT();
   const api = useApi();
   const { client } = useBeluga();
   const people = useApp((st) => {
@@ -124,22 +120,22 @@ function Compose({ onDone }: { onDone: () => void }) {
     void api.gateway
       .ask(to, ask.trim())
       .then(onDone)
-      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: t('gateway.view.couldntAsk', { error: message(err) }), level: 'error' }));
+      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't ask: ${message(err)}`, level: 'error' }));
   };
-  if (!list.length) return <div className={s.compose}>{t('gateway.view.nobody')}</div>;
+  if (!list.length) return <div className={s.compose}>Nobody to ask yet: add a friend, or invite someone to your room.</div>;
   return (
-    <div className={s.compose} role="group" aria-label={t('gateway.view.askSomeone')}>
+    <div className={s.compose} role="group" aria-label="Ask someone's agent">
       <div className={s.composeRow}>
-        <span>{t('gateway.view.to')}</span>
-        <Select label={t('gateway.view.whose')} value={to} onChange={setTo} options={list.map((p) => ({ value: p.id, label: t('gateway.view.theirAgent', { name: p.name }), icon: <Avatar name={p.name} id={p.id} size={16} /> }))} />
+        <span>To</span>
+        <Select label="Whose agent" value={to} onChange={setTo} options={list.map((p) => ({ value: p.id, label: `${p.name}’s agent`, icon: <Avatar name={p.name} id={p.id} size={16} /> }))} />
       </div>
-      <textarea className={s.edit} aria-label={t('gateway.view.whatToAsk')} placeholder={t('gateway.view.askPlaceholder')} value={ask} onChange={(e) => setAsk(e.target.value)} autoFocus />
+      <textarea className={s.edit} aria-label="What to ask" placeholder="What should their agent do? They see only this." value={ask} onChange={(e) => setAsk(e.target.value)} autoFocus />
       <div className={s.actions}>
         <Button variant="primary" disabled={!ask.trim()} onClick={send}>
-          {t('gateway.view.ask')}
+          Ask
         </Button>
         <Button variant="quiet" onClick={onDone}>
-          {t('gateway.view.cancel')}
+          Cancel
         </Button>
       </div>
     </div>
@@ -147,14 +143,13 @@ function Compose({ onDone }: { onDone: () => void }) {
 }
 
 export function RequestsView() {
-  useT();
   const gateway = useApp((st) => st.gateway);
   const [tab, setTab] = useState<Tab>(() => (gateway.tasks.some((t) => t.direction === 'received' && t.state === 'awaiting_approval') ? 'received' : 'sent'));
   const [open, setOpen] = useState<string | undefined>();
   const [composing, setComposing] = useState(false);
   const [answered, setAnswered] = useState(false);
   if (!gateway.enabled) {
-    return <Empty icon="hand" title={t('gateway.view.needApp')} detail={t('gateway.view.needAppDetail')} />;
+    return <Empty icon="hand" title="Requests need the Beluga app" detail="Tasks between agents run in the Beluga app's daemon." />;
   }
   const mine = gateway.tasks.filter((t) => t.direction === tab);
   const done = mine.filter((t) => !pending(t)).length;
@@ -165,21 +160,21 @@ export function RequestsView() {
       <div className={s.inner}>
         <div className={s.bar}>
           <Segmented<Tab>
-            label={t('gateway.view.requests')}
+            label="Requests"
             value={tab}
             onChange={(v) => {
               setTab(v);
               setOpen(undefined);
             }}
             options={[
-              { value: 'sent', label: `${t('gateway.view.sent')}${count('sent') ? ` · ${count('sent')}` : ''}` },
-              { value: 'received', label: `${t('gateway.view.received')}${count('received') ? ` · ${count('received')}` : ''}` },
+              { value: 'sent', label: `Sent${count('sent') ? ` · ${count('sent')}` : ''}` },
+              { value: 'received', label: `Received${count('received') ? ` · ${count('received')}` : ''}` },
             ]}
           />
           <span className={s.grow} />
           {composing ? null : (
             <Button icon="claude" onClick={() => setComposing(true)}>
-              {t('gateway.view.askButton')}
+              Ask Someone’s Agent…
             </Button>
           )}
         </div>
@@ -192,7 +187,7 @@ export function RequestsView() {
             }}
           />
         ) : null}
-        <div className={s.list} role="list" aria-label={tab === 'sent' ? t('gateway.view.sentList') : t('gateway.view.receivedList')}>
+        <div className={s.list} role="list" aria-label={tab === 'sent' ? 'Sent requests' : 'Received requests'}>
           {list.length ? (
             list.map((t) => (
               <div role="listitem" key={t.id}>
@@ -201,13 +196,13 @@ export function RequestsView() {
             ))
           ) : (
             <div className={s.empty}>
-              {done ? t('gateway.view.allAnswered') : tab === 'sent' ? t('gateway.view.noneSent') : t('gateway.view.noneReceived')}
+              {done ? 'Nothing waiting. Everything here has been answered.' : tab === 'sent' ? 'Nothing sent yet. Ask your agent to get something from a friend’s agent (“ask bob to run the tests”).' : 'Nothing received yet. When a friend’s agent asks yours for something, it shows here.'}
             </div>
           )}
         </div>
         {done ? (
           <Button variant="quiet" onClick={() => setAnswered(!answered)}>
-            {answered ? t('gateway.view.hideAnswered') : t('gateway.view.showAnswered', { n: done })}
+            {answered ? 'Hide answered' : `Show answered · ${done}`}
           </Button>
         ) : null}
       </div>

@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import type { AppState, LogItem } from '../../../../src/core/store.js';
 import type { MessageView } from '../../../../src/net/mesh/views.js';
 import type { ChatPop } from './chat-pops.js';
@@ -31,9 +30,9 @@ export function netChat(messages: readonly MessageView[] | undefined): ChatPop[]
   const out: ChatPop[] = [];
   for (const m of (messages ?? []).slice(-RECENT)) {
     if ((m.mine && !m.claude) || m.status === 'locked') continue;
-    const text = m.text.trim() || (m.files?.length ? (m.files.some((f) => f.mime?.startsWith('image/')) ? t('call.sentPicture') : t('call.sentFile')) : '');
+    const text = m.text.trim() || (m.files?.length ? (m.files.some((f) => f.mime?.startsWith('image/')) ? 'Sent a picture' : 'Sent a file') : '');
     if (!text) continue;
-    const name = m.claude ? (m.mine ? t('call.yourAgent') : t('call.theirAgent', { name: m.name })) : m.name;
+    const name = m.claude ? (m.mine ? 'Your agent' : `${m.name}’s agent`) : m.name;
     out.push({ id: m.id, by: m.from, name, text, at: m.ts, ...(m.claude ? { agent: true } : {}) });
   }
   return out;

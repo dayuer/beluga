@@ -11,7 +11,6 @@ import { playTestSound } from '../../lib/sounds/native.js';
 import { Row } from '../settings-controls.js';
 import s from './sound.module.css';
 import { keyPlatform } from '../../lib/shortcuts-model.js';
-import { useT, tl } from '../../i18n/index.js';
 
 export interface TestNotificationProps {
   readonly n: NotifySettings;
@@ -26,7 +25,6 @@ export interface TestNotificationProps {
  * that fixes it when something's in the way.
  */
 export function TestNotification({ n, onChecked, onAction }: TestNotificationProps) {
-  const t = useT();
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<TestOutcome>();
@@ -43,7 +41,7 @@ export function TestNotification({ n, onChecked, onAction }: TestNotificationPro
       onChecked(access);
       setOutcome(testOutcome(access, tone.kind === 'none' ? null : soundTitle(tone), keyPlatform()));
     } catch (e) {
-      setOutcome({ tone: 'warn', text: t('dialogs.sound.couldntSend', { error: e instanceof Error ? e.message : String(e) }) });
+      setOutcome({ tone: 'warn', text: `Couldn’t send it: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setBusy(false);
     }
@@ -51,18 +49,18 @@ export function TestNotification({ n, onChecked, onAction }: TestNotificationPro
 
   return (
     <>
-      <Row label={t('dialogs.sound.test')} detail={t('dialogs.sound.testDetail')}>
+      <Row label="Test notification" detail="Plays your sound here and shows a banner, whatever your other settings say.">
         <Button icon="bell" disabled={busy} onClick={() => void send()}>
-          {busy ? t('dialogs.sound.sending') : t('dialogs.sound.send')}
+          {busy ? 'Sending…' : 'Send Test Notification'}
         </Button>
       </Row>
       {outcome ? (
-        <div className={cx(s.outcome, s[`outcome_${outcome.tone}`])} role="status" aria-label={t('dialogs.sound.result')}>
+        <div className={cx(s.outcome, s[`outcome_${outcome.tone}`])} role="status" aria-label="Test result">
           <Icon name={outcome.tone === 'ok' ? 'check' : 'alert'} size={14} />
           <span className={s.outcomeText}>{outcome.text}</span>
           {outcome.action ? (
             <Button size="small" onClick={() => onAction(outcome.action!)}>
-              {tl('ACTION_LABELS', outcome.action, 'text', ACTION_LABELS[outcome.action])}
+              {ACTION_LABELS[outcome.action]}
             </Button>
           ) : null}
         </div>

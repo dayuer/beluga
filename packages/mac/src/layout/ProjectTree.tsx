@@ -42,7 +42,6 @@ import { TeamBadge, useTeamMenuItems } from '../team/Team.js';
 import side from './Sidebar.module.css';
 import s from './project-groups.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * The sidebar's Projects, arranged the way you like: drag projects and groups to reorder them,
@@ -62,13 +61,12 @@ const SPRING_MS = 700;
 function useHide(): (p: Project) => void {
   const api = useApi();
   const { client } = useBeluga();
-  const t = useT();
   return (p) => {
     void api.workspaces.hideProject(p.id).then(() => {
       // The core's note says how to bring it back from the terminal; here Undo does.
       const note = client.store.getState().toast;
       if (note?.text.startsWith('Project hidden')) client.store.dispatch({ type: 'toast_clear', id: note.id });
-      showUndo(t('layout.projectTree.hidden', { name: p.name }), () => void api.workspaces.showProject(p.root));
+      showUndo(`Hidden ${p.name}`, () => void api.workspaces.showProject(p.root));
     });
   };
 }
@@ -77,7 +75,6 @@ function useHide(): (p: Project) => void {
 function useIconItems(p: Project): readonly ActionItem[] {
   const api = useApi();
   const { client } = useBeluga();
-  const t = useT();
   const change = async (image: string | undefined): Promise<void> => {
     try {
       await api.projects.setIcon(p.id, image);
@@ -88,14 +85,14 @@ function useIconItems(p: Project): readonly ActionItem[] {
   };
   return [
     {
-      label: t('layout.projectTree.changeIcon'),
+      label: 'Change Icon…',
       separate: true,
       onSelect: () => {
-        void pickImage(t('layout.projectTree.iconFor', { name: p.name })).then((image) => (image ? change(image) : undefined));
+        void pickImage(`An icon for ${p.name}`).then((image) => (image ? change(image) : undefined));
       },
       disabled: !inApp() && !webServed(),
     },
-    { label: t('layout.projectTree.ownIcon'), onSelect: () => void change(undefined) },
+    { label: 'Use the Project’s Own Icon', onSelect: () => void change(undefined) },
   ];
 }
 
@@ -151,7 +148,6 @@ function useProjectFold(projectId: string): { folded: boolean; toggle: (all: boo
  */
 const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: { p: Project; depth: 0 | 1; entries: readonly Entry[]; arrange: Arrange }) {
   const actions = useActions();
-  const t = useT();
   const { client } = useBeluga();
   const view = useApp((st) => st.view);
   // Only the plans and the board (not the whole state): an open menu here isn't rebuilt on every change.
@@ -200,16 +196,16 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
   // Friends on the same GitHub repository you teamed up with (core/team).
   const teamItems = useTeamMenuItems(p.id);
   // Archived work stays out of the sidebar: the Overview's Archived list has it.
-  const showArchivedItem: ActionItem[] = archived.length ? [{ label: t('layout.chatsMenu.showArchived', { count: archived.length }), onSelect: () => showArchivedOf(actions.run, p.id) }] : [];
+  const showArchivedItem: ActionItem[] = archived.length ? [{ label: `Show Archived (${archived.length})`, onSelect: () => showArchivedOf(actions.run, p.id) }] : [];
   // Everything about its worktrees (archiving, restoring, cleaning up those made outside Beluga) is on the Worktrees page.
-  const cleanUpItem: ActionItem[] = p.workspaces.some((w) => w.kind === 'worktree') ? [{ label: t('layout.projectTree.manageWorktrees'), onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees', projectId: p.id } }) }] : [];
+  const cleanUpItem: ActionItem[] = p.workspaces.some((w) => w.kind === 'worktree') ? [{ label: 'Manage Worktrees…', onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees', projectId: p.id } }) }] : [];
   // Share with friends over the network (nobody hosts): it shows in their Projects with your avatar.
-  const shareItem: ActionItem[] = p.root ? [{ label: t('layout.projectTree.shareWith'), icon: 'people', separate: true, onSelect: () => openSheet({ kind: 'share_project', projectId: p.id }) }] : [];
+  const shareItem: ActionItem[] = p.root ? [{ label: 'Share with…', icon: 'people', separate: true, onSelect: () => openSheet({ kind: 'share_project', projectId: p.id }) }] : [];
   // A conversation had with Claude Code outside Beluga, continued in a new worktree (BLG-321).
-  const importItem: ActionItem[] = p.root ? [{ label: t('layout.projectTree.import'), icon: 'claude', onSelect: () => openSheet({ kind: 'import_conversation', projectId: p.id }) }] : [];
+  const importItem: ActionItem[] = p.root ? [{ label: 'Import from Claude Code…', icon: 'claude', onSelect: () => openSheet({ kind: 'import_conversation', projectId: p.id }) }] : [];
   // Its variables and its main folder's .env, without going through Settings (BLG-369).
-  const envItem: ActionItem[] = p.root ? [{ label: t('layout.projectTree.environment'), icon: 'lock', onSelect: () => openSheet({ kind: 'project_env', projectId: p.id }) }] : [];
-  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), earningsMenuItem(p, earning), ...githubItems, ...iconItems, { label: t('layout.projectTree.hide'), danger: true, separate: true, onSelect: () => hide(p) }, { label: t('layout.projectTree.delete'), danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
+  const envItem: ActionItem[] = p.root ? [{ label: 'Environment…', icon: 'lock', onSelect: () => openSheet({ kind: 'project_env', projectId: p.id }) }] : [];
+  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), earningsMenuItem(p, earning), ...githubItems, ...iconItems, { label: 'Hide Project', danger: true, separate: true, onSelect: () => hide(p) }, { label: 'Delete Project…', danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
   const kids = depth + 2;
   // Nothing to unfold: no arrow (its place kept, so the icons stay in line).
   const sessions = useCcSessions();
@@ -234,8 +230,8 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
                 <button
                   type="button"
                   className={s.foldButton}
-                  aria-label={fold.folded ? t('layout.projectTree.unfoldLabel', { name: p.name }) : t('layout.projectTree.foldLabel', { name: p.name })}
-                  title={fold.folded ? t('layout.projectTree.unfoldTitle') : t('layout.projectTree.foldTitle')}
+                  aria-label={fold.folded ? `Show what's in ${p.name}` : `Fold ${p.name}`}
+                  title={fold.folded ? 'Show (Option-click: every project)' : 'Fold (Option-click: every project)'}
                   onClick={(e) => (e.stopPropagation(), fold.toggle(e.altKey))}
                 >
                   <Icon name="chevronRight" size={9} className={cx(s.disclosure, !fold.folded && s.disclosureOpen)} />
@@ -270,10 +266,10 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
               <TeamBadge projectId={p.id} />
               <EarningsPill root={p.root} projectId={p.id} celebrate />
               <span className={side.hoverTools}>
-                <IconButton icon="branch" label={t('layout.projectTree.newWorktree', { name: p.name })} onClick={(e) => (e.stopPropagation(), actions.run({ type: 'new_worktree', projectId: p.id }))} />
-                <IconButton icon="plus" label={t('layout.projectTree.newChat', { name: p.name })} onClick={(e) => (e.stopPropagation(), actions.run({ type: 'new_chat', projectId: p.id }))} />
+                <IconButton icon="branch" label={`New worktree in ${p.name}`} onClick={(e) => (e.stopPropagation(), actions.run({ type: 'new_worktree', projectId: p.id }))} />
+                <IconButton icon="plus" label={`New chat in ${p.name}`} onClick={(e) => (e.stopPropagation(), actions.run({ type: 'new_chat', projectId: p.id }))} />
                 <SpecDropdown menu={{ kind: 'project', id: p.id }} align="end" extra={extra} hide={ownWay}>
-                  <IconButton icon="more" label={t('layout.projectTree.more', { name: p.name })} onClick={(e) => e.stopPropagation()} />
+                  <IconButton icon="more" label={`More for ${p.name}`} onClick={(e) => e.stopPropagation()} />
                 </SpecDropdown>
                 {/* Claude at work inside, beside what needs you or what's new (never hidden by them). */}
                 {busy ? (
@@ -323,7 +319,6 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
 /** Projects you hid, folded at the bottom: each with Show. */
 function HiddenProjects() {
   const actions = useActions();
-  const t = useT();
   const api = useApi();
   const hidden = useApp((st) => st.hiddenProjects);
   const open = useUi((u) => u.collapsed.includes('hidden-projects'));
@@ -339,7 +334,7 @@ function HiddenProjects() {
             <Icon name="eyeOff" size={14} className={s.folder} />
           </span>
         }
-        label={t('layout.projectTree.hiddenProjects')}
+        label="Hidden Projects"
         trailing={<span className={s.count}>{hidden.length}</span>}
         onClick={() => actions.run({ type: 'toggle_fold', key: 'hidden-projects' })}
       />
@@ -359,8 +354,8 @@ function HiddenProjects() {
                 label={name}
                 detail={root}
                 trailing={
-                  <button type="button" className={s.show} aria-label={t('layout.projectTree.showName', { name })} onClick={() => void api.workspaces.showProject(root)}>
-                    {t('layout.projectTree.show')}
+                  <button type="button" className={s.show} aria-label={`Show ${name}`} onClick={() => void api.workspaces.showProject(root)}>
+                    Show
                   </button>
                 }
               />
@@ -374,17 +369,16 @@ function HiddenProjects() {
 /** The + on the Projects heading: add projects, or make a group. */
 export function ProjectsAddMenu() {
   const actions = useActions();
-  const t = useT();
   const { ui } = useBeluga();
   const items: ActionItem[] = [
-    { label: t('layout.projectTree.addProjects'), keys: shortcutKeys('add-project'), onSelect: () => actions.run({ type: 'add_project' }) },
-    { label: t('layout.projectTree.newProject'), onSelect: () => ui.patch({ addProject: 'new' }) },
-    { label: t('layout.projectTree.clone'), onSelect: () => ui.patch({ addProject: 'clone' }) },
-    { label: t('layout.projectTree.newGroup'), onSelect: () => newEmptyGroup() },
+    { label: 'Add Projects…', keys: shortcutKeys('add-project'), onSelect: () => actions.run({ type: 'add_project' }) },
+    { label: 'New Project…', onSelect: () => ui.patch({ addProject: 'new' }) },
+    { label: 'Clone from Git…', onSelect: () => ui.patch({ addProject: 'clone' }) },
+    { label: 'New Group', onSelect: () => newEmptyGroup() },
   ];
   return (
     <ActionsDropdown items={items}>
-      <IconButton icon="plus" label={t('layout.projectTree.addMenu')} />
+      <IconButton icon="plus" label="Add a project, start one, clone one, or make a group" />
     </ActionsDropdown>
   );
 }
@@ -401,7 +395,6 @@ function useSpringLoad(group: string | undefined, folded: boolean): void {
 
 export function Projects() {
   const actions = useActions();
-  const t = useT();
   const names = useApp((st) => st.projects.map((p) => p.name).join('\n'));
   const localNames = useMemo(() => new Set(names.split('\n')), [names]);
   const { ui } = useBeluga();
@@ -429,9 +422,9 @@ export function Projects() {
         })()
       : entries.length;
   const treeItems: ActionItem[] = [
-    { label: t('layout.projectTree.newGroup'), onSelect: () => newEmptyGroup() },
-    { label: t('layout.projectTree.addProjects'), onSelect: () => actions.run({ type: 'add_project' }) },
-    { label: t('layout.projectTree.newProject'), onSelect: () => ui.patch({ addProject: 'new' }) },
+    { label: 'New Group', onSelect: () => newEmptyGroup() },
+    { label: 'Add Projects…', onSelect: () => actions.run({ type: 'add_project' }) },
+    { label: 'New Project…', onSelect: () => ui.patch({ addProject: 'new' }) },
   ];
   return (
     <>
@@ -476,7 +469,7 @@ export function Projects() {
           })}
           {newAt === entries.length ? <NewGroupRow /> : null}
           {hover?.kind === 'line' ? <div className={s.insertion} style={{ top: hover.y, left: hover.depth ? 32 : 18 }} aria-hidden="true" /> : null}
-          {entries.length || creating ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label={t('layout.projectTree.addProject')} onClick={() => actions.run({ type: 'add_project' })} />}
+          {entries.length || creating ? null : <Row className={side.hintRow} icon={<Icon name="plus" size={13} />} label="Add a project…" onClick={() => actions.run({ type: 'add_project' })} />}
         </div>
       </ActionsContext>
       {/* Your computers' projects this Mac doesn't have (BLG-785). */}

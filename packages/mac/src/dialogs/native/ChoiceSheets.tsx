@@ -8,8 +8,7 @@ import { Icon } from '../../components/Icon.js';
 import { useMyAgentName } from '../../lib/agent-words.js';
 import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import type { NativeMenuProps } from './index.js';
-import { rich, usePick } from './pick.js';
-import { useT } from '../../i18n/index.js';
+import { usePick } from './pick.js';
 import { revealLabel, thisComputer } from '../../lib/os-words.js';
 
 /**
@@ -17,7 +16,6 @@ import { revealLabel, thisComputer } from '../../lib/os-words.js';
  * current one selected, each with its mark. Another agent is picked in the composer's agent picker.
  */
 export function ModelSheet({ menu, close }: NativeMenuProps<'model'>) {
-  const t = useT();
   const api = useApi();
   const picker = useApp((st) => agentPicker(pickerState(st), menu.channel ?? 'draft', myRuntime(st.prefs)), samePicker);
   const group = picker.groups.find((g) => g.current);
@@ -30,20 +28,20 @@ export function ModelSheet({ menu, close }: NativeMenuProps<'model'>) {
     else void api.workbench.setModel(menu.channel, v);
     close();
   };
-  const who = group?.label ?? t('dialogs.model.yourAgent');
+  const who = group?.label ?? 'Your agent';
   return (
     <FormSheet
-      title={menu.channel === undefined ? t('dialogs.model.titleNew') : t('dialogs.model.titleThis')}
+      title={menu.channel === undefined ? 'Model for New Conversations' : 'Model for This Conversation'}
       icon={runtimeMark(picker.runtime)}
-      intro={t(menu.channel === undefined ? 'dialogs.model.introNew' : 'dialogs.model.introThis', { who })}
-      submitLabel={t('dialogs.model.use')}
+      intro={`${who} runs ${menu.channel === undefined ? 'new conversations' : 'this conversation'}. Each conversation can use its own model; it applies from the next message.`}
+      submitLabel="Use This Model"
       canSubmit={value !== current && !models.find((m) => m.value === value)?.why}
       onSubmit={() => use(value)}
       onCancel={close}
       width={500}
     >
       <PickList
-        label={t('dialogs.model.models', { who })}
+        label={`${who} models`}
         value={value}
         onChange={setValue}
         onChoose={use}
@@ -61,7 +59,6 @@ export function ModelSheet({ menu, close }: NativeMenuProps<'model'>) {
 
 /** First thing after joining a room: may people here use your agent? */
 export function WelcomeSheet({ menu, close }: NativeMenuProps<'welcome'>) {
-  const t = useT();
   const pick = usePick(menu);
   const agent = useMyAgentName();
   const room = useApp((st) => st.room);
@@ -71,30 +68,30 @@ export function WelcomeSheet({ menu, close }: NativeMenuProps<'welcome'>) {
   const [policy, setPolicy] = useState<'share-ask' | 'share-auto' | 'share-deny'>('share-ask');
   return (
     <FormSheet
-      title={t('dialogs.welcome.title', { room: String(room) })}
+      title={`Welcome to ${room}`}
       icon="people"
       intro={
         <>
-          <p>{others.length ? t('dialogs.welcome.here', { names: others.join(', '), n: others.length }) : t('dialogs.welcome.nobody')}</p>
-          <p>{t('dialogs.welcome.intro', { agent, computer: thisComputer() })}</p>
+          <p>{others.length ? `${others.join(', ')} ${others.length === 1 ? 'is' : 'are'} here.` : 'Nobody else is here yet.'}</p>
+          <p>Friends can ask your {agent} for help. It runs on {thisComputer()}, on your own account, only in folders you share, and you always see what they ask.</p>
         </>
       }
-      submitLabel={t('dialogs.welcome.continue')}
+      submitLabel="Continue"
       onSubmit={() => void pick(policy)}
       onCancel={close}
-      cancelLabel={t('dialogs.welcome.later')}
+      cancelLabel="Later"
       width={520}
     >
-      <Field label={t('dialogs.welcome.yourAgent')}>
+      <Field label="Your agent">
         <PickList
-          label={t('dialogs.welcome.question')}
+          label="Can people in this room use your agent?"
           value={policy}
           onChange={setPolicy}
           onChoose={(v) => pick(v)}
           rows={[
-            { value: 'share-ask', name: t('dialogs.welcome.ask'), detail: t('dialogs.welcome.askDetail') },
-            { value: 'share-auto', name: t('dialogs.welcome.auto'), detail: t('dialogs.welcome.autoDetail') },
-            { value: 'share-deny', name: t('dialogs.welcome.deny'), detail: t('dialogs.welcome.denyDetail') },
+            { value: 'share-ask', name: 'Ask me each time', detail: 'Recommended: you approve every request' },
+            { value: 'share-auto', name: 'Everyone can use it', detail: 'Requests run without asking' },
+            { value: 'share-deny', name: 'Keep it private', detail: 'Only you can use your agent' },
           ]}
         />
       </Field>
@@ -114,30 +111,29 @@ export function InboxRedirect({ close }: NativeMenuProps<'inbox'>) {
 
 /** An archived workspace: restore it (the usual thing), read it, or delete it for good. */
 export function ArchivedSheet({ menu, close }: NativeMenuProps<'archived'>) {
-  const t = useT();
   const pick = usePick(menu);
   const ws = useApp((st) => findWorkspace(st.projects, menu.id));
   if (!ws) return null;
   const worktree = ws.kind === 'worktree';
   return (
     <FormSheet
-      title={t('dialogs.archived.title', { name: ws.name })}
+      title={`“${ws.name}” is archived`}
       icon="archive"
-      intro={worktree ? <>{rich(t('dialogs.archived.worktree'), { branch: <code>{ws.branch ?? ''}</code> })}</> : t('dialogs.archived.chat')}
-      submitLabel={t('dialogs.archived.restore')}
+      intro={worktree ? <>Its branch <code>{ws.branch ?? ''}</code> and conversation are kept. Restoring makes the worktree again from the branch.</> : 'Its conversation is kept. Restoring shows it in the sidebar again.'}
+      submitLabel="Restore"
       onSubmit={() => void pick('a-restore')}
       onCancel={close}
       width={580}
       footer={
         <>
           <button type="button" className={f.linkButton} onClick={() => pick('a-open')}>
-            {t('dialogs.archived.read')}
+            Read Conversation
           </button>
           <button type="button" className={f.linkButton} onClick={() => pick('a-finder')}>
             {revealLabel('Project')}
           </button>
           <button type="button" className={f.linkDanger} onClick={() => pick('a-delete')}>
-            {t('dialogs.archived.delete')}
+            Delete…
           </button>
         </>
       }

@@ -10,8 +10,6 @@ import { useApi, useApp, useMachine } from '../../lib/beluga.js';
 import { pickFolders } from '../../lib/projects.js';
 import { agoText } from '../../views/project/home-model.js';
 import s from './import-conversation.module.css';
-import { rich } from './pick.js';
-import { useT } from '../../i18n/index.js';
 
 /** The folder and branch name Beluga makes from a name (as the core's `slug` does). */
 const slug = (name: string): string =>
@@ -37,7 +35,6 @@ function whereIn(dir: string, cwd: string, home: string): string {
  * of it; the original stays as it was.
  */
 export function ImportConversationSheet({ projectId, close }: { projectId: string; close: () => void }) {
-  const t = useT();
   const api = useApi();
   // On a computer's page, its folders (BLG-793).
   const machine = useMachine();
@@ -80,10 +77,10 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
   const opening = Boolean(chosen?.wsId);
   return (
     <FormSheet
-      title={t('dialogs.import.title')}
+      title="Import from Claude Code"
       icon="claude"
-      intro={t('dialogs.import.intro', { project: project.name })}
-      submitLabel={opening ? t('dialogs.import.open') : t('dialogs.import.continue')}
+      intro={`Pick a conversation from Terminal or another app. Your agent goes on with it in a new worktree of ${project.name}.`}
+      submitLabel={opening ? 'Open Its Worktree' : 'Continue in a Worktree'}
       canSubmit={Boolean(chosen) && (opening || Boolean(slug(name)))}
       onSubmit={() => {
         if (!chosen || !found) return;
@@ -95,36 +92,36 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
       width={580}
     >
       <Field
-        label={t('dialogs.import.from')}
+        label="From"
         aside={
           <Button
             size="small"
             variant="quiet"
             icon="folder"
             onClick={() =>
-              void pickFolders(t('dialogs.import.chooseTitle'), { machine }).then((p) => {
+              void pickFolders('Choose a folder Claude Code ran in', { machine }).then((p) => {
                 if (p?.[0]) setDir(p[0]);
               })
             }
           >
-            {t('dialogs.import.chooseAnother')}
+            Choose Another Folder…
           </Button>
         }
-        hint={t('dialogs.import.fromHint')}
+        hint="This folder and the folders inside it"
       >
         <span className={s.where} title={looking}>
           {tildePath(home, looking)}
         </span>
       </Field>
-      {found && found.conversations.length > SEARCH_FROM ? <TextInput value={query} onChange={setQuery} placeholder={t('dialogs.import.search')} spellCheck={false} aria-label={t('dialogs.import.search')} /> : null}
+      {found && found.conversations.length > SEARCH_FROM ? <TextInput value={query} onChange={setQuery} placeholder="Search conversations" spellCheck={false} aria-label="Search conversations" /> : null}
       {/* Where the sheet's focus starts: the list, not the folder button (it loads after opening). */}
       <div className={s.focus} data-autofocus tabIndex={-1}>
         {!found ? (
-          <p className={s.quiet}>{t('dialogs.import.looking')}</p>
+          <p className={s.quiet}>Looking for conversations…</p>
         ) : !found.conversations.length ? (
-          <p className={s.quiet}>{t('dialogs.import.none')}</p>
+          <p className={s.quiet}>No Claude Code conversation ran in this folder or inside it. Choose another folder, the one you started Claude in.</p>
         ) : (
-          <ul className={s.list} role="radiogroup" aria-label={t('dialogs.import.list')}>
+          <ul className={s.list} role="radiogroup" aria-label="Claude Code conversations">
             {shown.map((c) => {
               const where = whereIn(found.dir, c.cwd, home);
               const on = c.sessionId === picked;
@@ -134,19 +131,19 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
                     <Icon name={c.wsId ? 'branch' : 'chat'} size={14} className={s.icon} />
                     <span className={s.text}>
                       <span className={s.title}>{c.title}</span>
-                      <span className={s.detail}>{[c.wsId ? t('dialogs.import.already') : '', where, agoText(c.lastModified), formatBytes(c.bytes)].filter(Boolean).join(' · ')}</span>
+                      <span className={s.detail}>{[c.wsId ? 'Brought in already' : '', where, agoText(c.lastModified), formatBytes(c.bytes)].filter(Boolean).join(' · ')}</span>
                     </span>
                     {on ? <Icon name="check" size={13} className={s.check} /> : null}
                   </button>
                 </li>
               );
             })}
-            {!shown.length ? <li className={s.quiet}>{t('dialogs.import.noMatch', { query: query.trim() })}</li> : null}
+            {!shown.length ? <li className={s.quiet}>Nothing matches “{query.trim()}”</li> : null}
           </ul>
         )}
       </div>
       {chosen && !opening ? (
-        <Field label={t('dialogs.import.name')} htmlFor="import-convo-name" hint={slug(name) ? <>{rich(t('dialogs.import.branchHint'), { branch: <code>beluga/{slug(name)}</code> })}</> : undefined}>
+        <Field label="Name" htmlFor="import-convo-name" hint={slug(name) ? <>Your branch <code>beluga/{slug(name)}</code>, from the commit that folder is on. Its uncommitted changes stay there.</> : undefined}>
           <TextInput
             id="import-convo-name"
             value={name}

@@ -5,7 +5,6 @@ import type { SettingsPane, UiStore } from './beluga.js';
 import { inApp } from './boot.js';
 import { pickFolders } from './projects.js';
 import { openSheet } from './sheets.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Where the Mac app answers what the shared action runners ask by typing. They put
@@ -48,7 +47,7 @@ const viewedProject = (client: SocketClient): string | undefined => {
 /** Share a folder: the Open panel picks it, then who sees it. */
 export function shareAFolder({ client, ui }: RouteContext): void {
   if (!inApp()) return ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: client.store.getState().myShares });
-  void pickFolders(t('common.nativeRoutes.shareFolder')).then((picked) => {
+  void pickFolders('Share a folder').then((picked) => {
     if (picked?.[0]) ui.openMenu({ kind: 'share_who', dir: picked[0] });
   });
 }

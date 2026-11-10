@@ -12,7 +12,6 @@ import { machineClientOf } from '../machines/pane-clients.js';
 import type { RemoteSource } from '../machines/remote-work.js';
 import { useRemoteSources } from '../machines/use-remote.js';
 import s from './SidebarSearch.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * The field at the top of the sidebar: finds a conversation by name, branch, PR or project at once,
@@ -20,7 +19,6 @@ import { useT } from '../i18n/index.js';
  * the place of `children`, which stay mounted, so their folds and scroll come back as they were.
  */
 export function SidebarSearch({ children }: { children: React.ReactNode }) {
-  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { ui } = useBeluga();
@@ -81,8 +79,8 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
           ref={input}
           className={cx(s.input, 'selectable')}
           value={query}
-          placeholder={t('layout.sidebarSearch.placeholder')}
-          aria-label={t('layout.sidebarSearch.placeholder')}
+          placeholder="Search chats and messages"
+          aria-label="Search chats and messages"
           title={shortcutKeys('sidebar-search')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -100,7 +98,7 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
             }
           }}
         />
-        {query ? <IconButton icon="x" label={t('layout.sidebarSearch.clear')} className={s.clear} onClick={clear} /> : null}
+        {query ? <IconButton icon="x" label="Clear search" className={s.clear} onClick={clear} /> : null}
       </div>
       {q ? <Results list={list} results={results} selected={selected} looking={looking} open={open} /> : null}
       <div className={q ? s.kept : s.shown}>{children}</div>
@@ -109,19 +107,18 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
 }
 
 function Results({ list, results, selected, looking, open }: { list: React.RefObject<HTMLDivElement | null>; results: readonly SidebarResult[]; selected: number; looking: boolean; open: (result: SidebarResult) => void }) {
-  const t = useT();
   const firstMessage = results.findIndex((r) => r.type === 'message');
   const firstRemoteMessage = results.findIndex((r) => r.type === 'remote' && r.match.hit);
   const onlyAll = results.length === 1;
   return (
-    <div ref={list} className={s.results} role="listbox" aria-label={t('layout.sidebarSearch.results')}>
-      {onlyAll && !looking ? <div className={s.note}>{t('layout.sidebarSearch.none')}</div> : null}
+    <div ref={list} className={s.results} role="listbox" aria-label="Search results">
+      {onlyAll && !looking ? <div className={s.note}>No chats match.</div> : null}
       {results.map((r, i) => (
         <div key={r.key}>
-          {i === firstMessage || (firstMessage < 0 && i === firstRemoteMessage) ? <div className={s.heading}>{t('layout.sidebarSearch.messages')}</div> : null}
-          {r.type === 'all' && looking ? <div className={s.note}>{t('layout.sidebarSearch.searching')}</div> : null}
+          {i === firstMessage || (firstMessage < 0 && i === firstRemoteMessage) ? <div className={s.heading}>Messages</div> : null}
+          {r.type === 'all' && looking ? <div className={s.note}>Searching messages…</div> : null}
           <div role="option" aria-selected={i === selected} className={cx(s.result, i === selected && s.resultOn)} onClick={() => open(r)}>
-            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : r.type === 'remote' ? <RemoteResult match={r.match} /> : <span className={s.all}>{t('layout.sidebarSearch.seeAll')}</span>}
+            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : r.type === 'remote' ? <RemoteResult match={r.match} /> : <span className={s.all}>See All in Search</span>}
           </div>
         </div>
       ))}

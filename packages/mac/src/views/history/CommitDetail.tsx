@@ -11,11 +11,10 @@ import { useMyAgentName } from '../../lib/agent-words.js';
 import { openExternal } from '../../lib/system.js';
 import { STATE, UnifiedDiff } from '../DiffView.js';
 import { AuthorAvatar, type RefContext, RefPill } from './HistoryList.js';
-import { commitPage, fullDate, pillsOf, timeAgo } from './history-model.js';
+import { commitPage, fullDate, pillsOf, plural, timeAgo } from './history-model.js';
 import { useGitHub } from './use-history.js';
 import d from '../diff.module.css';
 import s from './history.module.css';
-import { useT } from '../../i18n/index.js';
 
 /** Diffs this small show opened; bigger commits list their files to open one by one. */
 const OPEN_ALL_LINES = 600;
@@ -41,7 +40,6 @@ function useCommit(target: string, hash: string): { detail?: Detail; error?: str
 
 function FileDiff({ file, open, onToggle }: { file: CommitFile; open: boolean; onToggle: () => void }) {
   const st = STATE[file.state];
-  const t = useT();
   const lines = useMemo(() => (open && file.diff ? parseDiff(file.diff) : []), [open, file.diff]);
   const name = file.path.split('/').pop() ?? file.path;
   const dir = file.path.slice(0, file.path.length - name.length).replace(/\/$/, '');
@@ -53,17 +51,17 @@ function FileDiff({ file, open, onToggle }: { file: CommitFile; open: boolean; o
         <span className={s.fileName}>
           {name}
           {dir ? <span className={s.fileDir}>{dir}</span> : null}
-          {file.from ? <span className={s.fileDir}>{t('views.history.from', { path: file.from })}</span> : null}
+          {file.from ? <span className={s.fileDir}>from {file.from}</span> : null}
         </span>
         <span className={s.fileCounts}>
-          {file.binary ? <span className={s.dim}>{t('views.history.binary')}</span> : null}
+          {file.binary ? <span className={s.dim}>binary</span> : null}
           {file.added ? <span className={d.add}>+{file.added}</span> : null}
           {file.removed ? <span className={d.del}>−{file.removed}</span> : null}
         </span>
       </button>
       {open ? (
         <div className={cx(s.fileBody, d.code, 'selectable')}>
-          {file.binary ? <div className={s.dimPad}>{t('views.history.binaryFile')}</div> : file.diff ? lines.length ? <UnifiedDiff lines={lines} compact /> : <div className={s.dimPad}>{t('views.history.modeOnly')}</div> : <div className={s.dimPad}>{t('views.history.tooBig')}</div>}
+          {file.binary ? <div className={s.dimPad}>A binary file: no text to compare.</div> : file.diff ? lines.length ? <UnifiedDiff lines={lines} compact /> : <div className={s.dimPad}>Only the file’s mode or name changed.</div> : <div className={s.dimPad}>Too big to show here.</div>}
         </div>
       ) : null}
     </div>
@@ -87,7 +85,6 @@ export interface CommitDetailProps {
 export function CommitDetail({ target, projectId, hash, refs, onSelect, onClose, compact }: CommitDetailProps) {
   const { detail, error } = useCommit(target, hash);
   const agent = useMyAgentName();
-  const t = useT();
   const { client, ui } = useBeluga();
   const api = useApi();
   const actions = useActions();
@@ -100,10 +97,10 @@ export function CommitDetail({ target, projectId, hash, refs, onSelect, onClose,
     setAllOpen(undefined);
   }, [hash]);
 
-  if (error) return <Empty icon="alert" title={t('views.history.cantReadCommit')} detail={error} />;
-  if (!detail) return <div className={s.dimPad}>{t('views.history.loadingCommit')}</div>;
+  if (error) return <Empty icon="alert" title="Couldn’t read this commit" detail={error} />;
+  if (!detail) return <div className={s.dimPad}>Loading the commit…</div>;
   const c = detail.commit;
-  const totals = detail.files.reduce((sum, f) => ({ add: sum.add + f.added, del: sum.del + f.removed }), { add: 0, del: 0 });
+  const totals = detail.files.reduce((t, f) => ({ add: t.add + f.added, del: t.del + f.removed }), { add: 0, del: 0 });
   const small = totals.add + totals.del <= OPEN_ALL_LINES && detail.files.length <= 12;
   const isOpen = (f: CommitFile): boolean => (opened.has(f.path) ? !(allOpen ?? small) : (allOpen ?? small));
   const toggle = (f: CommitFile): void => setOpened((set) => (set.has(f.path) ? new Set([...set].filter((p) => p !== f.path)) : new Set([...set, f.path])));
@@ -113,39 +110,39 @@ export function CommitDetail({ target, projectId, hash, refs, onSelect, onClose,
   const askClaude = (): void => {
     if (ws) {
       actions.run({ type: 'open_ws', id: ws, tab: 'chat' });
-      setTimeout(() => quoteInBox(ui, `${c.short} ${c.subject}`, t('views.history.aboutCommit')), 60);
+      setTimeout(() => quoteInBox(ui, `${c.short} ${c.subject}`, 'About this commit: '), 60);
       return;
     }
-    void api.workspaces.startChat(projectId, t('views.history.explainPrompt', { short: c.short, subject: c.subject, author: c.author.name, date: fullDate(c.date) }));
+    void api.workspaces.startChat(projectId, `Explain commit ${c.short} (“${c.subject}” by ${c.author.name}, ${fullDate(c.date)}): what it changed and why, and anything risky in it.`);
   };
   const startHere = (): void => {
     if (starting) return;
     setStarting(true);
     void api.git
       .worktreeAt(projectId, c.hash)
-      .catch((err: unknown) => toast(client, t('views.home.worktreeFailed', { error: errorText(err) }), 'error'))
+      .catch((err: unknown) => toast(client, `Couldn’t create the worktree: ${errorText(err)}`, 'error'))
       .finally(() => setStarting(false));
   };
   const repo = gh?.kind === 'github' ? gh.repo : undefined;
 
   return (
-    <article className={cx(s.detail, compact && s.detailCompact)} aria-label={t('views.history.commitAria', { short: c.short })}>
+    <article className={cx(s.detail, compact && s.detailCompact)} aria-label={`Commit ${c.short}`}>
       <div className={s.detailBar}>
         {compact ? (
           <Button size="small" variant="quiet" icon="back" onClick={onClose}>
-            {t('views.history.allCommits')}
+            All Commits
           </Button>
         ) : (
-          <span className={s.detailKicker}>{t('views.history.commit')}</span>
+          <span className={s.detailKicker}>Commit</span>
         )}
         <span className={s.flex} />
-        <Tip label={t('views.history.copyFullHash')}>
-          <button type="button" className={s.hashButton} onClick={() => void copyText(c.hash).then(() => say(t('views.diff.copiedHash', { hash: c.short })))}>
+        <Tip label="Copy the full hash">
+          <button type="button" className={s.hashButton} onClick={() => void copyText(c.hash).then(() => say(`Copied ${c.short}`))}>
             {c.short}
             <Icon name="copy" size={11} />
           </button>
         </Tip>
-        {compact ? null : <IconButton icon="x" label={t('views.peek.close')} keys="Esc" onClick={onClose} />}
+        {compact ? null : <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />}
       </div>
       <div className={s.detailScroll}>
         <h2 className={cx(s.detailSubject, 'selectable')}>{c.subject}</h2>
@@ -158,70 +155,70 @@ export function CommitDetail({ target, projectId, hash, refs, onSelect, onClose,
         ) : null}
         {c.body ? <pre className={cx(s.body, 'selectable')}>{c.body}</pre> : null}
         <dl className={s.facts}>
-          <dt>{t('views.history.author')}</dt>
+          <dt>Author</dt>
           <dd className={s.factAuthor}>
             <AuthorAvatar name={c.author.name} email={c.author.email} size={20} />
             <span className="selectable">
               {c.author.name} <span className={s.dim}>{c.author.email}</span>
             </span>
           </dd>
-          <dt>{t('views.history.date')}</dt>
+          <dt>Date</dt>
           <dd>
             <time dateTime={new Date(c.date).toISOString()}>{fullDate(c.date)}</time> <span className={s.dim}>· {timeAgo(c.date)}</span>
           </dd>
-          <dt>{c.parents.length > 1 ? t('views.history.parents') : t('views.history.parent')}</dt>
+          <dt>{c.parents.length > 1 ? 'Parents' : 'Parent'}</dt>
           <dd className={s.parents}>
             {c.parents.length ? (
               c.parents.map((p, i) => (
-                <button key={p} type="button" className={s.parent} onClick={() => onSelect(p)} title={i === 0 ? t('views.history.firstParent') : t('views.history.mergedIn')}>
+                <button key={p} type="button" className={s.parent} onClick={() => onSelect(p)} title={i === 0 ? 'The first parent (what this compares with)' : 'Merged in'}>
                   {p.slice(0, 7)}
                 </button>
               ))
             ) : (
-              <span className={s.dim}>{t('views.history.noParent')}</span>
+              <span className={s.dim}>None: the first commit</span>
             )}
           </dd>
         </dl>
         <div className={s.detailActions}>
-          <Button size="small" icon="copy" onClick={() => void copyText(c.hash).then(() => say(t('views.diff.copiedHash', { hash: c.short })))}>
-            {t('views.diff.copyHash')}
+          <Button size="small" icon="copy" onClick={() => void copyText(c.hash).then(() => say(`Copied ${c.short}`))}>
+            Copy Hash
           </Button>
           {repo ? (
             <Tip label={commitPage(repo.url, c.hash)}>
               <Button size="small" icon="external" onClick={() => void openExternal(commitPage(repo.url, c.hash))}>
-                {t('views.history.showOnGitHub')}
+                Show on GitHub
               </Button>
             </Tip>
           ) : null}
-          <Tip label={ws ? t('views.history.quoteTip') : t('views.history.askTip')}>
+          <Tip label={ws ? 'Quote it in this worktree’s chat' : 'A questions-only chat in the main folder'}>
             <Button size="small" icon="claude" onClick={askClaude}>
-              {t('views.diff.askAboutCommit', { agent })}
+              Ask {agent} About This Commit
             </Button>
           </Tip>
-          <Tip label={t('views.history.startTip')}>
+          <Tip label="A new worktree on its own branch, starting at this commit">
             <Button size="small" icon="branch" disabled={starting} onClick={startHere}>
-              {starting ? t('views.history.starting') : t('views.history.startHere')}
+              {starting ? 'Starting…' : 'Start a Worktree Here'}
             </Button>
           </Tip>
         </div>
         <div className={s.filesHead}>
-          <span className={s.filesTitle}>{t('views.history.filesChanged', { n: detail.files.length })}</span>
+          <span className={s.filesTitle}>{plural(detail.files.length, 'file')} changed</span>
           <span className={d.add}>+{totals.add}</span>
           <span className={d.del}>−{totals.del}</span>
-          {c.parents.length > 1 ? <span className={s.dim}>{t('views.history.comparedFirst')}</span> : null}
+          {c.parents.length > 1 ? <span className={s.dim}>· compared with the first parent</span> : null}
           <span className={s.flex} />
           {detail.files.length ? (
             <Button size="small" variant="quiet" onClick={() => (setAllOpen(!(allOpen ?? small)), setOpened(new Set()))}>
-              {(allOpen ?? small) ? t('views.history.collapseAll') : t('views.history.expandAll')}
+              {(allOpen ?? small) ? 'Collapse All' : 'Expand All'}
             </Button>
           ) : null}
         </div>
-        {detail.truncated ? <div className={s.note}>{t('views.history.bigCommit')}</div> : null}
+        {detail.truncated ? <div className={s.note}>A big commit: some diffs are left out here.</div> : null}
         <div className={s.files}>
           {detail.files.map((f) => (
             <FileDiff key={f.path} file={f} open={isOpen(f)} onToggle={() => toggle(f)} />
           ))}
-          {!detail.files.length ? <div className={s.dimPad}>{t('views.history.noFiles')}</div> : null}
+          {!detail.files.length ? <div className={s.dimPad}>No file changes (an empty commit, or a merge that changed nothing).</div> : null}
         </div>
       </div>
     </article>

@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from 'react';
 import type { SupportAsk } from '@beluga/core/support-store.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Supporting Beluga: where the star and the coffee go, and the sheets opened by hand (Settings ›
@@ -8,7 +7,7 @@ import { t } from '../i18n/index.js';
  * `support`, core/support-store.ts); these are the same sheets, any time, asking nothing back.
  */
 
-export const GITHUB_URL = 'https://github.com/kayraucklnc/beluga';
+export const GITHUB_URL = 'https://github.com/beluga-labs/beluga';
 
 /** Who makes Beluga, shown as a GitHub chip (the avatar ships with the app: the window loads no remote images). */
 export const MAINTAINER = { login: 'kayraucklnc', url: 'https://github.com/kayraucklnc' } as const;
@@ -16,21 +15,7 @@ export const MAINTAINER = { login: 'kayraucklnc', url: 'https://github.com/kayra
 /** The coffee amounts offered, in US dollars, with what each one buys. */
 export const COFFEE_AMOUNTS = [5, 10, 20, 50] as const;
 export type CoffeeAmount = (typeof COFFEE_AMOUNTS)[number];
-// Read when shown, in the language shown then.
-export const COFFEE_WORDS: Readonly<Record<CoffeeAmount, string>> = {
-  get 5() {
-    return t('common.support.coffee5');
-  },
-  get 10() {
-    return t('common.support.coffee10');
-  },
-  get 20() {
-    return t('common.support.coffee20');
-  },
-  get 50() {
-    return t('common.support.coffee50');
-  },
-};
+export const COFFEE_WORDS: Readonly<Record<CoffeeAmount, string>> = { 5: 'A coffee', 10: 'Coffee & cake', 20: 'Lunch', 50: 'A whole day' };
 
 /**
  * Stripe Payment Links: public checkout pages anyone may open (no keys, nothing secret, safe in a

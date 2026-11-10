@@ -1,4 +1,3 @@
-import { t, useT } from '../i18n/index.js';
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CallView, ShareMode } from '@beluga/shared/calls.js';
 import { Icon } from '../components/Icon.js';
@@ -50,7 +49,6 @@ type Tool = 'draw' | 'box';
  */
 export function Stage({ call }: { call: CallView }) {
   const engine = useCallEngine();
-  const t = useT();
   const live = useCallLive();
   const me = useApp((st) => st.network.self?.peerId ?? '');
   const stage = live.stage;
@@ -240,7 +238,7 @@ export function Stage({ call }: { call: CallView }) {
   const anyInk = ink.strokes.length > 0;
 
   return (
-    <section className={cx(c.stage, live.theater && c.theater, live.theater && barAway && c.theaterIdle)} onPointerMove={wake} aria-label={sharer?.me ? t('call.yourSharedScreen') : t('call.theirScreen', { name: sharer?.name ?? t('call.their') })}>
+    <section className={cx(c.stage, live.theater && c.theater, live.theater && barAway && c.theaterIdle)} onPointerMove={wake} aria-label={sharer?.me ? 'Your shared screen' : `${sharer?.name ?? 'Their'}’s screen`}>
       <div ref={frame} className={cx(c.stageFrame, showMine && c.stageOwnPointer)} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onLeave}>
         <video ref={video} className={c.stageVideo} autoPlay playsInline muted />
         <canvas ref={canvas} className={c.stageInk} style={{ width: size.w, height: size.h }} aria-hidden="true" />
@@ -248,7 +246,7 @@ export function Stage({ call }: { call: CallView }) {
         {/* Yours, as the others see it, right under your mouse (it stands in for the arrow there). */}
         {showMine && !pointersInPicture ? (
           <div className={c.pointers} aria-hidden="true">
-            <PointerMark by={me} name={call.people.find((p) => p.me)?.name ?? t('call.you')} style={{ opacity: 0 }} nodeRef={(el) => (mineMark.current = el)} />
+            <PointerMark by={me} name={call.people.find((p) => p.me)?.name ?? 'You'} style={{ opacity: 0 }} nodeRef={(el) => (mineMark.current = el)} />
           </div>
         ) : null}
         {sketch && !asking && !press.current ? (
@@ -272,7 +270,7 @@ export function Stage({ call }: { call: CallView }) {
       <div
         className={cx(c.stageBar, live.theater && barAway && c.barAway)}
         role="toolbar"
-        aria-label={t('call.theSharedScreen')}
+        aria-label="The shared screen"
         onPointerEnter={() => {
           onBar.current = true;
           wake();
@@ -284,26 +282,26 @@ export function Stage({ call }: { call: CallView }) {
       >
         <span className={c.stageWho}>
           <Icon name="screenShare" size={13} />
-          <span>{sharer?.me ? t('call.youreSharing') : t('call.theirScreen', { name: sharer?.name ?? t('call.someone') })}</span>
+          <span>{sharer?.me ? 'You’re sharing' : `${sharer?.name ?? 'Someone'}’s screen`}</span>
         </span>
-        <span className={c.toolGroup} role="radiogroup" aria-label={t('call.dragTo')}>
-          <Tip label={t('call.draw')}>
-            <button type="button" role="radio" aria-checked={tool === 'draw'} aria-label={t('call.draw')} className={cx(c.tool, tool === 'draw' && c.toolOn)} onClick={() => setTool('draw')}>
+        <span className={c.toolGroup} role="radiogroup" aria-label="Drag to">
+          <Tip label="Draw">
+            <button type="button" role="radio" aria-checked={tool === 'draw'} aria-label="Draw" className={cx(c.tool, tool === 'draw' && c.toolOn)} onClick={() => setTool('draw')}>
               <Icon name="pencil" size={14} />
             </button>
           </Tip>
-          <Tip label={t('call.box')} keys="⇧">
-            <button type="button" role="radio" aria-checked={tool === 'box'} aria-label={t('call.box')} className={cx(c.tool, tool === 'box' && c.toolOn)} onClick={() => setTool('box')}>
+          <Tip label="Box" keys="⇧">
+            <button type="button" role="radio" aria-checked={tool === 'box'} aria-label="Box" className={cx(c.tool, tool === 'box' && c.toolOn)} onClick={() => setTool('box')}>
               <Icon name="square" size={14} />
             </button>
           </Tip>
         </span>
-        <Tip label={showMine ? t('call.stopPointer') : t('call.showPointerAll')}>
+        <Tip label={showMine ? 'Stop Showing My Pointer' : 'Show My Pointer to Everyone'}>
           <button
             type="button"
             className={cx(c.tool, showMine && c.toolOn)}
             aria-pressed={showMine}
-            aria-label={t('call.showPointer')}
+            aria-label="Show My Pointer"
             onClick={() => {
               if (showMine) engine.pointerSend({ k: 'laser', by: me, x: -1, y: -1 });
               setShowMine(!showMine);
@@ -312,31 +310,31 @@ export function Stage({ call }: { call: CallView }) {
             <Icon name="pointer" size={14} />
           </button>
         </Tip>
-        <span className={c.stageHint}>{tool === 'box' ? t('call.boxHint') : t('call.drawHint')}</span>
+        <span className={c.stageHint}>{tool === 'box' ? 'Drag a box around something · everyone sees it' : 'Draw to point something out · ⇧ for a box'}</span>
         {anyInk ? (
-          <Tip label={t('call.clearDrawing')}>
-            <button type="button" className={c.tool} aria-label={t('call.clearDrawing')} onClick={() => engine.stageSend({ k: 'clear', by: me })}>
+          <Tip label="Clear the Drawing">
+            <button type="button" className={c.tool} aria-label="Clear the Drawing" onClick={() => engine.stageSend({ k: 'clear', by: me })}>
               <Icon name="eraser" size={14} />
             </button>
           </Tip>
         ) : null}
-        <Tip label={live.theater ? t('call.exitFull') : t('call.full')} keys={live.theater ? 'esc' : undefined}>
-          <button type="button" className={c.tool} aria-label={live.theater ? t('call.exitFull') : t('call.full')} onClick={() => void engine.setTheater(!live.theater)}>
+        <Tip label={live.theater ? 'Exit Full Screen' : 'Full Screen'} keys={live.theater ? 'esc' : undefined}>
+          <button type="button" className={c.tool} aria-label={live.theater ? 'Exit Full Screen' : 'Full Screen'} onClick={() => void engine.setTheater(!live.theater)}>
             <Icon name="expand" size={14} />
           </button>
         </Tip>
         {sharer && !sharer.me ? (
           <ActionsDropdown items={wantItems(sharer.name, live.mode, live.want, (m) => engine.setWant(m))}>
-            <IconButton icon="more" label={t('call.howYouSee')} />
+            <IconButton icon="more" label="How You See Their Screen" />
           </ActionsDropdown>
         ) : null}
         {sharer?.me ? (
           <>
             <ActionsDropdown items={shareItems(live.mode, (m) => engine.setShareMode(m))}>
-              <IconButton icon="more" label={t('call.howSent')} />
+              <IconButton icon="more" label="How Your Screen Is Sent" />
             </ActionsDropdown>
             <button type="button" className={c.pillQuiet} onClick={() => void engine.stopSharing()}>
-              {t('more.call.stopSharing')}
+              Stop Sharing
             </button>
           </>
         ) : null}
@@ -352,14 +350,13 @@ export function Stage({ call }: { call: CallView }) {
 
 /** Beside your sketch while it's up: ask your agent about the part it covers. */
 function AskPill({ at, frame, agent, ask, hold }: { at: CSSProperties; frame: { w: number; h: number }; agent: string; ask: () => void; hold: (on: boolean) => void }) {
-  const t = useT();
   const right = Number(at.left ?? 0) + Number(at.width ?? 0);
   const top = Number(at.top ?? 0);
   const style: CSSProperties = { left: Math.min(Math.max(8, right + 8), frame.w - 150), top: Math.min(Math.max(8, top - 6), frame.h - 40) };
   return (
     <button type="button" className={c.askPill} style={style} onPointerDown={(e) => e.stopPropagation()} onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)} onClick={ask}>
       <Icon name="sparkles" size={12} />
-      {t('call.askAgent', { agent })}
+      Ask {agent}
     </button>
   );
 }
@@ -370,16 +367,16 @@ function AskPill({ at, frame, agent, ask, hold }: { at: CSSProperties; frame: { 
  */
 function wantItems(name: string, mode: ShareMode, want: ShareMode | undefined, set: (m: ShareMode | undefined) => void): ActionItem[] {
   return [
-    { label: t('call.asSends', { name }), hint: mode === 'sharp' ? t('call.sharpNow') : t('call.smoothNow'), checked: want === undefined, onSelect: () => set(undefined) },
-    { label: t('call.sharp'), separate: true, hint: t('call.sharpHint'), checked: want === 'sharp', onSelect: () => set('sharp') },
-    { label: t('call.smooth'), hint: t('call.smoothHint'), checked: want === 'smooth', onSelect: () => set('smooth') },
+    { label: `As ${name} Sends It`, hint: mode === 'sharp' ? 'Sharp now' : 'Smooth now', checked: want === undefined, onSelect: () => set(undefined) },
+    { label: 'Sharp', separate: true, hint: 'Text stays crisp: full resolution, fewer frames', checked: want === 'sharp', onSelect: () => set('sharp') },
+    { label: 'Smooth', hint: 'Motion stays fluid: every frame, softer when the network is tight', checked: want === 'smooth', onSelect: () => set('smooth') },
   ];
 }
 
 /** The sharer's choice, behind •••: every pixel of text, or every frame of motion, for everyone who didn't pick their own. */
 function shareItems(mode: ShareMode, set: (m: ShareMode) => void): ActionItem[] {
   return [
-    { label: t('call.sharp'), hint: t('call.sharpHint'), checked: mode === 'sharp', onSelect: () => set('sharp') },
-    { label: t('call.smooth'), hint: t('call.smoothHint'), checked: mode === 'smooth', onSelect: () => set('smooth') },
+    { label: 'Sharp', hint: 'Text stays crisp: full resolution, fewer frames', checked: mode === 'sharp', onSelect: () => set('sharp') },
+    { label: 'Smooth', hint: 'Motion stays fluid: every frame, softer when the network is tight', checked: mode === 'smooth', onSelect: () => set('smooth') },
   ];
 }
