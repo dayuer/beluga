@@ -36,6 +36,23 @@ export function bearerOf(req: Request): string | undefined {
 }
 
 /**
+ * Make one magic link for a customer (already invited or active), mail it, and hand it back; the
+ * admin page shows it for a manual forward. `rate-limited` after five an hour for one email.
+ */
+export async function issueLoginLink(customer: Customer, deps: SessionDeps): Promise<{ readonly link: string; readonly expiresAt: number } | 'rate-limited'> {
+  const token = randomToken(32, deps.random);
+  const kept = await deps.hub.createLoginToken({ tokenHash: await sha256Hex(token), customerId: customer.id, now: deps.now, ttl: LOGIN_TOKEN_TTL_MS, maxPerHour: LOGIN_PER_EMAIL_PER_HOUR });
+  if (!kept) return 'rate-limited';
+  const link = `${deps.origin.replace(/\/$/, '')}/login#token=${token}`;
+  try {
+    await deps.mailer.send(customer.email, link);
+  } catch {
+    // The admin page can still show the link; the customer just didn't get a mail.
+  }
+  return { link, expiresAt: deps.now + LOGIN_TOKEN_TTL_MS };
+}
+
+/**
  * `POST /v1/login {email}`: always 202, whether or not the email is invited. The token goes in the
  * link's fragment, so it never reaches a server log or a Referer.
  */
@@ -43,18 +60,7 @@ export async function requestLogin(body: unknown, deps: SessionDeps): Promise<Hu
   const email = normalizeEmail((body as { email?: unknown } | null)?.email);
   if (email) {
     const customer = await deps.hub.customerByEmail(email);
-    if (customer && (customer.status === 'invited' || customer.status === 'active')) {
-      const token = randomToken(32, deps.random);
-      const kept = await deps.hub.createLoginToken({ tokenHash: await sha256Hex(token), customerId: customer.id, now: deps.now, ttl: LOGIN_TOKEN_TTL_MS, maxPerHour: LOGIN_PER_EMAIL_PER_HOUR });
-      if (kept) {
-        const link = `${deps.origin.replace(/\/$/, '')}/login#token=${token}`;
-        try {
-          await deps.mailer.send(email, link);
-        } catch {
-          // The request still looks the same; the operator can issue a link from the admin page.
-        }
-      }
-    }
+    if (customer && (customer.status === 'invited' || customer.status === 'active')) await issueLoginLink(customer, deps);
   }
   return { status: 202, body: { ok: true } };
 }

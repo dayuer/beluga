@@ -171,6 +171,8 @@ export interface HubStore {
   createCustomer(input: { readonly id: string; readonly email: string; readonly name: string; readonly now: number }): Promise<Customer | 'email-taken'>;
   /** Tombstone the account and clear its memberships, tokens, sessions and outbox. */
   removeCustomer(id: string, now: number): Promise<void>;
+  /** Drop a removed account's tombstone (so the email can be invited again); its data is already gone. */
+  deleteCustomer(id: string): Promise<void>;
   /** An invited customer who logged in once is active (the admin page shows "signed in"). */
   activateCustomer(id: string): Promise<void>;
 
@@ -399,6 +401,7 @@ export function memoryHub(): HubStore {
       const c = customers.get(cid);
       if (c && c.status === 'invited') customers.set(cid, { ...c, status: 'active' });
     },
+    deleteCustomer: async (cid) => void customers.delete(cid),
 
     project: async (pid) => projects.get(pid),
     projectsOfStudio: async (studioId) => [...projects.values()].filter((p) => p.studioId === studioId).sort((a, b) => a.createdAt - b.createdAt),

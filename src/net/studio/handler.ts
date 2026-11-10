@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, type AppFrame } from '../../studio/protocol.js';
+import { addMember, bindProject, createProject, customerLoginLink, inviteCustomer, listCustomers, removeCustomer, removeMember, revokeDaemon, studioDetail, unbindProject } from './accounts.js';
 import { enqueue, take } from './queue.js';
 import { authCustomer, bearerOf, logout as logoutSession, requestLogin, verifyLogin } from './session.js';
 import { listPlans, readView, turnsBefore } from './views.js';
@@ -427,17 +428,63 @@ export async function handleHubRequest(req: Request, deps: Deps): Promise<HubRep
       return reply(200, { code, expiresAt });
     }
 
-    // Owned by later M2 tasks; the routes exist so the shell can route them now.
-    case 'admin-studio':
-    case 'admin-projects':
-    case 'admin-customers':
-    case 'admin-customer':
-    case 'admin-customer-login':
-    case 'admin-project-daemon':
-    case 'admin-project-member':
+    case 'admin-studio': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
+      return studioDetail(route.params.sid!, deps);
+    }
+
+    case 'admin-projects': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
+      return createProject(route.params.sid!, await readJson(req), deps);
+    }
+
+    case 'admin-customers': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (method(req, 'GET')) return listCustomers(new URL(req.url).searchParams.get('studio') ?? undefined, deps);
+      if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
+      return inviteCustomer(await readJson(req), deps);
+    }
+
+    case 'admin-customer': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (!method(req, 'DELETE')) return failure(405, 'method-not-allowed');
+      return removeCustomer(route.params.cid!, deps);
+    }
+
+    case 'admin-customer-login': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
+      return customerLoginLink(route.params.cid!, deps);
+    }
+
+    case 'admin-project-daemon': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (method(req, 'PUT')) return bindProject(route.params.pid!, await readJson(req), deps);
+      if (method(req, 'DELETE')) return unbindProject(route.params.pid!, deps);
+      return failure(405, 'method-not-allowed');
+    }
+
+    case 'admin-project-member': {
+      const no = await operatorOnly(req, deps);
+      if (no) return no;
+      if (method(req, 'PUT')) return addMember(route.params.pid!, route.params.cid!, deps);
+      if (method(req, 'DELETE')) return removeMember(route.params.pid!, route.params.cid!, deps);
+      return failure(405, 'method-not-allowed');
+    }
+
     case 'admin-daemons': {
       const no = await operatorOnly(req, deps);
-      return no ?? notImplemented();
+      if (no) return no;
+      if (!method(req, 'DELETE')) return failure(405, 'method-not-allowed');
+      return revokeDaemon(route.params.did!, deps);
     }
 
     case 'login':
