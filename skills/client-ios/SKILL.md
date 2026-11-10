@@ -15,7 +15,7 @@ description: 客户要的是 iOS 原生 App 时使用:从 templates/ios-app 起�
 mkdir <项目名> && cd <项目名> && git init -b main
 cp -r <beluga>/templates/ios-app/. .
 mkdir -p docs && cp <需求文件> docs/需求.md
-# 改 project.yml:INFOPLIST_KEY_CFBundleDisplayName(应用名)、PRODUCT_BUNDLE_IDENTIFIER
+# 改 project.yml 的 INFOPLIST_KEY_CFBundleDisplayName(应用名)。Bundle ID/团队 ID 不写文件,由环境变量 BUNDLE_ID/TEAM_ID 传入;模拟器自测不用设
 <beluga>/skills/client-ios/sim.sh all        # 首次必须通过再提交
 git add -A && git commit -m "初始化:从 ios-app 模板建立"
 ```
@@ -53,16 +53,16 @@ git add -A && git commit -m "初始化:从 ios-app 模板建立"
 
 - 已安装并登录 `asc`;App Store Connect 里已有这个 App(建 App 要先问所有者)→ 得到 `APP_ID`。
 - 钥匙串里有该团队的 Apple Distribution 证书 → `TEAM_ID`。**不要自己创建或吊销证书。**
-- **Bundle ID 要换成真的**,模板的 `com.example.app` 是占位,Apple 不会让你注册。命名用以后可转移的、不绑定个人的反向域名,如 `com.<公司或品牌>.<应用>`,不要用个人名字或临时测试名;一旦上传就别改。
+- **Bundle ID 要是真的**:模拟器默认用占位 `local.placeholder.app`,Apple 不会让你注册;发布时必须 `BUNDLE_ID=… ` 传入,`testflight.sh` 遇到 `com.example.*` 等占位值会直接报错。命名用以后可转移的、不绑定个人的反向域名,如 `com.<公司或品牌>.<应用>`,不要用个人名字或临时测试名;一旦上传就别改。
 - 版本号改 `project.yml` 的 `MARKETING_VERSION`;构建号由脚本向 asc 要下一个,不能重复。
 
 ## 步骤
 
 1. 模拟器自测通过、已提交(上面的流程)。
-2. `APP_ID=… TEAM_ID=… testflight.sh check` ——只读,确认证书和构建号。
-3. `APP_ID=… TEAM_ID=… testflight.sh archive` ——签名归档并导出 `build/testflight/export/App.ipa`。签名/描述文件失败:把错误如实告诉所有者,停。
+2. `BUNDLE_ID=… APP_ID=… TEAM_ID=… testflight.sh check` ——只读,确认证书和构建号。
+3. `BUNDLE_ID=… APP_ID=… TEAM_ID=… testflight.sh archive` ——签名归档并导出 `build/testflight/export/App.ipa`。签名/描述文件失败:把错误如实告诉所有者,停。
 4. 问所有者(选择题):"现在上传这个版本到 TestFlight 吗?(是/稍后)"。同意后:
-   `CONFIRM_UPLOAD=yes APP_ID=… GROUP="<测试组>" testflight.sh upload`
+   `CONFIRM_UPLOAD=yes BUNDLE_ID=… APP_ID=… GROUP="<测试组>" testflight.sh upload`
 5. **外部测试链接**:外部测试者需要 Beta App 审核(通常要等),只有所有者同意、并提供审核联系人(以及应用有登录时的演示账号)后才加 `EXTERNAL=yes`。链接在 App Store Connect 的测试组里开启"公开链接"后得到,再用 `asc` 或网页读出,**经所有者确认后**发给客户。
 6. 发给客户的话(白话):装 TestFlight → 打开链接 → 接受邀请 → 安装。附上版本号和构建号。
 
@@ -76,7 +76,7 @@ git add -A && git commit -m "初始化:从 ios-app 模板建立"
 
 ## 自检清单
 
-- [ ] Bundle ID 不是 `com.example.*`,命名可转移
+- [ ] BUNDLE_ID 不是占位值,命名可转移
 - [ ] 上传前得到所有者明确同意
 - [ ] 外部测试没有未经同意就提交审核
 - [ ] 交付说明写了转移前提

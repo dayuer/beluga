@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # TestFlight 发布:check / archive / upload。上传是对外动作,必须先得到所有者同意。
 # 用法(在 iOS 工程目录或设 PROJECT):
-#   testflight.sh check                      检查工具、团队、App ID、下一个构建号(只读)
+#   BUNDLE_ID=com.品牌.应用 TEAM_ID=… testflight.sh check                      检查工具、团队、App ID、下一个构建号(只读)
 #   testflight.sh archive                    设构建号 → 签名归档 → 导出 .ipa(本机,不上传)
 #   CONFIRM_UPLOAD=yes testflight.sh upload  上传并加入测试组(没有 CONFIRM_UPLOAD=yes 一律拒绝)
-# 环境变量: APP_ID(App Store Connect 的 App ID) TEAM_ID(开发者团队) GROUP(测试组名)
+# 环境变量: BUNDLE_ID(必须真实) APP_ID(App Store Connect 的 App ID) TEAM_ID(开发者团队) GROUP(测试组名)
 #           SCHEME=App  BUILD_NUMBER=可选,默认向 asc 要下一个  EXTERNAL=yes 时附带提交 Beta 审核(外部测试链接需要)
 set -euo pipefail
 PROJECT="${PROJECT:-$PWD}"; cd "$PROJECT"
@@ -13,9 +13,19 @@ IPA="$OUT/export/$SCHEME.ipa"
 
 die() { echo "错误: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null || die "缺 $1($2)"; }
+# 占位 Bundle ID(模板默认值、com.example.* 等)Apple 不会让你注册,提前拦下
+require_real_bundle_id() {
+  [[ -n "${BUNDLE_ID:-}" ]] || die "请设 BUNDLE_ID,例如 BUNDLE_ID=com.<公司或品牌>.<应用>(要真实、以后可转移的命名)"
+  case "$BUNDLE_ID" in
+    com.example.*|example.*|local.placeholder.*|*.placeholder.*|com.yourcompany.*|com.test.*)
+      die "BUNDLE_ID=$BUNDLE_ID 是占位值,Apple 不会让你注册。请设成真实的、可转移的反向域名,如 BUNDLE_ID=com.<公司或品牌>.<应用>,并和 App Store Connect 里的 App 一致" ;;
+  esac
+  [[ "$BUNDLE_ID" =~ ^[A-Za-z0-9.-]+\.[A-Za-z0-9.-]+$ ]] || die "BUNDLE_ID=$BUNDLE_ID 格式不对(只能字母数字 . -,至少两段)"
+}
 version() { grep -E 'MARKETING_VERSION' project.yml | head -1 | sed -E 's/.*"?([0-9.]+)"?.*/\1/'; }
 
 cmd_check() {
+  require_real_bundle_id
   need asc "安装并登录 asc,见 asc-basics skill"
   need xcodebuild "需要 Xcode"
   [[ -n "${APP_ID:-}" ]] || die "请设 APP_ID(asc apps list --output table 可查;App 还没建要先问所有者)"
@@ -26,6 +36,7 @@ cmd_check() {
 }
 
 cmd_archive() {
+  require_real_bundle_id
   need xcodebuild "需要 Xcode"; [[ -n "${TEAM_ID:-}" ]] || die "请设 TEAM_ID"
   local n="${BUILD_NUMBER:-}"
   if [[ -z "$n" ]]; then need asc "或手动设 BUILD_NUMBER"; [[ -n "${APP_ID:-}" ]] || die "请设 APP_ID"

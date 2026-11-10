@@ -44,4 +44,24 @@ describe("testflight.sh", () => {
     const r = run(["check"], { PATH: `${tmp}/bin:/usr/bin:/bin` });
     expect(r.status).not.toBe(0);
   });
+
+  it.each(["com.example.app", "local.placeholder.app", "example.foo"])("check 拒绝占位 Bundle ID %s 并说明设置方法", (id) => {
+    const r = run(["check"], { BUNDLE_ID: id, APP_ID: "1", TEAM_ID: "T" });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain("占位值");
+    expect(r.stderr).toContain("BUNDLE_ID=com.");
+  });
+
+  it("check 没设 BUNDLE_ID 时提示怎么设", () => {
+    const env: Record<string, string | undefined> = { ...process.env, PROJECT: tmp };
+    delete env.BUNDLE_ID;
+    const r = spawnSync("bash", [tf, "check"], { encoding: "utf8", cwd: tmp, env });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain("请设 BUNDLE_ID");
+  });
+
+  it("真实 Bundle ID 能通过占位检查(之后才因缺工具/证书失败)", () => {
+    const r = run(["check"], { BUNDLE_ID: "com.acme.shop", PATH: "/usr/bin:/bin" });
+    expect(r.stderr).not.toContain("占位值");
+  });
 });

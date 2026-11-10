@@ -2,10 +2,12 @@
 # 模拟器自测:build / install / launch / shot / all
 # 用法: sim.sh <命令> [截图输出路径]     在 iOS 工程目录运行(或设 PROJECT)
 # 环境变量: PROJECT=工程目录  SIM_NAME=模拟器名(默认第一台可用 iPhone)
-#           SCHEME=App  BUNDLE_ID=自动从 project.yml 读取  SETTLE=启动后等待秒数(默认2)
+#           SCHEME=App  BUNDLE_ID=默认 local.placeholder.app  SETTLE=启动后等待秒数(默认2)
 set -euo pipefail
 PROJECT="${PROJECT:-$PWD}"; cd "$PROJECT"
 SCHEME="${SCHEME:-App}"; SETTLE="${SETTLE:-2}"
+export BUNDLE_ID="${BUNDLE_ID:-local.placeholder.app}"   # 模拟器不需要真实 ID;project.yml 读它
+export TEAM_ID="${TEAM_ID:-}"
 BUILD="$PROJECT/build"; APP="$BUILD/Build/Products/Debug-iphonesimulator/$SCHEME.app"
 
 die() { echo "错误: $*" >&2; exit 1; }
