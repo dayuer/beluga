@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { Icon } from '../components/Icon.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp, useBeluga, toast } from '../lib/beluga.js';
@@ -15,7 +14,6 @@ export function DrivingBanner({ wsId }: { readonly wsId: string }) {
   const api = useApi();
   const { client } = useBeluga();
   const driving = useApp((st) => st.agentTerms[wsId]);
-  const t = useT();
   if (!driving) return null;
   const mode = getPrefs().termView ? convoModeOf(getPrefs().convoModes, getPrefs().convoDefault, wsId) : 'off';
   const takeOver = async (): Promise<void> => {
@@ -30,14 +28,14 @@ export function DrivingBanner({ wsId }: { readonly wsId: string }) {
   return (
     <div className={s.driving} role="status">
       <Icon name="terminal" size={14} />
-      <span className={s.drivingText}>{t('agentTerm.driving', { name: driving.label })}</span>
+      <span className={s.drivingText}>{driving.label}’s terminal is driving this conversation</span>
       {mode === 'chat' ? (
         <Button size="small" variant="quiet" icon="terminal" onClick={() => setPrefs({ convoModes: withConvoMode(getPrefs().convoModes, wsId, 'terminal') })}>
-          {t('agentTerm.showTerminal')}
+          Show Terminal
         </Button>
       ) : null}
       <Button size="small" onClick={() => void takeOver()}>
-        {t('agentTerm.takeOver')}
+        Take Over
       </Button>
     </div>
   );

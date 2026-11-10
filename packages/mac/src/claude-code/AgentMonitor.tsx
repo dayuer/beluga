@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import type { Workspace } from '@beluga/workspaces/types.js';
 import { useNow } from '../chat/Items.js';
@@ -19,6 +18,7 @@ import { type SubAgent, agentIdOfPath, agentOfWorktree, agentTitle, effortLabel,
 import s from './claude-code.module.css';
 import m from './agent-monitor.module.css';
 import o from './agent-outputs.module.css';
+import { revealLabel } from '../lib/os-words.js';
 import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
 
 /**
@@ -33,28 +33,27 @@ import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
 /** Tell the lead Claude something for this sub-agent (only when the lead is one of Beluga's conversations). */
 function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | undefined; leadName?: string }) {
   const { client } = useBeluga();
-  const t = useT();
   const prefs = usePrefs();
   const [text, setText] = useState('');
   const [sent, setSent] = useState<string>();
   const can = steerable(sub) && parent !== undefined;
-  const lead = leadName ?? parent?.name ?? t('claudeCode.monitor.theStarter');
+  const lead = leadName ?? parent?.name ?? 'the conversation that started it';
   const send = (): void => {
     const body = text.trim();
     if (!body || !can || !parent) return;
     void client.api.session.submit(steerPrompt(sub.agent, body), { channel: `ws:${parent.id}` }).then(
       () => {
         setText('');
-        setSent(t('claudeCode.monitor.sent', { lead }));
+        setSent(`Sent to ${lead}’s agent: it passes it on.`);
       },
-      () => setSent(t('claudeCode.monitor.cantReach')),
+      () => setSent('Couldn’t reach that conversation. Try again.'),
     );
   };
   if (!can) {
     return (
       <div className={m.steerOff}>
         <Icon name="info" size={12} />
-        {sub.session.own ? t('claudeCode.monitor.starterGone') : t('claudeCode.monitor.startedOutside')}
+        {sub.session.own ? 'The conversation that started it is gone, so nobody can pass anything on.' : 'It was started outside Beluga: steer it from where its session runs.'}
       </div>
     );
   }
@@ -65,8 +64,8 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
           className={`${m.steerInput} selectable`}
           rows={1}
           value={text}
-          placeholder={t('claudeCode.monitor.tellPlaceholder', { lead })}
-          aria-label={t('claudeCode.monitor.tell', { lead })}
+          placeholder={`Tell ${lead}’s main agent something for this one…`}
+          aria-label={`Tell ${lead}’s main agent something for this one`}
           onChange={(e) => {
             setText(e.target.value);
             setSent(undefined);
@@ -79,13 +78,13 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
             send();
           }}
         />
-        <Tip label={t('claudeCode.monitor.tellTip', { lead })} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
+        <Tip label={`The main agent in ${lead} gets it and passes it on with SendMessage`} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
           <Button size="small" variant={text.trim() ? 'primary' : 'plain'} icon="send" disabled={!text.trim()} onClick={send}>
-            {t('claudeCode.monitor.sendMain')}
+            Send to Main Agent
           </Button>
         </Tip>
       </div>
-      <div className={m.steerHint}>{sent ?? t('claudeCode.monitor.steerHint', { lead })}</div>
+      <div className={m.steerHint}>{sent ?? `You steer it through ${lead}’s agent, which started it. Its answer shows in that chat.`}</div>
     </div>
   );
 }
@@ -93,7 +92,6 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
 /** The live page of one sub-agent (with its worktree when it has one). */
 export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Workspace }) {
   const { client } = useBeluga();
-  const tr = useT();
   const revealWords = useRevealLabel();
   const actions = useActions();
   const a = sub.agent;
@@ -117,9 +115,9 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
     ...(modelLabel(a.model) ? [{ label: modelLabel(a.model)!, tip: a.model }] : []),
     ...(effortLabel(a.effort) ? [{ label: effortLabel(a.effort)! }] : []),
     { label: agentElapsed(a, now) },
-    { label: tr('claudeCode.monitor.nSteps', { n: a.steps }) },
-    ...(a.tokens ? [{ label: tr('claudeCode.monitor.context', { n: tokens(a.tokens) }) }] : []),
-    ...(a.background ? [{ label: tr('claudeCode.monitor.background') }] : []),
+    { label: plural(a.steps, 'step') },
+    ...(a.tokens ? [{ label: `${tokens(a.tokens)} context` }] : []),
+    ...(a.background ? [{ label: 'Background' }] : []),
   ];
   return (
     <div className={s.sessionPage} data-agent-monitor={a.id}>
@@ -129,21 +127,23 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
         </span>
         <div className={m.titles}>
           <div className={m.kicker}>
-            {tr('claudeCode.monitor.subAgent')}
+            Sub-agent
             {parent ? (
               <>
-                {tr('claudeCode.monitor.of')}
+                {' of '}
                 <button type="button" className={m.parentLink} onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
                   {parent.kind === 'main' ? (projectName ?? parent.name) : parent.name}
                 </button>
               </>
             ) : sub.session.own ? null : (
               <>
-                {tr('claudeCode.monitor.ofSession', { title: sub.session.title })}
-                {projectName ? tr('claudeCode.monitor.inProject', { name: projectName }) : ''}
+                {' of “'}
+                {sub.session.title}
+                {'”, a Claude Code session outside Beluga'}
+                {projectName ? ` in ${projectName}` : ''}
               </>
             )}
-            {parentAgent ? tr('claudeCode.monitor.startedBy', { name: agentTitle(parentAgent) }) : null}
+            {parentAgent ? <> · started by its agent “{agentTitle(parentAgent)}”</> : null}
           </div>
           <h1 className={s.focusTitle}>{agentTitle(a)}</h1>
           <div className={m.facts}>
@@ -158,7 +158,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
             ))}
             {a.worktree ? (
               <span className={m.fact} title={a.worktree.path}>
-                <Icon name="branch" size={10} /> {tr('claudeCode.monitor.ownWorktree')}{a.worktree.branch ? ` · ${a.worktree.branch}` : ''}
+                <Icon name="branch" size={10} /> Its own worktree{a.worktree.branch ? ` · ${a.worktree.branch}` : ''}
               </span>
             ) : null}
           </div>
@@ -171,7 +171,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
         <div className={m.headActions}>
           {parent ? (
             <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
-              {tr('claudeCode.monitor.openMain')}
+              Open Main Chat
             </Button>
           ) : null}
           {worktree ? (
@@ -181,27 +181,27 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
           ) : null}
           {worktree && !live ? (
             <Button size="small" variant="danger" icon="archive" onClick={() => setRemoving(true)}>
-              {tr('claudeCode.monitor.removeWorktree')}
+              Remove Worktree…
             </Button>
           ) : null}
         </div>
       </header>
       <div className={o.tabs}>
         <Segmented
-          label={tr('claudeCode.monitor.show')}
+          label="Show"
           value={view}
           onChange={setView}
           options={[
-            { value: 'activity', label: tr('claudeCode.activity.activity'), hint: tr('claudeCode.monitor.activityHint') },
-            { value: 'outputs', label: made ? tr('claudeCode.monitor.outputsN', { n: made }) : tr('claudeCode.monitor.outputs'), hint: tr('claudeCode.monitor.outputsHint') },
-            ...(tasks.length ? [{ value: 'background' as const, label: tr('claudeCode.monitor.backgroundN', { n: runningTasks ? tr('claudeCode.activity.nRunning', { n: runningTasks }) : tasks.length }), hint: tr('claudeCode.monitor.backgroundHint') }] : []),
+            { value: 'activity', label: 'Activity', hint: 'What it does, as it does it' },
+            { value: 'outputs', label: made ? `Outputs · ${made}` : 'Outputs', hint: 'Screenshots, test output and logs it made or looked at' },
+            ...(tasks.length ? [{ value: 'background' as const, label: `Background · ${runningTasks ? `${runningTasks} running` : tasks.length}`, hint: 'Commands it runs in the background, with their output as it comes' }] : []),
           ]}
         />
       </div>
       {view === 'activity' ? (
-        <LiveTranscript key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} version={version} live={live} label={tr('claudeCode.monitor.subAgentNamed', { name: agentTitle(a) })} />
+        <LiveTranscript key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} version={version} live={live} label={`Sub-agent ${agentTitle(a)}`} />
       ) : view === 'background' ? (
-        <BackgroundTasks items={tasks} layout="split" empty={tr('claudeCode.monitor.noBackground')} />
+        <BackgroundTasks items={tasks} layout="split" empty="Nothing it runs in the background." />
       ) : (
         <AgentOutputs key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} list={outputs} {...(sub.session.cwd ? { cwd: sub.session.cwd } : {})} />
       )}
@@ -217,7 +217,6 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
  */
 export function AgentWorktreePage({ ws }: { ws: Workspace }) {
   const { client } = useBeluga();
-  const t = useT();
   const sessions = useApp((st) => st.claudeCode.sessions);
   const origin = useApp((st) => st.claudeCode.origins.find((o) => o.path === ws.path));
   const sub = useMemo(() => agentOfWorktree(sessions, ws), [sessions, ws]);
@@ -236,6 +235,6 @@ export function AgentWorktreePage({ ws }: { ws: Workspace }) {
     };
   }, [id, Boolean(sub)]);
   if (sub) return <AgentMonitor sub={sub} worktree={ws} />;
-  if (!looked) return <Empty icon="bot" title={t('claudeCode.monitor.finding')} detail={t('claudeCode.monitor.findingDetail')} />;
+  if (!looked) return <Empty icon="bot" title="Finding this sub-agent…" detail="Reading what Claude Code kept of it." />;
   return <WorktreeInfoPage ws={ws} agent {...(origin ? { origin } : {})} />;
 }

@@ -3,7 +3,6 @@ import { activityOf } from '@beluga/ui/workspace-models.js';
 import { worktreeOrigin } from '@beluga/workspaces/origin.js';
 import type { Project, Workspace } from '@beluga/workspaces/types.js';
 import { tokensOf } from '@beluga/workspaces/usage-days.js';
-import { t } from '../../i18n/index.js';
 
 /** What the breakdown is ordered by. */
 export type SortKey = 'size' | 'tokens' | 'recent';
@@ -163,13 +162,13 @@ export function compact(n: number): string {
 /** "just now", "12 min ago", "3 h ago", "yesterday", "5 d ago", "3 wk ago". */
 export function ago(ts: number, now: number): string {
   const m = Math.round((now - ts) / 60_000);
-  if (m < 1) return t('views.ago.now');
-  if (m < 60) return t('views.ago.min', { n: m });
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
-  if (h < 24) return t('views.ago.h', { n: h });
+  if (h < 24) return `${h} h ago`;
   const d = Math.round(h / 24);
-  if (d === 1) return t('views.ago.yesterday');
-  return d < 14 ? t('views.ago.d', { n: d }) : t('views.ago.wk', { n: Math.round(d / 7) });
+  if (d === 1) return 'yesterday';
+  return d < 14 ? `${d} d ago` : `${Math.round(d / 7)} wk ago`;
 }
 
 /** When a plan window resets: "3:10 PM" today, else "Thu 9 AM". */
@@ -179,10 +178,9 @@ export function resetsAt(ts: number, now: number): string {
   return ts - now < DAY && d.getDate() === new Date(now).getDate() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
-// Read when shown, in the language shown.
 export const REASON: Record<CleanupReason, string> = {
-  get merged() { return t('views.usage.reason.merged'); },
-  get nothing_new() { return t('views.usage.reason.nothingNew'); },
-  get idle() { return t('views.usage.reason.idle'); },
-  get agents() { return t('views.usage.reason.agents'); },
+  merged: 'Merged',
+  nothing_new: 'Nothing new on its branch',
+  idle: 'Idle two weeks',
+  agents: 'Left by sub-agents',
 };

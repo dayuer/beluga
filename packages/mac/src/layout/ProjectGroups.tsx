@@ -13,7 +13,6 @@ import side from './Sidebar.module.css';
 import s from './project-groups.module.css';
 import { isShortcut } from '../lib/shortcuts.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { type Key, t, useT } from '../i18n/index.js';
 
 /** The project menu's group options, done the Mac way: these spec options become "Move to Group ▸". */
 export const isGroupOption = (id: string): boolean => id.startsWith('p-group:') || id === 'p-newgroup' || id === 'p-ungroup';
@@ -26,8 +25,8 @@ export function moveItems(entries: readonly Entry[], item: Target, arrange: (ite
   const up = stepOf(entries, item, -1);
   const down = stepOf(entries, item, 1);
   return [
-    { label: t('layout.projectGroups.moveUp'), keys: shortcutKeys('project-up'), disabled: !up, onSelect: () => up && arrange(item, up) },
-    { label: t('layout.projectGroups.moveDown'), keys: shortcutKeys('project-down'), disabled: !down, onSelect: () => down && arrange(item, down) },
+    { label: 'Move Up', keys: shortcutKeys('project-up'), disabled: !up, onSelect: () => up && arrange(item, up) },
+    { label: 'Move Down', keys: shortcutKeys('project-down'), disabled: !down, onSelect: () => down && arrange(item, down) },
   ];
 }
 
@@ -38,12 +37,12 @@ export function groupItems(p: Project, entries: readonly Entry[], arrange: (item
   if (!p.root) return [];
   return [
     {
-      label: t('layout.projectGroups.moveToGroup'),
+      label: 'Move to Group',
       separate: true,
       submenu: [
         ...groups.map((g) => ({ label: g.name, checked: g.name === current, onSelect: () => (g.name === current ? undefined : arrange({ project: p.id }, { into: g.name, before: null })) })),
-        { label: t('layout.projectGroups.newGroup'), separate: groups.length > 0, onSelect: () => newGroupFor(p.id) },
-        ...(current ? [{ label: t('layout.projectGroups.removeFrom', { name: current }), onSelect: () => arrange({ project: p.id }, outOfGroup(entries, current)) }] : []),
+        { label: 'New Group…', separate: groups.length > 0, onSelect: () => newGroupFor(p.id) },
+        ...(current ? [{ label: `Remove from “${current}”`, onSelect: () => arrange({ project: p.id }, outOfGroup(entries, current)) }] : []),
       ],
       onSelect: () => undefined,
     },
@@ -89,20 +88,20 @@ function NameField({ initial, onDone, label }: { initial: string; onDone: (name:
   );
 }
 
-/** Icons a group can wear instead of the folder (Change Icon ▸ on its right-click menu); `label` is a key. */
-export const GROUP_ICONS: ReadonlyArray<{ readonly icon: IconName; readonly label: Key }> = [
-  { icon: 'folder', label: 'layout.projectGroups.icon.folder' },
-  { icon: 'grid', label: 'layout.projectGroups.icon.grid' },
-  { icon: 'spark', label: 'layout.projectGroups.icon.prompt' },
-  { icon: 'people', label: 'layout.projectGroups.icon.people' },
-  { icon: 'globe', label: 'layout.projectGroups.icon.globe' },
-  { icon: 'coin', label: 'layout.projectGroups.icon.coin' },
-  { icon: 'bulb', label: 'layout.projectGroups.icon.idea' },
-  { icon: 'wand', label: 'layout.projectGroups.icon.wand' },
-  { icon: 'terminal', label: 'layout.projectGroups.icon.terminal' },
-  { icon: 'lock', label: 'layout.projectGroups.icon.lock' },
-  { icon: 'archive', label: 'layout.projectGroups.icon.archive' },
-  { icon: 'important', label: 'layout.projectGroups.icon.flag' },
+/** Icons a group can wear instead of the folder (Change Icon ▸ on its right-click menu). */
+export const GROUP_ICONS: ReadonlyArray<{ readonly icon: IconName; readonly label: string }> = [
+  { icon: 'folder', label: 'Folder' },
+  { icon: 'grid', label: 'Grid' },
+  { icon: 'spark', label: 'Prompt' },
+  { icon: 'people', label: 'People' },
+  { icon: 'globe', label: 'Globe' },
+  { icon: 'coin', label: 'Coin' },
+  { icon: 'bulb', label: 'Idea' },
+  { icon: 'wand', label: 'Wand' },
+  { icon: 'terminal', label: 'Terminal' },
+  { icon: 'lock', label: 'Lock' },
+  { icon: 'archive', label: 'Archive' },
+  { icon: 'important', label: 'Flag' },
 ];
 
 const iconOfGroup = (icons: Readonly<Record<string, string>>, name: string): IconName => {
@@ -137,7 +136,6 @@ function renameGroupIcon(from: string, to: string): void {
 /** The row of a group being made: a folder and its name field (like Finder's New Folder). */
 export function NewGroupRow() {
   const api = useApi();
-  const t = useT();
   const { creating } = useGroupEdit();
   const project = useApp((st) => st.projects.find((p) => p.id === creating?.projectId));
   if (!creating) return null;
@@ -148,8 +146,8 @@ export function NewGroupRow() {
       </span>
       <NameField
         key={creating.projectId ?? ''}
-        initial={t('layout.projectGroups.newGroupName')}
-        label={project ? t('layout.projectGroups.nameFor', { name: project.name }) : t('layout.projectGroups.name')}
+        initial="New Group"
+        label={project ? `Name of the new group for ${project.name}` : 'Name of the new group'}
         onDone={(name) => {
           editGroups({ creating: undefined });
           if (name) void api.workspaces.newGroup(name, project ? { project: project.id } : {});
@@ -176,21 +174,20 @@ export interface GroupHeaderProps {
 /** A group in the sidebar: click to fold, drag to move, right-click to rename or ungroup. */
 export function GroupHeader({ name, count, open, busy, tally = NO_TALLY, dropOn, menu, onToggle, onMove }: GroupHeaderProps) {
   const api = useApi();
-  const t = useT();
   const { renaming } = useGroupEdit();
   const icon = iconOfGroup(usePrefs().groupIcons, name);
   const items: ActionItem[] = [
-    { label: t('layout.projectGroups.rename'), icon: 'pencil', onSelect: () => editGroups({ renaming: name, creating: undefined }) },
+    { label: 'Rename…', icon: 'pencil', onSelect: () => editGroups({ renaming: name, creating: undefined }) },
     {
-      label: t('layout.projectGroups.changeIcon'),
+      label: 'Change Icon',
       icon,
-      submenu: GROUP_ICONS.map((g) => ({ label: t(g.label), icon: g.icon, checked: g.icon === icon, onSelect: () => setGroupIcon(name, g.icon) })),
+      submenu: GROUP_ICONS.map((g) => ({ label: g.label, icon: g.icon, checked: g.icon === icon, onSelect: () => setGroupIcon(name, g.icon) })),
       onSelect: () => undefined,
     },
     ...menu,
     count
-      ? { label: t('layout.projectGroups.ungroup'), hint: t('layout.projectGroups.ungroupHint'), icon: 'x', danger: true, separate: true, onSelect: () => void api.workspaces.ungroup(name).then(() => setGroupIcon(name, undefined)) }
-      : { label: t('layout.projectGroups.delete'), icon: 'x', danger: true, separate: true, onSelect: () => void api.workspaces.ungroup(name).then(() => setGroupIcon(name, undefined)) },
+      ? { label: 'Ungroup', hint: 'Its projects stay, where the group was', icon: 'x', danger: true, separate: true, onSelect: () => void api.workspaces.ungroup(name).then(() => setGroupIcon(name, undefined)) }
+      : { label: 'Delete Group', icon: 'x', danger: true, separate: true, onSelect: () => void api.workspaces.ungroup(name).then(() => setGroupIcon(name, undefined)) },
   ];
   if (renaming === name) {
     return (
@@ -200,7 +197,7 @@ export function GroupHeader({ name, count, open, busy, tally = NO_TALLY, dropOn,
         </span>
         <NameField
           initial={name}
-          label={t('layout.projectGroups.renameLabel', { name })}
+          label={`New name for the group ${name}`}
           onDone={(to) => {
             editGroups({ renaming: undefined });
             if (to && to !== name) void api.workspaces.renameGroup(name, to).then(() => renameGroupIcon(name, to), () => undefined);
@@ -215,7 +212,7 @@ export function GroupHeader({ name, count, open, busy, tally = NO_TALLY, dropOn,
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={t('layout.projectGroups.label', { name })}
+        aria-label={`Group ${name}`}
         title={tallyTip(tally) || undefined}
         className={cx(side.row, side.groupRow, s.groupHead, dropOn && s.dropOn)}
         style={{ paddingLeft: 8 }}
@@ -249,7 +246,7 @@ export function GroupHeader({ name, count, open, busy, tally = NO_TALLY, dropOn,
               <TallyMark tally={tally} folded fallback={<span className={s.count}>{count}</span>} />
             </>
           )}
-          {open && !count ? <span className={s.empty}>{t('layout.projectGroups.empty')}</span> : null}
+          {open && !count ? <span className={s.empty}>Empty</span> : null}
         </span>
       </div>
     </ActionsContext>

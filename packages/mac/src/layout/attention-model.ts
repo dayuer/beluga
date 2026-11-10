@@ -9,7 +9,6 @@ import { remindLabel } from '../../../../src/shared/remind.js';
 import { threadNesting } from '../../../../src/ui/thread-tree.js';
 import { activityOf } from '../../../../src/ui/workspace-models.js';
 import type { Project, Workspace } from '../../../../src/workspaces/types.js';
-import { t } from '../i18n/index.js';
 
 /**
  * What each conversation in the sidebar is waiting on, Slack-style: it needs you (an approval,
@@ -41,11 +40,18 @@ export const IDLE_SIGNAL: Signal = { level: 'idle', unread: 0, working: false, t
 
 type Source = Pick<AppState, 'log' | 'unread' | 'questions' | 'approvals' | 'conflicts' | 'prs' | 'claudeCode' | 'plans' | 'board' | 'sentinel'>;
 
-export const needTip = (need: Need): string => t(`layout.attention.needTip.${need}`);
+const NEED_TIPS: Record<Need, string> = {
+  approval: 'Your agent needs your approval',
+  question: 'Your agent asks a question',
+  plan: 'Your agent has a plan for you to approve',
+  conflict: 'A merge conflict to resolve',
+  checks: 'Checks failed on its pull request',
+  stuck: 'Stuck: Beluga couldn’t move it on by itself',
+};
 
-const newMessages = (n: number): string => t('layout.attention.newMessages', { count: n });
-const updates = (n: number): string => t('layout.attention.updates', { count: n });
-const agentWorking = (): string => t('layout.attention.working');
+export const needTip = (need: Need): string => NEED_TIPS[need];
+
+const plural = (n: number, word: string): string => `${n} new ${word}${n === 1 ? '' : 's'}`;
 
 /** What holds a conversation up. `ws`: one of your workspaces (conflicts and checks are kept per workspace). */
 export function needOf(state: Source, channel: string, ws?: string): Need | undefined {
@@ -65,7 +71,7 @@ function newsLead(state: Source, channel: string): string | undefined {
     const item = state.log[i]!;
     if (item.channel !== channel) continue;
     if (item.type !== 'agent') return undefined;
-    return item.status === 'done' ? t('layout.attention.finished') : item.status === 'error' ? t('layout.attention.stopped') : undefined;
+    return item.status === 'done' ? 'Your agent finished' : item.status === 'error' ? 'Your agent stopped' : undefined;
   }
   return undefined;
 }
@@ -81,10 +87,10 @@ export function signalOf(state: Source, channel: string, ws?: string): Signal {
   // Failing checks or a conflict while your agent works there: it's on it (BLG-748), so it reads as working. Still there when it stops: red again.
   const fixing = working && found !== undefined && FIXABLE.has(found) ? found : undefined;
   const need = fixing ? undefined : found;
-  const news = unread ? [newsLead(state, channel), newMessages(unread)].filter(Boolean).join(' · ') : '';
-  if (need) return { level: 'needs', unread, need, working, tip: [needTip(need), unread ? newMessages(unread) : ''].filter(Boolean).join(' · ') };
+  const news = unread ? [newsLead(state, channel), plural(unread, 'message')].filter(Boolean).join(' · ') : '';
+  if (need) return { level: 'needs', unread, need, working, tip: [needTip(need), unread ? plural(unread, 'message') : ''].filter(Boolean).join(' · ') };
   if (unread) return { level: 'unread', unread, working, tip: news };
-  if (working) return { level: 'working', unread: 0, working, tip: fixing ? `${agentWorking()} · ${needTip(fixing)}` : agentWorking() };
+  if (working) return { level: 'working', unread: 0, working, tip: fixing ? `Your agent is working · ${needTip(fixing)}` : 'Your agent is working' };
   return IDLE_SIGNAL;
 }
 
@@ -95,7 +101,7 @@ export function signalOf(state: Source, channel: string, ws?: string): Signal {
  */
 export function laterSignal(signal: Signal, at: number, now = Date.now()): Signal {
   const label = remindLabel(at, now);
-  return { level: signal.working ? 'working' : 'idle', unread: 0, working: signal.working, tip: signal.working ? `${agentWorking()} · ${label}` : label, remindAt: at };
+  return { level: signal.working ? 'working' : 'idle', unread: 0, working: signal.working, tip: signal.working ? `Your agent is working · ${label}` : label, remindAt: at };
 }
 
 /** What Remind Me Later reads: each person's records (core/triage), with the categories on or off. */
@@ -166,8 +172,14 @@ export const projectTally = (state: QuietSource, p: Project): Tally => tally(pro
 
 export const groupTally = (state: QuietSource, projects: readonly Project[]): Tally => tally(projects.flatMap((p) => projectSignals(state, p)));
 
-/** "{who} asks a question": who's waiting (a task's key, a sentinel's name) and on what. */
-const needWords = (who: string, need: Need): string => t(`layout.attention.needWords.${need}`, { who });
+const NEED_WORDS: Record<Need, string> = {
+  approval: 'needs your approval',
+  question: 'asks a question',
+  plan: 'has a plan for you to approve',
+  conflict: 'has a merge conflict',
+  checks: 'has failing checks',
+  stuck: 'is stuck',
+};
 
 /** Where a plan waits on you: which of its conversations, and the plan's task there (its id), if it's a task's. */
 export interface PlanNeed {
@@ -183,12 +195,12 @@ function stuckOf(state: Source, plan: Plan): { readonly tip: string; readonly ta
     const [task, w] = stalled;
     const issueId = plan.body?.milestones.flatMap((m) => m.tasks).find((t) => t.id === task)?.issueId;
     const issue = state.board.issues.find((i) => (issueId !== undefined && i.id === issueId) || (i.plan?.id === plan.id && i.plan.task === task));
-    return { tip: t('layout.attention.stoppedTwice', { who: issue?.key ?? t('layout.attention.aTask'), reason: w.reason }), task, ...(issue?.worktrees?.[0] ? { ws: issue.worktrees[0] } : {}) };
+    return { tip: `${issue?.key ?? 'A task'} stopped twice: ${w.reason}`, task, ...(issue?.worktrees?.[0] ? { ws: issue.worktrees[0] } : {}) };
   }
   const given = Object.entries(plan.rescue ?? {}).find(([, r]) => r.yours);
   if (!given) return undefined;
   const title = plan.body?.milestones.find((m) => m.id === given[0])?.title;
-  return { tip: title ? t('layout.attention.stuckOn', { title }) : t('layout.attention.stuck') };
+  return { tip: title ? `Stuck on “${title}”` : 'Stuck: Beluga couldn’t move it on' };
 }
 
 /**
@@ -199,20 +211,20 @@ export function planSignal(state: Source, plan: Plan): Signal & { readonly at?: 
   const list = planConversations(state, plan.id).map((ws) => ({ ws, signal: signalOf(state, `ws:${ws}`, ws) }));
   const unread = list.reduce((n, x) => n + x.signal.unread, 0);
   const working = list.some((x) => x.signal.working);
-  const news = unread ? updates(unread) : '';
+  const news = unread ? `${unread} update${unread === 1 ? '' : 's'}` : '';
   const waiting = list.find((x) => x.signal.need);
   if (waiting) {
     const owner = planOwnerOf(state.plans, state.board, waiting.ws);
-    const who = owner?.issue.key ?? t('layout.attention.yourAgent');
+    const who = owner?.issue.key ?? 'Your agent';
     const need = waiting.signal.need!;
     const at = { ws: waiting.ws, ...(owner ? { task: owner.task.id } : {}) };
-    return { level: 'needs', unread, need, working, tip: [needWords(who, need), news].filter(Boolean).join(' · '), at };
+    return { level: 'needs', unread, need, working, tip: [`${who} ${NEED_WORDS[need]}`, news].filter(Boolean).join(' · '), at };
   }
   // Nothing asks, but the plan gave up on something by itself: it says what, and why.
   const stuck = stuckOf(state, plan);
   if (stuck) return { level: 'needs', unread, need: 'stuck', working, tip: [stuck.tip, news].filter(Boolean).join(' · '), ...(stuck.task && stuck.ws ? { at: { ws: stuck.ws, task: stuck.task } } : {}) };
   if (unread) return { level: 'unread', unread, working, tip: news };
-  if (working) return { level: 'working', unread: 0, working, tip: agentWorking() };
+  if (working) return { level: 'working', unread: 0, working, tip: 'Your agent is working' };
   return IDLE_SIGNAL;
 }
 
@@ -232,10 +244,8 @@ export function planRowSignal(state: Source, plan: Plan): PlanRowSignal {
   const own = state.unread[plan.home] ?? 0;
   const tasks = planConversations(state, plan.id).filter((ws) => `ws:${ws}` !== plan.home);
   const inside = tasks.some((ws) => (state.unread[`ws:${ws}`] ?? 0) > 0);
-  const news = own ? newMessages(own) : '';
-  // Without the tasks' news added up (" · 3 updates").
-  const added = all.unread ? ` · ${updates(all.unread)}` : '';
-  const tip = all.level === 'needs' ? (added && all.tip.endsWith(added) ? all.tip.slice(0, -added.length) : all.tip) : own ? news : inside ? t('layout.attention.newInTasks') : all.tip;
+  const news = own ? plural(own, 'message') : '';
+  const tip = all.level === 'needs' ? all.tip.replace(/ · \d+ updates?$/, '') : own ? news : inside ? 'New in its tasks' : all.tip;
   const level: Level = all.level === 'needs' ? 'needs' : own ? 'unread' : all.working ? 'working' : 'idle';
   return { level, unread: own, ...(all.need ? { need: all.need } : {}), working: all.working, tip: [tip, all.level === 'needs' && own ? news : ''].filter(Boolean).join(' · '), inside };
 }
@@ -249,8 +259,8 @@ export const projectWorking = (state: Source & LaterSource, p: Project): boolean
 export const groupWorking = (state: Source & LaterSource, projects: readonly Project[]): boolean => projects.some((p) => projectWorking(state, p));
 
 /** What a project's (or group's) row says on hover about what's inside. */
-export function tallyTip(n: Tally): string {
-  const parts = [n.needs ? t('layout.attention.tallyNeeds', { count: n.needs }) : '', n.unread ? t('layout.attention.tallyUnread', { count: n.unread }) : ''].filter(Boolean);
+export function tallyTip(t: Tally): string {
+  const parts = [t.needs ? `${t.needs} need${t.needs === 1 ? 's' : ''} you` : '', t.unread ? `${t.unread} unread` : ''].filter(Boolean);
   return parts.join(' · ');
 }
 
@@ -301,7 +311,7 @@ export function sentinelEntries(state: ListSource): UnreadEntry[] {
     const project = sentinel.projectId ? state.projects.find((p) => p.id === sentinel.projectId && p.root) : undefined;
     const unread = state.unread[e.first.channel] ?? 0;
     const working = activityOf(state.log, e.first.channel).running;
-    const signal: Signal = { level: 'needs', unread, need: e.first.need, working, tip: needWords(sentinel.name, e.first.need) };
+    const signal: Signal = { level: 'needs', unread, need: e.first.need, working, tip: `${sentinel.name} ${NEED_WORDS[e.first.need]}` };
     out.push({ kind: 'sentinel', channel: `sentinel:${id}`, name: sentinel.name, sentinel, runId: e.first.runId, at: e.first.channel, ...(project ? { project } : {}), channels: e.channels, signal, ts: activityOf(state.log, e.first.channel).lastTs ?? 0 });
   }
   return out;
@@ -331,10 +341,10 @@ export function conversationEntries(state: ListSource): UnreadEntry[] {
   }
   if (state.network.enabled) {
     for (const f of state.network.friends) {
-      if (f.unread > 0) out.push({ kind: 'dm', channel: `dm:${f.peerId}`, name: f.name, peerId: f.peerId, signal: { level: 'unread', unread: f.unread, working: false, tip: newMessages(f.unread) }, ts: f.last?.ts ?? 0 });
+      if (f.unread > 0) out.push({ kind: 'dm', channel: `dm:${f.peerId}`, name: f.name, peerId: f.peerId, signal: { level: 'unread', unread: f.unread, working: false, tip: plural(f.unread, 'message') }, ts: f.last?.ts ?? 0 });
     }
     for (const g of state.network.groups) {
-      if (g.active && g.unread > 0) out.push({ kind: 'group', channel: `group:${g.id}`, name: g.name, groupId: g.id, signal: { level: 'unread', unread: g.unread, working: false, tip: newMessages(g.unread) }, ts: g.last?.ts ?? 0 });
+      if (g.active && g.unread > 0) out.push({ kind: 'group', channel: `group:${g.id}`, name: g.name, groupId: g.id, signal: { level: 'unread', unread: g.unread, working: false, tip: plural(g.unread, 'message') }, ts: g.last?.ts ?? 0 });
     }
   }
   return out;
@@ -353,21 +363,7 @@ export function unreadEntries(state: ListSource): UnreadEntry[] {
  * Later (Remind Me Later, BLG-770), the owner's choices; the code says `active` and `snoozed`.
  */
 export const CATEGORY_ORDER: readonly ChatCategory[] = ['active', 'working', 'snoozed', 'settled'];
-/** Each category's title, read in the language shown when it's read. */
-export const CATEGORY_TITLES: Readonly<Record<ChatCategory, string>> = {
-  get active() {
-    return t('layout.attention.category.active');
-  },
-  get working() {
-    return t('layout.attention.category.working');
-  },
-  get snoozed() {
-    return t('layout.attention.category.snoozed');
-  },
-  get settled() {
-    return t('layout.attention.category.settled');
-  },
-};
+export const CATEGORY_TITLES: Readonly<Record<ChatCategory, string>> = { active: 'Inbox', working: 'Working', snoozed: 'Later', settled: 'Settled' };
 /** How many Settled rows show before "Show more". */
 export const SETTLED_PAGE = 50;
 
@@ -422,17 +418,17 @@ const isQuietOutside = (e: UnreadEntry): boolean => e.kind === 'workspace' && e.
 export function statusWords(status: RowStatus, now: number): string {
   switch (status.kind) {
     case 'need':
-      return needLabel(status.need);
+      return NEED_LABELS[status.need];
     case 'stopped':
-      return t('layout.attention.status.stopped');
+      return 'Stopped';
     case 'back':
-      return t('layout.attention.status.back');
+      return 'Back';
     case 'waiting':
-      return t('layout.attention.status.waiting');
+      return 'Waiting';
     case 'working':
-      return t('layout.attention.status.working', { span: span(now - status.since) });
+      return `Working ${span(now - status.since)}`;
     case 'left':
-      return t('layout.attention.status.left', { span: span(status.until - now) });
+      return `${span(status.until - now)} left`;
     case 'age':
     case 'settled':
       return status.at ? span(now - status.at) : '';
@@ -462,16 +458,16 @@ export function nextActive(state: CategorySource, channel: string): CategoryEntr
 
 /** Why a chat is Settled, in the line above its composer. */
 export function settledWords(settled: NonNullable<ChatTriage['settled']>, idleDays: number, now: number): string {
-  const ago = span(now - settled.at);
+  const ago = `Settled ${span(now - settled.at)} ago`;
   switch (settled.why) {
     case 'you':
-      return t('layout.attention.settled.you');
+      return 'Settled by you';
     case 'pr_merged':
-      return t('layout.attention.settled.prMerged', { ago, pr: settled.pr === undefined ? '' : `#${settled.pr} ` });
+      return `${ago}: PR ${settled.pr === undefined ? '' : `#${settled.pr} `}merged`;
     case 'merged_here':
-      return t('layout.attention.settled.mergedHere', { ago });
+      return `${ago}: merged into main here`;
     case 'idle':
-      return t('layout.attention.settled.idle', { count: idleDays });
+      return `Settled: idle for ${idleDays} day${idleDays === 1 ? '' : 's'}`;
   }
 }
 
@@ -482,8 +478,7 @@ export function wakeWords(at: number, now: number): string {
   return sameDay ? hhmm(at) : `${day.toLocaleDateString('en-US', { weekday: 'short' })} ${hhmm(at)}`;
 }
 
-/** A need in a word, at a row's edge; none for a conflict or failing checks (the mark says it). */
-const needLabel = (need: Need): string => (need === 'conflict' || need === 'checks' ? '' : t(`layout.attention.needLabel.${need}`));
+const NEED_LABELS: Readonly<Record<Need, string>> = { question: 'Input', approval: 'Approval', plan: 'Plan', stuck: 'Stuck', conflict: '', checks: '' };
 
 const FOLDED_BY_CATEGORIES = ['projects', 'working', 'snoozed', 'settled'];
 

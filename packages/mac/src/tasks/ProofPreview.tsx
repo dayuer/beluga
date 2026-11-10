@@ -11,7 +11,6 @@ import { useBeluga } from '../lib/beluga.js';
 import { ChangedFileView } from '../views/ChangedFile.js';
 import r from '../views/reader/reader.module.css';
 import s from './proof-preview.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * A file a task kept as proof, read over the page you're on (a log, Markdown, code, a picture, a
@@ -24,11 +23,10 @@ export const isMissing = (error: string): boolean => /ENOENT|no such file|not fo
 
 /** What shows where a proof's file was, once it's gone. */
 export function ProofGone({ className }: { className?: string }) {
-  const t = useT();
   return (
     <div className={cx(s.gone, className)} role="note">
       <Icon name="file" size={14} />
-      <span>{t('tasks.sections.gone')}</span>
+      <span>Proof file is gone</span>
     </div>
   );
 }
@@ -39,7 +37,6 @@ export const preloadReader = (): void => void import('../views/reader/FileReader
 export function ProofPreview({ proof, onClose }: { proof: Proof & { path: string }; onClose: () => void }) {
   const { client } = useBeluga();
   const actions = useActions();
-  const t = useT();
   const [at, setAt] = useState<Location>();
   const [error, setError] = useState<string>();
   const gone = Boolean(proof.gone) || (error !== undefined && isMissing(error));
@@ -75,19 +72,19 @@ export function ProofPreview({ proof, onClose }: { proof: Proof & { path: string
             {gone ? null : (
               <>
                 <Button size="small" variant="quiet" icon="folder" onClick={showInFiles}>
-                  {t('tasks.proof.showInFiles')}
+                  Show in Files
                 </Button>
                 <Button size="small" variant="quiet" icon="external" onClick={() => void openWithDefaultApp(client, proof.path)}>
-                  {t('tasks.proof.openInEditor')}
+                  Open in Editor
                 </Button>
               </>
             )}
             <Dialog.Close asChild>
-              <IconButton icon="x" label={t('plans.details.close')} keys="Esc" />
+              <IconButton icon="x" label="Close" keys="Esc" />
             </Dialog.Close>
           </header>
           <div className={cx(s.body, 'selectable')} tabIndex={0} role="region" aria-label={proof.title} {...{ [SCROLL_ROOT]: '' }}>
-            {gone ? <ProofGone className={s.goneLarge} /> : error ? <div className={r.opening}>{t('tasks.proof.cantOpen', { error })}</div> : at ? <ChangedFileView at={at} variant="panel" version={proof.at} /> : <div className={r.opening}>{t('tasks.proof.opening')}</div>}
+            {gone ? <ProofGone className={s.goneLarge} /> : error ? <div className={r.opening}>Can’t open this file: {error}</div> : at ? <ChangedFileView at={at} variant="panel" version={proof.at} /> : <div className={r.opening}>Opening…</div>}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

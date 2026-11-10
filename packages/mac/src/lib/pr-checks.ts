@@ -1,6 +1,5 @@
 import type { PrCheck, PullRequest } from '@beluga/core/work-store.js';
 import type { MergeMethod } from '@beluga/workspaces/pr.js';
-import { t } from '../i18n/index.js';
 
 /** How one check is doing, as the PR sheet draws it: a spinner, a clock, ✓, ✗ or a dash. */
 export type CheckTone = 'running' | 'queued' | 'passed' | 'failed' | 'skipped';
@@ -25,7 +24,7 @@ export function sortChecks(checks: readonly PrCheck[]): PrCheck[] {
 
 /** "42s", "3m 05s", "1h 02m": how long it ran, or has been running (`now`). Empty when unknown. */
 export function checkDuration(c: PrCheck, now: number): string {
-  if (checkTone(c) === 'skipped') return t('common.prChecks.skipped');
+  if (checkTone(c) === 'skipped') return 'Skipped';
   const start = c.startedAt ? Date.parse(c.startedAt) : NaN;
   const end = c.completedAt ? Date.parse(c.completedAt) : c.state === 'in_progress' ? now : NaN;
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
@@ -40,20 +39,14 @@ export function checksSummary(checks: readonly PrCheck[]): string {
   const n = { running: 0, queued: 0, passed: 0, failed: 0, skipped: 0 };
   for (const c of checks) n[checkTone(c)]++;
   const counted = checks.length - n.skipped;
-  return [t('common.prChecks.passed', { n: n.passed, of: counted }), n.failed ? t('common.prChecks.failed', { n: n.failed }) : '', n.running + n.queued ? t('common.prChecks.running', { n: n.running + n.queued }) : ''].filter(Boolean).join(' · ');
+  return [`${n.passed} of ${counted} passed`, n.failed ? `${n.failed} failed` : '', n.running + n.queued ? `${n.running + n.queued} running` : ''].filter(Boolean).join(' · ');
 }
 
-// Its words are read when shown, in the language shown then.
-const mergeMethod = (method: MergeMethod): { readonly method: MergeMethod; readonly label: string; readonly hint: string } => ({
-  method,
-  get label() {
-    return t(`common.prChecks.${method}.label`);
-  },
-  get hint() {
-    return t(`common.prChecks.${method}.hint`);
-  },
-});
-export const MERGE_METHODS: ReadonlyArray<{ readonly method: MergeMethod; readonly label: string; readonly hint: string }> = [mergeMethod('squash'), mergeMethod('merge'), mergeMethod('rebase')];
+export const MERGE_METHODS: ReadonlyArray<{ readonly method: MergeMethod; readonly label: string; readonly hint: string }> = [
+  { method: 'squash', label: 'Squash and Merge', hint: 'One commit on the base branch' },
+  { method: 'merge', label: 'Create a Merge Commit', hint: 'Every commit, joined by a merge commit' },
+  { method: 'rebase', label: 'Rebase and Merge', hint: 'Every commit, replayed on the base branch' },
+];
 
 /** Whether "Merge When Checks Pass" makes sense: something is still to come (checks or a review). */
 export const canAutoMerge = (pr: PullRequest): boolean => pr.state === 'OPEN' && !pr.autoMerge && (pr.checks === 'pending' || pr.review === 'REVIEW_REQUIRED');

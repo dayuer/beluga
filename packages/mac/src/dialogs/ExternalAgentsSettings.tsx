@@ -1,11 +1,11 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useClock } from '../lib/window-active.js';
+import { REMOTE_FULL_WARNING } from '@beluga/shared/remote-full.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
-import { t, useT } from '../i18n/index.js';
 
 /** In a grant's projects: all your chats with no project. */
 const STANDALONE_CHATS = 'chats';
@@ -23,13 +23,13 @@ interface Activity {
   readonly kind: Exclude<ActivityShown, 'all'>;
 }
 
-const activityShown = (): ReadonlyArray<{ value: ActivityShown; label: string }> => [
-  { value: 'all', label: t('more.ext.show.all') },
-  { value: 'allowed', label: t('more.ext.show.allowed') },
-  { value: 'asked', label: t('more.ext.show.asked') },
-  { value: 'refused', label: t('more.ext.show.refused') },
+const ACTIVITY_SHOWN: ReadonlyArray<{ value: ActivityShown; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'allowed', label: 'Allowed' },
+  { value: 'asked', label: 'Asked' },
+  { value: 'refused', label: 'Refused' },
 ];
-const kindWords = (kind: Activity['kind']): string => t(`more.ext.show.${kind}`);
+const KIND_WORDS: Readonly<Record<Activity['kind'], string>> = { allowed: 'Allowed', asked: 'Asked', refused: 'Refused' };
 
 type RouteKind = 'tailscale' | 'public';
 
@@ -58,16 +58,16 @@ interface Agent {
   readonly suspendedAt?: number;
 }
 
-const levels = (): ReadonlyArray<{ value: Level; label: string }> => [
-  { value: 'ask', label: t('more.ext.level.ask') },
-  { value: 'trusted', label: t('more.ext.level.trusted') },
-  { value: 'full', label: t('more.ext.level.full') },
+const LEVELS: ReadonlyArray<{ value: Level; label: string }> = [
+  { value: 'ask', label: 'Ask each time' },
+  { value: 'trusted', label: 'Trusted' },
+  { value: 'full', label: 'Full trust' },
 ];
-const levelWords = (level: string): string => (['blocked', 'ask', 'trusted', 'full'].includes(level) ? t(`more.ext.level.${level as 'blocked' | Level}`) : level);
+const LEVEL_WORDS: Readonly<Record<string, string>> = { blocked: 'Blocked', ask: 'Ask each time', trusted: 'Trusted', full: 'Full trust' };
 const REFRESH_MS = 5000;
-const routeRows = (): ReadonlyArray<{ kind: RouteKind; label: string; off: string; on: string }> => [
-  { kind: 'tailscale', label: t('more.ext.route.tailscale'), off: t('more.ext.route.tailscaleOff'), on: t('more.ext.route.tailscaleOn') },
-  { kind: 'public', label: t('more.ext.route.public'), off: t('more.ext.route.publicOff'), on: t('more.ext.route.publicOn') },
+const ROUTE_ROWS: ReadonlyArray<{ kind: RouteKind; label: string; off: string; on: string }> = [
+  { kind: 'tailscale', label: 'On your tailnet', off: 'Agents on your Tailscale network connect over https. Nobody else reaches it.', on: 'Only your tailnet reaches this address (Tailscale Serve, never Funnel).' },
+  { kind: 'public', label: 'Public address', off: 'Hosted agents connect through a Cloudflare tunnel. Each one still needs a pairing code.', on: 'This address changes when the tunnel restarts. Agents must then sign in again with a new code.' },
 ];
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -79,7 +79,6 @@ const seenWords = (at: number): string => new Date(at).toLocaleString(undefined,
  * gives is chosen here, and the sign-in page only spends it), see who connected, and revoke them.
  */
 export function ExternalAgentsSettings() {
-  const t = useT();
   const api = useApi();
   const projects = useApp((st) => st.projects.filter((p) => p.root && !p.error).map((p) => p.id + '\n' + p.name).join('\0'));
   const [status, setStatus] = useState<Status | undefined>();
@@ -117,7 +116,7 @@ export function ExternalAgentsSettings() {
     void work.then(look, (e: unknown) => setError(errorText(e)));
   };
   const makeCode = (): void => {
-    if (remote && level === 'full' && !confirmFull) return setError(t('more.ext.confirmFirst'));
+    if (remote && level === 'full' && !confirmFull) return setError('Confirm the warning for this code first.');
     setError(undefined);
     setConfirmFull(false);
     void api.external.pairingCode({ level, projects: allProjects ? 'all' : [...chosen], chats: { dms, groups }, ...(remote ? { remote: true } : {}), ...(remote && level === 'full' ? { allowRemoteFull: true } : {}) }).then((v) => setCode(v as { code: string; expiresAt: number }), (e: unknown) => setError(errorText(e)));
@@ -133,9 +132,9 @@ export function ExternalAgentsSettings() {
     setTurning(kind);
     void api.external.setRoute(kind, on).then(look, (e: unknown) => setError(errorText(e))).finally(() => setTurning(undefined));
   };
-  const routeDetail = (row: ReturnType<typeof routeRows>[number], route: Route | undefined): ReactNode => {
-    if (turning === row.kind && !route?.url) return t('more.ext.route.opening');
-    if (route?.state === 'reopening') return route.error ? t('more.ext.route.reopeningError', { error: route.error }) : t('more.ext.route.reopening');
+  const routeDetail = (row: (typeof ROUTE_ROWS)[number], route: Route | undefined): ReactNode => {
+    if (turning === row.kind && !route?.url) return 'Opening. A fresh address can take a minute.';
+    if (route?.state === 'reopening') return route.error ? `Opening a new address: ${route.error}` : 'It dropped. Opening a new address. Agents must then sign in again.';
     return route?.url ? <>{route.url}<br />{row.on}</> : row.off;
   };
   const projectRows = projects ? projects.split('\0').map((line) => line.split('\n') as [string, string]) : [];
@@ -143,34 +142,34 @@ export function ExternalAgentsSettings() {
   return (
     <>
       <Group>
-        <Row label={t('more.ext.connect')} detail={status?.error ?? (status?.on ? status.routes?.length ? t('more.ext.connectRoutes') : t('more.ext.connectLocal') : t('more.ext.connectOff'))}>
-          <Switch label={t('more.ext.connect')} on={status?.on ?? false} onChange={(on) => run(api.external.setEnabled(on))} />
+        <Row label="Let other agents connect" detail={status?.error ?? (status?.on ? status.routes?.length ? 'Each agent needs a pairing code from you.' : 'Only programs on this Mac can reach it, and each one needs a pairing code from you.' : 'Off: nothing listens.')}>
+          <Switch label="Let other agents connect" on={status?.on ?? false} onChange={(on) => run(api.external.setEnabled(on))} />
         </Row>
         {status?.on ? (
-          <Row label={t('more.ext.pause')} detail={status.paused ? t('more.ext.paused') : t('more.ext.pauseDetail')}>
-            <Switch label={t('more.ext.pause')} on={status.paused ?? false} onChange={(on) => run(api.external.setPaused(on))} />
+          <Row label="Pause all agents" detail={status.paused ? 'Paused: every agent is refused. Their grants stay.' : 'Refuses every agent and keeps their grants.'}>
+            <Switch label="Pause all agents" on={status.paused ?? false} onChange={(on) => run(api.external.setPaused(on))} />
           </Row>
         ) : null}
         {status?.url ? (
-          <Row label={t('more.ext.mcpUrl')} detail={status.url}>
-            <Button onClick={() => void copyText(status.url!)}>{t('more.ext.copyMcpUrl')}</Button>
+          <Row label="MCP URL" detail={status.url}>
+            <Button onClick={() => void copyText(status.url!)}>Copy MCP URL</Button>
           </Row>
         ) : null}
-        {routeRows().map((row) => {
+        {ROUTE_ROWS.map((row) => {
           const route = status?.routes?.find((r) => r.kind === row.kind);
           return (
             <Row key={row.kind} label={row.label} detail={routeDetail(row, route)}>
-              {route?.url ? <Button onClick={() => void copyText(route.url!)}>{t('more.ext.copyMcpUrl')}</Button> : null}
+              {route?.url ? <Button onClick={() => void copyText(route.url!)}>Copy MCP URL</Button> : null}
               <Switch label={row.label} on={route !== undefined} onChange={(on) => { if (!turning) setRoute(row.kind, on); }} />
             </Row>
           );
         })}
       </Group>
       {status?.on ? (
-        <Group title={t('more.ext.connectGroup')}>
-          <Row label={t('more.ext.outside')} detail={t('more.ext.outsideDetail')}>
+        <Group title="Connect an agent">
+          <Row label="For an agent outside this Mac" detail="It starts at Trusted. Full trust takes your explicit choice for this code.">
             <Switch
-              label={t('more.ext.outside')}
+              label="For an agent outside this Mac"
               on={remote}
               onChange={(on) => {
                 setRemote(on);
@@ -179,66 +178,66 @@ export function ExternalAgentsSettings() {
               }}
             />
           </Row>
-          <Row label={t('more.ext.mayDo')} detail={t('more.ext.mayDoDetail')}>
-            <Select<Level> label={t('more.ext.mayDo')} value={level} options={levels()} onChange={(next) => { setLevel(next); setConfirmFull(false); }} />
+          <Row label="What it may do" detail="Chosen now. The sign-in page can't raise it. Full: what you can do on this Mac.">
+            <Select<Level> label="What it may do" value={level} options={LEVELS} onChange={(next) => { setLevel(next); setConfirmFull(false); }} />
           </Row>
           {remote && level === 'full' ? (
-            <Row label={t('more.ext.fullForCode')} detail={<span className={s.fullWarning} role="alert">{t('more.ext.remoteFullWarning')}</span>}>
-              <Switch label={t('more.ext.understand')} on={confirmFull} onChange={setConfirmFull} />
+            <Row label="Full trust for this code" detail={<span className={s.fullWarning} role="alert">{REMOTE_FULL_WARNING}</span>}>
+              <Switch label="I understand. Full trust for this code." on={confirmFull} onChange={setConfirmFull} />
             </Row>
           ) : null}
-          <Row label={t('more.ext.allProjects')} detail={t('more.ext.allProjectsDetail')}>
-            <Switch label={t('more.ext.reachAll')} on={allProjects} onChange={setAllProjects} />
+          <Row label="All projects and chats" detail="Also projects you add later. Off: choose below what it reaches.">
+            <Switch label="Reach all projects and chats" on={allProjects} onChange={setAllProjects} />
           </Row>
           {allProjects ? null : projectRows.map(([id, name]) => (
-            <Row key={id} label={name} detail={t('more.ext.projectReached')}>
-              <Switch label={t('more.ext.reachName', { name })} on={chosen.has(id)} onChange={() => toggle(id)} />
+            <Row key={id} label={name} detail="A project it reaches">
+              <Switch label={`Reach ${name}`} on={chosen.has(id)} onChange={() => toggle(id)} />
             </Row>
           ))}
           {allProjects ? null : (
-            <Row label={t('more.ext.standalone')} detail={t('more.ext.standaloneDetail')}>
-              <Switch label={t('more.ext.reachStandalone')} on={chosen.has(STANDALONE_CHATS)} onChange={() => toggle(STANDALONE_CHATS)} />
+            <Row label="Your chats with no project" detail="They can hold private conversations. Off: it reaches only the chats it starts.">
+              <Switch label="Reach your chats with no project" on={chosen.has(STANDALONE_CHATS)} onChange={() => toggle(STANDALONE_CHATS)} />
             </Row>
           )}
-          <Row label={t('more.ext.dms')} detail={t('more.ext.dmsDetail')}>
-            <Switch label={t('more.ext.reachDms')} on={dms} onChange={setDms} />
+          <Row label="Direct messages" detail="It reads and sends yours, with its name on each one.">
+            <Switch label="Reach direct messages" on={dms} onChange={setDms} />
           </Row>
-          <Row label={t('more.ext.groups')} detail={t('more.ext.groupsDetail')}>
-            <Switch label={t('more.ext.reachGroups')} on={groups} onChange={setGroups} />
+          <Row label="Groups" detail="It reads and sends in your groups, with its name on each message.">
+            <Switch label="Reach groups" on={groups} onChange={setGroups} />
           </Row>
-          <Row label={t('more.ext.code')} detail={code ? t('more.ext.codeMade') : t('more.ext.codeHint')}>
+          <Row label="Pairing code" detail={code ? 'It works once, for 10 minutes. Enter it on the page your agent opens.' : 'Give your agent the MCP URL, then enter this on the page it opens.'}>
             {code ? <code data-pairing-code>{code.code}</code> : null}
-            {code ? <Button onClick={() => void copyText(code.code)}>{t('more.ext.copy')}</Button> : null}
-            <Button onClick={makeCode}>{code ? t('more.ext.makeAnother') : t('more.ext.makeCode')}</Button>
+            {code ? <Button onClick={() => void copyText(code.code)}>Copy</Button> : null}
+            <Button onClick={makeCode}>{code ? 'Make Another' : 'Make a Code'}</Button>
           </Row>
         </Group>
       ) : null}
       {error ? <p className={s.endpointError} role="alert">{error}</p> : null}
       {agents.length ? (
-        <Group title={t('more.ext.connected')}>
-          <Row label={t('more.ext.stopAll')} detail={t('more.ext.stopAllDetail')}>
-            <Button onClick={() => run(api.external.stopAll())}>{t('more.ext.stopAllButton')}</Button>
+        <Group title="Connected agents">
+          <Row label="Stop all agents" detail="Ends their runs, queued messages and friend tasks now. Their grants stay.">
+            <Button onClick={() => run(api.external.stopAll())}>Stop All</Button>
           </Row>
           {agents.map((a) => (
-            <Row key={a.id} label={a.name} detail={`${a.suspendedAt === undefined ? '' : t('more.ext.suspended')}${a.route === 'remote' && a.level === 'full' ? t('more.ext.fullOutside') : `${levelWords(a.level)} · ${a.route === 'local' ? t('more.ext.onMac') : t('more.ext.outsideMac')}`} · ${t('more.ext.lastSeen', { when: seenWords(a.lastSeen) })}`}>
-              {a.suspendedAt === undefined ? null : <Button onClick={() => run(api.external.resume(a.id))}>{t('more.ext.resume')}</Button>}
-              <Button onClick={() => run(api.external.stopAgent(a.id))}>{t('more.ext.stop')}</Button>
-              <Button tone="error" onClick={() => run(api.external.revoke(a.id))}>{t('more.ext.revoke')}</Button>
+            <Row key={a.id} label={a.name} detail={`${a.suspendedAt === undefined ? '' : 'Suspended after repeated refusals · '}${a.route === 'remote' && a.level === 'full' ? '⚠ Full trust from outside this Mac' : `${LEVEL_WORDS[a.level] ?? a.level} · ${a.route === 'local' ? 'On this Mac' : 'Outside this Mac'}`} · Last seen ${seenWords(a.lastSeen)}`}>
+              {a.suspendedAt === undefined ? null : <Button onClick={() => run(api.external.resume(a.id))}>Resume</Button>}
+              <Button onClick={() => run(api.external.stopAgent(a.id))}>Stop</Button>
+              <Button tone="error" onClick={() => run(api.external.revoke(a.id))}>Revoke</Button>
             </Row>
           ))}
         </Group>
       ) : null}
       {agents.length ? (
-        <Group title={t('more.ext.activity')}>
-          <Row label={t('more.ext.showLabel')} detail={t('more.ext.showDetail')}>
-            <Select<ActivityShown> label={t('more.ext.showLabel')} value={shown} options={activityShown()} onChange={setShown} />
+        <Group title="Activity">
+          <Row label="Show" detail="What agents did, and who decided.">
+            <Select<ActivityShown> label="Show" value={shown} options={ACTIVITY_SHOWN} onChange={setShown} />
           </Row>
           {activity.length ? activity.map((a) => (
-            <Row key={`${a.ts} ${a.tool} ${a.argsHash}`} label={`${a.agent}: ${a.tool}`} detail={`${kindWords(a.kind)} · ${a.decidedBy === 'person' ? t('more.ext.decidedByYou') : t('more.ext.decidedByLevel')}${a.target ? ` · ${a.target}` : ''} · ${seenWords(a.ts)}`}>
+            <Row key={`${a.ts} ${a.tool} ${a.argsHash}`} label={`${a.agent}: ${a.tool}`} detail={`${KIND_WORDS[a.kind]} · decided by ${a.decidedBy === 'person' ? 'you' : 'its level'}${a.target ? ` · ${a.target}` : ''} · ${seenWords(a.ts)}`}>
               {null}
             </Row>
           )) : (
-            <Row label={t('more.ext.nothing')} detail={t('more.ext.nothingDetail')}>
+            <Row label="Nothing yet" detail="Each call an agent makes shows here.">
               {null}
             </Row>
           )}

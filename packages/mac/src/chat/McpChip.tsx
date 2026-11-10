@@ -7,7 +7,6 @@ import { useApp, useBeluga } from '../lib/beluga.js';
 import { myRuntime } from './ModelPicker.js';
 import { MCP_FROM, MCP_STATUS, checkMcp, mcpRuntimeOf, mcpSummary, signInMcp, useMcp } from '../lib/mcp.js';
 import { openExternal } from '../lib/system.js';
-import { useT, tl } from '../i18n/index.js';
 import s from './mcp.module.css';
 
 const OPEN_DELAY_MS = 220;
@@ -21,7 +20,6 @@ const CLOSE_DELAY_MS = 180;
  */
 export function McpChip() {
   const { client, ui } = useBeluga();
-  const t = useT();
   // Your agent's servers (Codex's own when it's Codex, BLG-518): the same list as Settings shows.
   const runtime = mcpRuntimeOf(useApp((st) => myRuntime(st.prefs)));
   const { rows, checking, signingIn } = useMcp(client, runtime);
@@ -44,7 +42,7 @@ export function McpChip() {
       }}
     >
       <Popover.Trigger asChild>
-        <button type="button" className={s.chip} aria-label={t('chat.mcp.chipAria', { line: sum.line })} data-mcp-chip={sum.needYou ? 'needs-you' : 'ok'} {...hover}>
+        <button type="button" className={s.chip} aria-label={`MCP servers: ${sum.line}`} data-mcp-chip={sum.needYou ? 'needs-you' : 'ok'} {...hover}>
           <Icon name="plug" size={12} />
           <span className={s.count}>
             {sum.connected}/{rows.length}
@@ -53,10 +51,10 @@ export function McpChip() {
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={s.popover} side="top" align="end" sideOffset={8} collisionPadding={12} aria-label={t('chat.mcp.servers')} {...hover} onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className={s.popover} side="top" align="end" sideOffset={8} collisionPadding={12} aria-label="MCP servers" {...hover} onOpenAutoFocus={(e) => e.preventDefault()}>
           <div className={s.head}>
-            <span className={s.title}>{t('chat.mcp.servers')}</span>
-            <button type="button" className={s.quiet} disabled={checking} onClick={() => void checkMcp(client, runtime)} aria-label={t('chat.mcp.checkAgain')}>
+            <span className={s.title}>MCP servers</span>
+            <button type="button" className={s.quiet} disabled={checking} onClick={() => void checkMcp(client, runtime)} aria-label="Check again">
               <Icon name="refresh" size={12} className={cx(checking && s.turning)} />
             </button>
           </div>
@@ -71,7 +69,7 @@ export function McpChip() {
                 </span>
                 {row.canSignIn ? (
                   <button type="button" className={s.signIn} disabled={signingIn !== undefined} onClick={() => void signInMcp(client, row, runtime)}>
-                    {signingIn === row.name ? t('chat.mcp.waiting') : t('chat.items.signIn')}
+                    {signingIn === row.name ? 'Waiting…' : 'Sign In'}
                   </button>
                 ) : row.from === 'claude.ai' && row.status === 'needs-auth' ? (
                   <button type="button" className={s.signIn} onClick={() => void openExternal(CLAUDE_AI_CONNECTORS_URL)}>
@@ -79,14 +77,14 @@ export function McpChip() {
                   </button>
                 ) : (
                   <span className={s.state} title={row.error}>
-                    {tl('MCP_STATUS', row.status, 'words', MCP_STATUS[row.status].words)}
+                    {MCP_STATUS[row.status].words}
                   </span>
                 )}
               </li>
             ))}
           </ul>
           <div className={s.foot}>
-            <span className={s.hint}>{t('chat.mcp.hint')}</span>
+            <span className={s.hint}>Your own agent uses these. A friend’s request never does.</span>
             <button
               type="button"
               className={s.quiet}
@@ -95,7 +93,7 @@ export function McpChip() {
                 ui.patch({ settings: 'claude' });
               }}
             >
-              {t('chat.mcp.settings')}
+              Settings
             </button>
           </div>
         </Popover.Content>

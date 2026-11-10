@@ -1,4 +1,3 @@
-import { t, useT } from '../i18n/index.js';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { PrComment, PrReview, PrThread } from '@beluga/core/work-store.js';
 import { langOf, parseHunk } from '@beluga/shared/code-ref.js';
@@ -25,11 +24,11 @@ import { openCodeThere } from '../lib/remote-open.js';
 /** How many lines of the diff a thread shows above its comment. */
 const HUNK_ROWS = 8;
 
-const VERDICT: Record<PrReview['state'], { readonly words: string; tone?: string; icon?: 'check' | 'alert' }> = {
-  APPROVED: { get words() { return t('pr.verdict.approved'); }, tone: s.ok, icon: 'check' },
-  CHANGES_REQUESTED: { get words() { return t('pr.verdict.changes'); }, tone: s.bad, icon: 'alert' },
-  COMMENTED: { get words() { return t('pr.verdict.reviewed'); } },
-  DISMISSED: { get words() { return t('pr.verdict.dismissed'); } },
+const VERDICT: Record<PrReview['state'], { words: string; tone?: string; icon?: 'check' | 'alert' }> = {
+  APPROVED: { words: 'approved these changes', tone: s.ok, icon: 'check' },
+  CHANGES_REQUESTED: { words: 'requested changes', tone: s.bad, icon: 'alert' },
+  COMMENTED: { words: 'reviewed' },
+  DISMISSED: { words: 'reviewed (dismissed)' },
 };
 
 /** The lines a thread is on: where it was written (the hunk's numbering). */
@@ -60,7 +59,6 @@ export const threadLine = (t: PrThread): number | undefined => t.startLine ?? t.
 /** A box to write in: grows with the text, sends with your send key. */
 export function WriteBox({ placeholder, label, busyLabel, onSend, onCancel, autoFocus }: { placeholder: string; label: string; busyLabel: string; onSend: (body: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean }) {
   const prefs = usePrefs();
-  useT();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -108,12 +106,12 @@ export function WriteBox({ placeholder, label, busyLabel, onSend, onCancel, auto
       <div className={s.writeBar}>
         <span className={s.writeNote}>
           <Icon name="globe" size={11} />
-          {t('pr.write.note')}
+          On GitHub as you. Markdown works.
         </span>
         <span className={s.grow} />
         {onCancel ? (
           <Button size="small" variant="quiet" onClick={onCancel}>
-            {t('pr.write.cancel')}
+            Cancel
           </Button>
         ) : null}
         <Tip label={label} keys={sendKeys}>
@@ -127,21 +125,20 @@ export function WriteBox({ placeholder, label, busyLabel, onSend, onCancel, auto
 }
 
 /** One person's words: who, when, and what (yours are marked "you"). */
-export function Said({ c, what, compact }: { c: PrComment; what?: string; compact?: boolean }) {
+export function Said({ c, what = 'commented', compact }: { c: PrComment; what?: string; compact?: boolean }) {
   const actions = useActions();
-  useT();
   return (
     <article className={cx(s.said, compact && s.saidCompact)}>
       <header className={s.saidHead}>
         <Avatar name={c.author} id={`gh:${c.author}`} size={compact ? 18 : 20} />
         <strong>{c.author}</strong>
-        {c.mine ? <span className={s.you}>{t('pr.said.you')}</span> : null}
+        {c.mine ? <span className={s.you}>you</span> : null}
         <span className={s.when}>
-          {what ?? t('pr.said.commented')} {agoWords(c.at)}
+          {what} {agoWords(c.at)}
         </span>
         <span className={s.grow} />
         {c.url ? (
-          <button type="button" className={s.link} aria-label={t('issues.parts.openOnGitHub')} title={t('issues.parts.openOnGitHub')} onClick={() => actions.openLink({ kind: 'url', url: c.url })}>
+          <button type="button" className={s.link} aria-label="Open on GitHub" title="Open on GitHub" onClick={() => actions.openLink({ kind: 'url', url: c.url })}>
             <Icon name="external" size={11} />
           </button>
         ) : null}
@@ -157,7 +154,6 @@ export function Said({ c, what, compact }: { c: PrComment; what?: string; compac
 
 /** A review: its verdict as a mark, and what the reviewer said. */
 export function ReviewCard({ review }: { review: PrReview }) {
-  useT();
   const verdict = VERDICT[review.state];
   return (
     <div className={s.review}>
@@ -179,30 +175,29 @@ export function ReviewCard({ review }: { review: PrReview }) {
 export function ThreadCard({ wsId, thread, folded = thread.resolved, children }: { wsId: string; thread: PrThread; folded?: boolean; children?: React.ReactNode }) {
   const api = useApi();
   const { client } = useBeluga();
-  useT();
   const [open, setOpen] = useState(!folded);
   const rows = hunkRows(thread);
   const lang = langOf(thread.path);
   const first = thread.comments[0];
   const line = threadLine(thread);
   return (
-    <section className={cx(s.thread, thread.resolved && s.resolved)} data-pr-thread={thread.id} aria-label={t('pr.thread.commentsOn', { path: thread.path })}>
+    <section className={cx(s.thread, thread.resolved && s.resolved)} data-pr-thread={thread.id} aria-label={`Comments on ${thread.path}`}>
       <header className={s.threadHead}>
-        <button type="button" className={s.fold} aria-expanded={open} aria-label={open ? t('pr.thread.fold') : t('pr.thread.unfold')} onClick={() => setOpen(!open)}>
+        <button type="button" className={s.fold} aria-expanded={open} aria-label={open ? 'Fold' : 'Unfold'} onClick={() => setOpen(!open)}>
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={11} />
         </button>
-        <Tip label={t('pr.thread.goTo')}>
+        <Tip label="Go to this line in the file">
           <button type="button" className={s.path} data-go-to-code={thread.path} onClick={() => void goToCode(client, wsId, thread.path, line)}>
             <Icon name="file" size={12} />
             <span>{thread.path}</span>
             <em>{lineWords(thread)}</em>
           </button>
         </Tip>
-        {thread.outdated ? <span className={s.pill}>{t('pr.thread.outdated')}</span> : null}
+        {thread.outdated ? <span className={s.pill}>Outdated</span> : null}
         {thread.resolved ? (
           <span className={cx(s.pill, s.ok)}>
             <Icon name="check" size={10} />
-            {t('pr.thread.resolved')}
+            Resolved
           </span>
         ) : null}
         {!open && first ? (
@@ -212,8 +207,8 @@ export function ThreadCard({ wsId, thread, folded = thread.resolved, children }:
         ) : (
           <span className={s.grow} />
         )}
-        <span className={s.count}>{thread.comments.length > 1 ? t('issues.model.comments', { n: thread.comments.length }) : ''}</span>
-        <IconButton icon="external" label={t('pr.thread.openEditor')} className={s.small} onClick={() => void openCodeThere(client, wsId, thread.path, line)} />
+        <span className={s.count}>{thread.comments.length > 1 ? `${thread.comments.length} comments` : ''}</span>
+        <IconButton icon="external" label="Open in Editor" className={s.small} onClick={() => void openCodeThere(client, wsId, thread.path, line)} />
       </header>
       {open ? (
         <>
@@ -224,7 +219,7 @@ export function ThreadCard({ wsId, thread, folded = thread.resolved, children }:
           ) : null}
           <div className={s.comments}>
             {thread.comments.map((c, i) => (
-              <Said key={c.id} c={c} compact what={i === 0 ? t('pr.said.commented') : t('pr.said.replied')} />
+              <Said key={c.id} c={c} compact what={i === 0 ? 'commented' : 'replied'} />
             ))}
           </div>
           {children}

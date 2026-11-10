@@ -1,20 +1,17 @@
 import { useCurrencyChoice } from '../lib/earnings.js';
 import { Group, Row, Select } from './settings-controls.js';
-import { useT } from '../i18n/index.js';
 
 /** "Show earnings in": the one currency every earnings total is added up in. */
 export function CurrencySelect({ id, size, className }: { id?: string; size?: 'regular' | 'small'; className?: string }) {
   const choice = useCurrencyChoice();
-  const t = useT();
-  return <Select id={id} className={className} label={t('settings.earnings.showIn')} value={choice.value} options={choice.options} onChange={choice.onChange} size={size} searchPlaceholder={t('settings.earnings.searchCurrencies')} />;
+  return <Select id={id} className={className} label="Show earnings in" value={choice.value} options={choice.options} onChange={choice.onChange} size={size} searchPlaceholder="Search currencies" />;
 }
 
 /** Settings › General › Earnings. */
 export function EarningsSettings() {
-  const t = useT();
   return (
-    <Group title={t('settings.earnings.title')}>
-      <Row label={t('settings.earnings.showIn')} detail={t('settings.earnings.detail')}>
+    <Group title="Earnings">
+      <Row label="Show earnings in" detail="Every total from Stripe and RevenueCat, in the sidebar and the Usage view. Other currencies are converted at the European Central Bank’s daily rates.">
         <CurrencySelect />
       </Row>
     </Group>

@@ -10,7 +10,6 @@ import { useBeluga } from '../lib/beluga.js';
 import { chosenOf } from './plan-ask-model.js';
 import a from '../chat/attention.module.css';
 import s from './plan-ask.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * In the plan's conversation, above its box: what's asked of you here, answered right here. A
@@ -21,7 +20,6 @@ export function PlanAsk({ q }: { q: PendingQuestion }) {
   const actions = useActions();
   const { client } = useBeluga();
   const [own, setOwn] = useState('');
-  const t = useT();
   const current = currentQuestion(q);
   if (!current) return null;
   const decision = isDecisionQid(q.qid);
@@ -35,19 +33,19 @@ export function PlanAsk({ q }: { q: PendingQuestion }) {
     answerTyped(client, q, text);
   };
   return (
-    <div className={cx(a.card, s.card)} role="group" aria-label={decision ? t('plans.ask.yourCall') : t('plans.ask.agentAsks')} data-testid="plan-ask">
+    <div className={cx(a.card, s.card)} role="group" aria-label={decision ? 'Your call' : 'Your agent asks'} data-testid="plan-ask">
       <div className={a.head}>
         <Icon name={decision ? 'hand' : 'claude'} size={13} className={a.claude} />
-        <span className={a.title}>{current.header || (decision ? t('plans.ask.yourCall') : t('plans.ask.agentAsks'))}</span>
+        <span className={a.title}>{current.header || (decision ? 'Your call' : 'Your agent asks')}</span>
         {total > 1 ? (
           <span className={a.more}>
-            {t('plans.ask.nOf', { n: index + 1, total })}
+            {index + 1} of {total}
           </span>
         ) : null}
         {/* A decision of yours waits until you answer it; Claude's question can be skipped. */}
         {decision ? null : (
           <Button size="small" variant="quiet" onClick={() => actions.run({ type: 'answer', qid: q.qid, pick: 'skip' })}>
-            {t('plans.ask.skip')}
+            Skip
           </Button>
         )}
       </div>
@@ -55,7 +53,7 @@ export function PlanAsk({ q }: { q: PendingQuestion }) {
         <Markdown text={current.question} />
       </div>
       {current.options.length ? (
-        <div className={a.options} role={current.multiSelect ? 'group' : 'radiogroup'} aria-label={current.multiSelect ? t('plans.ask.pickAny') : t('plans.ask.pickOne')}>
+        <div className={a.options} role={current.multiSelect ? 'group' : 'radiogroup'} aria-label={current.multiSelect ? 'Pick any' : 'Pick one'}>
           {current.options.map((o, i) => {
             const on = chosen.has(o.label);
             return (
@@ -87,21 +85,21 @@ export function PlanAsk({ q }: { q: PendingQuestion }) {
         <input
           className={cx(s.ownInput, 'selectable')}
           value={own}
-          placeholder={current.options.length ? t('plans.ask.orOwn') : t('plans.ask.yourAnswer')}
-          aria-label={t('plans.ask.ownAria')}
+          placeholder={current.options.length ? 'Or write your own…' : 'Your answer…'}
+          aria-label="Write your own answer"
           onChange={(e) => setOwn(e.target.value)}
         />
         {own.trim() ? (
           <Button size="small" variant="primary" type="submit">
-            {t('plans.details.answer')}
+            Answer
           </Button>
         ) : current.multiSelect ? (
           <Button size="small" variant="primary" disabled={!chosen.size} onClick={() => actions.run({ type: 'answer', qid: q.qid, pick: 'done', question: current.question })}>
-            {t('plans.ask.done')}{chosen.size ? ` (${chosen.size})` : ''}
+            Done{chosen.size ? ` (${chosen.size})` : ''}
           </Button>
         ) : null}
       </form>
-      {decision ? <div className={a.hint}>{t('plans.ask.hint')}</div> : null}
+      {decision ? <div className={a.hint}>Your answer goes on the task, and the plan carries on with what waited on it.</div> : null}
     </div>
   );
 }

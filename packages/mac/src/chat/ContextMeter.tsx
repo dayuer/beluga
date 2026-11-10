@@ -6,9 +6,7 @@ import { LOCAL_RUNTIME, speedWords } from '@beluga/shared/local-endpoints.js';
 import { cx } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { type MeterModel, breakdownRows, meterModel, usageLine, whenText } from './context-model.js';
-import { useT } from '../i18n/index.js';
 import s from './context.module.css';
-import { localModelName } from '../lib/engine-words.js';
 
 const OPEN_DELAY_MS = 220;
 const CLOSE_DELAY_MS = 180;
@@ -77,16 +75,15 @@ export function ContextMeter({ channel }: { channel: string }) {
   const model = useMeter(channel);
   const local = useLocalRun(channel);
   const { open, setOpen, hover } = useHoverOpen();
-  const t = useT();
   if (!model) return null;
-  const label = model.compacting ? t('chat.context.compacting') : `${model.pct}%`;
+  const label = model.compacting ? 'Compacting…' : `${model.pct}%`;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
           className={cx(s.meter, model.compacting ? s.spinning : model.tone === 'full' ? s.full : model.tone === 'warn' && s.warn)}
-          aria-label={model.compacting ? t('chat.context.ariaCompacting') : t('chat.context.ariaUsed', { pct: model.pct })}
+          aria-label={model.compacting ? 'Context: compacting' : `Context ${model.pct}% used`}
           data-context-meter={model.compacting ? 'compacting' : model.tone}
           {...hover}
         >
@@ -96,7 +93,7 @@ export function ContextMeter({ channel }: { channel: string }) {
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={s.popover} data-tone={model.tone} side="top" align="end" sideOffset={8} collisionPadding={12} aria-label={t('chat.context.window')} {...hover} onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content className={s.popover} data-tone={model.tone} side="top" align="end" sideOffset={8} collisionPadding={12} aria-label="Context window" {...hover} onOpenAutoFocus={(e) => e.preventDefault()}>
           <MeterDetails channel={channel} model={model} />
         </Popover.Content>
       </Popover.Portal>
@@ -107,11 +104,10 @@ export function ContextMeter({ channel }: { channel: string }) {
 /** The popover: the numbers, where they come from, the model's window, compactions, Compact now. */
 function MeterDetails({ channel, model }: { channel: string; model: MeterModel }) {
   const api = useApi();
-  const t = useT();
   const { client } = useBeluga();
   const prefs = useApp((st) => st.prefs);
   const picked = useApp((st) => modelOf(st, channel));
-  const modelName = localModelName(useApp((st) => modelLabel(st, picked)));
+  const modelName = useApp((st) => modelLabel(st, picked));
   // A workspace someone shared with you: their Claude, so only they can compact it.
   const theirs = useApp((st) => st.view.kind === 'shared');
   const local = useLocalRun(channel);
@@ -120,25 +116,25 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
   const at = clampThreshold(prefs.autoCompactAt);
   const compact = (): void => {
     api.session.compact(channel).then(
-      () => (model.busy ? toast(client, t('chat.context.compactsLater'), 'info') : undefined),
-      (err: unknown) => toast(client, t('chat.context.compactFailed', { error: err instanceof Error ? err.message : String(err) }), 'error'),
+      () => (model.busy ? toast(client, 'Your agent compacts this conversation when it finishes what it’s doing', 'info') : undefined),
+      (err: unknown) => toast(client, `Couldn’t compact: ${err instanceof Error ? err.message : String(err)}`, 'error'),
     );
   };
   return (
     <>
       <div className={s.head}>
-        <span className={s.title}>{t('chat.context.window')}</span>
+        <span className={s.title}>Context window</span>
         <span className={cx(s.pct, model.tone === 'full' ? s.full : model.tone === 'warn' && s.warn)}>{model.compacting ? '…' : `${model.pct}%`}</span>
       </div>
       {info ? (
         <>
           <div className={s.bar} role="img" aria-label={usageLine(info)}>
             {rows.length ? rows.map((r) => <span key={r.key} className={s[`seg_${r.key}`]} style={{ width: `${r.share * 100}%` }} />) : <span className={s.seg_used} style={{ width: `${model.pct}%` }} />}
-            {prefs.autoCompact ? <i className={s.mark} style={{ left: `${at}%` }} title={t('chat.context.autoAt', { at })} /> : null}
+            {prefs.autoCompact ? <i className={s.mark} style={{ left: `${at}%` }} title={`Auto-compacts at ${at}%`} /> : null}
           </div>
           <div className={s.sub} data-context-usage="">
             {usageLine(info)}
-            {info.window > info.used ? ` · ${t('chat.context.left', { n: formatTokenCount(info.window - info.used) })}` : ''}
+            {info.window > info.used ? ` · ${formatTokenCount(info.window - info.used)} left` : ''}
           </div>
           {rows.length ? (
             <dl className={s.rows}>
@@ -156,31 +152,31 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
         </>
       ) : null}
       <dl className={cx(s.rows, s.facts)}>
-        <dt>{t('chat.context.modelWindow')}</dt>
+        <dt>Model window</dt>
         <dd>
           {formatTokenCount(info?.window ?? contextWindowFor(picked))}
           {modelName ? ` · ${modelName}` : ''}
         </dd>
         {local ? (
           <>
-            <dt>{t('chat.context.thisConversation')}</dt>
-            <dd data-local-usage="">{`${t('chat.context.tokens', { n: formatTokenCount(local.tokens) })} · ${speedWords(local.tps)}`}</dd>
+            <dt>This conversation</dt>
+            <dd data-local-usage="">{`${formatTokenCount(local.tokens)} tokens · ${speedWords(local.tps)}`}</dd>
           </>
         ) : null}
-        <dt>{t('chat.context.lastCompacted')}</dt>
-        <dd>{model.last ? `${whenText(model.last.ts)} · ${formatTokenCount(model.last.compact.pre ?? 0)} → ${formatTokenCount(model.last.compact.post ?? 0)}` : t('chat.context.notYet')}</dd>
-        <dt>{t('chat.context.autoCompact')}</dt>
-        <dd>{prefs.autoCompact ? t('chat.context.atPct', { at }) : t('chat.context.off')}</dd>
+        <dt>Last compacted</dt>
+        <dd>{model.last ? `${whenText(model.last.ts)} · ${formatTokenCount(model.last.compact.pre ?? 0)} → ${formatTokenCount(model.last.compact.post ?? 0)}` : 'Not yet'}</dd>
+        <dt>Auto-compact</dt>
+        <dd>{prefs.autoCompact ? `At ${at}%` : 'Off'}</dd>
       </dl>
       {theirs ? (
         <div className={s.actions}>
-          <span className={s.hint}>{t('chat.context.ownersAgent')}</span>
+          <span className={s.hint}>This is the owner’s agent: only they can compact it.</span>
         </div>
       ) : (
         <div className={s.actions}>
-          <span className={s.hint}>{t('chat.context.keeps')}</span>
+          <span className={s.hint}>Your agent keeps decisions, open tasks and file paths. The chat stays here.</span>
           <button type="button" className={s.compact} disabled={model.compacting} onClick={compact}>
-            {model.compacting ? t('chat.context.compacting') : model.busy ? t('chat.context.compactAfter') : t('chat.context.compactNow')}
+            {model.compacting ? 'Compacting…' : model.busy ? 'Compact After Turn' : 'Compact Now'}
           </button>
         </div>
       )}
@@ -191,11 +187,10 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
 /** The toolbar's quiet note once a conversation is getting full ("78% context"). */
 export function ContextNote({ channel, className }: { channel: string; className?: string }) {
   const model = useMeter(channel);
-  const t = useT();
   if (!model || (!model.compacting && model.tone === 'normal')) return null;
   return (
     <span className={cx(className, s.note, model.compacting ? undefined : model.tone === 'full' ? s.full : s.warn)} title={model.info ? usageLine(model.info) : undefined}>
-      {model.compacting ? t('chat.context.noteCompacting') : t('chat.context.note', { pct: model.pct })}
+      {model.compacting ? 'Compacting context…' : `${model.pct}% context`}
     </span>
   );
 }

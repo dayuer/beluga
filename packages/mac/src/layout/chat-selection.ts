@@ -1,6 +1,3 @@
-import { t } from '../i18n/index.js';
-
-
 export interface ChatSelection {
   readonly anchor?: string;
   readonly ids: readonly string[];
@@ -23,14 +20,14 @@ export interface ChatBatchResult {
 
 export const emptyChatSelection: ChatSelection = { ids: [] };
 
-/** Actions that apply independently to many chats. Each asks once for the whole batch. Their words are keys (`t`). */
+/** Actions that apply independently to many chats. Each asks once for the whole batch. */
 export const chatBulkActions = [
-  { id: 'archive', label: 'layout.chatSelection.archive', done: 'layout.chatSelection.archived', icon: 'archive', message: 'layout.chatSelection.archiveMessage' },
-  { id: 'delete', label: 'layout.chatSelection.delete', done: 'layout.chatSelection.deleted', icon: 'x', message: 'layout.chatSelection.deleteMessage' },
+  { id: 'archive', label: 'Archive', done: 'Archived', icon: 'archive', message: 'Archive these chats. Their conversations stay available in Archived.' },
+  { id: 'delete', label: 'Delete', done: 'Deleted', icon: 'x', message: 'Permanently delete these chats and their conversations. You cannot undo this action.' },
 ] as const;
 
 /** "1 chat", "3 chats"; `word` "Chat" for menu titles. */
-export const chatCount = (n: number, word: 'chat' | 'Chat' = 'chat'): string => t(word === 'Chat' ? 'layout.chatSelection.countTitle' : 'layout.chatSelection.count', { count: n });
+export const chatCount = (n: number, word = 'chat'): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 const selectionOf = (anchor: string | undefined, ids: readonly string[]): ChatSelection => (anchor === undefined ? { ids } : { anchor, ids });
 
@@ -88,7 +85,7 @@ export async function runChatBatch<T extends BatchChat>(chats: readonly T[], app
   for (const chat of chats) {
     try {
       if (await apply(chat)) succeeded.push(chat.id);
-      else failed.push({ id: chat.id, name: chat.name, reason: t('layout.chatSelection.notDone') });
+      else failed.push({ id: chat.id, name: chat.name, reason: 'The action did not complete.' });
     } catch (error) {
       failed.push({ id: chat.id, name: chat.name, reason: error instanceof Error ? error.message : String(error) });
     }

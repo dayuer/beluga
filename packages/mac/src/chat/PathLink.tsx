@@ -11,8 +11,7 @@ import { useBeluga } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
 import { localPathOf, revealInFinder } from '../lib/files.js';
 import { goToCode } from '../lib/go-to-code.js';
-import { thisComputer } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
+import { revealLabel, thisComputer } from '../lib/os-words.js';
 import s from './chat.module.css';
 import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
 
@@ -48,12 +47,11 @@ async function lookUp(client: SocketClient, ref: PathRef): Promise<{ path: strin
 export function PathLink({ pathRef: ref, children }: { pathRef: PathRef; children: ReactNode }) {
   const { client } = useBeluga();
   const actions = useActions();
-  const t = useT();
   const looksLikeFolder = ref.dir || !/\.[^./\\]+$/.test(baseName(ref.path));
   // On a computer's page: Download for a file, Copy Path for a folder (BLG-852).
   const revealFile = useRevealFileLabel();
   const revealFolder = useRevealLabel();
-  const missing = (): void => client.store.dispatch({ type: 'toast', text: t('chat.path.missing', { path: ref.path, computer: thisComputer() }), level: 'warn' });
+  const missing = (): void => client.store.dispatch({ type: 'toast', text: `Can’t find ${ref.path} on ${thisComputer()}`, level: 'warn' });
   const open = async (): Promise<void> => {
     const found = await lookUp(client, ref);
     if (!found) return missing();
@@ -63,16 +61,16 @@ export function PathLink({ pathRef: ref, children }: { pathRef: PathRef; childre
     actions.openLink({ kind: 'local', path: found.path, dir: found.kind === 'folder', ...(ref.line ? { line: ref.line } : {}) });
   };
   const items = (): readonly ActionItem[] => [
-    { label: looksLikeFolder ? t('chat.path.openFolder') : t('chat.images.open'), icon: looksLikeFolder ? 'folder' : 'file', onSelect: () => void open() },
+    { label: looksLikeFolder ? 'Open Folder' : 'Open', icon: looksLikeFolder ? 'folder' : 'file', onSelect: () => void open() },
     { label: looksLikeFolder ? revealFolder : revealFile, onSelect: () => void lookUp(client, ref).then((found) => (found ? revealInFinder(client, found.path) : missing())) },
     {
-      label: t('chat.path.copyPath'),
+      label: 'Copy Path',
       icon: 'copy',
       separate: true,
       onSelect: () =>
         void lookUp(client, ref)
           .then((found) => copyText(found?.path ?? ref.path))
-          .then(() => client.store.dispatch({ type: 'toast', text: t('chat.path.copied'), level: 'success' })),
+          .then(() => client.store.dispatch({ type: 'toast', text: 'Copied the path', level: 'success' })),
     },
   ];
   return (
@@ -80,7 +78,7 @@ export function PathLink({ pathRef: ref, children }: { pathRef: PathRef; childre
       <a
         href={ref.path}
         className={s.pathLink}
-        title={ref.line ? t('chat.path.atLine', { path: ref.path, line: ref.line }) : ref.path}
+        title={ref.line ? `${ref.path}, line ${ref.line}` : ref.path}
         onClick={(e) => {
           e.preventDefault();
           void open();

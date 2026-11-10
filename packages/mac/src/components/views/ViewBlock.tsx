@@ -24,7 +24,6 @@ import { GanttView } from './Gantt.js';
 import { HeatmapView } from './Heatmap.js';
 import { CalendarView } from './Calendar.js';
 import { tableRows, tableView } from './md-table.js';
-import { t as tNow, useT } from '../../i18n/index.js';
 import v from './views.module.css';
 
 /**
@@ -37,27 +36,26 @@ import v from './views.module.css';
 const Chart = lazy(() => import('./Chart.js'));
 
 const ICON: Record<ViewType, IconName> = { table: 'table', chart: 'chartLine', stats: 'gauge', code: 'command', colors: 'palette', gantt: 'gantt', heatmap: 'heat', calendar: 'calendar' };
-const NOUN = (type: ViewType): string => tNow(`common.viewBlock.noun.${type}` as const);
+const NOUN: Record<ViewType, string> = { table: 'a table', chart: 'a chart', stats: 'stats', code: 'code', colors: 'colors', gantt: 'a timeline', heatmap: 'a heatmap', calendar: 'a calendar' };
 /** Views drawn from all their rows at once (not a page of them). */
 const WHOLE: ReadonlySet<ViewType> = new Set(['chart', 'gantt', 'heatmap', 'calendar']);
 
 export const ViewBlock = memo(function ViewBlock({ code, type, live = false, local = false }: { code: string; type?: ViewType | 'any'; live?: boolean; local?: boolean }) {
   const parsed = useMemo(() => parseView(code, type === 'any' ? undefined : type), [code, type]);
-  const t = useT();
   if (!parsed.ok) {
     if (parsed.incomplete && live) {
       return (
-        <figure className={v.card} data-state="drawing" aria-label={t('common.viewBlock.view')}>
+        <figure className={v.card} data-state="drawing" aria-label="View">
           <div className={v.drawing}>
             <Icon name={type && type !== 'any' ? ICON[type] : 'grid'} size={14} />
-            {t('common.viewBlock.showing', { what: type && type !== 'any' ? NOUN(type) : t('common.viewBlock.data') })}
+            Showing {type && type !== 'any' ? NOUN[type] : 'data'}…
           </div>
         </figure>
       );
     }
     return (
       <figure className={v.cardError} data-state="error">
-        <figcaption>{t('common.viewBlock.cantShow', { error: parsed.error })}</figcaption>
+        <figcaption>Can’t show this: {parsed.error}</figcaption>
         <CodeLines text={code} lang="json" />
       </figure>
     );
@@ -74,15 +72,14 @@ function chartable(view: View, data: ViewData): boolean {
 
 function ViewCard({ view, code, warnings, local, bare = false }: { view: View; code: string; warnings: readonly string[]; local: boolean; bare?: boolean }) {
   const { client } = useBeluga();
-  const t = useT();
   const [ref, visible] = useVisible<HTMLElement>();
   const [shape, setShape] = useState<Shape>(view.type === 'chart' ? view.chart : 'table');
   const [full, setFull] = useState(false);
   const [shown, setShown] = useShownValues();
   const asChart = view.type === 'chart' || (view.type === 'table' && shape !== 'table');
   const data = useViewData(view, { local, visible, ...(asChart || WHOLE.has(view.type) ? { limit: Math.max(view.pageSize, 500) } : {}), ...(view.type === 'code' ? { text: true } : {}) });
-  const copySpec = (): void => void copyText(JSON.stringify(JSON.parse(code), null, 2)).then(() => toast(client, t('common.viewBlock.copiedJson'), 'success'));
-  const rowsCopied = (n: number): string => t('common.viewBlock.copiedRows', { n });
+  const copySpec = (): void => void copyText(JSON.stringify(JSON.parse(code), null, 2)).then(() => toast(client, 'Copied as JSON', 'success'));
+  const rowsCopied = (n: number, as = ''): string => `Copied ${n} ${n === 1 ? 'row' : 'rows'}${as}`;
   // A table copies as a table: HTML for Sheets, Numbers, Docs and Notion; Markdown for everything else.
   const [copied, copy] = useCopied();
   const tableCopy = view.type === 'table' && data.rows.length > 0;
@@ -94,11 +91,11 @@ function ViewCard({ view, code, warnings, local, bare = false }: { view: View; c
     });
   const exportable = data.rows.length > 0 && view.type !== 'code' && view.type !== 'colors';
   const items: ActionItem[] = [
-    ...(view.type !== 'code' && view.type !== 'colors' ? [{ label: t('common.viewBlock.fullWindow'), icon: 'expand' as const, onSelect: () => setFull(true) }] : []),
-    ...(tableCopy ? [{ label: t('common.viewBlock.copyTable'), icon: 'copy' as const, onSelect: copyTable }] : []),
+    ...(view.type !== 'code' && view.type !== 'colors' ? [{ label: 'Open in Full Window', icon: 'expand' as const, onSelect: () => setFull(true) }] : []),
+    ...(tableCopy ? [{ label: 'Copy Table', icon: 'copy' as const, onSelect: copyTable }] : []),
     ...(exportable ? exportItems(view, data, (text, ok) => toast(client, text, ok ? 'success' : 'error'), shown, setShown) : []),
-    { label: exportable ? t('common.viewBlock.copySpec') : t('common.viewBlock.copyJson'), icon: 'copy', separate: exportable, onSelect: copySpec },
-    ...(data.mode === 'live' ? [{ label: t('common.viewBlock.refresh'), icon: 'refresh' as const, onSelect: data.refresh }] : []),
+    { label: exportable ? 'Copy View Spec' : 'Copy as JSON', icon: 'copy', separate: exportable, onSelect: copySpec },
+    ...(data.mode === 'live' ? [{ label: 'Refresh', icon: 'refresh' as const, onSelect: data.refresh }] : []),
   ];
   const body = (inFull: boolean) => <Body view={view} data={data} shape={asChart ? (view.type === 'chart' && shape === 'table' ? view.chart : shape) : 'table'} full={inFull} />;
   const canSwitch = (view.type === 'table' || view.type === 'chart') && chartable(view, data);
@@ -108,16 +105,16 @@ function ViewCard({ view, code, warnings, local, bare = false }: { view: View; c
     <>
       <ActionsContext items={items}>
         <figure ref={ref} className={cx(v.card, bare && v.bare)} data-type={view.type} data-state="ready" aria-label={view.title ? `${label(view.type)}: ${view.title}` : label(view.type)}>
-          <Head view={view} data={data} warnings={warnings} shape={shape} setShape={canSwitch ? setShape : undefined} copy={tableCopy ? { copied, onCopy: copyTable } : undefined} more={exportable ? items : undefined} onExpand={!bare && items[0]?.label === t('common.viewBlock.fullWindow') ? () => setFull(true) : undefined} bare={bare} />
+          <Head view={view} data={data} warnings={warnings} shape={shape} setShape={canSwitch ? setShape : undefined} copy={tableCopy ? { copied, onCopy: copyTable } : undefined} more={exportable ? items : undefined} onExpand={!bare && items[0]?.label === 'Open in Full Window' ? () => setFull(true) : undefined} bare={bare} />
           <ControlsBar view={view} data={data} />
           {data.needsApproval ? <Approve command={data.needsApproval} onRun={data.approve} /> : null}
           {data.error ? (
             <div className={v.problem} role="alert">
               <Icon name="alert" size={13} />
-              <span>{t('common.viewBlock.couldntLoad', { error: data.error })}</span>
+              <span>Couldn’t load it: {data.error}</span>
               {data.mode === 'live' ? (
                 <button type="button" className={v.linkButton} onClick={data.refresh}>
-                  {t('common.viewBlock.tryAgain')}
+                  Try Again
                 </button>
               ) : null}
             </div>
@@ -131,7 +128,7 @@ function ViewCard({ view, code, warnings, local, bare = false }: { view: View; c
           <Dialog.Portal>
             <Dialog.Overlay className={v.fullOverlay} data-over-welcome={overWelcome} />
             <Dialog.Content className={v.full} data-over-welcome={overWelcome} aria-describedby={undefined} onOpenAutoFocus={(e) => e.preventDefault()}>
-              <Head view={view} data={data} warnings={warnings} shape={shape} setShape={canSwitch ? setShape : undefined} copy={tableCopy ? { copied, onCopy: copyTable } : undefined} more={exportable ? items.filter((it) => it.label !== t('common.viewBlock.fullWindow')) : undefined} inFull onClose={() => setFull(false)} />
+              <Head view={view} data={data} warnings={warnings} shape={shape} setShape={canSwitch ? setShape : undefined} copy={tableCopy ? { copied, onCopy: copyTable } : undefined} more={exportable ? items.filter((it) => it.label !== 'Open in Full Window') : undefined} inFull onClose={() => setFull(false)} />
               <ControlsBar view={view} data={data} />
               <div className={v.fullBody}>{body(true)}</div>
               <Foot view={view} data={data} />
@@ -171,29 +168,30 @@ function exportItems(view: View, data: ViewData, say: (text: string, ok: boolean
     const columns = data.columns.filter((c) => !c.hidden);
     return { text: exportRows(k.format, rows, columns, { shown: shown || !k.raw, name: view.title ?? 'rows' }), n: rows.length };
   };
-  const rowsWord = (n: number): string => tNow('common.viewBlock.nRows', { n });
+  const rowsWord = (n: number): string => `${n} ${n === 1 ? 'row' : 'rows'}`;
   const copyAs = (k: ExportKind): void => {
     const { text, n } = take(k);
     copyText(text).then(
-      () => say(tNow('common.viewBlock.copiedAs', { rows: rowsWord(n), as: k.label }), true),
-      (err: unknown) => say(tNow('common.viewBlock.couldntCopy', { error: err instanceof Error ? err.message : String(err) }), false),
+      () => say(`Copied ${rowsWord(n)} as ${k.label}`, true),
+      (err: unknown) => say(`Couldn’t copy: ${err instanceof Error ? err.message : String(err)}`, false),
     );
   };
   const saveAs = (k: ExportKind): void => {
     const { text, n } = take(k);
     saveTextAs(exportFileName(view.title, k.ext), text).then(
-      (to) => to && say(tNow('common.viewBlock.savedTo', { rows: rowsWord(n), file: baseName(to) }), true),
-      (err: unknown) => say(tNow('common.viewBlock.couldntSave', { error: err instanceof Error ? err.message : String(err) }), false),
+      (to) => to && say(`Saved ${rowsWord(n)} to ${baseName(to)}`, true),
+      (err: unknown) => say(`Couldn’t save it: ${err instanceof Error ? err.message : String(err)}`, false),
     );
   };
-  const valuesItem: ActionItem = { label: tNow('common.viewBlock.valuesShown'), hint: shown ? tNow('common.viewBlock.valuesShownHint') : tNow('common.viewBlock.valuesRawHint'), checked: shown, separate: true, onSelect: () => setShown(!shown) };
+  const valuesItem: ActionItem = { label: 'Values as Shown', hint: shown ? 'Like the table: $48,210, Yes' : 'Raw: 48210, true', checked: shown, separate: true, onSelect: () => setShown(!shown) };
   return [
-    { label: tNow('common.viewBlock.copyAs'), icon: 'copy', submenu: [...EXPORT_KINDS.map((k) => ({ label: k.label, onSelect: () => copyAs(k) })), valuesItem], onSelect: () => undefined },
-    { label: tNow('common.viewBlock.saveAs'), icon: 'download', submenu: [...EXPORT_KINDS.map((k) => ({ label: `${k.label}…`, onSelect: () => saveAs(k) })), valuesItem], onSelect: () => undefined },
+    { label: 'Copy as', icon: 'copy', submenu: [...EXPORT_KINDS.map((k) => ({ label: k.label, onSelect: () => copyAs(k) })), valuesItem], onSelect: () => undefined },
+    { label: 'Save as', icon: 'download', submenu: [...EXPORT_KINDS.map((k) => ({ label: `${k.label}…`, onSelect: () => saveAs(k) })), valuesItem], onSelect: () => undefined },
   ];
 }
 
-const label = (type: ViewType): string => tNow(`common.viewBlock.label.${type}` as const);
+const LABEL: Record<ViewType, string> = { table: 'Table', chart: 'Chart', stats: 'Stats', code: 'Code', colors: 'Colors', gantt: 'Timeline', heatmap: 'Heatmap', calendar: 'Calendar' };
+const label = (t: ViewType): string => LABEL[t];
 
 function Body({ view, data, shape, full }: { view: View; data: ViewData; shape: Shape; full: boolean }) {
   switch (view.type) {
@@ -219,18 +217,15 @@ function Body({ view, data, shape, full }: { view: View; data: ViewData; shape: 
   }
 }
 
-type Shown = 'table' | 'line' | 'area' | 'bar';
-const SHAPES: ReadonlyArray<{ shape: Shown; icon: IconName }> = [
-  { shape: 'table', icon: 'table' },
-  { shape: 'line', icon: 'chartLine' },
-  { shape: 'area', icon: 'chartArea' },
-  { shape: 'bar', icon: 'chartBar' },
+const SHAPES: ReadonlyArray<{ shape: Shape; icon: IconName; label: string }> = [
+  { shape: 'table', icon: 'table', label: 'Table' },
+  { shape: 'line', icon: 'chartLine', label: 'Line Chart' },
+  { shape: 'area', icon: 'chartArea', label: 'Area Chart' },
+  { shape: 'bar', icon: 'chartBar', label: 'Bar Chart' },
 ];
-const shapeLabel = (shape: Shown): string => tNow(`common.viewBlock.shape.${shape}` as const);
 
 function Head({ view, data, warnings, shape, setShape, copy, more, onExpand, inFull, onClose, bare = false }: { view: View; data: ViewData; warnings: readonly string[]; shape: Shape; setShape?: ((s: Shape) => void) | undefined; copy?: { copied: boolean; onCopy: () => void } | undefined; more?: readonly ActionItem[] | undefined; onExpand?: (() => void) | undefined; inFull?: boolean; onClose?: () => void; bare?: boolean }) {
   const actions = useActions();
-  const t = useT();
   const now = useClock(data.at !== undefined, 15_000);
   const live = data.mode === 'live' && Boolean(data.source?.refresh);
   const TitleTag = inFull ? Dialog.Title : 'span';
@@ -246,26 +241,26 @@ function Head({ view, data, warnings, shape, setShape, copy, more, onExpand, inF
       <span className={v.tools}>
         {warnings.length ? (
           <Tip label={warnings.join('\n')}>
-            <span className={v.note}>{t('common.viewBlock.leftOut', { n: warnings.length })}</span>
+            <span className={v.note}>{warnings.length} left out</span>
           </Tip>
         ) : null}
         {data.mode === 'live' && (data.at || data.loading || live) ? (
-          <Tip label={data.at ? t('common.viewBlock.fetched', { at: new Date(data.at).toLocaleString() }) : t('common.viewBlock.live')}>
+          <Tip label={data.at ? `Fetched ${new Date(data.at).toLocaleString()}` : 'Live'}>
             <span className={cx(v.status, live && v.statusLive, data.loading && v.statusBusy)}>
               <span className={v.dot} />
-              {data.loading ? t('common.viewBlock.loading') : live ? t('common.viewBlock.live') : data.at ? ago(data.at, now) : t('common.viewBlock.live')}
+              {data.loading ? 'Loading' : live ? 'Live' : data.at ? ago(data.at, now) : 'Live'}
             </span>
           </Tip>
         ) : data.mode === 'snapshot' && data.at ? (
-          <Tip label={t('common.viewBlock.snapshotTip')}>
+          <Tip label="These rows are from when the agent fetched them. Its source runs on its owner’s computer.">
             <span className={v.status}>{ago(data.at, now)}</span>
           </Tip>
         ) : null}
         {setShape ? (
-          <span className={v.segment} role="radiogroup" aria-label={t('common.viewBlock.showAs')}>
+          <span className={v.segment} role="radiogroup" aria-label="Show as">
             {SHAPES.map((s) => (
-              <Tip key={s.shape} label={shapeLabel(s.shape)}>
-                <button type="button" role="radio" aria-checked={shape === s.shape} aria-label={shapeLabel(s.shape)} className={cx(v.segmentItem, shape === s.shape && v.segmentOn)} onClick={() => setShape(s.shape)}>
+              <Tip key={s.shape} label={s.label}>
+                <button type="button" role="radio" aria-checked={shape === s.shape} aria-label={s.label} className={cx(v.segmentItem, shape === s.shape && v.segmentOn)} onClick={() => setShape(s.shape)}>
                   <Icon name={s.icon} size={12} />
                 </button>
               </Tip>
@@ -287,17 +282,17 @@ function Head({ view, data, warnings, shape, setShape, copy, more, onExpand, inF
             {a.label}
           </button>
         ))}
-        {copy ? <IconButton icon={copy.copied ? 'check' : 'copy'} label={copy.copied ? t('common.ui.copied') : t('common.viewBlock.copyTable')} className={cx(v.iconTool, copy.copied && v.iconDone)} onClick={copy.onCopy} /> : null}
-        {data.mode === 'live' ? <IconButton icon="refresh" label={t('common.viewBlock.refresh')} className={cx(v.iconTool, data.loading && v.spinning)} onClick={data.refresh} /> : null}
-        {onExpand ? <IconButton icon="expand" label={t('common.viewBlock.fullWindow')} className={v.iconTool} onClick={onExpand} /> : null}
+        {copy ? <IconButton icon={copy.copied ? 'check' : 'copy'} label={copy.copied ? 'Copied' : 'Copy Table'} className={cx(v.iconTool, copy.copied && v.iconDone)} onClick={copy.onCopy} /> : null}
+        {data.mode === 'live' ? <IconButton icon="refresh" label="Refresh" className={cx(v.iconTool, data.loading && v.spinning)} onClick={data.refresh} /> : null}
+        {onExpand ? <IconButton icon="expand" label="Open in Full Window" className={v.iconTool} onClick={onExpand} /> : null}
         {more ? (
           <ActionsDropdown items={more}>
-            <IconButton icon="more" label={t('common.viewBlock.copyOrSave')} className={v.iconTool} />
+            <IconButton icon="more" label="Copy or Save As" className={v.iconTool} />
           </ActionsDropdown>
         ) : null}
         {onClose ? (
           <Dialog.Close asChild>
-            <IconButton icon="x" label={t('common.ui.close')} keys="esc" className={v.iconTool} />
+            <IconButton icon="x" label="Close" keys="esc" className={v.iconTool} />
           </Dialog.Close>
         ) : null}
       </span>
@@ -307,12 +302,11 @@ function Head({ view, data, warnings, shape, setShape, copy, more, onExpand, inF
 
 /** A command Claude wrote by hand (not through its tool) runs once you press Load; after that, by itself. */
 function Approve({ command, onRun }: { command: string; onRun: () => void }) {
-  const t = useT();
   return (
     <div className={v.approve}>
       <button type="button" className={v.primary} onClick={onRun}>
         <Icon name="play" size={11} />
-        {t('common.viewBlock.load')}
+        Load
       </button>
       <Tip label={command}>
         <code className={v.approveCode}>{command}</code>
@@ -324,14 +318,13 @@ function Approve({ command, onRun }: { command: string; onRun: () => void }) {
 function Foot({ view, data }: { view: View; data: ViewData }) {
   if (!data.source || view.type === 'colors') return null;
   const kind = data.source.kind;
-  const t = useT();
   return (
     <div className={v.foot}>
       <Icon name={kind === 'http' ? 'globe' : kind === 'folder' ? 'folder' : kind === 'file' ? 'file' : kind === 'command' ? 'terminal' : 'grid'} size={11} />
       <span className={v.sourceText} title={describeSource(data.source)}>
-        {kind === 'sqlite' ? 'SQLite' : kind === 'postgres' ? 'Postgres' : kind === 'http' ? t('common.viewBlock.source.web') : kind === 'command' ? t('common.viewBlock.source.command') : kind === 'folder' ? t('common.viewBlock.source.folder') : t('common.viewBlock.source.file')} · {describeSource(data.source)}
+        {kind === 'sqlite' ? 'SQLite' : kind === 'postgres' ? 'Postgres' : kind === 'http' ? 'Web' : kind === 'command' ? 'Command' : kind === 'folder' ? 'Folder' : 'File'} · {describeSource(data.source)}
       </span>
-      {data.mode === 'snapshot' ? <span className={v.footNote}>{t('common.viewBlock.liveOnOwner')}</span> : data.source.refresh ? <span className={v.footNote}>{t('common.viewBlock.every', { n: data.source.refresh })}</span> : null}
+      {data.mode === 'snapshot' ? <span className={v.footNote}>Live on its owner’s computer</span> : data.source.refresh ? <span className={v.footNote}>Every {data.source.refresh}s</span> : null}
     </div>
   );
 }
@@ -352,7 +345,6 @@ export function MarkdownTable({ node, fallback }: { node: unknown; fallback: Rea
 /** A table that stays as written (it has links): Copy on hover takes it as drawn, links and all. */
 function PlainTable({ children }: { children: React.ReactNode }) {
   const { client } = useBeluga();
-  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const [copied, copy] = useCopied();
   const onCopy = (): void =>
@@ -361,13 +353,13 @@ function PlainTable({ children }: { children: React.ReactNode }) {
       if (!table) return Promise.resolve();
       const lines = [...table.rows].map((tr) => [...tr.cells].map((td) => td.innerText.trim()));
       const columns: Column[] = (lines[0] ?? []).map((label, i) => ({ key: String(i), label, type: 'text' }));
-      const rows: Row[] = lines.slice(1).map((cells) => Object.fromEntries(cells.map((c, i) => [String(i), c])));
-      return copyRich(table.outerHTML, toMarkdownTable(rows, columns)).then(() => toast(client, t('common.viewBlock.copiedRows', { n: rows.length }), 'success'));
+      const rows: Row[] = lines.slice(1).map((cells) => Object.fromEntries(cells.map((t, i) => [String(i), t])));
+      return copyRich(table.outerHTML, toMarkdownTable(rows, columns)).then(() => toast(client, `Copied ${rows.length} ${rows.length === 1 ? 'row' : 'rows'}`, 'success'));
     });
   return (
     <div ref={box} className={v.plainTable}>
       <span className={v.plainTools}>
-        <IconButton icon={copied ? 'check' : 'copy'} label={copied ? t('common.ui.copied') : t('common.viewBlock.copyTable')} className={cx(v.iconTool, copied && v.iconDone)} onClick={onCopy} />
+        <IconButton icon={copied ? 'check' : 'copy'} label={copied ? 'Copied' : 'Copy Table'} className={cx(v.iconTool, copied && v.iconDone)} onClick={onCopy} />
       </span>
       {children}
     </div>

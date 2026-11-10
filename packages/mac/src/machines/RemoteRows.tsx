@@ -13,7 +13,6 @@ import { onMachine, paneOf } from './pane-model.js';
 import { type Tagged, remoteOnlyProjects, remoteWorkIn, shortName, whereLine } from './remote-work.js';
 import { useRemoteSources } from './use-remote.js';
 import c from './machines.module.css';
-import { t as tr, useT } from '../i18n/index.js';
 
 /**
  * Your computers' work in the sidebar (BLG-785): their worktrees and chats under the project of
@@ -27,9 +26,8 @@ import { t as tr, useT } from '../i18n/index.js';
  * keeps its own name; the computer's name is on hover, and the row's label says it.
  */
 export function MachineChip({ machine, offline }: { machine: MachineView; offline?: boolean }) {
-  const t = useT();
   return (
-    <span className={cx(c.rowTag, offline && c.rowTagOff)} title={t('machines.rows.on', { name: machine.name })} data-machine-chip={shortName(machine.name)}>
+    <span className={cx(c.rowTag, offline && c.rowTagOff)} title={`On ${machine.name}`} data-machine-chip={shortName(machine.name)}>
       <MachineMark machine={machine} size={13} />
     </span>
   );
@@ -48,20 +46,19 @@ function useOnPage(machine: string, id: string): boolean {
  * Mac's rows, asked and done there with its own screen. Offline, or a chat: Open only.
  */
 function remoteItems(t: Tagged<{ readonly id: string; readonly kind: string }>, open: () => void): ActionItem[] {
-  const items: ActionItem[] = [{ label: tr('machines.rows.open'), icon: 'chevronRight', onSelect: open }];
+  const items: ActionItem[] = [{ label: 'Open', icon: 'chevronRight', onSelect: open }];
   const client = machineClientOf(t.machine.id);
   const ui = machineUiOf(t.machine.id);
   if (t.offline || t.item.kind !== 'worktree' || !client || !ui) return items;
   const run = (action: 'archive' | 'delete') => () => makeActions(client, ui).run({ type: 'ws', id: t.item.id, action });
   return [
     ...items,
-    { label: tr('machines.rows.archive'), icon: 'archive', hint: tr('machines.rows.archiveHint'), separate: true, onSelect: run('archive') },
-    { label: tr('machines.rows.delete'), icon: 'trash', danger: true, onSelect: run('delete') },
+    { label: 'Archive…', icon: 'archive', hint: 'Keeps your work; restore it any time', separate: true, onSelect: run('archive') },
+    { label: 'Delete…', icon: 'trash', danger: true, onSelect: run('delete') },
   ];
 }
 
 function RemoteWorkRow({ t, indent }: { t: Tagged<{ readonly id: string; readonly name: string; readonly kind: string }>; indent: number }) {
-  const tt = useT();
   const actions = useActions();
   const here = useOnPage(t.machine.id, t.item.id);
   const open = (): void => actions.run({ type: 'view', view: onMachine(t.machine.id, { kind: 'workspace', id: t.item.id, tab: 'chat' }) });
@@ -71,7 +68,7 @@ function RemoteWorkRow({ t, indent }: { t: Tagged<{ readonly id: string; readonl
         indent={indent}
         selected={here}
         className={cx(t.offline && c.offlineRow)}
-        aria-label={tt('machines.rows.itemOn', { item: t.item.name, name: t.machine.name })}
+        aria-label={`${t.item.name} on ${t.machine.name}`}
         data-machine-row={t.machine.id}
         icon={<Icon name={t.item.kind === 'chat' ? 'chat' : 'branch'} size={13} />}
         label={t.item.name}
@@ -102,17 +99,16 @@ export function RemoteWorkRows({ name, indent, onlyHere = false }: { name: strin
 
 /** Your computers' projects this Mac doesn't have: each with its computer, and its worktrees and chats. */
 export function RemoteProjects({ local }: { local: ReadonlySet<string> }) {
-  const tt = useT();
   const sources = useRemoteSources();
   const projects = useMemo(() => remoteOnlyProjects(local, sources), [local, sources]);
   if (!projects.length) return null;
   return (
-    <div role="group" aria-label={tt('machines.rows.onYourComputers')}>
+    <div role="group" aria-label="On your computers">
       {projects.map((t) => (
         <div key={`${t.machine.id}/${t.item.id}`}>
           <Row
             className={cx(side.projectRow, t.offline && c.offlineRow)}
-            aria-label={tt('machines.rows.itemOn', { item: t.item.name, name: t.machine.name })}
+            aria-label={`${t.item.name} on ${t.machine.name}`}
             icon={<Icon name="folder" size={13} />}
             label={t.item.name}
             detail={`${t.item.name} · ${whereLine(t)}`}

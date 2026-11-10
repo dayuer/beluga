@@ -19,11 +19,10 @@ import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { NoProjects } from '../work/NoProjects.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
-import { useT } from '../i18n/index.js';
 
-const STATES = (tr: ReturnType<typeof useT>): ReadonlyArray<{ readonly value: GhIssueState; readonly label: string; readonly hint: string }> => [
-  { value: 'open', label: tr('issues.view.open'), hint: tr('issues.view.openHint') },
-  { value: 'closed', label: tr('issues.view.closed'), hint: tr('issues.view.closedHint') },
+const STATES: ReadonlyArray<{ readonly value: GhIssueState; readonly label: string; readonly hint: string }> = [
+  { value: 'open', label: 'Open', hint: 'Issues still open on GitHub' },
+  { value: 'closed', label: 'Closed', hint: 'Fixed, or closed for another reason' },
 ];
 
 /**
@@ -34,7 +33,6 @@ const STATES = (tr: ReturnType<typeof useT>): ReadonlyArray<{ readonly value: Gh
  */
 export function IssuesView() {
   const view = useApp((st) => st.view);
-  const tr = useT();
   const allProjects = useApp((st) => st.projects);
   const projects = useMemo(() => allProjects.filter((p) => p.root && !p.error), [allProjects]);
   const tasksPrefs = useTasksPrefs();
@@ -75,7 +73,7 @@ export function IssuesView() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
-  if (!projects.length || !here || !projectId) return <NoProjects icon="issue" detail={tr('issues.view.noProjects')} />;
+  if (!projects.length || !here || !projectId) return <NoProjects icon="issue" detail="Issues come from a project’s GitHub repository. Add a project to see them here." />;
 
   const repo = list && list.kind !== 'none' ? list.repo : undefined;
   return (
@@ -83,18 +81,18 @@ export function IssuesView() {
       <div className={t.bar}>
         <div className={t.barGroup}>
           <PickMenu<string>
-            label={tr('issues.view.project')}
+            label="Project"
             choices={projects.map((p) => ({ value: p.id, label: p.name, mark: <ProjectIcon id={p.id} name={p.name} size={16} /> }))}
             chosen={[here.id]}
             onPick={(id) => openList(id)}
           >
-            <button type="button" className={t.projectSwitch} aria-label={tr('issues.view.projectIs', { name: here.name })}>
+            <button type="button" className={t.projectSwitch} aria-label={`Project: ${here.name}`}>
               <ProjectIcon id={here.id} name={here.name} size={18} />
               <span className={t.projectName}>{here.name}</span>
               <Icon name="chevronDown" size={11} />
             </button>
           </PickMenu>
-          <Segmented<GhIssueState> label={tr('issues.view.show')} value={prefs.state} onChange={(state) => setIssuesPrefs({ state })} options={STATES(tr)} />
+          <Segmented<GhIssueState> label="Show" value={prefs.state} onChange={(state) => setIssuesPrefs({ state })} options={STATES} />
         </div>
         <div className={cx(t.barGroup, t.barActions)}>
           <label className={cx(t.find, s.find)}>
@@ -103,20 +101,20 @@ export function IssuesView() {
               ref={find}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              placeholder={tr('issues.view.search')}
-              aria-label={tr('issues.view.searchLabel')}
+              placeholder="Search issues"
+              aria-label="Search issues on GitHub"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') setSearch(searchWords(typed));
                 if (e.key === 'Escape') (setTyped(''), setSearch(''), (e.target as HTMLInputElement).blur());
               }}
             />
             {typed ? (
-              <button type="button" className={t.findClear} aria-label={tr('issues.view.clearSearch')} onClick={() => (setTyped(''), setSearch(''))}>
+              <button type="button" className={t.findClear} aria-label="Clear the search" onClick={() => (setTyped(''), setSearch(''))}>
                 <Icon name="x" size={10} />
               </button>
             ) : null}
           </label>
-          <IconButton icon="refresh" label={loading ? tr('issues.view.asking') : tr('issues.view.askAgain')} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
+          <IconButton icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
           {repo ? (
             <Tip label={`${repo.url}/issues`}>
               <Button size="small" icon="external" onClick={() => openOnGitHub(`${repo.url}/issues`)}>
@@ -128,34 +126,34 @@ export function IssuesView() {
       </div>
       <div className={t.body}>
         {error ? (
-          <Empty icon="alert" title={tr('issues.view.cantRead')} detail={error} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
+          <Empty icon="alert" title="Couldn’t read the issues" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
         ) : !list ? (
-          <Empty icon="issue" title={tr('issues.view.asking')} detail={tr('issues.view.forIssues', { name: here.name })} />
+          <Empty icon="issue" title="Asking GitHub…" detail={`For ${here.name}’s issues`} />
         ) : list.kind === 'none' ? (
-          <Empty icon="issue" title={tr('issues.view.notOnGitHub')} detail={tr('issues.view.notOnGitHubDetail')} />
+          <Empty icon="issue" title="This project isn’t on GitHub" detail="Issues come from the GitHub repository a project’s origin remote points to. Push it to GitHub, or pick another project." />
         ) : list.kind === 'no_gh' ? (
           <Empty
             icon="issue"
-            title={tr('issues.view.connect')}
-            detail={tr('issues.view.connectDetail', { repo: repoSlug(list.repo) })}
+            title="Connect GitHub"
+            detail={`Beluga reads ${repoSlug(list.repo)}’s issues with GitHub’s command-line tool, signed in as you. Set it up once, then check again.`}
             action={
               <EmptyActions>
                 <Button variant="primary" onClick={() => setConnect(true)}>
-                  {tr('issues.view.connectButton')}
+                  Connect GitHub…
                 </Button>
               </EmptyActions>
             }
           />
         ) : list.kind === 'error' ? (
-          <Empty icon="alert" title={tr('issues.view.cantRead')} detail={list.message} action={<Button onClick={refresh}>{tr('issues.view.tryAgain')}</Button>} />
+          <Empty icon="alert" title="Couldn’t read the issues" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
         ) : !list.issues.length ? (
           <Empty
             icon={prefs.state === 'open' && !search ? 'task' : 'issue'}
-            title={search ? tr('issues.view.nothingMatches') : prefs.state === 'open' ? tr('issues.view.noOpen') : tr('issues.view.noClosed')}
-            detail={search ? tr('issues.view.tryOther') : prefs.state === 'open' ? tr('issues.view.nothingWaiting', { repo: repoSlug(list.repo) }) : tr('issues.view.nothingClosed', { repo: repoSlug(list.repo) })}
+            title={search ? 'Nothing matches' : prefs.state === 'open' ? 'No open issues' : 'No closed issues'}
+            detail={search ? 'Try other words, or the other tab.' : prefs.state === 'open' ? `Nothing waiting in ${repoSlug(list.repo)}.` : `Nothing closed in ${repoSlug(list.repo)} yet.`}
           />
         ) : (
-          <div className={cx(s.list, late && arr.arrive)} role="table" aria-label={tr('issues.view.listLabel', { name: here.name, state: prefs.state })}>
+          <div className={cx(s.list, late && arr.arrive)} role="table" aria-label={`${here.name}’s ${prefs.state} issues`}>
             {list.issues.map((issue) => (
               <IssueRow key={issue.number} projectId={projectId} repo={list.repo} issue={issue} />
             ))}
@@ -164,8 +162,9 @@ export function IssuesView() {
       </div>
       {list?.kind === 'github' && list.issues.length ? (
         <div className={t.foot}>
-          {tr('issues.view.foot', { count: `${list.issues.length}${list.more ? '+' : ''}`, state: prefs.state, repo: repoSlug(list.repo), when: ago(list.fetchedAt) })}
-          {list.more ? tr('issues.view.footMore') : ''}
+          {list.issues.length}
+          {list.more ? '+' : ''} {prefs.state} · {repoSlug(list.repo)} · from GitHub {ago(list.fetchedAt)}
+          {list.more ? ' · the most recently updated: search to find others' : ''}
         </div>
       ) : null}
       {connect ? (

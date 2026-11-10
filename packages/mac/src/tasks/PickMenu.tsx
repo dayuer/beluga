@@ -5,7 +5,6 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import m from '../components/SpecMenu.module.css';
 import t from './tasks.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * A pop-up menu that picks a value: each choice with its own mark (a status ring, priority bars,
@@ -43,7 +42,6 @@ export interface PickMenuProps<T extends string> {
 export function PickMenu<T extends string>({ label, choices, chosen, onPick, children, multiple, search, onCreate, actions, align = 'start', placeholder }: PickMenuProps<T>) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const tr = useT();
   const searchable = search ?? (choices.length > 8 || Boolean(onCreate));
   const q = query.trim().toLowerCase();
   const shown = useMemo(() => (q ? choices.filter((c) => c.label.toLowerCase().includes(q) || c.hint?.toLowerCase().includes(q)) : choices), [choices, q]);
@@ -83,7 +81,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
               <input
                 autoFocus
                 value={query}
-                placeholder={placeholder ?? (onCreate ? tr('tasks.pick.findOrCreate') : tr('tasks.pick.find'))}
+                placeholder={placeholder ?? (onCreate ? 'Find or create…' : 'Find…')}
                 onChange={(e) => setQuery(e.target.value)}
                 // Typing goes to the field, not the menu's type-ahead.
                 onKeyDown={(e) => {
@@ -93,7 +91,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
                     setQuery('');
                   } else if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Escape' && e.key !== 'Tab') e.stopPropagation();
                 }}
-                aria-label={tr('tasks.pick.findAria', { what: label.toLowerCase() })}
+                aria-label={`Find ${label.toLowerCase()}`}
               />
             </div>
           ) : null}
@@ -135,11 +133,11 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
                 <span className={t.pickMark}>
                   <Icon name="plus" size={12} />
                 </span>
-                <span className={m.label}>{tr('tasks.pick.create', { what: query.trim() })}</span>
+                <span className={m.label}>Create “{query.trim()}”</span>
               </span>
             </Dropdown.Item>
           ) : null}
-          {!shown.length && !(onCreate && q) ? <div className={t.pickEmpty}>{tr('tasks.view.noMatch')}</div> : null}
+          {!shown.length && !(onCreate && q) ? <div className={t.pickEmpty}>Nothing matches</div> : null}
           {actions?.length ? <Dropdown.Separator className={m.separator} /> : null}
           {actions?.map((a) => (
             <Dropdown.Item key={a.label} className={m.item} onSelect={a.onSelect}>

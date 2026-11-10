@@ -11,13 +11,12 @@ import { closeNet } from './net-sheets.js';
 import { useNetwork } from './use-net.js';
 import sh from '../dialogs/native/sharing.module.css';
 import s from './network.module.css';
-import { type Key, t, useT } from '../i18n/index.js';
 
-const STATES: ReadonlyArray<{ state: PresenceState; hint?: Key }> = [
-  { state: 'online' },
-  { state: 'away' },
-  { state: 'dnd', hint: 'network.status.silences' },
-  { state: 'offline', hint: 'network.status.stillGet' },
+const STATES: ReadonlyArray<{ state: PresenceState; hint: string }> = [
+  { state: 'online', hint: '' },
+  { state: 'away', hint: '' },
+  { state: 'dnd', hint: 'Silences notifications' },
+  { state: 'offline', hint: 'Still get messages' },
 ];
 
 /** What a status's emoji is usually about: meetings, food, away, focus, travel, feeling. */
@@ -25,7 +24,6 @@ const EMOJIS = ['💬', '📅', '🎧', '💻', '🧠', '🐛', '🚀', '🔥', 
 
 /** The emoji in front of the note: a smile until you pick one; picking one sets it at once. */
 function EmojiChooser({ emoji, onPick }: { emoji?: string; onPick: (emoji: string) => void }) {
-  useT();
   const [open, setOpen] = useState(false);
   const pick = (e: string): void => {
     onPick(e);
@@ -34,12 +32,12 @@ function EmojiChooser({ emoji, onPick }: { emoji?: string; onPick: (emoji: strin
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className={cx(s.emojiButton, emoji && s.emojiChosen)} aria-label={emoji ? t('network.status.change', { emoji }) : t('network.status.pick')}>
+        <button type="button" className={cx(s.emojiButton, emoji && s.emojiChosen)} aria-label={emoji ? `Status emoji ${emoji}: change it` : 'Pick a status emoji'}>
           {emoji ?? <Icon name="smile" size={13} />}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={s.emojiCard} side="bottom" align="start" sideOffset={6} collisionPadding={10} aria-label={t('network.status.emoji')}>
+        <Popover.Content className={s.emojiCard} side="bottom" align="start" sideOffset={6} collisionPadding={10} aria-label="Status emoji">
           <div className={s.emojiGrid}>
             {EMOJIS.map((e) => (
               <button key={e} type="button" className={cx(s.emojiPick, e === emoji && s.emojiPicked)} aria-label={e} aria-pressed={e === emoji} onClick={() => pick(e)}>
@@ -49,7 +47,7 @@ function EmojiChooser({ emoji, onPick }: { emoji?: string; onPick: (emoji: strin
           </div>
           {emoji ? (
             <button type="button" className={s.emojiNone} onClick={() => pick('')}>
-              {t('network.status.noEmoji')}
+              No Emoji
             </button>
           ) : null}
         </Popover.Content>
@@ -81,7 +79,6 @@ export function useSetPresence(): (p: Presence) => void {
  * one applies it at once (like the menu bar's); the note is saved on Return or when you leave it.
  */
 export function StatusPanel({ onDone }: { onDone?: () => void }) {
-  useT();
   const net = useNetwork();
   const set = useSetPresence();
   const self = net.self;
@@ -110,8 +107,8 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
           className={s.noteInput}
           value={note}
           maxLength={140}
-          placeholder={t('network.status.placeholder')}
-          aria-label={t('network.status.note')}
+          placeholder="What’s your status?"
+          aria-label="Status note"
           onChange={(e) => setNote(e.target.value)}
           onBlur={saveNote}
           onKeyDown={(e) => {
@@ -126,7 +123,7 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
           <button
             type="button"
             className={s.noteClear}
-            aria-label={t('network.status.clear')}
+            aria-label="Clear the note and emoji"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               setNote('');
@@ -138,7 +135,7 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
         ) : null}
       </div>
       <div className={s.separator} />
-      <div role="radiogroup" aria-label={t('network.status.status')}>
+      <div role="radiogroup" aria-label="Status">
         {STATES.map(({ state, hint }) => (
           <button
             key={state}
@@ -154,14 +151,14 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
             <span className={s.optionCheck}>{presence.state === state ? <Icon name="check" size={12} /> : null}</span>
             <PresenceDot state={state} size={10} />
             <span className={s.optionLabel}>{CHOICE_LABEL[state]}</span>
-            {hint ? <span className={s.optionHint}>{t(hint)}</span> : null}
+            {hint ? <span className={s.optionHint}>{hint}</span> : null}
           </button>
         ))}
       </div>
       {presence.state !== 'online' ? (
         <>
           <div className={s.separator} />
-          <div role="radiogroup" aria-label={t('network.status.forHowLong')}>
+          <div role="radiogroup" aria-label="For how long">
             {DURATIONS.map((d) => (
               <button
                 key={d.id}
@@ -187,7 +184,6 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
 
 /** You, at the bottom of the sidebar: your avatar and status; clicking changes it. */
 export function SelfBar() {
-  useT();
   const net = useNetwork();
   const [open, setOpen] = useState(false);
   const self = net.self;
@@ -195,7 +191,7 @@ export function SelfBar() {
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" className={s.me} aria-label={t('network.status.yours', { line: selfLine(self.presence) })}>
+        <button type="button" className={s.me} aria-label={`Your status: ${selfLine(self.presence)}`}>
           <PersonAvatar name={self.name} id={self.peerId} state={self.presence.state} size={26} />
           <span className={s.meText}>
             <span className={s.meName}>{self.name}</span>
@@ -211,7 +207,7 @@ export function SelfBar() {
           align="start"
           sideOffset={6}
           collisionPadding={10}
-          aria-label={t('network.status.yourStatus')}
+          aria-label="Your status"
           // Like a menu: keys go to the card, the note field waits to be clicked.
           onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement | null)?.focus())}
         >
@@ -224,13 +220,12 @@ export function SelfBar() {
 
 /** The same choices in a sheet of its own (the menu bar's Set a Status…). */
 export function StatusSheet() {
-  useT();
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : closeNet())}>
       <Dialog.Portal>
         <Dialog.Overlay className={sh.overlay} />
         <Dialog.Content className={cx(s.statusCard)} style={{ position: 'fixed', top: '14vh', left: '50%', translate: '-50% 0' }} aria-describedby={undefined}>
-          <Dialog.Title className="visually-hidden">{t('network.status.yourStatus')}</Dialog.Title>
+          <Dialog.Title className="visually-hidden">Your status</Dialog.Title>
           <StatusPanel onDone={closeNet} />
         </Dialog.Content>
       </Dialog.Portal>

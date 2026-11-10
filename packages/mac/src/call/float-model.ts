@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import type { CallView } from '../../../../src/shared/calls.js';
 
 /**
@@ -33,7 +32,7 @@ export function floatState(mine: CallView | undefined, ringing: readonly CallVie
       startedAt: mine.startedAt,
       muted: me?.muted ?? false,
       people: mine.people.filter((p) => !p.me).map((p) => ({ peerId: p.peerId, name: p.name, speaking: speaking.has(p.peerId), muted: p.muted })),
-      ...(sharer ? { sharing: sharer.me ? t('call.you') : sharer.name } : {}),
+      ...(sharer ? { sharing: sharer.me ? 'You' : sharer.name } : {}),
       ...(me?.sharing ? { youShare: true } : {}),
     };
   }

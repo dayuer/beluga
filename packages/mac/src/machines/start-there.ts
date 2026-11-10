@@ -14,7 +14,6 @@ import { onMachine, paneOf, sameView } from './pane-model.js';
 import { currentMachines } from './use-machines.js';
 import { holdReason } from './runs-on-model.js';
 import { noteStarted } from './started.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Start the work on that computer (BLG-788): Runs on picked one of your computers, so the new
@@ -104,7 +103,7 @@ export async function clientOf(machine: MachineView, d: Pick<StartDeps, 'home' |
   for (;;) {
     const c = machineClientOf(machine.id);
     if (c) return c;
-    if (Date.now() > until) throw new Error(t('machines.startThere.unreachable', { name: machine.name }));
+    if (Date.now() > until) throw new Error(`${machine.name} can’t be reached right now`);
     await sleep(150);
   }
 }
@@ -126,18 +125,18 @@ export async function projectReadyOn(client: SocketClient, machine: MachineView,
   const known = client.store.getState().projects.find((p) => p.name === named && p.root);
   if (known) return known.id;
   // Not there: the computer gets it ready from its origin.
-  if (!origin) throw new Error(t('machines.startThere.noOrigin', { project: project.name, name: machine.name }));
+  if (!origin) throw new Error(`${project.name} has no git origin here to get it from, so ${machine.name} can’t get it`);
   let run = (await client.call('machines.ready.start', origin, project.name)) as ReadyRun;
   onRun?.(run);
   while (run.state !== 'done') {
     if (run.state === 'failed') throw new Error(readyLine(run));
     await sleep(POLL_MS);
     const next = (await client.call('machines.ready.status', run.id).catch(() => undefined)) as ReadyRun | null | undefined;
-    if (!next) throw new Error(t('machines.startThere.stopped', { name: machine.name, project: project.name }));
+    if (!next) throw new Error(`${machine.name} stopped getting ${project.name} ready`);
     run = next;
     onRun?.(run);
   }
-  if (!run.projectId) throw new Error(t('machines.startThere.notListed', { name: machine.name, project: project.name }));
+  if (!run.projectId) throw new Error(`${machine.name} got ${project.name} ready, but it isn’t listed there`);
   return run.projectId;
 }
 
@@ -146,7 +145,7 @@ async function make(client: SocketClient, projectId: string | undefined, what: W
   switch (what.kind) {
     case 'worktree': {
       const id = (await client.call('workspaces.startWorktree', projectId!, what.text, what.opts as never)) as string | undefined;
-      if (!id) throw new Error(t('machines.startThere.noWorktree'));
+      if (!id) throw new Error('The worktree wasn’t made there');
       return { kind: 'workspace', id, tab: 'chat' };
     }
     case 'chat': {
@@ -167,7 +166,7 @@ async function make(client: SocketClient, projectId: string | undefined, what: W
     }
     case 'sentinel': {
       const made = (await client.call('sentinel.create', { ...what.draft, projectId: projectId ?? null } as never)) as { id: string } | undefined;
-      if (!made?.id) throw new Error(t('machines.startThere.noSentinel'));
+      if (!made?.id) throw new Error('The sentinel wasn’t made there');
       if (what.then) await client.call('sentinel.create', { ...what.then.draft, projectId: projectId ?? null, trigger: { kind: 'after', sentinelId: made.id, on: what.then.on } } as never);
       if (what.ask) void client.call('sentinel.ask', made.id, what.ask).catch(() => undefined);
       return { kind: 'sentinel_page', id: made.id };
@@ -180,8 +179,8 @@ async function make(client: SocketClient, projectId: string | undefined, what: W
  * while it gets there; opens what it made there at once (or, if you went elsewhere, says so).
  */
 export async function startThere(d: StartDeps, machine: MachineView, project: { readonly id: string; readonly name: string } | undefined, what: WorkToStart): Promise<boolean> {
-  const words = t(`machines.startThere.${what.kind}`);
-  set({ machine, what: project ? t('machines.startThere.inProject', { what: words, project: project.name }) : words, phase: 'connecting', shown: true, from: d.home.store.getState().view });
+  const words = what.kind === 'worktree' ? 'a worktree' : what.kind === 'chat' ? 'a chat' : what.kind === 'plan' ? 'a plan' : 'a sentinel';
+  set({ machine, what: project ? `${words} in ${project.name}` : words, phase: 'connecting', shown: true, from: d.home.store.getState().view });
   try {
     const client = await clientOf(machine, d);
     patch({ client });
@@ -192,14 +191,14 @@ export async function startThere(d: StartDeps, machine: MachineView, project: { 
     const shown = current?.shown ?? false;
     set(undefined);
     if (shown || paneOf(d.home.store.getState().view).machine === machine.id) d.go(onMachine(machine.id, page));
-    else toast(d.home, t('machines.startThere.started', { what: t(`machines.startThere.${what.kind}Up`), name: machine.name }), 'success');
+    else toast(d.home, `${upFirst(words)} started on ${machine.name}`, 'success');
     return true;
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     if (current?.shown) patch({ phase: 'failed', error });
     else {
       set(undefined);
-      toast(d.home, t('machines.startThere.failed', { what: words, name: machine.name, error }), 'error');
+      toast(d.home, `Couldn’t start ${words} on ${machine.name}: ${error}`, 'error');
     }
     return false;
   }

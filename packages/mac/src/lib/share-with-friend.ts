@@ -2,7 +2,6 @@ import { METHODS } from '@beluga/ipc/api.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { inviteChoice } from '@beluga/ui/invite-menus.js';
 import type { UiStore } from './beluga.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Sharing a project or a worktree with a friend (BLG-203's `/invite @ata` in a project). It goes
@@ -36,7 +35,7 @@ export async function shareWithFriend(client: SocketClient, ui: UiStore, req: Sh
     await client.api.sharing.invite(req.workspaceId, req.peerId, req.role);
     return 'room';
   }
-  const note = t('common.shareWithFriend.notYet', { name: req.name });
+  const note = `Sharing with friends who aren’t in your room isn’t in this Beluga yet. Invite ${req.name} here for now`;
   if (req.workspaceId) ui.openMenu({ kind: 'ws_share', id: req.workspaceId });
   else ui.openMenu({ kind: 'invite_link', ...inviteChoice(req.projectId) });
   client.store.dispatch({ type: 'toast', text: note, level: 'info' });

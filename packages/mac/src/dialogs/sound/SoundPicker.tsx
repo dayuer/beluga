@@ -7,17 +7,15 @@ import { keyPlatform } from '../../lib/shortcuts-model.js';
 import { generatedName, randomSeed } from '../../lib/sounds/generated.js';
 import { playSound } from '../../lib/sounds/player.js';
 import s from './sound.module.css';
-import { t, useT, tl } from '../../i18n/index.js';
-import { pw } from '../../lib/prefs-words.js';
 
 const FAMILIES = familiesHere(keyPlatform() === 'mac');
 
-const FAMILY_HINTS = (): Readonly<Record<SoundFamily, string>> => ({
-  chip: t('dialogs.sound.chipHint'),
-  gen: t('dialogs.sound.genHint'),
-  mac: t('dialogs.sound.macHint'),
-  none: t('dialogs.sound.noneHint'),
-});
+const FAMILY_HINTS: Readonly<Record<SoundFamily, string>> = {
+  chip: 'Short 8-bit sounds, made by Beluga',
+  gen: 'Soft sounds generated just for you',
+  mac: 'The sounds that come with your Mac',
+  none: 'Notifications stay silent',
+};
 
 export interface PickerProps {
   /** The sound being chosen (for "Same for all", or one kind). */
@@ -34,10 +32,9 @@ export interface PickerProps {
 
 /** A play button for one sound. */
 export function PlayButton({ choice, volume, label }: { choice: SoundChoice; volume: number; label: string }) {
-  const t = useT();
   if (choice.kind === 'none') return null;
   return (
-    <button type="button" className={s.play} aria-label={t('dialogs.sound.play', { name: label })} title={t('dialogs.sound.play', { name: label })} onClick={() => void playSound(choice, volume).catch(() => undefined)}>
+    <button type="button" className={s.play} aria-label={`Play ${label}`} title={`Play ${label}`} onClick={() => void playSound(choice, volume).catch(() => undefined)}>
       <Icon name="play" size={11} />
     </button>
   );
@@ -63,7 +60,6 @@ function Tile({ choice, on, volume, onPick }: { choice: SoundChoice; on: boolean
 
 /** Shuffle through generated sounds; keep the ones you like. */
 function Generator({ volume, onKeep }: { volume: number; onKeep: (seed: number) => void }) {
-  const t = useT();
   const [seed, setSeed] = useState(randomSeed);
   const candidate: SoundChoice = { kind: 'gen', seed };
   const shuffle = (): void => {
@@ -72,7 +68,7 @@ function Generator({ volume, onKeep }: { volume: number; onKeep: (seed: number) 
     void playSound({ kind: 'gen', seed: next }, volume).catch(() => undefined);
   };
   return (
-    <div className={s.generator} role="group" aria-label={t('dialogs.sound.make')}>
+    <div className={s.generator} role="group" aria-label="Make a new sound">
       <div className={s.genText}>
         <span className={s.genName} data-seed={seed}>
           {generatedName(seed)}
@@ -81,10 +77,10 @@ function Generator({ volume, onKeep }: { volume: number; onKeep: (seed: number) 
       </div>
       <PlayButton choice={candidate} volume={volume} label={generatedName(seed)} />
       <Button size="small" icon="refresh" onClick={shuffle}>
-        {t('dialogs.sound.shuffle')}
+        Shuffle
       </Button>
       <Button size="small" variant="primary" onClick={() => onKeep(seed)}>
-        {t('dialogs.sound.keep')}
+        Keep
       </Button>
     </div>
   );
@@ -92,13 +88,11 @@ function Generator({ volume, onKeep }: { volume: number; onKeep: (seed: number) 
 
 /** Every sound you can choose, by where it comes from, each with a ▶ to hear it first. */
 export function SoundPicker({ value, volume, made, onPick, onKeep, kindLabel }: PickerProps) {
-  const t = useT();
-  const hints = FAMILY_HINTS();
   // A Mac sound off the Mac (the default) plays as Beluga's chime: opened on the 8-bit ones.
   const [family, setFamily] = useState<SoundFamily>(FAMILIES.includes(value.kind) ? value.kind : 'chip');
   const current = choiceKey(value);
   const tiles = (choices: readonly SoundChoice[]) => (
-    <div className={s.tiles} role="radiogroup" aria-label={pw('familySounds', family, t('dialogs.sound.familySounds', { family: tl('FAMILY_LABELS', family, 'text', FAMILY_LABELS[family]) }))}>
+    <div className={s.tiles} role="radiogroup" aria-label={`${FAMILY_LABELS[family]} sounds`}>
       {choices.map((c) => (
         <Tile key={choiceKey(c)} choice={c} on={choiceKey(c) === current} volume={volume} onPick={onPick} />
       ))}
@@ -107,15 +101,15 @@ export function SoundPicker({ value, volume, made, onPick, onKeep, kindLabel }: 
   const kept: SoundChoice[] = [...new Set([...(value.kind === 'gen' ? [value.seed] : []), ...made])].map((seed) => ({ kind: 'gen', seed }));
   return (
     <div className={s.picker}>
-      {kindLabel ? <div className={s.pickerFor}>{t('dialogs.sound.for', { kind: kindLabel })}</div> : null}
-      <Segmented<SoundFamily> label={t('dialogs.sound.kind')} value={family} onChange={setFamily} options={FAMILIES.map((f) => ({ value: f, label: tl('FAMILY_LABELS', f, 'text', FAMILY_LABELS[f]), hint: hints[f] }))} />
-      <p className={s.hint}>{hints[family]}</p>
+      {kindLabel ? <div className={s.pickerFor}>Sound for “{kindLabel}”</div> : null}
+      <Segmented<SoundFamily> label="Kind of sound" value={family} onChange={setFamily} options={FAMILIES.map((f) => ({ value: f, label: FAMILY_LABELS[f], hint: FAMILY_HINTS[f] }))} />
+      <p className={s.hint}>{FAMILY_HINTS[family]}</p>
       {family === 'chip' ? tiles(CHIP_CHOICES) : null}
       {family === 'mac' ? tiles(MAC_CHOICES) : null}
       {family === 'gen' ? (
         <>
           <Generator volume={volume} onKeep={onKeep} />
-          {kept.length ? tiles(kept) : <p className={s.hint}>{t('dialogs.sound.shuffleHint')}</p>}
+          {kept.length ? tiles(kept) : <p className={s.hint}>Shuffle until you hear one you like, then Keep it. Kept sounds are listed here.</p>}
         </>
       ) : null}
       {family === 'none' ? tiles([{ kind: 'none' }]) : null}

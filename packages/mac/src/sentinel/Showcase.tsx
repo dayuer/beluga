@@ -3,7 +3,6 @@ import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import s from './showcase.module.css';
 import { yourComputer } from '../lib/os-words.js';
-import { t, useT } from '../i18n/index.js';
 
 /**
  * What Sentinel can do, shown before it's explained (BLG-334): a few short scenes that play like a
@@ -85,12 +84,8 @@ export const SLIDES: readonly Slide[] = [
   {
     id: 'sleep',
     icon: 'pulse',
-    get line() {
-      return t('sentinel.show.sleep.line');
-    },
-    get prompt() {
-      return t('sentinel.show.sleep.prompt');
-    },
+    line: 'Your site goes down at 3 a.m.; by morning a fix waits for your merge',
+    prompt: 'Watch my website every 5 minutes. When it stops answering, have the agent find out why on its own, open a task for it, fix it in a new worktree and open a pull request for me to merge, and tell me when it’s back.',
     ms: 8200,
     scene: () => (
       <div className={s.night}>
@@ -112,11 +107,11 @@ export const SLIDES: readonly Slide[] = [
           <div className={s.browserBody}>
             <div className={s.siteDown}>
               <Icon name="alert" size={16} />
-              {t('sentinel.show.cantReach')}
+              Can’t be reached
             </div>
             <div className={s.siteUp}>
               <Icon name="check" size={16} />
-              {t('sentinel.show.backUp')}
+              Back up
             </div>
           </div>
         </div>
@@ -131,17 +126,17 @@ export const SLIDES: readonly Slide[] = [
                 <i />
                 <i />
               </span>
-              <span className={s.agentSaid}>{t('sentinel.show.deployBroke')}</span>
+              <span className={s.agentSaid}>The 3:05 deploy broke the cache</span>
             </span>
           </div>
           <div className={s.pop} style={ms(3300)}>
             <Icon name="task" size={13} />
-            <strong>{t('sentinel.show.openedTask')}</strong>
-            <span>{t('sentinel.show.rollBack')}</span>
+            <strong>Opened a task</strong>
+            <span>Roll back the cache</span>
           </div>
           <div className={cx(s.pop, s.popMint)} style={ms(4300)}>
             <Icon name="merge" size={13} />
-            <strong>{t('sentinel.show.readyToMerge')}</strong>
+            <strong>Ready to merge</strong>
             <span>#63</span>
           </div>
         </div>
@@ -151,12 +146,8 @@ export const SLIDES: readonly Slide[] = [
   {
     id: 'board',
     icon: 'gauge',
-    get line() {
-      return t('sentinel.show.board.line', { computer: yourComputer() });
-    },
-    get prompt() {
-      return t('sentinel.show.board.prompt');
-    },
+    line: `Your numbers on one board, and on ${yourComputer()}’s desktop as widgets`,
+    prompt: 'Look at my projects and put the numbers that matter on a board: sales, sign-ups, how fast the site answers, open pull requests. Set up what keeps them fresh every morning, and tell me how to put them on my desktop as widgets.',
     ms: 7000,
     scene: () => (
       <div className={s.desktop}>
@@ -170,11 +161,11 @@ export const SLIDES: readonly Slide[] = [
             <i />
             <i />
             <i />
-            <span>{t('sentinel.dash.atAGlance')}</span>
+            <span>At a glance</span>
           </div>
           <div className={s.tiles}>
             <div className={s.tile} style={ms(200)}>
-              <span className={s.tileLabel}>{t('sentinel.show.revenue')}</span>
+              <span className={s.tileLabel}>Revenue</span>
               <strong>
                 <Count to={3412} prefix="$" delay={300} />
               </strong>
@@ -182,7 +173,7 @@ export const SLIDES: readonly Slide[] = [
               <Spark points={[2.6, 2.9, 2.7, 3.0, 3.1, 2.9, 3.2, 3.4]} delay={400} />
             </div>
             <div className={s.tile} style={ms(350)}>
-              <span className={s.tileLabel}>{t('sentinel.show.signUps')}</span>
+              <span className={s.tileLabel}>Sign-ups</span>
               <strong>
                 <Count to={35} delay={450} />
               </strong>
@@ -201,7 +192,7 @@ export const SLIDES: readonly Slide[] = [
               <Icon name="sentinel" size={10} />
               Beluga
             </span>
-            <span className={s.tileLabel}>{t('sentinel.show.revenue')}</span>
+            <span className={s.tileLabel}>Revenue</span>
             <strong>
               <Count to={3412} prefix="$" delay={1700} />
             </strong>
@@ -210,7 +201,7 @@ export const SLIDES: readonly Slide[] = [
           <div className={cx(s.widget, s.widgetSmall)} style={ms(2100)}>
             <span className={s.widgetHead}>
               <Icon name="pulse" size={10} />
-              {t('sentinel.show.siteSpeed')}
+              Site speed
             </span>
             <strong>
               <Count to={372} delay={2300} />
@@ -225,17 +216,13 @@ export const SLIDES: readonly Slide[] = [
   {
     id: 'fix',
     icon: 'wrench',
-    get line() {
-      return t('sentinel.show.fix.line');
-    },
-    get prompt() {
-      return t('sentinel.show.fix.prompt');
-    },
+    line: 'When the tests break, your agent fixes them and asks you to merge',
+    prompt: 'When the tests fail on GitHub for one of my projects, have the agent find out why, fix it in a new worktree and open a pull request for me to merge.',
     ms: 7000,
     scene: () => (
       <div className={s.fix}>
         <div className={s.checks}>
-          <div className={s.checksHead}>{t('sentinel.show.checks')}</div>
+          <div className={s.checksHead}>Checks · main</div>
           <div className={s.check}>
             <Icon name="check" size={12} />
             build
@@ -257,7 +244,7 @@ export const SLIDES: readonly Slide[] = [
         <div className={s.diff}>
           <div className={s.diffHead}>
             <Icon name="claude" size={12} />
-            {t('sentinel.show.agentFile')}
+            Agent · checkout.test.ts
           </div>
           <div className={s.diffLine} data-kind="del" style={ms(1600)}>
             <b>−</b> timeout: 2000
@@ -267,7 +254,7 @@ export const SLIDES: readonly Slide[] = [
           </div>
           <div className={cx(s.pop, s.popMint, s.diffPop)} style={ms(4200)}>
             <Icon name="merge" size={13} />
-            <strong>{t('sentinel.show.readyToMerge')}</strong>
+            <strong>Ready to merge</strong>
             <span>#52</span>
           </div>
         </div>
@@ -277,19 +264,15 @@ export const SLIDES: readonly Slide[] = [
   {
     id: 'review',
     icon: 'review',
-    get line() {
-      return t('sentinel.show.review.line');
-    },
-    get prompt() {
-      return t('sentinel.show.review.prompt');
-    },
+    line: 'Every pull request read before you get to it',
+    prompt: 'When a pull request opens in one of my projects, have the agent read the change and tell me what to look at, in a few lines.',
     ms: 6000,
     scene: () => (
       <div className={s.review}>
         <div className={s.pr}>
           <div className={s.prHead}>
             <Icon name="pr" size={13} />
-            <strong>{t('sentinel.show.prTitle')}</strong>
+            <strong>Retry refund webhooks</strong>
             <span>#61</span>
           </div>
           <Code widths={[62, 48, 74, 36, 58, 44]} mark={3} from={45} />
@@ -297,9 +280,9 @@ export const SLIDES: readonly Slide[] = [
         <div className={s.comment} style={ms(1800)}>
           <span className={s.commentWho}>
             <Icon name="claude" size={12} />
-            {t('sentinel.show.agentOnLine')}
+            Agent on line 48
           </span>
-          {t('sentinel.show.comment')}
+          A retried webhook can refund twice: check it’s new first.
         </div>
       </div>
     ),
@@ -311,7 +294,6 @@ const still = (): boolean => document.documentElement.dataset.motion === 'reduce
 export function Showcase({ onPick }: { onPick: (slide: Slide) => void }) {
   const [at, setAt] = useState(0);
   const [held, setHeld] = useState(false);
-  const tr = useT();
   const root = useRef<HTMLDivElement>(null);
   const go = (i: number): void => setAt((i + SLIDES.length) % SLIDES.length);
   const slide = SLIDES[at]!;
@@ -326,7 +308,7 @@ export function Showcase({ onPick }: { onPick: (slide: Slide) => void }) {
       className={s.show}
       role="region"
       aria-roledescription="carousel"
-      aria-label={tr('sentinel.show.label')}
+      aria-label="What Sentinel can do"
       tabIndex={0}
       onPointerEnter={() => setHeld(true)}
       onPointerLeave={() => setHeld(false)}
@@ -341,7 +323,7 @@ export function Showcase({ onPick }: { onPick: (slide: Slide) => void }) {
     >
       <div className={s.screen} data-slide={slide.id}>
         {/* Keyed: each scene plays from its start when it comes in. */}
-        <div key={slide.id} className={s.scene} role="group" aria-roledescription="slide" aria-label={tr('sentinel.show.slideLabel', { n: at + 1, total: SLIDES.length, line: slide.line })}>
+        <div key={slide.id} className={s.scene} role="group" aria-roledescription="slide" aria-label={`${at + 1} of ${SLIDES.length}: ${slide.line}`}>
           {slide.scene()}
         </div>
       </div>
@@ -351,10 +333,10 @@ export function Showcase({ onPick }: { onPick: (slide: Slide) => void }) {
           {slide.line}
         </span>
         <Button size="small" variant="primary" onClick={() => onPick(slide)}>
-          {tr('sentinel.show.setUp')}
+          Set This Up
         </Button>
       </div>
-      <div className={s.dots} role="tablist" aria-label={tr('sentinel.show.scenes')}>
+      <div className={s.dots} role="tablist" aria-label="Scenes">
         {SLIDES.map((x, i) => (
           <button key={x.id} type="button" role="tab" aria-selected={i === at} aria-label={x.line} className={cx(s.dot, i === at && s.dotOn)} data-held={held || undefined} onClick={() => go(i)}>
             <span key={i === at ? `${x.id}-on` : x.id} style={i === at ? { animationDuration: `${x.ms}ms` } : undefined} />

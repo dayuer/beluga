@@ -1,4 +1,3 @@
-import { t as tr } from '../i18n/index.js';
 import type { IDecoration, IMarker, Terminal } from '@xterm/xterm';
 import type { TermVisual } from '@beluga/shared/term-visuals.js';
 import { chipCells, imageHits, taskHits, visualHits } from '../lib/term-links.js';
@@ -88,14 +87,14 @@ const escape = (t: string): string => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp
 
 /** A chip's words: what it is, a few words more, and Open. */
 function chipHtml(n: number, v: TermVisual | undefined): string {
-  const title = v?.title ?? tr('agentTerm.visualN', { n });
+  const title = v?.title ?? `Visual ${n}`;
   const meta = v?.meta ? `<span class="${s.chipMeta}">${escape(v.meta)}</span>` : '';
-  return `<span class="${s.chipIcon}">${svg(v?.kind ?? 'table')}</span><span class="${s.chipTitle}">${escape(title)}</span>${meta}<span class="${s.chipOpen}">${escape(tr('agentTerm.openArrow'))}</span>`;
+  return `<span class="${s.chipIcon}">${svg(v?.kind ?? 'table')}</span><span class="${s.chipTitle}">${escape(title)}</span>${meta}<span class="${s.chipOpen}">Open →</span>`;
 }
 
 /** How many cells a chip would like (its words), so it isn't cut when there's room. */
 // Its words, plus room for the icon, the gaps and "Open →" (about 14 cells at any size).
-const wantCells = (n: number, v: TermVisual | undefined): number => (v?.title ?? tr('agentTerm.visualN', { n })).length + (v?.meta ? v.meta.length + 2 : 0) + 16;
+const wantCells = (n: number, v: TermVisual | undefined): number => (v?.title ?? `Visual ${n}`).length + (v?.meta ? v.meta.length + 2 : 0) + 16;
 
 interface Placed {
   readonly marker: IMarker;
@@ -146,9 +145,9 @@ export function attachTermLinks(term: Terminal, options: () => TermLinkOptions):
     el.classList.remove(s.taskLine!);
     el.classList.add(s.chip!);
     el.innerHTML = chipHtml(n, v);
-    el.title = tr('agentTerm.openBeside', { title: v?.title ?? tr('agentTerm.visual') });
+    el.title = `${v?.title ?? 'Visual'}: open it beside the terminal`;
     el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', tr('agentTerm.openVisual', { title: v?.title ?? tr('agentTerm.visualLower', { n }) }));
+    el.setAttribute('aria-label', `Open ${v?.title ?? `visual ${n}`}`);
     el.dataset.visual = String(n);
     el.onmousedown = (e) => {
       if (e.button !== 0) return;

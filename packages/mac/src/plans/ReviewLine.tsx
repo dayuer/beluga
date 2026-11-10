@@ -9,7 +9,6 @@ import { Button, cx } from '../components/ui.js';
 import { TonePill } from './marks.js';
 import type { Tone } from './plans-model.js';
 import { usePlanActions } from './use-plans.js';
-import { t as tNow, useT } from '../i18n/index.js';
 
 /**
  * While a fresh agent verifies the plan: never a still line that could be taken for stuck (BLG-772).
@@ -25,27 +24,26 @@ function Verifying({ plan }: { plan: Plan }) {
   const progress = verifyProgress(run?.type === 'agent' ? run : undefined);
   const now = useClock(true);
   const { openWorktree } = usePlanActions();
-  const t = useT();
   const took = Math.max(0, (now || Date.now()) - (progress.startedAt ?? review.at));
   return (
-    <div className={cx(p.changes, p.review, p.verifying)} role="status" aria-label={t('plans.review.verifying')}>
+    <div className={cx(p.changes, p.review, p.verifying)} role="status" aria-label="Verifying the plan">
       <div className={p.reviewHead}>
         <LiveDot />
-        <strong>{t('plans.review.verifying')}</strong>
+        <strong>Verifying the plan</strong>
         <span className={p.verifyTime}>{formatDuration(took)}</span>
-        <span className={p.verifyWhy}>{review.thenApprove ? t('plans.review.whyThenApprove') : t('plans.review.why')}</span>
+        <span className={p.verifyWhy}>A fresh agent checks it for contradictions, duplicates and stale decisions{review.thenApprove ? ', then approves it if nothing needs fixing' : ''}.</span>
         <span className={p.grow} />
         {review.chat ? (
           <Button size="small" variant="quiet" icon="eye" onClick={() => openWorktree(review.chat!)}>
-            {t('plans.review.watch')}
+            Watch It Work
           </Button>
         ) : null}
       </div>
-      <ol className={p.verifyChecks} aria-label={t('plans.review.checks')}>
+      <ol className={p.verifyChecks} aria-label="Checks">
         {progress.checks.map((c) => (
           <li key={c.key} className={p.verifyCheck} data-state={c.state}>
             {c.state === 'done' ? <Icon name="check" size={11} /> : c.state === 'now' ? <LiveDot /> : <span className={p.verifyTodo} aria-hidden="true" />}
-            {t(`plans.review.check.${c.key}` as const)}
+            {c.label}
           </li>
         ))}
       </ol>
@@ -59,13 +57,12 @@ function Verifying({ plan }: { plan: Plan }) {
 import p from './plans.module.css';
 
 /** What each kind of finding is called, and its tone. */
-const finding = (kind: ReviewFinding['kind'], tone: Tone): { readonly label: string; readonly tone: Tone } => ({ get label() { return tNow(`plans.review.finding.${kind}` as const); }, tone });
 export const FINDING_WORDS: Readonly<Record<ReviewFinding['kind'], { readonly label: string; readonly tone: Tone }>> = {
-  contradiction: finding('contradiction', 'warn'),
-  duplicate: finding('duplicate', 'info'),
-  stale: finding('stale', 'accent'),
-  order: finding('order', 'claude'),
-  other: finding('other', 'neutral'),
+  contradiction: { label: 'Contradiction', tone: 'warn' },
+  duplicate: { label: 'Duplicate', tone: 'info' },
+  stale: { label: 'Stale', tone: 'accent' },
+  order: { label: 'Order', tone: 'claude' },
+  other: { label: 'Other', tone: 'neutral' },
 };
 
 /**
@@ -77,7 +74,6 @@ export function ReviewLine({ plan, onApprove }: { plan: Plan; onApprove: () => v
   const { api, act } = usePlanActions();
   const state = reviewState(plan);
   const review = plan.review;
-  const t = useT();
   if (state === 'reviewing' && review) return <Verifying plan={plan} />;
   if (state !== 'findings' || !review) return null;
   const n = review.findings.length;
@@ -85,19 +81,19 @@ export function ReviewLine({ plan, onApprove }: { plan: Plan; onApprove: () => v
     <div className={cx(p.changes, p.review)} role="status">
       <div className={p.reviewHead}>
         <Icon name="eye" size={13} />
-        <strong>{review.fixAsked ? t('plans.review.fixing') : t('plans.review.found', { n })}</strong>
+        <strong>{review.fixAsked ? 'Your agent is fixing what verifying found' : `Verifying found ${n === 1 ? 'one thing' : `${n} things`} to fix`}</strong>
         <span className={p.grow} />
         {review.fixAsked ? (
           <Button size="small" variant="quiet" onClick={() => void act(() => api.verify(plan.id, { thenApprove: true }))}>
-            {t('plans.page.verifyThenApprove')}
+            Verify, Then Approve
           </Button>
         ) : (
           <>
             <Button size="small" variant="quiet" onClick={onApprove}>
-              {t('plans.page.approveAnyway')}
+              Approve Anyway
             </Button>
-            <Button size="small" variant="primary" icon="wand" onClick={() => void act(() => api.fixReview(plan.id), t('plans.page.toast.sentToAgent'))}>
-              {t('plans.page.fix')}
+            <Button size="small" variant="primary" icon="wand" onClick={() => void act(() => api.fixReview(plan.id), 'Sent to your agent')}>
+              Fix
             </Button>
           </>
         )}

@@ -6,7 +6,6 @@ import { DotMark } from '../layout/signal-marks.js';
 import { nextWords, planStatus, titleOf } from './plans-model.js';
 import { usePlanActions, usePlanView } from './use-plans.js';
 import n from './PlansNav.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * Each running plan as a row under Work (BLG-197): how far it got, a pulse while Claude works on
@@ -50,8 +49,7 @@ function PlanSideRow({ plan, indent = 0 }: { plan: Plan; indent?: number }) {
   const working = view.active.some((t) => t.state === 'running');
   const next = nextWords(view.next);
   const why = next.detail ? `${next.title}: ${next.detail}` : next.title;
-  const t = useT();
-  const tip = t('plans.nav.tip', { title, state: needs ? why : status.label, done: view.done, total: view.total });
+  const tip = `${title}: ${needs ? why : status.label} · ${view.done} of ${view.total} tasks done`;
   return (
     <Row
       indent={indent}

@@ -8,7 +8,6 @@ import { useActions } from '../lib/actions.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { handleInvite } from '../lib/invite-command.js';
-import { t } from '../i18n/index.js';
 import { MAX_LISTED, SuggestionBody, sectionOf } from './Suggestions.js';
 import s from './composer.module.css';
 
@@ -94,7 +93,7 @@ export function useBoxSuggestions({
     return true;
   };
   const list = suggestions.length ? (
-    <div ref={ref} className={cx(s.suggestions, className)} role="listbox" aria-label={t('chat.suggestions.aria')}>
+    <div ref={ref} className={cx(s.suggestions, className)} role="listbox" aria-label="Suggestions">
       {suggestions.slice(0, MAX_LISTED).map((sug, i, all) => (
         <Fragment key={`${sug.value}:${i}`}>
         {sectionOf(sug, all[i - 1]) ? (

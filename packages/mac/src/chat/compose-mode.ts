@@ -3,16 +3,14 @@
  * approve), or planning with tasks (a plan of milestones and tasks that goes on the board when you
  * approve it; see core/plans).
  */
-import { t } from '../i18n/index.js';
 
 export type ComposeMode = 'act' | 'plan' | 'tasks';
 
-/** A mode's words, in the language shown now. */
-export const modeInfo = (mode: ComposeMode): { readonly label: string; readonly hint: string; readonly banner: string } => ({
-  label: t(`chat.composeMode.${mode}Label`),
-  hint: t(`chat.composeMode.${mode}Hint`),
-  banner: mode === 'act' ? '' : t(`chat.composeMode.${mode}Banner`),
-});
+export const MODE_INFO: Readonly<Record<ComposeMode, { readonly label: string; readonly hint: string; readonly banner: string }>> = {
+  act: { label: 'Act', hint: 'Your agent does it right away', banner: '' },
+  plan: { label: 'Plan First', hint: 'Your agent looks around and asks you to approve a plan; approved, it becomes a task', banner: 'Your agent looks around and proposes a plan before changing anything' },
+  tasks: { label: 'Plan with Tasks', hint: 'Your agent cuts the work into milestones and tasks that can run side by side; nothing reaches the board until you approve', banner: 'Milestones and tasks, drafted here: nothing reaches the board until you approve' },
+};
 
 /** ⇧⇥: acting ↔ planning first, as in Claude Code. (Plan with Tasks makes a plan: it's picked from the menu, never a keystroke away.) */
 export function nextMode(mode: ComposeMode): ComposeMode {

@@ -1,4 +1,3 @@
-import { t as tr } from '../i18n/index.js';
 import type { CcSession, CcTask } from '../../../../src/core/claude-code/model.js';
 
 /**
@@ -22,7 +21,7 @@ function itemsOf(s: CcSession): TaskItem[] {
   return (s.tasks ?? []).map((task) => {
     const agent = task.agentId ? s.agents.find((a) => a.id === task.agentId) : undefined;
     // agent-wording: claude
-    return { task, sessionId: s.id, who: agent ? agent.description || agent.name || tr('claudeCode.bg.anAgent') : task.agentId ? tr('claudeCode.bg.anAgent') : 'Claude' };
+    return { task, sessionId: s.id, who: agent ? agent.description || agent.name || 'An agent' : task.agentId ? 'An agent' : 'Claude' };
   });
 }
 
@@ -54,18 +53,18 @@ function since(ms: number): string {
 
 /** "Running · 3m", "Failed · exit 2 · 1m ago", "Done · 5s ago". */
 export function taskLabel(t: CcTask, now: number): { label: string; tone: TaskTone } {
-  const ago = tr('claudeCode.bg.ago', { time: since(now - (t.endedAt ?? now)) });
-  const exit = t.exitCode !== undefined && t.exitCode !== 0 ? tr('claudeCode.bg.exit', { code: t.exitCode }) : '';
+  const ago = `${since(now - (t.endedAt ?? now))} ago`;
+  const exit = t.exitCode !== undefined && t.exitCode !== 0 ? ` · exit ${t.exitCode}` : '';
   switch (t.status) {
     case 'running':
-      return { label: tr(t.kind === 'monitor' ? 'claudeCode.bg.watching' : 'claudeCode.bg.running', { time: since(now - t.startedAt) }), tone: 'claude' };
+      return { label: `${t.kind === 'monitor' ? 'Watching' : 'Running'} · ${since(now - t.startedAt)}`, tone: 'claude' };
     case 'failed':
-      return { label: tr('claudeCode.bg.failed', { exit, ago }), tone: 'error' };
+      return { label: `Failed${exit} · ${ago}`, tone: 'error' };
     case 'finished':
-      return { label: tr('claudeCode.bg.done', { exit, ago }), tone: 'ok' };
+      return { label: `Done${exit} · ${ago}`, tone: 'ok' };
     case 'stopped':
-      return { label: tr('claudeCode.bg.stopped', { ago }), tone: 'muted' };
+      return { label: `Stopped · ${ago}`, tone: 'muted' };
     default:
-      return { label: tr('claudeCode.bg.noWord', { time: since(now - t.startedAt) }), tone: 'muted' };
+      return { label: `No word from it · ${since(now - t.startedAt)}`, tone: 'muted' };
   }
 }

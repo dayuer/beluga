@@ -4,7 +4,6 @@ import type { MachineView } from '../../../../src/machines/machines.js';
 import type { MachineIcon } from '../../../../src/shared/settings-schema.js';
 import { DISTRO_WORDS, KIND_WORDS } from '../../../../src/machines/words.js';
 import type { LinuxDistro } from '../../../../src/machines/kind.js';
-import { t } from '../i18n/index.js';
 // Which mark a computer shows is shared with the phone (src/machines/look.ts).
 export { type Brand, machineLook } from '../../../../src/machines/look.js';
 
@@ -22,8 +21,13 @@ export { KIND_WORDS } from '../../../../src/machines/words.js';
 
 /** The generic icons to pick from, in order (`auto` is the kind's own). */
 export const ICON_CHOICES: ReadonlyArray<{ readonly value: MachineIcon; readonly label: string }> = [
-  // Each label read when shown, in the language picked then.
-  ...(['auto', 'server', 'cloud', 'desktop', 'laptop', 'chip', 'box'] as const).map((value) => ({ value, get label() { return t(`machines.model.icon.${value}`); } })),
+  { value: 'auto', label: 'Its kind’s' },
+  { value: 'server', label: 'Server' },
+  { value: 'cloud', label: 'Cloud' },
+  { value: 'desktop', label: 'Desktop' },
+  { value: 'laptop', label: 'Laptop' },
+  { value: 'chip', label: 'Chip' },
+  { value: 'box', label: 'Box' },
 ];
 
 
@@ -38,17 +42,16 @@ export function kindLine(m: Pick<MachineView, 'kind' | 'region' | 'platform'> & 
 /** One line of what it has free, or how it is when it isn't online. */
 export function loadLine(m: Pick<MachineView, 'status' | 'info' | 'rttMs' | 'note' | 'lastSeen'>, now = Date.now()): string {
   if (m.note) return m.note;
-  if (m.status !== 'online') return m.status === 'offline' ? (m.lastSeen ? t('machines.model.offlineSeen', { ago: ago(now - m.lastSeen) }) : t('machines.model.offline')) : t('machines.model.looking');
+  if (m.status !== 'online') return m.status === 'offline' ? `Offline${m.lastSeen ? ` · seen ${ago(now - m.lastSeen)} ago` : ''}` : 'Looking for it…';
   const i = m.info;
-  if (!i) return t('machines.model.online');
-  const parts = [t('machines.model.busy', { pct: Math.round(i.loadPerCore * 100) }), t('machines.model.memFree', { gb: i.memory.freeGB }), ...(i.disk ? [t('machines.model.disk', { gb: Math.round(i.disk.freeGB) })] : []), ...(i.agentsRunning ? [t('machines.model.working', { n: i.agentsRunning })] : []), ...(m.rttMs !== undefined ? [t('machines.model.ms', { ms: m.rttMs })] : [])];
+  if (!i) return 'Online';
+  const parts = [`${Math.round(i.loadPerCore * 100)}% busy`, `${i.memory.freeGB} GB free`, ...(i.disk ? [`${Math.round(i.disk.freeGB)} GB disk`] : []), ...(i.agentsRunning ? [`${i.agentsRunning} working`] : []), ...(m.rttMs !== undefined ? [`${m.rttMs} ms`] : [])];
   return parts.join(' · ');
 }
 
-/** "5 min", "just now": how long ago, in the language shown (remote-work.ts says it too). */
-export const ago = (ms: number): string => {
+const ago = (ms: number): string => {
   const min = Math.round(ms / 60_000);
-  return min < 1 ? t('machines.model.ago.now') : min < 60 ? t('machines.model.ago.min', { n: min }) : min < 60 * 24 ? t('machines.model.ago.h', { n: Math.round(min / 60) }) : t('machines.model.ago.d', { n: Math.round(min / 1440) });
+  return min < 1 ? 'just now' : min < 60 ? `${min} min` : min < 60 * 24 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} d`;
 };
 
 /** One item of a computer's health strip: ready, or not with its fix. */
@@ -69,20 +72,20 @@ export function healthOf(m: Pick<MachineView, 'name' | 'info'>): Health[] {
   /** A runtime's state there; one you don't use there (not installed and `optional`) isn't shown. */
   const rt = (id: string, label: string, signIn: string, optional = false): Health[] => {
     const r = i.runtimes.find((x) => x.id === id);
-    const used = r?.usage?.fiveHour ? t('machines.model.usage5h', { pct: Math.round(r.usage.fiveHour.pct) }) : r?.usage?.week ? t('machines.model.usageWeek', { pct: Math.round(r.usage.week.pct) }) : undefined;
+    const used = r?.usage?.fiveHour ? `${Math.round(r.usage.fiveHour.pct)}% of 5 h` : r?.usage?.week ? `${Math.round(r.usage.week.pct)}% of the week` : undefined;
     if (r?.state === 'ready') return [{ key: id, label, ok: true, ...(used ? { usage: used } : {}) }];
-    if (r?.state === 'signed_out') return [{ key: id, label, ok: false, fix: { words: t('machines.model.signIn', { label, name: m.name }), command: signIn } }];
-    return optional ? [] : [{ key: id, label, ok: false, fix: { words: t('machines.model.notSetUp', { label, name: m.name }), command: 'beluga setup' } }];
+    if (r?.state === 'signed_out') return [{ key: id, label, ok: false, fix: { words: `Sign ${label} in on ${m.name}`, command: signIn } }];
+    return optional ? [] : [{ key: id, label, ok: false, fix: { words: `${label} isn’t set up on ${m.name}`, command: 'beluga setup' } }];
   };
   return [
     ...rt('claude', 'Claude', 'claude auth login'),
     ...rt('codex', 'Codex', 'codex login', true),
-    i.gh === 'signed_in' ? { key: 'gh', label: 'gh', ok: true } : { key: 'gh', label: 'gh', ok: false, fix: { words: i.gh === 'missing' ? t('machines.model.ghMissing', { name: m.name }) : t('machines.model.signIn', { label: 'gh', name: m.name }), command: 'gh auth login' } },
-    { key: 'mcp', label: t('machines.model.mcp', { n: i.mcp.length }), ok: true },
+    i.gh === 'signed_in' ? { key: 'gh', label: 'gh', ok: true } : { key: 'gh', label: 'gh', ok: false, fix: { words: i.gh === 'missing' ? `gh isn’t on ${m.name}` : `Sign gh in on ${m.name}`, command: 'gh auth login' } },
+    { key: 'mcp', label: i.mcp.length === 1 ? '1 MCP server' : `${i.mcp.length} MCP servers`, ok: true },
   ];
 }
 
 /** Run New Work On's choices: this computer, Best Available, and each computer by name. */
 export function runOnOptions(here: string, machines: ReadonlyArray<Pick<MachineView, 'id' | 'name'>>): Array<{ value: string; label: string }> {
-  return [{ value: 'here', label: here }, { value: 'best', label: t('machines.model.best') }, ...machines.map((m) => ({ value: m.id, label: m.name }))];
+  return [{ value: 'here', label: here }, { value: 'best', label: 'Best Available' }, ...machines.map((m) => ({ value: m.id, label: m.name }))];
 }

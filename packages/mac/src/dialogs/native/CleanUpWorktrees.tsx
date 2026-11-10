@@ -5,8 +5,6 @@ import { Alert, Checkbox } from '../../components/Alert.js';
 import { tildePath } from '../../layout/outside-model.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import s from './clean-up.module.css';
-import { rich } from './pick.js';
-import { useT } from '../../i18n/index.js';
 
 /**
  * Clean Up Worktrees…: a project's worktrees made outside Beluga that can go without losing
@@ -14,7 +12,6 @@ import { useT } from '../../i18n/index.js';
  * ticked, each with why and how big. Removing keeps every branch.
  */
 export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string; close: () => void }) {
-  const t = useT();
   const api = useApi();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const disk = useApp((st) => st.disk);
@@ -39,15 +36,15 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
     };
   }, [api, projectId]);
   if (!project) return null;
-  if (!list) return <Alert icon="refresh" tone="info" title={t('dialogs.cleanUp.looking', { name: project.name })} confirm={{ label: t('dialogs.cleanUp.remove'), disabled: true, onClick: () => undefined }} onCancel={close} />;
+  if (!list) return <Alert icon="refresh" tone="info" title={`Looking at the worktrees in ${project.name}…`} confirm={{ label: 'Remove', disabled: true, onClick: () => undefined }} onCancel={close} />;
   if (!list.length) {
     return (
       <Alert
         icon="check"
         tone="info"
-        title={t('dialogs.cleanUp.nothing')}
-        message={<p>{t('dialogs.cleanUp.nothingMessage', { name: project.name })}</p>}
-        confirm={{ label: t('dialogs.cleanUp.ok'), onClick: close }}
+        title="Nothing to clean up"
+        message={<p>Every worktree made outside Beluga in {project.name} still has work of its own, or is still in use: uncommitted changes, or commits that aren’t in its base branch yet. Remove one from its page if you’re sure.</p>}
+        confirm={{ label: 'OK', onClick: close }}
         cancel={false}
         onCancel={close}
       />
@@ -60,15 +57,20 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
     <Alert
       icon="archive"
       tone="caution"
-      title={t('dialogs.cleanUp.title', { name: project.name })}
+      title={`Clean up worktrees in ${project.name}?`}
       message={
         <p>
-          {t('dialogs.cleanUp.message')}
-          {frees ? rich(t('dialogs.cleanUp.frees'), { size: <strong>{formatBytes(frees)}</strong> }) : null}
+          These have nothing of their own: no uncommitted changes, and their work is merged or their folder is gone. Beluga removes the ones you tick; branches stay, so nothing committed is lost.
+          {frees ? (
+            <>
+              {' '}
+              This frees about <strong>{formatBytes(frees)}</strong>.
+            </>
+          ) : null}
         </p>
       }
       confirm={{
-        label: chosen.length ? t('dialogs.cleanUp.removeN', { n: chosen.length }) : t('dialogs.cleanUp.remove'),
+        label: chosen.length ? `Remove ${chosen.length}` : 'Remove',
         destructive: true,
         disabled: busy || !chosen.length,
         onClick: () => {
@@ -81,7 +83,7 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
       }}
       onCancel={close}
     >
-      <div className={s.list} role="group" aria-label={t('dialogs.cleanUp.group')}>
+      <div className={s.list} role="group" aria-label="Worktrees to remove">
         {list.map((w) => (
           <Checkbox
             key={w.id}

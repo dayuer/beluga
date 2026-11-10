@@ -23,7 +23,6 @@ import { TeamOffers } from '../team/Team.js';
 import { NoProjects } from '../work/NoProjects.js';
 import { isShortcut } from '../lib/shortcuts.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { t as tNow, useT } from '../i18n/index.js';
 
 const FlowGraph = lazy(() => import('../components/graph/FlowGraph.js'));
 
@@ -40,7 +39,6 @@ const FlowGraph = lazy(() => import('../components/graph/FlowGraph.js'));
 export function TasksView() {
   // Files dropped on a card or a row are added to its task.
   const dropping = useTaskFileDrop();
-  const tr = useT();
   const board = useBoard();
   const selfId = useSelfId();
   const prefs = useTasksPrefs();
@@ -120,8 +118,8 @@ export function TasksView() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [project, newTask.projectId]);
 
-  if (!board.enabled) return <Empty icon="task" title={tr('tasks.view.needsApp')} detail={tr('tasks.view.needsAppDetail')} />;
-  if (!projects.length || !here) return <NoProjects icon="task" detail={tr('tasks.view.noProjects')} />;
+  if (!board.enabled) return <Empty icon="task" title="Tasks need the Beluga app" detail="Open the Beluga app to plan and track work here." />;
+  if (!projects.length || !here) return <NoProjects icon="task" detail="Tasks belong to a project: a folder with your code. Add one, then plan its work here." />;
 
   const none = !board.issues.some((i) => showsOn(i, here.id));
   return (
@@ -130,16 +128,16 @@ export function TasksView() {
       <div className={t.bar}>
         <div className={cx(t.barGroup, t.barFilters)}>
         <PickMenu<string>
-          label={tr('tasks.view.board')}
-          choices={boards.map((b) => ({ value: b.id, label: b.name, mark: <BoardMark repos={b.repos} names={repoName} size={16} fit />, ...(boards.some((x) => x.own) ? { section: b.own ? tr('tasks.view.boards') : tr('tasks.view.projects') } : {}), hint: boardHint(board, b.id, b.repos.length) }))}
+          label="Board"
+          choices={boards.map((b) => ({ value: b.id, label: b.name, mark: <BoardMark repos={b.repos} names={repoName} size={16} fit />, ...(boards.some((x) => x.own) ? { section: b.own ? 'Boards' : 'Projects' } : {}), hint: boardHint(board, b.id, b.repos.length) }))}
           chosen={[here.id]}
           onPick={(id) => openList(id)}
           actions={[
-            { label: tr('tasks.view.newBoard'), icon: 'plus', onSelect: () => openSheet({ kind: 'task_board', repos: here.repos }) },
-            { label: tr('tasks.view.boardSettings'), icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
+            { label: 'New Board…', icon: 'plus', onSelect: () => openSheet({ kind: 'task_board', repos: here.repos }) },
+            { label: 'Board Settings…', icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
           ]}
         >
-          <button type="button" className={t.projectSwitch} aria-label={tr('tasks.view.boardAria', { name: here.name })}>
+          <button type="button" className={t.projectSwitch} aria-label={`Board: ${here.name}`}>
             <BoardMark repos={here.repos} names={repoName} size={18} />
             <span className={t.projectName}>{here.name}</span>
             <Icon name="chevronDown" size={11} />
@@ -148,17 +146,17 @@ export function TasksView() {
         {/* A board of several repos: whose tasks show (all, or the ones you tick). */}
         {several ? (
           <PickMenu<string>
-            label={tr('tasks.view.repos')}
+            label="Repos"
             multiple
             choices={repos.map((r) => ({ value: r, label: repoName(r) ?? r, mark: <ProjectIcon id={r} name={repoName(r) ?? r} size={16} /> }))}
             chosen={picked}
             onPick={(r) => setTasksPrefs({ repos: picked.includes(r) ? picked.filter((x) => x !== r) : [...picked, r] })}
             actions={[
-              ...(picked.length ? [{ label: tr('tasks.view.showAllRepos'), icon: 'eye' as const, onSelect: () => setTasksPrefs({ repos: [] }) }] : []),
-              { label: tr('tasks.view.reposOnBoard'), icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
+              ...(picked.length ? [{ label: 'Show All Repos', icon: 'eye' as const, onSelect: () => setTasksPrefs({ repos: [] }) }] : []),
+              { label: 'Repos on This Board…', icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
             ]}
           >
-            <button type="button" className={cx(t.repoFilter, picked.length > 0 && t.repoFilterOn)} aria-label={tr('tasks.view.reposAria', { repos: reposLabel(picked, repoName) })}>
+            <button type="button" className={cx(t.repoFilter, picked.length > 0 && t.repoFilterOn)} aria-label={`Repos: ${reposLabel(picked, repoName)}`}>
               <RepoStack repos={picked.length ? picked : repos} names={repoName} size={14} />
               <span>{reposLabel(picked, repoName)}</span>
               <Icon name="chevronDown" size={9} />
@@ -166,7 +164,7 @@ export function TasksView() {
           </PickMenu>
         ) : null}
         <Segmented<Scope>
-          label={tr('plans.page.show')}
+          label="Show"
           value={prefs.scope}
           onChange={(scope) => setTasksPrefs({ scope })}
           options={SCOPES.map((s) => ({ value: s.value, label: s.label, count: counts[s.value], hint: s.hint }))}
@@ -174,30 +172,30 @@ export function TasksView() {
         {/* Whose tasks: only when you work with others (alone, every task is yours and your Claude's). */}
         {people.length > 1 || (people.length === 1 && people[0]!.key !== `person:${selfId}` && people[0]!.key !== `claude:${selfId}`) ? (
           <Select
-            label={tr('tasks.view.whose')}
+            label="Whose tasks"
             size="small"
             value={who}
             onChange={(w) => setTasksPrefs({ who: w })}
-            options={[{ value: '', label: tr('tasks.view.everyone') }, ...people.map((p) => ({ value: p.key, label: p.label })), { value: 'nobody', label: tr('tasks.view.noOne') }, ...(hasPrivate ? [{ value: 'private', label: tr('tasks.view.private') }] : [])]}
+            options={[{ value: '', label: 'Everyone' }, ...people.map((p) => ({ value: p.key, label: p.label })), { value: 'nobody', label: 'No one yet' }, ...(hasPrivate ? [{ value: 'private', label: 'Private (only you see them)' }] : [])]}
           />
         ) : null}
         {/* Which worktree works on what: only its tasks. */}
         {project && worktrees.length ? (
           <Select
-            label={tr('tasks.view.worktree')}
+            label="Worktree"
             size="small"
             value={worktree}
             onChange={(w) => openWorktreeTasks(project, w || undefined)}
-            options={[{ value: '', label: tr('tasks.view.everyWorktree'), short: tr('tasks.view.worktrees') }, ...worktrees.map((w) => ({ value: w.id, label: w.name }))]}
+            options={[{ value: '', label: 'Every worktree', short: 'Worktrees' }, ...worktrees.map((w) => ({ value: w.id, label: w.name }))]}
           />
         ) : null}
         </div>
         <div className={cx(t.barGroup, t.barActions)}>
         <label className={t.find}>
           <Icon name="search" size={12} />
-          <input ref={find} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr('tasks.view.filter')} aria-label={tr('tasks.view.filterAria')} onKeyDown={(e) => e.key === 'Escape' && (setQuery(''), (e.target as HTMLInputElement).blur())} />
+          <input ref={find} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter" aria-label="Filter tasks" onKeyDown={(e) => e.key === 'Escape' && (setQuery(''), (e.target as HTMLInputElement).blur())} />
           {query ? (
-            <button type="button" className={t.findClear} aria-label={tr('tasks.view.clearFilter')} onClick={() => setQuery('')}>
+            <button type="button" className={t.findClear} aria-label="Clear the filter" onClick={() => setQuery('')}>
               <Icon name="x" size={10} />
             </button>
           ) : null}
@@ -210,47 +208,47 @@ export function TasksView() {
               onClick={() =>
                 openSheet({
                   kind: 'confirm',
-                  title: tr('tasks.view.emptyArchiveTitle', { n: counts.archived }),
-                  message: tr('tasks.view.emptyArchiveMessage'),
-                  confirm: tr('tasks.view.emptyArchive'),
+                  title: `Delete ${counts.archived} archived ${counts.archived === 1 ? 'task' : 'tasks'} for good?`,
+                  message: 'Their briefs, history and what’s left of their proof go away. This can’t be undone.',
+                  confirm: 'Empty Archive',
                   destructive: true,
-                  run: () => void act(() => api.emptyArchive(project), tr('tasks.view.archiveEmpty')),
+                  run: () => void act(() => api.emptyArchive(project), 'The Archive is empty'),
                 })
               }
             >
-              {tr('tasks.view.emptyArchive')}
+              Empty Archive
             </Button>
           ) : null
         ) : (
           <Segmented<Display>
-            label={tr('tasks.view.display')}
+            label="Display"
             iconOnly
             value={prefs.display}
             onChange={(display) => setTasksPrefs({ display })}
             options={[
-              { value: 'list', label: tr('plans.page.list'), icon: 'rows' },
-              { value: 'board', label: tr('tasks.view.board'), icon: 'columns' },
-              { value: 'graph', label: tr('tasks.view.graph'), icon: 'graph' },
+              { value: 'list', label: 'List', icon: 'rows' },
+              { value: 'board', label: 'Board', icon: 'columns' },
+              { value: 'graph', label: 'What Waits on What', icon: 'graph' },
             ]}
           />
         )}
         {sync ? <SyncPill sync={sync} onClick={() => openSheet({ kind: 'task_sync', projectId: here.id })} /> : null}
         <ActionsDropdown
           items={[
-            { label: several ? tr('tasks.view.reposOnBoard') : tr('tasks.view.boardSettings'), icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
-            { label: here.own ? tr('tasks.view.aboutBoard') : tr('tasks.view.aboutProject'), icon: 'book', onSelect: () => openSheet({ kind: 'project_context', projectId: here.id }) },
-            ...(here.own ? [] : [{ label: sync ? tr('tasks.view.linearSync') : tr('tasks.view.syncWithLinear'), icon: 'refresh' as const, onSelect: () => openSheet({ kind: 'task_sync', projectId: here.id }) }]),
-            ...(sync ? [{ label: tr('tasks.view.syncNow'), disabled: Boolean(sync.syncing), onSelect: () => void act(() => api.syncNow(project)) }] : []),
-            { label: tr('tasks.view.autoTasks'), separate: true, checked: board.autoTasks, onSelect: () => void act(() => api.setAutoTasks(!board.autoTasks)) },
-            { label: tr('tasks.view.archiveDone'), icon: 'archive', separate: true, disabled: !doneCount(board, project), onSelect: () => void act(() => api.archiveDone(project), tr('tasks.view.toast.archived')) },
-            { label: tr('tasks.view.showCanceled'), separate: true, checked: !prefs.folded.includes('canceled'), onSelect: () => setTasksPrefs({ folded: prefs.folded.includes('canceled') ? prefs.folded.filter((s) => s !== 'canceled') : [...prefs.folded, 'canceled'] }) },
-            ...(here.own ? [{ label: tr('tasks.view.deleteBoard'), icon: 'trash' as const, separate: true, danger: true, onSelect: () => deleteBoard(here.id) }] : []),
+            { label: several ? 'Repos on This Board…' : 'Board Settings…', icon: 'gear', onSelect: () => openSheet({ kind: 'task_board', boardId: here.id }) },
+            { label: here.own ? 'About This Board…' : 'About This Project…', icon: 'book', onSelect: () => openSheet({ kind: 'project_context', projectId: here.id }) },
+            ...(here.own ? [] : [{ label: sync ? 'Linear Sync…' : 'Sync with Linear…', icon: 'refresh' as const, onSelect: () => openSheet({ kind: 'task_sync', projectId: here.id }) }]),
+            ...(sync ? [{ label: 'Sync Now', disabled: Boolean(sync.syncing), onSelect: () => void act(() => api.syncNow(project)) }] : []),
+            { label: 'Agent Opens a Task for Worktree Work', separate: true, checked: board.autoTasks, onSelect: () => void act(() => api.setAutoTasks(!board.autoTasks)) },
+            { label: 'Archive Done Tasks', icon: 'archive', separate: true, disabled: !doneCount(board, project), onSelect: () => void act(() => api.archiveDone(project), 'Done tasks are in the Archive') },
+            { label: 'Show Canceled Tasks', separate: true, checked: !prefs.folded.includes('canceled'), onSelect: () => setTasksPrefs({ folded: prefs.folded.includes('canceled') ? prefs.folded.filter((s) => s !== 'canceled') : [...prefs.folded, 'canceled'] }) },
+            ...(here.own ? [{ label: 'Delete Board…', icon: 'trash' as const, separate: true, danger: true, onSelect: () => deleteBoard(here.id) }] : []),
           ]}
         >
-          <IconButton icon="more" label={tr('tasks.view.options')} />
+          <IconButton icon="more" label="Tasks Options" />
         </ActionsDropdown>
-        <Button variant="primary" size="small" icon="plus" className={t.newTask} aria-label={tr('tasks.view.newTask')} onClick={() => openSheet({ kind: 'new_task', ...newTask })} title={`${tr('tasks.view.newTask')}${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
-          {tr('tasks.view.newTask')}
+        <Button variant="primary" size="small" icon="plus" className={t.newTask} aria-label="New Task" onClick={() => openSheet({ kind: 'new_task', ...newTask })} title={`New Task${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
+          New Task
         </Button>
         </div>
       </div>
@@ -260,30 +258,30 @@ export function TasksView() {
         {none ? (
           <Empty
             icon="task"
-            title={tr('tasks.view.planWork')}
-            detail={several ? tr('tasks.view.planWorkSeveral', { repos: repos.map((r) => repoName(r)).join(', ') }) : tr('tasks.view.planWorkDetail')}
+            title="Plan the work"
+            detail={several ? `Tasks here run in ${repos.map((r) => repoName(r)).join(', ')}: each in the repo you pick. Write down what needs doing.` : 'Every new worktree opens a task here, and its pull request moves it along. Or write down what needs doing.'}
             action={
               <EmptyActions>
                 <Button variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_task', ...newTask })}>
-                  {tr('tasks.view.newTask')}
+                  New Task
                 </Button>
               </EmptyActions>
             }
           />
         ) : !issues.length ? (
           archive && !query ? (
-            <Empty icon="archive" title={tr('tasks.view.archiveEmpty')} detail={tr('tasks.view.archiveEmptyDetail')} />
+            <Empty icon="archive" title="The Archive is empty" detail="Archive Done tasks from the Done group: they come here, their words kept and their screenshots kept small." />
           ) : (
-            <Empty icon="task" title={query ? tr('tasks.view.noMatch') : worktree ? tr('tasks.view.noneFromWorktree') : who ? tr('tasks.view.noneForThem') : tr('tasks.view.nothingHere')} detail={query ? tr('tasks.view.fewerWords') : SCOPES.find((s) => s.value === prefs.scope)?.hint} />
+            <Empty icon="task" title={query ? 'Nothing matches' : worktree ? 'Nothing from this worktree here' : who ? 'Nothing for them here' : 'Nothing here'} detail={query ? 'Try fewer words.' : SCOPES.find((s) => s.value === prefs.scope)?.hint} />
           )
         ) : display === 'board' ? (
           <TaskBoard issues={issues} statuses={statuses} projectId={project} {...(newTask.projectId ? { repo: newTask.projectId } : {})} />
         ) : display === 'graph' && !graph ? (
-          <Empty icon="graph" title={tr('tasks.view.noGraph')} detail={tr('tasks.view.noGraphDetail')} />
+          <Empty icon="graph" title="Nothing waits on anything here" detail="Mark what blocks what, or add sub-tasks, on a task’s page: they show up here as a graph." />
         ) : display === 'graph' && graph ? (
           <div className={cx(t.graph, g.palette)}>
-            <Suspense fallback={<div className={t.graphNote}>{tr('plans.page.layingOut')}</div>}>
-              <FlowGraph key={`${project}:${prefs.scope}:${who}:${worktree}:${picked.join(',')}`} graph={graph} mode="full" localImages={false} openLabel={tr('plans.details.openTask')} onOpen={(id) => open({ id })} live pack startAt={going} />
+            <Suspense fallback={<div className={t.graphNote}>Laying out…</div>}>
+              <FlowGraph key={`${project}:${prefs.scope}:${who}:${worktree}:${picked.join(',')}`} graph={graph} mode="full" localImages={false} openLabel="Open Task" onOpen={(id) => open({ id })} live pack startAt={going} />
             </Suspense>
           </div>
         ) : (
@@ -293,12 +291,12 @@ export function TasksView() {
       </ShowingBoardProvider>
       {issues.length && display !== 'graph' ? (
         <div className={t.foot}>
-          {archive ? tr('tasks.view.nArchived', { n: issues.length }) : tr('tasks.view.openShown', { open: issues.filter((i) => isOpen(i.status)).length, n: issues.length })}
+          {archive ? `${issues.length} archived` : `${issues.filter((i) => isOpen(i.status)).length} open · ${issues.length} shown`}
           {tuck.hidden ? (
             <>
-              {tr('tasks.view.tucked', { n: tuck.hidden })}
+              {` · ${tuck.hidden} sub-task${tuck.hidden === 1 ? '' : 's'} tucked under their epics · `}
               <button type="button" className={t.footLink} onClick={() => (revealSubTasks(tuck.tucked), setTasksPrefs({ opened: [...new Set([...prefs.opened, ...tuck.tucked])] }))}>
-                {tr('tasks.view.showAll')}
+                Show All
               </button>
             </>
           ) : null}
@@ -312,20 +310,18 @@ export function TasksView() {
 
 /** Tasks of these projects (by name) on your computers, tagged. */
 function RemoteTasks({ projects }: { projects: readonly string[] }) {
-  const tr = useT();
   const sources = useRemoteSources();
   const names = projects.join('\n');
   const rows = useMemo(() => remoteTasks(sources).filter((t) => t.item.project !== undefined && names.split('\n').includes(t.item.project)).map((t) => ({ ...t, item: { id: t.item.id, title: t.item.title, sub: `${t.item.key} · ${t.item.status.replace('_', ' ')}`, page: { kind: 'task' as const, id: t.item.id } } })), [sources, names]);
-  return <RemoteList title={tr('tasks.view.onComputers')} rows={rows} />;
+  return <RemoteList title="Tasks on your computers" rows={rows} />;
 }
 
 /** How the project syncs with Linear, in the bar: syncing, when it last did, or that it needs you. */
 function SyncPill({ sync, onClick }: { sync: ProjectSync; onClick: () => void }) {
   const name = PROVIDER_INFO[sync.provider].label;
-  const tr = useT();
-  const text = sync.error?.code === 'auth' ? tr('tasks.view.sync.needsKey', { name }) : sync.syncing ? tr('tasks.view.sync.syncing', { name }) : sync.syncedAt ? `${name} · ${ago(sync.syncedAt)}` : name;
+  const text = sync.error?.code === 'auth' ? `${name}: needs a new key` : sync.syncing ? `${name}: syncing…` : sync.syncedAt ? `${name} · ${ago(sync.syncedAt)}` : name;
   return (
-    <button type="button" className={cx(t.syncPill, sync.error && t.syncPillProblem)} onClick={onClick} title={sync.error?.message ?? tr('tasks.view.sync.tip', { team: sync.team, name, auto: sync.auto ? tr('tasks.view.sync.auto') : '' })}>
+    <button type="button" className={cx(t.syncPill, sync.error && t.syncPillProblem)} onClick={onClick} title={sync.error?.message ?? `Synced with ${sync.team} in ${name}${sync.auto ? ' · Autosync on' : ''}`}>
       <Icon name={sync.error ? 'alert' : 'refresh'} size={11} className={sync.syncing ? t.syncSpin : undefined} />
       {text}
     </button>
@@ -335,5 +331,5 @@ function SyncPill({ sync, onClick }: { sync: ProjectSync; onClick: () => void })
 /** "3 repos · 4 open" (or less), beside each board in the switcher: what it shows, visitors too. */
 function boardHint(board: ReturnType<typeof useBoard>, boardId: string, repos: number): string | undefined {
   const n = board.issues.filter((i) => showsOn(i, boardId) && isOpen(i.status) && !i.archivedAt).length;
-  return [repos > 1 ? tNow('tasks.model.nRepos', { n: repos }) : '', n ? tNow('tasks.view.nOpen', { n }) : ''].filter(Boolean).join(' · ') || undefined;
+  return [repos > 1 ? `${repos} repos` : '', n ? `${n} open` : ''].filter(Boolean).join(' · ') || undefined;
 }

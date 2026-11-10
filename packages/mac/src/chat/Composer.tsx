@@ -47,12 +47,11 @@ import { DictationStrip, MicButton } from './Dictation.js';
 import { dictatingInto, useDictation, useDictationTarget } from '../lib/dictation.js';
 import { ActionsDropdown } from '../components/SpecMenu.js';
 import { openSheet } from '../lib/sheets.js';
-import { type ComposeMode, modeInfo, nextMode } from './compose-mode.js';
+import { type ComposeMode, MODE_INFO, nextMode } from './compose-mode.js';
 import { isPlanHome, planForHome } from '@beluga/core/plans/model.js';
 import { MaxFire } from './MaxFire.js';
 import { effectsOn, fireVars } from './fire-look.js';
 import { handleInvite } from '../lib/invite-command.js';
-import { t as tNow, useT } from '../i18n/index.js';
 import s from './composer.module.css';
 import m from './max.module.css';
 import d from './draft.module.css';
@@ -85,38 +84,35 @@ let boxOf: string | undefined;
 function placeholderOf(state: AppState, ui: { pending?: { kind: string; projectId: string; peerId?: string } }): string {
   const agent = agentName(defaultAgentOf(state.self));
   const q = state.questions[0];
-  if (q && q.channel === channelOf(state.view)) return q.question.kind === 'plan' ? tNow('chat.composer.placeholderPlan') : tNow('chat.composer.placeholderQuestion');
+  if (q && q.channel === channelOf(state.view)) return q.question.kind === 'plan' ? 'Say what to change in the plan, or approve it above' : 'Type your own answer, or pick an option above';
   const p = ui.pending;
-  if (p?.kind === 'peer_run') return tNow('chat.composer.placeholderPeerRun', { name: peerName(state, p.peerId ?? '') });
-  if (p?.kind === 'remote') return tNow('chat.composer.placeholderRemote');
-  if (p?.kind === 'setup' || p?.kind === 'run') return tNow('chat.composer.placeholderScript', { kind: p.kind });
-  if (p) {
-    const inProject = state.projects.find((x) => x.id === p.projectId && x.root)?.name;
-    return inProject ? tNow('chat.composer.placeholderNameIn', { kind: p.kind, project: inProject }) : tNow('chat.composer.placeholderName', { kind: p.kind });
-  }
+  if (p?.kind === 'peer_run') return `A command to run on ${peerName(state, p.peerId ?? '')}'s computer`;
+  if (p?.kind === 'remote') return 'Describe the task for their agent';
+  if (p?.kind === 'setup' || p?.kind === 'run') return `The project's ${p.kind} command (empty to clear it)`;
+  if (p) return `Name for the new ${p.kind}${state.projects.find((x) => x.id === p.projectId)?.root ? ` in ${state.projects.find((x) => x.id === p.projectId)?.name}` : ''}`;
   const v = state.view;
   if (v.kind === 'draft') {
     // A chat in a project runs in its main folder: questions only.
     const project = state.projects.find((x) => x.id === v.projectId && x.root);
-    return project ? tNow('chat.composer.placeholderAskAbout', { name: project.name }) : tNow('chat.composer.placeholderNewChat', { agent });
+    return project ? `Ask about ${project.name}…` : `Ask ${agent} anything. Your first message starts the chat`;
   }
-  if (v.kind === 'draft_worktree') return tNow('chat.composer.placeholderNewWorktree', { agent });
-  if (v.kind === 'search') return tNow('chat.composer.placeholderSearch');
-  if (v.kind === 'assistant') return tNow('chat.composer.placeholderAssistant', { computer: yourComputer() });
-  if (v.kind === 'sentinel_chat') return tNow('chat.composer.placeholderSentinel');
+  if (v.kind === 'draft_worktree') return `What should ${agent} work on in the new worktree?`;
+  if (v.kind === 'search') return 'Search every conversation';
+  if (v.kind === 'assistant') return `Ask ${yourComputer()} anything`;
+  if (v.kind === 'sentinel_chat') return 'Ask for a dashboard, a watcher or a pipeline: “chart my signups”, “tell me when my site is down”…';
   if (v.kind === 'workspace') {
     const ws = state.projects.flatMap((x) => x.workspaces).find((w) => w.id === v.id);
-    if (ws?.askOnly) return tNow('chat.composer.placeholderAskAbout', { name: state.projects.find((x) => x.root && x.workspaces.includes(ws))?.name ?? tNow('chat.composer.thisProject') });
+    if (ws?.askOnly) return `Ask about ${state.projects.find((x) => x.root && x.workspaces.includes(ws))?.name ?? 'this project'}…`;
     // The worktree's own agent (a Codex worktree says Codex), else yours.
-    return tNow('chat.composer.placeholderWorkspace', { agent: ws?.agent ? agentName(ws.agent) : agent, name: ws?.name ?? tNow('chat.composer.thisWorkspace') });
+    return `Tell ${ws?.agent ? agentName(ws.agent) : agent} what to do in ${ws?.name ?? 'this workspace'}`;
   }
   if (v.kind === 'shared') {
     const w = state.shared.find((x) => x.id === v.id);
     const waiting = waitingNote(state, v.id);
     if (waiting) return waiting;
-    return w?.role === 'view' ? tNow('chat.composer.placeholderFollowing', { name: w.name }) : tNow('chat.composer.placeholderMessage', { name: w?.name ?? tNow('chat.composer.theWorkspace') });
+    return w?.role === 'view' ? `You're following ${w.name}` : `Message ${w?.name ?? 'the workspace'}`;
   }
-  return state.peers.length <= 1 ? tNow('chat.composer.placeholderYourAgent', { agent }) : tNow('chat.composer.placeholderRoom');
+  return state.peers.length <= 1 ? `Message your ${agent}` : 'Message the room';
 }
 
 /** Where what you say in a friend's worktree runs (BLG-260): on their Mac (as ever) or in your own copy. */
@@ -125,7 +121,6 @@ const runOnChoice = new Map<string, RunOn>();
 
 /** In a friend's worktree you have a copy of: "Runs on Ata's Mac" or "on This Mac", one click to switch. */
 function RunOnChip({ wsId, ownerName, value, onChange }: { wsId: string; ownerName: string; value: RunOn; onChange: (v: RunOn) => void }) {
-  const t = useT();
   const key = useScopedKey(wsId);
   const pick = (v: RunOn): void => {
     runOnChoice.set(key, v);
@@ -135,13 +130,13 @@ function RunOnChip({ wsId, ownerName, value, onChange }: { wsId: string; ownerNa
     <ActionsDropdown
       align="start"
       items={[
-        { label: t('chat.composer.ownerComputer', { name: ownerName }), hint: t('chat.composer.ownerComputerHint'), icon: 'people', checked: value === 'owner', onSelect: () => pick('owner') },
-        { label: t('chat.composer.thisComputer', { computer: upFirst(thisComputer()) }), hint: t('chat.composer.hereHint'), icon: 'laptop', checked: value === 'here', onSelect: () => pick('here') },
+        { label: `${ownerName}’s computer`, hint: 'Their agent, in their worktree', icon: 'people', checked: value === 'owner', onSelect: () => pick('owner') },
+        { label: upFirst(thisComputer()), hint: 'Your agent, in your copy, on the same branch', icon: 'laptop', checked: value === 'here', onSelect: () => pick('here') },
       ]}
     >
-      <button type="button" className={cx(s.chip, value === 'here' && s.chipOn)} aria-label={t('chat.composer.runsOn', { where: value === 'here' ? t('chat.composer.thisComputerLower', { computer: thisComputer() }) : t('chat.composer.ownerComputer', { name: ownerName }) })}>
+      <button type="button" className={cx(s.chip, value === 'here' && s.chipOn)} aria-label={`Runs on ${value === 'here' ? thisComputer() : `${ownerName}’s computer`}`}>
         <Icon name={value === 'here' ? 'laptop' : 'people'} size={12} />
-        {value === 'here' ? t('chat.composer.thisComputer', { computer: upFirst(thisComputer()) }) : t('chat.composer.ownerComputer', { name: ownerName })}
+        {value === 'here' ? upFirst(thisComputer()) : `${ownerName}’s computer`}
         <Icon name="chevronDown" size={9} />
       </button>
     </ActionsDropdown>
@@ -156,7 +151,6 @@ function sameComposer<T extends { readonly compose: object }>(a: T, b: T): boole
 }
 
 export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
-  const t = useT();
   const { ui, client } = useBeluga();
   const api = useApi();
   const actions = useActions();
@@ -221,9 +215,9 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
   const mainAction = sendAction(prefs.sendDuringTurn, { busy: true, canSteer });
   const otherAction = sendAction(prefs.sendDuringTurn, { busy: true, canSteer, secondary: true });
   const actionTip = (action: string): string => action === 'steer'
-    ? t('chat.composer.steerTip', { agent: agentHere })
-    : steerBlock === 'plan' ? t('chat.composer.queueTipPlan', { agent: agentHere })
-    : steerBlock ? t('chat.composer.queueTipNoSteer', { agent: agentHere }) : t('chat.composer.queueTip', { agent: agentHere });
+    ? `Steer: ${agentHere} reads this at its next step, without stopping`
+    : steerBlock === 'plan' ? `Queue: in Plan First, this waits for ${agentHere}'s current turn to finish`
+    : steerBlock ? `Queue: ${agentHere} cannot steer. This waits for the current turn to finish` : `Queue: this waits for ${agentHere}'s current turn to finish`;
   const plan = state.planMode[channel] === true;
   // Plan with Tasks: this conversation is a plan's home (milestones and tasks, approved onto the board).
   const homePlan = planForHome(state.plans, channel);
@@ -260,7 +254,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     if (next !== 'tasks' && drafting && homePlan) {
       const discard = (): void => void api.plans.discard(homePlan.id).then(leave, (err: unknown) => toast(client, errorText(err), 'error'));
       if (!homePlan.draft?.milestones.length) return discard();
-      openSheet({ kind: 'confirm', title: t('chat.composer.discardTitle'), message: t('chat.composer.discardMessage'), confirm: t('chat.composer.discardConfirm'), destructive: true, run: discard });
+      openSheet({ kind: 'confirm', title: 'Throw away the draft plan?', message: 'Nothing of it is on the board. To keep it, approve it on its page instead.', confirm: 'Throw Away', destructive: true, run: discard });
       return;
     }
     leave();
@@ -406,7 +400,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     setWorktreeState({ name: '' });
     arm(false);
     if (sent === 'sent') return;
-    void api.workspaces.startWorktree(projectId, text, { ...(worktree.base ? { base: worktree.base } : {}), ...(name ? { name } : {}), ...(worktree.agent ? { agent: worktree.agent } : {}), ...mode }).catch((err: unknown) => toast(client, t('chat.composer.createFailed', { error: errorText(err) }), 'error'));
+    void api.workspaces.startWorktree(projectId, text, { ...(worktree.base ? { base: worktree.base } : {}), ...(name ? { name } : {}), ...(worktree.agent ? { agent: worktree.agent } : {}), ...mode }).catch((err: unknown) => toast(client, `Couldn't create the worktree: ${errorText(err)}`, 'error'));
   };
   /** Held for a computer that can't take it now: the words go back in the box, nothing was sent. */
   const keepWords = (text: string): void => {
@@ -416,7 +410,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     if (readOnly) return;
     if (runOn === 'here' && sharedWs && !text.startsWith('/')) {
       set('');
-      void api.sharing.runHere(sharedWs.owner, sharedWs.id, text).catch((err: unknown) => toast(client, t('chat.composer.runHereFailed', { error: errorText(err) }), 'error'));
+      void api.sharing.runHere(sharedWs.owner, sharedWs.id, text).catch((err: unknown) => toast(client, `Couldn’t start it here: ${errorText(err)}`, 'error'));
       return;
     }
     // /invite adds a friend, or adds friends to what's on screen (BLG-203): done here, where the view is known.
@@ -461,7 +455,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     const secret = state.view.kind === 'room' && !typed.startsWith('/') ? secretIn(typed) : undefined;
     if (secret && secretWarned.current !== typed) {
       secretWarned.current = typed;
-      toast(client, t('chat.composer.secretWarn', { secret, agent }), 'warn');
+      toast(client, `That looks like ${secret}, and everyone in the room would see it. Put it in Settings › Environment instead: your ${agent} uses it from there. Send again to share it anyway.`, 'warn');
       return;
     }
     secretWarned.current = undefined;
@@ -475,7 +469,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
       notes?.putBack();
     };
     if (!text && !(draftProject && worktree.name.trim())) {
-      if (draftProject) toast(client, t('chat.composer.describeOrName'), 'info');
+      if (draftProject) toast(client, 'Describe the task, or give the worktree a name', 'info');
       return;
     }
     if (!text && draftProject) return createWorktree(draftProject, '');
@@ -495,7 +489,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           // Put the message and its images back so nothing is lost.
           if (!ui.get().buffer) ui.patch({ buffer: typed, cursor: typed.length });
           putBack();
-          toast(client, t('chat.composer.imagesFailed', { error: errorText(err) }), 'error');
+          toast(client, `Couldn't send the images: ${errorText(err)}`, 'error');
         },
       );
       return;
@@ -516,8 +510,6 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     ref.current?.focus();
   };
   const sendKeys = prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter');
-  const actionLabel = (action: 'send' | 'queue' | 'steer'): string => (action === 'steer' ? t('chat.composer.steer') : action === 'queue' ? t('chat.composer.queue') : t('chat.composer.send'));
-  const actionWord = (action: 'send' | 'queue' | 'steer'): string => (action === 'steer' ? t('chat.composer.legendSteer') : action === 'queue' ? t('chat.composer.legendQueue') : t('chat.composer.legendSend'));
   function accept(picked: Suggestion): void {
     if (picked.enter === 'submit') {
       ui.patch({ buffer: '', cursor: 0 });
@@ -587,12 +579,12 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
   };
   const askingFor = pending
     ? pending.kind === 'peer_run'
-      ? t('chat.composer.askingCommand')
+      ? 'Command'
       : pending.kind === 'remote'
-        ? t('chat.composer.askingTask')
+        ? 'Task'
         : pending.kind === 'setup' || pending.kind === 'run'
-          ? t('chat.composer.askingScript', { kind: pending.kind })
-          : t('chat.composer.askingNew', { kind: pending.kind })
+          ? `${pending.kind[0]!.toUpperCase()}${pending.kind.slice(1)} command`
+          : `New ${pending.kind}`
     : undefined;
 
   return (
@@ -615,46 +607,46 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           <div className={s.planBanner} role="status">
             <span className={s.planTag}>
               <Icon name="sparkles" size={11} />
-              {t('chat.composer.btwTag')}
+              By the way
             </span>
-            <span className={s.planHint}>{t('chat.composer.btwHint', { agent: agentHere })}</span>
+            <span className={s.planHint}>A side question: answered above, {agentHere} keeps working and won’t remember it</span>
             <span className={s.flex} />
             <span className={s.planKeys}>
-              <Kbd>esc</Kbd> {t('chat.composer.toLeave')}
+              <Kbd>esc</Kbd> to leave
             </span>
           </div>
         ) : answering === 'plan' ? (
           <div className={s.planBanner} role="status">
             <span className={s.planTag}>
               <Icon name="wand" size={11} />
-              {t('chat.composer.planReview')}
+              Plan Review
             </span>
-            <span className={s.planHint}>{t('chat.composer.planReviewHint', { agent: agentHere })}</span>
+            <span className={s.planHint}>What you write goes back to {agentHere} as changes to the plan</span>
           </div>
         ) : mode !== 'act' ? (
           <div className={s.planBanner} role="status">
             <span className={s.planTag}>
               <Icon name={mode === 'tasks' ? 'graph' : 'wand'} size={11} />
-              {mode === 'plan' ? t('chat.composer.planning') : modeInfo(mode).label}
+              {mode === 'plan' ? 'Planning' : MODE_INFO[mode].label}
             </span>
-            <span className={s.planHint}>{modeInfo(mode).banner}</span>
+            <span className={s.planHint}>{MODE_INFO[mode].banner}</span>
             <span className={s.flex} />
             {mode === 'tasks' && homePlan ? (
               <button type="button" className={s.planLink} onClick={() => actions.run({ type: 'view', view: { kind: 'plan', id: homePlan.id } })}>
-                {t('chat.composer.openPlan')}
+                Open Plan
               </button>
             ) : planHome ? null : (
               <span className={s.planKeys}>
-                <Kbd>{shortcutKeys('composer-mode')}</Kbd> {t('chat.composer.toAct')}
+                <Kbd>{shortcutKeys('composer-mode')}</Kbd> to act
               </span>
             )}
           </div>
         ) : null}
         {draftProject ? <WorktreeDraft projectId={draftProject} choice={worktree} onChange={setWorktree} /> : null}
         {to ? (
-          <div className={s.askChip} aria-label={t('chat.composer.to', { name: recipientLabel(to) })}>
-            {t('chat.composer.to', { name: recipientLabel(to) })}
-            <button type="button" aria-label={t('chat.composer.unaddress')} onClick={() => ui.patch({ to: undefined })}>
+          <div className={s.askChip} aria-label={`To ${recipientLabel(to)}`}>
+            To {recipientLabel(to)}
+            <button type="button" aria-label="Don’t address it" onClick={() => ui.patch({ to: undefined })}>
               <Icon name="x" size={10} />
             </button>
           </div>
@@ -662,7 +654,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
         {askingFor ? (
           <div className={s.askChip}>
             {askingFor}
-            <button type="button" aria-label={t('chat.composer.cancel')} onClick={() => ui.patch({ pending: undefined, buffer: '' })}>
+            <button type="button" aria-label="Cancel" onClick={() => ui.patch({ pending: undefined, buffer: '' })}>
               <Icon name="x" size={10} />
             </button>
           </div>
@@ -679,7 +671,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
             rows={1}
             value={buffer}
             disabled={readOnly}
-            placeholder={aside ? t('chat.composer.placeholderBtw', { agent: agentHere }) : to ? t('chat.composer.placeholderMessage', { name: recipientLabel(to) }) : mode === 'tasks' && !homePlan?.body && !homePlan?.draft?.milestones.length ? t('chat.composer.placeholderTasks', { agent }) : state.placeholder}
+            placeholder={aside ? `Ask ${agentHere} something on the side…` : to ? `Message ${recipientLabel(to)}` : mode === 'tasks' && !homePlan?.body && !homePlan?.draft?.milestones.length ? `Describe what to build: ${agent} plans it into milestones and tasks` : state.placeholder}
             onChange={(e) => set(e.target.value)}
             onKeyDown={onKey}
             onPaste={att.onPaste}
@@ -691,14 +683,14 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
             <ActionsDropdown
               align="start"
               items={[
-                { label: t('chat.composer.openThePlan'), onSelect: () => actions.run({ type: 'view', view: { kind: 'plan', id: homePlan.id } }) },
+                { label: 'Open the Plan', onSelect: () => actions.run({ type: 'view', view: { kind: 'plan', id: homePlan.id } }) },
                 // While it's a draft nothing is on the board: it can go (asked first when it has something in it).
-                ...(tasksMode ? [{ label: t('chat.composer.discardDraft'), danger: true, separate: true, onSelect: () => setMode('act') }] : []),
+                ...(tasksMode ? [{ label: 'Discard the Draft', danger: true, separate: true, onSelect: () => setMode('act') }] : []),
               ]}
             >
-              <button type="button" className={cx(s.chip, s.chipOn)} title={t('chat.composer.planHomeTitle')} aria-label={t('chat.composer.modeAria', { mode: modeInfo('tasks').label })}>
+              <button type="button" className={cx(s.chip, s.chipOn)} title="This conversation is the plan’s own: its agent plans and runs it here" aria-label={`Mode: ${MODE_INFO.tasks.label}`}>
                 <Icon name="graph" size={12} />
-                {tasksMode ? modeInfo('tasks').label : t('chat.composer.plan')}
+                {tasksMode ? MODE_INFO.tasks.label : 'Plan'}
                 <Icon name="chevronDown" size={9} />
               </button>
             </ActionsDropdown>
@@ -707,24 +699,24 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
               align="start"
               items={(['act', 'plan', 'tasks'] as const)
                 .filter((m) => m !== 'tasks' || canPlanTasks || tasksMode)
-                .map((m) => ({ label: modeInfo(m).label, hint: modeInfo(m).hint, checked: mode === m, onSelect: () => setMode(m) }))}
+                .map((m) => ({ label: MODE_INFO[m].label, hint: MODE_INFO[m].hint, checked: mode === m, onSelect: () => setMode(m) }))}
             >
-              <button type="button" className={cx(s.chip, mode !== 'act' && s.chipOn)} title={mode === 'tasks' ? modeInfo(mode).hint : t('chat.composer.modeTitle', { hint: modeInfo(mode).hint, keys: shortcutKeys('composer-mode') ?? t('chat.composer.settingsKeyboard') })} aria-label={t('chat.composer.modeAria', { mode: modeInfo(mode).label })}>
+              <button type="button" className={cx(s.chip, mode !== 'act' && s.chipOn)} title={mode === 'tasks' ? MODE_INFO[mode].hint : `${MODE_INFO[mode].hint} (${shortcutKeys('composer-mode') ?? 'Settings › Keyboard'} switches acting and planning first)`} aria-label={`Mode: ${MODE_INFO[mode].label}`}>
                 <Icon name={mode === 'tasks' ? 'graph' : 'wand'} size={12} />
-                <span className={s.chipLabel}>{modeInfo(mode).label}</span>
+                <span className={s.chipLabel}>{MODE_INFO[mode].label}</span>
                 <Icon name="chevronDown" size={9} />
               </button>
             </ActionsDropdown>
           ) : null}
-          {canRunHere && sharedWs ? <RunOnChip wsId={sharedWs.id} ownerName={state.sharedProjects.find((p) => p.owner === sharedWs.owner)?.ownerName ?? t('chat.composer.their')} value={runOn} onChange={setRunOn} /> : null}
+          {canRunHere && sharedWs ? <RunOnChip wsId={sharedWs.id} ownerName={state.sharedProjects.find((p) => p.owner === sharedWs.owner)?.ownerName ?? 'Their'} value={runOn} onChange={setRunOn} /> : null}
           {!shared ? <ModelPicker channel={channel} {...(draftProject ? { draft: worktree.agent, onDraft: (agent: AgentRef | undefined) => setWorktree({ ...worktree, agent }) } : {})} /> : null}
           {/* Where new work runs (BLG-786); a chat that runs somewhere already says where. Only with a computer paired. */}
           {shared ? null : newWork ? <RunsOnPicker {...(newWork.project ? { project: newWork.project } : {})} {...(worktree.agent?.runtime && draftProject ? { runtime: worktree.agent.runtime } : {})} {...(newWork.folder ? { folder: newWork.folder } : {})} /> : <RunsOnLabel />}
           {burning && state.prefs.effort === 'max' ? (
-            <Tip label={t('chat.composer.maxTip', { agent: agentHere })}>
+            <Tip label={`Max effort: ${agentHere} thinks as hard as it can`}>
               <span className={m.tag}>
                 <Icon name="flame" size={11} className={m.flicker} />
-                {t('chat.modelPicker.maxLabel')}
+                Max
               </span>
             </Tip>
           ) : null}
@@ -734,24 +726,24 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           {channel !== 'draft' ? <ContextMeter channel={channel} /> : null}
           {/* While you talk, only your voice's control shows: two square buttons side by side stopped Claude by mistake. */}
           {compose.busy && !talking ? (
-            <Tip label={t('chat.composer.stopTip', { agent: agentHere })} keys={shortcutKeys('conv-stop')}>
-              <button type="button" className={s.stop} aria-label={t('chat.composer.stop', { agent: agentHere })} onClick={() => stopClaude({ client, ui, actions }, channel)}>
+            <Tip label={`Stop ${agentHere} here · your queued messages come back to the box`} keys={shortcutKeys('conv-stop')}>
+              <button type="button" className={s.stop} aria-label={`Stop ${agentHere}`} onClick={() => stopClaude({ client, ui, actions }, channel)}>
                 <span className={s.stopMark} />
               </button>
             </Tip>
           ) : null}
           {!readOnly ? <MicButton box={ref} /> : null}
           {draftProject ? (
-            <Tip label={worktree.name.trim() && !buffer.trim() ? t('chat.composer.createNoTask', { name: worktree.name.trim() }) : t('chat.composer.createTip', { agent: worktree.agent ? agentName(worktree.agent) : agent })} keys={sendKeys}>
+            <Tip label={worktree.name.trim() && !buffer.trim() ? `Create ${worktree.name.trim()} without a task` : `Make the branch and folder, then ${worktree.agent ? agentName(worktree.agent) : agent} starts on the task`} keys={sendKeys}>
               <button type="button" className={cx(d.create, canCreate && d.createReady)} onClick={() => send(false)} aria-disabled={!canCreate}>
                 <Icon name="branch" size={12} />
-                {t('chat.composer.createWorktree')}
+                Create Worktree
                 <span className={d.createKey}>{sendKeys}</span>
               </button>
             </Tip>
           ) : aside ? (
-            <Tip label={t('chat.composer.btwSendTip')} keys={sendKeys}>
-              <button type="button" className={cx(s.send, buffer.trim() && s.sendReady)} onClick={() => send(false)} aria-label={t('chat.composer.btwSend')} disabled={!buffer.trim()}>
+            <Tip label="Ask on the side: the answer shows above the box, the conversation never sees it" keys={sendKeys}>
+              <button type="button" className={cx(s.send, buffer.trim() && s.sendReady)} onClick={() => send(false)} aria-label="Ask on the side" disabled={!buffer.trim()}>
                 <Icon name="send" size={14} />
               </button>
             </Tip>
@@ -763,22 +755,22 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
               </button>
             </Tip>
           ) : queueing ? (
-            <div className={cx(s.split, buffer.trim() && s.splitReady)} role="group" aria-label={t('chat.composer.working', { agent: agentHere })}>
+            <div className={cx(s.split, buffer.trim() && s.splitReady)} role="group" aria-label={`${agentHere} is working`}>
               <Tip label={actionTip(mainAction)} keys={sendKeys}>
-                <button type="button" className={s.splitMain} aria-label={actionLabel(mainAction)} onClick={() => send(false)} disabled={!ready}>
+                <button type="button" className={s.splitMain} aria-label={upFirst(mainAction)} onClick={() => send(false)} disabled={!ready}>
                   <Icon name={mainAction === 'steer' ? 'send' : 'clock'} size={12} />
-                  <span className={s.chipLabel}>{actionLabel(mainAction)}</span>
+                  <span className={s.chipLabel}>{upFirst(mainAction)}</span>
                 </button>
               </Tip>
               {canSteer ? <Tip label={actionTip(otherAction)} keys={shortcutKeys('composer-steer')}>
                 <button type="button" className={s.splitAlt} onClick={() => send(true)} disabled={!ready}>
-                  {actionLabel(otherAction)}
+                  {upFirst(otherAction)}
                 </button>
               </Tip> : null}
             </div>
           ) : (
-            <Tip label={prefs.sendWith === 'enter' ? t('chat.composer.sendTipEnter', { key: returnName() }) : t('chat.composer.sendTipCmd', { keys: cmdReturn() })} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
-              <button type="button" className={cx(s.send, ready && s.sendReady)} onClick={() => send(false)} aria-label={t('chat.composer.send')} disabled={!ready}>
+            <Tip label={prefs.sendWith === 'enter' ? `Send · Shift+${returnName()} for a new line` : `Send · ${cmdReturn()}`} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
+              <button type="button" className={cx(s.send, ready && s.sendReady)} onClick={() => send(false)} aria-label="Send" disabled={!ready}>
                 <Icon name="send" size={14} />
               </button>
             </Tip>
@@ -790,35 +782,35 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
       <div className={s.legend}>
         {queueing ? (
           <>
-            <Kbd>{sendKeys}</Kbd> {actionWord(mainAction)} ·{canSteer && shortcutKeys('composer-steer') ? (
+            <Kbd>{sendKeys}</Kbd> {mainAction} ·{canSteer && shortcutKeys('composer-steer') ? (
               <>
                 {' '}
-                <Kbd>{shortcutKeys('composer-steer')}</Kbd> {actionWord(otherAction)} ·
+                <Kbd>{shortcutKeys('composer-steer')}</Kbd> {otherAction} ·
               </>
             ) : null}
             {steerBlock ? ` ${steerBlockNote(steerBlock)} · ` : null}
             {unread && shortcutKeys('composer-send-now') ? (
               <>
                 {' '}
-                <Kbd>{shortcutKeys('composer-send-now')}</Kbd> {t('chat.composer.legendSendNow')} ·
+                <Kbd>{shortcutKeys('composer-send-now')}</Kbd> send now ·
               </>
             ) : null}
             {shortcutKeys('conv-stop') ? (
               <>
                 {' '}
-                <Kbd>{shortcutKeys('conv-stop')}</Kbd> {t('chat.composer.legendStop')}
+                <Kbd>{shortcutKeys('conv-stop')}</Kbd> stop
               </>
             ) : null}
             {canBtw ? (
               <>
                 {' '}
-                · <Kbd>/btw</Kbd> {t('chat.composer.legendBtw')}
+                · <Kbd>/btw</Kbd> ask on the side
               </>
             ) : null}
           </>
         ) : (
           <>
-            <Kbd>{sendKeys}</Kbd> {t('chat.composer.legendCreate')} · <Kbd>esc</Kbd> {t('chat.composer.legendCancel')}
+            <Kbd>{sendKeys}</Kbd> create the worktree · <Kbd>esc</Kbd> cancel
           </>
         )}
       </div>

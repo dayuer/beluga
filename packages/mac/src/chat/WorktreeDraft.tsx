@@ -4,7 +4,6 @@ import { Icon } from '../components/Icon.js';
 import { Select, type SelectOption } from '../components/Select.js';
 import { Tip } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
-import { t as tNow, useT } from '../i18n/index.js';
 import s from './draft.module.css';
 
 /** What a new worktree starts from and is called (empty name: Beluga names it from the task). */
@@ -21,7 +20,6 @@ export interface WorktreeChoice {
  */
 export function WorktreeDraft({ projectId, choice, onChange }: { projectId: string; choice: WorktreeChoice; onChange: (c: WorktreeChoice) => void }) {
   const api = useApi();
-  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const [branches, setBranches] = useState<{ base: string; branches: readonly string[] }>();
   useEffect(() => {
@@ -38,23 +36,23 @@ export function WorktreeDraft({ projectId, choice, onChange }: { projectId: stri
   const base = choice.base ?? branches?.base ?? project?.base ?? '';
   const options = branches?.branches.length ? branches.branches : base ? [base] : [];
   return (
-    <div className={s.draft} role="group" aria-label={t('chat.draft.aria')}>
+    <div className={s.draft} role="group" aria-label="New worktree">
       <span className={s.project}>
         <Icon name="branch" size={12} />
-        {project?.name ?? t('chat.draft.project')}
+        {project?.name ?? 'Project'}
       </span>
       <label className={s.field}>
-        <span className={s.fieldLabel}>{t('chat.draft.basedOn')}</span>
-        <Tip label={t('chat.draft.basedOnTip')}>
-          <Select className={s.select} size="small" mono label={t('chat.draft.basedOn')} value={base} onChange={(b) => onChange({ ...choice, base: b })} options={branchOptions(options, branches?.base)} searchPlaceholder={t('chat.draft.findBranch')} />
+        <span className={s.fieldLabel}>Based on</span>
+        <Tip label="The branch the new one starts from (origin branches are fetched first, so it's the latest)">
+          <Select className={s.select} size="small" mono label="Based on" value={base} onChange={(b) => onChange({ ...choice, base: b })} options={branchOptions(options, branches?.base)} searchPlaceholder="Find a branch" />
         </Tip>
       </label>
       <label className={s.field}>
-        <span className={s.fieldLabel}>{t('chat.draft.name')}</span>
+        <span className={s.fieldLabel}>Name</span>
         <input
           className={`${s.name} selectable`}
-          aria-label={t('chat.draft.nameAria')}
-          placeholder={t('chat.draft.namePlaceholder')}
+          aria-label="Worktree name"
+          placeholder="from the task"
           value={choice.name}
           maxLength={60}
           spellCheck={false}
@@ -74,5 +72,5 @@ export function WorktreeDraft({ projectId, choice, onChange }: { projectId: stri
 
 /** The branches a worktree can start from, for the Based on pop-up: the default one says so. */
 export function branchOptions(branches: readonly string[], base: string | undefined): Array<SelectOption<string>> {
-  return branches.map((b) => ({ value: b, label: b, ...(b === base ? { badge: tNow('chat.draft.default') } : {}) }));
+  return branches.map((b) => ({ value: b, label: b, ...(b === base ? { badge: 'default' } : {}) }));
 }

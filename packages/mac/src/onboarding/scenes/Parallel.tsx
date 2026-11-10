@@ -1,4 +1,3 @@
-import { t, useT } from '../../i18n/index.js';
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon } from '../../components/Icon.js';
 import { EASE_OUT, SPRING } from '../fx.js';
@@ -49,16 +48,11 @@ const REPOS: readonly Repo[] = [
 ];
 
 const BEAT_MS = 1500;
-const LABEL: Record<Status, string> = {
-  get working() { return t('onboarding.scene.lane.working'); },
-  get pr() { return t('onboarding.scene.lane.pr'); },
-  get merged() { return t('onboarding.scene.lane.merged'); },
-};
+const LABEL: Record<Status, string> = { working: 'Agent working', pr: 'Pull request', merged: 'Merged' };
 const ICON: Record<Status, 'spark' | 'pr' | 'merge'> = { working: 'spark', pr: 'pr', merged: 'merge' };
 
 function LaneRow({ lane, step, live }: { readonly lane: Lane; readonly step: number; readonly live: boolean }) {
   const status = lane.steps[Math.min(step, lane.steps.length - 1)]!;
-  useT();
   return (
     <div className={s.lane}>
       <Icon name="branch" size={12} />

@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import type { CallPersonView, CallView } from '@beluga/shared/calls.js';
 import { callLength } from '@beluga/shared/calls.js';
@@ -23,19 +22,18 @@ function Picture({ stream, mirrored, className }: { stream: MediaStream; mirrore
 
 /** One camera: the picture, the name, muted, a ring while they talk. */
 function Tile({ person, stream, speaking, onOpen }: { person: CallPersonView; stream: MediaStream; speaking: boolean; onOpen?: () => void }) {
-  const t = useT();
   const tile = (
-    <figure className={cx(c.tile, speaking && !person.muted && c.tileSpeaking)} aria-label={person.me ? t('call.yourCamera') : t('call.theirCamera', { name: person.name })}>
+    <figure className={cx(c.tile, speaking && !person.muted && c.tileSpeaking)} aria-label={person.me ? 'Your camera' : `${person.name}’s camera`}>
       <Picture stream={stream} mirrored={Boolean(person.me)} className={c.tileVideo} />
       <figcaption className={c.tileName}>
         {person.muted ? <Icon name="micOff" size={10} /> : null}
-        {person.me ? t('call.you') : person.name}
+        {person.me ? 'You' : person.name}
       </figcaption>
     </figure>
   );
   if (!onOpen) return tile;
   return (
-    <button type="button" className={c.tileButton} onClick={onOpen} aria-label={t('call.faceToFaceWith', { name: person.me ? t('call.everyone') : person.name })}>
+    <button type="button" className={c.tileButton} onClick={onOpen} aria-label={`Face to face with ${person.me ? 'everyone' : person.name}`}>
       {tile}
     </button>
   );
@@ -47,20 +45,19 @@ function Tile({ person, stream, speaking, onOpen }: { person: CallPersonView; st
  */
 export function CameraStrip({ call, floating }: { call: CallView; floating?: boolean }) {
   const engine = useCallEngine();
-  const t = useT();
   const live = useCallLive();
   const on = call.people.filter((p) => live.cameras[p.peerId]);
   if (!on.length) return null;
   return (
-    <div className={floating ? c.filmstrip : c.faces} role="list" aria-label={t('call.cameras')} onPointerDown={floating ? (e) => e.stopPropagation() : undefined}>
+    <div className={floating ? c.filmstrip : c.faces} role="list" aria-label="Cameras" onPointerDown={floating ? (e) => e.stopPropagation() : undefined}>
       {on.map((p) => (
         <div key={p.peerId} role="listitem" className={c.tileWrap}>
           <Tile person={p} stream={live.cameras[p.peerId]!} speaking={live.speaking.has(p.peerId)} {...(floating ? {} : { onOpen: () => engine.setFaces(true) })} />
         </div>
       ))}
       {floating ? null : (
-        <Tip label={t('call.faceToFace')}>
-          <button type="button" className={c.facesOpen} aria-label={t('call.faceToFace')} onClick={() => engine.setFaces(true)}>
+        <Tip label="Face to Face">
+          <button type="button" className={c.facesOpen} aria-label="Face to Face" onClick={() => engine.setFaces(true)}>
             <Icon name="expand" size={14} />
           </button>
         </Tip>
@@ -91,7 +88,6 @@ type Corner = 'br' | 'bl' | 'tr' | 'tl';
  */
 export function FaceView({ call }: { call: CallView }) {
   const engine = useCallEngine();
-  const t = useT();
   const live = useCallLive();
   const place = useCallPlace(call.conversation);
   const now = useSecond();
@@ -133,12 +129,12 @@ export function FaceView({ call }: { call: CallView }) {
   };
 
   return (
-    <section className={c.faceView} aria-label={t('call.faceToFaceView')}>
+    <section className={c.faceView} aria-label="Face to face">
       <header className={c.faceHead}>
-        <strong>{place === t('call.theRoom') ? t('call.theRoomTitle') : place}</strong>
+        <strong>{place.replace(/^the room$/, 'The room')}</strong>
         <span>{callLength(now - call.startedAt)}</span>
       </header>
-      <div className={cx(c.collage, others.length === 1 && c.solo)} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }} role="list" aria-label={t('call.peopleInCall')}>
+      <div className={cx(c.collage, others.length === 1 && c.solo)} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }} role="list" aria-label="People in the call">
         {others.length ? (
           others.map((p) => {
             const stream = live.cameras[p.peerId];
@@ -146,7 +142,7 @@ export function FaceView({ call }: { call: CallView }) {
             return (
               <div key={p.peerId} role="listitem" className={c.collageCell}>
                 {stream ? (
-                  <figure className={cx(c.faceTile, speaking && !p.muted && c.tileSpeaking)} aria-label={t('call.theirCamera', { name: p.name })}>
+                  <figure className={cx(c.faceTile, speaking && !p.muted && c.tileSpeaking)} aria-label={`${p.name}’s camera`}>
                     <Picture stream={stream} className={c.faceVideo} />
                     <figcaption className={c.tileName}>
                       {p.muted ? <Icon name="micOff" size={10} /> : null}
@@ -160,7 +156,7 @@ export function FaceView({ call }: { call: CallView }) {
             );
           })
         ) : (
-          <p className={c.faceWaiting}>{t('call.waitingPickUp')}</p>
+          <p className={c.faceWaiting}>Waiting for them to pick up</p>
         )}
       </div>
       {me ? (
@@ -170,7 +166,7 @@ export function FaceView({ call }: { call: CallView }) {
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
-          aria-label={t('call.yourCamera')}
+          aria-label="Your camera"
         >
           {myCam ? <Picture stream={myCam} mirrored className={c.faceVideo} /> : <Avatar name="You" id={me.peerId} size={48} />}
         </div>
@@ -181,7 +177,7 @@ export function FaceView({ call }: { call: CallView }) {
         <CallControls call={call} />
         <button type="button" className={c.faceBack} onClick={() => engine.setFaces(false)}>
           <Icon name="chat" size={14} />
-          {t('call.backToChat')}
+          Back to Chat
         </button>
       </footer>
     </section>

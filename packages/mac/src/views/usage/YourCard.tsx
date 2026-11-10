@@ -14,7 +14,6 @@ import type { ShareInput } from './share-image.js';
 import { compact } from './usage-model.js';
 import { usePicked } from './use-stats.js';
 import s from './your-card.module.css';
-import { useLocale, useT } from '../../i18n/index.js';
 
 // three.js comes only with the Usage tab, and only once the card is drawn.
 const Lanyard = lazy(() => import('../../components/reactbits/lanyard-props.js'));
@@ -92,17 +91,15 @@ export function serialOf(id: string): string {
 
 /** Your name and picture as the network knows them (else this Mac's name). */
 function useYou(state: AppState): { name: string; id: string; picture?: string } {
-  const t = useT();
   const self = state.network.self;
   const id = self?.peerId ?? state.selfId;
-  const name = self?.name || state.self?.name || t('views.you.you');
+  const name = self?.name || state.self?.name || 'You';
   const picture = useAvatarUrl(id);
   return { name, id, ...(picture ? { picture } : {}) };
 }
 
 /** Everything the card and the titles read from the stats, all time. */
 function useStanding(stats: StatsSnapshot, now: number) {
-  const locale = useLocale();
   return useMemo(() => {
     const all = totalsOf(stats, '');
     const agents = [...totalsBy(stats, 'agent', '').entries()].filter(([k, t]) => k && t.agentMs + t.prompts + t.tokens > 0).length;
@@ -112,7 +109,7 @@ function useStanding(stats: StatsSnapshot, now: number) {
       .map((w) => w.map((d) => d.level));
     const active = Object.keys(stats.days).length;
     return { all, longest, titles: titlesOf({ all, hours: stats.hours, longestStreak: longest, agents }), year, active };
-  }, [stats, now, locale]);
+  }, [stats, now]);
 }
 
 /**
@@ -122,28 +119,26 @@ function useStanding(stats: StatsSnapshot, now: number) {
  */
 export function YourCard({ state, stats, now }: { state: AppState; stats: StatsSnapshot; now: number }) {
   const [recap, setRecap] = useState(false);
-  const t = useT();
-  const locale = useLocale();
   const you = useYou(state);
   const { all, longest, titles, year, active } = useStanding(stats, now);
   const [sharing, setSharing] = useState(false);
   const [worn, setWorn] = usePicked<string>(
     'beluga.usage.title',
     titles[0]!.id,
-    titles.map((x) => x.id),
+    titles.map((t) => t.id),
   );
-  const title: Title = titles.find((x) => x.id === worn) ?? titles[0]!;
-  const since = stats.since ? t('views.you.since', { when: new Date(stats.since).toLocaleDateString([], { month: 'short', year: 'numeric' }) }) : t('views.you.fromToday');
+  const title: Title = titles.find((t) => t.id === worn) ?? titles[0]!;
+  const since = stats.since ? `Since ${new Date(stats.since).toLocaleDateString([], { month: 'short', year: 'numeric' })}` : 'From today';
   const figures = useMemo(
     () => [
-      { value: duration(all.agentMs).replace(' min', 'm'), label: t('views.you.agentTime') },
-      { value: compact(all.prompts), label: t('views.you.prompts') },
-      all.prsMerged ? { value: compact(all.prsMerged), label: t('views.you.prsMerged') } : { value: compact(all.worktrees), label: t('views.you.worktrees') },
+      { value: duration(all.agentMs).replace(' min', 'm'), label: 'agent time' },
+      { value: compact(all.prompts), label: 'prompts' },
+      all.prsMerged ? { value: compact(all.prsMerged), label: 'PRs merged' } : { value: compact(all.worktrees), label: 'worktrees' },
     ],
-    [all, locale],
+    [all],
   );
   const [faces, setFaces] = useState<Faces | undefined>(undefined);
-  const key = `${locale}|${you.name}|${you.picture ?? ''}|${title.id}|${figures.map((f) => f.value).join(',')}|${since}|${stats.hours.join('')}|${active}`;
+  const key = `${you.name}|${you.picture ?? ''}|${title.id}|${figures.map((f) => f.value).join(',')}|${since}|${stats.hours.join('')}|${active}`;
   useEffect(() => {
     let alive = true;
     void loadPicture(you.picture).then((picture) => {
@@ -157,7 +152,7 @@ export function YourCard({ state, stats, now }: { state: AppState; stats: StatsS
     // Drawn again only when what's on it changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  const others = titles.filter((x) => x.id !== title.id);
+  const others = titles.filter((t) => t.id !== title.id);
   // What the picture to share shows (drawn again only when it changes).
   const shareInput = useMemo<ShareInput | undefined>(
     () =>
@@ -165,14 +160,14 @@ export function YourCard({ state, stats, now }: { state: AppState; stats: StatsS
         ? {
             front: faces.front,
             title: title.name,
-            why: title.id === 'rookie' ? t('views.you.justStarted') : title.why,
+            why: title.id === 'rookie' ? 'Just getting started' : title.why,
             color: title.color,
             since,
             figures: [
-              { value: figures[0]!.value, label: t('views.you.withAgents') },
-              { value: compact(all.prompts), label: t('views.you.promptsSent') },
-              all.prsMerged ? { value: compact(all.prsMerged), label: t('views.you.prsMergedLong') } : { value: compact(all.worktrees), label: t('views.you.worktreesMade') },
-              longest > 1 ? { value: t('views.hours.days', { n: longest }), label: t('views.you.longest') } : { value: active.toLocaleString(), label: t('views.you.activeDays') },
+              { value: figures[0]!.value, label: 'with my agents' },
+              { value: compact(all.prompts), label: 'prompts sent' },
+              all.prsMerged ? { value: compact(all.prsMerged), label: 'pull requests merged' } : { value: compact(all.worktrees), label: 'worktrees made' },
+              longest > 1 ? { value: `${longest} days`, label: 'longest streak' } : { value: active.toLocaleString(), label: 'active days' },
             ],
           }
         : undefined,
@@ -180,7 +175,7 @@ export function YourCard({ state, stats, now }: { state: AppState; stats: StatsS
   );
   const layer = useLayer();
   return (
-    <section ref={layer.ref} className={s.hero} aria-label={t('views.you.aria')}>
+    <section ref={layer.ref} className={s.hero} aria-label="Your card">
       {/* Its place in the layout; the pass itself hangs in the layer below. */}
       <div className={s.lanyard} />
       <div className={s.layer} style={layer.style}>
@@ -189,29 +184,29 @@ export function YourCard({ state, stats, now }: { state: AppState; stats: StatsS
       <div className={s.words}>
         <span className={s.brand}>
           <Mark size={30} delay={0.3} />
-          {t('views.you.brand', { year: new Date(now).getFullYear() })}
+          Beluga · Usage Pass {new Date(now).getFullYear()}
         </span>
-        <span className={s.hi}>{t('views.you.hi', { name: you.name.split(' ')[0] ?? '' })}</span>
+        <span className={s.hi}>Hi {you.name.split(' ')[0]}, you’re a</span>
         <h1 className={s.title}>
           <span className={s.titleMark} style={{ '--t': title.color } as React.CSSProperties}>
             <Icon name={title.icon} size={26} />
           </span>
           {title.name}
         </h1>
-        <p className={s.why}>{title.id === 'rookie' ? t('views.you.rookieWhy') : t('views.recap.because', { why: title.why })}</p>
+        <p className={s.why}>{title.id === 'rookie' ? 'Titles come as your stats grow: send prompts, ship pull requests, keep a streak.' : `Because: ${title.why}.`}</p>
         {others.length ? (
           <div className={s.earned}>
-            <span className={s.earnedLabel}>{t('views.you.alsoEarned')}</span>
+            <span className={s.earnedLabel}>Also earned · press one to wear it</span>
             <div className={s.chips}>
-              {others.map((x) => (
-                <button key={x.id} type="button" className={s.chip} style={{ '--t': x.color } as React.CSSProperties} title={x.why} onClick={() => setWorn(x.id)}>
-                  <Icon name={x.icon} size={13} />
-                  {x.name}
+              {others.map((t) => (
+                <button key={t.id} type="button" className={s.chip} style={{ '--t': t.color } as React.CSSProperties} title={t.why} onClick={() => setWorn(t.id)}>
+                  <Icon name={t.icon} size={13} />
+                  {t.name}
                 </button>
               ))}
               {title.id !== titles[0]!.id ? (
                 <button type="button" className={cx(s.chip, s.chipBack)} onClick={() => setWorn(titles[0]!.id)}>
-                  {t('views.you.backTo', { name: titles[0]!.name })}
+                  Back to {titles[0]!.name}
                 </button>
               ) : null}
             </div>
@@ -219,13 +214,13 @@ export function YourCard({ state, stats, now }: { state: AppState; stats: StatsS
         ) : null}
         <div className={s.foot}>
           <Button variant="primary" icon="play" onClick={() => setRecap(true)}>
-            {t('views.you.play')}
+            Play Your Recap
           </Button>
           <Button variant="plain" icon="share" onClick={() => setSharing(true)} disabled={!faces}>
-            {t('views.you.share')}
+            Share…
           </Button>
           <span className={s.since}>
-            {since} · {t('views.you.activeN', { n: active, shown: active.toLocaleString() })}
+            {since} · {active.toLocaleString()} active {active === 1 ? 'day' : 'days'}
           </span>
         </div>
       </div>

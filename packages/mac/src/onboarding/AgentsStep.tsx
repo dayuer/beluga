@@ -13,8 +13,6 @@ import { AGENT_RECHECK_MS, type AgentRow, INSTALLS, agentRows, awaitingAgent, fi
 import { EASE_OUT, Rise, SPRING, Words } from './fx.js';
 import { Glass } from './Glass.js';
 import s from './onboarding.module.css';
-import { useT } from '../i18n/index.js';
-import { runtimeLabel } from '../lib/prefs-words.js';
 
 /** Where Settings › Agent keeps its local models (Settings.tsx), to scroll to. */
 export const LOCAL_MODELS_ID = 'settings-local-models';
@@ -71,7 +69,6 @@ export function useAgents(): { rows: AgentRow[]; checking: boolean; checked: boo
 
 /** An agent's install command (Codex's, OpenCode's npm one), a tap to copy. */
 export function CopyCommand({ className, runtime = 'codex' }: { readonly className?: string; readonly runtime?: string }) {
-  const t = useT();
   const [copied, setCopied] = useState(false);
   const command = INSTALLS[runtime]?.command;
   if (!command) return null;
@@ -79,7 +76,7 @@ export function CopyCommand({ className, runtime = 'codex' }: { readonly classNa
     <button
       type="button"
       className={className}
-      aria-label={t('onboarding.agentsStep.copy', { command })}
+      aria-label={`Copy ${command}`}
       onClick={() => {
         void copyText(command);
         setCopied(true);
@@ -100,7 +97,6 @@ export function CopyCommand({ className, runtime = 'codex' }: { readonly classNa
  */
 export function AgentsStep() {
   const api = useApi();
-  const t = useT();
   const prefs = useApp((st) => st.prefs);
   const mine = myRuntime(prefs);
   const { rows, checking, checked, check, act } = useAgents();
@@ -124,26 +120,26 @@ export function AgentsStep() {
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text={t('onboarding.agentsStep.title')} />
+        <Words text="Which agent is yours?" />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        {t('onboarding.agentsStep.body')}
+        Beluga runs the coding agents you already use. Yours starts every new conversation and answers friends; any conversation can pick another.
       </Rise>
       <Glass radius={16} width="100%" className={s.rows}>
-        <div role="radiogroup" aria-label={t('onboarding.agentsStep.yourAgent')}>
+        <div role="radiogroup" aria-label="Your agent">
           {rows.map((row, i) => {
             const ready = row.state === 'ready';
             const on = ready && row.id === mine;
             return (
               <motion.div key={row.id} className={cx(s.row, s.agentRow)} data-on={on ? '' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.25 + i * 0.06 }}>
-                <button type="button" role="radio" aria-checked={on} aria-label={runtimeLabel(row.id, row.label)} disabled={!ready} className={s.agentPick} onClick={() => choose(row)}>
+                <button type="button" role="radio" aria-checked={on} aria-label={row.label} disabled={!ready} className={s.agentPick} onClick={() => choose(row)}>
                   <span className={s.agentRadio} aria-hidden="true">
                     {on ? <motion.span layoutId="agent-on" className={s.agentRadioOn} transition={SPRING} /> : null}
                   </span>
                   <Icon name={runtimeMark(row.id)} size={20} className={s.agentMark} />
                   <span className={s.rowText}>
                     <span className={s.rowLabel}>
-                      {runtimeLabel(row.id, row.label)}
+                      {row.label}
                       <span className={s.grant} data-grant={ready ? 'granted' : undefined} data-testid={`agent-state-${row.id}`}>
                         {ready ? <Icon name="check" size={10} /> : null}
                         {row.words}
@@ -164,10 +160,10 @@ export function AgentsStep() {
         </div>
       </Glass>
       <Rise delay={0.5} className={s.agentsBar}>
-        <span>{!asked ? t('onboarding.agentsStep.looking') : anyReady ? t('onboarding.agentsStep.changeAnyTime') : t('onboarding.agentsStep.noneReady')}</span>
+        <span>{!asked ? 'Looking for your agents…' : anyReady ? 'Change it any time in Settings › Agent.' : 'None of your agents is ready yet. Sign in to one now, or go on and set one up later in Settings › Agent.'}</span>
         <button type="button" className={s.agentsCheck} disabled={checking} onClick={() => void check()}>
           <Icon name="refresh" size={12} />
-          {checking ? t('onboarding.agents.checking') : t('onboarding.agentsStep.checkAgain')}
+          {checking ? 'Checking…' : 'Check Again'}
         </button>
       </Rise>
     </div>

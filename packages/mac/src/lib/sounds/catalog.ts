@@ -2,8 +2,6 @@ import { CHIP_SOUNDS, MAC_SOUNDS, SOUND_GROUPS, type SoundChoice, type SoundPref
 import { CHIP_LABELS, chipSpec } from './chip.js';
 import { generatedName, generatedSpec } from './generated.js';
 import { render, SAMPLE_RATE } from './synth.js';
-import { t, tl } from '../../i18n/index.js';
-import { macSoundName } from '../prefs-words.js';
 
 /** Everything you can pick, with names, for Settings › Notifications. */
 
@@ -15,9 +13,9 @@ export const FAMILY_LABELS: Readonly<Record<SoundFamily, string>> = { chip: '8-b
 export function soundName(choice: SoundChoice): string {
   switch (choice.kind) {
     case 'none':
-      return t('common.catalog.none');
+      return 'None';
     case 'mac':
-      return macSoundName(choice.id);
+      return choice.id;
     case 'chip':
       return CHIP_LABELS[choice.id];
     case 'gen':
@@ -26,7 +24,7 @@ export function soundName(choice: SoundChoice): string {
 }
 
 /** "8-bit · Coin": the name with where it's from. */
-export const soundTitle = (choice: SoundChoice): string => (choice.kind === 'none' || choice.kind === 'mac' ? soundName(choice) : `${tl('FAMILY_LABELS', choice.kind, 'text', FAMILY_LABELS[choice.kind])} · ${soundName(choice)}`);
+export const soundTitle = (choice: SoundChoice): string => (choice.kind === 'none' || choice.kind === 'mac' ? soundName(choice) : `${FAMILY_LABELS[choice.kind]} · ${soundName(choice)}`);
 
 /** The sound Beluga's own chime stands in for off the Mac, where the Mac's sounds aren't there. */
 const MAC_STAND_IN: SoundChoice = { kind: 'chip', id: 'chime' };

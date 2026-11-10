@@ -1,4 +1,3 @@
-import { t, useT } from '../../i18n/index.js';
 import { useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Icon } from '../../components/Icon.js';
@@ -17,17 +16,16 @@ import s from './scenes.module.css';
 
 /** A tab's name for each film. */
 const NAMES: Readonly<Record<string, string>> = {
-  get sleep() { return t('onboarding.scene.uses.sleep'); },
-  get board() { return t('onboarding.scene.uses.board'); },
-  get fix() { return t('onboarding.scene.uses.fix'); },
-  get review() { return t('onboarding.scene.uses.review'); },
+  sleep: 'Night shift',
+  board: 'Your numbers',
+  fix: 'Failing tests',
+  review: 'Pull requests',
 };
 
 export function SentinelUses() {
   const still = (useReducedMotion() ?? false) || usePrefs().reduceMotion;
   const [at, setAt] = useState(0);
   const [held, setHeld] = useState(false);
-  useT();
   const slide = SLIDES[at]!;
   useEffect(() => {
     if (held || still) return;
@@ -37,7 +35,7 @@ export function SentinelUses() {
   return (
     <div className={s.stage}>
       <div className={s.uses} onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)}>
-        <div className={s.usesTabs} role="tablist" aria-label={t('onboarding.scene.usesLabel')}>
+        <div className={s.usesTabs} role="tablist" aria-label="What sentinels do">
           {SLIDES.map((x, i) => (
             <button key={x.id} type="button" role="tab" aria-selected={i === at} className={s.usesTab} onClick={() => setAt(i)}>
               <Icon name={x.icon} size={12} />

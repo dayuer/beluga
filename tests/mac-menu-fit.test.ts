@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the Mac app's own tsc checks these modules
 const { fitSide } = (await import('../packages/mac/src/components/SpecMenu.js' as string)) as any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { menuText } = (await import('../packages/mac/src/i18n/index.js' as string)) as any;
 
 /** Menus show whole (packages/mac/src/components/SpecMenu.tsx): the side a dropdown opens on. */
 describe('where a dropdown opens', () => {
@@ -18,11 +16,3 @@ describe('where a dropdown opens', () => {
   });
 });
 
-describe('menu words', () => {
-  it('drop the trailing ellipsis in Chinese only', () => {
-    expect(menuText('设置与运行命令…', 'zh-CN')).toBe('设置与运行命令');
-    expect(menuText('管理工作树...', 'zh-CN')).toBe('管理工作树');
-    expect(menuText('Setup and run commands…', 'en')).toBe('Setup and run commands…');
-    expect(menuText('Claude Code agent 工作树（1）…', 'zh-CN')).toBe('Claude Code agent 工作树（1）');
-  });
-});

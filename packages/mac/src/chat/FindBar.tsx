@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LogItem } from '@beluga/core/store.js';
 import { Icon } from '../components/Icon.js';
 import { IconButton } from '../components/ui.js';
-import { useT } from '../i18n/index.js';
 import s from './find.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 
@@ -74,7 +73,6 @@ export interface FindState {
  * for the one before, Esc to close. `onGo` scrolls the log to an item.
  */
 export function FindBar({ items, logRef, onGo }: { items: readonly LogItem[]; logRef: React.RefObject<HTMLElement | null>; onGo: (index: number) => void }) {
-  const t = useT();
   const [find, setFind] = useState<FindState>({ open: false, query: '', at: 0 });
   const input = useRef<HTMLInputElement>(null);
   const matches = useMemo(() => {
@@ -123,14 +121,14 @@ export function FindBar({ items, logRef, onGo }: { items: readonly LogItem[]; lo
   };
   const step = (delta: number): void => setFind((f) => ({ ...f, at: f.at + delta }));
   return (
-    <div className={s.bar} role="search" aria-label={t('chat.find.label')}>
+    <div className={s.bar} role="search" aria-label="Find in this conversation">
       <Icon name="search" size={13} className={s.glass} />
       <input
         ref={input}
         autoFocus
         className={`${s.input} selectable`}
-        placeholder={t('chat.find.label')}
-        aria-label={t('chat.find.label')}
+        placeholder="Find in this conversation"
+        aria-label="Find in this conversation"
         value={find.query}
         spellCheck={false}
         onChange={(e) => setFind({ open: true, query: e.target.value, at: 0 })}
@@ -145,14 +143,14 @@ export function FindBar({ items, logRef, onGo }: { items: readonly LogItem[]; lo
         }}
       />
       <span className={s.count} aria-live="polite">
-        {find.query.trim() ? (matches.length ? t('chat.attention.nOfTotal', { n: at + 1, total: matches.length }) : t('chat.find.none')) : ''}
+        {find.query.trim() ? (matches.length ? `${at + 1} of ${matches.length}` : 'No matches') : ''}
       </span>
       <span className={s.steps}>
-        <IconButton icon="chevronUp" label={t('chat.find.prev')} keys={shortcutKeys('conv-find-prev')} disabled={!matches.length} onClick={() => step(-1)} />
-        <IconButton icon="chevronDown" label={t('chat.find.next')} keys={shortcutKeys('conv-find-next')} disabled={!matches.length} onClick={() => step(1)} />
+        <IconButton icon="chevronUp" label="Previous match" keys={shortcutKeys('conv-find-prev')} disabled={!matches.length} onClick={() => step(-1)} />
+        <IconButton icon="chevronDown" label="Next match" keys={shortcutKeys('conv-find-next')} disabled={!matches.length} onClick={() => step(1)} />
       </span>
       <button type="button" className={s.done} onClick={close}>
-        {t('chat.attention.done')}
+        Done
       </button>
     </div>
   );

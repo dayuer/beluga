@@ -26,7 +26,6 @@ import { EDGE_TYPES, EdgeMarkers, type FlowEdge } from './edges.js';
 import { Inspector } from './Inspector.js';
 import { Walkthrough } from './Walkthrough.js';
 import g from './graph.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * A `beluga-graph`, drawn with React Flow and laid out by ELK. Nodes are drawn once out of
@@ -128,7 +127,6 @@ const MIN_ZOOM = 0.15;
 
 function Canvas({ graph, mode, localImages, onExpand, onCopy, startStep, onLaidOut, cacheKey, onOpen, openLabel, live, pack, startAt }: FlowGraphProps) {
   const uid = useId().replace(/[^\w-]/g, '');
-  const tr = useT();
   const theme = useDocTheme();
   const motion = !reducedMotion();
   const flow = useReactFlow<FlowNode, FlowEdge>();
@@ -495,22 +493,22 @@ function Canvas({ graph, mode, localImages, onExpand, onCopy, startStep, onLaidO
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.2} className={g.dots} />
         {!inline ? <MiniMap pannable zoomable className={g.minimap} nodeClassName={(n) => (n.type === 'group' ? g.miniGroup! : g.miniNode!)} /> : null}
         <Panel position="top-right" className={g.tools}>
-          {steps.length ? <IconButton icon="play" label={step >= 0 ? tr('common.graph.leaveWalk') : tr('common.graph.walk')} active={step >= 0} onClick={() => goStep(step >= 0 ? -1 : 0)} /> : null}
-          <IconButton icon={across ? 'chevronDown' : 'chevronRight'} label={across ? tr('common.graph.topToBottom') : tr('common.graph.leftToRight')} onClick={turn} />
-          <IconButton icon="outline" label={tr('common.graph.fit')} onClick={() => frameAll(duration)} />
-          {onCopy ? <IconButton icon="copy" label={tr('common.viewBlock.copyJson')} onClick={onCopy} /> : null}
-          {onExpand ? <IconButton icon="expand" label={tr('common.viewBlock.fullWindow')} onClick={onExpand} /> : null}
+          {steps.length ? <IconButton icon="play" label={step >= 0 ? 'Leave the Walkthrough' : 'Walk Me Through It'} active={step >= 0} onClick={() => goStep(step >= 0 ? -1 : 0)} /> : null}
+          <IconButton icon={across ? 'chevronDown' : 'chevronRight'} label={across ? 'Lay Out Top to Bottom' : 'Lay Out Left to Right'} onClick={turn} />
+          <IconButton icon="outline" label="Fit to View" onClick={() => frameAll(duration)} />
+          {onCopy ? <IconButton icon="copy" label="Copy as JSON" onClick={onCopy} /> : null}
+          {onExpand ? <IconButton icon="expand" label="Open in Full Window" onClick={onExpand} /> : null}
         </Panel>
         {!inline ? (
           <Panel position="bottom-left" className={g.zoom}>
-            <IconButton icon="minus" label={tr('common.graph.zoomOut')} onClick={() => void flow.zoomOut({ duration })} />
-            <IconButton icon="plus" label={tr('common.graph.zoomIn')} onClick={() => void flow.zoomIn({ duration })} />
+            <IconButton icon="minus" label="Zoom Out" onClick={() => void flow.zoomOut({ duration })} />
+            <IconButton icon="plus" label="Zoom In" onClick={() => void flow.zoomIn({ duration })} />
           </Panel>
         ) : null}
       </ReactFlow>
-      {phase === 'failed' ? <div className={g.overlayNote}>{tr('common.graph.layoutFailed')}</div> : phase !== 'ready' ? <div className={g.overlayNote}>{tr('common.graph.layingOut')}</div> : null}
+      {phase === 'failed' ? <div className={g.overlayNote}>Couldn’t lay this graph out.</div> : phase !== 'ready' ? <div className={g.overlayNote}>Laying out…</div> : null}
       {current ? <Walkthrough steps={steps} index={step} onGo={goStep} /> : null}
-      {picked ? <Inspector graph={graph} node={picked} onPick={focusNode} onClose={() => setSelected(undefined)} wide={!inline} {...(onOpen ? { onOpen: () => onOpen(picked.id), openLabel: openLabel ?? tr('common.ui.open') } : {})} /> : null}
+      {picked ? <Inspector graph={graph} node={picked} onPick={focusNode} onClose={() => setSelected(undefined)} wide={!inline} {...(onOpen ? { onOpen: () => onOpen(picked.id), openLabel: openLabel ?? 'Open' } : {})} /> : null}
     </div>
   );
 }

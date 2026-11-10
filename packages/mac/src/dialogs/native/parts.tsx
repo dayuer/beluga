@@ -7,7 +7,6 @@ import { Button, cx } from '../../components/ui.js';
 import { tildePath } from '../../lib/brand.js';
 import s from './sharing.module.css';
 import { primaryKey } from '../../lib/shortcuts-model.js';
-import { useT } from '../../i18n/index.js';
 
 /**
  * The pieces the sharing sheets and popovers are built from: a sheet with a header and a
@@ -30,7 +29,6 @@ export interface SheetProps {
 }
 
 export function Sheet({ title, subtitle, icon, badge, close, footer, children, wide, onReturn }: SheetProps) {
-  const t = useT();
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : close())}>
       <Dialog.Portal>
@@ -51,7 +49,7 @@ export function Sheet({ title, subtitle, icon, badge, close, footer, children, w
               <Dialog.Title className={s.title}>{title}</Dialog.Title>
               {subtitle ? <div className={s.subtitle}>{subtitle}</div> : null}
             </div>
-            <Dialog.Close className={s.close} aria-label={t('dialogs.parts.close')}>
+            <Dialog.Close className={s.close} aria-label="Close">
               <Icon name="x" size={11} />
             </Dialog.Close>
           </header>
@@ -145,7 +143,6 @@ export function Choice<T extends string>({ value, options, onChange, label, tone
 
 /** "Are you sure?" the Mac way: what happens, Cancel, and the button that does it. */
 export function Alert({ title, message, confirm, onConfirm, onCancel }: { title: string; message: string; confirm: string; onConfirm: () => void; onCancel: () => void }) {
-  const t = useT();
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>
       <Dialog.Portal>
@@ -160,7 +157,7 @@ export function Alert({ title, message, confirm, onConfirm, onCancel }: { title:
           </p>
           <div className={s.alertButtons}>
             <Button onClick={onCancel} autoFocus>
-              {t('dialogs.parts.cancel')}
+              Cancel
             </Button>
             <Button variant="danger" className={s.alertDanger} onClick={onConfirm}>
               {confirm}

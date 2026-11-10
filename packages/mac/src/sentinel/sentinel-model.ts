@@ -42,11 +42,8 @@ import {
 import { agentForChoice } from '../../../../src/ui/agent-choice.js';
 import type { IconName } from '../components/Icon.js';
 import { ago } from '../tasks/tasks-model.js';
-import { assistantTitle } from '../lib/brand.js';
+import { ASSISTANT_TITLE } from '../../../../src/shared/assistant.js';
 import { computerTitle, computerWord } from '../lib/os-words.js';
-import { currentLocale, t as tr, tl } from '../i18n/index.js';
-import type { Key } from '../i18n/index.js';
-import { localPausedWords, localSchedule } from '../lib/ci-sentinel-words.js';
 
 /**
  * Sentinel's window, its plain parts (docs/sentinel.md §3): the list's rows and groups, the
@@ -60,19 +57,6 @@ export type Show = 'watching' | 'paused' | 'all';
 
 /** What a later update brings (shown on the disabled choices). */
 export const LATER = 'Comes with a later update';
-/** The same, in the language shown. */
-export const later = (): string => tr('sentinel.model.later');
-
-/** A label from an engine table, in the language shown (its English as the fallback). */
-const runStateLabel = (st: RunState): string => tl('RUN_STATE_INFO', st, 'label', RUN_STATE_INFO[st].label);
-const triggerLabel = (k: TriggerKind): string => tl('TRIGGER_INFO', k, 'label', TRIGGER_INFO[k].label);
-/** Dates in the language shown. */
-const dateLocale = (): string => (currentLocale() === 'zh-CN' ? 'zh-CN' : 'en-US');
-/** A choice whose words are read when shown. */
-const said = <T extends object>(o: T, words: Record<string, Key>): T => {
-  for (const [field, key] of Object.entries(words)) Object.defineProperty(o, field, { get: () => tr(key), enumerable: true });
-  return o;
-};
 
 // ---------------------------------------------------------------- icons
 
@@ -126,31 +110,31 @@ const startOf = (ts: number): number => {
 export function whenText(ts: number, now: number): string {
   const days = Math.round((startOf(now) - startOf(ts)) / DAY);
   const at = clockOf(ts);
-  if (days === 0) return tr('sentinel.model.today', { at });
-  if (days === 1) return tr('sentinel.model.yesterday', { at });
-  if (days > 1 && days < 7) return `${new Date(ts).toLocaleDateString(dateLocale(), { weekday: 'short' })} ${at}`;
-  return `${new Date(ts).toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' })} ${at}`;
+  if (days === 0) return `Today ${at}`;
+  if (days === 1) return `Yesterday ${at}`;
+  if (days > 1 && days < 7) return `${new Date(ts).toLocaleDateString('en-US', { weekday: 'short' })} ${at}`;
+  return `${new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${at}`;
 }
 
 /** When it runs next, short: "7:00" today, "Tue 7:00" this week, "Nov 3" later. */
 export function nextText(ts: number, now: number): string {
   const days = Math.round((startOf(ts) - startOf(now)) / DAY);
   if (days <= 0) return clockOf(ts);
-  if (days === 1) return tr('sentinel.model.tomorrow', { at: clockOf(ts) });
-  if (days < 7) return `${new Date(ts).toLocaleDateString(dateLocale(), { weekday: 'short' })} ${clockOf(ts)}`;
-  return new Date(ts).toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' });
+  if (days === 1) return `tomorrow ${clockOf(ts)}`;
+  if (days < 7) return `${new Date(ts).toLocaleDateString('en-US', { weekday: 'short' })} ${clockOf(ts)}`;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /** How long something took: "48 s", "2.1 s", "4 min 12 s", "1 h 3 min". */
 export function durationText(ms: number): string {
   if (ms < 0) return '';
-  if (ms < 10_000) return tr('sentinel.model.sec', { s: (Math.round(ms / 100) / 10).toString() });
+  if (ms < 10_000) return `${(Math.round(ms / 100) / 10).toString()} s`;
   const s = Math.round(ms / 1000);
-  if (s < 60) return tr('sentinel.model.sec', { s });
+  if (s < 60) return `${s} s`;
   const m = Math.floor(s / 60);
-  if (m < 60) return s % 60 ? tr('sentinel.model.minSec', { m, s: s % 60 }) : tr('sentinel.model.min', { m });
+  if (m < 60) return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
   const h = Math.floor(m / 60);
-  return m % 60 ? tr('sentinel.model.hMin', { h, m: m % 60 }) : tr('sentinel.model.h', { h });
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
 }
 
 /** A run's length: from its start to its end, or to now while it goes. */
@@ -180,7 +164,7 @@ export function filterSentinels(items: readonly Sentinel[], opts: { readonly sco
     if (opts.show === 'watching' && s.paused) return false;
     if (opts.show === 'paused' && !s.paused) return false;
     if (!q) return true;
-    const words = [s.name, localSchedule(s.trigger), ...s.steps.map((st) => `${st.name} ${STEP_INFO[st.kind].label}`)].join(' ').toLowerCase();
+    const words = [s.name, scheduleSentence(s.trigger), ...s.steps.map((st) => `${st.name} ${STEP_INFO[st.kind].label}`)].join(' ').toLowerCase();
     return words.includes(q);
   });
 }
@@ -202,7 +186,7 @@ export function groupSentinels(items: readonly Sentinel[], projects: ReadonlyArr
   }
   const known = new Set(projects.map((p) => p.id));
   const mac = items.filter((s) => !s.projectId || !known.has(s.projectId));
-  if (mac.length) out.push({ name: assistantTitle(), items: [...mac].sort(byName) });
+  if (mac.length) out.push({ name: ASSISTANT_TITLE, items: [...mac].sort(byName) });
   return out;
 }
 
@@ -229,10 +213,10 @@ export function rowOf(state: SentinelState, s: Sentinel, now: number): Row {
   const info = last ? RUN_STATE_INFO[last.state] : undefined;
   const trouble = troubleOf(state, s);
   return {
-    sentence: localSchedule(s.trigger, nameOfIn(state)),
+    sentence: scheduleSentence(s.trigger, nameOfIn(state)),
     ...(trouble ? { trouble } : {}),
-    ...(last && info ? { last: { id: last.id, state: last.state, label: runStateLabel(last.state), tone: info.tone, headline: headlineOf(last), when: ago(last.startedAt, now) } } : {}),
-    ...(next !== undefined && !s.paused ? { next: tr('sentinel.model.next', { when: nextText(next, now) }) } : {}),
+    ...(last && info ? { last: { id: last.id, state: last.state, label: info.label, tone: info.tone, headline: headlineOf(last), when: ago(last.startedAt, now) } } : {}),
+    ...(next !== undefined && !s.paused ? { next: `next ${nextText(next, now)}` } : {}),
     live: Boolean(last && isLive(last.state) && last.state !== 'needs-you'),
     steps: s.steps.map((st) => ({ kind: st.kind, name: st.name })),
   };
@@ -253,23 +237,23 @@ export function troubleOf(state: Pick<SentinelState, 'troubles' | 'webhook'>, s:
 /** A run's one line: its headline, else what it's doing. */
 export function headlineOf(run: Pick<RunSummary, 'headline' | 'state' | 'why'>): string {
   if (run.headline) return run.headline;
-  if (run.state === 'running') return tr('sentinel.model.running');
-  if (run.state === 'queued') return tr('sentinel.model.queued');
-  return run.why ?? runStateLabel(run.state);
+  if (run.state === 'running') return 'Running…';
+  if (run.state === 'queued') return 'Waiting for the run before it';
+  return run.why ?? RUN_STATE_INFO[run.state].label;
 }
 
 /** The sidebar row's line, and whether it's a problem (paused after failures; Claude's change isn't one). */
 /** Why a sentinel stopped on its own (failures in a row, a limit hit), in words; undefined while it's on, paused by hand, or paused because your agent changed it. */
-export const brokenWords = (s: Sentinel): string | undefined => (s.paused && s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? (localPausedWords(s) ?? tr('sentinel.model.pausedAfterFailures')) : undefined);
+export const brokenWords = (s: Sentinel): string | undefined => (s.paused && s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? (pausedWords(s) ?? 'Paused after failures') : undefined);
 
 export function sidebarLine(state: SentinelState): { readonly text: string; readonly problem: boolean } {
   const broken = state.items.map(brokenWords).find((w) => w !== undefined);
   if (broken) return { text: broken, problem: true };
   const watching = state.items.filter((s) => !s.paused);
-  if (!state.items.length) return { text: tr('sentinel.model.nothingYet'), problem: false };
-  if (!watching.length) return { text: tr('sentinel.model.nothingWatching', { n: state.items.length }), problem: false };
+  if (!state.items.length) return { text: 'Nothing watching yet', problem: false };
+  if (!watching.length) return { text: `Nothing watching · ${state.items.length} paused`, problem: false };
   const soonest = watching.map((s) => state.nextAt[s.id]).filter((n): n is number => n !== undefined).sort((a, b) => a - b)[0];
-  return { text: `${tr('sentinel.model.watching', { n: watching.length })}${soonest !== undefined ? tr('sentinel.model.nextAt', { at: clockOf(soonest) }) : ''}`, problem: false };
+  return { text: `${watching.length} watching${soonest !== undefined ? ` · next at ${clockOf(soonest)}` : ''}`, problem: false };
 }
 
 /** Whether any run is going now (the sidebar's live dot). */
@@ -280,7 +264,7 @@ export function footLine(items: readonly Sentinel[], runs: readonly RunSummary[]
   const c = countsOf(items);
   const ids = new Set(items.map((s) => s.id));
   const last = runs.filter((r) => ids.has(r.sentinelId)).reduce<number | undefined>((at, r) => (at === undefined || r.startedAt > at ? r.startedAt : at), undefined);
-  return [tr('sentinel.model.watching', { n: c.watching }), ...(c.paused ? [tr('sentinel.model.paused', { n: c.paused })] : []), ...(last !== undefined ? [tr('sentinel.model.lastRun', { ago: ago(last, now) })] : [])].join(' · ');
+  return [`${c.watching} watching`, ...(c.paused ? [`${c.paused} paused`] : []), ...(last !== undefined ? [`last run ${ago(last, now)}`] : [])].join(' · ');
 }
 
 // ---------------------------------------------------------------- runs
@@ -289,27 +273,27 @@ export function footLine(items: readonly Sentinel[], runs: readonly RunSummary[]
 export function byWords(run: Pick<RunSummary, 'by' | 'trigger'>, state: Pick<SentinelState, 'items' | 'runs'>): string {
   switch (run.by) {
     case 'schedule':
-      return tr('sentinel.model.by.schedule');
+      return 'schedule';
     case 'you':
-      return tr('sentinel.model.by.you');
+      return 'you';
     case 'phone':
-      return tr('sentinel.model.by.phone');
+      return 'your phone';
     case 'claude':
-      return tr('sentinel.model.by.agent');
+      return 'your agent';
     case 'event':
-      return run.trigger.summary || tr('sentinel.model.by.event');
+      return run.trigger.summary || 'an event';
     default: {
       const before = state.runs.find((r) => r.id === run.by.slice('after:'.length));
       const name = before ? state.items.find((s) => s.id === before.sentinelId)?.name : undefined;
-      return name ? tr('sentinel.model.by.after', { name }) : tr('sentinel.model.by.afterAnother');
+      return name ? `after ${name}` : 'after another sentinel';
     }
   }
 }
 
 /** Under a run's title: "Nightly tests · ran by schedule · Fri 2:00 · 4 min 12 s". */
 export function runLine(run: RunSummary, name: string | undefined, state: Pick<SentinelState, 'items' | 'runs'>, now: number): string {
-  const took = run.endedAt !== undefined ? durationText(run.endedAt - run.startedAt) : tr('sentinel.model.soFar', { d: durationText(now - run.startedAt) });
-  return [name ?? tr('sentinel.model.aSentinel'), tr('sentinel.model.ranBy', { by: byWords(run, state) }), whenText(run.startedAt, now), took].join(' · ');
+  const took = run.endedAt !== undefined ? durationText(run.endedAt - run.startedAt) : `${durationText(now - run.startedAt)} so far`;
+  return [name ?? 'A sentinel', `ran by ${byWords(run, state)}`, whenText(run.startedAt, now), took].join(' · ');
 }
 
 /** The history's dot strip: up to the last 30 runs, oldest first, each with its tone. */
@@ -317,7 +301,7 @@ export function dotStrip(runs: readonly RunSummary[], keep = 30): Array<{ readon
   return [...runs]
     .sort((a, b) => a.startedAt - b.startedAt)
     .slice(-keep)
-    .map((r) => ({ id: r.id, state: r.state, tone: RUN_STATE_INFO[r.state].tone, label: `${runStateLabel(r.state)} · ${headlineOf(r)}` }));
+    .map((r) => ({ id: r.id, state: r.state, tone: RUN_STATE_INFO[r.state].tone, label: `${RUN_STATE_INFO[r.state].label} · ${headlineOf(r)}` }));
 }
 
 /** Where a run's chat opens: a worktree's or a project chat's conversation, or one of Your Mac's chats. */
@@ -343,11 +327,11 @@ export function runsFolderOf(runs: ReadonlyArray<Pick<RunSummary, 'report'>>): s
 // ---------------------------------------------------------------- the When card
 
 export const EVERY_CHOICES: ReadonlyArray<{ readonly value: ScheduleEvery; readonly label: string }> = [
-  said({ value: 'day' as const, label: '' }, { label: 'sentinel.model.every.day' }),
-  said({ value: 'other-day' as const, label: '' }, { label: 'sentinel.model.every.otherDay' }),
-  said({ value: 'week' as const, label: '' }, { label: 'sentinel.model.every.week' }),
-  said({ value: 'month' as const, label: '' }, { label: 'sentinel.model.every.month' }),
-  said({ value: 'hours' as const, label: '' }, { label: 'sentinel.model.every.hours' }),
+  { value: 'day', label: 'Every day' },
+  { value: 'other-day', label: 'Every other day' },
+  { value: 'week', label: 'Every week' },
+  { value: 'month', label: 'Every month' },
+  { value: 'hours', label: 'Every few hours' },
 ];
 
 export const DEFAULT_SCHEDULE: ScheduleTrigger = { kind: 'schedule', every: 'day', at: '07:00', missed: 'catch-up' };
@@ -377,8 +361,21 @@ export const HOURS_CHOICES: readonly ScheduleHours[] = [1, 2, 3, 6, 12];
 
 /** "What starts it": a schedule, by hand, after another sentinel, or an event (each kind this Beluga runs). */
 export function triggerChoices(): Array<{ readonly value: TriggerKind; readonly label: string; readonly disabled: boolean; readonly description?: string }> {
-  return (Object.keys(TRIGGER_INFO) as TriggerKind[]).map((k) => ({ value: k, label: k === 'schedule' ? tr('sentinel.model.onASchedule') : triggerLabel(k), disabled: !triggerAvailable(k), ...(triggerAvailable(k) ? { description: tr(`sentinel.model.triggerHint.${k}`) } : { description: later() }) }));
+  return (Object.keys(TRIGGER_INFO) as TriggerKind[]).map((k) => ({ value: k, label: k === 'schedule' ? 'On a schedule' : TRIGGER_INFO[k].label, disabled: !triggerAvailable(k), ...(triggerAvailable(k) ? { description: TRIGGER_HINT[k] } : { description: LATER }) }));
 }
+
+/** The menu's one line under each kind. */
+const TRIGGER_HINT: Readonly<Record<TriggerKind, string>> = {
+  schedule: 'Every day, week, month or few hours',
+  manual: 'Run Now, here or from your phone',
+  after: 'When another sentinel’s run ends',
+  beluga: 'A task is done, a pull request opens, an agent finishes…',
+  github: 'An issue, a pull request, a failed workflow or deployment',
+  stripe: 'A failed payment, a subscription, a dispute, a refund',
+  uptime: 'A site stops answering, and when it’s back',
+  sentry: 'A new issue, a regression, a spike',
+  webhook: 'Its own URL: GitHub, Stripe or anything that posts',
+};
 
 /** A trigger of another kind, with what it needs filled in (an uptime starts on the project's site when it has one). */
 export function triggerOfKind(kind: TriggerKind, was: Trigger): Trigger | undefined {
@@ -414,34 +411,34 @@ export interface EventCard<W extends string = string> {
 }
 
 export const BELUGA_CARDS: ReadonlyArray<EventCard<BelugaTrigger['what']>> = [
-  said({ value: 'task-done' as const, label: '', line: '', icon: 'task' as const }, { label: 'sentinel.model.card.beluga.task-done.label', line: 'sentinel.model.card.beluga.task-done.line' }),
-  said({ value: 'pr-opened' as const, label: '', line: '', icon: 'pr' as const }, { label: 'sentinel.model.card.beluga.pr-opened.label', line: 'sentinel.model.card.beluga.pr-opened.line' }),
-  said({ value: 'pr-merged' as const, label: '', line: '', icon: 'merge' as const }, { label: 'sentinel.model.card.beluga.pr-merged.label', line: 'sentinel.model.card.beluga.pr-merged.line' }),
-  said({ value: 'milestone-passed' as const, label: '', line: '', icon: 'flag' as const }, { label: 'sentinel.model.card.beluga.milestone-passed.label', line: 'sentinel.model.card.beluga.milestone-passed.line' }),
-  said({ value: 'claude-finished' as const, label: '', line: '', icon: 'claude' as const }, { label: 'sentinel.model.card.beluga.claude-finished.label', line: 'sentinel.model.card.beluga.claude-finished.line' }),
-  said({ value: 'friend-asks' as const, label: '', line: '', icon: 'people' as const }, { label: 'sentinel.model.card.beluga.friend-asks.label', line: 'sentinel.model.card.beluga.friend-asks.line' }),
+  { value: 'task-done', label: 'A task is done', line: 'Any task on the board goes Done', icon: 'task' },
+  { value: 'pr-opened', label: 'A pull request opens', line: 'From one of your worktrees', icon: 'pr' },
+  { value: 'pr-merged', label: 'A pull request merges', line: 'One of your worktrees’ pull requests', icon: 'merge' },
+  { value: 'milestone-passed', label: 'A milestone passes', line: 'In one of your plans', icon: 'flag' },
+  { value: 'claude-finished', label: 'Agent finishes', line: 'A worktree’s agent ends its turn', icon: 'claude' },
+  { value: 'friend-asks', label: 'A friend asks', line: 'A request from a friend comes in', icon: 'people' },
 ];
 
 export const GITHUB_CARDS: ReadonlyArray<EventCard<GitHubTrigger['what']>> = [
-  said({ value: 'workflow-failed' as const, label: '', line: '', icon: 'alert' as const }, { label: 'sentinel.model.card.github.workflow-failed.label', line: 'sentinel.model.card.github.workflow-failed.line' }),
-  said({ value: 'issue-opened' as const, label: '', line: '', icon: 'issue' as const }, { label: 'sentinel.model.card.github.issue-opened.label', line: 'sentinel.model.card.github.issue-opened.line' }),
-  said({ value: 'issue-labelled' as const, label: '', line: '', icon: 'tag' as const }, { label: 'sentinel.model.card.github.issue-labelled.label', line: 'sentinel.model.card.github.issue-labelled.line' }),
-  said({ value: 'pr-opened' as const, label: '', line: '', icon: 'pr' as const }, { label: 'sentinel.model.card.github.pr-opened.label', line: 'sentinel.model.card.github.pr-opened.line' }),
-  said({ value: 'deployment-failed' as const, label: '', line: '', icon: 'globe' as const }, { label: 'sentinel.model.card.github.deployment-failed.label', line: 'sentinel.model.card.github.deployment-failed.line' }),
+  { value: 'workflow-failed', label: 'A workflow fails', line: 'CI or any Actions run', icon: 'alert' },
+  { value: 'issue-opened', label: 'An issue opens', line: 'Anyone opens one', icon: 'issue' },
+  { value: 'issue-labelled', label: 'An issue gets a label', line: 'Like “bug”, or any label', icon: 'tag' },
+  { value: 'pr-opened', label: 'A pull request opens', line: 'Yours or anyone’s', icon: 'pr' },
+  { value: 'deployment-failed', label: 'A deployment fails', line: 'Its latest status says failed', icon: 'globe' },
 ];
 
 export const STRIPE_CARDS: ReadonlyArray<EventCard<StripeTrigger['what']>> = [
-  said({ value: 'payment-failed' as const, label: '', line: '', icon: 'alert' as const }, { label: 'sentinel.model.card.stripe.payment-failed.label', line: 'sentinel.model.card.stripe.payment-failed.line' }),
-  said({ value: 'subscription-started' as const, label: '', line: '', icon: 'play' as const }, { label: 'sentinel.model.card.stripe.subscription-started.label', line: 'sentinel.model.card.stripe.subscription-started.line' }),
-  said({ value: 'subscription-ended' as const, label: '', line: '', icon: 'stop' as const }, { label: 'sentinel.model.card.stripe.subscription-ended.label', line: 'sentinel.model.card.stripe.subscription-ended.line' }),
-  said({ value: 'dispute-opened' as const, label: '', line: '', icon: 'flag' as const }, { label: 'sentinel.model.card.stripe.dispute-opened.label', line: 'sentinel.model.card.stripe.dispute-opened.line' }),
-  said({ value: 'refund' as const, label: '', line: '', icon: 'refresh' as const }, { label: 'sentinel.model.card.stripe.refund.label', line: 'sentinel.model.card.stripe.refund.line' }),
+  { value: 'payment-failed', label: 'A payment fails', line: 'A card declined, an invoice unpaid', icon: 'alert' },
+  { value: 'subscription-started', label: 'A subscription starts', line: 'A new customer subscribes', icon: 'play' },
+  { value: 'subscription-ended', label: 'A subscription ends', line: 'Cancelled or ran out', icon: 'stop' },
+  { value: 'dispute-opened', label: 'A dispute opens', line: 'A customer disputes a charge', icon: 'flag' },
+  { value: 'refund', label: 'A refund happens', line: 'From Stripe or your app', icon: 'refresh' },
 ];
 
 export const SENTRY_CARDS: ReadonlyArray<EventCard<SentryTrigger['what']>> = [
-  said({ value: 'new-issue' as const, label: '', line: '', icon: 'spark' as const }, { label: 'sentinel.model.card.sentry.new-issue.label', line: 'sentinel.model.card.sentry.new-issue.line' }),
-  said({ value: 'regression' as const, label: '', line: '', icon: 'refresh' as const }, { label: 'sentinel.model.card.sentry.regression.label', line: 'sentinel.model.card.sentry.regression.line' }),
-  said({ value: 'spike' as const, label: '', line: '', icon: 'chartLine' as const }, { label: 'sentinel.model.card.sentry.spike.label', line: 'sentinel.model.card.sentry.spike.line' }),
+  { value: 'new-issue', label: 'A new issue', line: 'An error Sentry hasn’t seen before', icon: 'spark' },
+  { value: 'regression', label: 'A regression', line: 'A resolved error is back', icon: 'refresh' },
+  { value: 'spike', label: 'A spike', line: 'Escalating, or 5× the hour before', icon: 'chartLine' },
 ];
 
 /** The cards each event kind shows (uptime and webhook have fields, not choices). */
@@ -463,46 +460,50 @@ export function eventCards(kind: TriggerKind): ReadonlyArray<EventCard> | undefi
 export const GITHUB_MINUTES: readonly number[] = [1, 2, 5, 15, 30, 60];
 export const UPTIME_MINUTES: ReadonlyArray<UptimeTrigger['minutes']> = [1, 5, 15];
 export const SIGNATURES: ReadonlyArray<{ readonly value: 'none' | NonNullable<WebhookTrigger['signature']>; readonly label: string; readonly description: string }> = [
-  said({ value: 'none' as const, label: '', description: '' }, { label: 'sentinel.model.signature.none.label', description: 'sentinel.model.signature.none.description' }),
-  said({ value: 'github' as const, label: 'GitHub', description: '' }, { description: 'sentinel.model.signature.github.description' }),
-  said({ value: 'stripe' as const, label: 'Stripe', description: '' }, { description: 'sentinel.model.signature.stripe.description' }),
+  { value: 'none', label: 'None', description: 'The secret in the URL is the check' },
+  { value: 'github', label: 'GitHub', description: 'X-Hub-Signature-256, with this sentinel’s signing secret (Copy Secret)' },
+  { value: 'stripe', label: 'Stripe', description: 'Stripe-Signature, with STRIPE_WEBHOOK_SECRET from Settings › Environment' },
 ];
 
-const every = (minutes: number): string => tr('sentinel.model.everyMinutes', { n: minutes });
+const every = (minutes: number): string => (minutes === 1 ? 'every minute' : `every ${minutes} minutes`);
 
 /** One sentence of what will happen, under the event's fields. `where`: the project's name and GitHub repository, when known. */
 export function eventSentence(t: Trigger, where: { readonly project?: string; readonly repo?: string } = {}): string | undefined {
-  const project = where.project ? tr('sentinel.model.event.inProject', { project: where.project }) : tr('sentinel.model.event.inAnyProject');
+  const project = where.project ? `in ${where.project}` : 'in any project';
   switch (t.kind) {
     case 'beluga': {
-      const p = t.projectId ? project : tr('sentinel.model.event.inAnyProject');
+      const p = t.projectId ? project : 'in any project';
       const what = BELUGA_CARDS.find((c) => c.value === t.what)?.label.toLowerCase() ?? t.what;
-      return tr('sentinel.model.event.beluga', { what, where: p });
+      return `When ${what} ${p}, a run starts with what happened as {{trigger}}. Its own runs’ worktrees, pull requests and chats never start it again.`;
     }
     case 'github': {
-      const repo = where.repo ?? tr('sentinel.model.event.projectRepo');
+      const repo = where.repo ?? 'the project’s repository';
       const what =
         t.what === 'workflow-failed'
-          ? tr('sentinel.model.event.github.workflowFailed')
+          ? 'a workflow run failed, the run starts with its failed jobs, the first failing step and the end of its log'
           : t.what === 'issue-labelled'
-            ? tr('sentinel.model.event.github.issueLabelled', { label: t.label ? tr('sentinel.model.event.github.theLabel', { label: t.label }) : tr('sentinel.model.event.github.aLabel') })
+            ? `an issue got ${t.label ? `the label “${t.label}”` : 'a label'}, the run starts with the issue`
             : t.what === 'deployment-failed'
-              ? tr('sentinel.model.event.github.deploymentFailed')
+              ? 'a deployment failed, the run starts with its environment, commit and status'
               : t.what === 'issue-opened'
-                ? tr('sentinel.model.event.github.issueOpened')
-                : tr('sentinel.model.event.github.prOpened');
-      return tr('sentinel.model.event.github', { repo, every: every(t.minutes ?? 2), what });
+                ? 'an issue opened, the run starts with the issue'
+                : 'a pull request opened, the run starts with it';
+      return `Beluga asks GitHub about ${repo} ${every(t.minutes ?? 2)} with gh. When ${what}. What was there before it was on never fires.`;
     }
     case 'stripe':
-      return tr('sentinel.model.event.stripe');
+      return `Beluga reads the project’s Stripe events every 2 minutes with its key from Earnings. Each new one starts a run with its amount, currency, the customer’s email and the description; never card details.`;
     case 'uptime':
-      return tr('sentinel.model.event.uptime', { host: hostOf(t.url) || tr('sentinel.model.event.theAddress'), every: every(t.minutes), expect: t.expect ?? 200 });
+      return `Beluga opens ${hostOf(t.url) || 'the address'} ${every(t.minutes)} and expects ${t.expect ?? 200} within 10 seconds. Two misses in a row start a run (“stopped answering”), and the first good answer after that starts another (“back”).`;
     case 'sentry':
       return t.org && t.project
-        ? tr('sentinel.model.event.sentry', { org: t.org, project: t.project, what: t.what === 'spike' ? tr('sentinel.model.event.sentry.spike') : t.what === 'regression' ? tr('sentinel.model.event.sentry.regression') : tr('sentinel.model.event.sentry.newIssue') })
-        : tr('sentinel.model.event.sentry.missing');
+        ? `Beluga reads ${t.org}/${t.project}’s unresolved issues every 2 minutes with $SENTRY_TOKEN. ${t.what === 'spike' ? 'An issue Sentry calls escalating, or with 5 times the events of the hour before (10 at least), starts a run once.' : t.what === 'regression' ? 'An issue that came back after it was resolved starts a run once.' : 'An issue first seen after it was turned on starts a run.'}`
+        : 'Say which Sentry organization and project, as in the address of its issues page (sentry.io/organizations/<org>/projects/<project>).';
     case 'webhook':
-      return t.signature === 'github' ? tr('sentinel.model.event.webhook.github') : t.signature === 'stripe' ? tr('sentinel.model.event.webhook.stripe') : tr('sentinel.model.event.webhook.any');
+      return t.signature === 'github'
+        ? 'Point GitHub’s webhook at this URL with Copy Secret’s secret as its Secret; it’s live while this sentinel is on. Each post starts a run with what was posted.'
+        : t.signature === 'stripe'
+          ? 'Point a Stripe webhook endpoint at this URL and keep its signing secret (whsec_…) in Settings › Environment as STRIPE_WEBHOOK_SECRET; it’s live while this sentinel is on.'
+          : 'Point GitHub’s webhook (or anything that posts) at this URL; it’s live while this sentinel is on. Each post starts a run with what was posted.';
     default:
       return undefined;
   }
@@ -521,12 +522,12 @@ export function looksLikeUrl(v: string): boolean {
 }
 
 /** The address the tunnel changes: quick tunnels get a new name when Beluga restarts. */
-export const webhookMoves = (): string => tr('sentinel.model.webhookMoves');
+export const WEBHOOK_MOVES = 'The address changes when Beluga restarts (Cloudflare quick tunnels get a new name): Copy it again then.';
 
 export const AFTER_ON: ReadonlyArray<{ readonly value: AfterTrigger['on']; readonly label: string; readonly description: string }> = [
-  said({ value: 'failure' as const, label: '', description: '' }, { label: 'sentinel.model.afterOn.failure.label', description: 'sentinel.model.afterOn.failure.description' }),
-  said({ value: 'success' as const, label: '', description: '' }, { label: 'sentinel.model.afterOn.success.label', description: 'sentinel.model.afterOn.success.description' }),
-  said({ value: 'always' as const, label: '', description: '' }, { label: 'sentinel.model.afterOn.always.label', description: 'sentinel.model.afterOn.always.description' }),
+  { value: 'failure', label: 'When it fails', description: 'A fixer for what the other one found broken' },
+  { value: 'success', label: 'When it succeeds', description: 'The next part of the work' },
+  { value: 'always', label: 'Whenever it runs', description: 'Done or failed; not when it had nothing to do' },
 ];
 
 /** The sentinels an "after" (or Run another sentinel) may name: every other one, A to Z. */
@@ -534,7 +535,7 @@ export const otherSentinels = (items: readonly Sentinel[], self: string): Array<
   items
     .filter((i) => i.id !== self)
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((i) => ({ value: i.id, label: i.name, ...(i.paused ? { description: tr('sentinel.model.pausedChoice') } : {}) }));
+    .map((i) => ({ value: i.id, label: i.name, ...(i.paused ? { description: 'Paused: it won’t start until you turn it on' } : {}) }));
 
 // ---------------------------------------------------------------- the Steps card
 
@@ -542,9 +543,7 @@ export const otherSentinels = (items: readonly Sentinel[], self: string): Array<
 export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label: string; readonly prompt: string }> = [
   {
     id: 'brief',
-    get label() {
-      return tr('sentinel.model.preset.brief');
-    },
+    label: 'Write a brief of what changed',
     prompt: [
       'Write a brief for {{project}} ({{date}}) of what changed since the last run: commits on the default branch (`git log --since="24 hours ago"`), pull requests opened, merged or waiting for review (`gh pr list`), new issues (`gh issue list`), the latest CI runs (`gh run list --limit 10`), and these open tasks:',
       '{{tasks}}',
@@ -554,9 +553,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
   },
   {
     id: 'tasks',
-    get label() {
-      return tr('sentinel.model.preset.tasks');
-    },
+    label: 'Turn this into tasks',
     prompt: [
       'Here is what came in:',
       '{{previous}}',
@@ -569,9 +566,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
   },
   {
     id: 'fix',
-    get label() {
-      return tr('sentinel.model.preset.fix');
-    },
+    label: 'Investigate and fix it',
     prompt: [
       'Something needs looking at:',
       '{{trigger}}',
@@ -582,9 +577,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
   },
   {
     id: 'review',
-    get label() {
-      return tr('sentinel.model.preset.review');
-    },
+    label: 'Review the changes',
     prompt: [
       'Review what changed in {{project}} since the last run (`git log --since="24 hours ago" -p`, and open pull requests with `gh pr diff`).',
       '',
@@ -593,9 +586,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
   },
   {
     id: 'deps',
-    get label() {
-      return tr('sentinel.model.preset.deps');
-    },
+    label: 'Update dependencies and run the tests',
     prompt: [
       'Update this project’s dependencies within the ranges its manifest allows, with its own package manager and lockfile.',
       'Run the tests and the type check. If something breaks, fix it when the fix is small and clear; otherwise put that dependency back and say why.',
@@ -604,9 +595,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
   },
   {
     id: 'notes',
-    get label() {
-      return tr('sentinel.model.preset.notes');
-    },
+    label: 'Write release notes',
     prompt: [
       'Write release notes for {{project}} up to {{date}} from the pull requests merged and the tasks done since the last release.',
       'Group them as New, Better and Fixed, one line each in plain words a user understands, in the voice of the project’s README and earlier notes. Leave out internal chores. If nothing shipped, say so in one line.',
@@ -615,7 +604,7 @@ export const CLAUDE_PRESETS: ReadonlyArray<{ readonly id: string; readonly label
 ];
 
 /** The one line under a text field: what it can say. */
-export const templateHelp = (): string => tr('sentinel.model.templateHelp');
+export const TEMPLATE_HELP = '{{trigger}}, {{previous}}, {{steps.<name>}}, {{project}}, {{date}}; $VAR from Settings › Environment';
 
 export interface StepChoice {
   readonly kind: StepKind;
@@ -630,7 +619,7 @@ export function stepChoices(access: Access): StepChoice[] {
     const info = STEP_INFO[kind];
     const later = !stepAvailable(kind);
     const refused = later ? undefined : stepRefusal(access, kind);
-    return { kind, label: tl('STEP_INFO', kind, 'label', info.label), hint: later ? tr('sentinel.model.later') : (refused ?? tl('STEP_INFO', kind, 'hint', info.hint)), disabled: later || Boolean(refused) };
+    return { kind, label: info.label, hint: later ? LATER : (refused ?? info.hint), disabled: later || Boolean(refused) };
   });
 }
 
@@ -638,44 +627,36 @@ export function stepChoices(access: Access): StepChoice[] {
 export function newStep(kind: StepKind): StepDraft {
   switch (kind) {
     case 'claude':
-      return { kind: 'claude', name: tr('sentinel.model.newStep.claude'), prompt: '', where: 'project' };
+      return { kind: 'claude', name: 'Ask your agent', prompt: '', where: 'project' };
     case 'script':
-      return { kind: 'script', name: tr('sentinel.model.newStep.script'), command: '', cwd: 'project', timeoutSec: 120 };
+      return { kind: 'script', name: 'Run a script', command: '', cwd: 'project', timeoutSec: 120 };
     case 'notify':
-      return { kind: 'notify', name: tr('sentinel.model.newStep.notify'), phone: false };
+      return { kind: 'notify', name: 'Tell me', phone: false };
     case 'http':
-      return { kind: 'http', name: tr('sentinel.model.newStep.http'), method: 'GET', url: 'https://', headers: {}, timeoutSec: 30, preset: 'url' };
+      return { kind: 'http', name: 'Call a service', method: 'GET', url: 'https://', headers: {}, timeoutSec: 30, preset: 'url' };
     case 'pr':
-      return { kind: 'pr', name: tr('sentinel.model.newStep.pr') };
+      return { kind: 'pr', name: 'Open a pull request' };
     case 'merge':
-      return { kind: 'merge', name: tr('sentinel.model.newStep.merge'), require: { checks: true, approval: true }, method: 'squash' };
+      return { kind: 'merge', name: 'Merge if acceptable', require: { checks: true, approval: true }, method: 'squash' };
     case 'message':
-      return { kind: 'message', name: tr('sentinel.model.newStep.message'), to: '', text: '{{sentinel}}: {{previous}}' };
+      return { kind: 'message', name: 'Message a chat', to: '', text: '{{sentinel}}: {{previous}}' };
     case 'friend':
-      return { kind: 'friend', name: tr('sentinel.model.newStep.friend'), peerId: '', prompt: '' };
+      return { kind: 'friend', name: 'Ask a friend’s agent', peerId: '', prompt: '' };
     case 'trigger':
-      return { kind: 'trigger', name: tr('sentinel.model.newStep.trigger'), sentinelId: '' };
+      return { kind: 'trigger', name: 'Run another sentinel', sentinelId: '' };
     case 'measure':
-      return { kind: 'measure', name: tr('sentinel.model.newStep.measure'), from: 'previous', metrics: [] };
+      return { kind: 'measure', name: 'Keep the numbers', from: 'previous', metrics: [] };
   }
 }
 
 // ---------------------------------------------------------------- phase 2's step fields
 
-export const SERVICE_CHOICES = (Object.keys(SERVICE_PRESETS) as Array<keyof typeof SERVICE_PRESETS>).map((k) => ({
-  value: k,
-  get label() {
-    return tl('SERVICE_PRESETS', k, 'label', SERVICE_PRESETS[k].label);
-  },
-  get description() {
-    return tl('SERVICE_PRESETS', k, 'line', SERVICE_PRESETS[k].line);
-  },
-}));
+export const SERVICE_CHOICES = (Object.keys(SERVICE_PRESETS) as Array<keyof typeof SERVICE_PRESETS>).map((k) => ({ value: k, label: SERVICE_PRESETS[k].label, description: SERVICE_PRESETS[k].line }));
 
 export const HTTP_METHODS: ReadonlyArray<HttpStep['method']> = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /** The one line under a service's fields: where secrets go, and that headers stay out of reports. */
-export const secretsNote = (): string => tr('sentinel.model.secretsNote');
+export const SECRETS_NOTE = '$VAR from Settings › Environment; headers never show in reports';
 
 /** Headers as rows to edit (one empty row to add to, at the end). */
 export function headerRows(headers: Readonly<Record<string, string>>): Array<{ readonly key: string; readonly value: string }> {
@@ -692,25 +673,25 @@ export function rowsToHeaders(rows: ReadonlyArray<{ readonly key: string; readon
 /** Where a Message step can write: your friends and the groups you're in. */
 export function chatChoices(network: { readonly friends: ReadonlyArray<{ readonly peerId: string; readonly name: string }>; readonly groups: ReadonlyArray<{ readonly id: string; readonly name: string; readonly active: boolean }> }): Array<{ readonly value: string; readonly label: string; readonly description: string }> {
   return [
-    ...[...network.friends].sort((a, b) => a.name.localeCompare(b.name)).map((f) => ({ value: `dm:${f.peerId}`, label: f.name, description: tr('sentinel.model.directMessage') })),
-    ...network.groups.filter((g) => g.active).sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({ value: `group:${g.id}`, label: g.name, description: tr('sentinel.model.aGroup') })),
+    ...[...network.friends].sort((a, b) => a.name.localeCompare(b.name)).map((f) => ({ value: `dm:${f.peerId}`, label: f.name, description: 'A direct message' })),
+    ...network.groups.filter((g) => g.active).sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({ value: `group:${g.id}`, label: g.name, description: 'A group' })),
   ];
 }
 
 /** The merge step in words: who decides. */
 export const mergeWords = (step: Pick<MergeStep, 'require'>): string =>
-  step.require.approval ? tr('sentinel.model.merge.approval') : tr('sentinel.model.merge.byItself');
+  step.require.approval ? 'It merges once the checks pass, the agent’s review says ship, and you tap Merge (here or on your phone).' : 'It merges by itself once the checks pass and the agent’s review says ship. A hold still asks you.';
 
 /** The access sentence, as the picker shows it (Ship says when a merge goes by itself). */
 export function accessSentence(access: Access, steps: readonly Step[]): string {
-  if (access === 'ship' && steps.some((st) => st.kind === 'merge' && !st.require.approval)) return tr('sentinel.model.shipMerges');
-  return tl('ACCESS_INFO', access, 'sentence', ACCESS_INFO[access].sentence);
+  if (access === 'ship' && steps.some((st) => st.kind === 'merge' && !st.require.approval)) return 'Your agent can change code in a worktree, open pull requests, and merge by itself when the checks pass';
+  return ACCESS_INFO[access].sentence;
 }
 
 // ---------------------------------------------------------------- New Sentinel
 
 /** A recipe's row in New Sentinel: when it runs, in the sentence its page will show. */
-export const recipeWhen = (r: Recipe): string => (r.sentinel.trigger ? localSchedule(r.sentinel.trigger) : triggerLabel('manual'));
+export const recipeWhen = (r: Recipe): string => (r.sentinel.trigger ? scheduleSentence(r.sentinel.trigger) : TRIGGER_INFO.manual.label);
 
 // ---------------------------------------------------------------- Claude changing it (the page's box)
 
@@ -727,7 +708,7 @@ export function describedName(text: string): string {
     .slice(0, 5)
     .join(' ')
     .replace(/(\s+(and|or|the|a|an|to|of|with|for))+$/i, '');
-  return words ? (words.charAt(0).toUpperCase() + words.slice(1)).slice(0, 80) : tr('sentinel.model.newSentinel');
+  return words ? (words.charAt(0).toUpperCase() + words.slice(1)).slice(0, 80) : 'New sentinel';
 }
 
 export interface AskLine {
@@ -740,10 +721,10 @@ export function askLine(ask: SentinelAsk | undefined, live: { readonly running: 
   if (!ask) return undefined;
   if (ask.state === 'writing') {
     const last = live?.running && live.last && live.last !== ask.text ? live.last : undefined;
-    return { who: 'claude', text: last ? tr('sentinel.model.ask.writingWhat', { what: toolWords(last) }) : tr('sentinel.model.ask.writing') };
+    return { who: 'claude', text: last ? `Your agent is writing… ${toolWords(last)}` : 'Your agent is writing…' };
   }
-  if (ask.state === 'failed') return { who: 'failed', text: ask.answer ? tr('sentinel.model.ask.stoppedWhy', { why: ask.answer }) : tr('sentinel.model.ask.stopped') };
-  return { who: 'done', text: ask.answer || tr('sentinel.model.ask.done') };
+  if (ask.state === 'failed') return { who: 'failed', text: ask.answer ? `Your agent stopped: ${ask.answer}` : 'Your agent stopped' };
+  return { who: 'done', text: ask.answer || 'Done' };
 }
 
 /** Claude's words with each `sentinel:<id>` it names said by name (“Open pull requests”), as a one-line status shows them. */
@@ -756,8 +737,8 @@ export function namedLine(text: string, nameOf: (id: string) => string | undefin
 
 /** A tool step in plain words ("mcp__beluga_sentinel__sentinel_update" → "changing the sentinel"). */
 function toolWords(line: string): string {
-  if (/sentinel_update/.test(line)) return tr('sentinel.model.ask.changing');
-  if (/sentinel_get|sentinel_list/.test(line)) return tr('sentinel.model.ask.reading');
+  if (/sentinel_update/.test(line)) return 'changing the sentinel';
+  if (/sentinel_get|sentinel_list/.test(line)) return 'reading the sentinel';
   return line.replace(/^mcp__\w+__/, '').slice(0, 120);
 }
 
@@ -776,7 +757,7 @@ export function duplicateStep(steps: readonly Step[], at: number): StepDraft[] {
   const s = steps[at];
   if (!s) return [...steps];
   const { id: _id, ...rest } = s;
-  const copy = { ...rest, name: tr('sentinel.model.copyName', { name: s.name }).slice(0, 80) } as StepDraft;
+  const copy = { ...rest, name: `${s.name} copy`.slice(0, 80) } as StepDraft;
   return [...steps.slice(0, at + 1), copy, ...steps.slice(at + 1)];
 }
 
@@ -788,23 +769,10 @@ export const patchStep = (steps: readonly Step[], id: string, patch: Partial<Ste
 export const PER_DAY_CHOICES: readonly number[] = [0, 1, 2, 3, 4, 6, 12, 24];
 export const PAUSE_AFTER_CHOICES: readonly number[] = [0, 1, 2, 3, 5, 10];
 
-export const perDayLabel = (n: number | undefined): string => (!n ? tr('sentinel.model.noLimit') : tr('sentinel.model.perDay', { n }));
-export const pauseAfterLabel = (n: number): string => (n === 0 ? tr('sentinel.model.never') : tr('sentinel.model.failuresInARow', { n }));
+export const perDayLabel = (n: number | undefined): string => (!n ? 'No limit' : n === 1 ? 'Once a day' : `${n} a day`);
+export const pauseAfterLabel = (n: number): string => (n === 0 ? 'Never' : n === 1 ? '1 failure' : `${n} failures in a row`);
 
-export const NOTIFY_LABEL: Readonly<Record<Sentinel['notify'], string>> = {
-  get mac() {
-    return tr('sentinel.model.notify.mac', { computer: computerWord() });
-  },
-  get phone() {
-    return tr('sentinel.model.notify.phone');
-  },
-  get both() {
-    return tr('sentinel.model.notify.both', { computer: computerTitle() });
-  },
-  get off() {
-    return tr('sentinel.model.notify.off');
-  },
-};
+export const NOTIFY_LABEL: Readonly<Record<Sentinel['notify'], string>> = { mac: `On the ${computerWord()}`, phone: 'On your phone', both: `${computerTitle()} and phone`, off: 'Off' };
 
 /** The model the Claude steps share ('' for Claude Code's default, undefined when they differ or there are none). */
 export function sharedModel(steps: readonly Step[]): string | undefined {
@@ -866,7 +834,7 @@ export const isSentinelView = (kind: string): boolean => SENTINEL_VIEWS.has(kind
 // ---------------------------------------------------------------- one page (BLG-300)
 
 /** What a sentinel does, in a few words: its steps' names in order ("Read what changed → Notify me"). */
-export const doesLine = (s: Pick<Sentinel, 'steps'>): string => (s.steps.length ? s.steps.map((st) => st.name).join(' → ') : tr('sentinel.model.noSteps'));
+export const doesLine = (s: Pick<Sentinel, 'steps'>): string => (s.steps.length ? s.steps.map((st) => st.name).join(' → ') : 'No steps yet');
 
 /** A run as a dot in a row's strip: its state's tone, and what to say on hover. */
 export interface RunDot {
@@ -881,7 +849,7 @@ export function dotsOf(state: Pick<SentinelState, 'runs'>, id: string, now: numb
     .filter((r) => r.sentinelId === id)
     .sort((a, b) => a.startedAt - b.startedAt)
     .slice(-n)
-    .map((r) => ({ id: r.id, state: r.state, label: `${ago(r.startedAt, now)} · ${runStateLabel(r.state)}${r.headline ? ` · ${r.headline}` : ''}` }));
+    .map((r) => ({ id: r.id, state: r.state, label: `${ago(r.startedAt, now)} · ${RUN_STATE_INFO[r.state].label}${r.headline ? ` · ${r.headline}` : ''}` }));
 }
 
 /** Something on Sentinel's page that waits for you, with what you'd do about it. */
@@ -902,15 +870,15 @@ export function needsOf(state: SentinelState, scope?: string): Need[] {
     if (run.state !== 'needs-you') continue;
     const s = items.find((i) => i.id === run.sentinelId);
     if (!s) continue;
-    out.push({ kind: 'merge', key: `run:${run.id}`, sentinel: s, run, title: run.pr ? tr('sentinel.model.need.merge', { name: s.name, n: run.pr.number }) : tr('sentinel.model.need.waits', { name: s.name }), detail: headlineOf(run) });
+    out.push({ kind: 'merge', key: `run:${run.id}`, sentinel: s, run, title: run.pr ? `${s.name} wants to merge #${run.pr.number}` : `${s.name} waits for you`, detail: headlineOf(run) });
   }
   for (const s of items) {
-    if (s.paused && s.pausedWhy === CLAUDE_CHANGED) out.push({ kind: 'changed', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.changed', { name: s.name }), detail: tr('sentinel.model.need.changedDetail') });
-    else if (s.paused && s.pausedWhy) out.push({ kind: 'failing', key: `s:${s.id}`, sentinel: s, title: `${s.name}: ${localPausedWords(s) ?? tr('sentinel.model.need.paused')}`, detail: headlineOf(lastRunOf(state, s.id) ?? { headline: '', state: 'failed' }) });
-    else if (!s.paused && troubleOf(state, s)) out.push({ kind: 'trouble', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.cantWatch', { name: s.name }), detail: troubleOf(state, s)! });
+    if (s.paused && s.pausedWhy === CLAUDE_CHANGED) out.push({ kind: 'changed', key: `s:${s.id}`, sentinel: s, title: `Your agent changed what “${s.name}” can do`, detail: 'Look it over, then turn it on again' });
+    else if (s.paused && s.pausedWhy) out.push({ kind: 'failing', key: `s:${s.id}`, sentinel: s, title: `${s.name}: ${pausedWords(s) ?? 'paused'}`, detail: headlineOf(lastRunOf(state, s.id) ?? { headline: '', state: 'failed' }) });
+    else if (!s.paused && troubleOf(state, s)) out.push({ kind: 'trouble', key: `s:${s.id}`, sentinel: s, title: `${s.name} can’t watch`, detail: troubleOf(state, s)! });
   }
   for (const s of items) {
-    if (s.paused && !s.pausedWhy && !lastRunOf(state, s.id)) out.push({ kind: 'draft', key: `s:${s.id}`, sentinel: s, title: tr('sentinel.model.need.draft', { name: s.name }), detail: [localSchedule(s.trigger, nameOf), doesLine(s)].join(' · ') });
+    if (s.paused && !s.pausedWhy && !lastRunOf(state, s.id)) out.push({ kind: 'draft', key: `s:${s.id}`, sentinel: s, title: `“${s.name}” is ready: look it over`, detail: [scheduleSentence(s.trigger, nameOf), doesLine(s)].join(' · ') });
   }
   return out;
 }
@@ -920,20 +888,20 @@ export function scopesOf(items: readonly Sentinel[], projects: ReadonlyArray<{ r
   const known = new Set(projects.map((p) => p.id));
   const mac = items.filter((s) => !s.projectId || !known.has(s.projectId)).length;
   return [
-    { value: undefined, label: tr('sentinel.model.allProjects'), count: items.length },
+    { value: undefined, label: 'All projects', count: items.length },
     ...projects.flatMap((p) => {
       const count = items.filter((s) => s.projectId === p.id).length;
       return count ? [{ value: p.id, label: p.name, count }] : [];
     }),
-    ...(mac ? [{ value: MAC_SCOPE, label: assistantTitle(), count: mac }] : []),
+    ...(mac ? [{ value: MAC_SCOPE, label: ASSISTANT_TITLE, count: mac }] : []),
   ];
 }
 
 /** The starting points on an empty Sentinel, grouped by what you get. */
 export const START_GROUPS: ReadonlyArray<{ readonly label: string; readonly ids: readonly string[] }> = [
-  said({ label: '', ids: ['morning-brief', 'uptime-guard', 'review-new-prs', 'issues-to-tasks', 'release-notes', 'failed-payments', 'watch-the-web'] }, { label: 'sentinel.model.start.tellMe' }),
-  said({ label: '', ids: ['fix-what-broke', 'nightly-tests', 'dependency-updates', 'fix-and-ship'] }, { label: 'sentinel.model.start.fixIt' }),
-  said({ label: '', ids: ['stripe-revenue', 'open-issues-prs', 'site-speed', 'customers-this-week', 'youtube-subscribers', 'last-job-run'] }, { label: 'sentinel.model.start.keepANumber' }),
+  { label: 'Tell me', ids: ['morning-brief', 'uptime-guard', 'review-new-prs', 'issues-to-tasks', 'release-notes', 'failed-payments', 'watch-the-web'] },
+  { label: 'Fix it', ids: ['fix-what-broke', 'nightly-tests', 'dependency-updates', 'fix-and-ship'] },
+  { label: 'Keep a number', ids: ['stripe-revenue', 'open-issues-prs', 'site-speed', 'customers-this-week', 'youtube-subscribers', 'last-job-run'] },
 ];
 
 /** The recipes in their groups, `per` at most in each (the rest are in New Sentinel › Recipe). */
@@ -943,9 +911,9 @@ export function startingPoints(recipes: readonly Recipe[], per = 4): Array<{ rea
 
 /** The toolbar's line under Sentinel: how it's doing ("8 watching · next at 7:00 · 2 need you"), or what it is. */
 export function sentinelSubtitle(state: SentinelState): string {
-  if (!state.items.length) return tr('sentinel.model.subtitleEmpty');
+  if (!state.items.length) return 'Things Beluga keeps an eye on for you';
   const needs = needsOf(state).length;
-  return [sidebarLine(state).text, ...(needs ? [tr('sentinel.model.needYou', { n: needs })] : [])].join(' · ');
+  return [sidebarLine(state).text, ...(needs ? [`${needs} ${needs === 1 ? 'needs' : 'need'} you`] : [])].join(' · ');
 }
 
 /**

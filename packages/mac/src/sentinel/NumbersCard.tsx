@@ -10,7 +10,6 @@ import { useSentinelActions } from './use-sentinel.js';
 import t from '../tasks/tasks.module.css';
 import s from './sentinel.module.css';
 import n from './numbers.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * A sentinel's Numbers (docs/sentinel.md §10), above its History when it keeps any: each number as
@@ -20,21 +19,20 @@ import { useT } from '../i18n/index.js';
  */
 export function NumbersCard({ item }: { item: Sentinel }) {
   const all = useApp((st) => st.sentinel.metrics?.[item.id]);
-  const tr = useT();
   const [compare, setCompare] = useState<Compare>('previous');
   const [open, setOpen] = useState<string>();
   const { numbers, tables } = useMemo(() => metricsOf({ metrics: all ? { [item.id]: all } : {} }, item.id), [all, item.id]);
   if (!numbers.length && !tables.length) return null;
   const shown = numbers.find((m) => m.name === open);
   return (
-    <section className={s.card} aria-label={tr('sentinel.numbersCard.numbers')} data-testid="sentinel-numbers">
+    <section className={s.card} aria-label="Numbers" data-testid="sentinel-numbers">
       <header className={s.cardHead}>
-        <h3 className={s.cardTitle}>{tr('sentinel.numbersCard.numbers')}</h3>
+        <h3 className={s.cardTitle}>Numbers</h3>
         <span className={t.grow} />
         {numbers.length ? <CompareSwitch value={compare} onChange={setCompare} /> : null}
       </header>
       {numbers.length ? (
-        <div className={n.tiles} role="list" aria-label={tr('sentinel.measure.numbersItKeeps')}>
+        <div className={n.tiles} role="list" aria-label="Numbers it keeps">
           {numbers.map((m) => (
             <div key={m.name} role="listitem" className={n.tileCell} data-metric={m.name}>
               <NumberTile w={numberWords(m, compare)} selected={open === m.name} onClick={() => setOpen(open === m.name ? undefined : m.name)} />
@@ -48,7 +46,7 @@ export function NumbersCard({ item }: { item: Sentinel }) {
           <div className={n.rowsHead}>
             <span className={n.rowsTitle}>{m.label}</span>
             <span className={s.hint}>
-              {tr('sentinel.numbersCard.rows', { n: m.rows?.length ?? 0 })}
+              {m.rows?.length ?? 0} {m.rows?.length === 1 ? 'row' : 'rows'}
               {m.rowsAt ? ` · ${ago(m.rowsAt)}` : ''}
             </span>
           </div>
@@ -62,7 +60,6 @@ export function NumbersCard({ item }: { item: Sentinel }) {
 /** One number over time: its whole history from the files (the state's 90 points until it comes); a point opens its run. */
 function OverTime({ item, metric, close }: { item: Sentinel; metric: MetricSeries; close: () => void }) {
   const a = useSentinelActions();
-  const tr = useT();
   const [whole, setWhole] = useState<MetricSeries>();
   const last = metric.points.at(-1)?.at;
   useEffect(() => {
@@ -81,10 +78,12 @@ function OverTime({ item, metric, close }: { item: Sentinel; metric: MetricSerie
   return (
     <div className={n.detail} data-testid="sentinel-number-chart">
       <div className={n.detailHead}>
-        <span className={n.rowsTitle}>{tr('sentinel.numbersCard.overTime', { label: metric.label })}</span>
-        <span className={s.hint}>{tr('sentinel.numbersCard.points', { n: series.points.length })}</span>
+        <span className={n.rowsTitle}>{metric.label} over time</span>
+        <span className={s.hint}>
+          {series.points.length} {series.points.length === 1 ? 'point' : 'points'} · a point opens its run
+        </span>
         <span className={t.grow} />
-        <IconButton icon="x" label={tr('sentinel.numbersCard.closeChart')} onClick={close} />
+        <IconButton icon="x" label="Close the chart" onClick={close} />
       </div>
       <MetricChart series={[series]} height={220} onRun={(runId) => a.openRun(runId)} />
     </div>

@@ -29,8 +29,6 @@ import { CleanUpWorktreesAlert } from './CleanUpWorktrees.js';
 import { DeleteProjectAlert } from './DeleteProjectAlert.js';
 import { WorkConfirm } from './WorkConfirm.js';
 import { GitTroubleSheet } from './GitTroubleSheet.js';
-import { rich } from './pick.js';
-import { useT } from '../../i18n/index.js';
 
 /** The folder and branch name Beluga makes from a name (as the core's `slug` does). */
 const slug = (name: string): string =>
@@ -42,7 +40,6 @@ const slug = (name: string): string =>
 
 /** Fork a workspace: a copy with its committed work and its conversation, under a new name. */
 function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
-  const t = useT();
   const api = useApi();
   const ws = useApp((st) => findWorkspace(st.projects, wsId));
   const siblings = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === wsId))?.workspaces);
@@ -51,10 +48,10 @@ function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
   const taken = siblings?.some((w) => w.name === slug(name));
   return (
     <FormSheet
-      title={t('dialogs.forkSheet.title', { name: ws.name })}
+      title={`Fork “${ws.name}”`}
       icon="branch"
-      intro={t('dialogs.forkSheet.intro')}
-      submitLabel={t('dialogs.forkSheet.fork')}
+      intro="A new worktree that starts from this one’s commits, with a copy of its conversation, so you can try another direction. Uncommitted changes stay here."
+      submitLabel="Fork"
       canSubmit={Boolean(slug(name)) && !taken}
       onSubmit={() => {
         void api.workspaces.fork(ws.id, name.trim());
@@ -63,7 +60,7 @@ function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
       onCancel={close}
       width={500}
     >
-      <Field label={t('dialogs.forkSheet.name')} htmlFor="fork-name" error={taken ? t('dialogs.forkSheet.taken') : undefined} hint={slug(name) ? <>{rich(t('dialogs.forkSheet.branch'), { branch: <code>beluga/{slug(name)}</code> })}</> : undefined}>
+      <Field label="Name" htmlFor="fork-name" error={taken ? 'A workspace in this project has this name.' : undefined} hint={slug(name) ? <>Branch <code>beluga/{slug(name)}</code></> : undefined}>
         <TextInput id="fork-name" value={name} onChange={setName} maxLength={120} invalid={taken} />
       </Field>
     </FormSheet>
@@ -72,7 +69,6 @@ function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
 
 /** Run one command on a friend's computer; the output shows in this chat. */
 function PeerRunSheet({ peerId, close }: { peerId?: string; close: () => void }) {
-  const t = useT();
   const api = useApi();
   const peers = useApp((st) => st.peers);
   const granted = useApp((st) => st.granted);
@@ -87,20 +83,20 @@ function PeerRunSheet({ peerId, close }: { peerId?: string; close: () => void })
       <Alert
         icon="terminal"
         tone="info"
-        title={t('dialogs.peerRun.nobodyTitle')}
-        message={t('dialogs.peerRun.nobodyMessage')}
+        title="Nobody lets you run commands yet"
+        message="When a friend lets your agent run commands on their computer, you can run one there yourself too. They choose that in their People settings."
         cancel={false}
-        confirm={{ label: t('dialogs.peerRun.ok'), onClick: close }}
+        confirm={{ label: 'OK', onClick: close }}
         onCancel={close}
       />
     );
   }
   return (
     <FormSheet
-      title={peer ? t('dialogs.peerRun.title', { name: peer.name }) : t('dialogs.peerRun.titleFriend')}
+      title={peer ? `Run a Command on ${peer.name}’s Computer` : 'Run a Command on a Friend’s Computer'}
       icon="terminal"
-      intro={peer ? (full ? t('dialogs.peerRun.now') : t('dialogs.peerRun.approve', { name: peer.name })) : t('dialogs.peerRun.output')}
-      submitLabel={t('dialogs.peerRun.run')}
+      intro={peer ? (full ? 'It runs right away. The output shows in this chat.' : `${peer.name} approves it first. The output shows in this chat.`) : 'The output shows in this chat.'}
+      submitLabel="Run"
       canSubmit={Boolean(peer && command.trim())}
       onSubmit={() => {
         if (!peer) return;
@@ -111,11 +107,11 @@ function PeerRunSheet({ peerId, close }: { peerId?: string; close: () => void })
       width={520}
     >
       {peerId ? null : (
-        <Field label={t('dialogs.peerRun.on')} htmlFor="run-peer">
-          <Popup id="run-peer" label={t('dialogs.peerRun.whose')} value={who} onChange={setWho} options={able.map((p) => ({ value: p.peerId, label: t('dialogs.peerRun.computer', { name: p.name }) }))} />
+        <Field label="On" htmlFor="run-peer">
+          <Popup id="run-peer" label="Whose computer" value={who} onChange={setWho} options={able.map((p) => ({ value: p.peerId, label: `${p.name}’s computer` }))} />
         </Field>
       )}
-      <Field label={t('dialogs.peerRun.command')} htmlFor="run-command">
+      <Field label="Command" htmlFor="run-command">
         <TextInput id="run-command" value={command} onChange={setCommand} mono placeholder="npm test" data-autofocus />
       </Field>
     </FormSheet>
@@ -124,7 +120,6 @@ function PeerRunSheet({ peerId, close }: { peerId?: string; close: () => void })
 
 /** What removing or leaving does, asked before the menu option runs. */
 function OptionAlert({ sheet, close }: { sheet: Extract<NativeSheet, { kind: 'confirm_option' }>; close: () => void }) {
-  const t = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const state = client.store.getState();
@@ -135,16 +130,16 @@ function OptionAlert({ sheet, close }: { sheet: Extract<NativeSheet, { kind: 'co
   const { menu } = sheet;
   const project = menu.kind === 'project' ? state.projects.find((p) => p.id === menu.id) : undefined;
   const shared = menu.kind === 'shared' ? state.shared.find((w) => w.owner === menu.owner && w.id === menu.id) : undefined;
-  const owner = shared ? (state.peers.find((p) => p.peerId === shared.owner)?.name ?? t('dialogs.option.theOwner')) : '';
+  const owner = shared ? (state.peers.find((p) => p.peerId === shared.owner)?.name ?? 'The owner') : '';
   switch (sheet.id) {
     case 'p-hide':
       return (
         <Alert
           icon="eye"
           tone="info"
-          title={t('dialogs.option.hideTitle', { name: project?.name ?? t('dialogs.option.thisProject') })}
-          message={t('dialogs.option.hideMessage')}
-          confirm={{ label: t('dialogs.option.hide'), onClick: go }}
+          title={`Hide “${project?.name ?? 'this project'}”?`}
+          message="It leaves the sidebar. Nothing is deleted: its folder and worktrees stay on disk, and you can add it back any time with Add Project."
+          confirm={{ label: 'Hide Project', onClick: go }}
           onCancel={close}
         />
       );
@@ -153,16 +148,16 @@ function OptionAlert({ sheet, close }: { sheet: Extract<NativeSheet, { kind: 'co
         <Alert
           icon="share"
           tone="caution"
-          title={t('dialogs.option.leaveTitle', { name: shared?.name ?? t('dialogs.option.thisWorkspace') })}
-          message={t('dialogs.option.leaveMessage', { owner })}
-          confirm={{ label: t('dialogs.option.leave'), destructive: true, onClick: go }}
+          title={`Leave “${shared?.name ?? 'this workspace'}”?`}
+          message={`You stop seeing its chat and files. ${owner} can invite you again.`}
+          confirm={{ label: 'Leave', destructive: true, onClick: go }}
           onCancel={close}
         />
       );
     default: {
       // Anything else that asks first: its own words from the menu.
       const option = menuSpec(state, menu)?.options[sheet.index];
-      return <Alert title={`${option?.label ?? t('dialogs.option.continue')}?`} message={option?.hint} confirm={{ label: option?.label ?? t('dialogs.option.ok'), destructive: true, onClick: go }} onCancel={close} />;
+      return <Alert title={`${option?.label ?? 'Continue'}?`} message={option?.hint} confirm={{ label: option?.label ?? 'OK', destructive: true, onClick: go }} onCancel={close} />;
     }
   }
 }

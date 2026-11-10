@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { githubId, runId, setupId, shellId } from '@beluga/shared/terminal-keys.js';
+import { githubId, runId, setupId, shellId, terminalLabel } from '@beluga/shared/terminal-keys.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { ActionsDropdown, type ActionItem } from '../../components/SpecMenu.js';
 import { Button, Dot, Empty, IconButton } from '../../components/ui.js';
@@ -8,7 +7,7 @@ import { useActions } from '../../lib/actions.js';
 import { useApi, useApp, useBeluga, useUi } from '../../lib/beluga.js';
 import { closeFocus, moveTerminal, openFocus, usePanelRuntime } from '../../lib/panel.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
-import { terminalTabLabel, useGlobalShells } from '../../lib/shells.js';
+import { useGlobalShells } from '../../lib/shells.js';
 import { chordLabel } from '../../lib/shortcuts-model.js';
 import { claimShell, extraShells, pruneShells, releaseShell, useShellOwners } from '../../lib/ws-shells.js';
 import { EnvStale, NoShells, ShellTabs, useEnvStale } from '../../views/TerminalView.js';
@@ -16,7 +15,6 @@ import { TerminalTab } from '../../views/TerminalTab.js';
 import { Xterm } from '../../views/Xterm.js';
 import t from '../../views/terminal.module.css';
 import s from './panel.module.css';
-import { useT } from '../../i18n/index.js';
 
 /** How recently ⌘J must have asked for the keyboard for a terminal that just appeared to take it. */
 const FOCUS_WINDOW_MS = 800;
@@ -50,7 +48,7 @@ function useWorkspaceTerminals(wsId: string): Tabbed {
   const isExtra = (k: string): boolean => extra.includes(k);
   return {
     key,
-    tabs: keys.map((k) => ({ key: k, label: terminalTabLabel(k, names), running: k in terminals && !(k in exits), ...(k in exits ? { exit: exits[k] } : {}), closable: isExtra(k), renamable: k === shellId(wsId) || isExtra(k) })),
+    tabs: keys.map((k) => ({ key: k, label: terminalLabel(k, names), running: k in terminals && !(k in exits), ...(k in exits ? { exit: exits[k] } : {}), closable: isExtra(k), renamable: k === shellId(wsId) || isExtra(k) })),
     start: (size) => {
       if (key === shellId(wsId)) void api.terminals.shell(wsId, size);
       else if (isExtra(key) && ws) void api.terminals.global(key, ws.path, size);
@@ -69,14 +67,13 @@ function useWorkspaceTerminals(wsId: string): Tabbed {
 /** The window's Run and Setup for a workspace, small enough for the terminal's bar. */
 function WorkspaceScripts({ wsId }: { wsId: string }) {
   const actions = useActions();
-  const tr = useT();
   const project = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === wsId)));
   const runOn = useApp((st) => runId(wsId) in st.terminals && !(runId(wsId) in st.termExits));
   if (!project?.scripts?.run) return null;
   return runOn ? (
-    <IconButton icon="stop" label={tr('layout.terminalPane.stop')} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'stop_run' })} />
+    <IconButton icon="stop" label="Stop running" keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'stop_run' })} />
   ) : (
-    <IconButton icon="play" label={tr('layout.terminalPane.run', { command: project.scripts.run.command })} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'run' })} />
+    <IconButton icon="play" label={`Run · ${project.scripts.run.command}`} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'run' })} />
   );
 }
 
@@ -84,26 +81,25 @@ function WorkspaceScripts({ wsId }: { wsId: string }) {
 function useMenuItems(where: 'drawer' | 'panel', wsId: string | undefined): ActionItem[] {
   const { client, ui } = useBeluga();
   const actions = useActions();
-  const tr = useT();
   const prefs = usePrefs();
   const project = useApp((st) => (wsId ? st.projects.find((p) => p.workspaces.some((w) => w.id === wsId)) : undefined));
   const other = where === 'drawer' ? 'panel' : 'drawer';
   return [
-    { label: other === 'panel' ? tr('layout.terminalPane.moveToPanel') : tr('layout.terminalPane.moveToDrawer'), icon: other === 'panel' ? 'panelRight' : 'panelBottom', onSelect: () => moveTerminal(client.store.getState(), other) },
+    { label: other === 'panel' ? 'Move to the Right Panel' : 'Move to the Bottom Drawer', icon: other === 'panel' ? 'panelRight' : 'panelBottom', onSelect: () => moveTerminal(client.store.getState(), other) },
     {
-      label: tr('layout.terminalPane.opens', { keys: chordLabel('Cmd+J') }),
+      label: `${chordLabel('Cmd+J')} Opens the Terminal`,
       separate: true,
       onSelect: () => undefined,
       submenu: [
-        { label: tr('layout.terminalPane.inDrawer'), checked: prefs.termIn === 'drawer', onSelect: () => setPrefs({ termIn: 'drawer' }) },
-        { label: tr('layout.terminalPane.inPanel'), checked: prefs.termIn === 'panel', onSelect: () => setPrefs({ termIn: 'panel' }) },
+        { label: 'In the Bottom Drawer', checked: prefs.termIn === 'drawer', onSelect: () => setPrefs({ termIn: 'drawer' }) },
+        { label: 'In the Right Panel', checked: prefs.termIn === 'panel', onSelect: () => setPrefs({ termIn: 'panel' }) },
       ],
     },
     wsId
-      ? { label: tr('layout.terminalPane.fullSize'), icon: 'expand', separate: true, onSelect: () => openFocus('terminal', wsId) }
-      : { label: tr('layout.terminalPane.openView'), icon: 'expand', separate: true, onSelect: () => actions.run({ type: 'view', view: { kind: 'terminal' } }) },
-    ...(project?.root ? [{ label: tr('layout.terminalPane.commands'), icon: 'terminal' as const, onSelect: () => ui.openMenu({ kind: 'scripts', projectId: project.id }) }] : []),
-    { label: tr('layout.terminalPane.settings'), icon: 'gear', onSelect: () => ui.patch({ settings: 'terminal' }) },
+      ? { label: 'Show Full Size', icon: 'expand', separate: true, onSelect: () => openFocus('terminal', wsId) }
+      : { label: 'Open the Terminal View', icon: 'expand', separate: true, onSelect: () => actions.run({ type: 'view', view: { kind: 'terminal' } }) },
+    ...(project?.root ? [{ label: 'Commands…', icon: 'terminal' as const, onSelect: () => ui.openMenu({ kind: 'scripts', projectId: project.id }) }] : []),
+    { label: 'Terminal Settings…', icon: 'gear', onSelect: () => ui.patch({ settings: 'terminal' }) },
   ];
 }
 
@@ -130,9 +126,6 @@ function useTabbed(wsId: string | undefined): Tabbed {
  * your own) as tabs, + for another, and the terminal itself filling the rest.
  */
 export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; onClose?: () => void }) {
-  const tr = useT();
-  // What a screen reader calls a terminal's input (xterm reads it as each terminal opens, after this).
-  Terminal.strings.promptLabel = tr('more.terminal.input');
   const view = useApp((st) => st.view);
   const exits = useApp((st) => st.termExits);
   const prefs = usePrefs();
@@ -163,9 +156,9 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
   // Restarted with new variables: a fresh terminal on the new program.
   const stale = useEnvStale(key);
   return (
-    <section className={s.term} aria-label={tr('layout.terminalPane.label')}>
+    <section className={s.term} aria-label="Terminal">
       <div className={s.termBar}>
-        <div className={s.termTabs} role="tablist" aria-label={tr('layout.terminalPane.tabs')}>
+        <div className={s.termTabs} role="tablist" aria-label="Terminals">
           {tabbed.tabs.map((x) => (
             <TerminalTab
               key={x.key}
@@ -178,26 +171,26 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
               onPick={() => tabbed.pick(x.key)}
               {...(x.closable ? { onClose: () => tabbed.close(x.key) } : {})}
               before={x.running ? <Dot tone="ok" /> : x.exit !== undefined ? <Dot tone={x.exit === 0 ? 'muted' : 'error'} /> : <Dot tone="muted" />}
-              after={x.exit !== undefined && !x.key.startsWith('shell:') ? <span className={t.exit}>{x.exit === 0 ? tr('layout.terminalPane.done') : tr('layout.terminalPane.exit', { code: x.exit ?? '?' })}</span> : null}
+              after={x.exit !== undefined && !x.key.startsWith('shell:') ? <span className={t.exit}>{x.exit === 0 ? 'done' : `exit ${x.exit ?? '?'}`}</span> : null}
             />
           ))}
-          <IconButton icon="plus" label={tr('layout.terminalPane.newShell')} className={s.termAdd} onClick={tabbed.add} />
+          <IconButton icon="plus" label="New shell" className={s.termAdd} onClick={tabbed.add} />
         </div>
         {wsId ? <WorkspaceScripts wsId={wsId} /> : null}
         <ActionsDropdown items={items}>
-          <IconButton icon="more" label={tr('layout.terminalPane.options')} />
+          <IconButton icon="more" label="Terminal options" />
         </ActionsDropdown>
-        {onClose ? <IconButton icon="x" label={tr('layout.terminalPane.closeDrawer')} keys={chordLabel('Cmd+J')} onClick={onClose} /> : null}
+        {onClose ? <IconButton icon="x" label="Close the drawer" keys={chordLabel('Cmd+J')} onClick={onClose} /> : null}
       </div>
       <div ref={body} className={s.termBody}>
         {elsewhere ? (
           <Empty
             icon={elsewhere === 'drawer' ? 'panelBottom' : 'expand'}
-            title={elsewhere === 'drawer' ? tr('layout.terminalPane.inDrawerTitle') : tr('layout.terminalPane.fullTitle')}
-            detail={elsewhere === 'drawer' ? tr('layout.terminalPane.onePlace') : undefined}
+            title={elsewhere === 'drawer' ? 'The terminal is in the drawer' : 'The terminal is showing full size'}
+            detail={elsewhere === 'drawer' ? 'It shows in one place at a time.' : undefined}
             action={
               <Button size="small" onClick={() => (elsewhere === 'drawer' ? setPrefs({ drawer: false }) : closeFocus())}>
-                {tr('layout.terminalPane.showHere')}
+                Show It Here
               </Button>
             }
           />
@@ -208,7 +201,7 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
             {key in exits && tabbed.restart ? (
               <div className={t.restart}>
                 <Button size="small" onClick={tabbed.restart}>
-                  {tr('layout.terminalPane.startAgain')}
+                  Start It Again
                 </Button>
               </div>
             ) : null}

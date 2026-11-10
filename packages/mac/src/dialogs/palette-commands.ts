@@ -12,7 +12,6 @@ import { openSupport } from '../lib/support.js';
 import { SHOW_WELCOME } from '../onboarding/onboarding-model.js';
 import { previewRequestPopup } from '../gateway/request-native.js';
 import { revealLabel } from '../lib/os-words.js';
-import { t } from '../i18n/index.js';
 
 export interface PaletteCommand {
   readonly id: string;
@@ -42,21 +41,21 @@ function workspaceCommands({ ui, actions, state }: Ctx): PaletteCommand[] {
   const project = state.projects.find((p) => p.id === ws.projectId);
   const worktree = ws.kind === 'worktree';
   const list: Array<[WorkspaceAction, PaletteCommand, boolean]> = [
-    ['pr', cmd('pr', 'pr', state.prs[ws.id] ? t('dialogs.cmd.pr') : t('dialogs.cmd.createPr'), 'pr', act('pr'), t('dialogs.cmd.prHint')), worktree],
-    ['fork', cmd('fork', 'fork', t('dialogs.cmd.fork'), 'branch', act('fork'), t('dialogs.cmd.forkHint')), ws.kind !== 'chat'],
-    ['handoff', cmd('handoff', 'handoff', t('dialogs.cmd.handoff'), 'hand', act('handoff'), t('dialogs.cmd.handoffHint')), worktree],
-    ['commit', cmd('commit', 'commit', t('dialogs.cmd.commit'), 'commit', act('commit')), worktree && Boolean(ws.status?.changed)],
-    ['merge', cmd('merge', 'merge', t('dialogs.cmd.merge'), 'merge', act('merge')), worktree],
-    ['compact', cmd('compact', 'compact', t('dialogs.cmd.compact'), 'wand', act('compact'), t('dialogs.cmd.compactHint')), true],
-    ['run', cmd('run', 'run', t('dialogs.cmd.run'), 'play', act('run')), Boolean(project?.scripts?.run)],
-    ['setup', cmd('setup', 'setup', t('dialogs.cmd.setup'), 'refresh', act('setup')), Boolean(project?.scripts?.setup)],
+    ['pr', cmd('pr', 'pr', state.prs[ws.id] ? 'Pull Request…' : 'Create Pull Request…', 'pr', act('pr'), 'Your agent pushes and opens one'), worktree],
+    ['fork', cmd('fork', 'fork', 'Fork This Workspace…', 'branch', act('fork'), 'A copy with its conversation'), ws.kind !== 'chat'],
+    ['handoff', cmd('handoff', 'handoff', 'Hand Off to Someone…', 'hand', act('handoff'), 'Their agent continues it'), worktree],
+    ['commit', cmd('commit', 'commit', 'Commit All Changes…', 'commit', act('commit')), worktree && Boolean(ws.status?.changed)],
+    ['merge', cmd('merge', 'merge', 'Merge into the Main Folder…', 'merge', act('merge')), worktree],
+    ['compact', cmd('compact', 'compact', 'Compact the Conversation…', 'wand', act('compact'), 'Your agent keeps what matters'), true],
+    ['run', cmd('run', 'run', 'Run the Project', 'play', act('run')), Boolean(project?.scripts?.run)],
+    ['setup', cmd('setup', 'setup', 'Run Setup Again', 'refresh', act('setup')), Boolean(project?.scripts?.setup)],
     ['finder', cmd('finder', 'finder', revealLabel(), 'folder', act('finder')), true],
-    ['archive', cmd('archive', 'archive', t('dialogs.cmd.archive'), 'archive', act('archive')), ws.kind !== 'main'],
-    ['delete', cmd('delete', 'delete', t('dialogs.cmd.delete'), 'alert', act('delete')), ws.kind !== 'main'],
+    ['archive', cmd('archive', 'archive', 'Archive This Workspace…', 'archive', act('archive')), ws.kind !== 'main'],
+    ['delete', cmd('delete', 'delete', 'Delete This Workspace…', 'alert', act('delete')), ws.kind !== 'main'],
   ];
   return [
     ...list.filter(([action, , ok]) => ok && !here.has(action)).map(([, c]) => c),
-    ...(project?.root ? [cmd('project', 'scripts', t('dialogs.cmd.projectSettings'), 'terminal', () => ui.openMenu({ kind: 'scripts', projectId: project.id }), t('dialogs.cmd.projectSettingsHint'))] : []),
+    ...(project?.root ? [cmd('project', 'scripts', 'Project Settings…', 'terminal', () => ui.openMenu({ kind: 'scripts', projectId: project.id }), 'Setup and Run commands')] : []),
   ];
 }
 
@@ -75,59 +74,59 @@ export function paletteCommands(ctx: Ctx): PaletteCommand[] {
     ...workspaceCommands(ctx),
     ...(talking
       ? [
-          cmd('clear', 'clear', state.view.kind === 'room' ? t('dialogs.cmd.clearRoom') : t('dialogs.cmd.clearThis'), 'x', () => ui.openMenu({ kind: 'clear', channel, host: state.isHost })),
-          cmd('plan', 'plan', state.planMode[channel] ? t('dialogs.cmd.planOff') : t('dialogs.cmd.planOn'), 'claude', () => ctx.actions.run({ type: 'plan_toggle', channel }), t('dialogs.cmd.planHint')),
-          cmd('visualize', 'visualize', t('dialogs.cmd.visualize'), 'grid', () => void api.session.submit('/visualize', { channel }), t('dialogs.cmd.visualizeHint')),
-          cmd('model', 'model', t('dialogs.cmd.model'), 'spark', () => ui.openMenu({ kind: 'model', ...(channel === 'room' ? {} : { channel }) }), t('dialogs.cmd.modelHint')),
+          cmd('clear', 'clear', state.view.kind === 'room' ? 'Clear the Group Chat…' : 'Clear This Conversation…', 'x', () => ui.openMenu({ kind: 'clear', channel, host: state.isHost })),
+          cmd('plan', 'plan', state.planMode[channel] ? 'Turn Off Plan First' : 'Turn On Plan First', 'claude', () => ctx.actions.run({ type: 'plan_toggle', channel }), 'Your agent plans, you approve, then it works'),
+          cmd('visualize', 'visualize', 'Draw This as a Graph', 'grid', () => void api.session.submit('/visualize', { channel }), 'Your agent draws this conversation as an interactive diagram'),
+          cmd('model', 'model', 'Choose the Model…', 'spark', () => ui.openMenu({ kind: 'model', ...(channel === 'room' ? {} : { channel }) }), 'For this conversation'),
         ]
       : []),
     ...(state.board.enabled
       ? [
-          { id: 'tasks:new', label: t('dialogs.cmd.newTask'), icon: 'task' as const, hint: t('dialogs.cmd.newTaskHint'), keywords: ['task', 'issue', 'todo', 'ticket'], run: () => openSheet({ kind: 'new_task' }) },
-          { id: 'plans:new', label: t('dialogs.cmd.newPlan'), icon: 'flag' as const, hint: t('dialogs.cmd.newPlanHint'), keywords: ['plan', 'milestone', 'roadmap', 'project'], run: () => openSheet({ kind: 'new_plan' }) },
-          { id: 'plans:open', label: t('dialogs.cmd.plans'), icon: 'flag' as const, hint: t('dialogs.cmd.plansHint'), keywords: ['plans', 'milestones', 'roadmap'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'plans' } }) },
-          { id: 'tasks:open', label: t('dialogs.cmd.tasks'), icon: 'task' as const, hint: t('dialogs.cmd.tasksHint'), keywords: ['tasks', 'board', 'issues', 'backlog', 'kanban'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'tasks' } }) },
-          { id: 'issues:open', label: t('dialogs.cmd.issues'), icon: 'issue' as const, hint: t('dialogs.cmd.issuesHint'), keywords: ['issues', 'github', 'bugs', 'triage', 'investigate', 'fix'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'issues' } }) },
-          { id: 'pulls:open', label: t('dialogs.cmd.pulls'), icon: 'pr' as const, hint: t('dialogs.cmd.pullsHint'), keywords: ['pull requests', 'prs', 'pulls', 'github', 'review', 'merge'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'pulls' } }) },
-          { id: 'actions:open', label: t('dialogs.cmd.actions'), icon: 'pulse' as const, hint: t('dialogs.cmd.actionsHint'), keywords: ['actions', 'github', 'ci', 'workflows', 'runs', 'builds', 'checks', 'pipeline'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'actions' } }) },
+          { id: 'tasks:new', label: 'New Task…', icon: 'task' as const, hint: 'Plan a piece of work', keywords: ['task', 'issue', 'todo', 'ticket'], run: () => openSheet({ kind: 'new_task' }) },
+          { id: 'plans:new', label: 'New Plan…', icon: 'flag' as const, hint: 'Plan big work with your agent: milestones, tasks, what runs side by side', keywords: ['plan', 'milestone', 'roadmap', 'project'], run: () => openSheet({ kind: 'new_plan' }) },
+          { id: 'plans:open', label: 'Go to Plans', icon: 'flag' as const, hint: 'Your plans, project by project', keywords: ['plans', 'milestones', 'roadmap'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'plans' } }) },
+          { id: 'tasks:open', label: 'Go to Tasks', icon: 'task' as const, hint: 'Every project’s board', keywords: ['tasks', 'board', 'issues', 'backlog', 'kanban'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'tasks' } }) },
+          { id: 'issues:open', label: 'Go to Issues', icon: 'issue' as const, hint: 'A project’s GitHub issues: your agent investigates, fixes, or writes them up as tasks', keywords: ['issues', 'github', 'bugs', 'triage', 'investigate', 'fix'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'issues' } }) },
+          { id: 'pulls:open', label: 'Go to Pull Requests', icon: 'pr' as const, hint: 'A project’s open pull requests on GitHub, anyone’s: open one in a worktree', keywords: ['pull requests', 'prs', 'pulls', 'github', 'review', 'merge'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'pulls' } }) },
+          { id: 'actions:open', label: 'Go to Actions', icon: 'pulse' as const, hint: 'A project’s GitHub Actions: runs as they go, and each workflow as a graph', keywords: ['actions', 'github', 'ci', 'workflows', 'runs', 'builds', 'checks', 'pipeline'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'actions' } }) },
         ]
       : []),
     ...(state.sentinel.enabled
       ? [
-          { id: 'sentinel:open', label: t('dialogs.cmd.sentinel'), icon: 'sentinel' as const, hint: t('dialogs.cmd.sentinelHint'), keywords: ['sentinel', 'schedule', 'cron', 'watch', 'every morning', 'brief', 'recurring'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel' } }) },
-          { id: 'dashboard:open', label: t('dialogs.cmd.dashboard'), icon: 'gauge' as const, hint: t('dialogs.cmd.dashboardHint'), keywords: ['dashboard', 'numbers', 'metrics', 'kpi', 'stats', 'revenue', 'subscribers', 'tiles'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'dashboard' } }) },
-          { id: 'sentinel:chat', label: t('dialogs.cmd.sentinelChat'), icon: 'chat' as const, hint: t('dialogs.cmd.sentinelChatHint'), keywords: ['sentinel', 'chat', 'ask', 'watchers'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel_chat', ...(ctx.state.sentinel.chats?.active ? { chat: ctx.state.sentinel.chats.active } : {}) } }) },
-          { id: 'sentinel:new', label: t('dialogs.cmd.newSentinel'), icon: 'sentinel' as const, hint: t('dialogs.cmd.newSentinelHint'), keywords: ['sentinel', 'schedule', 'cron', 'watch', 'recipe', 'automate'], run: () => openSheet({ kind: 'new_sentinel' }) },
+          { id: 'sentinel:open', label: 'Go to Sentinel', icon: 'sentinel' as const, hint: 'Watchers that run your agent, a script or a notification on a schedule', keywords: ['sentinel', 'schedule', 'cron', 'watch', 'every morning', 'brief', 'recurring'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel' } }) },
+          { id: 'dashboard:open', label: 'Go to Dashboard', icon: 'gauge' as const, hint: 'Sentinel’s dashboard: what your sentinels keep, as tiles', keywords: ['dashboard', 'numbers', 'metrics', 'kpi', 'stats', 'revenue', 'subscribers', 'tiles'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'dashboard' } }) },
+          { id: 'sentinel:chat', label: 'Go to Sentinel Chat', icon: 'chat' as const, hint: 'Talk to your agent about all of Sentinel', keywords: ['sentinel', 'chat', 'ask', 'watchers'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel_chat', ...(ctx.state.sentinel.chats?.active ? { chat: ctx.state.sentinel.chats.active } : {}) } }) },
+          { id: 'sentinel:new', label: 'New Sentinel…', icon: 'sentinel' as const, hint: 'Say what it should do, start from a recipe, or build it yourself', keywords: ['sentinel', 'schedule', 'cron', 'watch', 'recipe', 'automate'], run: () => openSheet({ kind: 'new_sentinel' }) },
         ]
       : []),
-    cmd('template', 'template-new', t('dialogs.cmd.newTemplate'), 'wand', () => openSheet({ kind: 'template' }), t('dialogs.cmd.newTemplateHint')),
-    cmd('template', 'templates', t('dialogs.cmd.manageTemplates'), 'wand', () => ui.openMenu({ kind: 'templates', manage: true })),
-    ...(canRun ? [cmd('run', 'peer-run', t('dialogs.cmd.peerRun'), 'terminal', () => openSheet({ kind: 'peer_run' }), t('dialogs.cmd.peerRunHint'))] : []),
-    ...(following ? [cmd('unfollow', 'unfollow', t('dialogs.cmd.unfollow', { name: following.name }), 'eye', () => void api.session.follow(undefined))] : []),
-    ...(state.myShares.length ? [cmd('unshare', 'unshare', t('dialogs.cmd.unshare'), 'share', () => ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: state.myShares }))] : []),
-    cmd('name', 'name', t('dialogs.cmd.name'), 'person', () => openSettings(ui, 'general', 'settings-name'), state.self?.name ? t('dialogs.cmd.nameNow', { name: state.self.name }) : undefined),
-    cmd('people', 'people', t('dialogs.cmd.people'), 'people', () => openSettings(ui, 'people'), t('dialogs.cmd.peopleHint')),
+    cmd('template', 'template-new', 'New Template…', 'wand', () => openSheet({ kind: 'template' }), 'A way to start a task you do often'),
+    cmd('template', 'templates', 'Manage Templates…', 'wand', () => ui.openMenu({ kind: 'templates', manage: true })),
+    ...(canRun ? [cmd('run', 'peer-run', 'Run a Command on a Friend’s Computer…', 'terminal', () => openSheet({ kind: 'peer_run' }), 'The output shows in the chat')] : []),
+    ...(following ? [cmd('unfollow', 'unfollow', `Stop Following ${following.name}`, 'eye', () => void api.session.follow(undefined))] : []),
+    ...(state.myShares.length ? [cmd('unshare', 'unshare', 'Stop Sharing a Folder…', 'share', () => ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: state.myShares }))] : []),
+    cmd('name', 'name', 'Change Your Name…', 'person', () => openSettings(ui, 'general', 'settings-name'), state.self?.name ? `Now: ${state.self.name}` : undefined),
+    cmd('people', 'people', 'People & Access…', 'people', () => openSettings(ui, 'people'), 'Who can use your agent, and how'),
     earningsCommand(state),
-    { id: 'cmd:support', label: t('dialogs.cmd.support'), icon: 'cup', hint: t('dialogs.cmd.supportHint'), keywords: ['support', 'coffee', 'donate', 'tip', 'sponsor', 'star', 'github'], run: () => openSupport('coffee') },
-    cmd('env', 'env', t('dialogs.cmd.env'), 'lock', () => openSettings(ui, 'environment'), t('dialogs.cmd.envHint')),
-    cmd('shell', 'shell', t('dialogs.cmd.shell'), 'terminal', () => openSettings(ui, 'terminal'), t('dialogs.cmd.shellHint')),
+    { id: 'cmd:support', label: 'Support Beluga…', icon: 'cup', hint: 'Buy the maker a coffee, or star Beluga on GitHub', keywords: ['support', 'coffee', 'donate', 'tip', 'sponsor', 'star', 'github'], run: () => openSupport('coffee') },
+    cmd('env', 'env', 'Environment Variables…', 'lock', () => openSettings(ui, 'environment'), 'For your shells, scripts and agents'),
+    cmd('shell', 'shell', 'Terminal Settings…', 'terminal', () => openSettings(ui, 'terminal'), 'Which shell, and how it starts'),
     {
       id: 'cmd:popup-preview',
-      label: t('dialogs.cmd.popup'),
+      label: 'Preview Request Pop-up',
       icon: 'bell',
-      hint: t('dialogs.cmd.popupHint'),
+      hint: 'The card a friend’s request, or your agent needing you, gets on top of other apps (a pretend one)',
       keywords: ['popup', 'pop-up', 'request', 'notification', 'preview', 'test', 'friend'],
       run: previewRequestPopup,
     },
-    { id: 'cmd:welcome', label: t('dialogs.cmd.welcome'), icon: 'spark', hint: t('dialogs.cmd.welcomeHint'), keywords: ['onboarding', 'welcome', 'tour', 'intro'], run: () => void document.dispatchEvent(new CustomEvent(SHOW_WELCOME)) },
+    { id: 'cmd:welcome', label: 'Onboard Again', icon: 'spark', hint: 'The welcome, the tour and the first settings', keywords: ['onboarding', 'welcome', 'tour', 'intro'], run: () => void document.dispatchEvent(new CustomEvent(SHOW_WELCOME)) },
     ...(state.isHost
       ? [
-          cmd('lock', 'lock', state.roomOpen ? t('dialogs.cmd.closeRoom') : t('dialogs.cmd.openRoom'), 'lock', () => void api.session.setRoomOpen(!state.roomOpen)),
-          cmd('newlink', 'newlink', t('dialogs.cmd.newLink'), 'link', () =>
-            openSheet({ kind: 'confirm', title: t('dialogs.cmd.newLinkTitle'), message: t('dialogs.cmd.newLinkMessage'), confirm: t('dialogs.cmd.newLinkConfirm'), run: () => void api.session.newInviteLink() }),
+          cmd('lock', 'lock', state.roomOpen ? 'Close the Room to New People' : 'Let New People Join', 'lock', () => void api.session.setRoomOpen(!state.roomOpen)),
+          cmd('newlink', 'newlink', 'Make a New Invite Link…', 'link', () =>
+            openSheet({ kind: 'confirm', title: 'Make a new invite link?', message: 'The current link stops working. People already in the room stay.', confirm: 'New Link', run: () => void api.session.newInviteLink() }),
           ),
         ]
-      : [cmd('quit', 'quit', t('dialogs.cmd.quit'), 'x', () => openSheet({ kind: 'confirm', title: t('dialogs.cmd.quitTitle'), message: t('dialogs.cmd.quitMessage'), confirm: t('dialogs.cmd.quitConfirm'), destructive: true, run: () => void api.session.quit() }))]),
+      : [cmd('quit', 'quit', 'Leave the Room…', 'x', () => openSheet({ kind: 'confirm', title: 'Leave the room?', message: 'Beluga disconnects and closes. You can come back with the invite link.', confirm: 'Leave', destructive: true, run: () => void api.session.quit() }))]),
   ];
 }
 
@@ -138,8 +137,8 @@ function earningsCommand(state: AppState): PaletteCommand {
   const connected = project ? Boolean(state.earnings[project.root] || state.revenuecat[project.root]) : false;
   return {
     id: 'cmd:earnings',
-    label: project ? (connected ? t('dialogs.cmd.earnings', { name: project.name }) : t('dialogs.cmd.connectEarningsTo', { name: project.name })) : t('dialogs.cmd.connectEarnings'),
-    hint: t('dialogs.cmd.stripeHint'),
+    label: project ? (connected ? `${project.name} Earnings…` : `Connect Earnings to ${project.name}…`) : 'Connect Earnings…',
+    hint: 'All-time earnings beside a project in the sidebar',
     icon: 'coin',
     keywords: ['stripe', 'revenuecat', 'earnings', 'revenue', 'money', 'sales'],
     run: () => openEarnings(project?.id),

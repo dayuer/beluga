@@ -10,12 +10,8 @@ import { Card, Meter } from './parts.js';
 import { ago, resetsAt } from './usage-model.js';
 import s from './usage.module.css';
 import { thisComputer } from '../../lib/os-words.js';
-import { t as tNow, useT } from '../../i18n/index.js';
-import { localWindow } from '../../lib/engine-words.js';
 
-function WindowMeter({ w: shared, now }: { w: CardWindow; now: number }) {
-  const t = useT();
-  const w = localWindow(shared);
+function WindowMeter({ w, now }: { w: CardWindow; now: number }) {
   return (
     <div className={s.window}>
       <div className={s.windowHead}>
@@ -25,33 +21,32 @@ function WindowMeter({ w: shared, now }: { w: CardWindow; now: number }) {
           <small>%</small>
         </span>
       </div>
-      <Meter pct={w.pct} label={t('views.plan.used', { label: w.label, pct: w.pct })} />
-      <div className={s.windowFoot}>{w.resetsAt && w.resetsAt > now ? t('views.plan.resets', { when: resetsAt(w.resetsAt, now) }) : t('views.plan.left', { pct: 100 - w.pct })}</div>
+      <Meter pct={w.pct} label={`${w.label}: ${w.pct}% used`} />
+      <div className={s.windowFoot}>{w.resetsAt && w.resetsAt > now ? `Resets ${resetsAt(w.resetsAt, now)}` : `${100 - w.pct}% left`}</div>
     </div>
   );
 }
 
 /** A local model has no plan: what it used, and how fast it answers. */
 function TokensFigures({ card }: { card: ProviderCard }) {
-  const t = useT();
   return (
     <div className={s.windows}>
       <div className={s.window}>
         <div className={s.windowHead}>
-          <span className={s.windowTitle}>{t('views.stats.m.tokens')}</span>
+          <span className={s.windowTitle}>Tokens</span>
           <span className={s.windowPct}>{card.tokens ? shortTokens(card.tokens.input + card.tokens.output) : '–'}</span>
         </div>
-        <div className={s.windowFoot}>{card.tokens ? t('views.plan.inOut', { in: shortTokens(card.tokens.input), out: shortTokens(card.tokens.output) }) : t('views.plan.since')}</div>
+        <div className={s.windowFoot}>{card.tokens ? `${shortTokens(card.tokens.input)} in · ${shortTokens(card.tokens.output)} out` : 'Since Beluga started'}</div>
       </div>
       <div className={s.window}>
         <div className={s.windowHead}>
-          <span className={s.windowTitle}>{t('views.plan.speed')}</span>
+          <span className={s.windowTitle}>Speed</span>
           <span className={s.windowPct}>
             {card.tokensPerSec !== undefined ? Math.round(card.tokensPerSec) : '–'}
             <small> tok/s</small>
           </span>
         </div>
-        <div className={s.windowFoot}>{t('views.plan.lastRun')}</div>
+        <div className={s.windowFoot}>Over its last run</div>
       </div>
     </div>
   );
@@ -59,36 +54,34 @@ function TokensFigures({ card }: { card: ProviderCard }) {
 
 /** The chip on each card: says which one is your default, or makes this one it. */
 function DefaultChip({ card }: { card: ProviderCard }) {
-  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   if (card.isDefault)
     return (
       <span className={cx(s.defaultChip, s.defaultChipOn)}>
         <Icon name="check" size={12} />
-        {t('views.plan.default')}
+        Default
       </span>
     );
   // Claude back as the default is "no default set" (null), like Settings › Agent.
   const agent: AgentRef | null = card.agent.runtime === CLAUDE_AGENT.runtime ? null : { runtime: card.agent.runtime, label: card.agent.label, ...(card.agent.model ? { model: card.agent.model } : {}) };
   const make = () =>
-    void api.session.setPrefs({ defaultAgent: agent }).catch((err: unknown) => toast(client, t('views.plan.defaultFailed', { error: err instanceof Error ? err.message : String(err) }), 'warn'));
+    void api.session.setPrefs({ defaultAgent: agent }).catch((err: unknown) => toast(client, `Couldn’t change your default agent: ${err instanceof Error ? err.message : String(err)}`, 'warn'));
   return (
-    <button type="button" className={s.defaultChip} onClick={make} aria-label={t('views.plan.makeDefaultAria', { agent: card.agent.label })}>
-      {t('views.plan.makeDefault')}
+    <button type="button" className={s.defaultChip} onClick={make} aria-label={`Make ${card.agent.label} your default agent`}>
+      Make default
     </button>
   );
 }
 
 /** What runs the agent, by name: Claude Code, Codex, OpenCode, Copilot, or a local model. */
-const runtimeName = (runtime: string): string => (runtime === 'claude' ? 'Claude Code' : runtime === 'codex' ? 'Codex' : runtime === 'opencode' ? 'OpenCode' : runtime === 'copilot' ? 'Copilot' : tNow('views.plan.localModel'));
+const runtimeName = (runtime: string): string => (runtime === 'claude' ? 'Claude Code' : runtime === 'codex' ? 'Codex' : runtime === 'opencode' ? 'OpenCode' : runtime === 'copilot' ? 'Copilot' : 'Local model');
 
 function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
-  const t = useT();
   const [details, setDetails] = useState(false);
   return (
     <Card
-      label={t('views.plan.usageAria', { agent: card.agent.label })}
+      label={`${card.agent.label} usage`}
       title={
         <span className={s.agentTitle}>
           <Icon name={agentMark(card.agent)} size={13} />
@@ -99,12 +92,12 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
         <>
           {card.plan ? <span className={s.planBadge}>{card.plan}</span> : null}
           <DefaultChip card={card} />
-          <IconButton icon="more" label={details ? t('views.plan.hideDetails') : t('views.plan.details')} active={details} onClick={() => setDetails(!details)} />
+          <IconButton icon="more" label={details ? 'Hide details' : 'Details'} active={details} onClick={() => setDetails(!details)} />
         </>
       }
     >
       {!card.signedIn ? (
-        <p className={s.quiet}>{t('views.plan.notSignedIn', { agent: card.agent.label, computer: thisComputer() })}</p>
+        <p className={s.quiet}>Not signed in. Sign in to {card.agent.label} on {thisComputer()} to use it.</p>
       ) : card.shape === 'quota' ? (
         <div className={s.windows}>
           {card.windows.map((w) => (
@@ -114,37 +107,35 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
       ) : card.shape === 'tokens' ? (
         <TokensFigures card={card} />
       ) : (
-        <p className={s.quiet}>{t('views.plan.afterRun', { agent: card.agent.label })}</p>
+        <p className={s.quiet}>{card.agent.label}’s usage shows up here after its next run.</p>
       )}
       {details ? (
         <dl className={s.providerDetails}>
-          <dt>{t('views.plan.runtime')}</dt>
+          <dt>Runtime</dt>
           <dd className={s.agentTitle}>
             <Icon name={agentMark(card.agent)} size={11} />
             {runtimeName(card.agent.runtime)}
           </dd>
           {card.agent.model ? (
             <>
-              <dt>{t('views.plan.model')}</dt>
+              <dt>Model</dt>
               <dd>{card.agent.model}</dd>
             </>
           ) : null}
-          <dt>{t('views.plan.updated')}</dt>
-          <dd>{card.updatedAt ? ago(card.updatedAt, now) : t('views.plan.notYet')}</dd>
+          <dt>Updated</dt>
+          <dd>{card.updatedAt ? ago(card.updatedAt, now) : 'not yet'}</dd>
         </dl>
       ) : null}
     </Card>
   );
 }
 
-function FriendWindow({ room, w: shared }: { room: FriendRoom; w: CardWindow | undefined }) {
-  const t = useT();
-  if (!shared) return <span />;
-  const w = localWindow(shared);
+function FriendWindow({ room, w }: { room: FriendRoom; w: CardWindow | undefined }) {
+  if (!w) return <span />;
   return (
     <span className={s.friendMeter}>
       <span className={s.friendLabel}>{w.short}</span>
-      <Meter pct={w.pct} size="mini" label={t('views.plan.friendUsed', { name: room.name, agent: room.agent.label, label: w.label, pct: w.pct })} />
+      <Meter pct={w.pct} size="mini" label={`${room.name}’s ${room.agent.label}: ${w.label} ${w.pct}% used`} />
       <span className={s.friendPct}>{w.pct}%</span>
     </span>
   );
@@ -166,10 +157,9 @@ function Friend({ room }: { room: FriendRoom }) {
 
 /** Whose agent has room left: every friend's providers that share plan windows. */
 function FriendsCard({ rooms }: { rooms: FriendRoom[] }) {
-  const t = useT();
   return (
-    <Card label={t('views.plan.friendsAria')} title={t('views.plan.friends')}>
-      <ul className={s.friendList} aria-label={t('views.plan.friendsList')}>
+    <Card label="Friends’ agents" title="Friends">
+      <ul className={s.friendList} aria-label="Friends’ agent plan usage">
         {rooms.map((r) => (
           <Friend key={`${r.peerId}:${r.agent.runtime}`} room={r} />
         ))}

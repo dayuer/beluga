@@ -6,7 +6,6 @@ import { openSheet } from '../lib/sheets.js';
 import { chatBulkActions, chatCount, chatJoins, chatSelectionStore, joinValue, retainVisibleChats, visibleChatIds } from './chat-selection.js';
 import { toolbarActions } from './toolbar-actions.js';
 import s from './Sidebar.module.css';
-import { t, useT } from '../i18n/index.js';
 
 interface SidebarSelection {
   readonly ids: readonly string[];
@@ -79,7 +78,7 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       const result = await store.run(chats, async (chat) => {
         // A chat can become a worktree while the confirmation is open.
         const latest = client.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === chat.id);
-        if (!latest || latest.kind !== 'chat' || latest.archived || latest.pending) throw new Error(t('layout.chatSelection.gone'));
+        if (!latest || latest.kind !== 'chat' || latest.archived || latest.pending) throw new Error('This chat is no longer available.');
         // Quiet: one message for the whole batch below, not one per chat.
         if (action.id === 'archive') return await client.api.workspaces.archive(chat.id, false, { quiet: true }) === true;
         await client.api.workspaces.remove(chat.id, { quiet: true });
@@ -90,12 +89,12 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       store.retain(visible());
       if (result.failed.length) {
         const message = result.failed.map((chat) => `${chat.name}: ${chat.reason}`).join('\n');
-        toast(client, t('layout.chatSelection.failedToast', { action: t(action.label), failed: result.failed.length, chats: chatCount(count), message }), 'error');
-        openSheet({ kind: 'confirm', title: t('layout.chatSelection.failedTitle', { chats: chatCount(result.failed.length) }), message, confirm: t('layout.chatSelection.ok'), run: () => undefined });
-      } else toast(client, t('layout.chatSelection.doneToast', { done: t(action.done), chats: chatCount(count) }), 'success');
+        toast(client, `${action.label} failed for ${result.failed.length} of ${chatCount(count)}. ${message}`, 'error');
+        openSheet({ kind: 'confirm', title: `${chatCount(result.failed.length)} failed`, message, confirm: 'OK', run: () => undefined });
+      } else toast(client, `${action.done} ${chatCount(count)}.`, 'success');
     };
     return chatBulkActions.map((action) => ({
-      label: t('layout.chatSelection.menuItem', { action: t(action.label), chats: chatCount(count, 'Chat') }),
+      label: `${action.label} ${chatCount(count, 'Chat')}…`,
       icon: action.icon,
       danger: true,
       disabled: store.get().busy || count === 0 || chats.some((chat: Workspace) => {
@@ -104,9 +103,9 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       }),
       onSelect: () => openSheet({
         kind: 'confirm',
-        title: t('layout.chatSelection.confirmTitle', { action: t(action.label), chats: chatCount(count) }),
-        message: t(action.message),
-        confirm: t('layout.chatSelection.confirm', { action: t(action.label), chats: chatCount(count, 'Chat') }),
+        title: `${action.label} ${chatCount(count)}?`,
+        message: action.message,
+        confirm: `${action.label} ${chatCount(count, 'Chat')}`,
         destructive: action.id === 'delete',
         run: () => void run(action),
       }),
@@ -132,7 +131,6 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
 export const useChatSelection = (): SidebarSelection | undefined => useContext(SelectionContext);
 
 export function ChatSelectionCount() {
-  const t = useT();
   const selection = useChatSelection();
   const count = selection?.ids.length ?? 0;
   // The last count stays while the bar folds away.
@@ -143,8 +141,8 @@ export function ChatSelectionCount() {
     <div className={s.chatSelection} data-open={count > 0} role="status" aria-live="polite" aria-hidden={!count}>
       <div className={s.chatSelectionFold}>
         <div className={s.chatSelectionBar}>
-          <span>{t('layout.chatSelection.selected', { chats: chatCount(shown) })}{selection.busy ? t('layout.chatSelection.working') : ''}</span>
-          <button type="button" onClick={selection.clear} disabled={selection.busy || !count} tabIndex={count ? 0 : -1} aria-label={t('layout.chatSelection.clearLabel')}>{t('layout.chatSelection.clear')}</button>
+          <span>{chatCount(shown)} selected{selection.busy ? ' · Working…' : ''}</span>
+          <button type="button" onClick={selection.clear} disabled={selection.busy || !count} tabIndex={count ? 0 : -1} aria-label="Clear chat selection">Clear</button>
         </div>
       </div>
     </div>

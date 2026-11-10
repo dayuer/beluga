@@ -1,5 +1,3 @@
-import { t } from '../../i18n/index.js';
-
 /** Whether macOS lets Beluga notify (System Settings › Notifications › Beluga). */
 export interface NotificationAccess {
   /**
@@ -45,22 +43,24 @@ export type NotifyOs = 'mac' | 'windows' | 'linux';
  * When the system won't say whether banners are allowed: where to allow them, and where a banner
  * shows. Windows has a settings page to open; Linux desktops each keep their own, so no button.
  */
-const unsaidFor = (os: NotifyOs, action?: AccessAction): { readonly detail: string; readonly where: string; readonly fix: string; readonly action?: AccessAction } => ({
-  get detail() {
-    return t(`common.accessModel.${os}.detail` as const);
-  },
-  get where() {
-    return t(`common.accessModel.${os}.where` as const);
-  },
-  get fix() {
-    return t(`common.accessModel.${os}.fix` as const);
-  },
-  ...(action ? { action } : {}),
-});
 const UNSAID: Readonly<Record<NotifyOs, { readonly detail: string; readonly where: string; readonly fix: string; readonly action?: AccessAction }>> = {
-  mac: unsaidFor('mac', 'notifications'),
-  windows: unsaidFor('windows', 'notifications'),
-  linux: unsaidFor('linux'),
+  mac: {
+    detail: 'macOS doesn’t tell apps whether their banners are allowed. If the test’s banner doesn’t show at the top right of your screen, allow Beluga in Notification Settings.',
+    where: 'the banner shows at the top right of your screen for a few seconds (clicking in Beluga closes it at once)',
+    fix: 'No banner? Allow Beluga in Notification Settings, and check Do Not Disturb (the moon in the menu bar).',
+    action: 'notifications',
+  },
+  windows: {
+    detail: 'Windows doesn’t tell apps whether their notifications are allowed. If the test doesn’t show at the bottom right of your screen, allow Beluga in Notification Settings.',
+    where: 'it shows at the bottom right of your screen for a few seconds',
+    fix: 'Nothing? Allow Beluga in Notification Settings, and check Do Not Disturb.',
+    action: 'notifications',
+  },
+  linux: {
+    detail: 'Your desktop doesn’t tell apps whether their notifications are allowed. Send a test: if nothing shows, allow Beluga in your desktop’s notification settings.',
+    where: 'it shows where your desktop puts notifications, for a few seconds',
+    fix: 'Nothing? Allow Beluga in your desktop’s notification settings, and check Do Not Disturb.',
+  },
 };
 
 /** The line at the top of Settings › Notifications: how things stand, and what to do about it. */
@@ -74,24 +74,26 @@ export interface NotifyStatus {
   readonly action?: AccessAction;
 }
 
+const WHAT_TO_TURN_ON = 'turn on “Allow notifications”, choose “Banners”, and turn on “Play sound for notifications”.';
+
 /** Something in the way, and what it did to a test notification. */
 type Block = NotifyStatus & { readonly action: AccessAction; readonly held: string };
 
 /** Turned off, or banners or sound off, for Beluga in System Settings (`null`: none of these). */
 function macBlock(a: NotificationAccess): Block | null {
   const action = 'notifications';
-  if (a.state === 'off') return { tone: 'warn', title: t('common.accessModel.blockedTitle'), detail: t('common.accessModel.blockedDetail'), fix: t('common.accessModel.blockedFix'), action, held: t('common.accessModel.blockedHeld') };
+  if (a.state === 'off') return { tone: 'warn', title: 'Blocked by macOS', detail: 'macOS isn’t letting Beluga show notifications. The bell in the toolbar still lists everything.', fix: `In System Settings › Notifications › Beluga, ${WHAT_TO_TURN_ON}`, action, held: 'Sent, but macOS blocked it.' };
   if (a.state !== 'allowed') return null;
-  if (!a.alerts) return { tone: 'warn', title: t('common.accessModel.bannersOffTitle'), detail: t('common.accessModel.bannersOffDetail'), fix: t('common.accessModel.bannersOffFix'), action, held: t('common.accessModel.bannersOffHeld') };
-  if (!a.sound) return { tone: 'warn', title: t('common.accessModel.soundOffTitle'), detail: t('common.accessModel.soundOffDetail'), fix: t('common.accessModel.soundOffFix'), action, held: t('common.accessModel.soundOffHeld') };
+  if (!a.alerts) return { tone: 'warn', title: 'Banners are off in macOS', detail: 'Beluga’s notifications only collect in Notification Center, without a banner or sound.', fix: 'In System Settings › Notifications › Beluga, choose “Banners” (or “Alerts”).', action, held: 'Sent, but macOS put it straight into Notification Center: banners are off.' };
+  if (!a.sound) return { tone: 'warn', title: 'Sounds are off in macOS', detail: 'Banners show, but silently.', fix: 'In System Settings › Notifications › Beluga, turn on “Play sound for notifications”.', action, held: 'Sent. The banner shows, but macOS keeps Beluga’s notifications silent.' };
   return null;
 }
 
 /** A Focus that's on (`null`: none is, or macOS won't say). */
 function focusBlock(a: NotificationAccess): Block | null {
   if (a.focus !== 'on') return null;
-  const name = a.focusName ?? t('common.accessModel.aFocus');
-  return { tone: 'warn', title: t('common.accessModel.focusTitle', { name }), detail: t('common.accessModel.focusDetail'), fix: t('common.accessModel.focusFix'), action: 'focus', held: t('common.accessModel.focusHeld', { name: a.focusName ?? t('common.accessModel.aFocusLower') }) };
+  const name = a.focusName ?? 'A Focus';
+  return { tone: 'warn', title: `${name} is on`, detail: 'macOS holds Beluga’s banners in Notification Center and mutes their sound until it ends.', fix: 'Turn it off in Control Center, or add Beluga to this Focus’s “Allowed Apps” in System Settings › Focus.', action: 'focus', held: `Sent, but ${a.focusName ?? 'a Focus'} is holding it in Notification Center, muted.` };
 }
 
 /** An older app shell's "not asked yet" isn't true for Beluga's banners: macOS just won't say. */
@@ -99,19 +101,19 @@ const normalize = (a: NotificationAccess): NotificationAccess => (a.state === 'n
 
 /** How things stand, from what macOS says and Beluga's own switches. */
 export function notifyStatus(raw: NotificationAccess | undefined, own: OwnSettings, os: NotifyOs = 'mac'): NotifyStatus {
-  if (!raw) return { tone: 'muted', title: t('common.accessModel.checking'), detail: t('common.accessModel.checkingDetail') };
+  if (!raw) return { tone: 'muted', title: 'Checking…', detail: 'Asking whether Beluga may notify you.' };
   const a = normalize(raw);
   const mac = macBlock(a) ?? focusBlock(a);
   if (mac) return mac;
-  if (!own.desktop) return { tone: 'muted', title: t('common.accessModel.desktopOff'), detail: t('common.accessModel.desktopOffDetail') };
-  if (own.quietUntil) return { tone: 'muted', title: t('common.accessModel.dndOn'), detail: t('common.accessModel.dndOnDetail', { until: own.quietUntil }) };
+  if (!own.desktop) return { tone: 'muted', title: 'Desktop notifications are off', detail: 'Turn them on below. The bell in the toolbar still lists everything.' };
+  if (own.quietUntil) return { tone: 'muted', title: 'Beluga’s Do Not Disturb is on', detail: `Banners are paused ${own.quietUntil}. The bell still fills.` };
   if (a.state === 'unknown') {
     const { detail, action } = UNSAID[os];
-    return { tone: 'muted', title: t('common.accessModel.sendTest'), detail, ...(action ? { action } : {}) };
+    return { tone: 'muted', title: 'Send a test to check', detail, ...(action ? { action } : {}) };
   }
-  const detail = t('common.accessModel.onDetail');
-  if (a.focus === 'off') return { tone: 'ok', title: t('common.accessModel.on'), detail };
-  return { tone: 'ok', title: t('common.accessModel.on'), detail: t('common.accessModel.onFocus', { detail }) };
+  const detail = 'macOS shows Beluga’s banners and plays their sound.';
+  if (a.focus === 'off') return { tone: 'ok', title: 'Notifications are on', detail };
+  return { tone: 'ok', title: 'Notifications are on', detail: `${detail} Do Not Disturb or another Focus can still hold them.` };
 }
 
 /** What happened to the test, in a sentence, and what to do if it didn't show. */
@@ -127,13 +129,13 @@ export interface TestOutcome {
  */
 export function testOutcome(raw: NotificationAccess, soundName: string | null, os: NotifyOs = 'mac'): TestOutcome {
   const a = normalize(raw);
-  const heard = soundName ? t('common.accessModel.heard', { name: soundName }) : '';
+  const heard = soundName ? ` You heard “${soundName}” here.` : '';
   const block = macBlock(a) ?? focusBlock(a);
   if (block) return { tone: 'warn', text: `${block.held}${heard}`, action: block.action };
   // macOS closes the banners of the app you're using as soon as you click in it.
   const unsaid = UNSAID[os];
-  const look = t('common.accessModel.sent', { where: unsaid.where, heard });
+  const look = `Sent: ${unsaid.where}.${heard}`;
   if (a.state === 'unknown') return { tone: 'ok', text: `${look} ${unsaid.fix}`, ...(unsaid.action ? { action: unsaid.action } : {}) };
   if (a.focus === 'off') return { tone: 'ok', text: look };
-  return { tone: 'ok', text: t('common.accessModel.nothing', { look }), action: 'focus' };
+  return { tone: 'ok', text: `${look} Nothing? If Do Not Disturb or another Focus is on (the moon in the menu bar), macOS holds it in Notification Center.`, action: 'focus' };
 }

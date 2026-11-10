@@ -1,4 +1,3 @@
-import { tl, useT } from '../../i18n/index.js';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { ACCESS, ACCESS_INFO, STEP_INFO } from '../../../../../src/core/sentinel/model.js';
@@ -33,7 +32,6 @@ export function Sentinel() {
   const [at, setAt] = useState(0);
   const [beat, setBeat] = useState(still ? Number.POSITIVE_INFINITY : 0);
   const [held, setHeld] = useState(false);
-  const tr = useT();
   const sentinel = TOUR_SENTINELS[at]!;
   const beats = beatsOf(sentinel.steps.length);
   const last = beats.length - 1;
@@ -70,11 +68,11 @@ export function Sentinel() {
             <i />
           </span>
           <span className={s.sentinelBarName}>
-            <Icon name="sentinel" size={12} /> {tr('more.tour.sentinel.ask')}
+            <Icon name="sentinel" size={12} /> Ask Sentinel
           </span>
           {on && !reported ? (
             <span className={s.live}>
-              <span className={s.liveDot} /> {tr('more.tour.running')}
+              <span className={s.liveDot} /> Running
             </span>
           ) : null}
         </div>
@@ -95,14 +93,14 @@ export function Sentinel() {
                   <Icon name={TRIGGER_ICON[sentinel.trigger]} size={13} />
                   <strong>{sentinel.name}</strong>
                   <span className={s.sentinelState} data-on={on || undefined}>
-                    {on ? tr('onboarding.scene.watching') : tr('onboarding.scene.paused')}
+                    {on ? 'Watching' : 'Paused'}
                   </span>
-                  <span className={s.toggle} data-on={on || undefined} role="img" aria-label={on ? tr('onboarding.scene.turnedOn') : tr('onboarding.scene.startsPaused')}>
+                  <span className={s.toggle} data-on={on || undefined} role="img" aria-label={on ? 'Turned on' : 'Starts paused'}>
                     <i />
                   </span>
                 </div>
                 <div className={s.sentinelRow} data-part="when">
-                  <span className={s.sentinelLabel}>{tr('onboarding.scene.when')}</span>
+                  <span className={s.sentinelLabel}>When</span>
                   <Icon name={TRIGGER_ICON[sentinel.trigger]} size={12} />
                   <span>{sentinel.when}</span>
                 </div>
@@ -110,24 +108,24 @@ export function Sentinel() {
                   const state = running > i || reported ? 'done' : running === i ? 'running' : 'waiting';
                   return (
                     <div key={st.kind + i} className={s.sentinelRow} data-part={st.kind === 'claude' || st.kind === 'script' || st.kind === 'measure' ? 'what' : 'then'} data-state={state}>
-                      <span className={s.sentinelLabel}>{i === 0 ? tr('onboarding.scene.then') : ''}</span>
+                      <span className={s.sentinelLabel}>{i === 0 ? 'Then' : ''}</span>
                       <span className={s.stepNum}>{i + 1}</span>
                       <Icon name={STEP_ICON[st.kind]} size={12} />
-                      <span className={s.stepKind}>{tl('STEP_INFO', st.kind, 'label', STEP_INFO[st.kind].label)}</span>
+                      <span className={s.stepKind}>{STEP_INFO[st.kind].label}</span>
                       <span className={s.stepDetail}>{st.detail}</span>
                       <span className={s.stepState}>{state === 'done' ? <Icon name="check" size={12} className={s.done} /> : state === 'running' ? <Icon name="refresh" size={12} className={s.spin} /> : null}</span>
                     </div>
                   );
                 })}
                 <div className={s.sentinelAccess}>
-                  <span className={s.accessPick} role="img" aria-label={tr('onboarding.scene.access', { name: tl('ACCESS_INFO', sentinel.access, 'label', ACCESS_INFO[sentinel.access].label) })}>
+                  <span className={s.accessPick} role="img" aria-label={`${ACCESS_INFO[sentinel.access].label} access`}>
                     {ACCESS.map((a) => (
                       <span key={a} data-on={a === sentinel.access || undefined}>
-                        {tl('ACCESS_INFO', a, 'label', ACCESS_INFO[a].label)}
+                        {ACCESS_INFO[a].label}
                       </span>
                     ))}
                   </span>
-                  <span className={s.dim}>{tl('ACCESS_INFO', sentinel.access, 'sentence', ACCESS_INFO[sentinel.access].sentence)}</span>
+                  <span className={s.dim}>{ACCESS_INFO[sentinel.access].sentence}</span>
                 </div>
               </motion.div>
 
@@ -141,14 +139,14 @@ export function Sentinel() {
                       <strong>{sentinel.report.title}</strong>
                       <span>{sentinel.report.line}</span>
                     </span>
-                    <span className={s.dim}>{tr('onboarding.scene.report')}</span>
+                    <span className={s.dim}>Report</span>
                   </motion.div>
                 ) : null}
               </AnimatePresence>
             </motion.div>
           </AnimatePresence>
         </div>
-        <div className={s.sentinelPick} role="tablist" aria-label={tr('onboarding.scene.sentinels')}>
+        <div className={s.sentinelPick} role="tablist" aria-label="Sentinels">
           {TOUR_SENTINELS.map((x, i) => (
             <button key={x.id} type="button" role="tab" aria-selected={i === at} className={s.sentinelChip} onClick={() => pick(i)}>
               <Icon name={TRIGGER_ICON[x.trigger]} size={11} />

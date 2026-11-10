@@ -4,7 +4,6 @@ import type { AgentRef } from '@beluga/protocol.js';
 import { agentName } from '@beluga/shared/agent-label.js';
 import { autoAgentName, routedAgent } from '@beluga/shared/auto-route.js';
 import { useApp } from '../lib/beluga.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Who auto route (fork, shared/auto-route.ts) gives a task: the same answer the daemon reaches
@@ -21,5 +20,5 @@ export function useAutoAgent(): (issue: Issue) => AgentRef | undefined {
 /** Who a task's Start says works it: its own (or its plan's) agent, else auto route's pick ("auto · Opus 5.5"), else yours. */
 export function startWho(own: AgentRef | undefined, routed: AgentRef | undefined): string {
   if (own) return agentName(own);
-  return routed ? t('tasks.start.auto', { model: autoAgentName(routed) }) : t('tasks.start.yourAgent');
+  return routed ? `auto · ${(autoAgentName(routed))}` : 'your agent';
 }

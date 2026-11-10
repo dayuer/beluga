@@ -3,7 +3,6 @@ import { Button, cx } from '../../components/ui.js';
 import { ACTION_LABELS, type AccessAction, type NotifyStatus } from '../../lib/sounds/access-model.js';
 import { Group } from '../settings-controls.js';
 import s from './sound.module.css';
-import { useT, tl } from '../../i18n/index.js';
 
 const ICONS: Readonly<Record<NotifyStatus['tone'], IconName>> = { ok: 'check', warn: 'alert', muted: 'info' };
 
@@ -18,11 +17,10 @@ export interface NotifyStatusProps {
  * a button that goes there. It updates when you come back from System Settings.
  */
 export function NotifyStatusLine({ status, onAction }: NotifyStatusProps) {
-  const t = useT();
   const { tone, title, detail, fix, action } = status;
   return (
     <Group>
-      <div className={cx(s.status, s[`status_${tone}`])} role="status" aria-label={t('dialogs.sound.status')} data-tone={tone}>
+      <div className={cx(s.status, s[`status_${tone}`])} role="status" aria-label="Notification status" data-tone={tone}>
         <Icon name={ICONS[tone]} size={16} />
         <div className={s.statusText}>
           <div className={s.statusTitle}>{title}</div>
@@ -31,7 +29,7 @@ export function NotifyStatusLine({ status, onAction }: NotifyStatusProps) {
         </div>
         {action ? (
           <Button variant="primary" onClick={() => onAction(action)}>
-            {tl('ACTION_LABELS', action, 'text', ACTION_LABELS[action])}
+            {ACTION_LABELS[action]}
           </Button>
         ) : null}
       </div>

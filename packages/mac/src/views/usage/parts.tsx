@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { cx } from '../../components/ui.js';
 import type { ColorSlot } from './usage-model.js';
 import s from './usage.module.css';
-import { useT } from '../../i18n/index.js';
 
 /** The CSS colour of a project's slot (see usage.module.css: --series-1…8, --series-other). */
 export const slotColor = (slot: ColorSlot): string => `var(--series-${slot})`;
@@ -50,8 +49,7 @@ export function Bar({ value, max, color, label }: { value: number; max: number; 
 
 /** Still measuring: a soft moving sheen where the number will be. */
 export function Shimmer({ wide }: { wide?: boolean }) {
-  const t = useT();
-  return <span className={cx(s.shimmer, wide && s.shimmerWide)} aria-label={t('views.storage.measuring')} />;
+  return <span className={cx(s.shimmer, wide && s.shimmerWide)} aria-label="Measuring" />;
 }
 
 /** Severity of a plan window: calm, getting close, nearly out. */

@@ -13,13 +13,11 @@ import { expiryLabel, openGroupInvitation, presenceLine, shownState, sortMembers
 import { closeNet, openNet, useNetSheet } from './net-sheets.js';
 import { openDm, useSay } from './use-net.js';
 import s from './network.module.css';
-import { t, useT } from '../i18n/index.js';
 
 type Confirm = { readonly title: string; readonly message: string; readonly confirm: string; readonly run: () => void };
 
 /** The group's name, renamed in place (anyone in the group may rename it). */
 function Name({ g }: { g: GroupView }) {
-  useT();
   const { client } = useBeluga();
   const [name, setName] = useState(g.name);
   useEffect(() => setName(g.name), [g.name]);
@@ -31,11 +29,11 @@ function Name({ g }: { g: GroupView }) {
   return (
     <input
       className={s.rename}
-      aria-label={t('network.group.nameLabel')}
+      aria-label="Channel name"
       value={name}
       maxLength={64}
       disabled={!g.active}
-      title={g.active ? t('network.group.clickRename') : undefined}
+      title={g.active ? 'Click to rename' : undefined}
       onChange={(e) => setName(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
@@ -52,15 +50,15 @@ function Name({ g }: { g: GroupView }) {
 function memberItems(g: GroupView, m: MemberView, ctx: { friend: boolean; message: () => void; confirm: (c: Confirm) => void; setAdmin: (on: boolean) => void }): ActionItem[] {
   if (m.self) return [];
   return [
-    ...(ctx.friend ? [{ label: t('network.group.message'), icon: 'chat' as const, onSelect: ctx.message }] : []),
+    ...(ctx.friend ? [{ label: 'Message', icon: 'chat' as const, onSelect: ctx.message }] : []),
     ...(g.admin && g.active
       ? [
-          { label: m.admin ? t('network.group.removeAdmin') : t('network.group.makeAdmin'), icon: 'person' as const, separate: ctx.friend, onSelect: () => ctx.setAdmin(!m.admin) },
+          { label: m.admin ? 'Remove as Admin' : 'Make Admin', icon: 'person' as const, separate: ctx.friend, onSelect: () => ctx.setAdmin(!m.admin) },
           {
-            label: t('network.group.removeMember', { name: m.name }),
+            label: `Remove ${m.name}…`,
             danger: true,
             separate: true,
-            onSelect: () => ctx.confirm({ title: t('network.group.removeTitle', { name: m.name, group: g.name }), message: t('network.group.removeMessage', { name: m.name }), confirm: t('network.group.remove'), run: () => void 0 }),
+            onSelect: () => ctx.confirm({ title: `Remove ${m.name} from ${g.name}?`, message: `${m.name} stops getting new messages. What was said before stays on their computer.`, confirm: 'Remove', run: () => void 0 }),
           },
         ]
       : []),
@@ -69,17 +67,16 @@ function memberItems(g: GroupView, m: MemberView, ctx: { friend: boolean; messag
 
 /** Who's in the group: you first, then admins, then everyone else, each with a menu. */
 function Members({ g, confirm }: { g: GroupView; confirm: (c: Confirm) => void }) {
-  useT();
   const { client } = useBeluga();
   const friends = useApp((st) => st.network.friends);
   const api = client.api.network;
   return (
     <div className={s.infoSection}>
       <div className={s.infoSectionHead}>
-        <span>{t('network.group.members', { n: g.members.length })}</span>
+        <span>{g.members.length} Members</span>
         {g.admin && g.active ? (
           <button type="button" onClick={() => openNet({ kind: 'add_people', groupId: g.id })}>
-            {t('network.group.addPeople')}
+            Add People…
           </button>
         ) : null}
       </div>
@@ -94,13 +91,13 @@ function Members({ g, confirm }: { g: GroupView; confirm: (c: Confirm) => void }
           setAdmin: (on) => void api['groups.setAdmin'](g.id, m.peerId, on),
         });
         const row = (
-          <button type="button" className={s.member} aria-label={t('network.group.memberLabel', { name: m.self ? t('network.group.you') : m.name, admin: m.admin ? t('network.group.adminSuffix') : '' })} disabled={!items.length}>
+          <button type="button" className={s.member} aria-label={`${m.self ? 'You' : m.name}${m.admin ? ', admin' : ''}`} disabled={!items.length}>
             <PersonAvatar name={m.name} id={m.peerId} state={m.self ? undefined : shownState(m)} size={28} />
             <span className={s.memberText}>
-              <span className={s.memberName}>{m.self ? t('network.group.memberYou', { name: m.name }) : m.name}</span>
+              <span className={s.memberName}>{m.self ? `${m.name} (you)` : m.name}</span>
               {m.self ? null : <span className={s.memberLine}>{presenceLine(m)}</span>}
             </span>
-            {m.admin ? <span className={s.admin}>{t('network.group.admin')}</span> : null}
+            {m.admin ? <span className={s.admin}>Admin</span> : null}
             {items.length ? <Icon name="more" size={14} /> : null}
           </button>
         );
@@ -120,23 +117,22 @@ function Members({ g, confirm }: { g: GroupView; confirm: (c: Confirm) => void }
 
 /** People who used the group's link and wait for an admin: Approve or Decline. */
 function Requests({ g }: { g: GroupView }) {
-  useT();
   const { client } = useBeluga();
   if (!g.admin || !g.requests.length) return null;
   return (
     <div className={s.infoSection}>
       <div className={s.infoSectionHead}>
-        <span>{t('network.group.askingToJoin')}</span>
+        <span>Asking to Join</span>
       </div>
       {g.requests.map((r) => (
         <div key={r.peerId} className={s.request}>
           <Avatar name={r.name} id={r.peerId} size={24} />
           <span>{r.name}</span>
           <Button size="small" variant="quiet" onClick={() => void client.api.network['groups.decline'](g.id, r.peerId)}>
-            {t('network.group.decline')}
+            Decline
           </Button>
           <Button size="small" variant="primary" onClick={() => void client.api.network['groups.approve'](g.id, r.peerId)}>
-            {t('network.group.approve')}
+            Approve
           </Button>
         </div>
       ))}
@@ -149,7 +145,6 @@ const autoLinks = new Set<string>();
 
 /** An invite link for the group (admins): approve each request, or let anyone with it in; Copy. */
 function InviteLink({ g }: { g: GroupView }) {
-  useT();
   const { client } = useBeluga();
   const say = useSay();
   const invitations = useApp((st) => st.network.invitations);
@@ -173,7 +168,7 @@ function InviteLink({ g }: { g: GroupView }) {
   return (
     <div className={s.infoSection}>
       <div className={s.infoSectionHead}>
-        <span>{t('network.group.inviteLink')}</span>
+        <span>Invite with a Link</span>
       </div>
       {open ? (
         <>
@@ -187,34 +182,34 @@ function InviteLink({ g }: { g: GroupView }) {
               onClick={() =>
                 void copyText(open.link).then(() => {
                   flash('link');
-                  say(t('network.tabs.copiedInvite', { name: g.name }));
+                  say(`Copied the invite link to ${g.name}`);
                 })
               }
             >
-              {copied === 'link' ? t('network.group.copied') : t('network.group.copy')}
+              {copied === 'link' ? 'Copied' : 'Copy'}
             </Button>
           </div>
           <div className={s.toggleRow}>
             <div>
               <Choice<'ask' | 'auto'>
-                label={t('network.group.whoGetsIn')}
+                label="Who gets in"
                 value={mode}
                 wide
                 onChange={(v) => void make(v === 'auto')}
                 options={[
-                  { value: 'ask', label: t('network.group.approveEach') },
-                  { value: 'auto', label: t('network.group.anyone') },
+                  { value: 'ask', label: 'Approve Each Request' },
+                  { value: 'auto', label: 'Anyone with the Link' },
                 ]}
               />
             </div>
           </div>
           <div className={s.dim} style={{ margin: '6px 2px 0' }}>
-            {mode === 'auto' ? t('network.group.anyoneJoins') : t('network.group.youApprove')} {expiryLabel(open.expiresAt)}.
+            {mode === 'auto' ? 'Anyone with the link joins right away.' : 'You (or another admin) approve each person.'} {expiryLabel(open.expiresAt)}.
           </div>
         </>
       ) : (
         <Button icon="link" disabled={busy} onClick={() => void make(false)}>
-          {t('network.group.createLink')}
+          Create Invite Link
         </Button>
       )}
     </div>
@@ -223,7 +218,6 @@ function InviteLink({ g }: { g: GroupView }) {
 
 /** The group's info, beside its header: name, members, join requests, invite link, Leave. */
 export function GroupInfo({ g, children }: { g: GroupView; children: ReactNode }) {
-  useT();
   const { client } = useBeluga();
   const sheet = useNetSheet();
   const open = sheet?.kind === 'group_info' && sheet.groupId === g.id;
@@ -231,15 +225,15 @@ export function GroupInfo({ g, children }: { g: GroupView; children: ReactNode }
   return (
     <>
       <Popover.Root open={open} onOpenChange={(v) => (v ? openNet({ kind: 'group_info', groupId: g.id }) : closeNet())}>
-        <Tip label={t('network.group.infoTip')}>
+        <Tip label="Channel info: members, invite link">
           <Popover.Trigger asChild>{children}</Popover.Trigger>
         </Tip>
         <Popover.Portal>
-          <Popover.Content className={s.info} side="bottom" align="end" sideOffset={6} collisionPadding={12} aria-label={t('network.group.about', { name: g.name })} onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement | null)?.focus())} onInteractOutside={(e) => confirm && e.preventDefault()}>
+          <Popover.Content className={s.info} side="bottom" align="end" sideOffset={6} collisionPadding={12} aria-label={`About ${g.name}`} onOpenAutoFocus={(e) => (e.preventDefault(), (e.currentTarget as HTMLElement | null)?.focus())} onInteractOutside={(e) => confirm && e.preventDefault()}>
             <div className={s.infoHead}>
               <GroupAvatar name={g.name} id={g.id} size={56} muted={!g.active} />
               <Name g={g} />
-              <div className={s.infoSub}>{g.active ? (g.admin ? t('network.group.youreAdmin') : t('network.group.keptOnEach')) : t('network.group.noLonger')}</div>
+              <div className={s.infoSub}>{g.active ? (g.admin ? 'You’re an admin' : 'Kept on each member’s computer') : 'You’re no longer in this group'}</div>
             </div>
             <Requests g={g} />
             <Members g={g} confirm={setConfirm} />
@@ -247,13 +241,13 @@ export function GroupInfo({ g, children }: { g: GroupView; children: ReactNode }
             {g.active ? (
               <div className={s.infoFooter}>
                 <button type="button" className={s.leave} onClick={() => openNet({ kind: 'leave_group', groupId: g.id })}>
-                  {t('network.group.leave')}
+                  Leave Channel…
                 </button>
               </div>
             ) : (
               <div className={s.infoFooter}>
                 <button type="button" className={s.leave} onClick={() => openNet({ kind: 'delete_group', groupId: g.id })}>
-                  {t('network.group.delete')}
+                  Delete Channel…
                 </button>
               </div>
             )}
@@ -282,11 +276,10 @@ export function GroupInfo({ g, children }: { g: GroupView; children: ReactNode }
 
 /** The group header's button: a few members' faces and how many there are. */
 export function MembersButton({ g }: { g: GroupView }) {
-  useT();
   const others = g.members.filter((m) => !m.self);
   return (
     <GroupInfo g={g}>
-      <button type="button" className={s.headerStack} aria-label={t('network.group.membersButton', { name: g.name, n: g.members.length })}>
+      <button type="button" className={s.headerStack} aria-label={`${g.name}: ${g.members.length} members, group info`}>
         <AvatarStack people={others.length ? others : g.members} size={22} />
         {g.members.length}
       </button>

@@ -12,7 +12,6 @@ import { useSentinelActions } from './use-sentinel.js';
 import d from './data.module.css';
 import n from './numbers.module.css';
 import { revealLabel } from '../lib/os-words.js';
-import { t as tr, useT } from '../i18n/index.js';
 
 /**
  * A metric's whole history (BLG-392), from its file: a number's value at every run, a table's rows
@@ -22,7 +21,6 @@ import { t as tr, useT } from '../i18n/index.js';
  */
 export function DataSheet({ sentinelId, metric, close }: { sentinelId: string; metric: string; close: () => void }) {
   const a = useSentinelActions();
-  useT();
   const [got, setGot] = useState<{ readonly metric: MetricSeries; readonly lines: readonly MetricLine[] }>();
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -36,25 +34,25 @@ export function DataSheet({ sentinelId, metric, close }: { sentinelId: string; m
     };
   }, [a, sentinelId, metric]);
   const m = got?.metric;
-  const out = (format: 'csv' | 'json') => void a.act(() => a.api.dataExport(sentinelId, { metric, format }), tr('sentinel.data.saved'));
+  const out = (format: 'csv' | 'json') => void a.act(() => a.api.dataExport(sentinelId, { metric, format }), 'Saved in Downloads › Beluga');
   return (
     <FormSheet
-      title={m ? m.label : tr('sentinel.data.kept')}
+      title={m ? m.label : 'Kept data'}
       icon="table"
       intro={got ? summary(got.metric, got.lines) : undefined}
-      submitLabel={tr('sentinel.data.close')}
+      submitLabel="Close"
       hideSubmit
-      cancelLabel={tr('sentinel.data.close')}
+      cancelLabel="Close"
       width={900}
       onSubmit={close}
       onCancel={close}
       footer={
         <span className={d.sheetBar}>
           <Button size="small" icon="download" onClick={() => out('csv')} disabled={!got?.lines.length}>
-            {tr('sentinel.data.exportCsv')}
+            Export CSV
           </Button>
           <Button size="small" icon="download" onClick={() => out('json')} disabled={!got?.lines.length}>
-            {tr('sentinel.data.exportJson')}
+            Export JSON
           </Button>
           <Button size="small" icon="folder" onClick={() => void a.act(() => a.api.dataReveal(sentinelId))}>
             {revealLabel()}
@@ -62,20 +60,20 @@ export function DataSheet({ sentinelId, metric, close }: { sentinelId: string; m
         </span>
       }
     >
-      {error ? <p className={d.note}>{error}</p> : !got ? <p className={d.note}>{tr('sentinel.data.reading')}</p> : got.metric.kind === 'output' ? <Outputs lines={got.lines} /> : <History metric={got.metric} lines={got.lines} />}
+      {error ? <p className={d.note}>{error}</p> : !got ? <p className={d.note}>Reading it…</p> : got.metric.kind === 'output' ? <Outputs lines={got.lines} /> : <History metric={got.metric} lines={got.lines} />}
     </FormSheet>
   );
 }
 
 function summary(m: MetricSeries, lines: readonly MetricLine[]): string {
-  if (!lines.length) return tr('sentinel.data.nothingYet');
-  const runs = m.kind === 'rows' ? tr('sentinel.data.rowsOverRuns', { rows: lines.reduce((t, l) => t + (l.rows?.length ?? 0), 0).toLocaleString(), n: lines.length, runs: lines.length.toLocaleString() }) : tr('sentinel.data.runs', { n: lines.length, runs: lines.length.toLocaleString() });
-  return tr('sentinel.data.summary', { runs, ago: ago(lines[0]!.at) });
+  if (!lines.length) return 'Nothing kept yet.';
+  const runs = `${lines.length.toLocaleString()} ${lines.length === 1 ? 'run' : 'runs'}`;
+  const rows = m.kind === 'rows' ? `${lines.reduce((t, l) => t + (l.rows?.length ?? 0), 0).toLocaleString()} rows over ` : '';
+  return `${rows}${runs}, since ${ago(lines[0]!.at)}. Newest first.`;
 }
 
 /** A number, a table or a list of points: every line as rows, newest first (the latest MAX_INLINE_ROWS). */
 function History({ metric, lines }: { metric: MetricSeries; lines: readonly MetricLine[] }) {
-  const w = useT();
   const view = useMemo(() => {
     const newest = [...lines].reverse();
     const kept = (l: MetricLine) => new Date(l.at).toISOString();
@@ -83,23 +81,23 @@ function History({ metric, lines }: { metric: MetricSeries; lines: readonly Metr
     let rows: Array<Record<string, unknown>>;
     if (metric.kind === 'rows') {
       const keys = [...new Set(newest.flatMap((l) => l.columns ?? Object.keys(l.rows?.[0] ?? {})))].slice(0, 30);
-      columns = [{ key: '__kept', label: w('sentinel.data.keptColumn'), type: 'datetime' }, ...keys.map((key) => ({ key, label: metric.columnTypes?.find((c) => c.key === key)?.label ?? key }))];
+      columns = [{ key: '__kept', label: 'Kept', type: 'datetime' }, ...keys.map((key) => ({ key, label: metric.columnTypes?.find((c) => c.key === key)?.label ?? key }))];
       rows = newest.flatMap((l) => (l.rows ?? []).map((r) => ({ __kept: kept(l), ...r })));
     } else if (metric.kind === 'series') {
-      columns = [{ key: '__kept', label: w('sentinel.data.keptColumn'), type: 'datetime' }, { key: 'x', label: w('sentinel.data.point') }, { key: 'y', label: w('sentinel.data.value'), type: 'number' }];
+      columns = [{ key: '__kept', label: 'Kept', type: 'datetime' }, { key: 'x', label: 'Point' }, { key: 'y', label: 'Value', type: 'number' }];
       rows = newest.flatMap((l) => (l.series ?? []).map((p) => ({ __kept: kept(l), x: p.x, y: p.y })));
     } else {
-      columns = [{ key: '__kept', label: w('sentinel.data.keptColumn'), type: 'datetime' }, { key: 'value', label: metric.label, ...unitColumn(metric.unit) }];
+      columns = [{ key: '__kept', label: 'Kept', type: 'datetime' }, { key: 'value', label: metric.label, ...unitColumn(metric.unit) }];
       rows = newest.filter((l) => l.value !== undefined).map((l) => ({ __kept: kept(l), value: l.value }));
     }
     const r = readView({ type: 'table', columns, data: rows.slice(0, MAX_INLINE_ROWS), pageSize: 25, search: true });
     return r.ok ? { view: r.view, cut: rows.length > MAX_INLINE_ROWS, total: rows.length } : undefined;
-  }, [metric, lines, w]);
-  if (!view) return <p className={d.note}>{w('sentinel.data.notATable')}</p>;
+  }, [metric, lines]);
+  if (!view) return <p className={d.note}>Its history doesn’t read as a table.</p>;
   return (
     <>
       <Rows view={view.view} />
-      {view.cut ? <p className={d.note}>{w('sentinel.data.cut', { n: MAX_INLINE_ROWS.toLocaleString(), total: view.total.toLocaleString() })}</p> : null}
+      {view.cut ? <p className={d.note}>The latest {MAX_INLINE_ROWS.toLocaleString()} of {view.total.toLocaleString()} rows show here: Export has all of them.</p> : null}
     </>
   );
 }
@@ -122,9 +120,8 @@ function unitColumn(unit: MetricSeries['unit']): { type: string; currency?: stri
 
 /** A kept output's last ones, newest first, as they read. */
 function Outputs({ lines }: { lines: readonly MetricLine[] }) {
-  const w = useT();
   const newest = [...lines].reverse().filter((l) => l.output);
-  if (!newest.length) return <p className={d.note}>{w('sentinel.data.nothingYet')}</p>;
+  if (!newest.length) return <p className={d.note}>Nothing kept yet.</p>;
   return (
     <div className={d.outputs}>
       {newest.map((l) => (

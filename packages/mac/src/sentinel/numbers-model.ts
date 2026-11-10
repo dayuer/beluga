@@ -3,10 +3,6 @@ import { type MetricColumn, isViewKind, storageSources } from '../../../../src/c
 import { type Dashboard, type MetricRef, type TileColumn, tileColumns, OUTPUT_STEP_KINDS, type StepRef, type Tile, type TileState, TILE_STATE_WORDS, metricOf, tileCompare, tileMetrics, tileOutput, tileStateIn, tileTitle } from '../../../../src/core/sentinel/dashboard-model.js';
 import { COMPARE, COMPARE_LABEL, COMPARE_WORDS, type Compare, type Tone, changeText, deltaOf, formatMetric, unitLabel } from '../../../../src/core/sentinel/metrics.js';
 import { type MetricKind, type MetricSeries, type SentinelState, STEP_INFO, type StepKind, firstLine } from '../../../../src/core/sentinel/model.js';
-import { t as tr, tl } from '../i18n/index.js';
-
-/** "vs yesterday", in the language shown. */
-const compareWords = (c: Compare): string => tl('COMPARE_WORDS', c, 'label', COMPARE_WORDS[c]);
 
 /**
  * Sentinel's dashboard on the Mac (docs/sentinel.md §10), the pure part: a number tile's words, a
@@ -15,15 +11,7 @@ const compareWords = (c: Compare): string => tl('COMPARE_WORDS', c, 'label', COM
  * tests/mac-dashboard.test.ts.
  */
 
-export const COMPARE_CHOICES: ReadonlyArray<{ readonly value: Compare; readonly label: string; readonly hint: string }> = COMPARE.map((c) => ({
-  value: c,
-  get label() {
-    return tl('COMPARE_LABEL', c, 'label', COMPARE_LABEL[c]);
-  },
-  get hint() {
-    return tr('sentinel.numbers.compareHint', { vs: compareWords(c) });
-  },
-}));
+export const COMPARE_CHOICES: ReadonlyArray<{ readonly value: Compare; readonly label: string; readonly hint: string }> = COMPARE.map((c) => ({ value: c, label: COMPARE_LABEL[c], hint: `Each change ${COMPARE_WORDS[c]}` }));
 
 /** A number tile as drawn: its label, value, change, tone, what it's compared with, and its sparkline. */
 export interface NumberWords {
@@ -50,7 +38,7 @@ export function numberWords(m: MetricSeries, compare: Compare, label = m.label):
     ...(unit && m.unit !== 'percent' && !m.unit.startsWith('currency:') && m.unit !== 'ms' && m.unit !== 'bytes' ? { unit } : {}),
     ...(change ? { change } : {}),
     tone: d?.tone ?? 'none',
-    vs: d?.change !== undefined ? compareWords(compare) : m.points.length > 1 ? tr('sentinel.numbers.nothingFrom', { vs: compareWords(compare) }) : tr('sentinel.numbers.firstNumber'),
+    vs: d?.change !== undefined ? COMPARE_WORDS[compare] : m.points.length > 1 ? `nothing ${COMPARE_WORDS[compare].replace(/^vs /, 'from ')}` : 'its first number',
     trend: m.points.slice(-30).map((p) => p.value),
     ...(last ? { runId: last.runId, at: last.at } : {}),
   };
@@ -102,7 +90,7 @@ export function chartViewOf(series: readonly MetricSeries[], kind: 'line' | 'are
     type: 'chart',
     chart: kind,
     x: 'at',
-    columns: [{ key: 'at', type: 'datetime', label: tr('sentinel.numbers.when') }, ...keys.map((k) => ({ key: k.key, label: k.label, type, ...(type === 'currency' && m ? { currency: m.unit.slice('currency:'.length) } : {}) }))],
+    columns: [{ key: 'at', type: 'datetime', label: 'When' }, ...keys.map((k) => ({ key: k.key, label: k.label, type, ...(type === 'currency' && m ? { currency: m.unit.slice('currency:'.length) } : {}) }))],
     series: keys.map((k) => ({ key: k.key, label: k.label })),
     data: rows,
     curve: 'smooth',
@@ -165,10 +153,10 @@ export function outputTable(rows: ReadonlyArray<Record<string, unknown>>): { rea
 }
 
 /** "Fetching… 2 of 3" (the one going is the next: 0 done means the first is running). */
-export const refreshLine = (r: { readonly done: number; readonly total: number } | undefined): string | undefined => (r ? tr('sentinel.numbers.fetching', { n: Math.min(r.total, r.done + 1), total: r.total }) : undefined);
+export const refreshLine = (r: { readonly done: number; readonly total: number } | undefined): string | undefined => (r ? `Fetching… ${Math.min(r.total, r.done + 1)} of ${r.total}` : undefined);
 
 /** What a tile can't draw from, in its quiet words (none: it draws). */
-export const tileNote = (state: TileState): string | undefined => (state === 'ok' ? undefined : tl('TILE_STATE_WORDS', state, 'label', TILE_STATE_WORDS[state]));
+export const tileNote = (state: TileState): string | undefined => (state === 'ok' ? undefined : TILE_STATE_WORDS[state]);
 
 /** What a tile is, for its menu and the sheet: "Revenue · Stripe revenue". */
 export function tileCaption(s: Pick<SentinelState, 'metrics' | 'items'>, t: Tile): { readonly title: string; readonly from?: string; readonly state: TileState } {
@@ -202,7 +190,7 @@ export interface StepChoice {
 /** Every step an output tile can show, by project then sentinel. */
 export function stepChoices(s: Pick<SentinelState, 'items'>, projectName: (id: string | undefined) => string): StepChoice[] {
   return s.items
-    .flatMap((i) => i.steps.filter((st) => OUTPUT_STEP_KINDS.has(st.kind)).map((st): StepChoice => ({ ref: { sentinelId: i.id, stepId: st.id }, label: st.name, kind: st.kind, sentinel: i.name, project: projectName(i.projectId), hint: st.kind === 'claude' ? tr('sentinel.numbers.hint.claude') : st.kind === 'http' ? tr('sentinel.numbers.hint.http') : tr('sentinel.numbers.hint.script') })))
+    .flatMap((i) => i.steps.filter((st) => OUTPUT_STEP_KINDS.has(st.kind)).map((st): StepChoice => ({ ref: { sentinelId: i.id, stepId: st.id }, label: st.name, kind: st.kind, sentinel: i.name, project: projectName(i.projectId), hint: st.kind === 'claude' ? 'What the agent wrote, as Markdown' : st.kind === 'http' ? 'The service’s answer, as a JSON tree or a table' : 'What the script printed' })))
     .sort((a, b) => a.project.localeCompare(b.project) || a.sentinel.localeCompare(b.sentinel));
 }
 
@@ -216,7 +204,7 @@ export function draftsOf(s: Pick<SentinelState, 'items' | 'dashboardAsks' | 'run
 }
 
 /** What an output tile says it is, under its title: "Read what changed · Morning brief" (the step's kind when it has no name). */
-export const stepLabel = (kind: StepKind): string => tl('STEP_INFO', kind, 'label', STEP_INFO[kind].label);
+export const stepLabel = (kind: StepKind): string => STEP_INFO[kind].label;
 
 /** Every metric to pick from, by project then sentinel, with whether this dashboard has it already. */
 export function metricChoices(s: Pick<SentinelState, 'metrics' | 'items'>, projectName: (id: string | undefined) => string, d?: Dashboard): MetricChoice[] {
@@ -231,7 +219,7 @@ export function metricChoices(s: Pick<SentinelState, 'metrics' | 'items'>, proje
           sentinel: i.name,
           project: projectName(i.projectId),
           kind: m.kind,
-          ...(m.kind === 'rows' ? { value: tr('sentinel.numbers.rows', { n: m.rows?.length ?? 0 }) } : m.kind === 'series' ? { value: tr('sentinel.numbers.points', { n: m.series?.length ?? 0 }) } : m.kind === 'output' ? { value: m.output?.format === 'json' ? 'JSON' : m.output?.format === 'markdown' ? 'Markdown' : tr('sentinel.numbers.text') } : last ? { value: formatMetric(last.value, m.unit) } : {}),
+          ...(m.kind === 'rows' ? { value: `${m.rows?.length ?? 0} rows` } : m.kind === 'series' ? { value: `${m.series?.length ?? 0} points` } : m.kind === 'output' ? { value: m.output?.format === 'json' ? 'JSON' : m.output?.format === 'markdown' ? 'Markdown' : 'text' } : last ? { value: formatMetric(last.value, m.unit) } : {}),
           onIt: on.has(`${i.id}/${m.name}`),
         };
       }),
@@ -254,7 +242,7 @@ export function tileWords(s: Pick<SentinelState, 'metrics' | 'items' | 'runs'> &
   }
   if (t.kind === 'table') {
     const m = metricOf(s, t.metric);
-    return { title, ...(m?.rows ? { value: tr('sentinel.numbers.rows', { n: m.rows.length }) } : {}) };
+    return { title, ...(m?.rows ? { value: `${m.rows.length} rows` } : {}) };
   }
   if (t.kind === 'series') {
     const ms = tileMetrics(s, t);
@@ -273,23 +261,7 @@ export function tileWords(s: Pick<SentinelState, 'metrics' | 'items' | 'runs'> &
 
 /** How a picked thing can show on the board, as the sheet's pictures say it. */
 export type TileLook = 'number' | 'line' | 'bars' | 'table' | 'text';
-export const LOOK_WORDS: Readonly<Record<TileLook, string>> = {
-  get number() {
-    return tr('sentinel.numbers.look.number');
-  },
-  get line() {
-    return tr('sentinel.numbers.look.line');
-  },
-  get bars() {
-    return tr('sentinel.numbers.look.bars');
-  },
-  get table() {
-    return tr('sentinel.numbers.look.table');
-  },
-  get text() {
-    return tr('sentinel.numbers.look.text');
-  },
-};
+export const LOOK_WORDS: Readonly<Record<TileLook, string>> = { number: 'A number', line: 'Over time', bars: 'Bars', table: 'A table', text: 'Its text' };
 
 /** The looks a kept thing fits: a number as itself or over time, a kept array as a chart, rows as a table, words as text. */
 export function looksFor(kind: MetricKind | 'step' | 'report'): readonly TileLook[] {
@@ -301,46 +273,11 @@ export function looksFor(kind: MetricKind | 'step' | 'report'): readonly TileLoo
 
 /** The sizes as shapes: how many of the six columns, and whether tall. */
 export const TILE_SIZES = [
-  {
-    id: 'small',
-    get label() {
-      return tr('sentinel.numbers.size.small');
-    },
-    w: 1,
-    h: 1,
-  },
-  {
-    id: 'wide',
-    get label() {
-      return tr('sentinel.numbers.size.wide');
-    },
-    w: 2,
-    h: 1,
-  },
-  {
-    id: 'half',
-    get label() {
-      return tr('sentinel.numbers.size.half');
-    },
-    w: 3,
-    h: 1,
-  },
-  {
-    id: 'big',
-    get label() {
-      return tr('sentinel.numbers.size.big');
-    },
-    w: 3,
-    h: 2,
-  },
-  {
-    id: 'full',
-    get label() {
-      return tr('sentinel.numbers.size.full');
-    },
-    w: 6,
-    h: 1,
-  },
+  { id: 'small', label: 'Small', w: 1, h: 1 },
+  { id: 'wide', label: 'Wide', w: 2, h: 1 },
+  { id: 'half', label: 'Half', w: 3, h: 1 },
+  { id: 'big', label: 'Big', w: 3, h: 2 },
+  { id: 'full', label: 'Full width', w: 6, h: 1 },
 ] as const;
 export type TileSizeId = (typeof TILE_SIZES)[number]['id'];
 
@@ -349,63 +286,12 @@ export const sizeFor = (look: TileLook): TileSizeId => (look === 'number' ? 'sma
 
 /** Somewhere a tile can come from that no sentinel fetches yet: Claude sets one up (a draft) when you pick it. */
 export const NEW_SOURCES = [
-  {
-    id: 'stripe' as const,
-    label: 'Stripe',
-    get hint(): string {
-      return tr('sentinel.numbers.source.stripe.hint');
-    },
-    get ideas(): readonly string[] {
-      return [tr('sentinel.numbers.source.stripe.idea0'), tr('sentinel.numbers.source.stripe.idea1'), tr('sentinel.numbers.source.stripe.idea2')];
-    },
-  },
-  {
-    id: 'github' as const,
-    label: 'GitHub',
-    get hint(): string {
-      return tr('sentinel.numbers.source.github.hint');
-    },
-    get ideas(): readonly string[] {
-      return [tr('sentinel.numbers.source.github.idea0'), tr('sentinel.numbers.source.github.idea1'), tr('sentinel.numbers.source.github.idea2')];
-    },
-  },
-  {
-    id: 'database' as const,
-    get label(): string {
-      return tr('sentinel.numbers.source.database.label');
-    },
-    get hint(): string {
-      return tr('sentinel.numbers.source.database.hint');
-    },
-    get ideas(): readonly string[] {
-      return [tr('sentinel.numbers.source.database.idea0'), tr('sentinel.numbers.source.database.idea1'), tr('sentinel.numbers.source.database.idea2')];
-    },
-  },
-  {
-    id: 'url' as const,
-    get label(): string {
-      return tr('sentinel.numbers.source.url.label');
-    },
-    get hint(): string {
-      return tr('sentinel.numbers.source.url.hint');
-    },
-    get ideas(): readonly string[] {
-      return [tr('sentinel.numbers.source.url.idea0'), tr('sentinel.numbers.source.url.idea1')];
-    },
-  },
-  {
-    id: 'script' as const,
-    get label(): string {
-      return tr('sentinel.numbers.source.script.label');
-    },
-    get hint(): string {
-      return tr('sentinel.numbers.source.script.hint');
-    },
-    get ideas(): readonly string[] {
-      return [tr('sentinel.numbers.source.script.idea0'), tr('sentinel.numbers.source.script.idea1')];
-    },
-  },
-];
+  { id: 'stripe', label: 'Stripe', hint: 'revenue, payments', ideas: ['Revenue per day', 'New subscriptions this week', 'Failed payments'] },
+  { id: 'github', label: 'GitHub', hint: 'pull requests, issues, CI', ideas: ['Open pull requests', 'Open issues', 'Failed CI runs this week'] },
+  { id: 'database', label: 'A database', hint: 'Supabase, Postgres, SQLite', ideas: ['Sign-ups per day', 'Rows added yesterday', 'The latest 10 orders'] },
+  { id: 'url', label: 'A URL or an API', hint: 'any JSON', ideas: ['A number from a JSON API', 'Whether my site answers'] },
+  { id: 'script', label: 'A script', hint: 'prints a number', ideas: ['Free disk space', 'Lines of code'] },
+] as const;
 export type NewSourceId = (typeof NEW_SOURCES)[number]['id'];
 
 /** What Claude is asked when you pick somewhere new and say what from it. */

@@ -1,55 +1,54 @@
 import type { TaskView } from '@beluga/core/gateway/model.js';
 import { isFinal } from '@beluga/core/gateway/model.js';
 import { humanizeLine } from '@beluga/shared/step-titles.js';
-import { t as tr } from '../../i18n/index.js';
 
 /**
  * What Claude is waiting on when it asked someone else's Claude (or Mac), in words, from the
  * task's live state: "bob is approving…", "bob's Claude is working · Reading payments.ts".
  */
 
-const target = (t: Pick<TaskView, 'peerName' | 'kind'>): string => tr(t.kind === 'ask' ? 'chat.waiting.theirAgent' : 'chat.waiting.theirComputer', { name: t.peerName });
+const target = (t: Pick<TaskView, 'peerName' | 'kind'>): string => (t.kind === 'ask' ? `${t.peerName}’s agent` : `${t.peerName}’s computer`);
 
 /** The waiting row's heading. */
-export const waitingFor = (t: TaskView | undefined): string => (t ? tr('chat.waiting.waitingFor', { target: target(t) }) : tr('chat.waiting.waitingAnswer'));
+export const waitingFor = (t: TaskView | undefined): string => (t ? `Waiting for ${target(t)}` : 'Waiting for an answer');
 
 /** Where the task is right now, as one line. */
 export function waitState(t: TaskView): string {
   const them = t.peerName;
-  if (t.question) return tr('chat.waiting.asks', { name: them, question: t.question.questions[0]?.question ?? tr('chat.waiting.aQuestion') });
+  if (t.question) return `${them}’s agent asks: ${t.question.questions[0]?.question ?? 'a question'}`;
   switch (t.state) {
     case 'confirm':
-      return tr('chat.waiting.confirm', { name: them });
+      return `Waiting for you to OK asking ${them}`;
     case 'sent':
-      return tr('chat.waiting.sent', { name: them });
+      return `Sent · reaching ${them}’s computer`;
     case 'queued':
-      return tr('chat.waiting.queued', { name: them });
+      return `In line behind ${them}’s other work`;
     case 'awaiting_approval':
-      return tr('chat.waiting.approving', { name: them });
+      return `${them} is approving…`;
     case 'working': {
-      if (t.incoming) return tr('chat.waiting.receiving', { name: them });
-      if (t.kind === 'run') return tr('chat.waiting.running', { name: them });
-      if (t.kind === 'file') return tr('chat.waiting.sendingFile', { name: them });
+      if (t.incoming) return `Receiving files from ${them}`;
+      if (t.kind === 'run') return `Running on ${them}’s computer`;
+      if (t.kind === 'file') return `${them}’s computer is sending the file`;
       const last = t.steps.at(-1);
-      return last ? tr('chat.waiting.workingOn', { name: them, doing: humanizeLine(last).doing }) : tr('chat.waiting.working', { name: them });
+      return `${them}’s agent is working${last ? ` · ${humanizeLine(last).doing}` : ''}`;
     }
     case 'done':
-      return tr('chat.waiting.answered', { target: target(t) });
+      return `${target(t)} answered`;
     case 'declined':
-      return tr('chat.waiting.declined', { name: them });
+      return `${them} declined`;
     case 'failed':
-      return tr('chat.waiting.failed');
+      return 'It failed';
     case 'cancelled':
-      return tr('chat.waiting.cancelled');
+      return 'Cancelled';
   }
 }
 
 /** How a finished wait reads in the list of steps. */
 export function waitedLabel(t: TaskView | undefined): string | undefined {
   if (!t || !isFinal(t.state)) return undefined;
-  if (t.state === 'done') return tr(t.kind === 'ask' ? 'chat.waiting.heardBack' : 'chat.waiting.gotResult', { name: t.peerName });
-  if (t.state === 'declined') return tr('chat.waiting.declined', { name: t.peerName });
-  return tr(t.state === 'cancelled' ? 'chat.waiting.stoppedWaiting' : 'chat.waiting.couldnt', { target: target(t) });
+  if (t.state === 'done') return t.kind === 'ask' ? `Heard back from ${t.peerName}’s agent` : `Got the result from ${t.peerName}’s computer`;
+  if (t.state === 'declined') return `${t.peerName} declined`;
+  return t.state === 'cancelled' ? `Stopped waiting for ${target(t)}` : `${target(t)} couldn’t do it`;
 }
 
 export const waitTone = (t: TaskView | undefined): 'claude' | 'warn' | 'ok' | 'error' =>

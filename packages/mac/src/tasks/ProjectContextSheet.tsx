@@ -5,8 +5,12 @@ import { toast, useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { ago } from './tasks-model.js';
 import { useBoard, useTaskActions } from './use-tasks.js';
-import { useT } from '../i18n/index.js';
 
+const PLACEHOLDER = [
+  'What the app is and who it’s for.',
+  'How the code is laid out: the main parts and where they live.',
+  'Words the team uses, and anything a new person gets wrong.',
+].join('\n');
 
 /**
  * About This Project (BLG-298): a few paragraphs Claude reads whenever it writes a task here, so a
@@ -20,25 +24,24 @@ export function ProjectContextSheet({ projectId, close }: { projectId: string; c
   const saved = board.projects[projectId]?.context;
   const [text, setText] = useState(saved?.text ?? '');
   const changed = text.trim() !== (saved?.text ?? '');
-  const t = useT();
-  const shared = mates.length ? t('tasks.context.sharedWith', { names: mates.join(', ') }) : t('tasks.context.teammates');
+  const shared = mates.length ? `Shared with ${mates.join(', ')}: an edit here reaches them too.` : 'Teammates on this project get it too.';
   return (
     <FormSheet
-      title={t('tasks.context.title')}
+      title="About This Project"
       icon="book"
-      intro={t('tasks.context.intro')}
-      submitLabel={t('plans.sheets.save')}
+      intro="Your agent reads this whenever it writes a task here, so tasks use the project’s own words and point at the right part of the app."
+      submitLabel="Save"
       width={600}
       canSubmit={changed}
       onCancel={close}
       onSubmit={async () => {
         await api.setContext(projectId, text);
         close();
-        toast(client, text.trim() ? t('tasks.context.toast.saved') : t('tasks.context.toast.cleared'), 'success');
+        toast(client, text.trim() ? 'Your agent knows about this project now' : 'The project’s context is cleared', 'success');
       }}
     >
-      <Field label={t('plans.details.context')} htmlFor="project-context" hint={`${shared}${saved?.text ? t('tasks.context.lastEdited', { by: saved.by, when: ago(saved.at) }) : ''}`}>
-        <TextArea id="project-context" autoFocus rows={12} value={text} placeholder={t('tasks.context.placeholder')} maxLength={MAX_PROJECT_CONTEXT} onChange={setText} />
+      <Field label="Context" htmlFor="project-context" hint={`${shared}${saved?.text ? ` Last edited by ${saved.by}, ${ago(saved.at)}.` : ''}`}>
+        <TextArea id="project-context" autoFocus rows={12} value={text} placeholder={PLACEHOLDER} maxLength={MAX_PROJECT_CONTEXT} onChange={setText} />
       </Field>
     </FormSheet>
   );

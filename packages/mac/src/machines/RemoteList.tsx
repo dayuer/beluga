@@ -5,7 +5,6 @@ import { onMachine } from './pane-model.js';
 import { type Tagged, whereLine } from './remote-work.js';
 import { MachineChip } from './RemoteRows.js';
 import c from './machines.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * A list's work on your computers (BLG-785): Plans, Sentinels, Tasks and Dashboards each show
@@ -23,23 +22,21 @@ export interface RemoteItem {
   readonly page: View;
 }
 
-export function RemoteList({ title: given, rows }: { title?: string; rows: ReadonlyArray<Tagged<RemoteItem>> }) {
-  const t = useT();
-  const title = given ?? t('machines.rows.onYourComputers');
+export function RemoteList({ title = 'On your computers', rows }: { title?: string; rows: ReadonlyArray<Tagged<RemoteItem>> }) {
   const actions = useActions();
   if (!rows.length) return null;
   return (
     <section className={c.remoteList} aria-label={title}>
       <div className={c.remoteHead}>{title}</div>
       <ul>
-        {rows.map((row) => (
-          <li key={`${row.machine.id}/${row.item.id}`}>
-            <button type="button" className={cx(c.remoteRow, row.offline && c.offlineRow)} title={whereLine(row)} aria-label={t('machines.rows.itemOn', { item: row.item.title, name: row.machine.name })} onClick={() => actions.run({ type: 'view', view: onMachine(row.machine.id, row.item.page) })}>
+        {rows.map((t) => (
+          <li key={`${t.machine.id}/${t.item.id}`}>
+            <button type="button" className={cx(c.remoteRow, t.offline && c.offlineRow)} title={whereLine(t)} aria-label={`${t.item.title} on ${t.machine.name}`} onClick={() => actions.run({ type: 'view', view: onMachine(t.machine.id, t.item.page) })}>
               <span className={c.remoteMain}>
-                <span className={c.remoteTitle}>{row.item.title}</span>
-                {row.item.sub || row.offline ? <span className={c.remoteSub}>{[row.item.sub, row.offline ? whereLine(row) : undefined].filter(Boolean).join(' · ')}</span> : null}
+                <span className={c.remoteTitle}>{t.item.title}</span>
+                {t.item.sub || t.offline ? <span className={c.remoteSub}>{[t.item.sub, t.offline ? whereLine(t) : undefined].filter(Boolean).join(' · ')}</span> : null}
               </span>
-              <MachineChip machine={row.machine} offline={row.offline} />
+              <MachineChip machine={t.machine} offline={t.offline} />
             </button>
           </li>
         ))}

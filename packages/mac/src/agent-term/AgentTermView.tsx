@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { agentTermId, paneTermId } from '@beluga/shared/terminal-keys.js';
 import { Icon } from '../components/Icon.js';
@@ -45,7 +44,6 @@ interface SplitsProps {
 /** The panes as their splits lay them out, each divider draggable. */
 function Splits({ tree, path, render, onResize }: SplitsProps) {
   const box = useRef<HTMLDivElement>(null);
-  const tr = useT();
   if (tree.kind === 'pane') return render(tree.key);
   const right = tree.dir === 'right';
   return (
@@ -55,7 +53,7 @@ function Splits({ tree, path, render, onResize }: SplitsProps) {
       </div>
       <ResizeHandle
         axis={right ? 'x' : 'y'}
-        label={right ? tr('agentTerm.resizeSide') : tr('agentTerm.resizeStack')}
+        label={right ? 'Resize the panes side by side' : 'Resize the panes one above the other'}
         className={s.splitHandle}
         onMove={(pos) => {
           const r = box.current?.getBoundingClientRect();
@@ -106,9 +104,8 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const api = useApi();
   const { client } = useBeluga();
   const prefs = usePrefs();
-  const tr = useT();
   const cwd = useApp((st) => st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.path ?? '');
-  const agentLabel = useApp((st) => st.agentTerms[wsId]?.label ?? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? tr('call.yourAgent'));
+  const agentLabel = useApp((st) => st.agentTerms[wsId]?.label ?? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? 'Your agent');
   const visuals = useApp((st) => st.termVisuals[wsId]);
   const agentKey = agentTermId(wsId);
   const [tabs, setTabsState] = useState<TermTabs>(() => loadTabs(wsId));
@@ -159,13 +156,13 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const openNewest = (): void => {
     const newest = visuals?.[visuals.length - 1];
     if (newest) open({ kind: 'visual', n: newest.n });
-    else toast(client, tr('agentTerm.noVisuals', { name: agentLabel, keys: keyOf('newest_visual') ?? chordLabel('Cmd+Enter') }), 'info');
+    else toast(client, `No visuals yet: when ${agentLabel} shows a graph or a table here, ${keyOf('newest_visual') ?? chordLabel('Cmd+Enter')} opens it`, 'info');
   };
 
   const newKey = (t: TermTabs): string => paneTermId(wsId, nextPaneNumber(allPaneKeys(t)));
   const newTab = (): void => {
     const t = tabsNow.current;
-    if (t.tabs.length >= MAX_TABS) return toast(client, tr('agentTerm.maxTabs', { n: MAX_TABS }), 'info');
+    if (t.tabs.length >= MAX_TABS) return toast(client, `Up to ${MAX_TABS} tabs here`, 'info');
     const key = newKey(t);
     show(addTab(t, key), key);
   };
@@ -173,7 +170,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
     const t = tabsNow.current;
     const tab = tabOf(t, target);
     if (!tab) return;
-    if (paneKeys(tab.tree).length >= MAX_PANES) return toast(client, tr('agentTerm.maxPanes', { n: MAX_PANES }), 'info');
+    if (paneKeys(tab.tree).length >= MAX_PANES) return toast(client, `Up to ${MAX_PANES} panes in one tab`, 'info');
     const key = newKey(t);
     show(withTree({ ...t, tabs: t.tabs.map((x) => (x.id === tab.id ? { id: x.id, tree: x.tree } : x)) }, tab.id, splitPane(tab.tree, target, dir, key)), key);
   };
@@ -182,7 +179,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
     const t = tabsNow.current;
     const tab = tabOf(t, key);
     if (!tab) return;
-    if (key === agentKey) return toast(client, tr('agentTerm.stays', { name: agentLabel }), 'info');
+    if (key === agentKey) return toast(client, `${agentLabel}’s terminal stays here: Take Over in the chat gives the conversation back to it`, 'info');
     void api.terminals.close(key).catch(() => undefined);
     const keysLeft = paneKeys(tab.tree).filter((k) => k !== key);
     if (!keysLeft.length) return show(closeTab(t, tab.id));
@@ -231,12 +228,12 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const tabTitle = (id: string, tree: PaneTree, zoom?: string): string => {
     if (id === AGENT_TAB) return agentLabel;
     const key = zoom ?? paneKeys(tree).find((k) => k === focusKey) ?? paneKeys(tree)[0]!;
-    return titles[key] || tr('agentTerm.shell');
+    return titles[key] || 'Shell';
   };
   return (
     <div ref={view} className={s.view}>
       <div className={s.main}>
-        <div className={s.tabs} role="tablist" aria-label={tr('agentTerm.tabs')}>
+        <div className={s.tabs} role="tablist" aria-label="Terminal tabs">
           {tabs.tabs.map((tab, i) => {
             const on = tab.id === tabs.active;
             const title = tabTitle(tab.id, tab.tree, tab.zoom);
@@ -250,15 +247,15 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
                   </button>
                 </Tip>
                 {tab.id === AGENT_TAB ? null : (
-                  <button type="button" className={s.tabClose} aria-label={tr('agentTerm.closeNamed', { name: title })} onClick={() => closeWholeTab(tab.id)}>
+                  <button type="button" className={s.tabClose} aria-label={`Close ${title}`} onClick={() => closeWholeTab(tab.id)}>
                     <Icon name="x" size={10} />
                   </button>
                 )}
               </div>
             );
           })}
-          <Tip label={tr('agentTerm.newTabTip')} keys={keyOf('new_tab')}>
-            <button type="button" className={s.tabAdd} aria-label={tr('agentTerm.newTab')} onClick={newTab}>
+          <Tip label="New Tab: a shell in this worktree" keys={keyOf('new_tab')}>
+            <button type="button" className={s.tabAdd} aria-label="New Tab" onClick={newTab}>
               <Icon name="plus" size={13} />
             </button>
           </Tip>
@@ -305,7 +302,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
         <>
           <ResizeHandle
             axis="x"
-            label={tr('agentTerm.resizeVisuals')}
+            label="Resize the visuals"
             className={s.visualsEdge}
             onMove={(x) => {
               const r = view.current?.getBoundingClientRect();

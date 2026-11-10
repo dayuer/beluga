@@ -17,7 +17,6 @@ import { isPdfFile } from '../../views/reader/reader-model.js';
 import { UnifiedDiff } from '../../views/DiffView.js';
 import { Markdown } from '../Markdown.js';
 import { AnsiText } from './AnsiText.js';
-import { t as tr } from '../../i18n/index.js';
 import s from './steps.module.css';
 
 /**
@@ -34,11 +33,11 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 function useCopy(): (text: string, what: string) => void {
   const { client } = useBeluga();
-  return (text, what) => void copyText(text).then(() => toast(client, tr('chat.messageMenu.copied', { what }), 'success'));
+  return (text, what) => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
 }
 
 /** A box that stops growing at its height, with "Show all" when there's more. */
-function Capped({ children, tall = false, fade = false, label }: { children: ReactNode; tall?: boolean; fade?: boolean; label?: string }) {
+function Capped({ children, tall = false, fade = false, label = 'Show all' }: { children: ReactNode; tall?: boolean; fade?: boolean; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [all, setAll] = useState(false);
   const [over, setOver] = useState(false);
@@ -53,7 +52,7 @@ function Capped({ children, tall = false, fade = false, label }: { children: Rea
       </div>
       {over || all ? (
         <button type="button" className={s.showAll} onClick={() => setAll(!all)}>
-          {all ? tr('chat.items.showLess') : (label ?? tr('chat.items.showAll'))}
+          {all ? 'Show less' : label}
         </button>
       ) : null}
     </div>
@@ -67,9 +66,9 @@ function Section({ label, copy, children, tone }: { label: string; copy?: { text
       <div className={s.sectionHead}>
         <span>{label}</span>
         {copy ? (
-          <button type="button" className={s.copy} onClick={() => doCopy(copy.text, copy.what)} aria-label={tr('chat.stepDetail.copyWhat', { what: copy.what })}>
+          <button type="button" className={s.copy} onClick={() => doCopy(copy.text, copy.what)} aria-label={`Copy ${copy.what}`}>
             <Icon name="copy" size={11} />
-            {tr('chat.items.copy')}
+            Copy
           </button>
         ) : null}
       </div>
@@ -83,24 +82,24 @@ function PathLink({ path, line }: { path: string; line?: number }) {
   const actions = useActions();
   if (!path) return null;
   return (
-    <button type="button" className={s.path} title={tr('chat.messageMenu.open', { name: path })} onClick={() => actions.openLink({ kind: 'local', path, dir: false, ...(line ? { line } : {}) })}>
+    <button type="button" className={s.path} title={`Open ${path}`} onClick={() => actions.openLink({ kind: 'local', path, dir: false, ...(line ? { line } : {}) })}>
       <Icon name="file" size={11} />
       <span>{path}</span>
     </button>
   );
 }
 
-function Output({ record, label, ansi = true }: { record: StepRecord; label?: string; ansi?: boolean }) {
+function Output({ record, label = 'Output', ansi = true }: { record: StepRecord; label?: string; ansi?: boolean }) {
   const out = tidy(record.output);
-  if (record.status === 'running' && !out) return <div className={s.waiting}>{tr('chat.stepDetail.waitingResult')}</div>;
+  if (record.status === 'running' && !out) return <div className={s.waiting}>Waiting for the result…</div>;
   return (
-    <Section label={record.isError ? tr('chat.stepDetail.failed') : (label ?? tr('chat.stepDetail.output'))} copy={out ? { text: stripAnsi(out), what: tr('chat.items.theOutput') } : undefined} tone={record.isError ? 'error' : undefined}>
+    <Section label={record.isError ? 'Failed' : label} copy={out ? { text: stripAnsi(out), what: 'the output' } : undefined} tone={record.isError ? 'error' : undefined}>
       {out ? (
         <Capped>
           <pre className={cx(s.term, 'selectable')}>{ansi ? <AnsiText text={out} /> : out}</pre>
         </Capped>
       ) : (
-        <div className={s.quiet}>{tr('chat.stepDetail.noOutput')}</div>
+        <div className={s.quiet}>No output</div>
       )}
     </Section>
   );
@@ -111,12 +110,12 @@ function BashDetail({ record }: { record: StepRecord }) {
   const command = str(input.command);
   return (
     <>
-      <Section label={str(input.description) || tr('chat.stepDetail.command')} copy={command ? { text: command, what: tr('chat.items.theCommand') } : undefined}>
+      <Section label={str(input.description) || 'Command'} copy={command ? { text: command, what: 'the command' } : undefined}>
         <pre className={cx(s.command, 'selectable')}>
           <span className={s.prompt}>$ </span>
           {command || record.title}
         </pre>
-        {input.run_in_background === true ? <div className={s.quiet}>{tr('chat.stepDetail.background')}</div> : null}
+        {input.run_in_background === true ? <div className={s.quiet}>Runs in the background</div> : null}
       </Section>
       <Output record={record} />
     </>
@@ -146,7 +145,7 @@ function Seen({ file }: { file: string }) {
   if (src.kind === 'local') {
     const image = localImage(src.path, name);
     return (
-      <Section label={tr('chat.mention.image')}>
+      <Section label="Image">
         <div className={s.seen}>
           <Thumb image={image} all={[image]} index={0} tiled={false} />
         </div>
@@ -174,7 +173,7 @@ function ReadDetail({ record }: { record: StepRecord }) {
         <PathLink path={file} {...(from ? { line: from } : {})} />
         {from || count ? <span className={s.quiet}>{from ? `from line ${from}` : ''}{from && count ? ', ' : ''}{count ? `${count} lines` : ''}</span> : null}
       </div>
-      {isAbsolutePath(file) && (imageSource(file).kind === 'local' || isPdfFile(file)) && !record.isError ? <Seen file={file} /> : <Output record={record} label={tr('chat.stepDetail.linesRead')} ansi={false} />}
+      {isAbsolutePath(file) && (imageSource(file).kind === 'local' || isPdfFile(file)) && !record.isError ? <Seen file={file} /> : <Output record={record} label="Lines read" ansi={false} />}
     </>
   );
 }
@@ -184,7 +183,7 @@ function diffOf(record: StepRecord): DiffLine[] {
   if (record.tool === 'Write') return addedLines(str(input.content));
   if (record.tool === 'NotebookEdit') return addedLines(str(input.new_source));
   if (record.tool === 'MultiEdit' && Array.isArray(input.edits)) {
-    return (input.edits as Array<Record<string, unknown>>).flatMap((e, i) => [...(i ? [{ kind: 'hunk' as const, text: tr('chat.stepDetail.editN', { n: i + 1 }) }] : []), ...editDiff(str(e.old_string), str(e.new_string))]);
+    return (input.edits as Array<Record<string, unknown>>).flatMap((e, i) => [...(i ? [{ kind: 'hunk' as const, text: `Edit ${i + 1}` }] : []), ...editDiff(str(e.old_string), str(e.new_string))]);
   }
   return editDiff(str(input.old_string), str(input.new_string));
 }
@@ -211,7 +210,7 @@ function EditDetail({ record }: { record: StepRecord }) {
           </div>
         </Capped>
       ) : null}
-      {record.isError ? <Output record={record} /> : record.status === 'running' ? <div className={s.waiting}>{tr('chat.stepDetail.applying')}</div> : null}
+      {record.isError ? <Output record={record} /> : record.status === 'running' ? <div className={s.waiting}>Applying…</div> : null}
     </>
   );
 }
@@ -234,7 +233,7 @@ function Matches({ text, base }: { text: string; base?: string }) {
           </div>
         );
       })}
-      {lines.length > 500 ? <div className={s.quiet}>{tr('more.chat.andMore', { n: lines.length - 500 })}</div> : null}
+      {lines.length > 500 ? <div className={s.quiet}>…and {lines.length - 500} more</div> : null}
     </div>
   );
 }
@@ -245,7 +244,7 @@ function SearchDetail({ record }: { record: StepRecord }) {
   const out = tidy(record.output);
   return (
     <>
-      <Section label={record.tool === 'Glob' ? tr('chat.stepDetail.filesMatching') : record.tool === 'LS' ? tr('chat.mention.folder') : tr('chat.stepDetail.pattern')}>
+      <Section label={record.tool === 'Glob' ? 'Files matching' : record.tool === 'LS' ? 'Folder' : 'Pattern'}>
         <pre className={cx(s.command, 'selectable')}>
           {str(input.pattern) || where}
           {input.glob ? <span className={s.quiet}> in {str(input.glob)}</span> : null}
@@ -253,15 +252,15 @@ function SearchDetail({ record }: { record: StepRecord }) {
         </pre>
       </Section>
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>{tr('chat.stepDetail.searching')}</div>
+        <div className={s.waiting}>Searching…</div>
       ) : (
-        <Section label={record.isError ? tr('chat.stepDetail.failed') : tr('chat.stepDetail.matches')} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? 'Failed' : 'Matches'} tone={record.isError ? 'error' : undefined}>
           {out ? (
             <Capped>
               <Matches text={out} {...(isAbsolutePath(where) ? { base: where } : {})} />
             </Capped>
           ) : (
-            <div className={s.quiet}>{tr('chat.find.none')}</div>
+            <div className={s.quiet}>No matches</div>
           )}
         </Section>
       )}
@@ -288,11 +287,11 @@ function WebDetail({ record }: { record: StepRecord }) {
       </div>
       {str(input.prompt) ? <div className={s.quiet}>{str(input.prompt)}</div> : null}
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>{tr('chat.stepDetail.fetching')}</div>
+        <div className={s.waiting}>Fetching…</div>
       ) : (
-        <Section label={record.isError ? tr('chat.stepDetail.failed') : tr('chat.stepDetail.result')} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? 'Failed' : 'Result'} tone={record.isError ? 'error' : undefined}>
           <Capped>
-            <div className={s.prose}>{out ? <Markdown text={out} /> : <span className={s.quiet}>{tr('chat.stepDetail.nothingBack')}</span>}</div>
+            <div className={s.prose}>{out ? <Markdown text={out} /> : <span className={s.quiet}>Nothing came back</span>}</div>
           </Capped>
         </Section>
       )}
@@ -306,7 +305,7 @@ function AgentDetail({ record }: { record: StepRecord }) {
   return (
     <>
       {str(input.prompt) ? (
-        <Section label={str(input.subagent_type) ? tr('chat.stepDetail.taskFor', { type: str(input.subagent_type) }) : tr('chat.composer.askingTask')}>
+        <Section label={`Task${str(input.subagent_type) ? ` for ${str(input.subagent_type)}` : ''}`}>
           <Capped fade>
             <div className={s.prose}>
               <Markdown text={str(input.prompt)} />
@@ -315,7 +314,7 @@ function AgentDetail({ record }: { record: StepRecord }) {
         </Section>
       ) : null}
       {out ? (
-        <Section label={record.isError ? tr('chat.stepDetail.failed') : tr('chat.stepDetail.itsAnswer')} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? 'Failed' : 'Its answer'} tone={record.isError ? 'error' : undefined}>
           <Capped fade>
             <div className={s.prose}>
               <Markdown text={out} />
@@ -323,7 +322,7 @@ function AgentDetail({ record }: { record: StepRecord }) {
           </Capped>
         </Section>
       ) : record.status === 'running' ? (
-        <div className={s.waiting}>{tr('chat.stepDetail.working')}</div>
+        <div className={s.waiting}>Working…</div>
       ) : null}
     </>
   );
@@ -336,9 +335,9 @@ function MessageDetail({ record }: { record: StepRecord }) {
   return (
     <>
       {str(input.summary) ? <div className={s.quiet}>{str(input.summary)}</div> : null}
-      <Section label={tr('chat.stepDetail.message')} copy={words ? { text: words, what: tr('chat.messageMenu.theMessage') } : undefined}>
+      <Section label="Message" copy={words ? { text: words, what: 'the message' } : undefined}>
         <Capped fade>
-          <div className={s.prose}>{words ? <Markdown text={words} /> : <span className={s.quiet}>{tr('chat.stepDetail.empty')}</span>}</div>
+          <div className={s.prose}>{words ? <Markdown text={words} /> : <span className={s.quiet}>Empty</span>}</div>
         </Capped>
       </Section>
       {record.isError ? <Output record={record} /> : null}
@@ -380,22 +379,22 @@ function JsonDetail({ record }: { record: StepRecord }) {
     <>
       <div className={s.quiet}>{record.tool}</div>
       {Object.keys(input).length ? (
-        <Section label={tr('chat.stepDetail.input')} copy={{ text: json, what: tr('chat.stepDetail.theInput') }}>
+        <Section label="Input" copy={{ text: json, what: 'the input' }}>
           <Capped>
             <pre className={cx(s.json, 'selectable')}>{json}</pre>
           </Capped>
         </Section>
       ) : null}
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>{tr('chat.stepDetail.waitingResult')}</div>
+        <div className={s.waiting}>Waiting for the result…</div>
       ) : (
-        <Section label={record.isError ? tr('chat.stepDetail.failed') : tr('chat.stepDetail.output')} copy={out ? { text: out, what: tr('chat.items.theOutput') } : undefined} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? 'Failed' : 'Output'} copy={out ? { text: out, what: 'the output' } : undefined} tone={record.isError ? 'error' : undefined}>
           {out ? (
             <Capped>
               <pre className={cx(s.json, 'selectable')}>{prettyText(out)}</pre>
             </Capped>
           ) : (
-            <div className={s.quiet}>{tr('chat.stepDetail.noOutput')}</div>
+            <div className={s.quiet}>No output</div>
           )}
         </Section>
       )}
@@ -404,9 +403,9 @@ function JsonDetail({ record }: { record: StepRecord }) {
 }
 
 export function ThinkingDetail({ record }: { record: StepRecord }) {
-  if (!record.text) return <div className={s.quiet}>{tr('chat.stepDetail.noThoughts')}</div>;
+  if (!record.text) return <div className={s.quiet}>The agent didn’t share what it thought here.</div>;
   return (
-    <Capped fade label={tr('chat.stepDetail.showMore')}>
+    <Capped fade label="Show more">
       <div className={s.thought}>
         <Markdown text={record.text} />
       </div>
@@ -441,7 +440,7 @@ export function StepDetail({ record }: { record: StepRecord }) {
   return (
     <div className={s.detail} data-step-detail={record.kind === 'thinking' ? 'thinking' : toolFamily(record.tool)}>
       {body}
-      {record.truncated ? <div className={s.note}>{tr('chat.stepDetail.truncated')}</div> : null}
+      {record.truncated ? <div className={s.note}>Long, so Beluga kept its start and end.</div> : null}
     </div>
   );
 }

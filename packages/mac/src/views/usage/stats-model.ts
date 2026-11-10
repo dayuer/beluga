@@ -3,7 +3,6 @@ import { RUNTIME_NAMES } from '@beluga/shared/agent-label.js';
 import { type StatRange, type StatsSnapshot, type TotalKey, type Totals, dayStart, previousRange, rangeStart, shiftDay, statDay, totalsBy, totalsOf } from '@beluga/shared/stats.js';
 import type { IconName } from '../../components/Icon.js';
 import { compact, formatCost, slotOf } from './usage-model.js';
-import { t as tr } from '../../i18n/index.js';
 
 /** The numbers on the stats strip: each picks what the calendar and the ranking show. */
 export type Metric = 'agentMs' | 'prompts' | 'pasted' | 'dictationMs' | 'worktrees' | 'prsMerged' | 'lines' | 'tokens';
@@ -29,19 +28,20 @@ export interface MetricDef {
   readonly daily: TotalKey;
 }
 
+const plural = (n: number, one: string, many = `${one}s`): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 /** "45 min", "3 h 20 min", "112 h". */
 export function duration(ms: number): string {
   const min = Math.round(ms / 60_000);
-  if (min < 1) return ms > 0 ? tr('views.stats.underMin') : tr('views.stats.min', { n: 0 });
-  if (min < 60) return tr('views.stats.min', { n: min });
+  if (min < 1) return ms > 0 ? '<1 min' : '0 min';
+  if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
   const rest = min % 60;
-  return h >= 20 || !rest ? tr('views.stats.h', { n: h.toLocaleString() }) : tr('views.stats.hMin', { h, min: rest });
+  return h >= 20 || !rest ? `${h.toLocaleString()} h` : `${h} h ${rest} min`;
 }
 
 /** "45m", "12 h": a duration short enough for an axis. */
-const hours = (ms: number): string => (ms < 3_600_000 ? tr('views.stats.axisMin', { n: Math.round(ms / 60_000) }) : tr('views.stats.h', { n: Math.round(ms / 3_600_000) }));
+const hours = (ms: number): string => (ms < 3_600_000 ? `${Math.round(ms / 60_000)}m` : `${Math.round(ms / 3_600_000)} h`);
 
 /** One significant figure past the point, when it helps ("1.5", "12"). */
 const about = (n: number): string => (n >= 10 ? Math.round(n).toLocaleString() : n >= 1 ? n.toFixed(1).replace(/\.0$/, '') : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
@@ -56,93 +56,93 @@ const WORKDAY_MS = 8 * 3_600_000;
 export const METRICS: readonly MetricDef[] = [
   {
     id: 'agentMs',
-    get label() { return tr('views.stats.m.agentMs'); },
+    label: 'Agent time',
     icon: 'clock',
     color: 'var(--m-time)',
     value: (t) => t.agentMs,
     format: duration,
     axis: hours,
-    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? `${tr('views.stats.workdays', { n: about(t.agentMs / WORKDAY_MS) })} · ${tr('views.stats.runs', { n: t.runs, shown: t.runs.toLocaleString() })}` : tr('views.stats.runs', { n: t.runs, shown: t.runs.toLocaleString() })),
-    empty: () => tr('views.stats.noRuns'),
+    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? `≈ ${about(t.agentMs / WORKDAY_MS)} workdays · ${plural(t.runs, 'run')}` : plural(t.runs, 'run')),
+    empty: () => 'No runs in this stretch',
     daily: 'agentMs',
   },
   {
     id: 'prompts',
-    get label() { return tr('views.stats.m.prompts'); },
+    label: 'Prompts',
     icon: 'send',
     color: 'var(--m-prompts)',
     value: (t) => t.prompts,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${tr('views.stats.chars', { n: compact(t.chars) })}${t.prompts ? tr('views.stats.perPrompt', { n: Math.round(t.chars / t.prompts) }) : ''}`,
-    empty: () => tr('views.stats.noneSent'),
+    aside: (t) => `${compact(t.chars)} characters${t.prompts ? ` · ${Math.round(t.chars / t.prompts)} a prompt` : ''}`,
+    empty: () => 'None sent in this stretch',
     daily: 'prompts',
   },
   {
     id: 'pasted',
-    get label() { return tr('views.stats.m.pasted'); },
+    label: 'Pasted',
     icon: 'clip',
     color: 'var(--m-pasted)',
     value: (t) => t.pasted,
     format: compact,
-    aside: (t) => (t.pasted >= NOVEL / 2 ? tr('views.stats.novels', { n: about(t.pasted / NOVEL) }) : tr('views.stats.pages', { n: Math.max(1, Math.round(t.pasted / PAGE)) })),
-    empty: () => tr('views.stats.nothingPasted'),
+    aside: (t) => (t.pasted >= NOVEL / 2 ? `≈ ${about(t.pasted / NOVEL)} novels` : `≈ ${plural(Math.max(1, Math.round(t.pasted / PAGE)), 'page')} of text`),
+    empty: () => 'Nothing pasted in this stretch',
     daily: 'pasted',
   },
   {
     id: 'dictationMs',
-    get label() { return tr('views.stats.m.dictationMs'); },
+    label: 'Dictated',
     icon: 'mic',
     color: 'var(--m-voice)',
     value: (t) => t.dictationMs,
     format: duration,
     axis: hours,
-    aside: (t) => tr('views.stats.words', { n: compact(Math.round((t.dictationMs / 60_000) * WORDS_PER_MIN)) }),
-    empty: () => tr('views.stats.noMic'),
+    aside: (t) => `≈ ${compact(Math.round((t.dictationMs / 60_000) * WORDS_PER_MIN))} words spoken`,
+    empty: () => 'Not used yet: the mic',
     daily: 'dictationMs',
   },
   {
     id: 'worktrees',
-    get label() { return tr('views.stats.m.worktrees'); },
+    label: 'Worktrees',
     icon: 'branch',
     color: 'var(--m-worktrees)',
     value: (t) => t.worktrees,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${tr('views.stats.archived', { n: t.archived.toLocaleString() })} · ${tr('views.stats.chats', { n: t.chats, shown: t.chats.toLocaleString() })}`,
+    aside: (t) => `${t.archived.toLocaleString()} archived · ${plural(t.chats, 'chat')}`,
     daily: 'worktrees',
   },
   {
     id: 'prsMerged',
-    get label() { return tr('views.stats.m.prsMerged'); },
+    label: 'PRs merged',
     icon: 'merge',
     color: 'var(--m-prs)',
     value: (t) => t.prsMerged,
     format: (n) => n.toLocaleString(),
-    aside: (t) => tr('views.stats.opened', { n: t.prsOpened.toLocaleString() }),
-    empty: (t) => (t.prsOpened ? undefined : tr('views.stats.noPrs')),
+    aside: (t) => `${t.prsOpened.toLocaleString()} opened`,
+    empty: (t) => (t.prsOpened ? undefined : 'None from Beluga’s worktrees yet'),
     github: true,
     daily: 'prsMerged',
   },
   {
     id: 'lines',
-    get label() { return tr('views.stats.m.lines'); },
+    label: 'Lines shipped',
     icon: 'diff',
     color: 'var(--m-lines)',
     value: (t) => t.linesAdded + t.linesRemoved,
     format: compact,
-    aside: (t) => tr('views.stats.linesAside', { add: compact(t.linesAdded), del: compact(t.linesRemoved) }),
-    empty: () => tr('views.stats.countedFrom'),
+    aside: (t) => `+${compact(t.linesAdded)} −${compact(t.linesRemoved)} in merged PRs`,
+    empty: () => 'Counted from merged PRs',
     github: true,
     daily: 'linesAdded',
   },
   {
     id: 'tokens',
-    get label() { return tr('views.stats.m.tokens'); },
+    label: 'Tokens',
     icon: 'spark',
     color: 'var(--m-tokens)',
     value: (t) => t.tokens,
     format: compact,
-    aside: (t) => (t.cost ? tr('views.stats.estimated', { cost: formatCost(t.cost) }) : tr('views.stats.noCost')),
-    empty: () => tr('views.stats.noneStretch'),
+    aside: (t) => (t.cost ? `${formatCost(t.cost)} estimated` : 'No cost counted'),
+    empty: () => 'None in this stretch',
     daily: 'tokens',
   },
 ];
@@ -150,7 +150,7 @@ export const METRICS: readonly MetricDef[] = [
 /** The small line under a number: what it amounts to, or (nothing yet) why, and how to get some. */
 export function asideOf(m: MetricDef, t: Totals, noGitHub: boolean): string {
   if (m.value(t) > 0) return m.aside(t);
-  if (m.github && noGitHub) return tr('views.stats.needsGh');
+  if (m.github && noGitHub) return 'Needs the GitHub CLI (gh)';
   return m.empty?.(t) ?? m.aside(t);
 }
 
@@ -186,9 +186,9 @@ const AGENT_COLOR: Readonly<Record<string, string>> = { claude: 'var(--claude)',
 
 /** A project's (or agent's) name, colour and icon, from its key (a root, or a runtime). */
 export function groupOf(key: string, by: GroupBy, projects: AppState['projects']): { name: string; color: string; projectId?: string } {
-  if (by === 'agent') return { name: key ? (RUNTIME_NAMES[key] ?? key) : tr('views.stats.notInRun'), color: AGENT_COLOR[key] ?? 'var(--series-other)' };
+  if (by === 'agent') return { name: key ? (RUNTIME_NAMES[key] ?? key) : 'Not in a run', color: AGENT_COLOR[key] ?? 'var(--series-other)' };
   const p = key ? projects.find((x) => x.root === key) : undefined;
-  const name = p?.name ?? (key ? (key.split('/').filter(Boolean).at(-1) ?? key) : tr('views.stats.chatsElsewhere'));
+  const name = p?.name ?? (key ? (key.split('/').filter(Boolean).at(-1) ?? key) : 'Chats and elsewhere');
   return { name, color: `var(--series-${p ? slotOf(projects, p) : key ? 'other' : 'chats'})`, ...(p ? { projectId: p.id } : {}) };
 }
 
@@ -242,5 +242,5 @@ export function favouriteHour(hours: readonly number[]): { day: string; time: st
     if (n > best) [best, at] = [n, i];
   });
   if (best <= 0) return undefined;
-  return { day: tr('views.stats.weekdays', { day: new Date(2026, 0, 4 + Math.floor(at / 24)).toLocaleDateString([], { weekday: 'long' }) }), time: new Date(2026, 0, 4, at % 24).toLocaleTimeString([], { hour: 'numeric' }) };
+  return { day: `${new Date(2026, 0, 4 + Math.floor(at / 24)).toLocaleDateString([], { weekday: 'long' })}s`, time: new Date(2026, 0, 4, at % 24).toLocaleTimeString([], { hour: 'numeric' }) };
 }

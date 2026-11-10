@@ -7,7 +7,6 @@ import { Tip, cx } from '../ui.js';
 import { GridEditor, JsonEditor, RowsEditor } from './PropEditors.js';
 import { choiceLabels, controlOf, dateAt, dayOf, startValue } from './preview-model.js';
 import s from './preview.module.css';
-import { t as tNow } from '../../i18n/index.js';
 
 /**
  * A live preview's props, one row each with the control its type calls for (preview-model.ts
@@ -27,7 +26,7 @@ export interface PropControlsProps {
 }
 
 export function PropControls({ fields, values, onChange, onClear, fired }: PropControlsProps) {
-  if (!fields.length) return <div className={s.propsEmpty}>{tNow('common.propControls.none')}</div>;
+  if (!fields.length) return <div className={s.propsEmpty}>It takes no props.</div>;
   return (
     <div className={s.props}>
       {fields.map((f) => (
@@ -53,7 +52,7 @@ function PropRow({ field, value, set, onChange, onClear, fired }: { field: Field
         {field.doc ? <Tip label={field.doc}>{name}</Tip> : name}
         <span className={s.grow} />
         {set && field.optional && kind !== 'event' ? (
-          <button type="button" className={s.iconMini} aria-label={tNow('common.propControls.useDefaultOf', { name: field.name })} title={tNow('common.propControls.useDefault')} onClick={onClear}>
+          <button type="button" className={s.iconMini} aria-label={`Use ${field.name}’s default`} title="Use its default" onClick={onClear}>
             <Icon name="x" size={9} />
           </button>
         ) : null}
@@ -68,8 +67,8 @@ function Unset({ field, onSet }: { field: Field; onSet: () => void }) {
   const fallback = field.fallback !== undefined ? (typeof field.fallback === 'string' ? `“${field.fallback}”` : JSON.stringify(field.fallback)) : undefined;
   return (
     <button type="button" className={s.unset} onClick={onSet}>
-      {fallback ? tNow('common.propControls.default', { value: fallback }) : tNow('common.ui.notSet')}
-      <span className={s.setIt}>{tNow('common.propControls.set')}</span>
+      {fallback ? `Default ${fallback}` : 'Not set'}
+      <span className={s.setIt}>Set</span>
     </button>
   );
 }
@@ -101,7 +100,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
     case 'color':
       return (
         <span className={s.colorField}>
-          <input type="color" value={String(value)} aria-label={tNow('common.propControls.colour', { label })} onChange={(e) => onChange(e.target.value)} />
+          <input type="color" value={String(value)} aria-label={`${label} colour`} onChange={(e) => onChange(e.target.value)} />
           <input className={s.field} value={String(value ?? '')} aria-label={label} onChange={(e) => onChange(e.target.value)} />
         </span>
       );
@@ -109,7 +108,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
       return (
         <span className={s.pictureField}>
           <img src={pictureOf(value)} alt="" />
-          <input className={s.field} placeholder={tNow('common.propControls.picture')} aria-label={label} onChange={(e) => e.target.value && onChange(e.target.value)} />
+          <input className={s.field} placeholder="A sample picture · paste a link" aria-label={label} onChange={(e) => e.target.value && onChange(e.target.value)} />
         </span>
       );
     case 'longText':
@@ -117,7 +116,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
     case 'text':
       return <input className={s.field} value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''} aria-label={label} onChange={(e) => onChange(e.target.value)} />;
     case 'event':
-      return <span className={cx(s.fired, fired > 0 && s.firedOn)}>{fired ? tNow('common.propControls.fired', { n: fired }) : tNow('common.propControls.fires')}</span>;
+      return <span className={cx(s.fired, fired > 0 && s.firedOn)}>{fired ? `Fired ${fired === 1 ? 'once' : `${fired} times`}` : 'Fires when used'}</span>;
     case 'grid':
       return <GridEditor value={value} label={label} onChange={onChange} />;
     case 'rows':

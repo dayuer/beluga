@@ -10,7 +10,6 @@ import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import t from './terminal-settings.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
-import { useT } from '../i18n/index.js';
 
 /** A theme's look in a few lines of a terminal, its own colours (Beluga's when it has none). */
 function ThemeCard({ name, colors, on, onPick, font }: { readonly name: string; readonly colors: TermColors | undefined; readonly on: boolean; readonly onPick: () => void; readonly font: string }) {
@@ -45,15 +44,14 @@ function ThemeCard({ name, colors, on, onPick, font }: { readonly name: string; 
  * well-known one. Each shows as it will look; one with light colours follows Beluga's appearance.
  */
 export function ThemeGroup() {
-  const tr = useT();
   const prefs = usePrefs();
   const dark = looksDark();
   const current = prefs.termTheme;
   const imported = current && current.from !== PRESET_FROM ? current : undefined;
   const pick = (theme: TermThemePref | null): void => setPrefs({ termTheme: theme });
   return (
-    <Group title={tr('dialogs.termThemes.colours')}>
-      <div className={t.themes} role="radiogroup" aria-label={tr('dialogs.termThemes.terminalColours')}>
+    <Group title="Colours">
+      <div className={t.themes} role="radiogroup" aria-label="Terminal colours">
         <ThemeCard name="Beluga" colors={undefined} font={prefs.termFont} on={!current} onPick={() => pick(null)} />
         {imported ? <ThemeCard name={imported.name} colors={colorsFor(imported, dark)} font={prefs.termFont} on onPick={() => pick(imported)} /> : null}
         {TERMINAL_PRESETS.map((p) => (
@@ -70,22 +68,21 @@ export function ThemeGroup() {
  * as the chat, the terminal, or both, and this picks how ones you haven't switched open.
  */
 export function ViewGroup() {
-  const tr = useT();
   const prefs = usePrefs();
   return (
-    <Group title={tr('dialogs.termThemes.advanced')}>
-      <Row label={tr('dialogs.termThemes.useTerminal')} detail={prefs.termView ? tr('dialogs.termThemes.useTerminalOn', { keys: chordLabel('Shift+Cmd+T') }) : tr('dialogs.termThemes.useTerminalOff')}>
-        <Switch label={tr('dialogs.termThemes.useTerminal')} on={prefs.termView} onChange={(v) => setPrefs({ termView: v })} />
+    <Group title="Advanced">
+      <Row label="Use Claude Code’s own terminal" detail={prefs.termView ? `A conversation’s header shows Chat · Terminal · Both (${chordLabel('Shift+Cmd+T')} switches). Graphs, tables and tasks open beside the terminal from their links.` : 'Off: conversations are the chat. On, you can talk to Claude in Claude Code’s own terminal app instead, on the same conversation.'}>
+        <Switch label="Use Claude Code’s own terminal" on={prefs.termView} onChange={(v) => setPrefs({ termView: v })} />
       </Row>
-      {prefs.termView ? <Row label={tr('dialogs.termThemes.openAs')} detail={prefs.convoDefault === 'chat' ? tr('dialogs.termThemes.openChat') : prefs.convoDefault === 'terminal' ? tr('dialogs.termThemes.openTerminal') : tr('dialogs.termThemes.openBoth')}>
+      {prefs.termView ? <Row label="Open conversations as" detail={prefs.convoDefault === 'chat' ? 'The chat, drawn. The header’s switch shows the terminal for one conversation.' : prefs.convoDefault === 'terminal' ? 'Your agent’s own terminal; graphs and tables open beside it from their links.' : 'Your agent’s terminal with the chat beside it.'}>
         <Segmented
-          label={tr('dialogs.termThemes.openAs')}
+          label="Open conversations as"
           value={prefs.convoDefault}
           onChange={(v) => setPrefs({ convoDefault: v, convoDefaultPicked: true })}
           options={[
-            { value: 'chat', label: tr('dialogs.termThemes.chat'), icon: 'chat' },
-            { value: 'terminal', label: tr('dialogs.termThemes.terminal'), icon: 'terminal' },
-            { value: 'both', label: tr('dialogs.termThemes.both'), icon: 'columns' },
+            { value: 'chat', label: 'Chat', icon: 'chat' },
+            { value: 'terminal', label: 'Terminal', icon: 'terminal' },
+            { value: 'both', label: 'Both', icon: 'columns' },
           ]}
         />
       </Row> : null}
@@ -98,27 +95,26 @@ export function ViewGroup() {
  * and whether they win over Beluga's shortcuts while the keyboard is in the terminal.
  */
 export function KeysGroup() {
-  const tr = useT();
   const prefs = usePrefs();
   const rows = termKeyRows(termKeysOf(prefs.termKeys?.keys, prefs.termKeys?.from));
   return (
-    <Group title={tr('dialogs.termThemes.keysTitle')}>
-      <Row label={tr('dialogs.termThemes.keysFirst')} detail={prefs.termKeysFirst ? tr('dialogs.termThemes.keysFirstOn', { keys: ['Cmd+T', 'Cmd+W', 'Cmd+1'].map(chordLabel).join(', ') }) : tr('dialogs.termThemes.keysFirstOff')}>
-        <Switch label={tr('dialogs.termThemes.keysFirst')} on={prefs.termKeysFirst} onChange={(v) => setPrefs({ termKeysFirst: v })} />
+    <Group title="Keys in the terminal view">
+      <Row label="The terminal’s keys come first" detail={prefs.termKeysFirst ? `While you type in the terminal, ${['Cmd+T', 'Cmd+W', 'Cmd+1'].map(chordLabel).join(', ')}… and the rest are the terminal’s, as in iTerm2 or Ghostty.` : 'Beluga’s shortcuts win; the terminal keeps only keys Beluga doesn’t use.'}>
+        <Switch label="The terminal’s keys come first" on={prefs.termKeysFirst} onChange={(v) => setPrefs({ termKeysFirst: v })} />
       </Row>
-      <div className={t.keyList} role="list" aria-label={tr('dialogs.termThemes.terminalKeys')}>
+      <div className={t.keyList} role="list" aria-label="Terminal keys">
         {rows.map((r) => (
           <div key={r.label} className={t.keyRow} role="listitem">
             <span>{r.label}</span>
-            {r.from ? <span className={t.keyFrom}>{tr('dialogs.termThemes.from', { name: r.from })}</span> : null}
+            {r.from ? <span className={t.keyFrom}>from {r.from}</span> : null}
             <span className={t.keyKeys}>{r.keys}</span>
           </div>
         ))}
       </div>
       {prefs.termKeys?.keys.length ? (
-        <Row label={tr('dialogs.termThemes.keysFrom', { n: prefs.termKeys.keys.length, from: prefs.termKeys.from || tr('dialogs.termThemes.yourTerminal') })} detail={tr('dialogs.termThemes.brought')}>
+        <Row label={`${prefs.termKeys.keys.length} keys from ${prefs.termKeys.from || 'your terminal'}`} detail="Brought with Import from…, over Beluga’s.">
           <Button size="small" onClick={() => setPrefs({ termKeys: null })}>
-            {tr('dialogs.termThemes.useBeluga')}
+            Use Beluga’s Keys
           </Button>
         </Row>
       ) : null}

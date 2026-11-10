@@ -6,7 +6,6 @@ import { useBeluga } from '../lib/beluga.js';
 import { thisComputer, upFirst } from '../lib/os-words.js';
 import { clientOf, projectReadyOn } from './start-there.js';
 import { useMachines } from './use-machines.js';
-import { t as tr } from '../i18n/index.js';
 
 /**
  * Where Move To ▸ can send work from the page you're on (BLG-806, BLG-807): your other computers
@@ -44,14 +43,14 @@ async function projectHere(home: SocketClient, project: { readonly name: string;
   }
   const named = mine.find((p) => p.name === project.name);
   if (named) return named.id;
-  throw new Error(tr('machines.moveTargets.missing', { here: upFirst(thisComputer()), project: project.name }));
+  throw new Error(`${upFirst(thisComputer())} doesn’t have ${project.name}: add it, then move it again`);
 }
 
 export function useMoveTargets(): MoveTargets {
   const { home, client, machine, ui } = useBeluga();
   const machines = useMachines(home);
   const hereName = upFirst(thisComputer());
-  const from: MovePlace = machine ? { id: machine, name: machines.find((m) => m.id === machine)?.name ?? tr('machines.moveTargets.thatComputer') } : { name: hereName };
+  const from: MovePlace = machine ? { id: machine, name: machines.find((m) => m.id === machine)?.name ?? 'that computer' } : { name: hereName };
   const targets: MoveTarget[] = [
     ...(machine ? [{ place: { name: hereName } }] : []),
     ...machines.filter((m) => m.id !== machine && m.status !== 'offline' && !m.readOnly).map((m) => ({ place: { id: m.id, name: m.name }, machine: m })),
@@ -62,6 +61,6 @@ export function useMoveTargets(): MoveTargets {
     fromClient: client,
     targets,
     clientFor: async (t) => (t.machine ? clientOf(t.machine, { home, windowUi: ui.windowStore }) : home),
-    projectOn: (t, to, project, say) => (t.machine ? projectReadyOn(to, t.machine, project, () => say(tr('machines.moveTargets.gettingReady', { project: project.name, place: t.place.name }))) : projectHere(home, project)),
+    projectOn: (t, to, project, say) => (t.machine ? projectReadyOn(to, t.machine, project, () => say(`Getting ${project.name} ready on ${t.place.name}…`)) : projectHere(home, project)),
   };
 }

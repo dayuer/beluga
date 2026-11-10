@@ -4,7 +4,6 @@ import { IconButton } from '../ui.js';
 import { rangesIn, scrollParent } from './md-dom.js';
 import f from '../../chat/find.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
-import { useT } from '../../i18n/index.js';
 
 type HighlightCtor = new (...ranges: Range[]) => unknown;
 const registry = (): Map<string, unknown> | undefined => (globalThis.CSS as unknown as { highlights?: Map<string, unknown> } | undefined)?.highlights;
@@ -45,7 +44,6 @@ function reveal(range: Range, within: HTMLElement): void {
  * ⇧Return / ⇧⌘G for the one before, Esc to close. `version` changes when the file's text does.
  */
 export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>; version: string }) {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
@@ -99,14 +97,14 @@ export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>
     page?.focus({ preventScroll: true });
   };
   return (
-    <div className={f.bar} role="search" aria-label={t('common.docFind.find')}>
+    <div className={f.bar} role="search" aria-label="Find in this file">
       <Icon name="search" size={13} className={f.glass} />
       <input
         ref={input}
         autoFocus
         className={`${f.input} selectable`}
-        placeholder={t('common.docFind.find')}
-        aria-label={t('common.docFind.find')}
+        placeholder="Find in this file"
+        aria-label="Find in this file"
         value={query}
         spellCheck={false}
         onChange={(e) => {
@@ -125,14 +123,14 @@ export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>
         }}
       />
       <span className={f.count} aria-live="polite">
-        {query.trim() ? (count ? t('common.docFind.nOf', { n: current + 1, count }) : t('common.docFind.none')) : ''}
+        {query.trim() ? (count ? `${current + 1} of ${count}` : 'No matches') : ''}
       </span>
       <span className={f.steps}>
-        <IconButton icon="chevronUp" label={t('common.docFind.prev')} keys={chordLabel('Shift+Cmd+G')} disabled={!count} onClick={() => setAt((a) => a - 1)} />
-        <IconButton icon="chevronDown" label={t('common.docFind.next')} keys={chordLabel('Cmd+G')} disabled={!count} onClick={() => setAt((a) => a + 1)} />
+        <IconButton icon="chevronUp" label="Previous match" keys={chordLabel('Shift+Cmd+G')} disabled={!count} onClick={() => setAt((a) => a - 1)} />
+        <IconButton icon="chevronDown" label="Next match" keys={chordLabel('Cmd+G')} disabled={!count} onClick={() => setAt((a) => a + 1)} />
       </span>
       <button type="button" className={f.done} onClick={close}>
-        {t('common.ui.done')}
+        Done
       </button>
     </div>
   );
