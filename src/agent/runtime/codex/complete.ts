@@ -47,7 +47,8 @@ export async function codexComplete(req: CompletionRequest, deps: { readonly con
       ephemeral: true,
       approvalPolicy: 'never',
       baseInstructions: req.system,
-      config: { ...confined.config, ...RUN_FEATURES_OFF, ...(mounted ? mcpConfig(mounted.servers) : {}) },
+      // No project docs: `system` is its whole instructions, and none to read under a sandbox that can't (#425).
+      config: { ...confined.config, ...RUN_FEATURES_OFF, project_doc_max_bytes: 0, ...(mounted ? mcpConfig(mounted.servers) : {}) },
     });
     await rpc.request('turn/start', {
       threadId: thread.thread.id,

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { findCodex } from '../src/agent/runtime/codex/app-server.js';
-import { CODEX_TRUST_TABLE, PROFILE, codexConfinement, originOf, sideCallConfinement, trustRow, trustTableMarkdown } from '../src/agent/runtime/codex/sandbox.js';
+import { CODEX_TRUST_TABLE, PROFILE, codexConfinement, originOf, readsUndeniable, sideCallConfinement, trustRow, trustTableMarkdown, withoutReadDenials } from '../src/agent/runtime/codex/sandbox.js';
 
 /** A JSON value as TOML (inline tables), for `codex -c key=value`. */
 function toml(value: unknown): string {
@@ -49,6 +49,31 @@ describe('the Codex trust table', () => {
     // Keyed by the platform's own paths (D:\p\main on Windows), as Codex there reads them.
     const main = path.resolve('/p/main');
     expect(profile.filesystem).toMatchObject({ [main]: 'read', [path.resolve('/p/fix')]: 'write', '/h/.beluga': 'deny', [path.join('/h', '.ssh')]: 'deny', [`${main}/**/.env*`]: 'deny' });
+  });
+});
+
+describe("Codex's unelevated Windows sandbox, which can't deny reads (#425)", () => {
+  const place = { cwd: '/p/wt', folders: ['/p/share'], writable: ['/p/wt'], home: '/h', belugaHome: '/h/.beluga' };
+
+  it("knows codex-cli's refusal when it sees it", () => {
+    expect(readsUndeniable(new Error('failed to prepare fs sandbox: windows unelevated restricted-token sandbox cannot enforce deny-read restrictions directly; refusing to run unsandboxed'))).toBe(true);
+    expect(readsUndeniable(new Error('windows unelevated restricted-token sandbox cannot enforce split filesystem read restrictions directly; refusing to run unsandboxed'))).toBe(true);
+    expect(readsUndeniable(new Error('no rollout found'))).toBe(false);
+    expect(readsUndeniable('cannot enforce deny-read restrictions')).toBe(false);
+  });
+
+  it('your own run keeps every folder and its write fence, with nothing denied', () => {
+    const loose = withoutReadDenials(codexConfinement('own', 'full', place))!;
+    const profile = loose.config[`permissions.${PROFILE}`] as { extends: string; filesystem: Record<string, string>; network: { enabled: boolean } };
+    expect(profile.extends).toBe(':workspace');
+    expect(profile.filesystem).toEqual({ [path.resolve('/p/wt')]: 'write', [path.resolve('/p/share')]: 'read' });
+    expect(profile.network.enabled).toBe(true);
+  });
+
+  it("anyone else's run gets none", () => {
+    expect(withoutReadDenials(codexConfinement('friend', 'full', place))).toBeUndefined();
+    expect(withoutReadDenials(codexConfinement('friend', 'folder', place))).toBeUndefined();
+    expect(withoutReadDenials(codexConfinement('agent', 'folder', place))).toBeUndefined();
   });
 });
 

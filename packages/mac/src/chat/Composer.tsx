@@ -27,6 +27,7 @@ import { cmdReturn, returnName, thisComputer, upFirst, yourComputer } from '../l
 import { ModelPicker, myRuntime } from './ModelPicker.js';
 import { ContextMeter } from './ContextMeter.js';
 import { McpChip } from './McpChip.js';
+import { plainWorktrees, worktreeNamesOf } from './worktree-box.js';
 import { RunsOnLabel, RunsOnPicker } from './RunsOn.js';
 import { sendToComputer, useStartDeps } from '../machines/start-there.js';
 import { QueueTray } from './QueueTray.js';
@@ -308,6 +309,14 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
 
   // Your agents (which run on this Mac), for the room's "@codex" (BLG-520).
   const runtimes = useApp((st) => st.runtimes);
+  // In a friend's worktree, "@claude" is yours (reading theirs from here, or in your copy) and "@claude:<them>" theirs.
+  const sharedOwner = shared ? state.shared.find((w) => w.id === (state.view as { id: string }).id)?.owner : undefined;
+  const ownerName = sharedOwner ? peerName({ ...state, network: { friends: state.friends } }, sharedOwner) : undefined;
+  const claudeHere = !ownerName
+    ? undefined
+    : runOn === 'here'
+      ? { hint: 'ask your agent, in your copy' }
+      : { hint: `ask your agent: it reads ${ownerName}’s worktree from here`, owner: { name: ownerName, hint: `ask ${ownerName}’s agent, in their worktree` } };
   // Suggestions as you type: commands, people and Claudes, workspaces, folders, tasks.
   const suggestions: Suggestion[] = useMemo(
     () =>
@@ -328,8 +337,9 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
             skills,
             skillsOn,
             ...(canBtw ? {} : { without: ['btw'] }),
+            ...(claudeHere ? { claudeHere } : {}),
           }),
-    [buffer, state.peers, state.selfId, state.dirCache, state.view.kind, state.projects, state.friends, wsId, mentionWorld.tasks, skills, skillsOn, canBtw, runtimes],
+    [buffer, state.peers, state.selfId, state.dirCache, state.view.kind, state.projects, state.friends, wsId, mentionWorld.tasks, skills, skillsOn, canBtw, runtimes, claudeHere?.hint],
   );
   const sug = useSuggestions(suggestions, buffer, (picked) => accept(picked));
 
@@ -446,7 +456,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
     const typed = buffer.trim();
     if (aside) {
       if (!typed) return;
-      askBtw(client, api, channel, typed);
+      askBtw(client, api, channel, plainWorktrees(typed, worktreeNamesOf(client.store.getState().projects)));
       setAsideIn(undefined);
       ui.patch({ buffer: '', cursor: 0, history: [...ui.get().history, `/btw ${typed}`].slice(-200), historyIndex: -1 });
       return;

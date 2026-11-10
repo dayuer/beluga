@@ -34,6 +34,7 @@ Claude Code asks Beluga before every step it takes, so the rules above are check
 - Guests can't use Codex.
 - Quick side calls on Codex (answering in a chat, naming a worktree, drafting a task) run as tightly as a friend's task, whoever asked: read only, your home and `.env` files out of reach, none of your own Codex tools, and no network unless the call runs commands (a pull request's review). A call given no tools can't read the folder either.
 - A talk or cross-reference between agents only looks: a Codex speaker's sandbox writes nowhere, whatever the worktree allows.
+- On Windows, Codex's unelevated sandbox (a standard account without MXC or Codex's elevated sandbox) fences writes but can't hide a file, and refuses a profile that does. There your own run still works in its folders, but it can read `.env` files and credential stores, and its card says so. Anyone else's run (a friend's task, an external agent below Full trust) is refused, because hiding those files is what keeps it out of your secrets. Codex's elevated sandbox, or MXC where Windows supports it, puts the denials back.
 
 <!-- codex-trust-table -->
 | Who asks | Trust | Files | Rest of your home | Network | `.env`, keys, credential stores | Going past the sandbox | Your Codex tools |
