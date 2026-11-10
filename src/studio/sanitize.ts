@@ -60,7 +60,9 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\b(?:sk|pk|rk)[-_](?:live[-_]|test[-_]|ant[-_]|proj[-_])?[\w-]{3,400}/g, ''],
   [/((?:密码|口令|密钥|私钥|令牌|秘钥)\s{0,3}(?:是|为|:|：)?\s{0,3})[!-~]{3,200}/g, '$1'],
   // A secret said in a sentence: after its word, in the same clause. Right after 是 / 改成 / is / : / = any value goes; further on, one with a digit or a symbol.
-  [/((?:密码|口令|密钥|私钥|令牌|秘钥|验证码|pin码?|passcode|password|passwd|pwd|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)[^，。；;！？\n]{0,40}?(?:是|为|改成了?|改为|设为|设成了?|设置为|换成了?|\bis|\bwas|=|:|：)\s{0,3})(?:"[^"\n]{0,200}"|'[^'\n]{0,200}'|[!-~]{4,200})/gi, '$1'],
+  [/((?:密码|口令|密钥|私钥|令牌|秘钥|验证码|pin码?|passcode|password|passwd|pwd|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)[^，。；;！？\n]{0,40}?(?:是|为|改成了?|改为|设为|设成了?|设置为|换成了?|=|:|：)\s{0,3})(?:"[^"\n]{0,200}"|'[^'\n]{0,200}'|[!-~]{4,200})/gi, '$1'],
+  // In English "is" is too common: there the value needs a digit or a symbol (or quotes).
+  [/(\b(?:password|passwd|pwd|passcode|pin|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)\b[^，。；;！？\n]{0,40}?\b(?:is|was)\s{1,3})(?:"[^"\n]{0,200}"|'[^'\n]{0,200}'|(?=[!-~]{0,200}[\d!@#$%^&*])[!-~]{4,200})/gi, '$1'],
   [/((?:密码|口令|密钥|私钥|令牌|秘钥|验证码|pin码?|passcode|password|passwd|pwd|secret|token|passphrase|api[ _-]?key|apikey|access[ _-]?key|secret[ _-]?key|license[ _-]?key|cookie|session[ _-]?id)[^，。；;！？\n]{0,40}?)(?<![!-~])(?=[!-~]{0,200}[\d!@#$%^&*])[!-~]{4,200}/gi, '$1'],
   // Account and password pairs, password flags.
   [/((?:账号|帐号|用户名|测试账号|\b(?:account|username|user)\b)[^，。；;\n]{0,20}?)[!-~]{2,100}\s{0,2}[/／:：]\s{0,2}[!-~]{3,200}/gi, '$1'],

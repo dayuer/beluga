@@ -201,3 +201,9 @@ describe('the M1 audit, second recheck (R-4)', () => {
   };
   for (const [name, [input, re]] of Object.entries(leaks)) it(name, () => expect(sanitizeText(input)).not.toMatch(re));
 });
+
+it('English requirements about passwords keep their words (third recheck)', () => {
+  const s = 'The password is required for login, and the token is refreshed every hour. PIN is optional.';
+  expect(sanitizeText(s)).toBe(s);
+  expect(sanitizeText('the password for the admin account on staging is hunter2')).not.toContain('hunter2');
+});
