@@ -10,7 +10,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 |---|---|---|
 | `/invite` | the Mac's message boxes route it themselves (`src/shared/invite-route.ts`, `lib/invite-command.ts`); elsewhere `session.submit` → `runCommand` | `/invite` alone: the Add a Friend sheet (link, code, QR) · `/invite @ata` adds ata to what's on screen: a channel (`network.groups.addMember`), a DM (offers “New channel with you, X and Y”, the New Channel sheet), a project or worktree (`sharing.shareWithFriend` once it exists, through `lib/share-with-friend.ts`; until then a friend in your room gets the worktree through the room, otherwise the room's share sheet opens with a note) · `/invite @` completes your friends' names, in the chat box and in a DM's or channel's box · Sidebar footer Invite · File › Invite… · ⌘K › Add a friend… (one entry for inviting and adding a friend) |
 | `/overview` | `session.submit` → `runCommand` | typed in the composer · Sidebar › Overview · Go › Overview (⌘1) |
-| `/room` | `session.submit` → `runCommand` | typed in the composer · Sidebar › Chat (⌘3) |
+| `/room` | `session.submit` → `runCommand` | typed in the composer · Sidebar › Channels › Group chat and ⌘K › In this room › Group chat, while someone else is in the room (alone it goes Home: the room's chat is no place of its own, BLG-871) |
 | `/new` | `session.submit` → `runCommand` | typed in the composer · Sidebar project ⌥ button · File › New Worktree… (⌘⇧N) · ⌘K · empty Overview / chat › New Worktree |
 | `/chat` | `session.submit` → `runCommand` | typed in the composer · Sidebar project + · File › New Chat (⌘N: in a project, a new chat on its main folder; elsewhere a chat of its own) · ⌘K › New chat in … |
 | `/review` | `session.submit` → `runCommand` | typed in the composer · the right panel's Changes tab (⌥⌘1; a diff opens in full with ⌘↩) |
@@ -193,7 +193,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `sharing.scratch` | ✓ a friend's worktree's Scratch tab |
 | `sharing.earlier` | ✓ scrolling back in a friend's worktree |
 | `sharing.runHere` | ✓ a friend's worktree's "Runs on" chip › This Mac |
-| `sharing.fork` | ✓ a friend's worktree's header › Fork to My Mac (a sheet: what comes over, what stays behind, a name), then Open My Fork |
+| `sharing.fork` | ✓ a friend's worktree's header › Fork to My Mac (a sheet: what comes over, what stays behind, a name), Getting <project>… while a project not on this Mac yet is cloned or copied first, then Open My Fork |
 | `invites.create` | ✓ |
 | `invites.revoke` | ✓ |
 | `invites.copyLink` | ✓ |
@@ -307,6 +307,18 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `companion.voice` | – the phone only: Settings › Voice, which of the Mac's voice models are here or coming (the Mac app has no microphone) |
 | `companion.voicePrepare` | – the phone only: Settings › Voice, get a model on the Mac now |
 | `companion.transcribe` | – the phone only: the Ask sheet's microphone, On your Mac: the recording written down here and deleted |
+| `external.status` | Settings › External agents, and `beluga mcp status` |
+| `external.setEnabled` | Settings › External agents, and `beluga mcp on` / `off` |
+| `external.setRoute` | Settings › External agents › On your tailnet and Public address, and `beluga mcp on --tailscale` / `--public` |
+| `external.pairingCode` | Settings › External agents › Make a code, and `beluga mcp pair` |
+| `external.localToken` | `beluga mcp token`, with its card on the Mac |
+| `external.agents` | Settings › External agents: the list, and `beluga mcp agents` |
+| `external.revoke` | Settings › External agents › Revoke, and `beluga mcp revoke` |
+| `external.resume` | Settings › External agents › Resume, and `beluga mcp resume` |
+| `external.stopAgent` | The driven-by strip, Settings › External agents › Stop, and the phone's External agents |
+| `external.stopAll` | Settings › External agents › Stop All, and the phone's External agents |
+| `external.setPaused` | Settings › External agents › Pause All |
+| `external.activity` | Settings › External agents › Activity, and the phone's External agents |
 | `voice.models` | Settings › Voice: the models on this Mac, here or coming |
 | `voice.prepare` | Settings › Voice › Get now |
 | `voice.load` | – asked by a call's window now and then: how busy this Mac is, to decide who writes down whose words (BLG-718) |

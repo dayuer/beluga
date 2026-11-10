@@ -669,6 +669,19 @@ export const MACHINE: Record<Method, MachineSide> = {
   'web.public': 'refuse',
   'web.tailscale': 'refuse',
   'web.stop': 'refuse',
+  // ---- external agents: letting one in stays with the computer itself.
+  'external.activity': 'drive',
+  'external.agents': 'drive',
+  'external.localToken': 'refuse',
+  'external.pairingCode': 'refuse',
+  'external.resume': 'drive',
+  'external.revoke': 'drive',
+  'external.setEnabled': 'refuse',
+  'external.setPaused': 'drive',
+  'external.setRoute': 'refuse',
+  'external.status': 'drive',
+  'external.stopAgent': 'drive',
+  'external.stopAll': 'drive',
 };
 
 /** A method a screen driving a computer may not call (unknown names are left to the API, which refuses them). */

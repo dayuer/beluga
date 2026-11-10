@@ -148,7 +148,7 @@ export function Said({ c, what, compact }: { c: PrComment; what?: string; compac
       </header>
       {c.body.trim() ? (
         <div className={s.body}>
-          <Markdown text={c.body} />
+          <Markdown text={c.body} html />
         </div>
       ) : null}
     </article>

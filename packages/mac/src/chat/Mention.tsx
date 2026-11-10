@@ -17,7 +17,7 @@ import s from './mention.module.css';
  * project, the worktree, the file, the task).
  */
 
-const ICON: Readonly<Record<MentionKind, IconName>> = { friend: 'person', claude: 'claude', project: 'grid', workspace: 'branch', folder: 'folder', file: 'file', task: 'task', image: 'image' };
+const ICON: Readonly<Record<MentionKind, IconName>> = { friend: 'person', claude: 'claude', project: 'grid', workspace: 'branch', folder: 'folder', file: 'file', task: 'task', image: 'image', worktree: 'branch' };
 /** A mention's kind in words: its key. */
 const WHAT = (kind: MentionKind): `chat.mention.${MentionKind}` => `chat.mention.${kind}`;
 

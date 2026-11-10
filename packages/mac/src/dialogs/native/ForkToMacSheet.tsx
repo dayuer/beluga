@@ -148,6 +148,16 @@ export function ForkToMacButton({ owner, wsId }: { owner: string; wsId: string }
     );
   }
   if (fork?.state === 'copying') return <ForkProgress fork={fork} />;
+  if (fork?.state === 'preparing') {
+    const project = ws.project ?? t('more.up.fork.theProject');
+    return (
+      <Tip label={t('more.up.fork.preparingTip', { project, computer: thisComputer() })}>
+        <Button variant="quiet" icon="download" disabled aria-busy="true">
+          {t('more.up.fork.getting', { project })}
+        </Button>
+      </Tip>
+    );
+  }
   if (fork?.state === 'asking') {
     return (
       <Tip label={online ? t('dialogs.fork.packing', { owner: ownerName }) : t('dialogs.fork.whenBack')}>

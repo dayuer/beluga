@@ -31,6 +31,7 @@ import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettin
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
 import { t, useT, useLocale, tl } from '../i18n/index.js';
+import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
@@ -696,6 +697,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
   environment: EnvironmentSettings,
   people: People,
   phone: PhoneSettings,
+  external: ExternalAgentsSettings,
   computers: MachinesSettings,
   voice: VoiceSettings,
   keyboard: KeyboardSettings,

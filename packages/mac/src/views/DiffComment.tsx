@@ -9,6 +9,7 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { type DiffComment, addComment, codeRange, commentedRows, makeComment, subscribeComments, waitingComments } from './diff-comments.js';
 import s from './diff.module.css';
+import { useT } from '../i18n/index.js';
 
 /**
  * Commenting on a diff's lines (diff-comments.ts): a line's + picks it (Shift for a range from
@@ -34,6 +35,7 @@ export function useWaitingComments(box: string): readonly DiffComment[] {
 const useBoxHere = (): string => useApp((st) => channelOf(st.view));
 
 export function useDiffComments(path: string | undefined, lines: readonly DiffLine[]): DiffComments {
+  const t = useT();
   const boxHere = useBoxHere();
   const waiting = useWaitingComments(boxHere);
   const [pick, setPick] = useState<{ anchor: number; end: number }>();
@@ -58,7 +60,7 @@ export function useDiffComments(path: string | undefined, lines: readonly DiffLi
     close();
   };
   const where = picked ? codeRange(lines, picked.from, picked.to) : undefined;
-  const box = picked && where ? <CommentBox where={where.from === where.to ? `line ${where.from}` : `lines ${where.from}–${where.to}`} removed={where.side === 'old'} text={text} onText={setText} onAdd={add} onCancel={close} /> : null;
+  const box = picked && where ? <CommentBox where={where.from === where.to ? t('more.up.comment.line', { n: where.from }) : t('more.up.comment.lines', { from: where.from, to: where.to })} removed={where.side === 'old'} text={text} onText={setText} onAdd={add} onCancel={close} /> : null;
   return {
     marked,
     ...(picked ? { picked } : {}),
@@ -73,6 +75,7 @@ export function useWaitingHere(): number {
 }
 
 function CommentBox({ where, removed, text, onText, onAdd, onCancel }: { where: string; removed: boolean; text: string; onText: (v: string) => void; onAdd: () => void; onCancel: () => void }) {
+  const t = useT();
   const agent = useMyAgentName();
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -86,15 +89,15 @@ function CommentBox({ where, removed, text, onText, onAdd, onCancel }: { where: 
   };
   return (
     <div className={s.commentBox}>
-      <TextArea value={text} onChange={onText} onKeyDown={onKey} rows={3} autoFocus placeholder={`Comment on ${removed ? 'removed ' : ''}${where} for ${agent}…`} aria-label={`Comment on ${where}`} />
+      <TextArea value={text} onChange={onText} onKeyDown={onKey} rows={3} autoFocus placeholder={t(removed ? 'more.up.comment.placeholderRemoved' : 'more.up.comment.placeholder', { where, agent })} aria-label={t('more.up.comment.on', { where })} />
       <div className={s.commentActions}>
-        <span className={s.commentHint}>Waits above your message, goes when you send</span>
+        <span className={s.commentHint}>{t('more.up.comment.hint')}</span>
         <Button size="small" variant="quiet" onClick={onCancel}>
-          Cancel
+          {t('more.up.comment.cancel')}
         </Button>
-        <Tip label="Put it with your message" keys={chordLabel('Cmd+Enter')}>
+        <Tip label={t('more.up.comment.putTip')} keys={chordLabel('Cmd+Enter')}>
           <Button size="small" variant="primary" icon="chat" disabled={!text.trim()} onClick={onAdd}>
-            Add to Chat
+            {t('more.up.comment.add')}
           </Button>
         </Tip>
       </div>
@@ -104,6 +107,7 @@ function CommentBox({ where, removed, text, onText, onAdd, onCancel }: { where: 
 
 /** A code line's comment button, over its +/− sign: shown on hover, and kept as a bubble once it has a comment. */
 export function CommentButton({ row, line, comments }: { row: number; line: DiffLine; comments: DiffComments }) {
+  const t = useT();
   const n = line.new ?? line.old;
   // One bubble per comment, on its last line (the bar beside the numbers marks them all).
   const on = comments.marked.has(row) && !comments.marked.has(row + 1);
@@ -111,8 +115,8 @@ export function CommentButton({ row, line, comments }: { row: number; line: Diff
     <button
       type="button"
       className={cx(s.commentBtn, on && s.commentOn)}
-      aria-label={on ? `Line ${n} has a comment waiting to send; comment again` : `Comment on line ${n}`}
-      title={on ? 'Commented: it goes with your next message' : 'Comment (Shift-click for a range)'}
+      aria-label={on ? t('more.up.comment.lineWaiting', { n: String(n) }) : t('more.up.comment.onLine', { n: String(n) })}
+      title={on ? t('more.up.comment.commented') : t('more.up.comment.range')}
       onClick={(e) => comments.pick(row, e.shiftKey)}
     >
       <Icon name={on ? 'chat' : 'plus'} size={10} />

@@ -578,4 +578,4 @@ function milestoneName(plan: Plan, id: string): string {
 const sameAgent = (a: AgentRef | undefined, b: AgentRef | undefined): boolean => a?.runtime === b?.runtime && a?.model === b?.model && a?.label === b?.label;
 const agentOnly = (a: AgentRef): AgentRef => ({ runtime: a.runtime, label: a.label, ...(a.model ? { model: a.model } : {}) });
 
-const sameActor = (a: Actor, b: Actor): boolean => a.kind === b.kind && (a.kind === 'person' ? a.id === (b as typeof a).id : a.kind === 'claude' ? a.owner === (b as typeof a).owner : true);
+const sameActor = (a: Actor, b: Actor): boolean => a.kind === b.kind && (a.kind === 'person' ? a.id === (b as typeof a).id : a.kind === 'claude' ? a.owner === (b as typeof a).owner && a.external?.id === (b as typeof a).external?.id : true);

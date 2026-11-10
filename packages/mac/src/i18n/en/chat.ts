@@ -559,6 +559,7 @@ export const chat = {
   'chat.mention.file': 'File',
   'chat.mention.task': 'Task',
   'chat.mention.image': 'Image',
+  'chat.mention.worktree': 'Worktree',
 
   // MentionedTasks
   'chat.mentioned.one': 'Task mentioned',
