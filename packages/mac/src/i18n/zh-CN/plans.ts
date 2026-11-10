@@ -366,6 +366,8 @@ export const plans: Translation<typeof en> = {
   'plans.details.task': '任务',
   'plans.details.forYou': '归你',
   'plans.details.now': '现在：{what}',
+  'plans.page.decidePaused': '计划已暂停：恢复后才会问你做决定',
+  'plans.page.decideNotYet': '还没轮到它：它在等前面的任务或里程碑',
   'plans.details.decide': '做决定…',
   'plans.details.start': '开始',
   'plans.details.answer': '回答',

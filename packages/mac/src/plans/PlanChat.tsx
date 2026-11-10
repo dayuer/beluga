@@ -1,5 +1,5 @@
 import { TriageLine } from "../chat/TriageLine.js";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { queueIn } from "@beluga/ui/compose.js";
 import { activityOf } from "@beluga/ui/workspace-models.js";
 import { ChatLog } from "../chat/ChatLog.js";
@@ -21,7 +21,7 @@ import { useApi, useApp, useBeluga, useScopedKey } from "../lib/beluga.js";
 import { useMyAgentName } from "../lib/agent-words.js";
 import { LiveDot } from "./marks.js";
 import { PlanAsk } from "./PlanAsk.js";
-import { planAskOf } from "./plan-ask-model.js";
+import { onWantedDecision, planAskOf, wantedDecision } from "./plan-ask-model.js";
 import { type PlanMessage, planMessage, sendPlanMessage } from "./plan-send.js";
 import { useConversationLoaded } from "./use-plans.js";
 import s from "../chat/composer.module.css";
@@ -105,9 +105,15 @@ export function PlanChat({
     [queued],
   );
   // What it asks you here is answered right here; an approval (or a plan to approve) in the whole conversation.
+  // Decide… on a task: its card, scrolled to (wanted.at changes on every press, so a second press scrolls again).
+  const wanted = useSyncExternalStore(onWantedDecision, wantedDecision);
   const askJson = useApp((st) =>
-    JSON.stringify(planAskOf(st.questions, channel) ?? null),
+    JSON.stringify(planAskOf(st.questions, channel, wanted?.qid) ?? null),
   );
+  const askRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (wanted) askRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [wanted?.at, askJson]);
   const ask = useMemo(
     () => (JSON.parse(askJson) ?? undefined) as ReturnType<typeof planAskOf>,
     [askJson],
@@ -280,7 +286,7 @@ export function PlanChat({
           />
         </PaneLook.Provider>
       </div>
-      {ask ? <PlanAsk key={ask.qid} q={ask} /> : null}
+      {ask ? <div ref={askRef}><PlanAsk key={ask.qid} q={ask} /></div> : null}
       {asking && wsId ? (
         <button
           type="button"

@@ -9,7 +9,8 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { ActionsDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { usePrefs } from '../lib/prefs.js';
 import { PLAN_CHAT_TOGGLE } from '../lib/panel.js';
-import { OPEN_DECISION } from './plan-ask-model.js';
+import { type DecisionWanted, OPEN_DECISION, wantDecision } from './plan-ask-model.js';
+import { decisionQid } from '@beluga/core/plans/decisions.js';
 import { ResizeHandle } from '../layout/panel/ResizeHandle.js';
 import { taskChatsItem } from '../layout/plan-task-chats.js';
 import { Button, Empty, IconButton, Segmented, Tip, Working, cx } from '../components/ui.js';
@@ -185,16 +186,30 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     return () => watch.disconnect();
   }, []);
   const chatWidth = drag ?? clampChatWidth(prefs.chatWidth, areaWidth || window.innerWidth);
-  const start = useCallback(
-    (taskId: string, agent?: AgentRef) => (view.ready.some((t) => t.task.id === taskId && t.forYou) ? showChat(true) : void act(() => api.startTask(plan.id, taskId, agent))),
-    [plan.id, act, api, view, showChat],
+  // Decide… on a task of yours (the canvas, the outline, its details): the conversation opens on its card,
+  // scrolled to; with no card for it yet, a toast says why (the plan is paused, or it isn't its turn).
+  const decide = useCallback(
+    (taskId: string) => {
+      const qid = decisionQid(plan.id, taskId);
+      showChat(true);
+      wantDecision(qid);
+      if (!client.store.getState().questions.some((q) => q.qid === qid)) toast(client, plan.paused ? t('plans.page.decidePaused') : t('plans.page.decideNotYet'), 'info');
+    },
+    [plan.id, plan.paused, showChat, client, t],
   );
-  // Decide… on a task of yours (the outline, its details): the conversation, where its card is.
+  const start = useCallback(
+    (taskId: string, agent?: AgentRef) => (view.ready.some((x) => x.task.id === taskId && x.forYou) ? decide(taskId) : void act(() => api.startTask(plan.id, taskId, agent))),
+    [plan.id, act, api, view, decide],
+  );
   useEffect(() => {
-    const open = (): void => showChat(true);
+    const open = (e: Event): void => {
+      const want = (e as CustomEvent<DecisionWanted | undefined>).detail;
+      if (want?.planId === plan.id) decide(want.taskId);
+      else showChat(true);
+    };
     document.addEventListener(OPEN_DECISION, open);
     return () => document.removeEventListener(OPEN_DECISION, open);
-  }, [showChat]);
+  }, [plan.id, decide, showChat]);
   const next = view.next;
   const words = nextWords(next);
   const checker = useCheckerChat(next.kind === 'checking' ? next.milestone : undefined);
