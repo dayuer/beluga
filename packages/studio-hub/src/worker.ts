@@ -12,6 +12,7 @@ import {
   sha256Hex,
 } from '../../../src/net/studio/store.js';
 import {
+  SECURITY_HEADERS,
   alwaysAllow,
   handleHubRequest,
   routeOf,
@@ -19,6 +20,7 @@ import {
   type InternalAuth,
 } from '../../../src/net/studio/handler.js';
 import { authCustomer, bearerOf } from '../../../src/net/studio/session.js';
+import { ADMIN_HTML } from './admin-page.js';
 import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
 import { jsonOf, responseOf } from './reply.js';
@@ -105,6 +107,10 @@ export default {
     const origin = env.HUB_ORIGIN ?? url.origin;
 
     if (route.name === 'not-found') return jsonOf({ error: 'not-found' }, 404);
+    // The admin page is static; the data behind it needs the operator token.
+    if (route.name === 'admin-page' && req.method === 'GET') {
+      return new Response(ADMIN_HTML, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS } });
+    }
     // Internal routes are only reachable through this Worker's own calls to a DO.
     if (url.pathname.startsWith('/v1/internal/')) return jsonOf({ error: 'not-found' }, 404);
 
