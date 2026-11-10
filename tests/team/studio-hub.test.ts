@@ -22,6 +22,8 @@ import {
   verifyDaemonConnect,
 } from '../../src/net/studio/handler.js';
 import { memoryHub, memoryStudio, sha256Hex, type HubStore, type StudioStore } from '../../src/net/studio/store.js';
+import { readView } from '../../src/net/studio/views.js';
+import type { StudioPlanView } from '../../src/studio/protocol.js';
 
 /** BLG-57: one binding code registers a daemon key; after that, every connection is signed. */
 
@@ -254,6 +256,85 @@ describe('a daemon connection is signed', () => {
     const synced = await onDaemonMessage(daemonId, JSON.stringify({ t: 'synced' }), deps);
     expect(synced).toEqual([]);
     expect((await w.studio.conn(daemonId))?.synced).toBe(true);
+  });
+});
+
+describe('incremental frames (BLG-68)', () => {
+  const viewOf = (title: string): StudioPlanView => ({
+    planRef: 'p1',
+    draftRev: 0,
+    title,
+    goal: '',
+    stage: 'drafting',
+    waitingOn: 'customer',
+    headline: '计划在写',
+    progress: { done: 0, total: 0 },
+    milestones: [],
+    decisions: [],
+    turns: [],
+    typing: false,
+    moreTurns: false,
+    activity: [],
+  });
+
+  /** A daemon with one mapped project, connected and out of hello. */
+  async function ready(w: World): Promise<{ daemonId: string; deps: Deps & { studio: StudioStore; studioId: string } }> {
+    const daemonId = 'D'.repeat(32);
+    const at = w.deps.now;
+    await w.studio.putConn({ daemonId, lastAt: at, connectedAt: at, lastSeenAt: at, hello: false, synced: false });
+    await w.hub.createProject({ id: 'sp1', studioId: 'st_test', name: 'App', now: at });
+    await w.hub.replaceDaemonProjects(daemonId, [{ id: 'dpp1', name: 'App' }], at);
+    await w.hub.bindProject({ projectId: 'sp1', daemonId, daemonProjectId: 'dpp1', now: at });
+    const deps = { ...w.deps, studio: w.studio, studioId: 'st_test' };
+    await onDaemonMessage(daemonId, JSON.stringify({ t: 'hello', proto: { major: 1, minor: 1 }, daemon: daemonId, projects: [{ id: 'dpp1', name: 'App' }] }), deps);
+    return { daemonId, deps };
+  }
+
+  it('applies a patch whose rev follows the cached one', async () => {
+    const w = await world();
+    const { daemonId, deps } = await ready(w);
+    const full = await onDaemonMessage(daemonId, JSON.stringify({ t: 'for', project: 'dpp1', frame: { t: 'plan', rev: 1, view: viewOf('Before') } }), deps);
+    expect(full).toEqual([expect.objectContaining({ to: 'app', projectId: 'sp1' })]);
+
+    const patch = await onDaemonMessage(daemonId, JSON.stringify({ t: 'patch', project: 'dpp1', planRef: 'p1', rev: 2, set: { title: 'After' } }), deps);
+    expect(patch).toEqual([expect.objectContaining({ to: 'app', projectId: 'sp1', frame: expect.objectContaining({ t: 'plan', rev: 2 }) })]);
+    expect((await readView('sp1', 'p1', deps))?.view.title).toBe('After');
+    // The daemon's patch is not trusted either: an unknown field makes the whole merged view bad.
+    const bad = await onDaemonMessage(daemonId, JSON.stringify({ t: 'patch', project: 'dpp1', planRef: 'p1', rev: 3, set: { secret: 'x' } }), deps);
+    expect(bad).toEqual([expect.objectContaining({ to: 'daemon', msg: { t: 'resync', project: 'dpp1', planRef: 'p1' } })]);
+    expect((await readView('sp1', 'p1', deps))?.view.title).toBe('After');
+  });
+
+  it('asks for a full snapshot on a rev gap, and keeps the last good view', async () => {
+    const w = await world();
+    const { daemonId, deps } = await ready(w);
+    await onDaemonMessage(daemonId, JSON.stringify({ t: 'for', project: 'dpp1', frame: { t: 'plan', rev: 4, view: viewOf('Cached') } }), deps);
+    const gap = await onDaemonMessage(daemonId, JSON.stringify({ t: 'patch', project: 'dpp1', planRef: 'p1', rev: 9, set: { title: 'Skipped' } }), deps);
+    expect(gap).toEqual([expect.objectContaining({ to: 'daemon', msg: { t: 'resync', project: 'dpp1', planRef: 'p1' } })]);
+    expect((await readView('sp1', 'p1', deps))?.view.title).toBe('Cached');
+  });
+
+  it('a mapping tells the daemon to push that project', async () => {
+    const w = await world();
+    const { daemonId } = await ready(w);
+    expect(routeOf('POST', '/v1/internal/resync')).toMatchObject({ name: 'internal-resync', area: 'studio' });
+
+    const deps = { ...w.deps, studio: w.studio, studioId: 'st_test' };
+    const reply = await handleStudioRequest(request('POST', '/v1/internal/resync', { body: { daemonId, project: 'dpp1' } }), deps, { role: 'operator' });
+    expect(reply.status).toBe(200);
+    expect(reply.effects).toEqual([{ to: 'daemon', daemonId, msg: { t: 'resync', project: 'dpp1' } }]);
+
+    const refused = await handleStudioRequest(request('POST', '/v1/internal/resync', { body: { daemonId, project: 'dpp1' } }), deps, { role: 'daemon', daemonId });
+    expect(refused.status).toBe(403);
+  });
+
+  it('accepts a patch frame strictly, but only the named fields', () => {
+    const patch = { t: 'patch', project: 'dpp1', planRef: 'p1', rev: 2, set: { title: 'x' } };
+    expect(DaemonUp.safeParse(patch).success).toBe(true);
+    expect(DaemonUp.safeParse({ ...patch, extra: 1 }).success).toBe(false);
+    expect(DaemonUp.safeParse({ ...patch, planRef: 'not a ref' }).success).toBe(false);
+    const turns = Array.from({ length: 51 }, (_, i) => ({ id: `t${i}`, who: 'ai', text: 'x', at: i }));
+    expect(DaemonUp.safeParse({ ...patch, turns }).success).toBe(false);
   });
 });
 

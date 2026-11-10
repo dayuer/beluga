@@ -8,11 +8,11 @@
  */
 
 import { z } from 'zod';
-import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, type AppFrame } from '../../studio/protocol.js';
+import { DaemonHello, LIMITS, PlanFrame, PlanGoneFrame, STUDIO_PROTO, StudioAction, StudioReceipt, StudioTurn, type AppFrame } from '../../studio/protocol.js';
 import { addMember, bindProject, createProject, customerLoginLink, inviteCustomer, listCustomers, removeCustomer, removeMember, revokeDaemon, studioDetail, unbindProject } from './accounts.js';
 import { ack, enqueue, take } from './queue.js';
 import { authCustomer, bearerOf, logout as logoutSession, requestLogin, verifyLogin } from './session.js';
-import { ingestGone, ingestPlan, listPlans, readView, turnsBefore } from './views.js';
+import { ingestGone, ingestPatch, ingestPlan, listPlans, readView, turnsBefore } from './views.js';
 import {
   ALERTS_KEEP,
   CLOCK_SKEW_MS,
@@ -145,6 +145,7 @@ export type RouteName =
   | 'daemon-ws'
   | 'internal-status'
   | 'internal-close'
+  | 'internal-resync'
   | 'not-found';
 
 export interface Route {
@@ -206,6 +207,7 @@ export function routeOf(_method: string, pathname: string): Route {
 
   if (s(1) === 'internal') {
     if (p.length === 3 && s(2) === 'close') return at('internal-close', 'studio');
+    if (p.length === 3 && s(2) === 'resync') return at('internal-resync', 'studio');
     if (p.length === 5 && s(2) === 'studios' && id(3) && s(4) === 'status') return at('internal-status', 'studio', { sid: s(3)! });
   }
 
@@ -370,9 +372,22 @@ export function internalAuthOf(header: string | null): InternalAuth | undefined 
 const ref = z.string().min(1).max(LIMITS.ref).regex(REF);
 const proto = z.object({ major: z.number().int().min(0), minor: z.number().int().min(0) }).strict();
 
+/** M3's incremental frame: only the top-level fields that changed, and the newest turns when they did. */
+export const PatchUp = z
+  .object({
+    t: z.literal('patch'),
+    project: ref,
+    planRef: ref,
+    rev: z.number().int().min(0),
+    set: z.record(z.string(), z.unknown()).optional(),
+    turns: z.array(StudioTurn).max(50).optional(),
+  })
+  .strict();
+
 export const DaemonUp = z.union([
   DaemonHello,
   z.object({ t: z.literal('for'), project: ref, frame: z.union([PlanFrame, PlanGoneFrame]) }).strict(),
+  PatchUp,
   StudioReceipt,
   z.object({ t: z.literal('synced') }).strict(),
 ]);
@@ -517,6 +532,9 @@ export async function handleHubRequest(req: Request, deps: Deps): Promise<HubRep
 
 const CloseBody = z.object({ role: z.enum(['daemon', 'customer', 'session']), id: z.string().min(1).max(200) }).strict();
 
+/** The Worker tells the DO that a Studio project was just mapped: the daemon should push it now. */
+const ResyncBody = z.object({ daemonId: z.string().regex(/^[A-Za-z0-9_-]{32}$/), project: ref }).strict();
+
 /** A customer route: the internal identity is an app one for this project, and still a member. */
 async function appGuard(auth: InternalAuth, pid: string | undefined, deps: StudioDeps): Promise<HubReply | undefined> {
   if (auth.role !== 'app' || pid === undefined || auth.projectId !== pid) return failure(403, 'not-yours');
@@ -552,6 +570,14 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
             ? { to: 'close', tag: `cust:${id}`, code: 4004, reason: 'removed' }
             : { to: 'close', tag: `sess:${id}`, code: 4004, reason: 'signed-out' };
       return { status: 200, body: { ok: true }, effects: [close] };
+    }
+
+    case 'internal-resync': {
+      if (auth.role !== 'operator') return failure(403, 'not-yours');
+      if (!method(req, 'POST')) return failure(405, 'method-not-allowed');
+      const parsed = ResyncBody.safeParse(await readJson(req));
+      if (!parsed.success) return failure(400, 'bad-args');
+      return { status: 200, body: { ok: true }, effects: [{ to: 'daemon', daemonId: parsed.data.daemonId, msg: { t: 'resync', project: parsed.data.project } }] };
     }
 
     case 'internal-status': {
@@ -653,13 +679,6 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
     return [];
   }
 
-  // M3's incremental frame is reserved: ask for a full snapshot instead (docs/studio-hub.md §15).
-  if ((parsed as { t?: unknown } | null)?.t === 'patch') {
-    const patch = parsed as { readonly project?: unknown; readonly planRef?: unknown };
-    await deps.studio.alert(daemonId, 'patched-early', deps.now);
-    return typeof patch.project === 'string' ? [{ to: 'daemon', daemonId, msg: { t: 'resync', project: patch.project, ...(typeof patch.planRef === 'string' ? { planRef: patch.planRef } : {}) } }] : [];
-  }
-
   const frame = DaemonUp.safeParse(parsed);
   if (!frame.success) {
     await deps.studio.alert(daemonId, 'bad-frame', deps.now);
@@ -689,6 +708,12 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
       const result = frame.data.frame.t === 'plan'
         ? await ingestPlan(daemonId, { project: frame.data.project, frame: frame.data.frame }, deps)
         : await ingestGone(daemonId, { project: frame.data.project, planRef: frame.data.frame.planRef }, deps);
+      return [...result.effects];
+    }
+
+    case 'patch': {
+      // Only against the cached full view, rev + 1; a gap, a bad merge or a bad field asks for one.
+      const result = await ingestPatch(daemonId, frame.data, deps);
       return [...result.effects];
     }
 

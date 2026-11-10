@@ -597,6 +597,7 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
 |---|---|
 | `GET /v1/internal/studios/:sid/status` | 管理页需要的在线状态、`daemon_conn`、alerts |
 | `POST /v1/internal/close` | 体 `{role:'daemon' / 'customer' / 'session', id}`；壳关闭匹配标签的套接字（吊销、移除、登出） |
+| `POST /v1/internal/resync` | 体 `{daemonId, project}`；M3：项目刚在管理页映射到 daemon 后，让 daemon 立刻推这个项目的全量视图 |
 
 `POST /v1/internal/close` 是纯传输动作：Worker 已经在 D1 改完状态（吊销、移除、登出），这里只让 DO 把
 受影响的套接字关掉，不重新判断业务。
@@ -744,7 +745,7 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
 
 ### 8.2 `ingestPatch(daemonId, {project, planRef, rev, set?, turns?}, deps)`
 
-M2 只写函数与测试，**不上线**（M3 加线上增量帧时用）：
+M3 起在线上：`DaemonUp` 的 `patch` 分支（§10.1）收到即调本函数，effects 直接执行。
 
 - `rev === 当前 rev + 1` 才应用；否则丢弃，回 `{t:'resync', project, planRef}`（让 daemon 推全量）。
 - `set` 是 `StudioPlanView` 的顶层字段补丁；合并后**整份再过 strict schema**，失败则丢弃、写 alert、
@@ -802,7 +803,7 @@ M3 的 daemon 连接器按本文的信封实现，并在那份文档补一行指
 | `for` | `{t:'for', project: REF, frame: PlanFrame \| PlanGoneFrame}` | 视图帧；`project` 必须是映射到本 daemon 的项目。 |
 | `receipt` | `StudioReceipt`（`{t:'receipt', opId, state, code?, planRef?}`） | 动作回执（ack）。只接受 `done`/`refused`。 |
 | `synced` | `{t:'synced'}` | 全量推完；收到后才开始投递队列。 |
-| `patch` | *M2 不接* | 帧形如 `{t:'patch', project, planRef, rev, set?, turns?}`。M2 的联合类型里没有它；收到就忽略并回 `{t:'resync', project, planRef}`（每连接最多 alert 一次 `patched-early`）。M3 定稿后加入联合并调 `ingestPatch`。 |
+| `patch` | `{t:'patch', project: REF, planRef: REF, rev: int, set?: Record<string, unknown>, turns?: StudioTurn[] (≤50)}` | M3 起的增量帧。`.strict()`；调 `ingestPatch`（§8.2），rev 必须是缓存 + 1，合并后整份再过 strict `StudioPlanView`；缺口、坏字段、计划未知都回 `resync`，不覆盖旧缓存。 |
 
 `hello` 之前收到 `for`/`receipt`/`synced` → 关闭 4003 `not-hello`。任何一帧 JSON 或 schema 失败 →
 忽略、写 alert `bad-frame`（每连接最多一条），**不关闭**连接（避免版本差异导致重连风暴）。
@@ -985,9 +986,10 @@ $ grep -rn "from '.*src/" packages/studio-hub/src
 2. **顺序**：设计 §6 是频率先于 `checkAction`。实现是：成员 → `expire` → opId 回执 → 频率 → `checkAction`。
    成员先是为了被移除的客户连旧回执都拿不到；`expire` 先是为了第 8 天重放不再返回 stale `queued`；
    回执先于限频是为了幂等重发不被 `rate-limited` 挡住（审计 M2-3/M2-15）。
-3. **`patch` 帧 M2 不上线**：设计 §8 把它列进 `DaemonUp` 并注明"预留，M3 定稿"。M2 只实现
-   `ingestPatch` 函数与测试，线上收到 `patch` 回 `resync`；M3 再把它加入信封联合。理由是不让一个
-   未定稿的增量格式进入线上校验。
+3. **`patch` 帧在 M3 上线**：M2 只实现 `ingestPatch` 与测试，线上收到 `patch` 回 `resync`，不让未定稿的
+   增量格式进入线上校验。M3 把它加入 `DaemonUp`（strict，`set` 只放顶层字段，`turns` ≤ 50），收到即调
+   `ingestPatch`；`STUDIO_PROTO.minor` 升到 1（只做加法）。同时加 `POST /v1/internal/resync`：管理页把
+   Studio 项目映射到 daemon 项目后，Worker 让 DO 叫 daemon 立刻推这个项目（映射在 D1，daemon 原来无从知道）。
 4. **客户账号不加 `studio_id`**：设计 §4 的 `customers` 没有工作室列，邮箱全局唯一。这允许同一客户
    出现在多个工作室的项目里（P1 只有一个运营者，实际很少见）；授权始终按项目成员查，不按客户所属工作室。
    代价是"已邀请但未加入任何项目"的客户不在工作室详情列表里——管理页在邀请响应里直接拿 id 做下一步。
