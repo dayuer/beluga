@@ -204,6 +204,25 @@ describe('a view is read by its own project only', () => {
     expect(got.status).toBe(200);
     expect((bodyOf(got).view as { title: string }).title).toBe('客户 App');
   });
+
+  it('tells the customer whether the studio is online and when it last synced', async () => {
+    const w = await world();
+    await ingestPlan('d1', { project: 'dp1', frame: { t: 'plan', rev: 1, view } }, w.deps);
+
+    const online = await get('/v1/app/projects/p1/plans', appAuth(), w);
+    expect(online.status).toBe(200);
+    expect(bodyOf(online).studio).toEqual({ online: true, lastSyncAt: w.deps.now });
+
+    // The daemon disconnects: connectedAt is gone, lastSeenAt is when it was last alive.
+    await w.studio.putConn({ daemonId: 'd1', lastAt: w.deps.now, lastSeenAt: w.deps.now - 90_000, hello: true, synced: false });
+    const offline = await get('/v1/app/projects/p1/plans', appAuth(), w);
+    expect(bodyOf(offline).studio).toEqual({ online: false, lastSyncAt: w.deps.now - 90_000 });
+
+    // A project with no daemon mapped has never synced.
+    const unbound = await get('/v1/app/projects/p2/plans', appAuth('c2', 'p2'), w);
+    expect(unbound.status).toBe(200);
+    expect(bodyOf(unbound).studio).toEqual({ online: false, lastSyncAt: null });
+  });
 });
 
 describe('the cache trusts only the strict view', () => {

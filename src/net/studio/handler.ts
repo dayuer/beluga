@@ -586,7 +586,13 @@ export async function handleStudioRequest(req: Request, deps: StudioDeps, auth: 
       const no = await appGuard(auth, route.params.pid, deps);
       if (no) return no;
       if (!method(req, 'GET')) return failure(405, 'method-not-allowed');
-      return reply(200, { plans: await listPlans(route.params.pid!, deps) });
+      // Whether the studio is there is part of the list's answer: the app shows "工作室离线 · 上次同步
+      // x 分钟前" without a second request (docs/studio-hub.md §6.2, M5 design §0.2).
+      const project = await deps.hub.project(route.params.pid!);
+      const conn = project?.daemonId ? await deps.studio.conn(project.daemonId) : undefined;
+      const online = conn?.connectedAt !== undefined;
+      const studio = { online, lastSyncAt: online ? deps.now : (conn?.lastSeenAt ?? null) };
+      return reply(200, { plans: await listPlans(route.params.pid!, deps), studio });
     }
 
     case 'app-plan': {
