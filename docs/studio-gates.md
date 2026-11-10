@@ -501,9 +501,10 @@ stateDiagram-v2
 
 - **决策（BLG-79）**：`plugs.decisions(plan, view)` 返回 `PlanFacts['decisions']`，键是 `d-m<i>-t<j>`，值是
   `{ audience, open, qid, question, options: { o0: label, … }, multi }`。只有 `audience === 'customer'` 且没有命中
-  敏感词的进去；`qid = decide:<plan>:<task>`（`core/plans/decisions.ts`）。`view.ts` 的 `decisionsOf` 改用同一个
-  过滤器和编号，只保留一份实现。客户答别的 qid 由 `callRefusal('questions.answer')` 的 `decide:` 前缀加
-  `checkAction` 的 audience 判断双重拦下。
+  敏感词的进去；`qid = decide:<plan>:<task>`（`core/plans/decisions.ts`）。实现在 `StudioDecisions`：命中敏感词却
+  被标成 customer 的，每个（计划、任务、draftRev）在 `plan.home` 发一次警告，然后**不**给客户。`view.ts` 的
+  `decisionsOf` 改用同一个过滤器和编号（`studioDecisions`），只保留一份实现。客户答别的 qid 由
+  `callRefusal('questions.answer')` 的 `decide:` 前缀加 `checkAction` 的 audience 判断双重拦下。
 - **草稿（BLG-80）**：`changesSummary(plan)` 给 changes Gate 卡提供 `added`；`draft.discard` 在收件箱的同一个
   同步段里比对 `draftRev` 再 `exec.discard`；`draft.apply` 走 Gate（kind `changes`），由 gates 绑定 `draftRev`。
   没有开工的计划不显示差异卡（`draftDiffOf` 只在 `plan.body && plan.draft` 时出现），主按钮是“确认计划”。

@@ -1,5 +1,6 @@
 import type { PlanBody, PlanEventKind, PlanMilestone, PlanTask } from '../core/plans/model.js';
-import type { MilestoneState, MilestoneView, PlanView, TaskState, TaskView } from '../core/plans/progress.js';
+import type { MilestoneState, MilestoneView, PlanView, TaskState } from '../core/plans/progress.js';
+import { hiddenFromCustomer, studioDecisions } from './decisions.js';
 import { StudioPlanView, type StudioDecision, type StudioDraftDiff, type StudioGate, type StudioMilestone, type StudioTurn } from './protocol.js';
 import { OMITTED, type SanitizeOptions, sanitizeLine as cleanLine, sanitizeText as cleanText } from './sanitize.js';
 
@@ -34,11 +35,7 @@ let building: SanitizeOptions = {};
 const sanitizeText = (s: string, max?: number): string => cleanText(s, max, building);
 const sanitizeLine = (s: string, max?: number): string => cleanLine(s, max, building);
 
-/** A plan task as Studio reads it: who may answer its decision (missing: the operator). */
-type StudioTask = PlanTask & { readonly audience?: 'customer' | 'operator' };
-
 const FINISHED: ReadonlySet<TaskState> = new Set(['review', 'planned', 'done', 'canceled', 'missing']);
-const NOT_YET: ReadonlySet<TaskState> = new Set(['draft', 'later', 'blocked']);
 
 const MILESTONE_STATUS: Readonly<Record<MilestoneState, StudioMilestone['status']>> = {
   draft: 'planned',
@@ -74,9 +71,6 @@ const optText = (s: string | undefined): { goal?: string } => {
   return t ? { goal: t } : {};
 };
 
-/** A task of yours not marked for the customer. */
-const operatorOnly = (t: PlanTask): boolean => t.assignee === 'me' && (t as StudioTask).audience !== 'customer';
-
 function milestoneOf(m: MilestoneView, i: number): StudioMilestone {
   return {
     ref: `m${i}`,
@@ -86,7 +80,7 @@ function milestoneOf(m: MilestoneView, i: number): StudioMilestone {
     status: MILESTONE_STATUS[m.state],
     // Yours that aren't the customer's (accounts, keys, payments) aren't in their list at all, not even by title.
     tasks: m.tasks.slice(0, 60).flatMap((t, j) =>
-      operatorOnly(t.task)
+      hiddenFromCustomer(t.task)
         ? []
         : [
             {
@@ -101,25 +95,15 @@ function milestoneOf(m: MilestoneView, i: number): StudioMilestone {
   };
 }
 
-const decisionOpen = (t: TaskView): boolean => !FINISHED.has(t.state) && !NOT_YET.has(t.state);
-
+/** The customer's decisions, filtered and numbered once (src/studio/decisions.ts), sanitized here. */
 function decisionsOf(view: PlanView): StudioDecision[] {
-  return view.milestones.flatMap((m, i) =>
-    m.tasks.flatMap((t, j): StudioDecision[] => {
-      const task = t.task as StudioTask;
-      // Only what's marked for the customer; the plan's own decisions (body.decisions) never.
-      if (!task.decision || task.audience !== 'customer') return [];
-      return [
-        {
-          decisionId: `d-m${i}-t${j}`,
-          question: sanitizeText(task.decision.question),
-          options: task.decision.options.slice(0, 20).map((o, k) => ({ id: `o${k}`, label: sanitizeLine(o.label, 200), ...(o.description ? { description: sanitizeLine(o.description) } : {}) })),
-          multi: Boolean(task.decision.multi),
-          open: view.plan.status === 'active' && !view.plan.paused && decisionOpen(t),
-        },
-      ];
-    }),
-  ).slice(0, 40);
+  return studioDecisions(view).map((d) => ({
+    decisionId: d.decisionId,
+    question: sanitizeText(d.question),
+    options: d.options.map((o) => ({ id: o.id, label: sanitizeLine(o.label, 200), ...(o.description ? { description: sanitizeLine(o.description) } : {}) })),
+    multi: d.multi,
+    open: d.open,
+  }));
 }
 
 const taskWords = (t: PlanTask): string => sanitizeText([t.goal ?? '', ...t.acceptance].filter(Boolean).join('\n'));
@@ -131,8 +115,8 @@ export function draftDiffOf(body: PlanBody, draft: PlanBody, draftRev: number): 
   const oldMs = new Map(body.milestones.map((m) => [m.id, m]));
   const newMs = new Map(draft.milestones.map((m) => [m.id, m]));
   // The operator's own tasks aren't in the customer's diff either (not even their titles).
-  const oldTasks = new Map(body.milestones.flatMap((m) => m.tasks.filter((t) => !operatorOnly(t)).map((t) => [t.id, t] as const)));
-  const newTasks = new Map(draft.milestones.flatMap((m) => m.tasks.filter((t) => !operatorOnly(t)).map((t) => [t.id, { t, m }] as const)));
+  const oldTasks = new Map(body.milestones.flatMap((m) => m.tasks.filter((t) => !hiddenFromCustomer(t)).map((t) => [t.id, t] as const)));
+  const newTasks = new Map(draft.milestones.flatMap((m) => m.tasks.filter((t) => !hiddenFromCustomer(t)).map((t) => [t.id, { t, m }] as const)));
   for (const m of draft.milestones) {
     const was = oldMs.get(m.id);
     if (!was) diff.added.push({ kind: 'milestone', title: sanitizeLine(m.title, 200) });

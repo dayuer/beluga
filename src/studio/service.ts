@@ -5,6 +5,7 @@ import { needPlans } from '../core/plans/registry.js';
 import type { Store } from '../core/store.js';
 import { identityPem, type Identity } from '../net/crypto.js';
 import { StudioChat, type SayResult, type StudioChatSession } from './chat.js';
+import { StudioDecisions } from './decisions.js';
 import { StudioGates, type GateAnswer, type GateAnswerResult } from './gates.js';
 import { StudioInbox, type InboxExec, type InboxPlugs } from './inbox.js';
 import { identityOf, loadStudioConfig, newRefKey, newStudioIdentity, removeStudioConfig, saveStudioConfig, studioPath, type StudioConfig } from './keys.js';
@@ -114,6 +115,7 @@ export class StudioService {
   private inbox: StudioInbox | undefined;
   private gates: StudioGates | undefined;
   private chat: StudioChat | undefined;
+  private decisions: StudioDecisions | undefined;
   /** A link is registering right now: two screens can't start two registrations. */
   private linking = false;
 
@@ -309,6 +311,8 @@ export class StudioService {
     const cfg = this.config;
     const identity = this.identity;
     if (!cfg || !identity || this.connection) return;
+    // Which decisions a customer may see and answer (one filter for the view and the answer path).
+    if (!this.decisions) this.decisions = new StudioDecisions({ store: this.store });
     // The customer's conversation: queued words to the plan's own chat, and what the customer sees back.
     if (!this.chat && !this.plugs?.chat && this.chatSession) {
       this.chat = new StudioChat({
@@ -340,11 +344,12 @@ export class StudioService {
     if (!this.inbox) {
       const gates = this.plugs?.gates ?? this.gates;
       const chat = this.plugs?.chat ?? this.chat;
+      const decisions = this.plugs?.decisions ?? (this.decisions ? (plan, view) => this.decisions!.decisions(plan, view) : undefined);
       this.inbox = new StudioInbox({
         store: this.store,
         config: () => this.config,
         exec: this.exec ?? MISSING_EXEC,
-        plugs: { ...(this.plugs ?? {}), ...(gates ? { gates } : {}), ...(chat ? { chat } : {}) },
+        plugs: { ...(this.plugs ?? {}), ...(gates ? { gates } : {}), ...(chat ? { chat } : {}), ...(decisions ? { decisions } : {}) },
         send: (frame) => this.connection?.send(frame) ?? false,
         file: this.inboxFile ?? join(dirname(this.file), 'studio-inbox.json'),
         now: this.now,
