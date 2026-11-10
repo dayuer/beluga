@@ -1,0 +1,35 @@
+import type { Translation } from '../../../../../src/shared/i18n.js';
+import type { studio as en } from '../en/studio.js';
+
+/** Synon Studio 在 Mac 上的文案（简体中文）。 */
+export const studio: Translation<typeof en> = {
+  'studio.preview.button': '客户看到的',
+  'studio.preview.tip': 'Synon Studio 的客户会看到的这个计划：没有路径、分支、agent 和任务 KEY',
+  'studio.preview.title': '客户看到的',
+  'studio.preview.intro': '按 Synon Studio 发出的样子生成：只有这些字段，文字都已净化。',
+  'studio.preview.done': '完成',
+  'studio.preview.failed': '这个计划没法给客户看：{why}',
+  'studio.preview.progress': '已完成 {done} 项，共 {total} 项',
+  'studio.preview.milestones': '里程碑',
+  'studio.preview.decisions': '要客户回答的问题',
+  'studio.preview.noDecisions': '没有要回答的：只有标给客户的问题会出现在这里。',
+  'studio.preview.open': '待回答',
+  'studio.preview.answered': '已回答',
+  'studio.preview.changes': '改动',
+  'studio.preview.added': '新增',
+  'studio.preview.changed': '修改',
+  'studio.preview.removed': '移除',
+  'studio.preview.review': '检查结果',
+  'studio.preview.activity': '动态',
+  'studio.preview.waiting.customer': '在等客户',
+  'studio.preview.waiting.studio': '在等工作室',
+  'studio.preview.waiting.ai': 'AI 在做',
+  'studio.preview.status.planned': '已计划',
+  'studio.preview.status.waiting': '等待中',
+  'studio.preview.status.working': '进行中',
+  'studio.preview.status.doing': '在做',
+  'studio.preview.status.checking': '检查中',
+  'studio.preview.status.review': '待验收',
+  'studio.preview.status.passed': '已通过',
+  'studio.preview.status.done': '完成',
+};
