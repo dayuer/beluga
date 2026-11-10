@@ -147,6 +147,16 @@ export interface GateCheck {
   readonly notes: string;
 }
 
+/** A milestone's design, at most (`plan_design`). */
+export const MAX_DESIGN = 12000;
+
+/** A milestone's technical design, written before its work starts. */
+export interface MilestoneDesign {
+  readonly text: string;
+  readonly at: number;
+  readonly by: Actor;
+}
+
 /** How a milestone is going (by milestone id). */
 export interface MilestoneRun {
   readonly passedAt?: number;
@@ -162,6 +172,15 @@ export interface MilestoneRun {
    * plan's conversation stays free while it checks and milestones are checked side by side.
    */
   readonly checker?: string;
+  /**
+   * The conversation that writes its technical design before its work starts (a workspace id),
+   * when the plan has an agent for its architecture (`Plan.archAgent`); retired once it passed.
+   */
+  readonly architect?: string;
+  /** When its architect was asked for the design (asked once per round). */
+  readonly designAsked?: number;
+  /** Its technical design, written by the architect (`plan_design`): its worker follows it, its checker checks against it. */
+  readonly design?: MilestoneDesign;
   /** Passing it couldn't merge its tasks into the plan's branch (not a conflict: a dirty checkout, no git identity): why, until it's passed again. */
   readonly mergeFailed?: { readonly at: number; readonly reason: string };
   /**
@@ -324,6 +343,8 @@ export interface Plan {
   readonly agent?: AgentRef;
   /** The agent its milestone checkers and draft reviews run on: a stronger model than the work's; none: `agent`'s. */
   readonly checkAgent?: AgentRef;
+  /** The agent that writes each milestone's technical design before its work starts; none: no architect step. */
+  readonly archAgent?: AgentRef;
   readonly paused: boolean;
   readonly runs: Readonly<Record<string, MilestoneRun>>;
   /** Tasks whose start is being combined from several branches (by plan task id). */
@@ -460,6 +481,14 @@ export function checkerOf(state: PlansState, channel: string): { readonly plan: 
   if (!channel.startsWith('ws:')) return undefined;
   const id = channel.slice(3);
   for (const plan of state.plans) for (const [milestone, run] of Object.entries(plan.runs ?? {})) if (run?.checker === id) return { plan, milestone };
+  return undefined;
+}
+
+/** The plan and milestone a conversation designs (see MilestoneRun.architect). */
+export function architectOf(state: PlansState, channel: string): { readonly plan: Plan; readonly milestone: string } | undefined {
+  if (!channel.startsWith('ws:')) return undefined;
+  const id = channel.slice(3);
+  for (const plan of state.plans) for (const [milestone, run] of Object.entries(plan.runs ?? {})) if (run?.architect === id) return { plan, milestone };
   return undefined;
 }
 
