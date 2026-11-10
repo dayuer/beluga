@@ -306,6 +306,11 @@ export const settingsIndex = (): readonly Entry[] => [
   ]),
   group('phone', t('settings.phone.pair'), t('settings.find.pair'), 'pair qr code android iphone companion app 配对 二维码'),
   ...rows('phone', t('settings.phone.pair'), [[t('settings.about.app'), t('settings.find.phoneApp'), 'app download install 下载 安装']]),
+  group('phone', t('phone.invite.title'), t('phone.invite.projectDetail'), 'invite customer client project link expires share 邀请客户 邀请 客户 项目 链接 有效期'),
+  ...rows('phone', t('phone.invite.title'), [
+    [t('phone.invite.project'), t('phone.invite.projectDetail'), 'invite customer client project 邀请 客户 项目'],
+    [t('phone.invite.valid'), t('phone.invite.validDetail'), 'invite link expires days validity 邀请 有效期 过期'],
+  ]),
 
   // Voice
   ...rows('voice', t('settings.voice.writing'), [

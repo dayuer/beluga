@@ -17,7 +17,9 @@ import { type DeviceBook, type DeviceRecord, deviceId } from './devices.js';
 import { type DocumentBytes, FileServer, RefTable, type Thumbnailer } from './files.js';
 import { ProjectIcons, type SmallIcon } from './icons.js';
 import type { MergeBook } from './merge.js';
-import { DevicePairing, type PairingInfo } from './pair.js';
+import { clientConv, clientHome, clientNudge, clientOlder } from './client-view.js';
+import { CLIENT_BLOCKED_FRAMES, clientRefusal, topicInProject } from './client-scope.js';
+import { DevicePairing, type PairStartOptions, type PairingInfo } from './pair.js';
 import { Uploads } from './uploads.js';
 import { type MacVoice, sharedVoice } from '../core/voice.js';
 import type { VoiceModelId } from '../shared/voice-models.js';
@@ -368,12 +370,13 @@ class PhoneLink implements PhoneLinkHandle {
       this.hello = frame;
       const state = this.host.state();
       const relay = this.host.relayUrl();
-      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}) });
+      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}), ...(this.device.client ? { client: { project: this.device.client.project, name: (state.projects.find((p) => p.id === this.device.client!.project)?.name ?? '').slice(0, 200) } } : {}) });
       this.host.helloed(this, frame.app, frame.via);
       this.subscribe(frame.topics);
       this.host.tellComputers(this);
       return;
     }
+    if (this.device.client && CLIENT_BLOCKED_FRAMES.has(frame.t)) return;
     switch (frame.t) {
       case 'hello':
         return;
@@ -382,6 +385,7 @@ class PhoneLink implements PhoneLinkHandle {
       case 'call':
         return void this.host.phoneCall(this, frame.method, frame.args).then((r) => this.send({ t: 'result', id: frame.id, ...r, ...(r.ok ? {} : { error: r.error.slice(0, 2000) }) }));
       case 'get':
+        if (this.device.client && frame.variant === 'text') return this.send({ t: 'result', id: frame.id, ok: false, error: 'That isn’t available to you' });
         return void this.host.files
           .piece(frame.ref, frame.variant, frame.off)
           .then((p) => this.send({ t: 'chunk', id: frame.id, ...p }))
@@ -457,7 +461,9 @@ class PhoneLink implements PhoneLinkHandle {
 
   /** The topics on the phone's screen now: new ones are sent at once, gone ones forgotten. */
   subscribe(topics: readonly Topic[]): void {
-    const wanted = new Set(topics.slice(0, MAX_TOPICS));
+    const project = this.device.client?.project;
+    const state = project === undefined ? undefined : this.host.state();
+    const wanted = new Set(topics.slice(0, MAX_TOPICS).filter((t) => state === undefined || topicInProject(state, project!, t)));
     for (const [t, st] of this.topics) {
       if (wanted.has(t)) continue;
       clearTimeout(st.timer);
@@ -481,7 +487,7 @@ class PhoneLink implements PhoneLinkHandle {
   }
 
   private sendView(topic: Topic, st: TopicState): void {
-    const data = this.host.render(topic);
+    const data = this.host.render(topic, this.device.client?.project);
     if (data === undefined) return;
     const json = JSON.stringify(data);
     const hash = createHash('sha256').update(json).digest('base64');
@@ -644,9 +650,9 @@ export class CompanionHost {
 
   // ---- the API (companion-handlers.ts)
 
-  pairStart(): Promise<PairingInfo> {
+  pairStart(opts?: PairStartOptions): Promise<PairingInfo> {
     const why = this.opts.cannotPair?.();
-    return why ? Promise.reject(new Error(why)) : this.pairing.start();
+    return why ? Promise.reject(new Error(why)) : this.pairing.start(opts);
   }
 
   /** Pair the phone on the USB cable (BLG-190): a pairing opens here and on the phone, the four pictures as ever. */
@@ -911,7 +917,20 @@ export class CompanionHost {
 
   /** A call from a phone: only what the allowlist says it may, then exactly as a screen's call. */
   async phoneCall(link: PhoneLink, method: string, args: readonly unknown[]): Promise<CallOutcome> {
-    if (!phoneMay(method)) return { ok: false, error: `${method} is only on your Mac` };
+    const project = link.device.client?.project;
+    if (project !== undefined) {
+      // A customer's phone: its own, much shorter list, and only its project (client-scope.ts).
+      const why = clientRefusal(this.state(), project, method, args);
+      if (why) return { ok: false, error: why };
+      if (method === 'companion.older') {
+        try {
+          const page = args[1] as { before: string; limit?: number };
+          return { ok: true, value: clientOlder(this.state(), this.ctx, project, String(args[0]), page.before, page.limit) };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      }
+    } else if (!phoneMay(method)) return { ok: false, error: `${method} is only on your Mac` };
     // A conversation asked from the phone: tell it when its answer is done.
     if (method === 'session.submit') {
       const channel = (args[1] as { channel?: unknown } | null | undefined)?.channel;
@@ -935,9 +954,9 @@ export class CompanionHost {
     };
   }
 
-  render(topic: Topic): unknown {
+  render(topic: Topic, project?: string): unknown {
     const state = this.state();
-    let data = viewOf(state, this.ctx, topic);
+    let data = project !== undefined ? (topic === 'client' ? clientHome(state, this.ctx, project) : clientConv(state, this.ctx, project, topic)) : viewOf(state, this.ctx, topic);
     // A view must fit in a frame: a long conversation sends fewer turns (the rest: companion.older).
     let size = data === undefined ? 0 : Buffer.byteLength(JSON.stringify(data));
     while (size > MAX_COMPANION_FRAME - 4096 && data && typeof data === 'object' && 'turns' in data) {
@@ -1118,17 +1137,22 @@ export class CompanionHost {
    * minutes) a nudge to a linked phone or a push to one that isn't. What needs you while you're at
    * the Mac is held, and told once you step away if it's still waiting (BLG-360).
    */
-  private async tell(nudges: readonly Nudge[], state: DomainState, idle: number | undefined): Promise<void> {
+  private async tell(nudges: readonly Nudge[], state: DomainState, idle: number | undefined, owner = false): Promise<void> {
     for (const record of this.phonesToTell()) {
+      const project = record.client?.project;
+      if (project !== undefined && owner) continue;
       const id = deviceId(record.cert);
       const linked = [...this.links].filter((l) => l.deviceId === id && l.hello);
       const onScreen = new Set<string>(linked.flatMap((l) => [...l.topics.keys()]));
       const inFront = linked.some((l) => l.inFront);
       const leaves = this.leavesFriends(linked);
-      for (const nudge of nudges) {
+      for (const original of nudges) {
+        // A customer's phone hears only its own project's cards, in its own words, wherever you are.
+        const nudge = project === undefined ? original : clientNudge(state, project, original);
+        if (!nudge) continue;
         if (nudge.away && (!linked.length || inFront)) continue;
         if (nudge.friends && leaves) continue;
-        const how: Delivery = deliver(nudge, { linked: linked.length > 0, onScreen, inFront, macFront: state.attention.front, canPush: Boolean(record.push), ...(idle !== undefined ? { macIdleMs: idle } : {}) });
+        const how: Delivery = deliver(nudge, { linked: linked.length > 0, onScreen, inFront, macFront: project === undefined && state.attention.front, canPush: Boolean(record.push), ...(idle !== undefined && project === undefined ? { macIdleMs: idle } : {}) });
         if (how === 'nudge') for (const l of linked) l.send({ t: 'nudge', kind: nudge.kind, title: nudge.title, body: nudge.body, ...(nudge.topic ? { topic: nudge.topic } : {}) });
         else if (how === 'push' && record.push) await (this.opts.pusher ?? NO_PUSH).push({ deviceId: id, ...record.push, box: record.cert.box }, nudge).catch((err: unknown) => this.logLine(`push failed: ${String(err)}`));
         else if (how === 'held') this.hold(nudge);
@@ -1188,7 +1212,7 @@ export class CompanionHost {
     const still = [...this.held].filter(([need]) => live.has(need)).map(([, n]) => n);
     this.held.clear();
     done();
-    if (still.length) await this.tell(still, state, idle);
+    if (still.length) await this.tell(still, state, idle, true);
   }
 
   /** The shared state's `companion` slice: the phones (who's linked, last seen) and the pairing. */

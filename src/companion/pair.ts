@@ -33,7 +33,19 @@ export interface PairingInfo {
   readonly link: string;
   readonly code: string;
   readonly expiresAt: number;
+  /** A client invite (BLG-14): the project the phone that pairs gets, and nothing else. */
+  readonly project?: string;
   readonly waiting?: { readonly name: string; readonly fingerprint: string };
+}
+
+/** A client invite lasts a day unless told otherwise, and never more than a week. */
+export const CLIENT_INVITE_TTL_MS = 24 * 3600_000;
+export const CLIENT_INVITE_MAX_TTL_MS = 7 * 24 * 3600_000;
+
+export interface PairStartOptions {
+  /** Pair the phone as a client of this project, not as a device of you. */
+  readonly project?: string;
+  readonly ttlMs?: number;
 }
 
 export interface DevicePairingOptions {
@@ -71,6 +83,7 @@ interface Open {
   readonly secret: string;
   readonly code: string;
   readonly expiresAt: number;
+  readonly project?: string;
   readonly servers: Server[];
   /** The link's and the code's temporary key pairs (they get a relay record on the DHT too). */
   readonly keyPairs: KeyPair[];
@@ -90,7 +103,7 @@ export class DevicePairing {
   info(): PairingInfo | undefined {
     const o = this.open;
     if (!o) return undefined;
-    return { link: deviceLink(o.secret, this.opts.relayUrl?.()), code: formatCode(o.code), expiresAt: o.expiresAt, ...(o.waiting ? { waiting: { name: o.waiting.hello.name, fingerprint: o.waiting.fingerprint } } : {}) };
+    return { link: deviceLink(o.secret, this.opts.relayUrl?.()), code: formatCode(o.code), expiresAt: o.expiresAt, ...(o.project ? { project: o.project } : {}), ...(o.waiting ? { waiting: { name: o.waiting.hello.name, fingerprint: o.waiting.fingerprint } } : {}) };
   }
 
   get isOpen(): boolean {
@@ -108,15 +121,17 @@ export class DevicePairing {
    * listening go on meanwhile, long done before anyone has typed twelve characters. Nothing here
    * waits for the relay's tunnel (its URL joins the link whenever it's up).
    */
-  async start(): Promise<PairingInfo> {
+  async start(start: PairStartOptions = {}): Promise<PairingInfo> {
     await this.cancel();
     const secret = randomBytes(16).toString('base64url');
     const code = Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
-    const expiresAt = Date.now() + (this.opts.ttlMs ?? PAIR_TTL_MS);
+    const project = start.project?.trim() || undefined;
+    const ttl = project ? Math.min(start.ttlMs ?? CLIENT_INVITE_TTL_MS, CLIENT_INVITE_MAX_TTL_MS) : (this.opts.ttlMs ?? PAIR_TTL_MS);
+    const expiresAt = Date.now() + ttl;
     const servers: Server[] = [];
     const timer = setTimeout(() => void this.cancel(), Math.max(0, expiresAt - Date.now()));
     timer.unref();
-    const open: Open = { secret, code, expiresAt, servers, keyPairs: [], timer, failures: [] };
+    const open: Open = { secret, code, expiresAt, ...(project ? { project } : {}), servers, keyPairs: [], timer, failures: [] };
     this.open = open;
     // The node, and each ticket's keys (the code's take a moment: Argon2id), all at once.
     const node = this.opts.node();
@@ -170,7 +185,7 @@ export class DevicePairing {
     };
     const cert: DeviceCert = { ...unsigned, sig: signText(identity, CERT_LABEL, canonical(unsigned)) };
     try {
-      this.opts.devices.add(cert, w.hello.app);
+      this.opts.devices.add(cert, w.hello.app, o.project ? { project: o.project } : undefined);
     } catch (err) {
       send(w.socket, { t: 'dev_refused', reason: err instanceof Error ? err.message.slice(0, 200) : 'Could not pair', ...(this.opts.devices.size >= MAX_DEVICES ? { why: 'full' as const } : {}) });
       w.socket.close(1000);

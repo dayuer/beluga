@@ -26,6 +26,8 @@ export const DeviceRecord = z.object({
   use: z.enum(PHONE_USE).optional(),
   /** The phone's own switch was off when it last said (its Stop): every route is refused until it says yes (BLG-187). */
   stopped: z.boolean().optional(),
+  /** A customer's phone (BLG-14): it sees this project only. Absent means a device of you. */
+  client: z.object({ project: z.string().min(1).max(200) }).optional(),
 });
 export type DeviceRecord = z.infer<typeof DeviceRecord>;
 
@@ -53,11 +55,11 @@ export class DeviceBook {
   byLink = (linkHex: string): DeviceRecord | undefined => this.list.find((r) => r.cert.link === linkHex);
 
   /** Keep a new phone (the same device again replaces its old certificate). */
-  add(cert: DeviceCert, app?: string): DeviceRecord {
+  add(cert: DeviceCert, app?: string, client?: { project: string }): DeviceRecord {
     if (!isPhoneCert(cert)) throw new Error('Only a phone pairs here');
     const rest = this.list.filter((r) => r.cert.device !== cert.device && r.cert.link !== cert.link);
     if (rest.length >= MAX_DEVICES) throw new Error(`You have ${MAX_DEVICES} phones paired; remove one first`);
-    const record: DeviceRecord = { cert, pairedAt: cert.issuedAt, ...(app ? { app } : {}) };
+    const record: DeviceRecord = { cert, pairedAt: cert.issuedAt, ...(app ? { app } : {}), ...(client ? { client } : {}) };
     this.save([...rest, record]);
     return record;
   }
@@ -87,6 +89,7 @@ export class DeviceBook {
       push: Boolean(r.push),
       ...(r.path ? { path: r.path } : {}),
       ...(r.note ? { note: r.note } : {}),
+      ...(r.client ? { client: r.client } : {}),
     }));
   }
 
