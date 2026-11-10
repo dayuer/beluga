@@ -2,6 +2,7 @@ import type { Autonomy, Plan } from '../core/plans/model.js';
 import { planTitle, reviewState } from '../core/plans/model.js';
 import type { Store, StudioGateNeed } from '../core/store.js';
 import { OPID_KEEP_MS } from './actions.js';
+import { changesSummary } from './draft.js';
 import { refOf, type StudioConfig } from './keys.js';
 import type { StudioGate } from './protocol.js';
 
@@ -208,7 +209,7 @@ export class StudioGates {
         const plan = this.plan(g.planId);
         if (!plan) return [];
         const body = plan.draft ?? plan.body;
-        const added = this.addedOf(plan);
+        const added = changesSummary(plan)?.added;
         return [
           {
             id: g.id,
@@ -334,25 +335,6 @@ export class StudioGates {
 
   private pointsOf(plan: Plan): number {
     return ((plan.draft ?? plan.body)?.milestones ?? []).reduce((total, m) => total + m.tasks.reduce((sum, t) => sum + (t.estimate ?? 0), 0), 0);
-  }
-
-  /** What a changes Gate adds, for its card (BLG-80's changesSummary does the same for the customer). */
-  private addedOf(plan: Plan): { milestones: number; tasks: number; points: number } | undefined {
-    if (!plan.body || !plan.draft) return undefined;
-    const before = new Map(plan.body.milestones.map((m) => [m.id, m]));
-    const hadTasks = new Set(plan.body.milestones.flatMap((m) => m.tasks.map((t) => t.id)));
-    let milestones = 0;
-    let tasks = 0;
-    let points = 0;
-    for (const m of plan.draft.milestones) {
-      if (!before.has(m.id)) milestones++;
-      for (const t of m.tasks) {
-        if (hadTasks.has(t.id)) continue;
-        tasks++;
-        points += t.estimate ?? 0;
-      }
-    }
-    return { milestones, tasks, points };
   }
 
   private note(channel: string, text: string): void {

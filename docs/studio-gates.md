@@ -505,9 +505,11 @@ stateDiagram-v2
   被标成 customer 的，每个（计划、任务、draftRev）在 `plan.home` 发一次警告，然后**不**给客户。`view.ts` 的
   `decisionsOf` 改用同一个过滤器和编号（`studioDecisions`），只保留一份实现。客户答别的 qid 由
   `callRefusal('questions.answer')` 的 `decide:` 前缀加 `checkAction` 的 audience 判断双重拦下。
-- **草稿（BLG-80）**：`changesSummary(plan)` 给 changes Gate 卡提供 `added`；`draft.discard` 在收件箱的同一个
-  同步段里比对 `draftRev` 再 `exec.discard`；`draft.apply` 走 Gate（kind `changes`），由 gates 绑定 `draftRev`。
-  没有开工的计划不显示差异卡（`draftDiffOf` 只在 `plan.body && plan.draft` 时出现），主按钮是“确认计划”。
+- **草稿（BLG-80）**：`changesSummary(plan)`（`src/studio/draft.ts`）给 changes Gate 卡提供 `added`，gates 的
+  `needs()` 直接用它；客户视图的差异卡仍由 `view.ts` 的 `draftDiffOf` 生成，两边都剔除 `hiddenFromCustomer` 的
+  任务。`draft.discard` 在收件箱的同一个同步段里比对 `draftRev` 再 `exec.discard`；`draft.apply` 走 Gate（kind
+  `changes`），由 gates 绑定 `draftRev`。没有开工的计划不显示差异卡（`draftDiffOf` 只在 `plan.body && plan.draft`
+  时出现），主按钮是“确认计划”。
 
 ## 7. 测试要点（文件名按通过标准）
 
