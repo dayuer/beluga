@@ -132,9 +132,9 @@ onAppOpen(customerId: string, projectId: string, deps: Deps): Promise<Effect[]>;
 | `TURNS_PAGE` | 50 | 一次读 turns 的条数（上限 50） |
 | `VIEW_TURNS` | 50 | 视图里带的最近 turns（协议上限） |
 | `DELIVER_MAX` | 50 | 一次 `take` 最多取走的条数 |
-| `RATE_PER_MIN` | 20 | 每客户每计划每分钟的动作条数 |
-| `RATE_PER_DAY` | 300 | 每客户每计划每天的动作条数 |
-| `RATE_CHARS_PER_DAY` | 50 000 | 每客户每计划每天客户文字总量（设计 §3.5） |
+| `RATE_PER_MIN` | 20 | 每客户每项目每分钟的动作条数（有该计划视图时细分为项目+计划） |
+| `RATE_PER_DAY` | 300 | 每客户每项目每天的动作条数（同上） |
+| `RATE_CHARS_PER_DAY` | 50 000 | 每客户每项目每天客户文字总量（设计 §3.5；只有带文字的 kind 计） |
 | `PREVIEW_TTL_MS` | 15 分钟 | 预览链接签名有效期（P2） |
 | `OUTBOX_TTL_MS` | 15 分钟 | 魔法链接在 outbox 的保留期 |
 | `ALERTS_KEEP` | 200 | 每工作室保留的 alert 条数 |
@@ -238,6 +238,9 @@ P1 用邮箱魔法链接。**没有开放注册**；只有运营者邀请过、�
 - 生成 32 字节令牌 → `b64url`（43 字符），存 `sha256Hex(token)`，15 分钟，单用。
 - 链接：`<HUB_ORIGIN>/login#token=<token>`（`HUB_ORIGIN` 是 Worker 变量，本地 `http://localhost:8787`）。
   **token 放 fragment**，不会进服务器日志或 Referer。
+  `HUB_ORIGIN` 缺失或不是绝对 http(s) origin 时**拒发链接**：`POST /v1/login` 仍 202 但不发信，管理页的
+  `login-link` 回 503 `hub-origin-missing`。**绝不用请求的 Host 兜底**（否则攻击者的 Host 能把 token 引到
+  自己的域名）。
 - 交给 `Mailer.send(email, link)`。P1 两种实现，按变量 `MAIL_MODE` 选：
   - `console`：只在开发日志里打印链接（整条链接是凭证，线上不要用）；
   - `outbox`：写 D1 `outbox(id, customer_id, link, created_at, expires_at=now+15min)`，管理页显示，
@@ -616,7 +619,8 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
 | 429 | `rate-limited` | 频率 |
 | 500 | `internal` | 未预期错误；不返回堆栈、不记正文 |
 
-日志只记 `{route, status, ms}` 与帧类型/大小；**不记请求体、邮箱、令牌、链接、客户文字**。
+日志只记 `{route, status, ms}` 与帧类型/大小；**不记请求体、邮箱、令牌、链接、客户文字**。`MAIL_MODE`
+默认是 `outbox`；`console` 只打印“login link issued”，不打印邮箱或链接（凭证不进日志）。
 
 ## 7. 队列、opId 与频率（`src/net/studio/queue.ts`）
 
@@ -625,18 +629,24 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
 入口：`enqueue(frame, ctx, deps)`，`ctx = {studio, projectId, customerId, projectName?}`。步骤：
 
 1. **解析**：`StudioAction.safeParse(frame)`（strict）。失败时若能取出合法 `opId`（`opIdOf`），按
-   `checkAction` 的规则回 `refused`（`bad-args` 或 `not-allowed`）并记 ops；否则 400。
-2. **opKey**：`opKey({studio, plan: planRef, project: projectId}, opId)`（`actions.ts` 原样；`opId` 小写）。
-   `plan.create` 没有 `planRef`，作用域是 `new:<Studio 项目 id>`。
-3. **回执优先**：`StudioStore.op(opKey)` 存在 → 直接返回它的**当前**状态（queued/done/refused/expired）。
-   **幂等重发不受频率限制影响**，所以这一步在限频之前（见 §15 差异说明）。
-4. **频率**（只对 `chat.send`、`decision.answer`、`milestone.sendBack`，以及带文本的 `plan.create`）：
-   - 每客户每计划每分钟 ≤ 20 条；
+   `checkAction` 的规则回 `refused`（`bad-args` 或 `not-allowed`）并记 ops；否则 400。坏帧也要走到限频。
+2. **opKey**：`opKey({studio, plan: planRef, project: projectId}, opId)`（`actions.ts` 原样；键为
+   **studio、project、plan、opId**，`opId` 小写）。同一工作室的两个项目可以各有一个 `plan1`，所以 project 必须
+   在键里。`plan.create` 没有 `planRef`，plan 段是 `new`。
+3. **成员**：`hub.canAccess(customerId, projectId)` 不通过 → 403 `not-yours`。HTTP 路由的 `appGuard` 也先判一次，
+   这里是 DO 自己的第二道。
+4. **过期与回执优先**：先 `expire(now)`（7 天前的 queued/taken 变 expired），再查 `StudioStore.op(opKey)`：
+   存在 → 返回它的**当前**状态（queued/done/refused/expired）。**幂等重发不受频率限制影响**，所以这一步在限频
+   之前（见 §15 差异说明）。
+5. **频率**（**所有**帧都计入，包括坏帧和命名了不存在计划的帧）：
+   - 每客户每项目每分钟 ≤ 20 条；
    - 每天 ≤ 300 条（按 `now - now % DAY_MS` 的 UTC 日，不随本地时区变化）；
-   - 当天客户文字总量 ≤ 50 000 字（`chars` = 各字段长度之和：`chat.send.text`、
-     `milestone.sendBack.reason`、`decision.answer.text`、`plan.create.goal`）。
+   - 键是（客户、项目）；只有当该项目确实有这份缓存视图时，才细分为（客户、项目、计划）——键不来自可无限
+     取名的新请求字段；
+   - 带文字的 kind 额外计当天总量 ≤ 50 000 字（`chars` = 各字段长度之和：`chat.send.text`、
+     `milestone.sendBack.reason`、`decision.answer.text`、`plan.create.goal`）；
    - 超了 → 记 ops `refused/rate-limited`，返回回执 `refused`。
-5. **合成 PlanFacts**（从该计划的缓存视图）：
+6. **合成 PlanFacts**（从该计划的缓存视图）：
    ```ts
    { id: planRef, home: 'hub', started: stage !== 'drafting' && stage !== 'awaiting-start',
      draftRev: view.draftRev,
@@ -647,16 +657,16 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
    缓存里的决策已经是"只给客户的"（`view.ts` 构造时过滤），所以 `audience` 恒为 `customer`；
    `qid` 在 hub 侧没有意义，用 `''` 占位（daemon 执行时用自己状态里的真 qid）。`ctx.projectId` 是
    **daemon 项目 id**（来自映射）；没有映射时 `plan.create` 会被 `checkAction` 判 `not-yours`。
-   `seen` 传 `() => undefined`（第 3 步已经处理过重放）。
-6. **`checkAction`**（`src/studio/actions.ts`，与 daemon 同一份）：
+   `seen` 传 `() => undefined`（第 4 步已经处理过重放）。
+7. **`checkAction`**（`src/studio/actions.ts`，与 daemon 同一份）：
    - `refused` → 记 ops `refused/code`，返回回执；
-   - `replay`（理论上第 3 步已拦）→ 返回该回执；
+   - `replay`（理论上第 4 步已拦）→ 返回该回执；
    - `call` / `gate` → **合法**。入队的是**原帧**，不是 `call`。daemon 收到后自己再跑一次
      `checkAction`，得到它那边的 `call`/`gate`，并且 `callRefusal` 再兜一层。
-7. **入队**：`INSERT INTO queue(op_key UNIQUE, op_id, project_id, plan_ref, customer_id, kind,
-   frame_json, state='queued', enqueued_at=now)`；同时在 `ops` 记 `queued`。`op_key` 唯一冲突 → 回到第 3 步
+8. **入队**：`INSERT INTO queue(op_key UNIQUE, op_id, project_id, plan_ref, customer_id, kind,
+   frame_json, state='queued', enqueued_at=now)`；同时在 `ops` 记 `queued`。`op_key` 唯一冲突 → 回到第 4 步
    （并发重发）。
-8. **回执**：立刻返回 `{"t":"receipt","opId","state":"queued",..."planRef"}`；若该项目的 daemon
+9. **回执**：立刻返回 `{"t":"receipt","opId","state":"queued",..."planRef"}`；若该项目的 daemon
    已 `synced`，接着 `take` 并投递（§7.2）。
 
 队列条目字段就是上表 `queue` 的列；`frame_json` 是原帧（含 `t:'action'`、opId、kind、payload），
@@ -738,7 +748,8 @@ M2 只写函数与测试，**不上线**（M3 加线上增量帧时用）：
 
 - `rev === 当前 rev + 1` 才应用；否则丢弃，回 `{t:'resync', project, planRef}`（让 daemon 推全量）。
 - `set` 是 `StudioPlanView` 的顶层字段补丁；合并后**整份再过 strict schema**，失败则丢弃、写 alert、
-  回 `resync`，不覆盖旧缓存。
+  回 `resync`，不覆盖旧缓存。`set` **不能改 `planRef`**（与请求里的不一致就拒），否则 rev 校验的行和写入的行
+  会不是同一份计划。
 - `turns` 用与全量相同的合并、排序、截 500。
 - 全量快照永远可以覆盖增量状态；增量不能"降级"全量。
 
@@ -898,8 +909,9 @@ P1 的规模远低于上限。
 - **样式**：按 `packages/companion/lib/theme.ts` 的中性灰 token（`#` 值直接内联；管理页不是手机 App，
   但保持同一套灰阶与圆角）。
 - **安全头**（Worker 加）：
-  `Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'`，
-  `X-Content-Type-Options: nosniff`，`Referrer-Policy: no-referrer`。
+  `Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`，
+  `X-Frame-Options: DENY`，`X-Content-Type-Options: nosniff`，`Referrer-Policy: no-referrer`，
+  `Cache-Control: no-store`（管理页与所有 API 响应；管理详情里有 outbox 登录链接）。
 - M2 的页面验收用 `packages/studio-hub/scripts/fake-daemon.mjs` 模拟登记 + 连接，让"已连接的 daemon"
   出现一行；截图存 `.beluga/scratch/`（BLG-61）。
 
@@ -966,12 +978,13 @@ $ grep -rn "from '.*src/" packages/studio-hub/src
 
 ## 15. 与设计文档的差异与理由
 
-1. **频率多了"每天 5 万字"**：M2 设计给的是 20 次/分、300 次/天。按协议单条上限 4000 字，
-   300 条最坏是 120 万字，挡不住把大量文字塞进 agent。设计 §3.5 明确"每天对话总字数 ≤ 50 000 字
-   （中台入队时限）"，因此在 `rate` 表加了 `chars` 列并同时校验。条数仍用 20/分、300/天。
-2. **回执先于限频**：设计 §6 的步骤 1 是频率、3 是 `checkAction`。实现把"opId 已有回执"提到限频之前，
-   否则客户端在回执丢失后重发会被 `rate-limited` 挡住，违背"同一 opId 永远拿到第一次的结果"。
-   其余顺序不变。
+1. **频率多了"每天 5 万字"，并且覆盖所有动作**：M2 设计给的是 20 次/分、300 次/天，只对带文字的动作。
+   实现保留这些数，另加设计 §3.5 的"每天对话总字数 ≤ 50 000 字"（`rate.chars`），并且**所有动作**都计入
+   条数：坏帧、`plan.verify` 这类零文字动作也能刷 DO 存储/队列。键是（客户、项目），只有该项目真有这份计划
+   视图时才细分为（客户、项目、计划），请求里的 `planRef` 不能用来造无限多个新桶（审计 M2-2/M2-8）。
+2. **顺序**：设计 §6 是频率先于 `checkAction`。实现是：成员 → `expire` → opId 回执 → 频率 → `checkAction`。
+   成员先是为了被移除的客户连旧回执都拿不到；`expire` 先是为了第 8 天重放不再返回 stale `queued`；
+   回执先于限频是为了幂等重发不被 `rate-limited` 挡住（审计 M2-3/M2-15）。
 3. **`patch` 帧 M2 不上线**：设计 §8 把它列进 `DaemonUp` 并注明"预留，M3 定稿"。M2 只实现
    `ingestPatch` 函数与测试，线上收到 `patch` 回 `resync`；M3 再把它加入信封联合。理由是不让一个
    未定稿的增量格式进入线上校验。
@@ -984,6 +997,11 @@ $ grep -rn "from '.*src/" packages/studio-hub/src
    的约束。mailbox 没有可参照的 WS，所以这是新代码；端到端靠 fake daemon 验证。
 7. **删除客户后再次邀请**：设计没写。本文定为"删墓碑、建新账号"（旧数据已清），避免 UNIQUE 邮箱让
    运营者永远无法重新邀请。
+8. **opKey 含 projectId**：设计 §5.3 的作用域写（工作室、计划），`plan.create` 写（工作室、项目）。实现把
+   projectId 放进所有键：同一工作室的两个项目可以各有一个 `plan1`（daemon 各自命名），不分开会让回执与
+   限频串项目（审计 M2-16）。M3 daemon 必须用同一个 `actions.opKey`。
+9. **`HUB_ORIGIN` fail closed**：设计只说链接用 `HUB_ORIGIN`；实现不允许缺失时退回请求 Host，见 §3.4
+   （审计 M2-10）。
 
 ## 16. 不在本里程碑
 

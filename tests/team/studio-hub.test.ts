@@ -14,6 +14,7 @@ import {
   internalAuthOf,
   newLinkCode,
   normalizeLinkCode,
+  onDaemonMessage,
   routeOf,
   type ConnectCheck,
   type Deps,
@@ -208,7 +209,7 @@ describe('a daemon connection is signed', () => {
 
     // A replay of the same accepted timestamp is refused; one millisecond later is fine.
     const at = w.deps.now;
-    await w.studio.putConn({ daemonId, lastAt: at, connectedAt: at, lastSeenAt: at, synced: false });
+    await w.studio.putConn({ daemonId, lastAt: at, connectedAt: at, lastSeenAt: at, hello: true, synced: false });
     expect(await connect(w.deps, daemonId, identity, at)).toMatchObject({ ok: false, status: 409, error: 'replayed' });
     expect((await connect(w.deps, daemonId, identity, at + 1)).ok).toBe(true);
 
@@ -230,6 +231,29 @@ describe('a daemon connection is signed', () => {
     expect(wrong.status).toBe(403);
     const notDaemon = await handleStudioRequest(upgrade, { ...w.deps, studio: w.studio, studioId: 'st_test' }, { role: 'operator' });
     expect(notDaemon.status).toBe(403);
+  });
+
+  it('enforces hello, then the full snapshots, then synced before any delivery', async () => {
+    const w = await world();
+    const daemonId = 'D'.repeat(32);
+    const at = w.deps.now;
+    await w.studio.putConn({ daemonId, lastAt: at, connectedAt: at, lastSeenAt: at, hello: false, synced: false });
+    const deps = { ...w.deps, studio: w.studio, studioId: 'st_test' };
+
+    const stale = await onDaemonMessage(daemonId, JSON.stringify({ t: 'synced' }), deps, at - 1);
+    expect(stale).toEqual([expect.objectContaining({ to: 'close', tag: `daemon:${daemonId}`, code: 4002 })]);
+
+    const early = await onDaemonMessage(daemonId, JSON.stringify({ t: 'synced' }), deps);
+    expect(early).toEqual([expect.objectContaining({ to: 'close', tag: `daemon:${daemonId}`, code: 4003 })]);
+    expect((await w.studio.conn(daemonId))?.synced).toBe(false);
+
+    const hello = await onDaemonMessage(daemonId, JSON.stringify({ t: 'hello', proto: { major: 1, minor: 0 }, daemon: daemonId, projects: [] }), deps);
+    expect(hello).toEqual([expect.objectContaining({ to: 'daemon', msg: expect.objectContaining({ t: 'welcome', studio: 'st_test' }) })]);
+    expect((await w.studio.conn(daemonId))?.hello).toBe(true);
+
+    const synced = await onDaemonMessage(daemonId, JSON.stringify({ t: 'synced' }), deps);
+    expect(synced).toEqual([]);
+    expect((await w.studio.conn(daemonId))?.synced).toBe(true);
   });
 });
 

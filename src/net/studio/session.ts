@@ -35,11 +35,24 @@ export function bearerOf(req: Request): string | undefined {
   return token !== undefined && token.length <= 512 ? token : undefined;
 }
 
+/** An absolute http(s) origin with no path: the one thing a magic link may be built from. */
+export const isOrigin = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.pathname === '/' && url.search === '' && url.hash === '';
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Make one magic link for a customer (already invited or active), mail it, and hand it back; the
- * admin page shows it for a manual forward. `rate-limited` after five an hour for one email.
+ * admin page shows it for a manual forward. `rate-limited` after five an hour for one email, and
+ * `no-origin` when HUB_ORIGIN is missing or not an absolute http(s) origin: a link built from the
+ * request's Host would point wherever an attacker's Host header says.
  */
-export async function issueLoginLink(customer: Customer, deps: SessionDeps): Promise<{ readonly link: string; readonly expiresAt: number } | 'rate-limited'> {
+export async function issueLoginLink(customer: Customer, deps: SessionDeps): Promise<{ readonly link: string; readonly expiresAt: number } | 'rate-limited' | 'no-origin'> {
+  if (!isOrigin(deps.origin)) return 'no-origin';
   const token = randomToken(32, deps.random);
   const kept = await deps.hub.createLoginToken({ tokenHash: await sha256Hex(token), customerId: customer.id, now: deps.now, ttl: LOGIN_TOKEN_TTL_MS, maxPerHour: LOGIN_PER_EMAIL_PER_HOUR });
   if (!kept) return 'rate-limited';

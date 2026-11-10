@@ -26,8 +26,8 @@ restarts; delete it to start clean.
 | Variable | What |
 |---|---|
 | `OPERATOR_TOKEN` | the admin page's bearer token; hash-compared in the rules |
-| `MAIL_MODE` | `outbox` (links in D1, shown on the admin page) or `console` (dev log) |
-| `HUB_ORIGIN` | the public origin used in magic links (`http://localhost:8787` locally) |
+| `MAIL_MODE` | `outbox` by default (links in D1, shown on the admin page); `console` only logs "link issued", never the token |
+| `HUB_ORIGIN` | the public origin used in magic links (`http://localhost:8787` locally); required for links — with no absolute http(s) origin here, the hub refuses to issue one instead of trusting the request Host |
 | `PREVIEW_SECRET` | P2 only; P1 never signs a preview link |
 
 ## Routes
@@ -48,5 +48,6 @@ and, for a daemon, the signature and replay.
 
 When P1 gets a public home: `wrangler login`, `wrangler d1 create synon-studio`, put the returned
 `database_id` in `wrangler.toml`, `wrangler d1 execute synon-studio --remote --file schema.sql`,
-`wrangler secret put OPERATOR_TOKEN`, `wrangler deploy`. Free plan: D1 plus SQLite Durable Objects
+`wrangler secret put OPERATOR_TOKEN`, set `HUB_ORIGIN` to the deployed URL (without it, magic links
+are refused), `wrangler deploy`. Free plan: D1 plus SQLite Durable Objects
 (`new_sqlite_classes`), the same as `packages/mailbox`.

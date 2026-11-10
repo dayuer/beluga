@@ -57,7 +57,7 @@ async function world(): Promise<World> {
   await hub.createDaemon({ id: 'd1', studioId: st.id, publicKey: 'views-test-key', name: 'Mac', now: clock.now });
   await hub.replaceDaemonProjects('d1', [{ id: 'dp1', name: 'api' }], clock.now);
   await hub.bindProject({ projectId: 'p1', daemonId: 'd1', daemonProjectId: 'dp1', now: clock.now });
-  await studio.putConn({ daemonId: 'd1', lastAt: clock.now - 1, connectedAt: clock.now, lastSeenAt: clock.now, synced: true });
+  await studio.putConn({ daemonId: 'd1', lastAt: clock.now - 1, connectedAt: clock.now, lastSeenAt: clock.now, hello: true, synced: true });
   const deps: StudioDeps = {
     hub,
     studio,
@@ -118,6 +118,17 @@ describe('a customer logs in with a magic link', () => {
     await w.hub.removeCustomer('c1', w.deps.now);
     await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), w.deps);
     expect(w.sent).toHaveLength(1);
+  });
+
+  it('refuses to build a link without a configured origin', async () => {
+    const w = await world();
+    const noOrigin = { ...w.deps, origin: '' };
+    const login = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), noOrigin);
+    expect(login.status).toBe(202);
+    expect(w.sent).toHaveLength(0);
+    const link = await handleHubRequest(request('POST', '/v1/admin/customers/c1/login-link', { token: 'operator' }), noOrigin);
+    expect(link.status).toBe(503);
+    expect((bodyOf(link) as { error: string }).error).toBe('hub-origin-missing');
   });
 
   it('caps the mail per email at five an hour', async () => {
@@ -188,7 +199,7 @@ describe('a view is read by its own project only', () => {
   it('serves the last snapshot when the daemon is offline', async () => {
     const w = await world();
     await ingestPlan('d1', { project: 'dp1', frame: { t: 'plan', rev: 1, view } }, w.deps);
-    await w.studio.putConn({ daemonId: 'd1', lastAt: w.deps.now, lastSeenAt: w.deps.now, synced: false });
+    await w.studio.putConn({ daemonId: 'd1', lastAt: w.deps.now, lastSeenAt: w.deps.now, hello: true, synced: false });
     const got = await get('/v1/app/projects/p1/plans/plan1', appAuth(), w);
     expect(got.status).toBe(200);
     expect((bodyOf(got).view as { title: string }).title).toBe('客户 App');
@@ -249,6 +260,11 @@ describe('the cache trusts only the strict view', () => {
 
     const bad = await ingestPatch('d1', { project: 'dp1', planRef: 'plan1', rev: 3, set: { extra: 1 } }, w.deps);
     expect(bad).toMatchObject({ ok: false, alert: 'bad-view' });
+    expect((await readView('p1', 'plan1', w.deps))?.view.title).toBe('v2');
+
+    // A patch can't move the plan to another ref.
+    const moved = await ingestPatch('d1', { project: 'dp1', planRef: 'plan1', rev: 3, set: { planRef: 'plan2' } }, w.deps);
+    expect(moved).toMatchObject({ ok: false, alert: 'bad-view' });
     expect((await readView('p1', 'plan1', w.deps))?.view.title).toBe('v2');
   });
 });

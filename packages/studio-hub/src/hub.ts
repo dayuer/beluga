@@ -7,6 +7,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   alwaysAllow,
+  appSocketAllowed,
   handleStudioRequest,
   internalAuthOf,
   onAppOpen,
@@ -91,6 +92,7 @@ const TABLES: readonly string[] = [
      last_at      INTEGER NOT NULL,
      connected_at INTEGER,
      last_seen_at INTEGER NOT NULL,
+     hello        INTEGER NOT NULL DEFAULT 0,
      synced       INTEGER NOT NULL DEFAULT 0
    )`,
   'CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, daemon_id TEXT, what TEXT NOT NULL)',
@@ -106,7 +108,10 @@ export class StudioHub extends DurableObject<Env> {
     for (const statement of TABLES) this.sql.exec(statement);
     // Application-level keepalive: answered without waking the object.
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
-    void ctx.storage.setAlarm(Date.now() + DAY_MS);
+    // Do not push an existing alarm forward on every hibernation wake: expire/prune would starve.
+    void ctx.storage.getAlarm().then((alarm) => {
+      if (alarm === null) void ctx.storage.setAlarm(Date.now() + DAY_MS);
+    });
   }
 
   private store(): DoStudioStore {
@@ -164,7 +169,7 @@ export class StudioHub extends DurableObject<Env> {
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], daemonTags(daemonId));
     pair[1].serializeAttachment({ role: 'daemon', daemonId, at } satisfies DaemonAttachment);
-    await deps.studio.putConn({ daemonId, lastAt: at, connectedAt: deps.now, lastSeenAt: deps.now, synced: false });
+    await deps.studio.putConn({ daemonId, lastAt: at, connectedAt: deps.now, lastSeenAt: deps.now, hello: false, synced: false });
     await this.apply(await onDaemonOpen(daemonId, deps));
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
@@ -172,6 +177,17 @@ export class StudioHub extends DurableObject<Env> {
   /** A customer's project socket: membership was checked by the Worker and is checked again. */
   private async acceptApp(auth: AppAttachment, deps: StudioDeps): Promise<Response> {
     if (!(await deps.hub.canAccess(auth.customerId, auth.projectId))) return jsonOf({ error: 'not-yours' }, 403);
+    // A customer may have a few devices; beyond 32 in a studio, the oldest go (design §11.4).
+    const open = this.ctx.getWebSockets(`cust:${auth.customerId}`);
+    if (open.length >= 32) {
+      for (const old of open.slice(0, open.length - 31)) {
+        try {
+          old.close(1000, 'too-many');
+        } catch {
+          // Already closed.
+        }
+      }
+    }
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1], appTags(auth.customerId, auth.projectId, auth.sessionHash));
     pair[1].serializeAttachment({ role: 'app', customerId: auth.customerId, projectId: auth.projectId, ...(auth.sessionHash !== undefined ? { sessionHash: auth.sessionHash } : {}) } satisfies AppAttachment);
@@ -186,20 +202,29 @@ export class StudioHub extends DurableObject<Env> {
     const att = attachmentOf(ws);
     if (att?.role !== 'daemon') return; // customers act over HTTP only
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
-    await this.apply(await onDaemonMessage(att.daemonId, raw, await this.deps()));
+    await this.apply(await onDaemonMessage(att.daemonId, raw, await this.deps(), att.at));
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     const att = attachmentOf(ws);
     if (att?.role === 'daemon') await this.apply(await onDaemonClose(att.daemonId, att.at, await this.deps()));
-    ws.close(code, reason);
+    // 1006 is "closed abnormally" and cannot be sent in a close frame; the socket is already gone.
+    try {
+      if (code !== 1006) ws.close(code, reason);
+    } catch {
+      // Already closed.
+    }
   }
 
   async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
     void error;
     const att = attachmentOf(ws);
     if (att?.role === 'daemon') await this.apply(await onDaemonClose(att.daemonId, att.at, await this.deps()));
-    ws.close(1011, 'internal');
+    try {
+      ws.close(1011, 'internal');
+    } catch {
+      // Already closed.
+    }
   }
 
   private async apply(effects: readonly Effect[]): Promise<void> {
@@ -213,7 +238,18 @@ export class StudioHub extends DurableObject<Env> {
           }
         }
       } else if (effect.to === 'app') {
+        const deps = await this.deps();
         for (const ws of this.ctx.getWebSockets(`app:${effect.projectId}`)) {
+          const att = attachmentOf(ws);
+          // The close after a removal/logout is best effort; the gate is this per-send check.
+          if (att?.role !== 'app' || !(await appSocketAllowed(att.customerId, effect.projectId, att.sessionHash, deps))) {
+            try {
+              ws.close(4004, 'not-yours');
+            } catch {
+              // Already closed.
+            }
+            continue;
+          }
           try {
             ws.send(JSON.stringify(effect.frame));
           } catch {

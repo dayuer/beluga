@@ -45,7 +45,7 @@ async function setup(): Promise<World> {
   await hub.replaceDaemonProjects('d1', [{ id: 'dp1', name: 'api' }], clock.now);
   await hub.bindProject({ projectId: 'p1', daemonId: 'd1', daemonProjectId: 'dp1', now: clock.now });
   await studio.putView({ projectId: 'p1', planRef: 'plan1', rev: 1, viewJson: JSON.stringify(view), updatedAt: clock.now });
-  await studio.putConn({ daemonId: 'd1', lastAt: clock.now - 1, connectedAt: clock.now, lastSeenAt: clock.now, synced: true });
+  await studio.putConn({ daemonId: 'd1', lastAt: clock.now - 1, connectedAt: clock.now, lastSeenAt: clock.now, hello: true, synced: true });
   const deps: QueueDeps = {
     hub,
     studio,
@@ -62,6 +62,7 @@ const apply = (n: number, draftRev = 3): unknown => ({ t: 'action', opId: uuid(n
 const start = (n: number, draftRev = 3): unknown => ({ t: 'action', opId: uuid(n), kind: 'plan.requestStart', planRef: 'plan1', payload: { draftRev } });
 const answer = (n: number, picks: string[]): unknown => ({ t: 'action', opId: uuid(n), kind: 'decision.answer', planRef: 'plan1', payload: { decisionId: 'd-m0-t0', picks } });
 const create = (n: number): unknown => ({ t: 'action', opId: uuid(n), kind: 'plan.create', payload: { goal: '做一个预约页面', platforms: ['web'] } });
+const verify = (n: number): unknown => ({ t: 'action', opId: uuid(n), kind: 'plan.verify', planRef: 'plan1', payload: {} });
 
 const receiptOf = (r: Awaited<ReturnType<typeof enqueue>>): { state: string; code?: string } => {
   expect(r.ok).toBe(true);
@@ -124,6 +125,14 @@ describe('project membership and stale drafts', () => {
     expect(await enqueue(chat(12), w.ctx, w.deps)).toEqual({ ok: false, status: 403, error: 'not-yours' });
   });
 
+  it('does not answer an old opId receipt to a customer removed from the project', async () => {
+    const w = await setup();
+    expect(receiptOf(await enqueue(chat(13), w.ctx, w.deps))).toEqual({ state: 'queued' });
+    await w.hub.removeMember('p1', 'c1');
+    // Without the membership check first, the replay would return the old `queued` receipt.
+    expect(await enqueue(chat(13), w.ctx, w.deps)).toEqual({ ok: false, status: 403, error: 'not-yours' });
+  });
+
   it('refuses stale draftRev with `stale`, and lets the fresh one through', async () => {
     const w = await setup();
     expect(receiptOf(await enqueue(pass(20, 2), w.ctx, w.deps))).toEqual({ state: 'refused', code: 'stale' });
@@ -162,7 +171,7 @@ describe('the queue itself', () => {
 
     // A daemon that hasn't pushed its views yet gets nothing.
     const w2 = await setup();
-    await w2.studio.putConn({ daemonId: 'd1', lastAt: w2.deps.now, connectedAt: w2.deps.now, lastSeenAt: w2.deps.now, synced: false });
+    await w2.studio.putConn({ daemonId: 'd1', lastAt: w2.deps.now, connectedAt: w2.deps.now, lastSeenAt: w2.deps.now, hello: true, synced: false });
     await enqueue(chat(43), w2.ctx, w2.deps);
     expect((await take('d1', w2.deps)).deliver).toHaveLength(0);
   });
@@ -203,6 +212,52 @@ describe('the queue itself', () => {
     const chars = await setup();
     for (let i = 0; i < 12; i++) expect(receiptOf(await enqueue(chat(200 + i, 'x'.repeat(4000)), chars.ctx, chars.deps))).toEqual({ state: 'queued' });
     expect(receiptOf(await enqueue(chat(220, 'x'.repeat(4000)), chars.ctx, chars.deps))).toEqual({ state: 'refused', code: 'rate-limited' });
+  });
+
+  it('limits every action, not only the ones with text', async () => {
+    const w = await setup();
+    for (let i = 0; i < 20; i++) expect(receiptOf(await enqueue(verify(300 + i), w.ctx, w.deps))).toEqual({ state: 'queued' });
+    expect(receiptOf(await enqueue(verify(330), w.ctx, w.deps))).toEqual({ state: 'refused', code: 'rate-limited' });
+  });
+
+  it('counts malformed frames and unknown plans against the same budget', async () => {
+    const w = await setup();
+    for (let i = 0; i < 20; i++) {
+      const bad = { t: 'action', opId: uuid(500 + i), kind: 'chat.send', planRef: 'plan1', payload: { text: '' } };
+      expect(receiptOf(await enqueue(bad, w.ctx, w.deps))).toEqual({ state: 'refused', code: 'bad-args' });
+    }
+    const over = { t: 'action', opId: uuid(530), kind: 'chat.send', planRef: 'plan1', payload: { text: '' } };
+    expect(receiptOf(await enqueue(over, w.ctx, w.deps))).toEqual({ state: 'refused', code: 'rate-limited' });
+
+    const other = await setup();
+    for (let i = 0; i < 20; i++) {
+      const ghost = { t: 'action', opId: uuid(540 + i), kind: 'chat.send', planRef: `junk${i}`, payload: { text: 'hi' } };
+      expect(receiptOf(await enqueue(ghost, other.ctx, other.deps))).toEqual({ state: 'refused', code: 'unknown-plan' });
+    }
+    const ghostOver = { t: 'action', opId: uuid(570), kind: 'chat.send', planRef: 'junk-new', payload: { text: 'hi' } };
+    expect(receiptOf(await enqueue(ghostOver, other.ctx, other.deps))).toEqual({ state: 'refused', code: 'rate-limited' });
+  });
+
+  it('scopes an opId and the rate budget by project too', async () => {
+    const w = await setup();
+    await w.hub.createProject({ id: 'p2', studioId: w.ctx.studio, name: '项目二', now: w.deps.now });
+    await w.hub.addMember('p2', 'c1', w.deps.now);
+    await w.hub.bindProject({ projectId: 'p2', daemonId: 'd1', daemonProjectId: 'dp2', now: w.deps.now });
+    await w.studio.putView({ projectId: 'p2', planRef: 'plan1', rev: 1, viewJson: JSON.stringify(view), updatedAt: w.deps.now });
+
+    expect(receiptOf(await enqueue(chat(600), w.ctx, w.deps))).toEqual({ state: 'queued' });
+    // The same opId in the other project is another action: both projects have a planRef "plan1".
+    expect(receiptOf(await enqueue(chat(600), { ...w.ctx, projectId: 'p2' }, w.deps))).toEqual({ state: 'queued' });
+    const taken = await take('d1', w.deps);
+    expect(taken.deliver.map((d) => d.action.opId)).toEqual([uuid(600), uuid(600)]);
+    expect(taken.deliver.map((d) => d.daemonProjectId)).toEqual(['dp1', 'dp2']);
+  });
+
+  it('expires an old queued entry before answering a replay', async () => {
+    const w = await setup();
+    expect(receiptOf(await enqueue(chat(700), w.ctx, w.deps))).toEqual({ state: 'queued' });
+    w.advance(QUEUE_TTL_MS + 1);
+    expect(receiptOf(await enqueue(chat(700), w.ctx, w.deps))).toEqual({ state: 'expired' });
   });
 
   it('has a receipt keyed by studio and plan, so the same opId in another plan is another action', async () => {

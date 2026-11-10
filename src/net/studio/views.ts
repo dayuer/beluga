@@ -138,6 +138,13 @@ export async function ingestPatch(
     return { ok: false, alert: 'bad-view', effects: [resync(daemonId, input.project, input.planRef)] };
   }
 
+  // A patch may change fields, never which plan the view belongs to.
+  const setPlan = isPlainObject(input.set) ? input.set.planRef : undefined;
+  if (setPlan !== undefined && setPlan !== input.planRef) {
+    await deps.studio.alert(daemonId, 'bad-view', deps.now);
+    return { ok: false, alert: 'bad-view', effects: [resync(daemonId, input.project, input.planRef)] };
+  }
+
   const merged = { ...current, ...(isPlainObject(input.set) ? input.set : {}), ...(input.turns ? { turns: input.turns } : {}) };
   const view = StudioPlanView.safeParse(merged);
   if (!view.success) {

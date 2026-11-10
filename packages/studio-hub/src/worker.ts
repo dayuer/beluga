@@ -36,11 +36,12 @@ async function operatorTokenHash(env: Env): Promise<string> {
 
 /** console (dev: the link in the log) or outbox (D1, for the admin page to forward). */
 function mailerFor(env: Env, hub: D1HubStore, now: number): Deps['mailer'] {
-  const mode = env.MAIL_MODE ?? 'console';
+  // Outbox by default: a magic link is a credential and must not be in a log by default.
+  const mode = env.MAIL_MODE ?? 'outbox';
   return {
     send: async (email, link) => {
       if (mode !== 'outbox') {
-        console.log(`[studio] login link for ${email}: ${link}`);
+        console.log('[studio] login link issued');
         return;
       }
       const customer = await hub.customerByEmail(email);
@@ -104,7 +105,8 @@ export default {
     const route = routeOf(req.method, url.pathname);
     const hub = new D1HubStore(env.DB);
     const now = Date.now();
-    const origin = env.HUB_ORIGIN ?? url.origin;
+    // Never fall back to the request's Host: a magic link built from it could point at an attacker.
+    const origin = env.HUB_ORIGIN ?? '';
 
     if (route.name === 'not-found') return jsonOf({ error: 'not-found' }, 404);
     // The admin page is static; the data behind it needs the operator token.

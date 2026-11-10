@@ -89,7 +89,9 @@ export async function customerLoginLink(cid: string, deps: Deps): Promise<HubRep
   if (!customer) return failure(404, 'unknown-customer');
   if (customer.status === 'removed') return failure(409, 'customer-removed');
   const link = await issueLoginLink(customer, deps);
-  return link === 'rate-limited' ? failure(429, 'rate-limited') : reply(200, link);
+  if (link === 'rate-limited') return failure(429, 'rate-limited');
+  if (link === 'no-origin') return failure(503, 'hub-origin-missing');
+  return reply(200, link);
 }
 
 /** `POST /v1/admin/studios/:sid/projects {name}`: a Studio project, unbound until mapped. */

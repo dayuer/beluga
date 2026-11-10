@@ -109,9 +109,11 @@ export interface HubReply {
 }
 
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
-  'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'",
+  'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
   'referrer-policy': 'no-referrer',
+  'cache-control': 'no-store',
 };
 
 // --- Routing ---
@@ -642,7 +644,7 @@ export async function onDaemonOpen(daemonId: string, deps: StudioDeps): Promise<
  * full `for` snapshots → `synced`, and only then deliveries. A bad frame is alerted and ignored,
  * never closes the socket (a version difference must not start a reconnect storm).
  */
-export async function onDaemonMessage(daemonId: string, raw: string, deps: StudioDeps): Promise<Effect[]> {
+export async function onDaemonMessage(daemonId: string, raw: string, deps: StudioDeps, at?: number): Promise<Effect[]> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
@@ -666,6 +668,10 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
 
   const conn = await deps.studio.conn(daemonId);
   if (!conn) return [{ to: 'close', tag: `daemon:${daemonId}`, code: 4003, reason: 'not-hello' }];
+  // A replaced socket may still deliver queued messages before its close lands: fence it by `at`.
+  if (at !== undefined && conn.lastAt !== at) return [{ to: 'close', tag: `daemon:${daemonId}`, code: 4002, reason: 'replaced' }];
+  // The fixed reconnect order: hello, then the full views, then synced. Nothing else comes first.
+  if (frame.data.t !== 'hello' && !conn.hello) return [{ to: 'close', tag: `daemon:${daemonId}`, code: 4003, reason: 'not-hello' }];
   await deps.studio.putConn({ ...conn, lastSeenAt: deps.now });
 
   switch (frame.data.t) {
@@ -675,6 +681,7 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
         return [{ to: 'daemon', daemonId, msg: { t: 'outdated' } }, { to: 'close', tag: `daemon:${daemonId}`, code: 4001, reason: 'outdated' }];
       }
       await deps.hub.replaceDaemonProjects(daemonId, frame.data.projects, deps.now);
+      await deps.studio.putConn({ ...conn, lastSeenAt: deps.now, hello: true });
       return [{ to: 'daemon', daemonId, msg: { t: 'welcome', studio: deps.studioId, proto: STUDIO_PROTO } }];
     }
 
@@ -692,7 +699,7 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
     }
 
     case 'synced': {
-      await deps.studio.putConn({ ...conn, lastSeenAt: deps.now, synced: true });
+      await deps.studio.putConn({ ...conn, lastSeenAt: deps.now, hello: true, synced: true });
       return delivery(daemonId, deps);
     }
   }
@@ -703,9 +710,23 @@ export async function onDaemonMessage(daemonId: string, raw: string, deps: Studi
 export async function onDaemonClose(daemonId: string, at: number, deps: StudioDeps): Promise<Effect[]> {
   const conn = await deps.studio.conn(daemonId);
   if (!conn || conn.lastAt !== at) return [];
-  await deps.studio.putConn({ daemonId, lastAt: conn.lastAt, lastSeenAt: deps.now, synced: false });
+  await deps.studio.putConn({ daemonId, lastAt: conn.lastAt, lastSeenAt: deps.now, hello: conn.hello, synced: false });
   await deps.studio.requeueTaken(daemonId);
   return [];
+}
+
+/**
+ * Is this socket still allowed to receive the project's broadcasts? Re-checked before every send,
+ * so a failed close (or a removed/logged-out customer whose socket lingers) still learns nothing.
+ */
+export async function appSocketAllowed(customerId: string, projectId: string, sessionHash: string | undefined, deps: StudioDeps): Promise<boolean> {
+  if (sessionHash !== undefined) {
+    const session = await deps.hub.session(sessionHash);
+    if (!session || session.revokedAt !== undefined || session.expiresAt <= deps.now) return false;
+    const customer = await deps.hub.customer(session.customerId);
+    if (!customer || (customer.status !== 'invited' && customer.status !== 'active')) return false;
+  }
+  return deps.hub.canAccess(customerId, projectId);
 }
 
 /** A customer socket was accepted: send the last full view of every cached plan (only to it). */

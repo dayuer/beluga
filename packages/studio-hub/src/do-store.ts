@@ -46,6 +46,7 @@ interface ConnDb {
   readonly last_at: number;
   readonly connected_at: number | null;
   readonly last_seen_at: number;
+  readonly hello: number;
   readonly synced: number;
 }
 interface AlertDb {
@@ -72,7 +73,7 @@ const queueOf = (r: QueueDb): QueueItem => ({
   ...(r.taken_at !== null ? { takenAt: r.taken_at } : {}),
 });
 const opOf = (r: OpDb): OpRow => ({ opKey: r.op_key, state: r.state, ...(r.code !== null ? { code: r.code } : {}), at: r.at, updatedAt: r.updated_at });
-const connOf = (r: ConnDb): Conn => ({ daemonId: r.daemon_id, lastAt: r.last_at, ...(r.connected_at !== null ? { connectedAt: r.connected_at } : {}), lastSeenAt: r.last_seen_at, synced: r.synced === 1 });
+const connOf = (r: ConnDb): Conn => ({ daemonId: r.daemon_id, lastAt: r.last_at, ...(r.connected_at !== null ? { connectedAt: r.connected_at } : {}), lastSeenAt: r.last_seen_at, hello: r.hello === 1, synced: r.synced === 1 });
 const alertOf = (r: AlertDb): AlertRow => ({ id: r.id, at: r.at, ...(r.daemon_id !== null ? { daemonId: r.daemon_id } : {}), what: r.what });
 
 const minuteOf = (now: number): number => now - (now % 60_000);
@@ -253,12 +254,13 @@ export class DoStudioStore implements StudioStore {
 
   async putConn(conn: Conn): Promise<void> {
     this.sql.exec(
-      `INSERT INTO daemon_conn (daemon_id, last_at, connected_at, last_seen_at, synced) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(daemon_id) DO UPDATE SET last_at = excluded.last_at, connected_at = excluded.connected_at, last_seen_at = excluded.last_seen_at, synced = excluded.synced`,
+      `INSERT INTO daemon_conn (daemon_id, last_at, connected_at, last_seen_at, hello, synced) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(daemon_id) DO UPDATE SET last_at = excluded.last_at, connected_at = excluded.connected_at, last_seen_at = excluded.last_seen_at, hello = excluded.hello, synced = excluded.synced`,
       conn.daemonId,
       conn.lastAt,
       conn.connectedAt ?? null,
       conn.lastSeenAt,
+      conn.hello ? 1 : 0,
       conn.synced ? 1 : 0,
     );
   }
@@ -281,5 +283,7 @@ export class DoStudioStore implements StudioStore {
   async prune(before: number): Promise<void> {
     this.sql.exec("DELETE FROM queue WHERE state IN ('done', 'refused', 'expired') AND enqueued_at < ?", before);
     this.sql.exec("DELETE FROM ops WHERE state IN ('done', 'refused', 'expired') AND updated_at < ?", before);
+    // Minute buckets are only needed for the current day; keep them for the same 14-day window.
+    this.sql.exec('DELETE FROM rate WHERE window_start < ?', before);
   }
 }

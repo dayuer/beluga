@@ -232,10 +232,19 @@ export class D1HubStore implements HubStore {
   async bindProject(input: { readonly projectId: string; readonly daemonId: string; readonly daemonProjectId: string; readonly now: number }): Promise<'ok' | 'unknown-project' | 'already-bound' | 'already-mapped'> {
     const project = await this.project(input.projectId);
     if (!project) return 'unknown-project';
-    if (project.daemonId !== undefined && project.daemonId !== input.daemonId) return 'already-bound';
+    // A bound project must be unbound first (the page says so too).
+    if (project.daemonId !== undefined) return 'already-bound';
     const taken = await this.first<{ id: string }>('SELECT id FROM projects WHERE daemon_id = ? AND daemon_project_id = ? AND id <> ?', input.daemonId, input.daemonProjectId, input.projectId);
     if (taken) return 'already-mapped';
-    await this.run('UPDATE projects SET daemon_id = ?, daemon_project_id = ? WHERE id = ?', input.daemonId, input.daemonProjectId, input.projectId);
+    try {
+      // Conditional: two operators (or two tabs) cannot both bind an unbound project to different daemons.
+      const changed = await this.run('UPDATE projects SET daemon_id = ?, daemon_project_id = ? WHERE id = ? AND daemon_id IS NULL', input.daemonId, input.daemonProjectId, input.projectId);
+      if (changed === 0) return 'already-bound';
+    } catch {
+      // The UNIQUE (daemon_id, daemon_project_id) lost a race: another project took that daemon project.
+      const raced = await this.first<{ id: string }>('SELECT id FROM projects WHERE daemon_id = ? AND daemon_project_id = ? AND id <> ?', input.daemonId, input.daemonProjectId, input.projectId);
+      return raced ? 'already-mapped' : 'already-bound';
+    }
     return 'ok';
   }
 

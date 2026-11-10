@@ -255,6 +255,9 @@ export interface Conn {
   readonly lastAt: number;
   readonly connectedAt?: number;
   readonly lastSeenAt: number;
+  /** It sent `hello` on this connection; before that, no other frame is accepted (reconnect order). */
+  readonly hello: boolean;
+  /** It pushed its full snapshots and said `synced`; only then does the queue deliver. */
   readonly synced: boolean;
 }
 
@@ -415,7 +418,7 @@ export function memoryHub(): HubStore {
     bindProject: async ({ projectId, daemonId, daemonProjectId }) => {
       const p = projects.get(projectId);
       if (!p) return 'unknown-project';
-      if (p.daemonId !== undefined && p.daemonId !== daemonId) return 'already-bound';
+      if (p.daemonId !== undefined) return 'already-bound';
       const taken = [...projects.values()].some((q) => q.id !== projectId && q.daemonId === daemonId && q.daemonProjectId === daemonProjectId);
       if (taken) return 'already-mapped';
       projects.set(projectId, { ...p, daemonId, daemonProjectId });
@@ -603,6 +606,7 @@ export function memoryStudio(limits: RateLimits = { perMinute: 20, perDay: 300, 
         if (q.state !== 'queued' && q.state !== 'taken' && q.enqueuedAt < before) queue.splice(i, 1);
       }
       for (const [key, row] of ops) if (row.state !== 'queued' && row.updatedAt < before) ops.delete(key);
+      for (const [key, row] of rates) if (row.windowStart < before) rates.delete(key);
     },
   };
 }

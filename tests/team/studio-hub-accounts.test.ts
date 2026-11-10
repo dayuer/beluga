@@ -224,6 +224,8 @@ describe('project ↔ daemon mapping', () => {
     expect(bound.status).toBe(200);
     expect(bodyOf(bound).project).toMatchObject({ daemonId: d1, daemonProjectId: 'dp1' });
 
+    // A bound project must be unbound first, even for the same daemon with another project.
+    expect((await admin(w, 'PUT', `/v1/admin/projects/${p1}/daemon`, { daemonId: d1, daemonProjectId: 'dp2' })).status).toBe(409);
     expect((await admin(w, 'PUT', `/v1/admin/projects/${p1}/daemon`, { daemonId: d2, daemonProjectId: 'dp1' })).status).toBe(409);
     expect((await admin(w, 'PUT', `/v1/admin/projects/${p2}/daemon`, { daemonId: d1, daemonProjectId: 'dp1' })).status).toBe(409);
     expect((await admin(w, 'PUT', `/v1/admin/projects/${p2}/daemon`, { daemonId: d1, daemonProjectId: 'dp9' })).status).toBe(404);

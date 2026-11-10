@@ -56,8 +56,6 @@ export interface ExpiredNotice {
 
 export type AckResult = { readonly ok: true; readonly projectId: string; readonly receipt: StudioReceipt } | { readonly ok: false; readonly error: string };
 
-/** Kinds whose payload carries customer text, and so counts against the rate limits. */
-const RATE_KINDS: ReadonlySet<string> = new Set(['chat.send', 'decision.answer', 'milestone.sendBack', 'plan.create']);
 const RATE_LIMITS = { perMinute: RATE_PER_MIN, perDay: RATE_PER_DAY, charsPerDay: RATE_CHARS_PER_DAY } as const;
 const REF = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -85,10 +83,8 @@ const charsOf = (action: StudioAction): number => {
   }
 };
 
-const rateKeyOf = (action: StudioAction, projectId: string): string => {
-  const planRef = (action as { readonly planRef?: unknown }).planRef;
-  return typeof planRef === 'string' ? `plan:${planRef}` : `new:${projectId}`;
-};
+/** The rate bucket is per project, and per plan only when that plan actually exists in this project. */
+const rateKeyFor = (projectId: string, planRef: string | undefined, hasPlan: boolean): string => (hasPlan && planRef !== undefined ? `plan:${projectId}:${planRef}` : `project:${projectId}`);
 
 function actionOf(json: string): StudioAction | undefined {
   try {
@@ -146,25 +142,32 @@ export async function enqueue(frame: unknown, ctx: EnqueueContext, deps: QueueDe
   const planRef = typeof framePlan === 'string' && REF.test(framePlan) ? framePlan : undefined;
   const key = opKey({ studio: ctx.studio, plan: planRef, project: ctx.projectId }, opId);
 
+  // The project belongs to this customer (the Worker checked too; this is the DO's own look).
+  // Membership comes before the opId replay: a removed customer gets nothing back, not even an
+  // old receipt.
+  if (!(await deps.hub.canAccess(ctx.customerId, ctx.projectId))) return { ok: false, status: 403, error: 'not-yours' };
+
+  // Anything that waited seven days is expired before a replay can read a stale `queued`.
+  await expire(deps.now, deps);
+
   // An opId already handled answers with its current state, before rate limiting: an idempotent
   // retry must not be turned into `rate-limited`.
   const existing = await deps.studio.op(key);
   if (existing) return { ok: true, receipt: receiptOf(existing, opId, planRef) };
 
-  // The project belongs to this customer (the Worker checked too; this is the DO's own look).
-  if (!(await deps.hub.canAccess(ctx.customerId, ctx.projectId))) return { ok: false, status: 403, error: 'not-yours' };
-
-  if (parsed.success && RATE_KINDS.has(parsed.data.kind)) {
-    const chars = charsOf(parsed.data);
-    if (!(await deps.studio.rateHit(ctx.customerId, rateKeyOf(parsed.data, ctx.projectId), deps.now, chars, RATE_LIMITS))) {
-      const refused: OpRow = { opKey: key, state: 'refused', code: 'rate-limited', at: deps.now, updatedAt: deps.now };
-      await deps.studio.recordOp(refused);
-      return { ok: true, receipt: receiptOf(refused, opId, planRef) };
-    }
-    await deps.studio.rateAdd(ctx.customerId, rateKeyOf(parsed.data, ctx.projectId), deps.now, chars);
-  }
-
+  // Every frame counts against the budget, including malformed ones and ones naming a plan that
+  // doesn't exist: the key never comes from a request field that can mint new buckets. Only the
+  // text-carrying kinds add characters.
   const view = planRef ? await deps.studio.readView(ctx.projectId, planRef) : undefined;
+  const chars = parsed.success ? charsOf(parsed.data) : 0;
+  const rateKey = rateKeyFor(ctx.projectId, planRef, view !== undefined);
+  if (!(await deps.studio.rateHit(ctx.customerId, rateKey, deps.now, chars, RATE_LIMITS))) {
+    const refused: OpRow = { opKey: key, state: 'refused', code: 'rate-limited', at: deps.now, updatedAt: deps.now };
+    await deps.studio.recordOp(refused);
+    return { ok: true, receipt: receiptOf(refused, opId, planRef) };
+  }
+  await deps.studio.rateAdd(ctx.customerId, rateKey, deps.now, chars);
+
   const project = await deps.hub.project(ctx.projectId);
   const verdict = checkAction(frame, {
     scope: { studio: ctx.studio, plan: planRef, project: ctx.projectId },
