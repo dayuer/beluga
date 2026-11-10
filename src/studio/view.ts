@@ -1,7 +1,7 @@
 import type { PlanBody, PlanEventKind, PlanMilestone, PlanTask } from '../core/plans/model.js';
 import type { MilestoneState, MilestoneView, PlanView, TaskState, TaskView } from '../core/plans/progress.js';
 import { StudioPlanView, type StudioDecision, type StudioDraftDiff, type StudioGate, type StudioMilestone, type StudioTurn } from './protocol.js';
-import { OMITTED, sanitizeLine, sanitizeText } from './sanitize.js';
+import { OMITTED, type SanitizeOptions, sanitizeLine as cleanLine, sanitizeText as cleanText } from './sanitize.js';
 
 /**
  * What a Synon Studio customer sees of a plan (decision no-code-leak): built field by field from
@@ -23,9 +23,16 @@ export interface StudioViewInput {
   readonly typing?: boolean;
   readonly moreTurns?: boolean;
   readonly gate?: StudioGate;
+  /** The studio's task KEY prefixes (BLG): taken out in any case, even when they look like words. */
+  readonly keyPrefixes?: readonly string[];
   /** AI role names as the studio calls them (Product → 产品), configurable later. */
   readonly roles?: Readonly<Record<string, string>>;
 }
+
+/** The options of the view being built (set for the length of one synchronous build, so the helpers below stay plain). */
+let building: SanitizeOptions = {};
+const sanitizeText = (s: string, max?: number): string => cleanText(s, max, building);
+const sanitizeLine = (s: string, max?: number): string => cleanLine(s, max, building);
 
 /** A plan task as Studio reads it: who may answer its decision (missing: the operator). */
 type StudioTask = PlanTask & { readonly audience?: 'customer' | 'operator' };
@@ -123,8 +130,9 @@ export function draftDiffOf(body: PlanBody, draft: PlanBody, draftRev: number): 
   const diff: { added: StudioDraftDiff['added']; changed: StudioDraftDiff['changed']; removed: StudioDraftDiff['removed'] } = { added: [], changed: [], removed: [] };
   const oldMs = new Map(body.milestones.map((m) => [m.id, m]));
   const newMs = new Map(draft.milestones.map((m) => [m.id, m]));
-  const oldTasks = new Map(body.milestones.flatMap((m) => m.tasks.map((t) => [t.id, t] as const)));
-  const newTasks = new Map(draft.milestones.flatMap((m) => m.tasks.map((t) => [t.id, { t, m }] as const)));
+  // The operator's own tasks aren't in the customer's diff either (not even their titles).
+  const oldTasks = new Map(body.milestones.flatMap((m) => m.tasks.filter((t) => !operatorOnly(t)).map((t) => [t.id, t] as const)));
+  const newTasks = new Map(draft.milestones.flatMap((m) => m.tasks.filter((t) => !operatorOnly(t)).map((t) => [t.id, { t, m }] as const)));
   for (const m of draft.milestones) {
     const was = oldMs.get(m.id);
     if (!was) diff.added.push({ kind: 'milestone', title: sanitizeLine(m.title, 200) });
@@ -178,6 +186,15 @@ function turnOf(t: StudioTurn, roles: Readonly<Record<string, string>> | undefin
 
 /** The customer's view of a plan. Throws if what it built doesn't fit the strict schema (a bug, never sent). */
 export function studioPlanView(input: StudioViewInput): StudioPlanView {
+  building = input.keyPrefixes ? { keyPrefixes: input.keyPrefixes } : {};
+  try {
+    return build(input);
+  } finally {
+    building = {};
+  }
+}
+
+function build(input: StudioViewInput): StudioPlanView {
   const { view } = input;
   const { plan } = view;
   const body = plan.draft ?? plan.body;

@@ -226,3 +226,20 @@ describe('studioPlanView: changes to a running plan', () => {
     expectClean(withBody);
   });
 });
+
+it('the draft diff leaves out the operator’s tasks (audit recheck S-8)', () => {
+  const b = body();
+  const secret = { ...decisionTask('quote', 'operator'), title: '运营方内部：给客户报价 3 万还是 5 万' } as PlanTask;
+  const d: PlanBody = { ...b, milestones: [{ ...b.milestones[0]!, tasks: [...b.milestones[0]!.tasks, secret] }] };
+  const p = plan({ status: 'active', body: b, draft: d });
+  const v = studioPlanView({ planRef: 'p1', view: { ...planView({ ...p, body: undefined }, {} as BoardState), plan: p } });
+  expect(JSON.stringify(v)).not.toContain('报价');
+});
+
+it('the studio’s KEY prefixes reach every text (lowercase keys too)', () => {
+  const b = body();
+  const p = plan({ draft: { ...b, goal: '接着 blg-52 做会员登录' } });
+  const v = studioPlanView({ planRef: 'p1', view: planView(p, {} as BoardState), keyPrefixes: ['BLG'] });
+  expect(v.goal).not.toMatch(/blg/i);
+  expect(v.goal).toContain('会员登录');
+});

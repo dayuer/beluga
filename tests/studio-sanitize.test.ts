@@ -160,3 +160,31 @@ describe('the M1 audit (docs/reports/studio-m1-audit.md)', () => {
     }
   });
 });
+
+describe('the M1 audit recheck (R-1 to R-3)', () => {
+  const leaks: Record<string, [string, RegExp]> = {
+    variationSelector: ['这次是用 cl️aude-op️us-5-5 写的登录页面，请你验收一下', /aude|us-5/],
+    graphemeJoiner: ['我改了 src͏/studio͏/view͏/index 里的登录逻辑，现在好了', /studio|view/],
+    mathBold: ['这次是用 𝐜𝐥𝐚𝐮𝐝𝐞 写的登录页面，请你验收一下', /𝐜|claude/i],
+    joinedAfterRemoval: ['这次是用 cla()ude 和 son""net 写的，登录页面 BLG()-52 做完了，密钥 gh""p_abcdEFGH1234', /claude|sonnet|BLG|ghp/i],
+    passwordSentence: ['密码改成了 hunter2，口令设为 Tr0ub4dor&3，后台的 password is hunter2，登录页面可以用了', /hunter2|Tr0ub/],
+    userPassHost: ['数据库在 admin:hunter2@db.internal 上，登录页面可以用了', /hunter2/],
+    tokens: ['令牌 hf_AbCdEfGh1234567890abcdef、whsec_AbCdEfGh1234567890、SG.AbCd1234.EfGh5678ijkl、npm_AbCd1234EfGh5678 配好了', /hf_|whsec|SG\.|npm_/],
+    mysql: ['用 mysql -uroot -phunter2 prod 能连上，登录页面可以用了', /hunter2|mysql/],
+    htmlComment: ['好了 <!-- 内部：见 BLG-9 与 /Users/me/app/x --> 请验收', /BLG|Users/],
+    entities: ['我改了 &#x2F;Users&#x2F;me&#x2F;app 里的登录逻辑', /Users/],
+    classNames: ['我改了 StudioPlanView 和 LoginViewController 还有 com.synon.secret.auth.LoginManager，登录好了', /StudioPlanView|LoginView|synon/],
+    cnDot: ['我改了 login。ts 里的登录逻辑，现在好了', /login/],
+  };
+  for (const [name, [input, re]] of Object.entries(leaks)) it(name, () => expect(sanitizeText(input)).not.toMatch(re));
+
+  it('the studio’s own KEY prefixes go in any case, even when they look like words', () => {
+    expect(sanitizeText('登录页面 blg-52 和 PM-12 做完了，分支 blg-52-m1', 4000, { keyPrefixes: ['BLG', 'PM'] })).not.toMatch(/blg|PM-12/i);
+    expect(sanitizeText('登录页面 PM-12 做完了')).toContain('PM-12');
+  });
+
+  it('keeps clean prose', () => {
+    for (const s of ['Pick a brand color, then call the doctor. We need search/filter and login/signup pages.', '联系邮箱 hello@example.com，官网 example.com，周五 15:30 开会，预算 3-5 万。', 'WeChat 和 GitHub 登录都要有。'])
+      expect(sanitizeText(s)).toBe(s);
+  });
+});

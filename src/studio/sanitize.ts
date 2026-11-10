@@ -27,6 +27,8 @@ const MODELS =
 
 /** Two lowercase words around a slash that are prose, not a path. */
 const PROSE_PAIRS = new Set(['and/or', 'either/or', 'he/she', 'his/her', 'him/her', 'km/h', 'm/s', 'w/o', 'n/a', 'yes/no', 'on/off', 'read/write', 'input/output', 'client/server', 'light/dark', 'true/false', 'i/o', 'pass/fail', 'day/night', 'am/pm']);
+/** Folder names that make `a/b` a path (src/auth, packages/mac), not prose (search/filter). */
+const SRC_DIRS = new Set(['src', 'lib', 'libs', 'app', 'apps', 'packages', 'components', 'pages', 'tests', 'test', 'docs', 'scripts', 'public', 'assets', 'bin', 'dist', 'build', 'config', 'server', 'api', 'utils', 'hooks', 'styles', 'e2e', 'modules', 'core', 'shared', 'internal', 'cmd', 'pkg', 'routes', 'controllers', 'services', 'store', 'stores', 'types', 'spec', 'specs', 'fixtures', 'mocks', 'node_modules', 'vendor', 'tmp', 'etc', 'usr', 'var', 'home', 'users', 'opt']);
 /** Names that end like a file and are products. */
 const PRODUCT_FILES = /^(?:node|vue|next|nuxt|three|d3|express|react|chart|ember|backbone|angular|svelte|solid|alpine|moment|day|p5)\.js$/i;
 /** iPhone-like words that look like identifiers. */
@@ -43,7 +45,9 @@ type Replacer = string | ((match: string, ...groups: string[]) => string);
 const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   // HTML: scripts and styles whole, other tags.
   [/<(script|style)\b[^>]{0,500}>[\s\S]{0,20000}?<\/\1\s*>/gi, ''],
+  [/<!--[\s\S]{0,20000}?(?:-->|$)/g, ''],
   [/<\/?[a-zA-Z][\w-]{0,40}(?:\s[^<>]{0,500})?\/?>/g, ''],
+  [/<(?=[A-Za-z/!])/g, ''],
   // Markdown: images whole (alt text too); links and reference links keep their words; definitions go.
   [/!\[[^\]\n]{0,500}\]\([^)\n]{0,2000}\)/g, ''],
   [/!\[[^\]\n]{0,500}\]\[[^\]\n]{0,200}\]/g, ''],
@@ -55,6 +59,11 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\bBearer\s+[\w.~+/=-]{1,4000}/gi, ''],
   [/\b(?:sk|pk|rk)[-_](?:live[-_]|test[-_]|ant[-_]|proj[-_])?[\w-]{3,400}/g, ''],
   [/((?:密码|口令|密钥|私钥|令牌|秘钥)\s{0,3}(?:是|为|:|：)?\s{0,3})[!-~]{3,200}/g, '$1'],
+  [/((?:密码|口令|密钥|私钥|令牌|秘钥|password|passwd|pwd|secret|token|passphrase)[^\n]{0,16}?)(?<![!-~])(?=[!-~]{0,200}[\d!@#$%^&*])[!-~]{4,200}/gi, '$1'],
+  [/\b[\w.-]{1,100}:[^\s@:]{3,200}@[\w.-]{1,200}/g, ''],
+  [/\b(?:whsec|npm|hf|dop_v1|shpat|shpss|sq0atp)_[\w-]{8,400}/g, ''],
+  [/\b(?:SG|ya29)\.[\w.-]{8,400}/g, ''],
+  [/\b[A-Za-z]{2,10}_(?=[A-Za-z0-9_]{0,200}[A-Z])(?=[A-Za-z0-9_]{0,200}\d)[A-Za-z0-9_]{16,200}/g, ''],
   [/\b(?:ghp|gho|ghs|ghu|ghr|github_pat|glpat|xox[abprs]|xapp)[-_][\w-]{4,400}/g, ''],
   [/\bAKIA[0-9A-Z]{8,40}/g, ''],
   [/\bAIza[\w-]{20,60}/g, ''],
@@ -81,10 +90,10 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   // Internal method names (plans.approve, session.submit…).
   [/\b(?:plans|session|questions|host|companion|board|files|git|studio|views|voice|sentinel|workspace|worktree|issues|tasks)\.[a-z][\w]{1,60}(?:\.[a-z]\w{0,60}){0,3}\b/g, ''],
   // Shell commands.
-  [/\b(?:npm|npx|yarn|pnpm|bun|git|pip3?|brew|curl|wget|sudo|docker|kubectl|cargo|xcodebuild|gradlew?|pod|tsc|vitest|jest|node|python3?|deno|wrangler|expo|eas|fastlane|asc|beluga|rm|mkdir|chmod|cd|export|ssh|scp)\s+[-\w:@./=~]{1,200}(?:\s+[-\w:@./=~]{1,200}){0,4}/g, ''],
+  [/\b(?:npm|npx|yarn|pnpm|bun|git|pip3?|brew|curl|wget|sudo|docker|kubectl|cargo|mysql|psql|mongo|mongosh|redis-cli|sqlcmd|aws|gcloud|az|gh|openssl|xcodebuild|gradlew?|pod|tsc|vitest|jest|node|python3?|deno|wrangler|expo|eas|fastlane|asc|beluga|rm|mkdir|chmod|cd|export|ssh|scp)\s+[-\w:@./=~]{1,200}(?:\s+[-\w:@./=~]{1,200}){0,4}/g, ''],
   [/\s*(?:&&|\|\|)\s*/g, ' '],
   // Branches.
-  [/\b(?:plan|beluga|feature|feat|fix|bugfix|hotfix|release|chore|refs\/heads|origin|claude|codex)\/[\w./-]{1,200}/gi, ''],
+  [/\b(?:plan|beluga|feature|feat|fix|bugfix|hotfix|release|chore|refs\/heads|origin|claude|codex|spike|refactor|dev|wip|exp|experiment|docs|test|tests|ci|perf|deps|renovate|dependabot)\/[\w./-]{1,200}/gi, ''],
   [/\b[a-z]{2,8}-\d{1,6}-[\w-]{1,100}\b/gi, ''],
   // Paths: absolute and home (two segments or more), relative, Windows, three or more segments.
   [new RegExp(`(?<![A-Za-z0-9_.])(?:~|\\.{1,2})?\\/${SEG0}(?:\\/${SEG}){1,40}\\/?`, 'gu'), ''],
@@ -92,15 +101,20 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\b[A-Za-z]:\\[^\s]{0,2000}/g, ''],
   [/(?:\.{1,2}\\|\b[\w.@-]{1,120}\\)[\w.@-]{1,120}(?:\\[\w.@-]{1,120}){0,40}/g, ''],
   [new RegExp(`\\b${SEG0}(?:\\/${SEG}){2,40}\\/?`, 'gu'), ''],
-  [/(?<![\w./])[a-z][\w.-]{0,60}\/[a-z][\w.-]{0,80}(?![\w/])/g, (m) => (PROSE_PAIRS.has(m.toLowerCase()) ? m : '')],
+  [/(?<![\w./])[a-z][\w.-]{0,60}\/[a-z][\w.-]{0,80}(?![\w/])/g, (m) => (PROSE_PAIRS.has(m.toLowerCase()) || !m.split('/').some((x) => SRC_DIRS.has(x)) ? m : '')],
   // File names: a/b.ext, name.ext, dot files, well-known ones.
   [new RegExp(`\\b[\\w.@-]{1,120}\\/[\\p{L}\\p{N}_.@-]{1,120}\\.(?:${EXT})\\b`, 'giu'), ''],
   [new RegExp(`(?<![\\w.])[\\p{L}\\p{N}_@$-]{1,120}(?:\\.[\\p{L}\\p{N}_@$-]{1,60}){0,6}\\.(?:${EXT})\\b`, 'giu'), (f) => (PRODUCT_FILES.test(f) ? f : '')],
   [/(?<![\w.])\.[A-Za-z][\w.-]{0,60}/g, ''],
+  [new RegExp(`\\b[\\w-]{1,120}[。｡](?:${EXT})\\b`, 'gi'), ''],
   [/\b(?:Podfile|Gemfile|Dockerfile|Makefile|Procfile|Brewfile|Rakefile|Fastfile|Appfile|Cartfile)\b(?:\.lock)?/g, ''],
   // Identifiers: snake_case (tools, folders), camelCase (functions).
   [/\b_{0,2}[a-z][a-z0-9]{0,40}(?:_{1,2}[a-z0-9]{1,40}){1,10}_{0,2}\b/g, ''],
   [/\b[a-z][a-z0-9]{0,40}(?:[A-Z][a-z0-9]{0,40}){1,10}\b/g, (w) => (PRODUCT_WORDS.has(w.toLowerCase()) ? w : '')],
+  // Class names (StudioPlanView, LoginViewController) and package paths (com.synon.auth.LoginManager).
+  [/\b(?:[A-Z][a-z0-9]{1,30}){3,8}\b|\b(?:[A-Z][a-z0-9]{1,30}){2}(?:View|Controller|Manager|Service|Provider|Store|Facts|Handler|Model|Props|Schema|Screen|Page|Api|Client|Server|Hook|Context|Reducer|Util|Utils|Helper|Repository|Factory|Module|Component|Delegate|Activity|Fragment|Adapter)\b/g, (w) => (PRODUCT_WORDS.has(w.toLowerCase()) ? w : '')],
+  [/\b(?:com|org|net|io|dev|app|cn|me)\.[a-z][\w]{0,40}(?:\.[A-Za-z_][\w]{0,60}){1,10}\b/g, ''],
+  [/\b[a-z][\w]{0,40}(?:\.[a-z][\w]{0,40}){1,6}\.[A-Z][\w]{1,60}\b/g, ''],
   // Models and agents.
   [MODELS, ''],
 ];
@@ -172,8 +186,11 @@ function dropBareCode(text: string): string {
 
 // ---- Lookalikes ----
 
-const DASHES = /[‐-―−⁃﹘﹣－­]/g;
-const SLASHES = /[／⁄∕⧸]/g;
+const ENTITIES: Readonly<Record<string, string>> = { '&#47;': '/', '&#x2f;': '/', '&sol;': '/', '&#92;': '\\', '&#x5c;': '\\', '&bsol;': '\\', '&lt;': '<', '&gt;': '>', '&amp;': '&', '&#46;': '.', '&#x2e;': '.', '&period;': '.', '&#64;': '@', '&#x40;': '@', '&commat;': '@' };
+/** Marks that draw nothing (variation selectors, the grapheme joiner) and combining marks right after a Latin letter or digit. */
+const MARKS = /[\u034F\u17B4\u17B5\u180B-\u180F\uFE00-\uFE0F\u{E0100}-\u{E01EF}]|(?<=[A-Za-z0-9])\p{Mn}+/gu;
+const DASHES = /[\u02D7\u207B‐-―−⁃﹘﹣－­]/g;
+const SLASHES = /[\u2571／⁄∕⧸]/g;
 const BACKSLASHES = /[＼∖⧹]/g;
 /** Zero-width, joiners, bidi and other format characters (not visible, used to split words). */
 const INVISIBLE = /[\p{Cf}᠎ㅤﾠᅟᅠ]/gu;
@@ -193,6 +210,10 @@ const HOMOGLYPH = new RegExp(`[${Object.keys(HOMOGLYPHS).join('')}]`, 'g');
  */
 export function foldLookalikes(text: string): string {
   return text
+    .replace(/&(?:#0*47|#x0*2f|sol|#0*92|#x0*5c|bsol|lt|gt|amp|#0*46|#x0*2e|period|#0*64|#x0*40|commat);/gi, (e) => ENTITIES[e.toLowerCase().replace(/^&#x0*/, '&#x').replace(/^&#0*/, '&#')] ?? e)
+    // NFKC folds the rest (math bold, circled letters, ligatures), sparing the Chinese punctuation a customer reads.
+    .replace(/[^\u0000-\u007F\u3000-\u303F\uFF01\uFF08\uFF09\uFF0C\uFF1A\uFF1B\uFF1F\u2018-\u201D\u2026\u00B7]/gu, (c) => c.normalize('NFKC'))
+    .replace(MARKS, '')
     .replace(INVISIBLE, '')
     .replace(/[０-９Ａ-Ｚａ-ｚ＃＄％＆＊＋．＜＝＞＠［］＾＿｀｛｜｝～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
     .replace(DASHES, '-')
@@ -232,7 +253,12 @@ function tidy(s: string): string {
  * Free text → words a customer may read, at most `max` characters. When most of a sentence was
  * technical, the whole of it becomes a placeholder rather than a broken half.
  */
-export function sanitizeText(input: string, max = 4000): string {
+export interface SanitizeOptions {
+  /** The studio's own task KEY prefixes (BLG): taken out in any case (blg-52), even when they look like a word (PM-12). */
+  readonly keyPrefixes?: readonly string[];
+}
+
+export function sanitizeText(input: string, max = 4000, opts: SanitizeOptions = {}): string {
   if (!input) return '';
   let s = foldLookalikes(input.slice(0, Math.min(MAX_INPUT, Math.max(max * 4, 2000))).replace(/\r\n?/g, '\n'));
   s = dropFences(s);
@@ -240,10 +266,19 @@ export function sanitizeText(input: string, max = 4000): string {
   s = s.replace(/(`+)(?:(?!\1)[\s\S]){0,2000}?\1/g, '');
   s = s.replace(/`/g, '');
   s = dropBareCode(s);
+  const own = new Set((opts.keyPrefixes ?? []).map((p) => p.toUpperCase()));
+  const ownKey = own.size ? new RegExp(`#?\\b(?:${[...own].filter((p) => /^[A-Z][A-Z0-9]{0,9}$/.test(p)).join('|') || '(?!)'})[-_#]\\d{1,6}(?:-[\\w-]{1,100})?\\b`, 'gi') : undefined;
   const before = visible(s);
-  for (const [re, to] of replacers) s = typeof to === 'string' ? s.replace(re, to) : s.replace(re, to);
-  s = s.replace(KEY, (k, prefix: string) => (NOT_KEY_PREFIX.has(prefix) ? k : ''));
-  s = tidy(tidy(s));
+  // Taking one thing out can join what's around it into another (cla()ude): run again until nothing changes.
+  for (let round = 0; ; round++) {
+    const was = s;
+    for (const [re, to] of replacers) s = typeof to === 'string' ? s.replace(re, to) : s.replace(re, to);
+    s = s.replace(KEY, (k, prefix: string) => (NOT_KEY_PREFIX.has(prefix) && !own.has(prefix) ? k : ''));
+    if (ownKey) s = s.replace(ownKey, '');
+    s = tidy(tidy(s));
+    if (s === was) break;
+    if (round === 4) return OMITTED;
+  }
   const after = visible(s);
   if (before >= 20 && (after < 4 || after < before * 0.25)) s = OMITTED;
   else if (!after && before) s = s.includes(CODE_OMITTED) ? CODE_OMITTED : OMITTED;
@@ -251,4 +286,4 @@ export function sanitizeText(input: string, max = 4000): string {
 }
 
 /** One line (a title, a criterion): sanitized, newlines folded. */
-export const sanitizeLine = (input: string, max = 400): string => sanitizeText(input.slice(0, MAX_INPUT).replace(/\s*\n\s*/g, ' '), max);
+export const sanitizeLine = (input: string, max = 400, opts: SanitizeOptions = {}): string => sanitizeText(input.slice(0, MAX_INPUT).replace(/\s*\n\s*/g, ' '), max, opts);

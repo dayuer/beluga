@@ -34,9 +34,16 @@ export const CUSTOMER_CLOSE = '<</客户的话>>';
  * leading "/always" or ":yes" is never a composer command, and the customer can't close the
  * marker early (a "<<" of theirs is drawn as "‹‹").
  */
-export const wrapCustomerText = (text: string): string => `${CUSTOMER_OPEN}\n${text.replaceAll('<<', '‹‹').replaceAll('>>', '››')}\n${CUSTOMER_CLOSE}`;
+export const wrapCustomerText = (text: string): string =>
+  `${CUSTOMER_OPEN}\n${text
+    // Nothing invisible, no look-alike angle brackets: the marker can't be imitated.
+    .replace(/[\p{Cf}\u034F\uFE00-\uFE0F]/gu, '')
+    .replace(/[<\uFF1C\uFE64\u3008\u27E8]{2}/g, '‹‹')
+    .replace(/[>\uFF1E\uFE65\u3009\u27E9]{2}/g, '››')
+    // "@name" would message that friend as you (session.submit tells who's mentioned): a full-width ＠ isn't a mention.
+    .replaceAll('@', '＠')}\n${CUSTOMER_CLOSE}`;
 
-const wrapped = (v: unknown): boolean => typeof v === 'string' && v.startsWith(`${CUSTOMER_OPEN}\n`) && v.endsWith(`\n${CUSTOMER_CLOSE}`) && v.indexOf(CUSTOMER_CLOSE) === v.length - CUSTOMER_CLOSE.length;
+const wrapped = (v: unknown): boolean => typeof v === 'string' && v.startsWith(`${CUSTOMER_OPEN}\n`) && v.endsWith(`\n${CUSTOMER_CLOSE}`) && v.indexOf(CUSTOMER_CLOSE) === v.length - CUSTOMER_CLOSE.length && !v.includes('@');
 
 export interface CustomerDecision {
   readonly audience?: 'customer' | 'operator';
