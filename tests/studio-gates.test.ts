@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gateTool } from '../src/agent/tool-gate.js';
 import { asActingAgent } from '../src/core/acting-agent.js';
 import { Board } from '../src/core/board/board.js';
 import { BoardWork } from '../src/core/board/work.js';
@@ -378,6 +379,31 @@ describe('the start Gate (BLG-74)', () => {
     second.restore(saved);
     expect(second.needs()).toEqual([]);
     expect(second.answer(saved[0]!.id, { approve: true })).toEqual({ ok: false, error: 'gone' });
+  });
+});
+
+describe('a customer turn in every runtime (BLG-110)', () => {
+  it('denies Bash, writes and other tools, and asks nobody', async () => {
+    const asked: string[] = [];
+    const input = {
+      canUseTool: async (name: string) => (asked.push(name), true),
+      canUseSecret: async (name: string) => (asked.push(name), true),
+    };
+    const policy = { cwd: '/tmp/shop', roots: ['/tmp/shop'], autoEdit: false, customerTurn: true } as const;
+    expect(await gateTool('Bash', { command: 'ls' }, input, policy)).toBeTruthy();
+    expect(await gateTool('Write', { file_path: '/tmp/shop/a.ts', content: 'x' }, input, policy)).toBeTruthy();
+    expect(await gateTool('mcp__beluga_plan__plan_start_task', { task: 't' }, input, policy)).toBeTruthy();
+    expect(await gateTool('Read', { file_path: '/tmp/shop/a.ts' }, input, policy)).toBeUndefined();
+    expect(await gateTool('mcp__beluga_plan__plan_write', { body: {} }, input, policy)).toBeUndefined();
+    // No approval card: the owner is never asked for anything in a customer turn.
+    expect(asked).toEqual([]);
+  });
+
+  it('every runner puts customerTurn into its policy', () => {
+    for (const runtime of ['claude', 'codex', 'copilot', 'opencode']) {
+      const src = readFileSync(join(process.cwd(), 'src/agent/runtime', runtime, 'runner.ts'), 'utf8');
+      expect(src, runtime).toContain('customerTurn: true');
+    }
   });
 });
 
