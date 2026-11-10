@@ -325,6 +325,35 @@ describe('StudioPublisher', () => {
     h.publisher.stop();
   });
 
+  it('moves a plan between shared projects: gone under the old one, full under the new', () => {
+    const store = world();
+    const h = harness(store, config(['p1', 'p2']));
+    expect(h.full).toHaveLength(1);
+    store.dispatch({ type: 'plan_put', plan: planOf({ projectId: 'p2' }) });
+    h.time.advance(250);
+    expect(h.sent).toHaveLength(2);
+    const [gone, full] = h.sent as [Extract<DaemonUp, { t: 'for' }>, Extract<DaemonUp, { t: 'for' }>];
+    expect(gone.project).toBe(projectRef(h.cfg(), 'p1'));
+    expect(gone.frame.t).toBe('plan-gone');
+    expect(full.project).toBe(projectRef(h.cfg(), 'p2'));
+    expect(full.frame.t).toBe('plan');
+    h.publisher.stop();
+  });
+
+  it('says plan-gone for everything it published when it leaves (unlinking)', () => {
+    const store = world();
+    store.dispatch({ type: 'plan_put', plan: planOf({ id: 'pl2', body: { ...BODY, title: 'Second' } }) });
+    const h = harness(store);
+    expect(h.full).toHaveLength(2);
+    h.publisher.leave();
+    expect(h.sent).toHaveLength(2);
+    for (const frame of h.sent) {
+      expect(frame.t).toBe('for');
+      expect((frame as Extract<DaemonUp, { t: 'for' }>).frame.t).toBe('plan-gone');
+    }
+    h.publisher.stop();
+  });
+
   it('takes the project’s board prefixes with it', () => {
     const prefixes = keyPrefixesOf({ enabled: true, issues: [], projects: { p1: { prefix: 'BOB', next: 1 }, both: { prefix: 'TWO', next: 1, repos: ['p1', 'p2'] } }, autoTasks: false }, 'p1');
     expect(prefixes.sort()).toEqual(['BOB', 'TWO']);

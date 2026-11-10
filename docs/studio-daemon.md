@@ -319,6 +319,8 @@ class StudioPublisher implements SnapshotSource {
   onResync(project: string, planRef?: string): void;
   onOnline(): void;
   projectsChanged(): void;
+  leave(): void;                              // unlink：逐计划 plan-gone（尽力）
+  status(): { lastError?: string; lastPushAt?: number; plans: number };  // service 的 StudioStatus 用
 }
 ```
 
@@ -474,7 +476,7 @@ interface StudioStatus {
 
 ### 7.3 CLI（`src/cli/studio.ts`）
 
-`src/cli.ts` 只是入口，命令都在 `src/cli/`；`src/cli/main.ts` 加 `case 'studio'`，经 `callDaemon` 调 IPC。
+`src/cli.ts` 只是入口，命令都在 `src/cli/`；`src/cli/main.ts` 加 `case 'studio'`，经仓库现有的 `attached()` + `SocketClient` 调 IPC（与 `beluga computers`、`beluga phones` 一致；不是旧的 `callDaemon`）。
 
 ```
 beluga studio link <code> [--hub URL] [--name N]

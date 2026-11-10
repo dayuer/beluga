@@ -76,8 +76,14 @@ function scheduler(start = START): Scheduler {
 }
 
 /** Let the hub's promise chains run: every await is a microtask, and sockets deliver on one. */
-async function flush(rounds = 12): Promise<void> {
+async function flush(rounds = 20): Promise<void> {
   for (let i = 0; i < rounds; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+/** Wait (in real time) for a state the hub reaches after a few crypto awaits; never a fixed round count. */
+async function until(cond: () => boolean, ms = 3_000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!cond() && Date.now() < end) await new Promise<void>((resolve) => setTimeout(resolve, 5));
 }
 
 // --- The hub, over an in-memory socket pair ---
@@ -460,7 +466,7 @@ describe('StudioLink', () => {
     const src = source();
     const link = linkFor(w, src);
     link.start();
-    await flush();
+    await until(() => link.status().state === 'online');
     expect(link.status().state).toBe('online');
     const server = [...(w.sockets.get(w.daemonId) ?? [])][0];
     expect(framesOf(server)).toEqual(['hello', 'for', 'synced']);
@@ -478,7 +484,7 @@ describe('StudioLink', () => {
     const src = source();
     const link = linkFor(w, src);
     link.start();
-    await flush();
+    await until(() => link.status().state === 'online');
     const server = [...(w.sockets.get(w.daemonId) ?? [])][0]!;
     server.push({ t: 'resync', project: 'dpp1', planRef: 'p1' });
     await flush();
@@ -491,7 +497,7 @@ describe('StudioLink', () => {
     const src = source();
     const link = linkFor(w, src);
     link.start();
-    await flush();
+    await until(() => link.status().state === 'online');
     expect(link.status().state).toBe('online');
 
     // Offline: the hub requeues what it had taken, and a customer's action waits.
@@ -513,8 +519,9 @@ describe('StudioLink', () => {
       onState: (s) => void (s.state === 'online' && src.events.push('online')),
     });
     again.start();
-    await flush();
+    await until(() => again.status().state === 'online');
     expect(again.status().state).toBe('online');
+    await until(() => delivered.length > 0);
     expect(delivered).toEqual(['dpp1']);
     const server = [...(w.sockets.get(w.daemonId) ?? [])][0]!;
     expect(framesOf(server)).toEqual(['hello', 'for', 'synced']);
@@ -537,10 +544,43 @@ describe('StudioLink', () => {
     const delivered: unknown[] = [];
     const link = linkFor(w, source(), { onDeliver: (f) => void delivered.push(f) });
     link.start();
-    await flush();
+    await until(() => link.status().state === 'online');
     expect(link.status().state).toBe('online');
     expect(delivered).toEqual([]);
     expect(link.status().dropped).toBeGreaterThan(0);
+    link.stop();
+  });
+
+  it('does nothing with a deliver when nothing consumes it (M3)', async () => {
+    const w = await World.make();
+    const link = linkFor(w, source()); // no onDeliver: the service wires none in M3
+    link.start();
+    await until(() => link.status().state === 'online');
+    expect(link.status().state).toBe('online');
+    const server = [...(w.sockets.get(w.daemonId) ?? [])][0]!;
+    server.push({
+      t: 'deliver',
+      seq: 1,
+      project: 'dpp1',
+      action: { t: 'action', opId: crypto.randomUUID(), kind: 'plan.create', payload: { goal: 'x', platforms: ['web'] } },
+    });
+    await flush();
+    // Still up, nothing happened, and it is not counted as garbage (it was a valid frame).
+    expect(link.status().state).toBe('online');
+    expect(link.status().dropped).toBe(0);
+    link.stop();
+  });
+
+  it('ignores a frame it does not know without dropping the socket', async () => {
+    const w = await World.make();
+    const link = linkFor(w, source());
+    link.start();
+    await until(() => link.status().state === 'online');
+    const server = [...(w.sockets.get(w.daemonId) ?? [])][0]!;
+    server.push({ t: 'something-newer', x: 1 });
+    await flush();
+    expect(link.status().state).toBe('online');
+    expect(link.status().dropped).toBe(1);
     link.stop();
   });
 
@@ -597,7 +637,7 @@ describe('StudioLink', () => {
     await w.hub.revokeDaemon(w.daemonId, w.clock.now());
     const link = linkFor(w, source());
     link.start();
-    await flush();
+    await until(() => link.status().state === 'revoked');
     expect(link.status().state).toBe('revoked');
     expect(link.status().retryAt).toBeUndefined();
     const attempts = w.attempts.length;
@@ -611,7 +651,7 @@ describe('StudioLink', () => {
     const w = await World.make();
     const first = linkFor(w, source());
     first.start();
-    await flush();
+    await until(() => first.status().state === 'online');
     expect(first.status().state).toBe('online');
     first.stop();
     await flush();
@@ -620,7 +660,7 @@ describe('StudioLink', () => {
     const src = source();
     const second = new StudioLink({ config: w.config(), identity: w.identity, source: src, ws: w.ws, now: w.clock.now, random: () => 0.5, timers: w.clock.timers });
     second.start();
-    await flush();
+    await until(() => second.status().state === 'online');
     expect(second.status().state).toBe('online');
     expect(w.attempts.map((a) => a.error ?? 'ok')).toEqual(['ok', 'replayed', 'ok']);
     expect(w.attempts[1]!.at).toBe(w.attempts[0]!.at);
@@ -649,7 +689,7 @@ describe('StudioLink', () => {
     const wait = link.status().retryAt! - w.clock.now();
     expect(wait).toBeGreaterThanOrEqual(250);
     w.clock.advance(wait + 1);
-    await flush();
+    await until(() => link.status().state === 'online');
     expect(w.attempts).toHaveLength(2);
     expect(link.status().state).toBe('online');
     link.stop();
@@ -660,7 +700,7 @@ describe('StudioLink', () => {
     const stranger = generateIdentity();
     const link = new StudioLink({ config: w.config(), identity: stranger, source: source(), ws: w.ws, now: w.clock.now, random: () => 0.5, timers: w.clock.timers });
     link.start();
-    await flush();
+    await until(() => link.status().state === 'revoked');
     expect(link.status().state).toBe('revoked');
     expect(link.status().lastError).toBe('bad-signature');
     expect(w.attempts[0]?.error).toBe('bad-signature');
@@ -669,11 +709,28 @@ describe('StudioLink', () => {
     link.stop();
   });
 
+  it('stops when the hub says this app is outdated', async () => {
+    const w = await World.make();
+    const link = linkFor(w, source());
+    link.start();
+    await until(() => link.status().state === 'online');
+    const server = [...(w.sockets.get(w.daemonId) ?? [])][0]!;
+    server.push({ t: 'outdated' });
+    await until(() => link.status().state === 'outdated');
+    expect(link.status().state).toBe('outdated');
+    expect(link.status().retryAt).toBeUndefined();
+    const attempts = w.attempts.length;
+    w.clock.advance(120_000);
+    await flush();
+    expect(w.attempts.length).toBe(attempts);
+    link.stop();
+  });
+
   it('keeps a wrong studio out', async () => {
     const w = await World.make();
     const link = linkFor(w, source(), { config: { studioId: 'another-studio' } });
     link.start();
-    await flush();
+    await until(() => link.status().state === 'wrong-studio');
     expect(link.status().state).toBe('wrong-studio');
     link.stop();
   });

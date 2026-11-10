@@ -179,6 +179,10 @@ export class StudioPublisher {
         this.badView();
         continue;
       }
+      // A plan that changed project (import, a moved plan) still has its old project's view at the
+      // hub: say it's gone there before the new full frame.
+      const was = this.baseline.get(planId);
+      if (was && was.projectRef !== projectRef) frames.push({ t: 'for', project: was.projectRef, frame: { t: 'plan-gone', planRef: was.planRef } });
       const rev = this.nextRev(view.planRef);
       frames.push({ t: 'for', project: projectRef, frame: { t: 'plan', rev, view } });
       this.baseline.set(planId, { planRef: view.planRef, projectRef, view, rev });
@@ -306,7 +310,11 @@ export class StudioPublisher {
         continue;
       }
       const base = this.baseline.get(planId);
-      if (!base || base.planRef !== view.planRef) {
+      if (base && base.projectRef !== projectRef) {
+        // It moved project: the old project's cached view has to go, then the new one is full.
+        if (!this.sendGone(base.projectRef, base.planRef, planId)) return;
+      }
+      if (!base || base.planRef !== view.planRef || base.projectRef !== projectRef) {
         this.sendFull(planId, projectRef, view);
         continue;
       }

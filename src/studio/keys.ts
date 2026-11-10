@@ -61,6 +61,8 @@ function configOf(raw: unknown): StudioConfig | undefined {
   const refKey = str('refKey', 100);
   const linkedAt = raw['linkedAt'];
   if (!hub || !studioId || !daemonId || !name || !key || !refKey) return undefined;
+  // The ref key is 32 bytes; a hand-edited or truncated one would make refs guessable, so it's "not linked".
+  if (Buffer.from(refKey, 'base64url').length !== 32) return undefined;
   if (typeof linkedAt !== 'number' || !Number.isFinite(linkedAt) || linkedAt < 0) return undefined;
   const lastAt = raw['lastAt'];
   if (lastAt !== undefined && (typeof lastAt !== 'number' || !Number.isFinite(lastAt) || lastAt < 0)) return undefined;

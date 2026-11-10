@@ -2,7 +2,7 @@ import os from 'node:os';
 import type { Store } from '../core/store.js';
 import { identityPem, type Identity } from '../net/crypto.js';
 import { identityOf, loadStudioConfig, newRefKey, newStudioIdentity, removeStudioConfig, saveStudioConfig, studioPath, type StudioConfig } from './keys.js';
-import { StudioLink, defaultHub, hubUrl, registerWithCode, type LinkState } from './link.js';
+import { StudioLink, defaultHub, hubUrl, registerWithCode, type LinkState, type LinkTimers, type WsFactory } from './link.js';
 import { StudioPublisher } from './publish.js';
 
 /**
@@ -43,15 +43,22 @@ export class StudioService {
   private readonly store: Store;
   private readonly demo: boolean;
   private readonly file: string;
+  /** Test seams: the hub can be a fake socket and the clock hand-driven. */
+  private readonly ws?: WsFactory;
+  private readonly timers?: LinkTimers;
+  private readonly now: () => number;
   private config: StudioConfig | undefined;
   private identity: Identity | undefined;
   private connection: StudioLink | undefined;
   private publisher: StudioPublisher | undefined;
 
-  constructor(d: { readonly store: Store; readonly demo?: boolean; readonly file?: string }) {
+  constructor(d: { readonly store: Store; readonly demo?: boolean; readonly file?: string; readonly ws?: WsFactory; readonly timers?: LinkTimers; readonly now?: () => number }) {
     this.store = d.store;
     this.demo = Boolean(d.demo);
     this.file = d.file ?? studioPath();
+    if (d.ws) this.ws = d.ws;
+    if (d.timers) this.timers = d.timers;
+    this.now = d.now ?? Date.now;
   }
 
   /** Read the link's file (if any) and start connecting. Demo runs never read or write it. */
@@ -95,7 +102,7 @@ export class StudioService {
       studioId: registered.studioId,
       daemonId: registered.daemonId,
       name: who,
-      linkedAt: Date.now(),
+      linkedAt: this.now(),
       key: identityPem(identity),
       refKey: newRefKey(),
       projects: {},
@@ -153,7 +160,7 @@ export class StudioService {
     if (!this.store.getState().projects.some((p) => p.id === projectId)) throw new Error('No such project');
     const projects = { ...cfg.projects };
     if (shared) {
-      if (!projects[projectId]) projects[projectId] = { since: Date.now() };
+      if (!projects[projectId]) projects[projectId] = { since: this.now() };
     } else delete projects[projectId];
     const next: StudioConfig = { ...cfg, projects };
     saveStudioConfig(next, this.file);
@@ -176,6 +183,8 @@ export class StudioService {
       config: cfg,
       identity,
       source: this.publisher,
+      ...(this.ws ? { ws: this.ws } : {}),
+      ...(this.timers ? { timers: this.timers } : {}),
       // The hub refuses an `at` it has already seen, and its record survives our restarts.
       onAt: (at) => this.rememberAt(at),
     });
