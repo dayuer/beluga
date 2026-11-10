@@ -1,0 +1,19 @@
+# 带自动 HTTPS 的版本:用法见《部署说明》“要 HTTPS”。需要 .env 里填 DOMAIN,并且域名已解析到本服务器。
+services:
+  app:
+    build: .
+    restart: unless-stopped
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?请在 .env 里填 DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+volumes:
+  caddy_data:

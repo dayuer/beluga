@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      # 对外端口,默认 8080,在 .env 里用 HOST_PORT 修改
+      - "${HOST_PORT:-8080}:80"
