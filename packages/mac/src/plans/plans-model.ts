@@ -1,7 +1,7 @@
 import type { BoardState } from '../../../../src/core/board/model.js';
 import type { Actor } from '../../../../src/core/board/model.js';
 import { type Autonomy, type Plan, type PlanBody, type PlanEvent, type PlanPr, type PlansState, type TestsAt, diffBodies, milestoneDeps, planTitle, reviewState, shownBody } from '../../../../src/core/plans/model.js';
-import { type MilestoneState, type MilestoneView, type NextStep, type PlanView, type TaskState, type TaskView, agentNowWords } from '../../../../src/core/plans/progress.js';
+import { type MilestoneState, type MilestoneView, type NextStep, type PlanView, type TaskState, type TaskView, agentNowWords, designing } from '../../../../src/core/plans/progress.js';
 import { pulseWords } from '../../../../src/core/plans/watchdog.js';
 import { t } from '../i18n/index.js';
 import type { Key } from '../i18n/index.js';
@@ -56,8 +56,9 @@ const and = (names: readonly string[]): string => names.join(t('plans.model.and'
  * A milestone's status text in the plan's list: its state, plus when it runs. Open milestones say
  * they run side by side with the others open now; a waiting one says what it waits on.
  */
-export function milestoneLabel(view: Pick<PlanView, 'milestones' | 'open'>, m: MilestoneView): string {
-  const base = MILESTONE_STATE[m.state].label;
+export function milestoneLabel(view: Pick<PlanView, 'milestones' | 'open' | 'plan'>, m: MilestoneView): string {
+  // Its architect writes its design first: its work starts once that's in.
+  const base = designing(view.plan, m) ? t('plans.model.designing') : MILESTONE_STATE[m.state].label;
   const title = (id: string): string => `“${view.milestones.find((x) => x.milestone.id === id)?.milestone.title ?? id}”`;
   if (m.state === 'later') {
     const waits = m.dependsOn.filter((d) => view.milestones.find((x) => x.milestone.id === d)?.state !== 'passed');

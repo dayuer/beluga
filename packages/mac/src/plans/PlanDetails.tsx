@@ -3,7 +3,7 @@ import { type Criterion, criteria } from '@beluga/core/board/criteria.js';
 import { type Plan, shownBody, taskById } from '@beluga/core/plans/model.js';
 import { staleTasks } from '@beluga/core/plans/coherence.js';
 import { taskProof } from '@beluga/core/board/model.js';
-import { FINISHED, type MilestoneView, type PlanView, type TaskView, taskOrder } from '@beluga/core/plans/progress.js';
+import { FINISHED, type MilestoneView, type PlanView, type TaskView, designing, taskOrder } from '@beluga/core/plans/progress.js';
 import { Markdown } from '../chat/Markdown.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { Button, IconButton, cx } from '../components/ui.js';
@@ -61,7 +61,7 @@ export function PlanDetails({ view, picked, canStart, onPick, onClose }: { view:
   return (
     <aside className={p.details} aria-label={feed ? t('plans.details.whatHappened') : branch ? t('plans.details.whereWorkGoes') : decided ? t('plans.page.decisions') : t('plans.page.details')}>
       <header className={p.detailsHead} data-scrolled={scrolled ? 'true' : 'false'}>
-        <div className={p.detailsHeadText}>{feed ? <FeedHead /> : branch ? <BranchHead view={view} /> : decided ? <DecisionsHead /> : gate ? <GateHead m={gate} /> : <TaskHead t={task!} />}</div>
+        <div className={p.detailsHeadText}>{feed ? <FeedHead /> : branch ? <BranchHead view={view} /> : decided ? <DecisionsHead /> : gate ? <GateHead plan={view.plan} m={gate} /> : <TaskHead t={task!} />}</div>
         <IconButton icon="x" label={t('plans.details.close')} className={p.detailsClose} onClick={onClose} />
       </header>
       <div key={picked} className={p.detailsBody} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}>
@@ -314,16 +314,18 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
   );
 }
 
-function GateHead({ m }: { m: MilestoneView }) {
+function GateHead({ plan, m }: { plan: Plan; m: MilestoneView }) {
   const info = MILESTONE_STATE[m.state];
   const t = useT();
+  // Its architect writes its design before its work starts.
+  const label = designing(plan, m) ? t('plans.model.designing') : info.label;
   return (
     <>
       <div className={p.detailsKind}>{t('plans.details.milestoneN', { n: m.index + 1 })}</div>
       <h3 className={p.detailsTitle}>{m.milestone.title}</h3>
       <div className={p.detailsRow}>
         <TonePill tone={info.tone} live={m.state === 'checking' || m.state === 'running'}>
-          {info.label}
+          {label}
         </TonePill>
         <span className={p.muted}>
           {t('plans.details.tasksFinished', { done: m.finished, total: m.total })}
@@ -429,6 +431,17 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
           <p className={p.muted}>{t('plans.details.noCriteria')}</p>
         )}
       </section>
+      {m.run.design ? (
+        <section className={p.detailsSection} aria-label={t('plans.details.design')}>
+          <details className={p.designFold}>
+            <summary>
+              <h4>{t('plans.details.design')}</h4>
+              <span className={p.muted}>{t('plans.details.designBy')}</span>
+            </summary>
+            <Markdown text={m.run.design.text} />
+          </details>
+        </section>
+      ) : null}
       {check ? (
         <section className={p.detailsSection}>
           <h4>{check.verdict === 'pass' ? t('plans.details.checkPasses') : t('plans.details.checkNotYet')}</h4>

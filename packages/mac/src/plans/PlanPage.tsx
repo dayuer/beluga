@@ -344,11 +344,21 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     { label: t('plans.page.sameAsWork'), checked: !plan.checkAgent, onSelect: () => checkAgent(YOUR_AGENT) },
     ...agentMenuItems(agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)), plan.checkAgent, checkAgent).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
   ];
+  // Agent for Its Architecture ▸: who writes each milestone's design before its work starts; none: no architect step.
+  const archAgent = (v: string): void =>
+    void act(() => api.setArchAgent(plan.id, v === YOUR_AGENT ? null : agentForChoice(v, runtimes))).then((said) => {
+      if (typeof said === 'string') toast(client, said, 'success');
+    });
+  const archItems: ActionItem[] = [
+    { label: t('plans.page.noArchitect'), checked: !plan.archAgent, onSelect: () => archAgent(YOUR_AGENT) },
+    ...agentMenuItems(agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)), plan.archAgent, archAgent).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
+  ];
   const more: ActionItem[] = [
     ...(plan.body && plan.status === 'active' ? [{ label: plan.paused ? t('plans.model.next.resume') : t('plans.page.pause'), onSelect: () => void act(() => api.setPaused(plan.id, !plan.paused)) }] : []),
     { label: t('plans.page.runAtOnce'), submenu: [1, 2, 3, 4, 6, MAX_PARALLEL].map((n) => ({ label: t('plans.model.nMilestones', { n }), checked: plan.maxParallel === n, onSelect: () => void act(() => api.setParallel(plan.id, n)) })), onSelect: () => undefined },
     ...(plan.status !== 'done' ? [{ label: t('plans.page.agentForWork'), submenu: agentMenuItems(agents, plan.agent, workAgent), onSelect: () => undefined }] : []),
     ...(plan.status !== 'done' ? [{ label: t('plans.page.agentForChecks'), submenu: checkItems, onSelect: () => undefined }] : []),
+    ...(plan.status !== 'done' ? [{ label: t('plans.page.agentForArchitecture'), submenu: archItems, onSelect: () => undefined }] : []),
     { label: t('plans.page.whenToRunTests'), submenu: TESTS_AT.map((x) => ({ label: testsAtInfo(x).label, hint: testsAtInfo(x).hint, checked: plan.testsAt === x, onSelect: () => void act(() => api.setTestsAt(plan.id, x), x === 'end' ? t('plans.page.toast.testsAtEnd') : t('plans.page.toast.testsAtMilestone')) })), onSelect: () => undefined },
     ...(review === 'reviewing' ? [{ label: t('plans.page.approveWithoutWaiting'), onSelect: approvePlan }] : []),
     ...(review !== 'off' && review !== 'reviewing' ? [{ label: review === 'none' ? t('plans.page.verifyPlan') : t('plans.page.verifyPlanAgain'), onSelect: () => verify(false) }] : []),
