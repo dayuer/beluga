@@ -66,6 +66,7 @@ describe('the table of what your app may do on a computer', () => {
         'studio.unlink',
         'studio.setProject',
         'studio.answerGate',
+        'studio.say',
       ].sort(),
     );
   });

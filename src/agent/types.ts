@@ -125,6 +125,8 @@ export interface AgentRunInput {
   /** A plan (Plans): its tools for this run (its home conversation), and what Claude is told about it. */
   readonly planTools?: PlanTools;
   readonly planBrief?: string;
+  /** A Synon Studio customer's turn: the plan tools change only the draft, and policy.ts denies everything else. */
+  readonly customerTurn?: boolean;
   /** "Your Mac" (core/assistant): its tools (the screen, device info, starting work) and what Claude is told it is. */
   readonly macTools?: MacTools;
   readonly macBrief?: string;

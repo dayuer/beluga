@@ -27,4 +27,6 @@ export const STUDIO_API = {
   'studio.reconnect': { args: z.tuple([]) },
   // → { ok: true, state } | { ok: false, error: 'gone' | 'settled' | 'stale' | 'failed' }.
   'studio.answerGate': { args: z.tuple([z.string().min(1).max(40), gateAnswer]) },
+  // → { ok: true } | { ok: false, error: 'unknown-plan' | 'not-shared' }. Mac only: your own words.
+  'studio.say': { args: z.tuple([z.string().min(1).max(200), z.string().trim().min(1).max(4000)]) },
 } as const;

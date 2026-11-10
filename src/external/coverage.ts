@@ -34,6 +34,7 @@ const COMPUTERS = 'It manages your other computers, or moves work between them: 
 const NO_TOOL = 'No tool reaches it yet: a tool for it comes with its own decision.';
 const STUDIO_PUBLISH = 'A person links Studio with the admin page’s code and chooses what customers see: no agent publishes a plan.';
 const STUDIO_GATE = 'Starting a customer’s plan is the operator’s own answer: no agent approves a start Gate.';
+const STUDIO_SAY = 'Talking to a customer is the operator’s own words: no agent speaks for them.';
 
 export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.submit': 'covered',
@@ -570,6 +571,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'studio.setProject': { refused: STUDIO_PUBLISH },
   'studio.reconnect': 'ui_only',
   'studio.answerGate': { refused: STUDIO_GATE },
+  'studio.say': { refused: STUDIO_SAY },
   'preview.open': { refused: PREVIEW },
   'preview.snapshot': { refused: PREVIEW },
   'files.readRange': { refused: NO_TOOL },

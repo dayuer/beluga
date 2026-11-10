@@ -10,6 +10,7 @@ import type { LogItem, Store } from '../store.js';
 import type { WorkspaceController } from '../workspace-controller.js';
 import { ApplyError, applyDraft } from './apply.js';
 import { coherenceWarnings, warningsText } from './coherence.js';
+import { customerTurns } from './customer-turns.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
@@ -185,7 +186,11 @@ export class PlansWork {
     const home = `${WS}${chat.id}`;
     const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
-    this.deps.askClaude(goal, home, true);
+    // A Studio customer's first turn is limited too (docs/studio-gates.md §5.3): the marker is up
+    // before the run starts, and down again if no run could start.
+    if (opts.customerTurn) customerTurns.begin(home);
+    const asked = this.deps.askClaude(goal, home, true);
+    if (opts.customerTurn && asked === undefined) customerTurns.end(home);
     // Named in a moment by a quick model (your message is never its name); Claude's plan_write names it after that.
     void this.deps
       .titlePlan?.(goal)
@@ -471,7 +476,18 @@ export class PlansWork {
   // ------------------------------------------------------------------ for Claude
 
   /** A run in a plan's home conversation (yours): the plan's tools, and how to plan or run it. */
-  forRun(channel: string, from: string): { readonly tools?: PlanTools; readonly brief?: string; readonly checker?: boolean } | undefined {
+  forRun(channel: string, from: string): { readonly tools?: PlanTools; readonly brief?: string; readonly checker?: boolean; readonly customerTurn?: boolean } | undefined {
+    // A customer's turn (Synon Studio): whatever the plan's autonomy, its changes only reach the
+    // draft, and it gets those three tools and nothing else (the runtime's policy refuses the rest).
+    if (customerTurns.active(channel)) {
+      const theirPlan = planForHome(this.plans.state(), channel);
+      if (!theirPlan) return undefined;
+      customerTurns.started(channel);
+      const board = this.deps.store.getState().board;
+      const view = this.pilot.view(theirPlan);
+      const brief = theirPlan.body ? headBrief(view) + planningBrief(theirPlan, board, this.plans.planningStyle) : planningBrief(theirPlan, board, this.plans.planningStyle);
+      return { tools: this.customerTools(theirPlan.id), brief, customerTurn: true };
+    }
     const me = this.deps.board.me();
     if (me.kind !== 'person' || from !== me.id) return undefined;
     // A milestone's checker: its brief, and only plan_get and plan_gate.
@@ -572,6 +588,15 @@ export class PlansWork {
    */
   toolsForAgent(planId: string, agent: ExternalActor): PlanTools {
     return { ...this.toolsFor(planId, this.deps.board.agentActor(agent)), only: ['plan_get', 'plan_write', 'plan_update', 'plan_start_task', 'plan_pause'] };
+  }
+
+  /**
+   * A Synon Studio customer's turn: reading the plan, and changes that only reach the draft
+   * (always, whatever the autonomy). No task tools, no gate, no starting or pausing.
+   */
+  private customerTools(planId: string): PlanTools {
+    const external: ExternalActor = { id: 'synon-studio-customer', name: 'a Synon Studio customer' };
+    return { ...this.toolsForAgent(planId, external), only: ['plan_get', 'plan_write', 'plan_update'] };
   }
 
   /** The chat of a plan's started task (its id, or its board key): the worktree it works in. */

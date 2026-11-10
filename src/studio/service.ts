@@ -4,6 +4,7 @@ import type { Autonomy } from '../core/plans/model.js';
 import { needPlans } from '../core/plans/registry.js';
 import type { Store } from '../core/store.js';
 import { identityPem, type Identity } from '../net/crypto.js';
+import { StudioChat, type SayResult, type StudioChatSession } from './chat.js';
 import { StudioGates, type GateAnswer, type GateAnswerResult } from './gates.js';
 import { StudioInbox, type InboxExec, type InboxPlugs } from './inbox.js';
 import { identityOf, loadStudioConfig, newRefKey, newStudioIdentity, removeStudioConfig, saveStudioConfig, studioPath, type StudioConfig } from './keys.js';
@@ -102,6 +103,7 @@ export class StudioService {
   /** The repository's one `plans.approve`, and the way to lower an autopilot plan. */
   private readonly approve?: (planId: string) => void;
   private readonly setAutonomy?: (planId: string, autonomy: Autonomy, milestone?: string) => void;
+  private readonly chatSession?: StudioChatSession;
   private readonly plugs?: Partial<InboxPlugs>;
   private readonly inboxFile?: string;
   private readonly log?: (line: string) => void;
@@ -111,6 +113,7 @@ export class StudioService {
   private publisher: StudioPublisher | undefined;
   private inbox: StudioInbox | undefined;
   private gates: StudioGates | undefined;
+  private chat: StudioChat | undefined;
   /** A link is registering right now: two screens can't start two registrations. */
   private linking = false;
 
@@ -124,6 +127,7 @@ export class StudioService {
     readonly exec?: InboxExec;
     readonly approve?: (planId: string) => void;
     readonly setAutonomy?: (planId: string, autonomy: Autonomy, milestone?: string) => void;
+    readonly session?: StudioChatSession;
     readonly plugs?: Partial<InboxPlugs>;
     readonly inboxFile?: string;
     readonly log?: (line: string) => void;
@@ -137,6 +141,7 @@ export class StudioService {
     if (d.exec) this.exec = d.exec;
     if (d.approve) this.approve = d.approve;
     if (d.setAutonomy) this.setAutonomy = d.setAutonomy;
+    if (d.session) this.chatSession = d.session;
     if (d.plugs) this.plugs = d.plugs;
     if (d.inboxFile) this.inboxFile = d.inboxFile;
     if (d.log) this.log = d.log;
@@ -229,7 +234,9 @@ export class StudioService {
     this.publisher = undefined;
     this.identity = undefined;
     this.config = undefined;
-    // Pending Gates go void; the opId receipts stay (an opId is scoped to the studio that made it).
+    // Pending Gates go void and queued customer words are dropped; the opId receipts stay (an opId
+    // is scoped to the studio that made it).
+    this.chat?.unlink();
     this.inbox?.unlink();
     this.dispatchStudio();
     let removed = true;
@@ -292,10 +299,28 @@ export class StudioService {
     return this.gates.answer(gateId, answer);
   }
 
+  /** The operator's words to a customer (Mac only): "名字 · Synon Studio" in the customer's turns. */
+  say(planId: string, text: string): SayResult {
+    if (!this.chat) return { ok: false, error: 'not-shared' };
+    return this.chat.say(planId, text);
+  }
+
   private connect(): void {
     const cfg = this.config;
     const identity = this.identity;
     if (!cfg || !identity || this.connection) return;
+    // The customer's conversation: queued words to the plan's own chat, and what the customer sees back.
+    if (!this.chat && !this.plugs?.chat && this.chatSession) {
+      this.chat = new StudioChat({
+        store: this.store,
+        config: () => this.config,
+        session: this.chatSession,
+        persist: () => this.inbox?.persist(),
+        touch: (planId) => this.publisher?.touch(planId),
+        now: this.now,
+        ...(this.log ? { log: this.log } : {}),
+      });
+    }
     // The Gate is the only holder of `plans.approve`; the inbox's executor can't reach it.
     if (!this.gates && !this.plugs?.gates && this.approve) {
       this.gates = new StudioGates({
@@ -314,11 +339,12 @@ export class StudioService {
     // The inbox keeps what an opId already did and the Gates raised, in its own file next to the key.
     if (!this.inbox) {
       const gates = this.plugs?.gates ?? this.gates;
+      const chat = this.plugs?.chat ?? this.chat;
       this.inbox = new StudioInbox({
         store: this.store,
         config: () => this.config,
         exec: this.exec ?? MISSING_EXEC,
-        plugs: { ...(this.plugs ?? {}), ...(gates ? { gates } : {}) },
+        plugs: { ...(this.plugs ?? {}), ...(gates ? { gates } : {}), ...(chat ? { chat } : {}) },
         send: (frame) => this.connection?.send(frame) ?? false,
         file: this.inboxFile ?? join(dirname(this.file), 'studio-inbox.json'),
         now: this.now,
@@ -422,6 +448,7 @@ export function launchStudio(d: { readonly session: object; readonly store: Stor
     // The one place a Gate's approve is wired: nothing else in `src/studio/` holds it.
     approve: (id) => void needPlans(d.session).approve(id),
     setAutonomy: (id, autonomy, milestone) => void needPlans(d.session).setAutonomy(id, autonomy, milestone),
+    session: d.session as unknown as StudioChatSession,
     log: (line) => console.error(`[studio] ${line}`),
   });
   attachStudio(d.session, service);
