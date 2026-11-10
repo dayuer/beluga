@@ -34,7 +34,7 @@ export function PersonContextMenu({ index, children }: { index: number; children
       <Context.Root modal={false}>
         <Context.Trigger asChild>{children}</Context.Trigger>
         <Context.Portal>
-          <Context.Content className={m.menu} collisionPadding={8}>
+          <Context.Content sticky="always" collisionPadding={8} className={m.menu}>
             <Items index={index} onRemove={setRemoving} onRun={() => setRunning(true)} />
           </Context.Content>
         </Context.Portal>

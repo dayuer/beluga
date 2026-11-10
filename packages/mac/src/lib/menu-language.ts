@@ -6,20 +6,20 @@
  */
 import { inApp } from './boot.js';
 import { subscribePrefs } from './prefs.js';
-import { type Key, currentLocale, t } from '../i18n/index.js';
+import { type Key, currentLocale, menuText, t } from '../i18n/index.js';
 import { menu } from '../i18n/en/menu.js';
 
 const KEYS = Object.keys(menu) as (keyof typeof menu)[];
 
 /** Every menu word in the language shown now, id → text (`menu.` dropped), Run's aside. */
-export const menuLabels = (): Record<string, string> => Object.fromEntries(KEYS.filter((k) => !k.startsWith('menu.ws-run')).map((k) => [k.slice('menu.'.length), t(k)]));
+export const menuLabels = (): Record<string, string> => Object.fromEntries(KEYS.filter((k) => !k.startsWith('menu.ws-run')).map((k) => [k.slice('menu.'.length), menuText(t(k))]));
 
 const COMMAND_WORDS: Readonly<Record<string, Key>> = { Run: 'menu.ws-run', 'Stop Running': 'menu.ws-run.stop' };
 
 /** A command's own label (commands.ts) as the menu bar shows it, in the language shown now. */
 export const menuWord = (label: string): string => {
   const key = COMMAND_WORDS[label];
-  return key ? t(key) : label;
+  return menuText(key ? t(key) : label);
 };
 
 /** Send the menus their words now and on every language change (returns the way to stop). */

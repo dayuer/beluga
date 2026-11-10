@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { FitContent } from '../components/SpecMenu.js';
 import { useSyncExternalStore } from 'react';
 import type { MachineView } from '@beluga/machines/machines.js';
 import { Icon } from '../components/Icon.js';
@@ -102,7 +103,7 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
         </button>
       </Dropdown.Trigger>
       <Dropdown.Portal>
-        <Dropdown.Content className={cx(m.menu, r.menu)} align="start" sideOffset={4} collisionPadding={8} aria-label={t('chat.runsOn.words')}>
+        <FitContent className={cx(m.menu, r.menu)} align="start" aria-label={t('chat.runsOn.words')}>
           <Dropdown.Label className={r.head}>{t('chat.runsOn.words')}</Dropdown.Label>
           {rows.map((row) => (
             <Dropdown.Item key={row.value} className={m.item} disabled={row.disabled} onSelect={() => set(row.value)} data-checked={row.value === value || undefined} aria-label={`${row.label}: ${row.line}`}>
@@ -114,7 +115,7 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
               <span className={cx(m.hint, r.line)}>{row.line}</span>
             </Dropdown.Item>
           ))}
-        </Dropdown.Content>
+        </FitContent>
       </Dropdown.Portal>
     </Dropdown.Root>
   );

@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { FitContent } from '../components/SpecMenu.js';
 import { type ReactNode, useMemo, useState } from 'react';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
@@ -60,11 +61,9 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
         {children}
       </Dropdown.Trigger>
       <Dropdown.Portal>
-        <Dropdown.Content
+        <FitContent
           className={cx(m.menu, t.pickMenu)}
           align={align}
-          sideOffset={4}
-          collisionPadding={8}
           onCloseAutoFocus={(e) => e.preventDefault()}
           aria-label={label}
           onKeyDown={(e) => {
@@ -152,7 +151,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
               </span>
             </Dropdown.Item>
           ))}
-        </Dropdown.Content>
+        </FitContent>
       </Dropdown.Portal>
     </Dropdown.Root>
   );
