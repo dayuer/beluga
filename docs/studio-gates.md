@@ -435,8 +435,10 @@ stateDiagram-v2
 ### 5.1 收下一条消息
 
 - `chat.accept(plan, opId, text)` 只收原文；`wrapCustomerText` 在提交时做（§5.2）。
-- 限流（每个计划）：每分钟 ≤ 10 条、每天 ≤ 50 000 字。中台入队时已经限一次，daemon 再限一次；超了回
-  `rate-limited`，消息不排队。长度 ≤ 4000 字由动作 schema 拦成 `bad-args`。
+- 限流两层（设计 §3.5 写明了两层的数字，`docs/studio-hub.md` §2 有中台那张表）：
+  - 中台入队：每客户每项目（或项目+计划）20 条**动作**/分、300 条/天、50 000 字/天，所有动作都算；
+  - daemon：每个计划的**聊天消息** 10 条/分、50 000 字/天（`src/studio/chat.ts`），`sendBack` 的原因同等对待。
+  超了回 `rate-limited`，消息不排队。长度 ≤ 4000 字由动作 schema 拦成 `bad-args`。
 - 收下的消息进 pending 队列并落盘（`studio-inbox.json` 的 `chat` 段），回执 `done` 表示「已收下」，不是「agent
   已经回复」。回复到了才成为 turn（§5.4）。
 - 客户自己的消息进 turns 前去掉包裹标记：他看到的永远是自己写的原话。
