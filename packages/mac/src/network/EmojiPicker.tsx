@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { type EmojiCategory, type PickerEmoji, loadEmojiCategories, searchEmojis } from './emoji-data.js';
 import r from './reactions.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Every emoji, to react with one (BLG-702): a search field, the categories as icons to jump to,
@@ -53,7 +52,7 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             const first = sections[0]?.emojis[0];
-            if (e.key === 'Enter' && !isImeComposing(e) && query.trim() && first) {
+            if (e.key === 'Enter' && query.trim() && first) {
               e.preventDefault();
               onPick(first.emoji);
             }

@@ -11,7 +11,6 @@ import { closeNet } from './net-sheets.js';
 import { useNetwork } from './use-net.js';
 import sh from '../dialogs/native/sharing.module.css';
 import s from './network.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 const STATES: ReadonlyArray<{ state: PresenceState; hint: string }> = [
   { state: 'online', hint: '' },
@@ -113,7 +112,7 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
           onChange={(e) => setNote(e.target.value)}
           onBlur={saveNote}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !isImeComposing(e)) {
+            if (e.key === 'Enter') {
               e.preventDefault();
               saveNote();
               onDone?.();

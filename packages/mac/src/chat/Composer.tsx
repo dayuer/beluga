@@ -17,7 +17,6 @@ import { defaultAgentOf } from '@beluga/protocol.js';
 import { Icon } from '../components/Icon.js';
 import { Kbd, Tip, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
-import { isImeComposing } from '../lib/ime.js';
 import { recipientLabel, recipientPrefix, toast, useApi, useApp, useBeluga, useUi, useMachine, useScopedKey } from '../lib/beluga.js';
 import { agentName, useAgentNameIn, useMyAgentName } from '../lib/agent-words.js';
 import { sameDeep, sameFields } from '../lib/stable.js';
@@ -533,7 +532,7 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter while an input method is composing (Japanese, Chinese…) picks the characters.
-    if (isImeComposing(e)) return;
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     // Shift-Tab switches between acting and planning first, as in Claude Code (not focus).
     if (isShortcut('composer-mode', e) && !shared && !planHome) {
       e.preventDefault();

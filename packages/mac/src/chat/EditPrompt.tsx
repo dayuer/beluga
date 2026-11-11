@@ -4,7 +4,6 @@ import { toast, useBeluga } from '../lib/beluga.js';
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import s from './edit-prompt.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 type Mode = 'here' | 'fork';
 
@@ -50,7 +49,7 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
     }
   };
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (isImeComposing(e)) return;
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

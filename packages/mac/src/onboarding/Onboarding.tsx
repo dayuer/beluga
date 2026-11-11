@@ -4,7 +4,6 @@ import { Icon } from '../components/Icon.js';
 import { APP_VERSION } from '../lib/boot.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { usePrefs } from '../lib/prefs.js';
-import { isImeComposing } from '../lib/ime.js';
 import { usePrivacyAccess } from '../lib/privacy.js';
 import { AccessStepView } from './AccessSteps.js';
 import { AgentsStep } from './AgentsStep.js';
@@ -188,7 +187,7 @@ export function Onboarding({ start = 'hello', onClose, onArrive }: { readonly st
       if (e.target instanceof Element && !e.target.closest('[data-welcome]') && e.target !== document.body) return;
       const field = e.target instanceof HTMLElement && e.target.closest('input, textarea, [role="combobox"], [role="listbox"], [role="radiogroup"], [role="switch"]');
       const onButton = e.target instanceof HTMLButtonElement && !e.target.closest('[role="radiogroup"]');
-      if (e.key === 'Enter' && !isImeComposing(e) && !e.metaKey && !onButton && !(field && e.target instanceof HTMLTextAreaElement)) {
+      if (e.key === 'Enter' && !e.metaKey && !onButton && !(field && e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         next();
       } else if ((e.metaKey && e.key === ']') || (!field && e.key === 'ArrowRight')) {

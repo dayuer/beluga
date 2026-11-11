@@ -10,7 +10,6 @@ import type { MenuKind } from '@beluga/ui/menus.js';
 import { Check, Choice, Field, Section, Sheet, Tag, tilde } from './parts.js';
 import s from './sharing.module.css';
 import f from './share.module.css';
-import { isImeComposing } from '../../lib/ime.js';
 
 type Who = 'all' | 'some';
 
@@ -111,7 +110,7 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
             <span className={f.pathIcon}>
               <Icon name="folder" size={14} />
             </span>
-            <input id="share-path" className={cx(s.input, f.path)} value={path} placeholder={canPickFolders() ? 'Choose a folder, or type its path' : '~/path/to/folder'} spellCheck={false} aria-label="Folder path" autoFocus={!inApp()} onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && (e.preventDefault(), share())} />
+            <input id="share-path" className={cx(s.input, f.path)} value={path} placeholder={canPickFolders() ? 'Choose a folder, or type its path' : '~/path/to/folder'} spellCheck={false} aria-label="Folder path" autoFocus={!inApp()} onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), share())} />
             {canPickFolders() ? <Button onClick={() => void choose()}>Choose…</Button> : null}
           </div>
         ) : (

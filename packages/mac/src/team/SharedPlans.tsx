@@ -11,7 +11,6 @@ import { ago } from '../tasks/tasks-model.js';
 import p from '../plans/plans.module.css';
 import s from './shared-plans.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Plans shared within a team (BLG-225). Yours: Share Plan with Team in the plan's •••, and Team
@@ -242,7 +241,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
             rows={2}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeComposing(e) && primaryKey(e)) {
+              if (e.key === 'Enter' && primaryKey(e)) {
                 e.preventDefault();
                 send();
               }
