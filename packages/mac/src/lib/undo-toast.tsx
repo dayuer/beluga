@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { Icon } from '../components/Icon.js';
+import { useOneToast } from '../fork/calm/one-toast.js';
 import s from './undo-toast.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
 
@@ -36,6 +37,7 @@ export function UndoToast() {
     },
     () => current,
   );
+  const one = useOneToast('undo', toast?.id);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => (current?.id === toast.id ? set(undefined) : undefined), SHOW_MS);
@@ -45,15 +47,16 @@ export function UndoToast() {
       set(undefined);
       toast.undo();
     };
-    window.addEventListener('keydown', onKey);
+    // Its timer always runs out; a hidden one does nothing, ⌘Z included (fork/calm/one-toast.ts).
+    if (one) window.addEventListener('keydown', onKey);
     return () => {
       clearTimeout(t);
       window.removeEventListener('keydown', onKey);
     };
-  }, [toast]);
-  if (!toast) return null;
+  }, [toast, one]);
+  if (!toast || !one) return null;
   return (
-    <div className={s.wrap} role="status" aria-live="polite">
+    <div className={s.wrap} role="status" aria-live="polite" data-one-toast="undo">
       <div key={toast.id} className={s.toast}>
         <Icon name="check" size={13} className={s.icon} />
         <span className={s.text}>{toast.text}</span>

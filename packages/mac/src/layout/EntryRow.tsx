@@ -12,6 +12,7 @@ import { chatPlaceOf, iconOf } from '../sentinel/sentinel-model.js';
 import { IDLE_SIGNAL, type Signal, type UnreadEntry, planSignal, workspaceSignal } from './attention-model.js';
 import { SignalMark, nameClass, signalClass } from './signal-marks.js';
 import { Row, type RowProps } from './sidebar-parts.js';
+import { useHeldEntries } from '../fork/calm/hold-order.js';
 import m from './signal.module.css';
 
 /** One conversation in a sidebar list, and opening it from there: the seam the Unread section and the categories share. */
@@ -94,7 +95,12 @@ export function useEntryList<E extends UnreadEntry>(entriesOf: (state: AppState)
     setKept({ entry: e, at, arrived: e.channel === here });
     openEntry(e, actions.run, client);
   };
-  return { here, entries, ...(stay && kept ? { kept: { entry: stay, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? 'Shared', open };
+  // While you are working in the sidebar the list you opened from stays as it was (fork/calm/hold-order.ts).
+  const held = useHeldEntries(entries);
+  // The row you just opened is put back in its old place (`kept` below): leave it out here, or it
+  // would be drawn twice when the held group still has it.
+  const listed = stay && kept ? held.filter((e) => e.channel !== kept.entry.channel) : held;
+  return { here, entries: listed, ...(stay && kept ? { kept: { entry: stay, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? 'Shared', open };
 }
 
 /** Where you are, as a channel: a plan counts as one place (its page, its conversation and its tasks' worktrees). */

@@ -18,6 +18,28 @@ const SNAPSHOT = path.join(__dirname, 'fork-calm.snapshot.json');
 /** One-off decoration that may keep its motion (docs/calm-ui.md §7.4). */
 const KEEP_DECOR = ['onboarding/', 'dialogs/star-scene.module.css', 'components/PixelBurst.tsx', 'components/pixel-burst-model.ts'];
 
+/** Files are named from the repository root here, as docs/fork.md names them. */
+const REPO = path.join(__dirname, '..');
+
+/**
+ * Every place this fork reaches into an upstream file (docs/fork.md's touch points; each one is
+ * designed in docs/calm/hooks.md). `match` is the line the fork relies on: a missing match means an
+ * upstream change moved or removed the hook and the fork's behaviour is silently gone. That is a
+ * broken fork integration, not an upstream style finding, so it fails the run (unlike the report
+ * below). Each task that adds a hook adds its row here.
+ */
+const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; readonly why: string }[] = [
+  { file: 'packages/mac/src/main.tsx', match: /import '\.\/fork\/calm\/index\.js'/, why: 'calm overlay loads before the first frame (M0)' },
+  { file: 'packages/mac/src/dialogs/Settings.tsx', match: /<CalmRow \/>/, why: 'the calm switch in Settings › Appearance (M0)' },
+  { file: 'tests/mac-settings-search.test.ts', match: /read\('fork\/calm\/settings\.tsx'\)/, why: 'settings search reads the fork row (M0)' },
+  { file: 'packages/mac/src/layout/Sidebar.tsx', match: /useSidebarHold\(drop\.ref\)/, why: 'the sidebar probe that holds its order (BLG-165)' },
+  { file: 'packages/mac/src/layout/EntryRow.tsx', match: /useHeldEntries\(/, why: 'the frozen order both sidebar lists read (BLG-165)' },
+  { file: 'packages/mac/src/chat/ChatLog.tsx', match: /<JumpLabel rows=\{rows\.length\} \/>/, why: 'the count of messages below, on the way back down (BLG-166)' },
+  { file: 'packages/mac/src/App.tsx', match: /useOneToast\('global', toast\?\.id\)/, why: 'one toast at a time: the app toast steps aside (BLG-167)' },
+  { file: 'packages/mac/src/lib/undo-toast.tsx', match: /useOneToast\('undo', toast\?\.id\)/, why: 'one toast at a time: the undo toast steps aside (BLG-167)' },
+  { file: 'packages/mac/src/lib/live-motion.ts', match: /calmLive\(/, why: 'only the current step row loops in calm mode (BLG-168)' },
+];
+
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
 const BANNED = ['pop', 'hop', 'bounce', 'ripple', 'sheen', 'shimmer', 'breathe', 'pulse', 'shake', 'blink', 'glow'];
 
@@ -185,5 +207,13 @@ describe('fork-calm: what the overlay cannot reach', () => {
       return FORBIDDEN_IN_FORK.has(f.category) || BANNED.some((word) => lower.includes(word));
     });
     expect(violations.map((f) => `${f.category}|${f.file}|${f.name}`)).toEqual([]);
+  });
+
+  it('keeps every line into an upstream file that the fork relies on', () => {
+    const missing = TOUCHPOINTS.filter((t) => {
+      const full = path.join(REPO, t.file);
+      return !existsSync(full) || !t.match.test(readFileSync(full, 'utf8'));
+    });
+    expect(missing.map((t) => `${t.file}: ${t.why}`)).toEqual([]);
   });
 });
