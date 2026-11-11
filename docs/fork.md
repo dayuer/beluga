@@ -58,6 +58,8 @@ node scripts/sync-upstream.mjs --report
 - `packages/mac/src/dialogs/Settings.tsx`：Appearance 的 Layout 组、Reduce motion 行后加一行 `<CalmRow />`；开关本体在 `packages/mac/src/fork/calm/settings.tsx`。
 - `tests/mac-settings-search.test.ts`：appearance 的 `PANE_SOURCES` 加 `read('fork/calm/settings.tsx')`，让「索引的标签必须在面板源码里」这条校验读得到 fork 自己的行。
 - `CLAUDE.md`：原来的《The Mac app's look: calm, not lively》一节搬进 `docs/calm-ui.md`，原处只留一行指向；规则本体的改动都在 fork 文件里，不碰上游。
+- `packages/mac/src/layout/Sidebar.tsx`：一行 `useSidebarHold(drop.ref)`——「指针/焦点/拖拽是否在侧栏上」只有 nav 自己知道，探针逻辑在 `fork/calm/hold-order.ts`。操作侧栏时不重排、离开 600ms 后换上新顺序（`docs/calm/hooks.md` §1）。
+- `packages/mac/src/layout/EntryRow.tsx`：`useEntryList` 的返回值经过 `useHeldEntries`——Unread 与 Categories 两种侧栏模式都从这里拿排序结果，改这一处覆盖两种；冻结的取舍与实现见 `docs/calm/hooks.md` §1。
 
 ### 版本号（脚本自动处理）
 

@@ -131,6 +131,12 @@ return frozen.current;
 - `packages/mac/src/layout/Sidebar.tsx`：一行 `useSidebarHold(drop.ref)`——侧栏上「在操作」的探针，逻辑在 `fork/calm/hold-order.ts`。
 - `packages/mac/src/layout/EntryRow.tsx`：`useEntryList` 里包一层 `useHeldEntries`——两种侧栏模式共同消费排序结果的唯一缝。
 
+### 1.7 证据（BLG-165）
+
+- 单测 `tests/fork-calm-hold-order.test.ts`：5 条状态机用例（悬停冻结、离开 600ms 后释放、键盘焦点仍冻结、宽限期内再操作续冻、拖动、菜单未关续期）。
+- e2e `packages/mac/e2e/fork-calm-sidebar.spec.ts`：calm 开时指针停在侧栏、会话变成 needs 的期间 Unread 列表逐行不变，离开后才换；calm-off 变体断言同样的变化在指针仍在侧栏时发生。按计划在里程碑最终步骤统一跑 e2e。
+- canary 已加进 `tests/fork-calm.test.ts` 的 `TOUCHPOINTS`（`useSidebarHold(drop.ref)`、`useHeldEntries(`）。
+
 ## 2. 挂钩二：对话滚动锚定与「有新内容」（BLG-166）
 
 ### 2.1 上游现状（已核对，不用重写滚动）
