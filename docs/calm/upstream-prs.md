@@ -115,7 +115,7 @@
 | RE-01 onboarding reduce | `onboarding` calm-on/reduce 仍 0；calm-off/reduce 的两条由上游新增媒体查询停掉（待 e2e/构建确认） |
 | unread e2e 断言 | 改为 400 + 计数徽标。**实施中发现**：行名的基础色本来就是 `--text`，与 `.unreadName` 相同——S2 之后名字在沉稳下与普通行完全一致，未读只由计数徽标表示。原「只换颜色」的说法不成立；本里程碑按「徽标是未读信号」处理，175 可在 SH-02 的状态里写清楚 |
 | typecheck / fork-calm / sync-upstream | `packages/mac` typecheck 通过；`fork-calm` 3 passed（快照 440 条，Recap 并入 keep-decor 后减少 2 条）；`sync-upstream --report` 0 个 `!` |
-| e2e：fork-calm-sidebar / fork-calm-toast / plans / unread | 待跑（e2e-lock 被另一个 worktree 的运行占着；结果回填在本节末） |
+| e2e：fork-calm-sidebar / fork-calm-toast / plans / unread | **按里程碑约定延到计划的最终步骤统一跑**（本任务的指令是只跑 typecheck 与新增/改动的单测，e2e 与全量套件在最后一步一次跑；e2e-lock 当时也被另一个 worktree 占着）。R3-06 若在 `plans` 下失败，按 §7 回退为 keep-decor |
 
 **与定稿的偏差**
 
