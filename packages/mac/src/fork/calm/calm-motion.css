@@ -1,0 +1,8 @@
+/*
+ * Calm mode: motion (docs/calm-ui.md §2, §7).
+ * M1 (BLG-161) fills this: keyframes off, transitions 120–200 ms ease-out, the single whitelisted
+ * loop (`:root[data-calm] [data-current]`), and reduced motion as fades only.
+ * Empty in M0 on purpose: calm mode is on by default, so this skeleton must change nothing yet.
+ */
+:root[data-calm] {
+}

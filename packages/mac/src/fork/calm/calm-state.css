@@ -1,0 +1,7 @@
+/*
+ * Calm mode: dots, badges, counts and "needs you" (docs/calm-ui.md §3).
+ * M1 (BLG-162) fills this: states swap in place or fade, and needing you is a steady mark.
+ * Empty in M0 on purpose: calm mode is on by default, so this skeleton must change nothing yet.
+ */
+:root[data-calm] {
+}
