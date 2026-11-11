@@ -69,4 +69,46 @@ describe('the studio app hub client', () => {
     expect(parse(PlansRes, { plans: [], studio: { online: 'yes', lastSyncAt: null } }).ok).toBe(false);
     expect(parse(PlansRes, { plans: [] }).ok).toBe(false);
   });
+
+  it('reads one plan view from its own path', async () => {
+    const view = {
+      planRef: 'plan1',
+      draftRev: 1,
+      title: '饮水',
+      goal: '',
+      stage: 'running',
+      waitingOn: 'ai',
+      headline: '在做',
+      progress: { done: 0, total: 0 },
+      milestones: [],
+      decisions: [],
+      turns: [],
+      typing: false,
+      moreTurns: false,
+      activity: [],
+    };
+    let seen = '';
+    const r = await hubWith(async (url) => {
+      seen = String(url);
+      return reply(JSON.stringify({ view, updatedAt: 123 }));
+    }).plan('p1', 'plan1');
+    expect(seen).toBe('https://hub.test/v1/app/projects/p1/plans/plan1');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.view.title).toBe('饮水');
+    expect(r.value.updatedAt).toBe(123);
+  });
+
+  it('pages the conversation before a turn id', async () => {
+    let seen = '';
+    const r = await hubWith(async (url) => {
+      seen = String(url);
+      return reply(JSON.stringify({ turns: [{ id: 't1', who: 'ai', text: '你好', at: 1 }], more: false }));
+    }).turns('p1', 'plan1', 't9');
+    expect(seen).toBe('https://hub.test/v1/app/projects/p1/plans/plan1/turns?before=t9');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.turns).toHaveLength(1);
+    expect(r.value.more).toBe(false);
+  });
 });

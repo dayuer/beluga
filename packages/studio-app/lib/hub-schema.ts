@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { STAGES, WAITING_ON, StudioReceipt } from '../../../src/studio/protocol';
+import { STAGES, WAITING_ON, StudioPlanViewLoose, StudioReceipt, StudioTurn } from '../../../src/studio/protocol';
 
 /**
  * The hub's list responses, parsed loosely: unknown fields are dropped, so a newer daemon or hub
@@ -43,6 +43,18 @@ export const PlansRes = z.object({
   studio: StudioStatus,
 });
 
+/** One plan's full customer view (the hub's `{view, updatedAt}`). */
+export const PlanRes = z.object({
+  view: StudioPlanViewLoose,
+  updatedAt: ms,
+});
+
+/** A page of the plan's conversation, oldest first, with whether older turns exist. */
+export const TurnsRes = z.object({
+  turns: z.array(StudioTurn).max(50),
+  more: z.boolean(),
+});
+
 export const VerifyRes = z.object({
   session: z.string().min(1).max(512),
   expiresAt: ms,
@@ -55,6 +67,8 @@ export type ProjectSummary = z.infer<typeof ProjectSummary>;
 export type ProjectsRes = z.infer<typeof ProjectsRes>;
 export type PlanSummary = z.infer<typeof PlanSummary>;
 export type PlansRes = z.infer<typeof PlansRes>;
+export type PlanRes = z.infer<typeof PlanRes>;
+export type TurnsRes = z.infer<typeof TurnsRes>;
 export type StudioStatus = z.infer<typeof StudioStatus>;
 export type VerifyRes = z.infer<typeof VerifyRes>;
 

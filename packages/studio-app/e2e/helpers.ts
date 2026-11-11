@@ -88,7 +88,12 @@ export function delivers(): number {
     .filter((entry) => entry.kind === 'deliver' && entry.actionKind === 'plan.create').length;
 }
 
-export async function controlPost(action: 'stop' | 'start'): Promise<void> {
-  const res = await fetch(`${control}/daemon/${action}`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+export async function controlPost(action: 'stop' | 'start' | 'view' | 'approve' | 'reset', body?: unknown): Promise<void> {
+  const res = await fetch(`${control}/daemon/${action}`, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(5000),
+  });
   if (!res.ok) throw new Error(`control ${action} failed: ${res.status}`);
 }

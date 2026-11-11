@@ -15,6 +15,7 @@
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
 import { dirname } from 'node:path';
 import WebSocket from 'ws';
 
@@ -31,6 +32,8 @@ const name = flag('name', 'Fake Studio Mac');
 const projects = flags('project');
 const interval = Number(flag('interval', '4000'));
 const keyFile = flag('key-file');
+// The e2e runner's control port: push a fixture view (BLG-91) or approve the start gate.
+const controlPort = Number(flag('control-port', '0'));
 
 const log = (kind, extra = {}) => console.log(JSON.stringify({ kind, at: Date.now(), ...extra }));
 
@@ -89,6 +92,8 @@ let synced = false;
 let stopping = false;
 let rev = 0;
 const plans = projects.map((project, i) => ({ project, planRef: `plan${i + 1}` }));
+/** Views pushed by the e2e runner (`POST /view`, `POST /approve`), per daemon project id. */
+const customViews = new Map();
 
 function send(frame) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -98,7 +103,23 @@ function send(frame) {
 
 function snapshot(entry) {
   rev += 1;
-  send({ t: 'for', project: entry.project, frame: { t: 'plan', rev, view: view(entry.planRef, rev) } });
+  const custom = customViews.get(entry.project);
+  const next = custom ? { ...custom, planRef: entry.planRef } : view(entry.planRef, rev);
+  send({ t: 'for', project: entry.project, frame: { t: 'plan', rev, view: next } });
+}
+
+/** The Mac's NeedsYou approval: the start gate is approved and the plan is running. */
+function approve(entry) {
+  const base = customViews.get(entry.project) ?? view(entry.planRef, rev);
+  const next = {
+    ...base,
+    planRef: entry.planRef,
+    stage: 'running',
+    waitingOn: 'ai',
+    gate: { kind: 'start', state: 'approved', draftRev: base.draftRev ?? 1 },
+  };
+  customViews.set(entry.project, next);
+  snapshot(entry);
 }
 
 function pushAll() {
@@ -157,6 +178,51 @@ function connect() {
     if (!stopping) setTimeout(connect, 800);
   });
   ws.on('error', (err) => log('error', { message: String(err?.message ?? err) }));
+}
+
+// The e2e runner's controls: push a plan view fixture, approve the start gate, or go back to the
+// default ticking view. The interface stays stable for M7's soak test.
+if (controlPort) {
+  const pick = (data) => plans.find((p) => p.project === data.project) ?? plans[0];
+  http
+    .createServer((req, res) => {
+      let body = '';
+      req.on('data', (chunk) => (body += chunk));
+      req.on('end', () => {
+        const answer = (status, json) => {
+          res.writeHead(status, { 'content-type': 'application/json' });
+          res.end(JSON.stringify(json));
+        };
+        let data;
+        try {
+          data = body ? JSON.parse(body) : {};
+        } catch {
+          return answer(400, { error: 'bad-json' });
+        }
+        const entry = pick(data);
+        try {
+          if (req.method === 'POST' && req.url === '/view') {
+            if (!data.view || typeof data.view !== 'object') return answer(400, { error: 'view-required' });
+            customViews.set(entry.project, data.view);
+            snapshot(entry);
+            return answer(200, { ok: true, rev });
+          }
+          if (req.method === 'POST' && req.url === '/approve') {
+            approve(entry);
+            return answer(200, { ok: true });
+          }
+          if (req.method === 'POST' && req.url === '/reset') {
+            customViews.delete(entry.project);
+            snapshot(entry);
+            return answer(200, { ok: true });
+          }
+          return answer(404, { error: 'unknown' });
+        } catch (error) {
+          return answer(400, { error: String(error?.message ?? error) });
+        }
+      });
+    })
+    .listen(controlPort, '127.0.0.1', () => log('control', { port: controlPort }));
 }
 
 process.on('SIGUSR2', () => {

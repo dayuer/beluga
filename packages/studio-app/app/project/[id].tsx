@@ -12,6 +12,7 @@ import { TextButton } from '../../components/TextButton';
 import { cache } from '../../lib/cache';
 import { hub } from '../../lib/client';
 import type { PlansRes, ProjectSummary, StudioStatus } from '../../lib/hub-schema';
+import { live } from '../../lib/live';
 import { useOnline } from '../../lib/net';
 import { rowFromView, type PlanRowData } from '../../lib/plan-rows';
 import { session } from '../../lib/session';
@@ -103,7 +104,7 @@ export default function ProjectHomeScreen() {
   // reconnect, refresh the list and say so for two seconds.
   useEffect(() => {
     if (!pid) return;
-    const close = hub.watch(pid, {
+    const close = live.subscribe(pid, {
       frame: (f) => {
         if (f.t === 'plan') {
           const row = rowFromView(f.view);
@@ -185,7 +186,7 @@ export default function ProjectHomeScreen() {
           ) : (plans ?? []).length === 0 ? (
             <EmptyState title={t(lang, 'home.empty')} testID="home-empty" />
           ) : (
-            (plans ?? []).map((plan) => <PlanRow key={plan.planRef} plan={plan} />)
+            (plans ?? []).map((plan) => <PlanRow key={plan.planRef} plan={plan} pid={pid} />)
           )}
         </View>
       </ScrollView>
