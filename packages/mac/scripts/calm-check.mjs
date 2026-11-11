@@ -475,6 +475,117 @@ function stepsFor(page, shot) {
         await shot('closed');
       }
     },
+
+    // BLG-171 work/data scenes
+    /** The plan canvas (React Flow): nodes, edges and the transitions they keep. */
+    plancanvas: async () => {
+      await side(page, 'Card checkout for launch').click();
+      await wait(2500);
+      await shot('canvas');
+      return {
+        flow: await page.evaluate(
+          pageFn(`() => {
+            const node = document.querySelector('.react-flow__node');
+            const edge = document.querySelector('.react-flow__edge-path');
+            const cs = node ? getComputedStyle(node) : null;
+            return {
+              nodes: document.querySelectorAll('.react-flow__node').length,
+              edges: document.querySelectorAll('.react-flow__edge').length,
+              nodeDuration: cs ? cs.transitionDuration : null,
+              nodeTiming: cs ? cs.transitionTimingFunction : null,
+              edgeDuration: edge ? getComputedStyle(edge).transitionDuration : null,
+            };
+          }`),
+        ),
+      };
+    },
+    /** A task's page, opened from its card on the board. */
+    taskdetail: async () => {
+      await workPage(page, 'Tasks');
+      const card = page.locator('[role="list"][aria-label="Board"] [role="button"][aria-label]').first();
+      if (await card.count().catch(() => 0)) {
+        await card.click({ timeout: 8000 }).catch(() => undefined);
+        await wait(1800);
+        await shot('task');
+      }
+    },
+    /** A task created on the board: where its card lands and what the column does to the others. */
+    tasknew: async () => {
+      await workPage(page, 'Tasks');
+      const places = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('[role="list"][aria-label="Board"] [role="button"][aria-label]')].map((el) => ({
+            label: el.getAttribute('aria-label'),
+            y: Math.round(el.getBoundingClientRect().top),
+            h: Math.round(el.getBoundingClientRect().height),
+          })),
+        );
+      const before = await places();
+      const newTask = page.getByRole('button', { name: 'New Task', exact: true });
+      if (await newTask.count().catch(() => 0)) {
+        await newTask.first().click();
+        await wait(700);
+        // The sheet starts asking the agent; write the title here instead (deterministic).
+        const myself = page.getByRole('button', { name: 'Write title and goal myself' });
+        if (await myself.count().catch(() => 0)) {
+          await myself.first().click();
+          await wait(300);
+        }
+        const title = page.locator('#task-title');
+        if (await title.count().catch(() => 0)) {
+          await title.fill('Board insert probe');
+          await wait(300);
+        }
+        const create = page.getByRole('button', { name: /^Create Task/ });
+        if (await create.count().catch(() => 0)) {
+          await create.first().click();
+          await wait(2000);
+        }
+      }
+      if (await page.getByRole('dialog').count().catch(() => 0)) await page.keyboard.press('Escape');
+      await wait(1200);
+      const after = await places();
+      await shot('after-create');
+      return { before, after };
+    },
+    /** GitHub issues, from Work. */
+    issues: async () => {
+      await workPage(page, 'Issues');
+      await shot('issues');
+    },
+    /** Sentinel's dashboard: tiles and charts, and whether the numbers sit in fixed-width digits. */
+    sentineldash: async () => {
+      await page.getByRole('button', { name: 'Settings and menus' }).click();
+      await wait(300);
+      await page.getByRole('menuitem', { name: 'Go' }).hover();
+      await wait(300);
+      await page.getByRole('menuitem', { name: 'Dashboard', exact: true }).click();
+      await wait(2000);
+      await shot('dashboard');
+      return {
+        numbers: await page.evaluate(
+          pageFn(`() => {
+            const out = [];
+            for (const el of document.querySelectorAll('span, div, b, strong')) {
+              const t = (el.textContent ?? '').trim();
+              if (!/^[-+$€£]?[\\d,.]+[%KMB]?$/.test(t) || el.children.length) continue;
+              const r = el.getBoundingClientRect();
+              if (!r.width) continue;
+              const cs = getComputedStyle(el);
+              out.push({ text: t, width: Math.round(r.width), numeric: cs.fontVariantNumeric });
+              if (out.length >= 20) break;
+            }
+            return out;
+          }`),
+        ),
+      };
+    },
+    /** A project's home page: its numbers, plans, worktrees and tasks. */
+    projecthome: async () => {
+      await side(page, 'bob-api').click();
+      await wait(2000);
+      await shot('project');
+    },
   };
 }
 
