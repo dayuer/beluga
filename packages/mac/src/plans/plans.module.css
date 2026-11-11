@@ -251,13 +251,15 @@
 }
 .pageHead {
   display: flex;
+  /* Narrow (BLG-124): the actions go under the name rather than over it. */
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 16px;
+  gap: 6px 16px;
   padding: 10px 16px 12px;
   border-bottom: 1px solid var(--hairline);
 }
 .headMain {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
   display: flex;
   flex-direction: column;

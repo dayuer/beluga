@@ -12,6 +12,7 @@ import { machineClientOf } from '../machines/pane-clients.js';
 import type { RemoteSource } from '../machines/remote-work.js';
 import { useRemoteSources } from '../machines/use-remote.js';
 import s from './SidebarSearch.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * The field at the top of the sidebar: finds a conversation by name, branch, PR or project at once,
@@ -87,7 +88,7 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
               setSelected((at) => moveSelection(at, results.length, e.key === 'ArrowDown' ? 1 : -1));
-            } else if (e.key === 'Enter') {
+            } else if (e.key === 'Enter' && !isImeComposing(e)) {
               e.preventDefault();
               const result = results[selected];
               if (result) open(result);

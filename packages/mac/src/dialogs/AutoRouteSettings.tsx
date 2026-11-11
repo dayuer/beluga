@@ -1,5 +1,5 @@
 import { agentChoices } from '@beluga/ui/agent-choice.js';
-import { type AutoRoute, type RouteList, HARD_LABEL, MAX_CANDIDATES, autoRouteOn, candidateRuns, tierList } from '@beluga/shared/auto-route.js';
+import { type AutoRoute, type RouteList, HARD_LABEL, MAX_CANDIDATES, autoAgentName, autoRouteOn, candidateRuns, parseChoice, tierList } from '@beluga/shared/auto-route.js';
 import { agentEntries } from '../chat/ModelPicker.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
@@ -9,7 +9,7 @@ import { Group, Row, Select, Switch } from './settings-controls.js';
  * Settings › Agent › Auto Route (fork, shared/auto-route.ts): a task nobody picked an agent for
  * goes, when it starts, to the first model of its list that runs here: hard work (the `hard`
  * label, urgent or high) to the strong list, the rest to the cheap one. A plan's checks go to the
- * list in between, its design and its hard fixes to the strong one. Unset, it's on once one of its local candidates runs here.
+ * list in between (Plan Audits), its design and its hard fixes to the strong one (its footer says so). Unset, it's on once one of its local candidates runs here.
  */
 export function AutoRouteSettings() {
   const api = useApi();
@@ -23,19 +23,26 @@ export function AutoRouteSettings() {
     void api.session.setPrefs({ autoRoute: next });
   };
   const setList = (tier: RouteList, list: readonly string[]): void => save({ [tier]: [...list] });
+  // A candidate not set up here isn't in the pop-up: its model and where it would run ("Sonnet 5.5 · Local model"), not its raw id (BLG-124).
+  const readable = (value: string): string => {
+    const c = parseChoice(value);
+    if (!c) return value;
+    const where = runtimes.find((r) => r.id === c.runtime)?.label ?? c.runtime;
+    return c.model ? `${autoAgentName({ runtime: c.runtime, label: where, model: c.model })} · ${where}` : where;
+  };
 
   const tierRows = (tier: RouteList) => {
     const list = tierList(tier, route);
     const used = list.find((v) => candidateRuns(runtimes, v));
     const custom = route?.[tier];
     return (
-      <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Checking the Work' : 'Everything Else'}>
+      <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Plan Audits' : 'Everything Else'}>
         {list.map((value, i) => {
           const runs = candidateRuns(runtimes, value);
           const detail = value === used ? 'Used now' : runs ? 'If the one above stops working' : 'Not set up on this Mac: skipped';
           return (
             <Row key={`${tier}-${i}`} label={`Choice ${(i + 1)}`} detail={detail}>
-              <Select label={`Choice ${(i + 1)}`} value={value} options={entries} placeholder={value} onChange={(v) => setList(tier, list.map((x, j) => (j === i ? v : x)))} />
+              <Select label={`Choice ${(i + 1)}`} value={value} options={entries} placeholder={readable(value)} onChange={(v) => setList(tier, list.map((x, j) => (j === i ? v : x)))} />
               <Button size="small" disabled={i === 0} aria-label={'Move up'} onClick={() => setList(tier, list.map((x, j) => (j === i - 1 ? value : j === i ? list[i - 1]! : x)))}>
                 ↑
               </Button>
@@ -45,7 +52,7 @@ export function AutoRouteSettings() {
             </Row>
           );
         })}
-        <Row label={tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? 'Its tasks start on the one marked Used now' : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
+        <Row label={tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? (tier === 'hard' ? 'Its tasks, and plans’ design and hard fixes, start on the one marked Used now' : 'Its tasks start on the one marked Used now') : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
           {list.length < MAX_CANDIDATES ? (
             <Button size="small" onClick={() => setList(tier, [...list, 'claude:'])}>
               {'Add'}

@@ -136,6 +136,21 @@ describe('a plan’s agent for hard fixes', () => {
     expect(again.need(plan.id)).toMatchObject({ agent: CHEAP, checkAgent: MID, fixAgent: STRONG });
   });
 
+  it('what Plan Settings saves (BLG-123) is still there after the daemon restarts', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'plan-settings-'));
+    const t = setup({ dir });
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CHEAP }, { quiet: true });
+    t.work.setAutonomy(plan.id, 'gated');
+    t.work.setTestsAt(plan.id, 'end');
+    t.work.setWorkAgent(plan.id, MID);
+    t.work.setCheckAgent(plan.id, STRONG);
+    t.work.setArchAgent(plan.id, STRONG);
+    t.work.setFixAgent(plan.id, MID);
+    t.plans.flush();
+    const again = new Plans({ store: new Store(initialState('room')), dir });
+    expect(again.need(plan.id)).toMatchObject({ autonomy: 'gated', testsAt: 'end', agent: MID, checkAgent: STRONG, archAgent: STRONG, fixAgent: MID });
+  });
+
   it('fix tasks after a failed check: the milestone’s worktree goes to the fix agent before it’s told about them, once', async () => {
     const t = setup({ workers: 'milestone' });
     const plan = await approved(t, ONE);
@@ -194,6 +209,48 @@ describe('a plan’s agent for hard fixes', () => {
     expect(t.switched.at(-1)).toMatchObject({ channel: 'ws:main', agent: CHEAP });
   });
 
+  it('two conflicts at once (BLG-131): one gone keeps the conversation on the fix agent; both gone, it goes back', async () => {
+    const fixed = new Set<string>();
+    const dirOf = (key: string) => `/tmp/.bases/p/${key.toLowerCase()}-base`;
+    const t = setup({ workers: 'task', combine: async (_p, key) => (fixed.has(key) ? { ok: true, branch: `beluga/${key.toLowerCase()}-base` } : { ok: false, branch: `beluga/${key.toLowerCase()}-base`, dir: dirOf(key), merging: 'beluga/b', files: ['shared.txt'] }) });
+    await approved(t, { title: 'Stack', goal: '', milestones: [{ id: 'm', title: 'Everything', criteria: ['works'], tasks: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }, { id: 'd', title: 'D' }, { id: 'two', title: 'Two', blockedBy: ['a', 'b'] }, { id: 'four', title: 'Four', blockedBy: ['c', 'd'] }] }] }, { autonomy: 'gated' });
+    await waitFor(() => ['A', 'B', 'C', 'D'].every((x) => t.issue(x).worktrees.length));
+    for (const title of ['A', 'B', 'C', 'D']) t.board.update(t.issue(title).id, { status: 'in_review' }, t.claude);
+    const [two, four] = [t.issue('Two').key, t.issue('Four').key];
+    await waitFor(() => t.asked.some((a) => a.prompt.includes(dirOf(two))) && t.asked.some((a) => a.prompt.includes(dirOf(four))));
+    expect(t.switched).toEqual([{ channel: 'ws:main', agent: STRONG, at: expect.any(Number) }]);
+    // Two's conflict is fixed; Four's is still there: no handing back.
+    fixed.add(two);
+    t.run('ws:main', 'started', 'fix-1');
+    t.run('ws:main', 'done', 'fix-1');
+    await waitFor(() => t.issue('Two').status === 'in_progress');
+    expect(t.switched.map((s) => s.agent)).toEqual([STRONG]);
+    // Four's too: back on the work's agent.
+    fixed.add(four);
+    t.run('ws:main', 'started', 'fix-2');
+    t.run('ws:main', 'done', 'fix-2');
+    await waitFor(() => t.issue('Four').status === 'in_progress');
+    expect(t.switched.map((s) => s.agent)).toEqual([STRONG, CHEAP]);
+  });
+
+  it('put on the fix agent before a restart (BLG-131): no second handover, and back on the work’s agent once the conflict is gone', async () => {
+    let fixed = false;
+    const t = setup({ workers: 'task', combine: async (_p, key) => (fixed ? { ok: true, branch: `beluga/${key.toLowerCase()}-base` } : { ok: false, branch: `beluga/${key.toLowerCase()}-base`, dir: '/tmp/.bases/p/two-base', merging: 'beluga/b', files: ['shared.txt'] }) });
+    // What the daemon kept on the plan's conversation from before: it's on the fix agent (this session never switched it).
+    t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((w) => (w.id === 'main' ? ({ ...w, agent: STRONG } as Workspace) : w)) })) });
+    const plan = await approved(t, { title: 'Stack', goal: '', milestones: [{ id: 'm', title: 'Everything', criteria: ['works'], tasks: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'two', title: 'Two', blockedBy: ['a', 'b'] }] }] }, { autonomy: 'gated' });
+    await waitFor(() => t.issue('A').worktrees.length && t.issue('B').worktrees.length);
+    for (const title of ['A', 'B']) t.board.update(t.issue(title).id, { status: 'in_review' }, t.claude);
+    await waitFor(() => t.asked.some((a) => a.channel === 'ws:main' && a.prompt.includes('/tmp/.bases/p/two-base')));
+    expect(t.switched).toEqual([]);
+    expect(t.plans.need(plan.id).activity.some((e) => e.text === 'handed the conflict to Claude (Opus)')).toBe(false);
+    fixed = true;
+    t.run('ws:main', 'started', 'fix-1');
+    t.run('ws:main', 'done', 'fix-1');
+    await waitFor(() => t.issue('Two').status === 'in_progress');
+    expect(t.switched).toEqual([{ channel: 'ws:main', agent: CHEAP, at: expect.any(Number) }]);
+  });
+
   it('a task that stops twice goes to the fix agent and is woken once more; a third time, it waits for you', async () => {
     let now = Date.now();
     const t = setup({ workers: 'task', now: () => now });
@@ -240,5 +297,30 @@ describe('a plan’s agent for hard fixes', () => {
     t.work.setFixAgent(plan.id, STRONG);
     const view = planPageView(t.store.getState(), plan.id)!;
     expect(PlanView.parse(view).fixAgent).toEqual(STRONG);
+  });
+});
+
+/** The agent for the work, changed while a milestone is at work (TRC-179: paused on a usage limit, picking another agent changed nothing). */
+describe('the agent for the work, changed while a milestone is at work', () => {
+  it('one mid-turn keeps its agent; paused on a usage limit, it goes to the new agent now and goes on there', async () => {
+    const t = setup();
+    const plan = await approved(t, ONE, { fix: null });
+    const channel = `ws:${await waitFor(() => t.issue('Idempotent webhooks').worktrees.at(-1))}`;
+    const toIt = () => t.switched.filter((s) => s.channel === channel);
+    const asks = () => t.asked.filter((a) => a.channel === channel).length;
+    // Mid-turn: switching would cut the turn, so it keeps its agent.
+    t.run(channel, 'started', 'r1');
+    expect(t.work.setWorkAgent(plan.id, MID)).toBe('Claude (Sonnet) works what starts next; the milestone already at work keeps its agent');
+    expect(toIt()).toEqual([]);
+    // Its turn ended on your usage limit: paused until the reset.
+    t.run(channel, 'done', 'r1');
+    const now = Date.now();
+    t.plans.setWatch(plan.id, 'retries', { at: now, reason: 'You hit your Claude plan usage limit', run: 'r1', limitUntil: now + 60 * MIN, line: 'paused: usage limit · resumes at 16:45' });
+    const before = asks();
+    expect(t.work.setWorkAgent(plan.id, MID)).toBe('Claude (Sonnet) works this plan’s milestones and tasks, the milestone already at work included');
+    expect(toIt()).toEqual([{ channel, agent: MID, at: expect.any(Number) }]);
+    // It goes on now, on the new agent, instead of waiting for the reset.
+    await waitFor(() => asks() > before);
+    expect(t.plans.need(plan.id).watch?.retries?.limitUntil).toBeUndefined();
   });
 });

@@ -6,6 +6,7 @@ import { ActionsContext } from '../components/SpecMenu.js';
 import { copyText } from '../lib/copy.js';
 import { useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import s from './lists.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /** Search every conversation (yours and the ones shared with you), and jump to a result. */
 export function SearchView() {
@@ -52,7 +53,7 @@ export function SearchView() {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
               client.store.dispatch({ type: 'search_cursor', cursor: search.cursor + (e.key === 'ArrowDown' ? 1 : -1) });
-            } else if (e.key === 'Enter' && search.hits.length) open(search.cursor);
+            } else if (e.key === 'Enter' && !isImeComposing(e) && search.hits.length) open(search.cursor);
           }}
         />
         {search.query ? <span className={s.dim}>{search.hits.length} in {search.searched} conversations</span> : null}

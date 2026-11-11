@@ -16,6 +16,7 @@ import type { AgentRef } from '@beluga/protocol.js';
 /** A change you make to a plan (as the API takes it). */
 type PlanOp = Parameters<ReturnType<typeof usePlanActions>['api']['edit']>[1][number];
 import p from './plans.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * A plan as an outline: milestones in order, each with what passes it and its tasks. Names change
@@ -187,7 +188,7 @@ function Rename({ value, onDone, className, label }: { value: string; onDone: (n
       onBlur={() => finish(true)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Enter' && !isImeComposing(e)) finish(true);
         if (e.key === 'Escape') finish(false);
       }}
     />

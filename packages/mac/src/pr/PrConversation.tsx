@@ -14,6 +14,7 @@ import { agoWords } from '../issues/issues-model.js';
 import type { ConversationItem } from './use-pr-conversation.js';
 import s from './pr-conversation.module.css';
 import { openCodeThere } from '../lib/remote-open.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * The pieces a PR's conversation is drawn with: someone's words, a review's verdict, and a thread
@@ -96,7 +97,7 @@ export function WriteBox({ placeholder, label, busyLabel, onSend, onCancel, auto
             onCancel();
             return;
           }
-          if (e.nativeEvent.isComposing || e.key !== 'Enter') return;
+          if (isImeComposing(e) || e.key !== 'Enter') return;
           const modKey = e.metaKey || e.ctrlKey;
           if (prefs.sendWith === 'enter' ? e.shiftKey || modKey : !modKey) return;
           e.preventDefault();

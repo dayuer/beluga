@@ -60,8 +60,8 @@ node scripts/sync-upstream.mjs --report
 - Agent：`src/agent/plan-tools.ts`、`src/agent/policy.ts`、`src/agent/types.ts`
 - API：`src/ipc/plans-api.ts`、`src/ipc/plans-handlers.ts`、`src/external/domain/tools.ts`、`src/external/adapters/tools/state-rows.ts`
 - 手机：`src/companion/protocol.ts`、`src/companion/views.ts`、`src/companion/calls.ts`、`packages/companion/app/plan/[id].tsx`、`packages/companion/lib/link/calls.ts`、`packages/companion/components/AgentPicker.tsx`
-- Mac：`packages/mac/src/plans/PlanPage.tsx`、`packages/mac/src/plans/PlanSheets.tsx`、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`
-- 文档与测试：`docs/tasks-and-plans.md`、`tests/plans.test.ts`、`tests/agent-change.test.ts`
+- Mac：`packages/mac/src/plans/PlanPage.tsx`、`packages/mac/src/plans/PlanSheets.tsx`、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`；计划设置的接入：`packages/mac/src/dialogs/native/WorkSheets.tsx`（一个 case）、`packages/mac/src/lib/sheets.ts`（一行）
+- 文档与测试：`docs/tasks-and-plans.md`、`tests/plans.test.ts`、`tests/agent-change.test.ts`、`tests/mac-plans.test.ts`（计划动态里角色变化的中文行）
 
 ### 自动路由（没指定 agent 的任务交给合适的模型）
 
@@ -79,10 +79,23 @@ node scripts/sync-upstream.mjs --report
 
 - `packages/mac/src/components/SpecMenu.tsx`、`packages/mac/src/components/SpecMenu.module.css`、`packages/mac/src/chat/RunsOn.tsx`、`packages/mac/src/dialogs/native/PersonCards.tsx`、`packages/mac/src/dialogs/native/PersonMenu.tsx`、`packages/mac/src/tasks/PickMenu.tsx`、`packages/mac/src/views/TerminalTab.tsx`、`packages/mac/src/views/overview/FilterBar.tsx`
 
+### git 输出固定用英文（BLG-133：留在 fork，不提回上游）
+
+原因：中文系统下 git 的提示是中文，Beluga 按英文原话判断 git 的结果（冲突、没有改动、分支不存在等）会判断错，全量测试也因此拿不到 Tested-on（见 `docs/reports/plan-roles-git-locale.md`）。每处只加一行 `LC_MESSAGES=C LANGUAGE=C`。
+
+- `src/workspaces/git.ts`、`src/workspaces/pr.ts`、`src/machines/ready.ts`、`tests/machines-ready.test.ts`
+
+### 中文输入法组字时 Enter 只选词（BLG-133：留在 fork，不提回上游）
+
+原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown，输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断放在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），每个输入框只加一次调用。
+
+- `packages/mac/e2e/plan-chat.spec.ts`、`packages/mac/src/agent-term/TermPane.tsx`、`packages/mac/src/call/NotesBox.tsx`、`packages/mac/src/chat/BoxSuggestions.tsx`、`packages/mac/src/chat/Composer.tsx`、`packages/mac/src/chat/EditPrompt.tsx`、`packages/mac/src/chat/FindBar.tsx`、`packages/mac/src/chat/WorktreeDraft.tsx`、`packages/mac/src/claude-code/AgentMonitor.tsx`、`packages/mac/src/components/FormSheet.tsx`、`packages/mac/src/components/SelectMenu.tsx`、`packages/mac/src/components/markdown/CodeEditor.tsx`、`packages/mac/src/components/markdown/DocFind.tsx`、`packages/mac/src/dialogs/MachinesSettings.tsx`、`packages/mac/src/dialogs/MenuSheet.tsx`、`packages/mac/src/dialogs/SettingsSearch.tsx`、`packages/mac/src/dialogs/native/PeerSheets.tsx`、`packages/mac/src/dialogs/native/ShareFolderSheet.tsx`、`packages/mac/src/dialogs/native/parts.tsx`、`packages/mac/src/gateway/AccessSettings.tsx`、`packages/mac/src/gateway/RequestsView.tsx`、`packages/mac/src/issues/IssueComposer.tsx`、`packages/mac/src/issues/IssueReply.tsx`、`packages/mac/src/issues/IssuesView.tsx`、`packages/mac/src/layout/ProjectGroups.tsx`、`packages/mac/src/layout/SidebarSearch.tsx`、`packages/mac/src/layout/panel/ContentSearch.tsx`、`packages/mac/src/layout/workspace-row.tsx`、`packages/mac/src/lib/dictation.ts`、`packages/mac/src/network/ConversationView.tsx`、`packages/mac/src/network/EmojiPicker.tsx`、`packages/mac/src/network/GroupInfo.tsx`、`packages/mac/src/network/NetComposer.tsx`、`packages/mac/src/network/NetworkSheets.tsx`、`packages/mac/src/network/NetworkSidebar.tsx`、`packages/mac/src/network/StatusMenu.tsx`、`packages/mac/src/onboarding/Onboarding.tsx`、`packages/mac/src/onboarding/SetupSteps.tsx`、`packages/mac/src/phone/PhoneView.tsx`、`packages/mac/src/pr/PrConversation.tsx`、`packages/mac/src/sentinel/DashboardPage.tsx`、`packages/mac/src/sentinel/SentinelCards.tsx`、`packages/mac/src/sentinel/SentinelHome.tsx`、`packages/mac/src/sentinel/SentinelPage.tsx`、`packages/mac/src/tasks/Activity.tsx`、`packages/mac/src/tasks/Brief.tsx`、`packages/mac/src/tasks/NewTaskSheet.tsx`、`packages/mac/src/tasks/TaskPage.tsx`、`packages/mac/src/tasks/TaskSections.tsx`、`packages/mac/src/team/SharedPlans.tsx`、`packages/mac/src/views/DiffComment.tsx`、`packages/mac/src/views/SearchView.tsx`、`packages/mac/src/views/reader/FileEditor.tsx`
+
 ### 适合提回上游的通用修复
 
 - 设置窗口标题和搜索框固定、只有列表滚动：`packages/mac/src/dialogs/Settings.tsx`、`packages/mac/src/dialogs/settings.module.css`
 - 路径上不存在的图片显示为“缺失”：`packages/mac/src/chat/images.ts`、`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`tests/mac-chat-images-cache.test.ts`
 - 本地模型在自己的文件夹里运行 Claude Code：`src/agent/runtime/local.ts`、`tests/local-endpoints.test.ts`
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
+- 哨兵保留数据的测试不再用固定日期（过了 14 天保留期就失败，上游也一样）：`tests/sentinel-kept-data.test.ts`
 - 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`
