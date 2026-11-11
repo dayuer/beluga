@@ -88,7 +88,7 @@ export async function customerLoginLink(cid: string, deps: Deps): Promise<HubRep
   const customer = await deps.hub.customer(cid);
   if (!customer) return failure(404, 'unknown-customer');
   if (customer.status === 'removed') return failure(409, 'customer-removed');
-  const link = await issueLoginLink(customer, deps);
+  const link = await issueLoginLink(customer, deps, { keepOnMailFailure: true });
   if (link === 'rate-limited') return failure(429, 'rate-limited');
   if (link === 'no-origin') return failure(503, 'hub-origin-missing');
   return reply(200, link);

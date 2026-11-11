@@ -292,6 +292,10 @@ export class D1HubStore implements HubStore {
     return changed === 1 ? row.customer_id : undefined;
   }
 
+  async removeLoginToken(tokenHash: string): Promise<void> {
+    await this.run('DELETE FROM login_tokens WHERE token_hash = ?', tokenHash);
+  }
+
   async createSession(input: { readonly tokenHash: string; readonly customerId: string; readonly now: number; readonly ttl: number }): Promise<void> {
     await this.run('INSERT INTO sessions (token_hash, customer_id, created_at, expires_at) VALUES (?, ?, ?, ?)', input.tokenHash, input.customerId, input.now, input.now + input.ttl);
   }

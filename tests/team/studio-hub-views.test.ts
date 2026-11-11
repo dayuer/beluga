@@ -185,6 +185,34 @@ describe('a customer logs in with a magic link', () => {
   });
 });
 
+describe('mail failures on the login route', () => {
+  it('answers a retryable 503 for an invited email, and 202 for everyone else', async () => {
+    const w = await world();
+    const failing: StudioDeps = { ...w.deps, mailer: { send: async () => { throw new Error('down'); } } };
+
+    const invited = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), failing);
+    expect(invited.status).toBe(503);
+    expect(bodyOf(invited).error).toBe('mail-unavailable');
+
+    const unknown = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'nobody@example.test' } }), failing);
+    expect(unknown.status).toBe(202);
+
+    // The failed attempt removed its token; a retry with a working mailer sends once.
+    const retry = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), w.deps);
+    expect(retry.status).toBe(202);
+    expect(w.sent).toHaveLength(1);
+  });
+
+  it('still gives the operator the link when the mail fails; it is marked not delivered', async () => {
+    const w = await world();
+    const failing: StudioDeps = { ...w.deps, mailer: { send: async () => { throw new Error('down'); } } };
+    const link = await handleHubRequest(request('POST', '/v1/admin/customers/c1/login-link', { token: 'operator' }), failing);
+    expect(link.status).toBe(200);
+    expect(bodyOf(link).link).toContain('/login#token=');
+    expect(bodyOf(link).delivered).toBe(false);
+  });
+});
+
 describe('a view is read by its own project only', () => {
   it('refuses no identity, another project, and a customer who is not a member', async () => {
     const w = await world();
@@ -203,6 +231,25 @@ describe('a view is read by its own project only', () => {
     const got = await get('/v1/app/projects/p1/plans/plan1', appAuth(), w);
     expect(got.status).toBe(200);
     expect((bodyOf(got).view as { title: string }).title).toBe('客户 App');
+  });
+
+  it('tells the customer whether the studio is online and when it last synced', async () => {
+    const w = await world();
+    await ingestPlan('d1', { project: 'dp1', frame: { t: 'plan', rev: 1, view } }, w.deps);
+
+    const online = await get('/v1/app/projects/p1/plans', appAuth(), w);
+    expect(online.status).toBe(200);
+    expect(bodyOf(online).studio).toEqual({ online: true, lastSyncAt: w.deps.now });
+
+    // The daemon disconnects: connectedAt is gone, lastSeenAt is when it was last alive.
+    await w.studio.putConn({ daemonId: 'd1', lastAt: w.deps.now, lastSeenAt: w.deps.now - 90_000, hello: true, synced: false });
+    const offline = await get('/v1/app/projects/p1/plans', appAuth(), w);
+    expect(bodyOf(offline).studio).toEqual({ online: false, lastSyncAt: w.deps.now - 90_000 });
+
+    // A project with no daemon mapped has never synced.
+    const unbound = await get('/v1/app/projects/p2/plans', appAuth('c2', 'p2'), w);
+    expect(unbound.status).toBe(200);
+    expect(bodyOf(unbound).studio).toEqual({ online: false, lastSyncAt: null });
   });
 });
 
