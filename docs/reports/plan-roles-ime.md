@@ -46,6 +46,29 @@ WorktreeItem、OverviewRows、FilesTab 列表、ci/parts、issues/parts）；Por
 - e2e（plan-chat、issues、network）按计划在最后一步统一跑。
 - 真实 Mac 应用里用简体中文输入法手测：待 BLG-120 审计补上（截图放这里）。
 
-## 手测（BLG-120）
+## 审计（BLG-120）
 
-待补。
+由另一个 agent（Sonnet，只读）独立检查 packages/mac/src 里所有 keydown 处理，包括 Enter 的其他写法（e.code、keyCode 13、
+快捷键辅助函数、建议列表的 onKeyDown）。
+
+**发现的漏网，已修（同一提交）：**
+- dialogs/native/parts.tsx:41：Sheet 外层的 Enter 冒泡后会直接 `onReturn`。它只排除 `input[type="text"]`，没写 type 的输入框会被漏掉，
+  所以输入法选词的 Enter 会直接触发新建群（NetworkSheets）、运行命令（PeerSheets）、分享文件夹（ShareFolderSheet）。现在先判断 isImeComposing。
+- onboarding/Onboarding.tsx:190：引导页全局 Enter 会直接跳下一步，中文输入名字时会误跳。已加判断。
+- components/SelectMenu.tsx:137：带搜索框的下拉菜单，Enter 会选中当前项。搜索框里用中文选词时会误选，已加判断。
+
+**检查过、没问题：** 建议列表（Suggestions.tsx、BoxSuggestions.tsx）的调用方都先判断了组字；守卫都在动作之前，运算优先级没有写错；
+代码里没有 NumpadEnter、keyCode 13 或 onKeyPress 形式的 Enter 判断；call/NotesBox.tsx 的 window keydown 不处理 Enter。
+
+**覆盖清单（审计要求手测的四处）：**
+
+| 输入框 | 文件 | 代码覆盖 | 真机中文输入法手测 |
+| --- | --- | --- | --- |
+| 计划对话框 | plans/PlanChat.tsx | 已覆盖，并有 e2e 用例（keyCode 229） | 遗留 |
+| 主聊天框 | chat/Composer.tsx | 已覆盖 | 遗留 |
+| 新建任务 | tasks/NewTaskSheet.tsx | 已覆盖 | 遗留 |
+| 计划改名 | plans/PlanPage.tsx | 已覆盖 | 遗留 |
+
+**遗留：真机手测。** agent 驱动不了系统的简体中文输入法：切换输入法属于改系统设置，用 System Events 模拟按键也需要辅助功能权限。
+所以手测要由用户在真实 Mac 应用里做：切到简体拼音，在上面四个框里各输入 hello 并按 Enter，应该只上屏、不发送；
+再按一次 Enter 才发送。截图放到本节。
