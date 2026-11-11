@@ -6,7 +6,8 @@ P1 的完整流程截图在 [§11](#11-完整流程截图)。
 
 P1 已落地（M1–M7）。真实链路的一次完整演练和它发现的问题见
 [`reports/studio-p1-run.md`](reports/studio-p1-run.md)；独立审计见
-[`reports/studio-p1-audit.md`](reports/studio-p1-audit.md)。
+[`reports/studio-p1-audit.md`](reports/studio-p1-audit.md)。给客户的条款（中台能读到什么）在
+[`studio-terms.md`](studio-terms.md)，邀请客户时一并附上。
 
 ## 1. Synon Studio 是什么
 
@@ -108,7 +109,7 @@ npx wrangler dev --persist-to .wrangler/state      # http://localhost:8787
    一台 daemon 的一个本地项目也只映射一个 Studio 项目；解绑 `DELETE …/daemon`，项目与成员保留。
 4. **邀请客户**：`POST /v1/admin/customers {email, name?}`（P1 没有注册页；只有被邀请的邮箱能拿到魔法
    链接）。把客户加进项目：`PUT /v1/admin/projects/:pid/members/:cid`。移除成员会立即关掉他在这个工作室
-   的套接字。
+   的套接字。开通前把 [`studio-terms.md`](studio-terms.md) 发给客户——中台能读计划文字和对话这条要写明。
 5. **发登录链接**：客户在 App 里填邮箱，或你 `POST /v1/admin/customers/:cid/login-link` 立刻发一封并拿到
    `{link, expiresAt}`（链接 15 分钟、一次性；`#token=` 在 fragment 里，不会进服务端日志）。
 
@@ -233,12 +234,12 @@ npm run proxy -- --dist       # 同源代理，http://localhost:8790
 
 ## 11. 完整流程截图
 
-下面的图来自一次真实运行（真中台 + 真 Resend 邮件 + 真 AI 规划 + 真 daemon + Mac 前端），报告见
-[`reports/studio-p1-run.md`](reports/studio-p1-run.md)。文件名固定：
+下面的图来自一次真实运行（真中台 —— `MAIL_MODE=outbox`，真 Resend 邮件待补 —— + 真 AI 规划 +
+真 daemon + Mac 前端），报告见 [`reports/studio-p1-run.md`](reports/studio-p1-run.md)。文件名固定：
 
 | 文件 | 是什么 |
 |---|---|
-| ![登录邮件](img/studio-p1/01-login-email.jpg) | `01-login-email`：真邮箱收到的魔法链接（令牌已遮住） |
+| ![登录链接](img/studio-p1/01-login-email.jpg) | `01-login-email`：管理页 outbox 里的魔法链接（令牌已遮住；真邮箱收信待补） |
 | ![登录成功](img/studio-p1/02-login-done.jpg) | `02-login-done`：在客户 Web 上登录成功 |
 | ![新需求](img/studio-p1/03-new-request.jpg) | `03-new-request`：新需求输入 |
 | ![计划长出来 A](img/studio-p1/04-plan-growing-a.jpg) | `04-plan-growing-a`：第一版草稿（里程碑） |
