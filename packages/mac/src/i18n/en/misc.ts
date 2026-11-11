@@ -16,7 +16,7 @@ export const misc = {
   // onboarding/Steps.tsx
   'onboarding.steps.heroTitle': 'Every project. Every agent.',
   'onboarding.steps.heroSoft': 'All at once.',
-  'onboarding.steps.heroBody': 'Claude Code, Codex, OpenCode or a model of your own, working across all your repositories in parallel. Everything they do, in view. Your friends’ agents, one message away.',
+  'onboarding.steps.heroBody': 'Claude Code, Codex, OpenCode, GitHub Copilot or a model of your own, working across all your repositories in parallel. Everything they do, in view. Your friends’ agents, one message away.',
   'onboarding.steps.getStarted': 'Get Started',
   'onboarding.steps.allSet': 'You’re all set.',
   'onboarding.steps.projectsHere': (v: Vars) => `Your ${v.n === 1 ? 'project is' : `${v.n} projects are`} here. Start a worktree from any of them, and your agent gets to work on its own branch.`,

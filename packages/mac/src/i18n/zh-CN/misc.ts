@@ -16,7 +16,7 @@ export const misc: Translation<typeof en> = {
   // onboarding/Steps.tsx
   'onboarding.steps.heroTitle': '每个项目，每个 Agent。',
   'onboarding.steps.heroSoft': '同时进行。',
-  'onboarding.steps.heroBody': 'Claude Code、Codex、OpenCode 或你自己的模型，在你所有的仓库里并行工作。它们做的每件事都看得见。朋友的 Agent，一条消息就能找到。',
+  'onboarding.steps.heroBody': 'Claude Code、Codex、OpenCode、GitHub Copilot 或你自己的模型，在你所有的仓库里并行工作。它们做的每件事都看得见。朋友的 Agent，一条消息就能找到。',
   'onboarding.steps.getStarted': '开始使用',
   'onboarding.steps.allSet': '一切就绪。',
   'onboarding.steps.projectsHere': (v) => `你的${v.n === 1 ? '项目' : ` ${v.n} 个项目`}已经在这里了。从任意一个开一个工作树，你的 Agent 就会在它自己的分支上开工。`,
