@@ -310,6 +310,7 @@ reduced-motion 下两者都停：CSS 走 `prefers-reduced-motion` / `:root[data-
 - `packages/mac/src/dialogs/star-scene.module.css`：关于/支持页的星空装饰。
 - `packages/mac/src/call/call.module.css` 的来电响铃（`ring*`）：必须提示的来电，不是工作表面。
 - `packages/mac/src/components/PixelBurst.tsx` 与 `pixel-burst-model.ts`：一次性的庆祝粒子。
+- `packages/mac/src/views/usage/Recap.tsx`：Usage Pass 的「Play Your Recap」回放（M3 · BLG-173 批准：用户点按才播的一次性成就回放，不在工作表面）。
 
 ### 7.5 范围外
 

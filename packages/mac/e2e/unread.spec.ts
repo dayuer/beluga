@@ -52,7 +52,8 @@ test('a run that finishes while you are elsewhere marks its row and project unti
   await openWorkspace(page, 'new-hero', 'landing');
   await expect(auth).toHaveAttribute('data-signal-row', 'unread', { timeout: 40_000 });
   await expect(auth.locator('[data-signal="unread"]')).toHaveText('1');
-  await expect(auth.getByText('add-auth')).toHaveCSS('font-weight', '650');
+  // Calm mode signals unread by the count, not by a heavier name (docs/calm/overlay.md S2).
+  await expect(auth.getByText('add-auth')).toHaveCSS('font-weight', '400');
   await expect(auth).toHaveAttribute('title', /Your agent finished · 1 new message/);
 
   // The project adds it up, and folded, that's how you notice.

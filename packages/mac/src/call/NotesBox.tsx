@@ -10,6 +10,7 @@ import { namesOf } from './CallStrip.js';
 import { clockOf, findTurns, lengthOf, marks, minuteMarks, timeline, turns, wordCount } from './notes-model.js';
 import c from './notes.module.css';
 import { isImeComposing } from '../lib/ime.js';
+import { reducedMotion } from '../lib/reduced-motion.js';
 
 /* ---------- Which notes are open (one reader at a time, over its conversation) ---------- */
 
@@ -154,7 +155,7 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
   const goTo = (index: number, smooth = true): void => {
     const el = list.current?.querySelector<HTMLElement>(`[data-turn="${index}"]`);
     el?.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
-    el?.animate([{ backgroundColor: 'color-mix(in srgb, var(--call) 22%, transparent)' }, { backgroundColor: 'transparent' }], { duration: 900, easing: 'ease-out' });
+    el?.animate([{ backgroundColor: 'color-mix(in srgb, var(--call) 22%, transparent)' }, { backgroundColor: 'transparent' }], { duration: reducedMotion() ? 0 : 160, easing: 'ease-out' });
   };
 
   // ⌘F searches the notes while they're open; Esc closes them.

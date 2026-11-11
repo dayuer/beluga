@@ -1256,3 +1256,11 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/* Reduce motion stops the hero's sheen and the button's beam too (M3 · RE-01; BLG-174). */
+@media (prefers-reduced-motion: reduce) {
+  .heroSoft,
+  .beam {
+    animation: none;
+  }
+}

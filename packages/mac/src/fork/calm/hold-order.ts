@@ -32,9 +32,10 @@ function subscribe(l: () => void): () => void {
 /** Nothing is being used any more: let go unless a menu opened from the sidebar is still up. */
 function release(): void {
   grace = undefined;
-  // A menu opened from a row is a portal outside the sidebar, so moving into it already ended
-  // the pointer hold. Ask the page instead: still open keeps the order for another grace period.
-  if (typeof document !== 'undefined' && document.querySelector('[role="menu"]')) {
+  // A menu (or a picker's dialog/listbox) opened from a row is a portal outside the sidebar, so
+  // moving into it already ended the pointer hold. Ask the page instead: still open keeps the
+  // order for another grace period (M3: dialogs and listboxes too, not only menus).
+  if (typeof document !== 'undefined' && document.querySelector('[role="menu"], [role="dialog"], [role="listbox"]')) {
     grace = setTimeout(release, HOLD_MS);
     return;
   }
@@ -113,18 +114,20 @@ export function useSidebarHold(ref: RefObject<HTMLElement | null>): void {
 }
 
 /**
- * The list as the sidebar should show it: `fresh` while nothing is being used, else the whole
- * group captured when the hold began (rows, sections and counts stay as they were; the new order
- * arrives on the first render after the hold ends).
+ * The list as the sidebar should show it: `fresh` while nothing is being used, else the group in
+ * the order it had when the hold began. Only the order is frozen (M3 · SH-08): a mark that
+ * arrives while the pointer is here still shows on its row. A row that appears during the hold
+ * waits for the release — showing it would push the rows under the pointer.
  */
-export function useHeldEntries<E>(fresh: readonly E[]): readonly E[] {
+export function useHeldEntries<E extends { readonly channel: string }>(fresh: readonly E[]): readonly E[] {
   const on = useCalm();
   const held = useSyncExternalStore(subscribe, holdHeld, holdHeld);
-  const frozen = useRef<readonly E[] | undefined>(undefined);
+  const frozen = useRef<readonly string[] | undefined>(undefined);
   if (!on || !held) {
     frozen.current = undefined;
     return fresh;
   }
-  frozen.current ??= fresh;
-  return frozen.current;
+  frozen.current ??= fresh.map((e) => e.channel);
+  const byChannel = new Map(fresh.map((e) => [e.channel, e]));
+  return frozen.current.map((channel) => byChannel.get(channel)).filter((e): e is E => e !== undefined);
 }

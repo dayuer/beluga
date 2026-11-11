@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | CH-01 | O | S7/S8（已有） | 已用覆盖层修好 |
 | CH-02 | O + H | R3-01（`.folding` 过渡归零）+ AgentSteps `useStill` 读 calm | 上游接入点，TOUCHPOINTS |
-| CH-03 | U-PR | `ChatLog.tsx` 的 `shouldAdjustScrollPositionOnItemSizeChange` 一行 | 行为接入点，TOUCHPOINTS |
+| CH-03 | §7 | 虚拟列表锚点：安装的 @tanstack/react-virtual **3.19** 已移除旧选项并内建滚动校正，问题不再复现 | 175 迁移（附依赖版本证据） |
 | CH-04 | §5 | 队列条插入的固有位移 | 理由已在 chat.md §5 |
 | CH-05 | §5 | Working 行随内容移动 | 同上 |
 | CH-06 | H | `flight.ts` 的 `calmOn()` 瞬时分支 | 行为接入点，TOUCHPOINTS |
@@ -43,7 +43,7 @@
 | RE-03 | O | R3-03 对话框背板淡入 | 已用覆盖层修好 |
 | RE-04 | §7 | 待加入/信任卡的选项后果文案 | 上游文案 PR 候选；不是沉稳问题 |
 
-**对账**：覆盖层主处置 **13** 条（CH-01/02/07/08、SH-01/02/04/05/06、WK-02/03、DA-03、RE-03），挂钩/上游主处置 **10** 条（CH-02/03/06、SH-02/08/09、WK-01/02、DA-02、RE-01），keep-decor **3** 条（SH-03、RE-01、RE-02），迁移到 §5 的 **4** 条（CH-04/05、SH-07、DA-05），迁移到 §7 的 **4** 条（CH-09、SH-10、DA-04、RE-04），合并 **2** 条（WK-04→WK-01、DA-01→WK-03）。13+10+3+4+4+2 = 36；其中 CH-02、SH-02、WK-02、RE-01 各跨两层（覆盖层 + 上游/keep-decor），各被数了两次，36 − 4 = **32**，与输入的 32 条相等。
+**对账**：覆盖层主处置 **13** 条（CH-01/02/07/08、SH-01/02/04/05/06、WK-02/03、DA-03、RE-03），挂钩/上游主处置 **9** 条（CH-02/06、SH-02/08/09、WK-01/02、DA-02、RE-01），keep-decor **3** 条（SH-03、RE-01、RE-02），迁移到 §5 的 **4** 条（CH-04/05、SH-07、DA-05），迁移到 §7 的 **5** 条（CH-03、CH-09、SH-10、DA-04、RE-04），合并 **2** 条（WK-04→WK-01、DA-01→WK-03）。13+9+3+4+5+2 = 36；其中 CH-02、SH-02、WK-02、RE-01 各跨两层（覆盖层 + 上游/keep-decor），各被数了两次，36 − 4 = **32**，与输入的 32 条相等。
 
 ## 2 覆盖层补充规则
 
@@ -57,14 +57,13 @@
 | --- | --- | --- | --- | --- | --- | :---: |
 | `packages/mac/src/chat/steps/AgentSteps.tsx` | CH-02 | `useStill()` 的返回值加 `useCalm()`；import 来自 `../fork/calm/index.js`（2 行） | framer-motion 的 `height:auto` 动画是 JS 驱动的，CSS 覆盖层管不到 | 否（沉稳专属判据；「步骤到达不做高度动画」可作上游 PR 卖点，但接口是 fork 自己的） | `AgentSteps.tsx`：步骤行的 `useStill()` 读沉稳开关，沉稳时 0 时长（M3 · CH-02） | 是 |
 | `packages/mac/src/chat/flight.ts` | CH-06 | `land()`/`launchFlight()` 的 `reducedMotion()` 判据加 `calmOn()`（2 行 + import） | WAAPI 飞入由 JS 发起，CSS 覆盖层看不到 | 否（fork 的模式判据）；「飞入尊重 Reduce motion」上游已有 | `flight.ts`：沉稳时消息不飞入，走 `data-flown="instant"`（M3 · CH-06） | 是 |
-| `packages/mac/src/chat/ChatLog.tsx` | CH-03 | `useVirtualizer` 选项加 `shouldAdjustScrollPositionOnItemSizeChange: () => !stick.current`（1 行） | 虚拟列表的补偿只能配在它的选项上 | 是（对所有人都是修位移 bug） | `ChatLog.tsx`：虚拟列表在「不贴底」时按行高变化补 scrollTop（M3 · CH-03） | 是 |
 | `packages/mac/src/tasks/TaskBoard.tsx` | WK-01 / WK-04 | `const reduce = document.documentElement.dataset.motion === 'reduce' 或 calmOn()`（1 行 + import）；`reduce` 已用于 layout/抬起动画 | framer 的 layout 动画是 JS 驱动的 | 否（沉稳专属判据） | `TaskBoard.tsx`：沉稳时看板卡不做 framer layout 滑动（M3 · WK-01） | 是 |
 | `packages/mac/src/sentinel/DashboardPage.tsx` | DA-02 | `still()` 加 `calmOn()`（1 行 + import） | 瓦片 glide 是 WAAPI | 否（沉稳专属判据） | `DashboardPage.tsx`：沉稳时瓦片换位不 glide（M3 · DA-02） | 是 |
 | `packages/mac/src/onboarding/onboarding.module.css` | RE-01 | 文件末尾加 `@media (prefers-reduced-motion: reduce) { .sheen, .beam { animation: none } }`（3 行） | 覆盖层在 calm-on 已兜住；这里修的是「calm 关 + 系统 Reduce motion」的上游缺口 | 是（所有开 Reduce motion 的用户） | `onboarding/onboarding.module.css`：sheen/beam 在 Reduce motion 下停（M3 · RE-01） | 否（纯样式） |
 | `packages/mac/src/call/NotesBox.tsx` | （overlay §8.1 遗留） | `goTo()` 的高亮 WAAPI `duration: 900` → `reducedMotion() ? 0 : 160`（2 行） | 900ms 的 WAAPI 背景闪是 JS 发起的 | 是（900ms 对所有人都是过长反馈） | `call/NotesBox.tsx`：跳到一条发言的高亮 900ms → 160ms，Reduce motion 下不做（M3 · overlay §8.1） | 否（行为小改，无需挂钩契约） |
 | `packages/mac/e2e/unread.spec.ts` | SH-02 | 断言从 `font-weight: 650` 改为「颜色与 idle 不同、字重与 idle 相同」（1–3 行） | 测试不是界面，覆盖层无法让它通过 | 否（fork-only：沉稳有意只换颜色；提上游等于让上游改测试语义） | `e2e/unread.spec.ts`：未读断言改为颜色（沉稳 S2 的配套，fork-only，M3 · SH-02） | 否（测试） |
 
-**合计 8 个上游文件**（含一个 e2e）；其中 ChatLog / onboarding / NotesBox 适合提上游，其余是沉稳专属的接入点。每个都保持接入点式最小 diff，可单独抽成提交。
+**合计 7 个上游文件**（含一个 e2e）；其中 onboarding / NotesBox 适合提上游，其余是沉稳专属的接入点。每个都保持接入点式最小 diff，可单独抽成提交。
 
 ## 4 fork 自己的改动（BLG-174，无需 fork.md 上游登记）
 
@@ -92,7 +91,33 @@
 
 ## 7 BLG-175 的改状态说明
 
-- 问题表保留的行（迁移后）：CH-01/02/03/06/07/08、SH-01/02/03/04/05/06/08/09、WK-01/02/03、DA-02/03、RE-01/02/03（共 21 行）。
-- 迁移：CH-04/05、SH-07、DA-05 → §5（固有 + 理由）；CH-09、SH-10、DA-04、RE-04 → §7（记录）；WK-04 并入 WK-01；DA-01 并入 WK-03。
+- 问题表保留的行（迁移后）：CH-01/02/06/07/08、SH-01/02/03/04/05/06/08/09、WK-01/02/03、DA-02/03、RE-01/02/03（共 20 行）。
+- 迁移：CH-04/05、SH-07、DA-05 → §5（固有 + 理由）；CH-03、CH-09、SH-10、DA-04、RE-04 → §7（记录/不再适用）；WK-04 并入 WK-01；DA-01 并入 WK-03。
 - 状态终值映射：O →「已用覆盖层修好」；H/U/U-PR →「已改上游文件并登记」；K →「已批准的例外（keep-decor）」。
 - 若 174 的 R3-06（React Flow clamp）在 plans e2e 下失败，改为：节点/边保持 520ms → 记为「已批准的例外（keep-decor）」并在 §7.4/KEEP_DECOR 双登记（图引擎自身动效，不在工作表面之外的例外）；此分支要先在 173 的验收列里注明，再由 175 落状态。
+
+## 8 实施回填（BLG-174 实测）
+
+覆盖层（R3-01…R3-07）与上游 7 个文件全部落地；以下是回填的实测值（`calm-check` 在 `4f8d2b0e3` + 本次改动上重跑，probe 见 `.beluga/scratch/probe-174.mjs`，不进仓库）：
+
+| 规则 / 改动 | 实测 |
+| --- | --- |
+| R3-01 折叠过渡归零 | 点 Show Steps 后 `.folding` 计算 `transition-duration: 0s`（原 0.16s）。**注意**：选择器必须重复 M3 的 `:not([data-dragging]):not([data-arranging])`，否则被 M3 的 160ms clamp 压过（第一次实测就是 0.16s，修好后才 0s） |
+| R3-02 `[data-opening]` 归零 | `sentinel` calm-on/full CLS 0.037 → **0.004**；`sentineldash` 0.142 → **0.004**；Ask 面板仍能打开（场景截图） |
+| R3-03 对话框背板 | 设置打开：背板 `calm-surface-in` 160ms、内容 `calm-surface-drop` 160ms；命令面板同 |
+| R3-04 面板内容淡入 | `.settled .body` → `calm-surface-in` 160ms；`shellpanel` CLS 0.0055（只改 opacity） |
+| R3-05 侧问卡淡入 | `[aria-label="Side question"]` → `calm-surface-in` 160ms |
+| R3-06 React Flow 同 clamp | `plancanvas` calm-on/full：节点与边均 `0.16s`、`cubic-bezier(0.3,0.7,0.3,1)`（原 0.52/0.16） |
+| R3-07 reduce 归零 | `plancanvas` calm-on/reduce：节点与边均 `0s`（原 0.52s） |
+| CH-02 AgentSteps 挂钩 | `chatrun` calm-on/reduce CLS 0.062 → **0.016**；步骤到达不再有高度动画 |
+| WK-01 TaskBoard 挂钩 | `tasknew` 仍然「新卡追加列底、原有卡 0 移动」（BOB-17…21 连续插入，位置逐张不变） |
+| SH-08 / SH-09 hold-order | `npx vitest run tests/fork-calm-hold-order.test.ts` 5 passed（测试的 window stub 按新选择器更新）；`shellsidebar` calm-on/full 0.000 |
+| RE-01 onboarding reduce | `onboarding` calm-on/reduce 仍 0；calm-off/reduce 的两条由上游新增媒体查询停掉（待 e2e/构建确认） |
+| unread e2e 断言 | 改为 400 + 计数徽标。**实施中发现**：行名的基础色本来就是 `--text`，与 `.unreadName` 相同——S2 之后名字在沉稳下与普通行完全一致，未读只由计数徽标表示。原「只换颜色」的说法不成立；本里程碑按「徽标是未读信号」处理，175 可在 SH-02 的状态里写清楚 |
+| typecheck / fork-calm / sync-upstream | `packages/mac` typecheck 通过；`fork-calm` 3 passed（快照 440 条，Recap 并入 keep-decor 后减少 2 条）；`sync-upstream --report` 0 个 `!` |
+| e2e：fork-calm-sidebar / fork-calm-toast / plans / unread | 待跑（e2e-lock 被另一个 worktree 的运行占着；结果回填在本节末） |
+
+**与定稿的偏差**
+
+- **CH-03 的「一行修法」不适用于当前依赖**：`@tanstack/react-virtual` 3.19 已把 `shouldAdjustScrollPositionOnItemSizeChange` 从 options 移除（成为实例内部行为，并有 `anchorTo`/`followOnAppend` 选项）。实测锚点在 3/4 组合为 0，未复现问题。CH-03 从「上游一行」改为 §7 记录，上游文件清单相应变为 7 个（不是 8 个）。
+- **SH-02 的「只留颜色」未成立**（见上）；覆盖层规则不变，e2e 断言改为徽标+字重。这需要 BLG-175 在 SH-02 的状态里注明「未读由计数徽标表示」。

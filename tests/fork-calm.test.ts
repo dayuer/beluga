@@ -16,7 +16,7 @@ const SRC = path.join(__dirname, '../packages/mac/src');
 const SNAPSHOT = path.join(__dirname, 'fork-calm.snapshot.json');
 
 /** One-off decoration that may keep its motion (docs/calm-ui.md §7.4). */
-const KEEP_DECOR = ['onboarding/', 'dialogs/star-scene.module.css', 'components/PixelBurst.tsx', 'components/pixel-burst-model.ts'];
+const KEEP_DECOR = ['onboarding/', 'dialogs/star-scene.module.css', 'components/PixelBurst.tsx', 'components/pixel-burst-model.ts', 'views/usage/Recap.tsx'];
 
 /** Files are named from the repository root here, as docs/fork.md names them. */
 const REPO = path.join(__dirname, '..');
@@ -38,6 +38,10 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'packages/mac/src/App.tsx', match: /useOneToast\('global', toast\?\.id\)/, why: 'one toast at a time: the app toast steps aside (BLG-167)' },
   { file: 'packages/mac/src/lib/undo-toast.tsx', match: /useOneToast\('undo', toast\?\.id\)/, why: 'one toast at a time: the undo toast steps aside (BLG-167)' },
   { file: 'packages/mac/src/lib/live-motion.ts', match: /calmLive\(/, why: 'only the current step row loops in calm mode (BLG-168)' },
+  { file: 'packages/mac/src/chat/steps/AgentSteps.tsx', match: /useCalm\(\)/, why: 'steps arrive without the framer height animation in calm mode (M3 · CH-02)' },
+  { file: 'packages/mac/src/chat/flight.ts', match: /calmOn\(\)/, why: 'a sent message lands without the flight in calm mode (M3 · CH-06)' },
+  { file: 'packages/mac/src/tasks/TaskBoard.tsx', match: /calmOn\(\)|useCalm\(\)/, why: 'cards take their places at once in calm mode (M3 · WK-01)' },
+  { file: 'packages/mac/src/sentinel/DashboardPage.tsx', match: /calmOn\(\)/, why: 'dashboard tiles do not glide in calm mode (M3 · DA-02)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */

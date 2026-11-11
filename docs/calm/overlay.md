@@ -70,7 +70,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 | M1 | 全局关关键帧 | `animation-name: none !important`，排除 §7 锚点与 `[data-opening]` | §2.3：不留装饰性循环 |
 | M2 | 白名单槽位 | `:root[data-calm] [data-step][data-current]` 及其子元素/伪元素 `animation-name: none !important`（M1 占位） | §7：唯一允许的循环，M2 换视觉 |
 | M3 | 过渡统一 | `transition-duration: var(--dur)`、`transition-timing-function: var(--ease-standard)`、`transition-delay: 0s`，全部 `!important`；**拖动时整体退场** | §2.1：120–200ms、ease-out |
-| M4 | 功能例外 | `[data-opening]` 的 `animation-duration: var(--dur)`、`animation-timing-function: var(--ease-standard)` | 让折叠/面板开合的 animationend 照常触发 |
+| M4 | 功能例外 | `[data-opening]` 的 `animation-duration: var(--dur)`、`animation-timing-function: var(--ease-standard)`（M3 起由 §12 R3-02 归零为 0s；animationend 仍触发） | 让折叠/面板开合的 animationend 照常触发 |
 | M5 | reduce | 无锚点排除的全局关闭重申（装饰也停），只留 `[data-opening]` | §2.5 |
 
 **M3 不碰 `transition-property`**：卡片/磁贴拖动靠 `transform`/`left` 的过渡跟手，只改时长与曲线。
@@ -852,13 +852,13 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 
 | 编号 | 关闭的问题 | 做法（选择器/机制） | 目标文件 | 验收（场景 × 指标 → 期望） |
 | --- | --- | --- | --- | --- |
-| R3-01 | CH-02（覆盖层半） | `:root[data-calm] [class*='_folding_'] { transition: none !important }`（`.folding` 的 grid-template-rows 过渡归零；`[data-opening]` 的 `unfold` 仍走 R3-02） | `calm-motion.css` | `chatsteps` calm-on/full：`.folding` 计算 `transition-duration: 0s`；CLS 不再含折叠过渡帧 |
-| R3-02 | WK-03 / DA-01 | **修订 M4**：`:root[data-calm] [data-opening] { animation-duration: 0s !important }`（0s 仍触发 animationend；Ask 面板、步骤折叠的状态推进不变） | `calm-motion.css`（替换 M4 的 `var(--dur)`） | `sentinel`/`sentineldash` calm-on/full：`aside[data-opening]` 计算 0s；CLS ≤0.005（原 0.037/0.142）；Sentinel Ask 面板仍能打开；`e2e` 折叠用例仍过 |
-| R3-03 | RE-03 | `:root[data-calm] :is([data-state='open'][class*='_overlay_']) { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（对话框背板与内容同步淡入；必须先做锚点碰撞核对） | `calm-overlays.css` | 设置/命令面板打开：背板 `calm-surface-in` 160ms、内容 `calm-surface-drop` 160ms；`document.getAnimations()` 在打开瞬间有这两条 |
-| R3-04 | SH-04 | `:root[data-calm] [class*='_settled_'] [class*='_body_'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（面板滑动结束后的内容淡入，替回被 M1 关掉的 `settle`） | `calm-overlays.css` | `shellpanel`：面板内容在滑动后 160ms 淡入；CLS 仍 0（只改 opacity） |
-| R3-05 | CH-07（可选半） | `:root[data-calm] [aria-label='Side question'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（侧问卡的 `rise` 被 M1 关后补一条淡入；`transform` 不参与） | `calm-overlays.css` | `chatbtw`：卡片 `calm-surface-in` 160ms；截图/CLS 不变 |
-| R3-06 | WK-02（覆盖层半） | `:root[data-calm] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: var(--dur) !important; transition-timing-function: var(--ease-standard) !important }`（节点与边同 160ms，解决 520/160 不一致） | `calm-motion.css` | `plancanvas` calm-on/full：节点与边的 `transition-duration` 均 0.16s；**必须**重跑 `e2e/plans.spec.ts` 确认边线跟得上；失败则回退为 keep-decor 例外（见 upstream-prs §7） |
-| R3-07 | WK-02（reduce 半） | `:root[data-calm][data-motion='reduce'] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: 0s !important }` | `calm-motion.css` | `plancanvas` calm-on/reduce：节点 `transition-duration` 0s（原 0.52s） |
+| R3-01 | CH-02（覆盖层半） | `:root[data-calm]:not([data-dragging]):not([data-arranging]) [class*='_folding_'] { transition: none !important }`（选择器与 M3 同级以上，否则被 M3 的 160ms clamp 压过；`[data-opening]` 的 `unfold` 仍走 R3-02） | `calm-motion.css` | **实测**：点 Show Steps 后 `.folding` 计算 `transition-duration: 0s`（0.16s→0s） |
+| R3-02 | WK-03 / DA-01 | **修订 M4**：`:root[data-calm] [data-opening] { animation-duration: 0s !important }`（0s 仍触发 animationend；Ask 面板、步骤折叠的状态推进不变） | `calm-motion.css`（替换 M4 的 `var(--dur)`） | **实测**：`sentinel` 0.037→0.004、`sentineldash` 0.142→0.004（calm-on/full）；Ask 面板仍能打开（截图与场景） |
+| R3-03 | RE-03 | `:root[data-calm] :is([data-state='open'][class*='_overlay_']) { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（对话框背板与内容同步淡入；锚点已碰撞核对） | `calm-overlays.css` | **实测**：设置打开时背板 `calm-surface-in` 160ms、内容 `calm-surface-drop` 160ms；命令面板同 |
+| R3-04 | SH-04 | `:root[data-calm] [class*='_settled_'] [class*='_body_'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（面板滑动结束后的内容淡入，替回被 M1 关掉的 `settle`） | `calm-overlays.css` | **实测**：`.settled .body` 的 `animation-name: calm-surface-in`、160ms；`shellpanel` CLS 0.0055（只改 opacity） |
+| R3-05 | CH-07（可选半） | `:root[data-calm] [aria-label='Side question'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（侧问卡的 `rise` 被 M1 关后补一条淡入；`transform` 不参与） | `calm-overlays.css` | **实测**：侧问卡 `animation-name: calm-surface-in`、160ms |
+| R3-06 | WK-02（覆盖层半） | `:root[data-calm] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: var(--dur) !important; transition-timing-function: var(--ease-standard) !important }`（节点与边同 160ms，解决 520/160 不一致） | `calm-motion.css` | **实测**：`plancanvas` calm-on/full 节点与边均 `0.16s`、`cubic-bezier(0.3,0.7,0.3,1)`（原 0.52/0.16）；`e2e/plans.spec.ts` 见 §12 注 |
+| R3-07 | WK-02（reduce 半） | `:root[data-calm][data-motion='reduce'] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: 0s !important }` | `calm-motion.css` | **实测**：`plancanvas` calm-on/reduce 节点与边均 `0s`（原 0.52s） |
 
 完整新增块（照抄）。**R3-01/02/06/07 进 `calm-motion.css`（追加到文件末）；R3-03/04/05 进 `calm-overlays.css`（追加到 reduce 分支之前）。**
 
@@ -866,8 +866,9 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 
 ```css
 /* ---- R3 (M3) ---- */
-/* R3-01: a finished answer's steps fold without an animated height (CH-02). */
-:root[data-calm] [class*='_folding_'] {
+/* R3-01: a finished answer's steps fold without an animated height (CH-02). The M3 clamp's
+ * selector is more specific than a bare [data-calm] rule, so it is repeated here. */
+:root[data-calm]:not([data-dragging]):not([data-arranging]) [class*='_folding_'] {
   transition: none !important;
 }
 

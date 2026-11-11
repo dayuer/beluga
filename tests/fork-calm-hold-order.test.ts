@@ -13,7 +13,7 @@ function windowish(menuOpen = false): { menuOpen: boolean } {
   vi.stubGlobal('document', {
     documentElement: { dataset: {} as Record<string, string | undefined> },
     activeElement: null,
-    querySelector: (selector: string) => (selector === '[role="menu"]' && state.menuOpen ? {} : null),
+    querySelector: (selector: string) => (selector.includes('[role="menu"]') && state.menuOpen ? {} : null),
   });
   return state;
 }

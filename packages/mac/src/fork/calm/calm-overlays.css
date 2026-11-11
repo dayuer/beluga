@@ -73,3 +73,38 @@
     animation-name: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * R3. M3 page-by-page follow-ups (docs/calm/overlay.md §12; BLG-174).
+ * ------------------------------------------------------------------------------------------- */
+
+/* R3-03: a dialog's backdrop fades in with its content (RE-03). Radix's Dialog.Overlay carries
+ * data-state=open and an _overlay_ class; non-Radix overlays don't, so they are not matched. */
+:root[data-calm] :is([data-state='open'][class*='_overlay_']) {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* R3-04: the panel's content fades in as the slide ends (SH-04). */
+:root[data-calm] [class*='_settled_'] [class*='_body_'] {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* R3-05: a side question card fades in (CH-07). */
+:root[data-calm] [aria-label='Side question'] {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* Reduced motion: no entrance at all (both switches). */
+:root[data-calm][data-motion='reduce'] :is(
+  [data-state='open'][class*='_overlay_'], [class*='_settled_'] [class*='_body_'], [aria-label='Side question']
+) {
+  animation-name: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-calm] :is(
+    [data-state='open'][class*='_overlay_'], [class*='_settled_'] [class*='_body_'], [aria-label='Side question']
+  ) {
+    animation-name: none !important;
+  }
+}

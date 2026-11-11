@@ -150,8 +150,8 @@
 /* ---------------------------------------------------------------------------------------------
  * M4. The two functional exceptions. AgentSteps' folding (steps.module.css, unfold) and the
  * Sentinel ask panel (sentinel/home.module.css, askIn) advance their state on animationend, so the
- * animation must keep its name; only its length and curve are brought into the calm range. A 0 s
- * animation still fires animationend, so reduced motion cannot wedge them.
+ * animation must keep its name. M1-M2 brought only their length and curve into the calm range;
+ * M3's R3-02 below takes the length to 0 s as well (a 0 s animation still fires animationend).
  * ------------------------------------------------------------------------------------------- */
 
 :root[data-calm] [data-opening] {
@@ -177,4 +177,32 @@
   :root[data-calm] ::after {
     animation-name: none !important;
   }
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * R3. M3 page-by-page follow-ups (docs/calm/overlay.md §12; BLG-173/BLG-174).
+ * ------------------------------------------------------------------------------------------- */
+
+/* R3-01: a finished answer's steps fold without an animated height (CH-02). The M3 clamp's
+ * selector is more specific than a bare [data-calm] rule, so it is repeated here. */
+:root[data-calm]:not([data-dragging]):not([data-arranging]) [class*='_folding_'] {
+  transition: none !important;
+}
+
+/* R3-02: the two functional [data-opening] animations advance state on animationend; a 0 s
+ * animation still fires it, and nothing lays out on the way (WK-03/DA-01). This replaces M4's
+ * 160 ms: the Ask panel's width animation was the largest layout shift on the Sentinel pages. */
+:root[data-calm] [data-opening] {
+  animation-duration: 0s !important;
+}
+
+/* R3-06 / R3-07: React Flow's nodes keep their 520 ms through inline styles (M3 excludes [style]);
+ * the edges were clamped to 160 ms, so the two disagreed. Same length for both (WK-02); under
+ * reduce, no transition at all. */
+:root[data-calm] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) {
+  transition-duration: var(--dur) !important;
+  transition-timing-function: var(--ease-standard) !important;
+}
+:root[data-calm][data-motion='reduce'] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) {
+  transition-duration: 0s !important;
 }
