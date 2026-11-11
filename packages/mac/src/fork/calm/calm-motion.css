@@ -1,8 +1,161 @@
 /*
- * Calm mode: motion (docs/calm-ui.md §2, §7).
- * M1 (BLG-161) fills this: keyframes off, transitions 120–200 ms ease-out, the single whitelisted
- * loop (`:root[data-calm] [data-current]`), and reduced motion as fades only.
- * Empty in M0 on purpose: calm mode is on by default, so this skeleton must change nothing yet.
+ * Calm mode: motion (docs/calm-ui.md §2, §7; rules in docs/calm/overlay.md §2).
+ *
+ * With calm mode on, no keyframe animation plays except the ones a keep-decor anchor keeps (the
+ * welcome, the incoming call, the call's ask card, the star scene, the Usage Pass, the one-time
+ * shell arrival) and the functional `[data-opening]` case two components use to advance state on
+ * animationend. Every transition runs at the --dur token (160 ms, 0 under reduced motion) with
+ * --ease-standard, except while a card, tile or the project tree is being dragged.
+ *
+ * Three mechanics make this stick (docs/calm/overlay.md §1):
+ * - lazy-loaded view CSS is inserted later, so the global rules carry !important;
+ * - :is() and :where() cannot hold pseudo-elements, so the selector is written three times
+ *   (element, ::before, ::after) instead of one :is(*, *::before, *::after);
+ * - the keep-decor list below is the one from docs/calm/overlay.md §7.0.
  */
-:root[data-calm] {
+
+/* ---------------------------------------------------------------------------------------------
+ * M1. Keyframes off, except the keep-decor subtrees and [data-opening].
+ * ------------------------------------------------------------------------------------------- */
+
+:root[data-calm] *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-opening]
+)) {
+  animation: none !important;
+}
+
+/* The same list again: a pseudo-element cannot be reached through :is(), and the exclusion has to
+   sit on the element that owns the pseudo-element. */
+:root[data-calm] *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-opening]
+))::before,
+:root[data-calm] *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-opening]
+))::after {
+  animation: none !important;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * M2. The one loop slot. M1 keeps it still: the "in progress" mark today is StepRow's Shimmer,
+ * moved by the live-motion clock in JS, which CSS neither can nor should stop. M2 replaces this
+ * slot with the final indicator; the anchor is [data-step][data-current] and does not move.
+ *
+ * Not [data-current] alone: WaitingRow (chat/steps/AgentSteps.tsx) also sets it, and its avatar
+ * ring is a 2.2 s infinite animation; ProjectTree sets it too.
+ * ------------------------------------------------------------------------------------------- */
+
+:root[data-calm] [data-step][data-current],
+:root[data-calm] [data-step][data-current] *,
+:root[data-calm] [data-step][data-current]::before,
+:root[data-calm] [data-step][data-current] *::before,
+:root[data-calm] [data-step][data-current]::after,
+:root[data-calm] [data-step][data-current] *::after {
+  animation: none !important;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * M3. Every transition: 160 ms (0 under reduced motion), ease-standard, no delay. The property
+ * list is left alone — cards and tiles are positioned by their transitions while dragged. While
+ * one is being dragged or the sidebar is being rearranged the clamp steps aside entirely, or the
+ * element lags the pointer by a frame and a half.
+ *
+ * This list is §7.0 without [data-opening]: the folding transition has to stay clamped so it
+ * matches the 160 ms unfold animation.
+ * ------------------------------------------------------------------------------------------- */
+
+:root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *
+)),
+:root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *
+))::before,
+:root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
+  [data-welcome], [data-welcome] *,
+  [data-arriving],
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_ringIcon_"], [class*="_ringIcon_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *,
+  section[aria-label='Your card'], section[aria-label='Your card'] *
+))::after {
+  transition-duration: var(--dur) !important;
+  transition-timing-function: var(--ease-standard) !important;
+  transition-delay: 0s !important;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * M4. The two functional exceptions. AgentSteps' folding (steps.module.css, unfold) and the
+ * Sentinel ask panel (sentinel/home.module.css, askIn) advance their state on animationend, so the
+ * animation must keep its name; only its length and curve are brought into the calm range. A 0 s
+ * animation still fires animationend, so reduced motion cannot wedge them.
+ * ------------------------------------------------------------------------------------------- */
+
+:root[data-calm] [data-opening] {
+  animation-duration: var(--dur) !important;
+  animation-timing-function: var(--ease-standard) !important;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * M5. Reduced motion: everything stops, keep-decor included (docs/calm-ui.md §7.4 requires the
+ * welcome's sheen and beam to stop here). Only [data-opening] survives, at the 0 ms token.
+ * Transitions need no rule of their own: M3 reads --dur, which is 0 under both reduce switches.
+ * ------------------------------------------------------------------------------------------- */
+
+:root[data-calm][data-motion='reduce'] *:not([data-opening]),
+:root[data-calm][data-motion='reduce'] ::before,
+:root[data-calm][data-motion='reduce'] ::after {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-calm] *:not([data-opening]),
+  :root[data-calm] ::before,
+  :root[data-calm] ::after {
+    animation: none !important;
+  }
 }
