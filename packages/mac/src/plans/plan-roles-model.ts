@@ -67,3 +67,44 @@ export function rolesInput(picks: Readonly<Record<PlanRole, string>>, d: PlanRol
   const fixAgent = pick('fix');
   return { ...(agent ? { agent } : {}), ...(archAgent ? { archAgent } : {}), ...(checkAgent ? { checkAgent } : {}), ...(fixAgent ? { fixAgent } : {}) };
 }
+
+/** A plan's roles as it has them (Plan Settings): unset is what it does without one. */
+export interface PlanRoleAgents {
+  readonly agent?: AgentRef | undefined;
+  readonly archAgent?: AgentRef | undefined;
+  readonly checkAgent?: AgentRef | undefined;
+  readonly fixAgent?: AgentRef | undefined;
+}
+
+const FIELD: Record<PlanRole, keyof PlanRoleAgents> = { arch: 'archAgent', work: 'agent', check: 'checkAgent', fix: 'fixAgent' };
+
+/**
+ * Where a role's pop-up starts in Plan Settings: the plan's own agent (as the tiers, when it is the
+ * tier's pick). Unset, what the plan really does: the tier when auto route picks it then (work on
+ * auto route, checks on the audit list, hard fixes on the strong list), else as before. Never the
+ * tier's recommendation for a role the plan doesn't have. `choiceOf`: an agent as a pop-up value.
+ */
+export function roleFromPlan(role: PlanRole, plan: PlanRoleAgents, d: PlanRoleDefaults, routeOn: boolean, choiceOf: (a: AgentRef) => string): string {
+  const current = plan[FIELD[role]];
+  const tier = tierLabel(role, d) ? tierAgent(role, d) : undefined;
+  if (current) return tier && choiceOf(tier) === choiceOf(current) ? BY_TIER : choiceOf(current);
+  if (role === 'arch') return NO_ARCHITECT;
+  if (role === 'work') return d.work === 'auto' ? BY_TIER : AS_BEFORE;
+  return routeOn && tier ? BY_TIER : AS_BEFORE;
+}
+
+/** Each role's pop-up as it starts on a plan. */
+export function rolesFromPlan(plan: PlanRoleAgents, d: PlanRoleDefaults, routeOn: boolean, choiceOf: (a: AgentRef) => string): Record<PlanRole, string> {
+  return Object.fromEntries(PLAN_ROLES.map((r) => [r, roleFromPlan(r, plan, d, routeOn, choiceOf)])) as Record<PlanRole, string>;
+}
+
+/** What Plan Settings saves: only the roles whose pop-up moved, each as its agent (null: unset). */
+export function roleChanges(from: Readonly<Record<PlanRole, string>>, to: Readonly<Record<PlanRole, string>>, d: PlanRoleDefaults, forChoice: (value: string) => AgentRef): Partial<Record<PlanRole, AgentRef | null>> {
+  const out: Partial<Record<PlanRole, AgentRef | null>> = {};
+  for (const role of PLAN_ROLES) {
+    const v = to[role];
+    if (v === from[role]) continue;
+    out[role] = v === BY_TIER ? (tierAgent(role, d) ?? null) : v === AS_BEFORE || v === NO_ARCHITECT ? null : forChoice(v);
+  }
+  return out;
+}
