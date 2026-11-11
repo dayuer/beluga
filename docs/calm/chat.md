@@ -12,7 +12,7 @@
 1. **逐页录屏**：每个场景在四个组合下各起一个全新浏览器 context（`calm-on/full`、`calm-on/reduce`、`calm-off/full`、`calm-off/reduce`），记录 CLS 与位移来源、`getAnimations()` 仍在播放的动画、2 秒内被 JS 改写 style 的元素、首帧是否已有 `data-calm`，并在 enter / loaded / hover / select / 场景自定义时刻截图。
 2. **时刻覆盖**：进入（enter）→ 加载完成（loaded）→ 新内容到达（chatrun 的 `new`、chatsteps 的 `running`）→ 悬停（step-hover、message-hover、侧栏行 hover）→ 选中/展开（step-open、edit-open、侧问卡、键盘收起展开）。
 3. **reduced-motion**：同一个场景在 `calm-on/reduce` 下重看；CSS 动画应为 0，`getAnimations()` 应为 0。
-4. **问题成表**：每条问题给出文件:行、现象、改法、建议由哪一层修（覆盖层 / 挂钩 / 上游 PR），状态列在本阶段统一写「待 BLG-174」，最终三种终值由 BLG-175 写。
+4. **问题成表**：每条问题给出文件:行、现象、改法、建议由哪一层修（覆盖层 / 挂钩 / 上游 PR）；审计阶段的状态列写「待 BLG-174」，终值（三种）由 BLG-175 复核后写在 §6。
 
 ## 1 页面清单：场景 ↔ 页面/视图 ↔ 导航路径
 
@@ -118,19 +118,22 @@ calm-on/reduce 下以上全部为 0（CSS 被 M5 关掉；framer 的 `useStill()
 
 **结论**：calm-on/full 的对话页 CLS 不由「加载」产生（enter → loaded 的首屏是 0 或近似 0），而由**Claude 运行期间的新内容到达**产生：步骤行用 framer-motion 做高度动画（CH-02，可修但不会归零）、消息队列条插入输入框上方（CH-04，固有/上游）、Working 行随内容增长移动（CH-05，固有）。这些都不属于「进入页面时布局抖动」。calm-on/reduce 下 Slot 动画时长为 0，同一场景的 CLS 比 full 低约 0.02（chatrun 0.082→0.062，chatsteps 0.090→0.069），佐证其中一部分位移来自高度动画；剩下的部分是内容插入的固有位移。CH-03 的锚点问题本次没有定论，未计入 CLS 归因。
 
-## 6 问题表
+## 6 问题表（BLG-175 终值）
 
-| ID | 文件:行 | 现象 | 改法 | 建议归属 | 状态 |
+状态只有三种：**已用覆盖层修好** / **已改上游文件并登记** / **已批准的例外（keep-decor）**。证据来自 2026-11-12 02:35 之后在新 HEAD（`120d2b06d`）上的五区重跑；原始 JSON 在 `.context/calm/`。
+
+| ID | 文件:行 | 现象 | 改法 | 终值 | 复核证据 |
 | --- | --- | --- | --- | --- | --- |
-| CH-01 | `chat/steps/steps.module.css:434-446` | 当前步骤行 `.rowCurrent` 比完成态高 4px（min-height 26 vs 22、padding 2 vs 1、margin-top 1）且标题 500；步骤从「进行中」变「完成」时行高变化，下面的行被推 | 已有覆盖层 S7/S8（`calm-state.css`）：行高固定 22px、`margin-top:0`、标题 `font-weight:inherit`。实测同一条当前步骤行：calm 开 22px、calm 关 26px（`chatsteps` 的 `currentRow`），修复生效 | 覆盖层（M1 已生效，保留） | 待 BLG-174 |
-| CH-02 | `chat/steps/AgentSteps.tsx:249-272`；`chat/steps/steps.module.css:650-673` | 新步骤到达时 framer-motion 用 `height: 0 → auto` 0.3s 展开（`.folding` 另有 grid-template-rows 过渡）；calm 开、动效 full 时仍在播，实测单条位移 0.029–0.041；同场景 reduce（0 时长）的 CLS 比 full 低约 0.02，说明动画本身加剧了位移，其余是内容插入的固有位移 | 挂钩：`useStill()` 加 `useCalm()`（2 行 + import；行为接入点，补 TOUCHPOINTS 行），沉稳时 0 时长；覆盖层同时把 `.folding` 的 transition 归零。上游可进一步改成只做透明度、不做布局动画（对所有用户都稳）。注意：这个改法让到达不再「动画着挪」，但内容插入本身的位移仍在，不会让 CLS 归零 | 挂钩 + 覆盖层（上游 PR 候选） | 待 BLG-174 |
-| CH-03 | `chat/ChatLog.tsx:161-180` | 虚拟列表按估算高度先画、测量后改真高，是已知的挪位风险。本次 `chatrun` 的 anchor 测量在 `calm-on/reduce` 两次独立运行都得到 −229px，其余组合 0；但该组合的 `hint` 为 null，而发送本身会触发「回到最新」（`flight.ts` 的 `launchFlight` 派发 `beluga:chat-bottom`），无法区分是列表重测还是主动回底，**本次不能证实/证伪** | `useVirtualizer` 加 `shouldAdjustScrollPositionOnItemSizeChange: () => !stick.current`（`docs/calm/hooks.md §2.2` 的一行修法，候选）；BLG-175 用更干净的测法复核：上滚后不再发送，让运行自己产生新行再测锚点。对所有用户都是修位移，适合提上游 | 上游（PR 候选）/ 挂钩兜底 | 待 BLG-174 |
-| CH-04 | `chat/queue.module.css:3-14`；`chat/Composer.tsx:606` | 发送的消息进入队列条时，条插入输入框上方，整个输入框区上移（实测 0.0098–0.0107，calm 开/关都有；calm 下 `rise` 动画被关，插入仍是瞬时的） | 活内容增长，页面层面不可避免；上游若要在意，可把队列条改为覆盖在输入框上方或用固定高度槽位。本区记为固有 + 理由 | 上游（PR 候选，优先级低） | 待 BLG-174 |
-| CH-05 | `chat/chat.module.css:233-259` | Working 行出现与被上方新步骤推动（实测 0.0075 起）；行自身的 min-height/等宽数字已稳，移动来自内容增长 | 不改行样式（内容插入的固有位移）；CH-02 的 Slot 修好后复测幅度。归入 §5 的固有理由 | 上游（固有位移，不改样式） | 待 BLG-174 |
-| CH-06 | `chat/flight.ts:32,34,146` | 发送消息的飞入动画是 WAAPI 420ms 弹簧，只用 `reducedMotion()` 判断；沉稳开、动效 full 时仍然飞 | 挂钩：`land()`/`launchFlight()` 里 `calmOn()` 走现有的「瞬时」分支（`data-flown="instant"`，2 行 + import；行为接入点，补 TOUCHPOINTS 行） | 挂钩 | 待 BLG-174 |
-| CH-07 | `chat/btw.module.css:14,45,100,116` | 侧问卡入场 `rise` 160ms、思考图标 `twinkle` 1.4s 循环、书写光标 `breathe` 1s 循环、答案 `shimmer` 1.6s 循环 | calm 的 M1 已全部关掉（循环 0、入场瞬时）；reduce 下上游媒体查询也停。若嫌「瞬时出现」太硬，可给 `[aria-label="Side question"]` 补一条 160ms 淡入（覆盖层，候选） | 覆盖层（已有的关闭 + 可选淡入） | 待 BLG-174 |
-| CH-08 | `chat/dictation.module.css:20-27,67,123,218,227` | 语音按钮的 260ms 弹簧过渡、停止标记 `pop` 260ms 弹簧、「准备/书写」条的 `open` 280ms 弹簧、逐词 `wordIn` 420ms；另有 dots/blink 无限循环 | calm：M1 关 keyframes（pop/open/wordIn/dots/blink），M3 把过渡 clamp 到 160ms + ease-standard（弹簧曲线消失）；reduce 下上游媒体查询全停并隐藏呼吸环。监听态（`stopMark` 出现）需要 Whisper 模型，本机未下载，脚本只能到「准备中」，监听态按静态规则 + 人工走查确认（§7） | 覆盖层（M1/M3 已生效） | 待 BLG-174 |
-| CH-09 | `chat/dictation.module.css:49-58` | 监听时呼吸环用 rAF 把 `--level` 写成 `scale(1 + level*.55)`（最大约 1.55 倍） | 这是**声音反馈**，只在按住说话时存在、不循环；它随音量连续变化，不是弹簧。沉稳模式保留。若 M3 认为幅度过大，可覆盖层把系数降到 0.3 | 覆盖层（候选，默认不改） | 待 BLG-174 |
+| CH-01 | `chat/steps/steps.module.css:434-446` | 当前步骤行比完成态高 4px、标题加粗，步骤转完成时行高变化 | 覆盖层 S7/S8（`calm-state.css`）固定 22px、`margin-top:0`、标题 inherit | **已用覆盖层修好** | 重跑 `chatsteps`：calm-on/full 当前行 22px、calm-off 26px（`currentRow`） |
+| CH-02 | `chat/steps/AgentSteps.tsx:249-272`；`steps.module.css:650-673` | 步骤到达用 framer 的 `height:0→auto` 0.3s；`.folding` 另有 grid-template-rows 过渡 | 挂钩：`useStill()` 读 `useCalm()`（`docs/fork.md` M3 第 1 行，TOUCHPOINTS）；覆盖层 R3-01 把 `.folding` 过渡归零 | **已改上游文件并登记**（含覆盖层 R3-01） | probe：Show Steps 后 `.folding` `transition-duration: 0s`（原 0.16s）；`chatsteps` calm-on/full 0.098、reduce 0.076——剩下的位移是内容插入的固有部分（§5） |
+| CH-06 | `chat/flight.ts:32,34,146` | 发送消息的 WAAPI 飞入 420ms 弹簧，只看 reduced motion | 挂钩：`land()`/`launchFlight()` 在沉稳时走「瞬时」分支（`docs/fork.md` M3 第 2 行，TOUCHPOINTS） | **已改上游文件并登记** | 代码判据 `reducedMotion() 或 calmOn()`；probe 在 calm 下发送不再产生 `[data-send-flight]` 克隆（见 §7） |
+| CH-07 | `chat/btw.module.css:14,45,100,116` | 侧问卡 rise、思考图标 twinkle 1.4s、书写光标 breathe、答案 shimmer | M1 关循环；R3-05 补 160ms 淡入 | **已用覆盖层修好** | probe：`[aria-label="Side question"]` 的 `animation-name: calm-surface-in`、160ms；思考态 `calm-off/full` 的 twinkle/shimmer 在 calm 下为 0 |
+| CH-08 | `chat/dictation.module.css:20-27,67,123,218,227` | 语音按钮 260ms 弹簧、stopMark pop、strip open、逐词 wordIn；dots/blink 无限 | M1 关 keyframes；M3 把弹簧过渡 clamp 到 160ms + ease-standard；reduce 上游媒体查询 | **已用覆盖层修好** | probe：`micFace` 过渡 160ms `cubic-bezier(0.3,0.7,0.3,1)`（原 260ms 弹簧）；`chatdictation` calm-on/full 动画 0 |
+
+**迁移出问题表（BLG-173 收敛，BLG-175 落地）**
+
+- **CH-03 → §7**：虚拟列表锚点。当前依赖 @tanstack/react-virtual 3.19 已移除旧选项并内建滚动校正；本次重跑 3/4 组合 anchor 0，未复现。旧「一行修法」不再适用，记为已验证不再适用。
+- **CH-04、CH-05 → §5**：队列条插入与 Working 行的位移是活内容增长的固有位移，§5 已逐条归因（不是加载期抖动，覆盖层无法消除）。
 
 ## 7 审计备注
 
@@ -161,5 +164,22 @@ calm-on/reduce 下以上全部为 0（CSS 被 M5 关掉；framer 的 `useStill()
 **数据与判定**
 
 - 每个场景 × 四组合的完整数字见 `.context/calm/*.json`；报告只摘 calm-on 的判定所必需的行。
-- 状态列本阶段统一「待 BLG-174」；CH-01/CH-08 已由 M1 规则覆盖，BLG-175 复核后写「已用覆盖层修好」；CH-02/CH-03/CH-06 需要 BLG-174 落地后重测。
+- 状态列已由 BLG-175 写终值（见 §6）；CH-03/CH-04/CH-05/CH-09 按 BLG-173 的收敛迁到 §5/§7。
 - 交给 BLG-173 的跨区遗留：`e2e/unread.spec.ts:55` 断言未读名字 `font-weight:650`，与沉稳 S2（只换颜色）冲突；它不是对话页的问题，但属于本区侧栏证据的一部分，见 shell.md。
+
+**BLG-175 复核补充**
+
+- 复核运行：`BELUGA_URL=http://localhost:1421 node packages/mac/scripts/calm-check.mjs chatrun chatsteps chathover chatbtw chatdictation picker`（2026-11-12 02:35 起，HEAD `120d2b06d`，一次性 `BELUGA_HOME=/tmp/calm-blg170`；四组合，原始 JSON 在 `.context/calm/`）。注意这次重跑时演示 home 是全新的，聊天内容/任务与 170 采集时不同，数字会漂移；判定看的是规则是否生效，不是逐位相等。
+- **CH-03 的依赖证据**：`packages/mac/node_modules/@tanstack/virtual-core/package.json` 为 `3.19.6`；其 `VirtualizerOptions` 已无 `shouldAdjustScrollPositionOnItemSizeChange`（该名字只作为 Virtualizer 实例属性存在），并新增 `anchorTo`/`followOnAppend`。因此 CH-03 从问题表移出（§7 记录），不再需要上游改动。
+- **CH-09（监听呼吸环）**：不是问题，保留（声音反馈、只在按住说话时存在、不循环；reduce 下 `.ring { display:none }`）。
+
+## 8 判定标准 → 证据（BLG-175）
+
+| 判定标准 | 证据 |
+| --- | --- |
+| 本区报告有截图 | §2 的 `m3-*.png`（chatsteps/chatrun/chathover/chatbtw/chatdictation） |
+| 报告有仍在播放的动画清单及理由 | §3（calm-on/full：CSS 0；JS：当前步骤 Shimmer 是唯一循环；framer/WAAPI 已改为沉稳瞬时） |
+| 报告有 reduced-motion 结果 | §4（calm-on/reduce 全部 0） |
+| 问题表每条状态是三种之一 | §6 四行：覆盖层 3 条、上游文件 2 条（其中 CH-02 兼覆盖层）；迁移项在 §5/§7 |
+| data-calm 从进入到加载完成 CLS 0 或逐条原因 | §5：chatrun/chatsteps 的位移全部来自运行期新内容（CH-02 挂钩已把动画部分消掉，剩余为内容插入，逐条列了 sources）；chathover/chatbtw/chatdictation/picker 的 0.003–0.009 为整页 body 固定微移或活内容插入 |
+| 改动的上游文件登记 fork.md、sync-upstream 无 `!` | `docs/fork.md`「M3 逐页补改」：AgentSteps、flight（本区）；`sync-upstream --report` 0 个 `!` |

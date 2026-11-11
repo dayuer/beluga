@@ -12,7 +12,7 @@
 1. **逐页录屏**：每场景四组合（`calm-on/full`、`calm-on/reduce`、`calm-off/full`、`calm-off/reduce`），各起独立浏览器 context；记录 CLS 与 sources、`getAnimations()`、2 秒内 JS 改写 style 的元素、首帧 `data-calm`，并在 enter / loaded / hover / select / 场景自定义时刻截图。
 2. **时刻覆盖**：进入 → 加载完成 → 悬停/选中 → 展开收起；任务板另做**插入新卡**（tasknew）的前后坐标测量，计划画布另测 React Flow 节点/边的过渡，Sentinel 另测 Ask 面板。
 3. **reduced-motion**：`calm-on/reduce` 重看；CSS 动画应为 0，声明的过渡不应把布局拖着走。
-4. **问题成表**：文件:行、现象、改法、建议归属（覆盖层 / 挂钩 / 上游 PR），状态本阶段「待 BLG-174」。
+4. **问题成表**：文件:行、现象、改法、建议归属（覆盖层 / 挂钩 / 上游 PR）；审计阶段的状态列写「待 BLG-174」，终值由 BLG-175 复核后写在 §6。
 
 ## 1 页面清单：场景 ↔ 页面/视图 ↔ 导航路径
 
@@ -109,14 +109,19 @@ React Flow 的 520ms 是**过渡**不是动画，见 WK-02；任务卡的 framer
 
 `calm-off/full` 的 sentinel 是 0.052（同样的面板，时长 180ms 上游曲线），`calm-on/reduce` 为 0（面板瞬时停靠）——说明这 0.037 全部来自宽度动画期间的重排，不是数据加载。
 
-## 6 问题表
+## 6 问题表（BLG-175 终值）
 
-| ID | 文件:行 | 现象 | 改法 | 建议归属 | 状态 |
+状态只有三种：**已用覆盖层修好** / **已改上游文件并登记** / **已批准的例外（keep-decor）**。证据来自 2026-11-12 02:35 之后在新 HEAD（`120d2b06d`）上的重跑与 probe（`.context/calm/`）。
+
+| ID | 文件:行 | 现象 | 改法 | 终值 | 复核证据 |
 | --- | --- | --- | --- | --- | --- |
-| WK-01 | `tasks/TaskBoard.tsx:561`（`layout={reduce ? false : 'position'}`）、`:73` SPRING；`:421` 抬起卡 `scale 1.035` | 看板卡用 framer 的 layout 动画做重排/落下（弹簧 560/44），判断条件只读 reduced motion；沉稳 full 下拖拽落下、排序变化时卡片会弹着滑动。本次「新卡追加列底」没有触发（坐标未变），但代码路径存在 | 挂钩：把 `reduce` 条件换成 `reduce 或 calmOn()`（同 AgentSteps 的 `useStill`，2 行 + import；行为接入点，补 TOUCHPOINTS 行）；抬起卡跟手与拖拽中的 1.035 缩放保留（交互反馈），只让「落位」瞬时 | 挂钩 | 待 BLG-174 |
-| WK-02 | `plans/PlanCanvas.module.css:11-20`、`plans/plans.module.css:476`、`:1468` | React Flow 节点声明 520ms（transform/width/height），边在 calm 下被 clamp 成 160ms——节点与边时长不一致；reduce 下节点仍是 520ms（`PlanCanvas.module.css` 的按类型规则压过 `plans.module.css` 的 reduce 重置）。实测 calm-on/full 与 calm-on/reduce 的节点过渡都是 `0.52s`，边 0.16s（reduce 0s） | 两条路：① 覆盖层给 `[class*="react-flow__node"]` 与 `[class*="react-flow__edge-path"]` 设 `transition-duration: var(--dur)`（同一时长，重跑 `e2e/plans.spec.ts` 确认边线跟得上）；② 上游把 520ms 改成读 `--dur`，并在 reduce 媒体查询里对 milestone/task/gate 也归零（对所有用户都是修复） | 覆盖层（候选，需 e2e 验证）/ 上游 PR | 待 BLG-174 |
-| WK-03 | `sentinel/home.module.css:37`（Ask 面板 `askIn`，宽度 0→380）；`sentinel/SentinelHome.tsx:147`（`data-opening`） | Sentinel 首页/看板首次停靠 Ask 面板时，宽度动画 160ms 让看板内容连续重排；calm-on/full 的 sentinel 0.037、dashboard 场景 0.142（§data.md），reduce 下 0 | 覆盖层：沉稳时把 `[data-opening]` 的 `animation-duration` 设为 0（0s 仍会触发 animationend，M4 已验证）；上游可改为 `transform/opacity` 进入，不改变布局 | 覆盖层（复议 M4）/ 上游 PR | 待 BLG-174 |
-| WK-04 | `tasks/TaskBoard.tsx:381-387`（AnimatePresence）、任务卡 `motion.div` | 看板列的卡片增删走 framer 的 presence；本次插入/删除都没有留下可见的多余动画（CSS `pop-in`/`tuck-out` 已被 M1 关） | 无需补；与 WK-01 的同一处 `reduce` 判据一起处理即可 | 挂钩（并入 WK-01） | 待 BLG-174 |
+| WK-01 | `tasks/TaskBoard.tsx:561`（`layout={reduce ? false : 'position'}`）、`:73` SPRING；`:421` 抬起卡 | 看板卡用 framer layout 动画重排/落下，只读 reduced motion | 挂钩：`reduce` 判据加 `useCalm()`（`docs/fork.md` M3 第 4 行，TOUCHPOINTS）；拖拽跟手保留 | **已改上游文件并登记** | 重跑 `tasknew`：新卡追加列底、原有卡片逐张 0 移动（BOB-17 y413，其余 y/高不变）；`tasks` calm-on/full 动画 0 |
+| WK-02 | `plans/PlanCanvas.module.css:11-20`、`plans/plans.module.css:476,1468` | React Flow 节点 520ms、边 160ms 不一致；reduce 下节点仍 520ms | 覆盖层 R3-06/07：节点与边同 `--dur`，reduce 下 0s；上游把 520ms 接 `--dur` 是 PR 候选 | **已用覆盖层修好** | 重跑 `plancanvas`：calm-on/full 节点与边均 `0.16s`、`cubic-bezier(0.3,0.7,0.3,1)`；calm-on/reduce 均 `0s`（原 0.52s）；`plans` e2e 延到最终步骤 |
+| WK-03 | `sentinel/home.module.css:37`；`SentinelHome.tsx:147` | Ask 面板停靠的 160ms 宽度动画让看板重排 | 覆盖层 R3-02：`[data-opening]` 时长归零（animationend 仍触发） | **已用覆盖层修好** | 重跑 `sentinel` calm-on/full CLS 0.037→**0.003**；`sentineldash` 0.142→**0.004**；面板仍能打开 |
+
+**迁移出问题表（BLG-173 收敛，BLG-175 落地）**
+
+- **WK-04 → WK-01**：AnimatePresence 的卡片增删与 WK-01 是同一处 `reduce` 判据，合并为一条。
 
 ## 7 审计备注
 
@@ -143,3 +148,21 @@ React Flow 的 520ms 是**过渡**不是动画，见 WK-02；任务卡的 framer
 
 - WK-02 的 React Flow 裁决必须与 `overlay.md §10.5` 的「React Flow 520ms 已知例外」合并成一条最终规则，并决定是否重跑 `e2e/plans.spec.ts`。
 - WK-03 与 M4 的 `[data-opening]` 功能例外冲突：如果 173 决定沉稳下归零，M4 的「160ms 保持」要一并改写；否则 Sentinel 页面的 CLS 只能记为固有。
+
+**BLG-175 复核补充**
+
+- 复核运行：`BELUGA_URL=http://localhost:1421 node packages/mac/scripts/calm-check.mjs plan plancanvas tasks taskdetail tasknew issues sentinel`（2026-11-12 02:35 起，HEAD `120d2b06d`，全新演示 home）。
+- `tasknew` 在全新 home 上再次确认：插入 BOB-17 后，BOB-6（y197/h89）、BOB-13（y292/h108）、BOB-1（y197/h117）逐张不变。
+- 计划画布的两条数值是从场景 JSON 的 `flow` 字段读的（`nodeDuration`/`edgeDuration`），不依赖截图目测。
+- `calm-off/full` 的 `sentinel` 仍 0.135（面板宽度动画在上游没有被禁），这正是 WK-03 由覆盖层修、上游 PR 候选的原因。
+
+## 8 判定标准 → 证据（BLG-175）
+
+| 判定标准 | 证据 |
+| --- | --- |
+| 本区报告有截图 | §2 的 `m3-*.png`（plancanvas/tasks/taskdetail/tasknew/issues/sentinel） |
+| 报告有仍在播放的动画清单及理由 | §3（calm-on/full CSS 0；React Flow 是过渡，见 WK-02 的实测值） |
+| 报告有 reduced-motion 结果 | §4（动画 0；React Flow 过渡 0s） |
+| 问题表每条状态是三种之一 | §6 三行：覆盖层 2 条、上游文件 1 条；WK-04 已并入 WK-01 |
+| data-calm 从进入到加载完成 CLS 0 或逐条原因 | §5：plan/tasks/taskdetail/tasknew 的 0.003 为 body 固定微移；sentinel 的 0.003 来自剩余的面板/内容；均逐条列了 sources |
+| 改动的上游文件登记 fork.md、sync-upstream 无 `!` | TaskBoard 在 `docs/fork.md`「M3 逐页补改」；`sync-upstream --report` 0 个 `!` |

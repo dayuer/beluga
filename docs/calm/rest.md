@@ -12,7 +12,7 @@
 1. **逐页录屏**：每场景四组合，独立浏览器 context；记录 CLS 与 sources、`getAnimations()`、JS 改写 style、首帧 `data-calm`，enter/loaded/hover/select 及场景自定义时刻截图。
 2. **时刻覆盖**：进入 → 加载完成 → 悬停/选中 → 打开/关闭；通话另覆盖「呼叫中」，对话框另覆盖「破坏性确认」。
 3. **reduced-motion**：`calm-on/reduce` 重看。
-4. **问题成表**：文件:行、现象、改法、建议归属、状态（本阶段「待 BLG-174」）。
+4. **问题成表**：文件:行、现象、改法、建议归属；审计阶段的状态列写「待 BLG-174」，终值由 BLG-175 复核后写在 §6。
 
 **本轮的两条判定线**（任务上下文）：① keep-decor 的引导动画、来电提醒、纯装饰组件**维持原状**，只确认没被覆盖层误伤；② 对话框属于「重」反馈，检查后果与按钮是否写清。
 
@@ -105,16 +105,19 @@
 - **房间的两条待决策卡**：「zoe wants to join bob-api」（`Let in` / `Let in to watch` / `Not now`）与「How much do you trust bob?」（`Ask me every time` / `Trusted` / `Full trust` / `Can't use my agent`，`Later`）。按钮齐全、有退路（Not now / Later）；但**卡片本身没有写每种选择的后果**（例如 Let in to watch 与 Let in 的区别、信任三档的差别）。这是文案问题，见 RE-03。
 - **设置**：每个分区用一句副标题说明作用（General 的 Your name/Your picture/Language/Requests/Updates…），开关有即时说明；命令面板只有一个输入框与结果列表，无破坏性动作。
 
-## 6 问题表
+## 6 问题表（BLG-175 终值）
 
-| ID | 文件:行 | 现象 | 改法 | 建议归属 | 状态 |
+状态只有三种：**已用覆盖层修好** / **已改上游文件并登记** / **已批准的例外（keep-decor）**。证据来自 2026-11-12 02:35 之后在新 HEAD（`120d2b06d`）上的重跑与 probe（`.context/calm/`、`.beluga/scratch/probe-rest.mjs`）。
+
+| ID | 文件:行 | 现象 | 改法 | 终值 | 复核证据 |
 | --- | --- | --- | --- | --- | --- |
-| RE-01 | `onboarding/scenes/scenes.module.css`（`_sheen_` 6s、`_beam_` 3.2s） | keep-decor 的引导页动画在 calm-on/full 按预期保留（9 条，未被误伤）；calm-on/reduce 被 M5 停成 0；但 **calm-off/reduce 仍有 2 条**——上游自己的 `prefers-reduced-motion` 没覆盖这两条 | calm 侧已经兜住（M5）；上游补齐两条的 reduce 媒体查询（对所有开了 Reduce motion 的用户都对） | keep-decor（已批准）+ 上游 PR | 待 BLG-174 |
-| RE-02 | `call/call.module.css:363-435,108-118`；`overlay.md §7.0` 锚点 | 来电横幅 `ringIn`/`ripple` 与铃铛 `nudge` 属 keep-decor，覆盖层按 `_incoming_`/`_ringIcon_` 锚点排除；演示环境没有入站来电，无法现场触发 | 静态验证：锚点在 `calm-motion.css` 的 `:not(:where(...))` 列表里，`fork-calm` 快照也把它们算作 keep-decor；本轮录到的是呼叫方 Ringing（无循环）。保持 | keep-decor（已批准例外） | 待 BLG-174 |
-| RE-03 | `dialogs/native/parts.tsx`（Dialog.Overlay）；`dialogs/settings.module.css:6`、`dialogs/palette.module.css:6` 的 overlay | 设置/命令面板打开时，**背板背景动画 `fade` 被 M1 关掉、瞬时出现**，而对话框内容淡入 160ms——两层不同步（overlay.md §10.5 的遗留项） | 覆盖层候选：`:root[data-calm] [data-state='open'][class*='_overlay_'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`；先做全库锚点碰撞核对（`_overlay_` 是否只命中对话框背板），再决定 | 覆盖层（候选） | 待 BLG-174 |
-| RE-04 | `network/ConversationView.tsx`（待加入/信任卡） | 「重」决策卡的按钮与退路齐全，但卡片不解释各选项的后果（Let in vs Let in to watch；三档信任） | 上游文案：每条选项下加一行后果（如「Let in to watch: they read your files; their agent can't change anything」）；纯文案，不动动效 | 上游（文案，PR 候选） | 待 BLG-174 |
+| RE-01 | `onboarding/onboarding.module.css:147,213` | 引导页的 sheen 6s、beam 3.2s 等 keep-decor 动画；calm-off/reduce 原先不尊重 Reduce motion | keep-decor 保留（calm 的 M5 在 reduce 下停）；上游补 reduce 媒体查询（`docs/fork.md` M3） | **已批准的例外（keep-decor）** | 重跑 `onboarding`：calm-on/full **8 条**（sheen/beam + 一次性入场），calm-on/reduce **0**；上游修好后 calm-off/reduce 也是 **0**（原 2 条） |
+| RE-02 | `call/call.module.css:363-435,108-118`；overlay §7.0 锚点 | 来电 ringIn/ripple、铃铛 nudge 属 keep-decor；演示没有入站来电 | keep-decor：锚点排除覆盖层；reduce 下 M5 停 | **已批准的例外（keep-decor）** | 静态：`_incoming_`/`_ringIcon_`/`_askCard_`/`_askPill_` 在 `calm-motion.css` 的排除表、`fork-calm` 快照认可；重跑 `call`：呼叫方 Ringing 条动画 0、控件齐全、`Leave Call` 可点 |
+| RE-03 | `dialogs/native/parts.tsx`（Dialog.Overlay）；`settings.module.css:6`、`palette.module.css:6` | 对话框背板 `fade` 被 M1 关成瞬现，内容 160ms 淡入，两层不同步 | 覆盖层 R3-03：`[data-state='open'][class*='_overlay_']` 160ms 淡入 | **已用覆盖层修好** | probe：设置打开时背板 `calm-surface-in` 160ms、内容 `calm-surface-drop` 160ms；命令面板同；`settings`/`palette` calm-on/full 动画 0（入场已结束） |
 
-**手机页**：演示环境 `panel-model.ts:103` 的 Phone 标签没有出现（`Your Mac` 页签只有 New chat/Scratch/Info/Terminal），`view.kind='phone'` 也没有其他入口；本轮无法录屏。不记问题，记覆盖缺口（见 §7）。
+**迁移出问题表（BLG-173 收敛，BLG-175 落地）**
+
+- **RE-04 → §7**：待加入/信任决策卡的选项后果文案是上游文案改进（PR 候选），不是沉稳问题。
 
 ## 7 审计备注
 
@@ -137,3 +140,21 @@
 - RE-03 与 `overlay.md §10.5` 的「Dialog.Overlay 背板瞬时出现」是同一条；若 173 决定补规则，需要一并核对 `_overlay_` 的锚点碰撞（settings/palette/native parts 共用一个类名片段）。
 - RE-01 的「keep-decor 在 reduce 下必须停」在 calm 内已由 M5 满足；上游那两条是 PR 候选，不影响本里程碑的 calm 判定。
 - 手机页、入站来电的覆盖缺口需要在后续里程碑或 BLG-175 的最终重跑里补（如果能造出对应状态）。
+
+**BLG-175 复核补充**
+
+- 复核运行：`BELUGA_URL=http://localhost:1421 node packages/mac/scripts/calm-check.mjs onboarding call network confirmremove settings person palette`（2026-11-12 02:35 起，HEAD `120d2b06d`，全新演示 home）。
+- `onboarding` 的 keep-decor 条数从 170 采集时的 9 条变为 8 条：演示场景的入场时序/哪几个一次性动画在测量窗口内结束不同，不是被覆盖层误伤（calm-off/full 同次 10 条，reduce 0）。
+- `socket`/`call` 的 keep-decor 动画本机无法造出入站来电；结论依赖锚点与快照的静态验证（RE-02）。
+- 对话框的「重」反馈复核未发现新问题：Remove bob? 仍写清后果 + Cancel/Remove；朋友卡信任说明清楚；决策卡的按钮/退路齐全（RE-04 只是文案建议）。
+
+## 8 判定标准 → 证据（BLG-175）
+
+| 判定标准 | 证据 |
+| --- | --- |
+| 本区报告有截图 | §2 的 `m3-*.png`（onboarding/call/network/confirmremove/settings/person/palette） |
+| 报告有仍在播放的动画清单及理由 | §3（calm-on/full：只有引导页 8 条 keep-decor；通话/对话框 0） |
+| 报告有 reduced-motion 结果 | §4（calm-on/reduce 0；引导页 reduce 截图） |
+| 问题表每条状态是三种之一 | §6 三行：keep-decor 2 条、覆盖层 1 条；RE-04 已迁移 |
+| data-calm 从进入到加载完成 CLS 0 或逐条原因 | §5：最大 0.006（朋友卡/确认框打开时的整块移动），其余 0.003–0.004 是 body 微移；逐条与 shell.md §5 同源 |
+| 改动的上游文件登记 fork.md、sync-upstream 无 `!` | onboarding.module.css 在 `docs/fork.md`「M3 逐页补改」；`sync-upstream --report` 0 个 `!` |

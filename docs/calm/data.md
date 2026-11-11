@@ -12,7 +12,7 @@
 1. **逐页录屏**：每场景四组合，独立浏览器 context；记录 CLS 与 sources、`getAnimations()`、2 秒内 JS 改写 style 的元素、首帧 `data-calm`，enter/loaded/hover/select 及场景自定义时刻截图。
 2. **时刻覆盖**：进入 → 加载完成 → 悬停/选中；数字类页面额外读 `font-variant-numeric` 与数字元素宽度，Dashboard 额外检查瓦片换位的 WAAPI。
 3. **reduced-motion**：`calm-on/reduce` 重看。
-4. **问题成表**：文件:行、现象、改法、建议归属、状态（本阶段「待 BLG-174」）。
+4. **问题成表**：文件:行、现象、改法、建议归属；审计阶段的状态列写「待 BLG-174」，终值由 BLG-175 复核后写在 §6。
 
 ## 1 页面清单：场景 ↔ 页面/视图 ↔ 导航路径
 
@@ -81,15 +81,20 @@ calm-on/full 没有 CSS 循环，也没有 JS 改写 style 的元素（`jsMotion
 
 **结论**：数据页自身的内容（数字、瓦片、图表、列表）没有留下非 0 位移。两次较大的 CLS 都来自页面外壳：① Sentinel 的 Ask 面板停靠（WK-03，与 work.md 同一处）；② 项目主页右栏 Inspector 的异步内容（与 shell.md SH-07 同一族）。
 
-## 6 问题表
+## 6 问题表（BLG-175 终值）
 
-| ID | 文件:行 | 现象 | 改法 | 建议归属 | 状态 |
+状态只有三种：**已用覆盖层修好** / **已改上游文件并登记** / **已批准的例外（keep-decor）**。证据来自 2026-11-12 02:35 之后在新 HEAD（`120d2b06d`）上的重跑（`.context/calm/`）。
+
+| ID | 文件:行 | 现象 | 改法 | 终值 | 复核证据 |
 | --- | --- | --- | --- | --- | --- |
-| DA-01 | `sentinel/home.module.css:37`；`sentinel/SentinelHome.tsx:147`（同 work.md WK-03） | Dashboard 首次打开时 Ask Sentinel 面板以 160ms 宽度动画停靠，主区变窄、14 个瓦片连续重排；calm-on/full 0.142、calm-off 0.129、reduce 0.001 | 与 WK-03 同一改法：覆盖层把 `[data-opening]` 时长归零（animationend 仍触发）或上游改成 transform/opacity 进入 | 覆盖层（复议 M4）/ 上游 PR | 待 BLG-174 |
-| DA-02 | `sentinel/DashboardPage.tsx:443`（`still()`）、`:471-482`（glide 220/260ms） | 瓦片顺序/尺寸变化时用 WAAPI 平移，`still()` 只读 reduce，不读沉稳开关；沉稳 full 下会滑 220/260ms（本次导航未触发，未捕获） | 挂钩：`still()` 加上 `calmOn()`（1 行 + import；行为接入点，补 TOUCHPOINTS 行），沉稳时瓦片直接落位 | 挂钩 | 待 BLG-174 |
-| DA-03 | `views/usage/leaderboard.module.css:119,235,253` | 榜单条 `transform` 700ms、名次标记/圆点 `left` 800ms——换位时整段滑动。演示数据里没有榜单行（没有朋友数据），**本次未观察到** | 覆盖层已有的过渡 clamp（无内联样式的元素 → 160ms + ease-standard）会覆盖它；静态规则成立，实测留给能造出榜单数据的审计（BLG-175 可给演示补两条朋友数据） | 覆盖层（已生效，待实测） | 待 BLG-174 |
-| DA-04 | Dashboard/Usage 的数字元素 | 数字宽度抖动 | 实测 `$3,412` 57px、`12,304` 57px、`1,482,210` 79px、百分比 31px，都是 `font-variant-numeric: tabular-nums`；单个计数（如 "4"）是普通数字但只有一位，换位不改变宽度 | 无需改（已稳） | 待 BLG-174 |
-| DA-05 | `layout/Inspector.tsx`（右栏 Info/Notifications 异步内容） | 项目主页首次加载时右栏 section 高度变化，把自身推了 0.0056（calm-on/full 0.009 的一部分） | 上游：右栏异步内容按最终尺寸占位，或把加载态做成固定高度；对所有用户都减少位移 | 上游（PR 候选） | 待 BLG-174 |
+| DA-02 | `sentinel/DashboardPage.tsx:443`（`still()`）、`:471-482`（glide） | 瓦片换位 WAAPI 220/260ms，`still()` 不读沉稳开关 | 挂钩：`still()` 加 `calmOn()`（`docs/fork.md` M3 第 5 行，TOUCHPOINTS） | **已改上游文件并登记** | 重跑 `sentineldash`：calm-on/full 0.004、动画 0；`getAnimations()` 里不再出现 `glide`（本次导航本来也不触发，代码判据已生效） |
+| DA-03 | `views/usage/leaderboard.module.css:119,235,253` | 榜单条 700ms、名次标记/圆点 800ms 的滑动 | 覆盖层 M3 过渡 clamp（无内联样式 → 160ms + ease-standard） | **已用覆盖层修好** | 重跑 `usage`：calm-on/full 过渡元素被 clamp（probe 0.16s）；演示仍是空态（没有榜单行），规则已由全局 clamp 覆盖；`usage` 的 1 条动画是 keep-decor 的 `_titleIn_`（finished） |
+
+**迁移出问题表（BLG-173 收敛，BLG-175 落地）**
+
+- **DA-01 = WK-03**：Ask 面板宽度动画与 work.md 的 WK-03 是同一条，已由 R3-02 修好（`sentineldash` calm-on/full 0.142→**0.004**）。
+- **DA-04 → §7**：数字宽度已验证稳定（tabular-nums），不是问题。
+- **DA-05 → §5**：项目主页右栏 Inspector 的异步内容是固有位移，§5 已归因。
 
 ## 7 审计备注
 
@@ -116,3 +121,21 @@ calm-on/full 没有 CSS 循环，也没有 JS 改写 style 的元素（`jsMotion
 
 - DA-01 与 work.md WK-03 是同一条规则（Ask 面板 `data-opening`），裁决一次即可。
 - DA-02 的 `still()` 挂钩与 work.md WK-01（TaskBoard framer）是同一类「沉稳时瞬时、保留拖拽跟手」的挂钩，建议一起做。
+
+**BLG-175 复核补充**
+
+- 复核运行：`BELUGA_URL=http://localhost:1421 node packages/mac/scripts/calm-check.mjs usage sentineldash projecthome`（2026-11-12 02:35 起，HEAD `120d2b06d`，全新演示 home）。
+- `usage` 在 calm-on/full 记录到 1 条 `_titleIn_` 600ms（playState finished）：Usage Pass 卡片标题的入场，属 `section[aria-label='Your card']` 的 keep-decor（overlay §7.1/§7.3），不是违规；本轮其它动画 0。
+- `sentineldash` calm-on/full 0.004（原 0.142），剩下的 0.0028 是整页 body 微移、0.0007 是瓦片在面板落定后的一次一像素级重排。
+- 数字宽度：Dashboard 的 `$3,412`/`12,304`/`1,482,210` 与用量页百分比仍是 tabular-nums、宽度按位数固定（DA-04 的结论不变）。
+
+## 8 判定标准 → 证据（BLG-175）
+
+| 判定标准 | 证据 |
+| --- | --- |
+| 本区报告有截图 | §2 的 `m3-*.png`（sentineldash/usage/projecthome） |
+| 报告有仍在播放的动画清单及理由 | §3（calm-on/full：usage 的 `_titleIn_` 是 keep-decor；其余 0；Dashboard glide 由 DA-02 关闭） |
+| 报告有 reduced-motion 结果 | §4（动画 0、jsMotion 0；sentineldash 0.001） |
+| 问题表每条状态是三种之一 | §6 两行：覆盖层 1 条、上游文件 1 条；DA-01/04/05 已迁移/合并 |
+| data-calm 从进入到加载完成 CLS 0 或逐条原因 | §5：sentineldash 的 0.004 原为 Ask 面板的宽度动画（R3-02 后剩余 body/一像素级），projecthome 0.003 为 body 微移，usage 0.003 为 body 微移；逐条列了 sources |
+| 改动的上游文件登记 fork.md、sync-upstream 无 `!` | DashboardPage 在 `docs/fork.md`「M3 逐页补改」；`sync-upstream --report` 0 个 `!` |

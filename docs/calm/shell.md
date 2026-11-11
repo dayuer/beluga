@@ -12,7 +12,7 @@
 1. **逐页录屏**：每个场景在四个组合下各起一个全新浏览器 context（`calm-on/full`、`calm-on/reduce`、`calm-off/full`、`calm-off/reduce`），记录 CLS 与位移来源、`getAnimations()`、2 秒内被 JS 改写 style 的元素、首帧是否已有 `data-calm`，并在 enter / loaded / hover / select / 自定义时刻截图。
 2. **时刻覆盖**：进入（room 的 enter）→ 加载完成（loaded）→ 新内容到达（通知中心的内容、聊天到达）→ 悬停（侧栏 needs 行 hover）→ 选中（needs 行 select）→ 展开收起（右侧面板、侧栏、通知中心）。
 3. **reduced-motion**：`calm-on/reduce` 重看；CSS 动画与 JS 动效应为 0。
-4. **问题成表**：文件:行、现象、改法、建议归属（覆盖层 / 挂钩 / 上游 PR），状态本阶段统一「待 BLG-174」。
+4. **问题成表**：文件:行、现象、改法、建议归属（覆盖层 / 挂钩 / 上游 PR）；审计阶段的状态列写「待 BLG-174」，终值由 BLG-175 复核后写在 §6。
 
 本报告覆盖：**侧栏**（含 needs-you / unread 信号）、**工具栏**、**右侧面板**（Changes/Files/Terminal 与开合）、**通知中心与 toast**、以及外壳入口。`palette`/`settings`/`person` 属对话框区（BLG-172），`usage` 属数据区（BLG-171）；本次运行顺带采集，判定写在那两份报告里。
 
@@ -143,20 +143,25 @@ calm-on/reduce 下 CSS 动画为 0；通知中心、面板的过渡为 0ms（`--
 
 **结论**：外壳的「进入 → 加载完成」只剩两类非 0：① 多数场景都有的整页 body 0.0028（见上，亚像素感知、与覆盖层规则无关）；② `workspace` 的 0.012（右侧面板首次取回 changes 后绘制列表并自动选中文件，SH-07）和 `dock` 的 0.013（终端抽屉打开期间聊天仍在到达新步骤，属活内容）。侧栏悬停、选中、面板/侧栏开合、通知中心开合本身都不产生非输入位移。`workspace` 的差异只出现在首个组合，因为 daemon 随后缓存了 review 结果——是采集顺序造成的，不是覆盖层。
 
-## 6 问题表
+## 6 问题表（BLG-175 终值）
 
-| ID | 文件:行 | 现象 | 改法 | 建议归属 | 状态 |
+状态只有三种：**已用覆盖层修好** / **已改上游文件并登记** / **已批准的例外（keep-decor）**。证据来自 2026-11-12 02:35 之后在新 HEAD（`120d2b06d`）上的重跑与 probe（`.context/calm/`、`.beluga/scratch/probe-*.mjs`）。
+
+| ID | 文件:行 | 现象 | 改法 | 终值 | 复核证据 |
 | --- | --- | --- | --- | --- | --- |
-| SH-01 | `layout/signal.module.css:22-39` | needs-you 行 4.2s 无限扫光 | 覆盖层 S1：`:root[data-calm] [class*='_needsRow_']::after { display:none }`；保留琥珀底与左亮边。本次 calm-on 动画 0、calm-off/full 1 条 | 覆盖层（M1 已生效，保留） | 待 BLG-174 |
-| SH-02 | `layout/signal.module.css:7-10` | 未读名字 `font-weight:650`，行宽变化 | 覆盖层 S2：`font-weight:inherit`，只留颜色。**注意**：`e2e/unread.spec.ts:55` 仍断言 650，与 S2 冲突，BLG-173 必须裁决（改 fork 侧断言 / 提上游让「未读只换颜色」成为上游行为） | 覆盖层（已生效）+ 上游 PR（裁决项） | 待 BLG-174 |
-| SH-03 | `layout/Shell.module.css:6-18` | 外壳入场 1.6s、`scale(1.08)` | keep-decor：`[data-arriving]` 锚点放行；reduce 下上游停。probe 实测 calm full 1600ms、reduce none | keep-decor（已批准例外） | 待 BLG-174 |
-| SH-04 | `layout/panel/panel.module.css:27-53,793-806,833` | 右侧面板滑入/滑出 160ms（calm，实测 transform 160ms）；滑动结束后 tab 内容的 `settle` 淡入被 M1 关掉，内容**瞬时出现**；抽屉 `drawerIn/Out`、focus `focusIn` 同样被关，开合是瞬时的 | 覆盖层候选：给 `.settled .body` 一条 160ms 淡入（`calm-surface-in`），让面板内容与滑动顺接；抽屉/focus 瞬时开合是沉稳一致的，确认接受（overlay §10.5 的「抽屉/聚焦面板被关后瞬时出现」就是这一条，正常路径下不出错，只是硬切） | 覆盖层（候选） | 待 BLG-174 |
-| SH-05 | `layout/notifications.module.css:1-28` | 通知中心 popover 的 `drop`（淡入 + 下移 4px + 缩放到 .98）被 M1 关掉 | 实测 role=`dialog`，覆盖层的 `calm-surface-drop`（淡入 + 4px，160ms）接管；落位与铃铛右缘对齐、距铃铛底 6px，没有被入场位移带偏。无需再补 | 覆盖层（已生效） | 待 BLG-174 |
-| SH-06 | `layout/Shell.module.css:55-70` | 全局 toast 的 `toastIn`（上移 6px + 淡入，180ms）被 M1 关掉 | 覆盖层 `calm-surface-drop`（淡入 + 4px，160ms）接管（实测）；同一时刻只有一条 toast（M2 `one-toast`）。`shellcollapse` 场景里还拍到了一条真实到达的全局 toast | 覆盖层（已生效）+ 挂钩（已有） | 待 BLG-174 |
-| SH-07 | `layout/panel/ChangesTab.tsx:266-302,395-402` | 首次打开 Changes 时异步取回 review，随后文件列表与自动选中的 diff 才出现；`_top_`/`_list_` 位置变化（calm-on/full 0.0116，仅首个组合） | 上游：加载期按最终尺寸占位（骨架行），或先定 split 再填内容；对所有用户都减少位移 | 上游（PR 候选） | 待 BLG-174 |
-| SH-08 | `fork/calm/hold-order.ts:115-130`（hooks §9.2） | 侧栏冻结的是**整组内容**：操作期间「需要你」标记晚到也不会显示，直到释放 | 复议「只冻结顺序」：冻结 id 顺序、内容取 fresh（按冻结 id 重排），新增行按规则插入；接口不变。副作用是要处理新增/删除行 | 挂钩（复议候选） | 待 BLG-174 |
-| SH-09 | `fork/calm/hold-order.ts:32-42`（hooks §1.5/§9.6） | 菜单启发式：非 `role=menu` 的浮层（如 `role=dialog` 的选择器）从侧栏打开时，指针离开侧栏 600ms 后顺序仍可能变 | 本次运行未复现（场景不覆盖从侧栏打开非 menu 浮层的组合）；人工确认上限「600ms 后换序」可接受。若要消除，需要在浮层关闭事件上补 `holdEnd` | 挂钩（人工确认项） | 待 BLG-174 |
-| SH-10 | `App.tsx:51-71`；`lib/undo-toast.tsx:16-27`（hooks §3.6） | 被后到 toast 压制的撤销不可见、也不响应 ⌘Z（M2 有意取舍） | 人工确认：可接受（不可见的提示不应响应快捷键）；若不可接受，需把撤销并入后到 toast 作为动作，接入面变大 | 挂钩（已批准取舍） | 待 BLG-174 |
+| SH-01 | `layout/signal.module.css:22-39` | needs-you 行 4.2s 无限扫光 | 覆盖层 S1 隐藏 `::after`，保留琥珀底 + 左亮边 | **已用覆盖层修好** | 重跑 `shellsidebar`/`shellpanel`/`room`：calm-on/full 动画 0；calm-off/full 1–2 条 `_scan_`；截图仍是琥珀底 + 亮边 |
+| SH-02 | `layout/signal.module.css:7-10` | 未读名字 `font-weight:650`，行宽变化 | 覆盖层 S2 `font-weight:inherit`；e2e 断言改为 400 + 计数徽标（fork-only，`docs/fork.md` M3） | **已用覆盖层修好** | probe：未读与 idle 行名都是 `400`、`rgb(29,29,31)`——沉稳下名字不再加粗，未读由计数徽标表示（实施中发现的偏差，见 §7）；`shellsidebar` 0 动画 |
+| SH-03 | `layout/Shell.module.css:6-18` | 外壳入场 1.6s、`scale(1.08)` | keep-decor：`[data-arriving]` 锚点放行；reduce 上游停 | **已批准的例外（keep-decor）** | probe：强制 `data-arriving` 后 `_arrive_` 1600ms running；reduce 下 `animation: none`。overlay §7.1 锚点已在 |
+| SH-04 | `layout/panel/panel.module.css:27-53,793-806,833` | 面板滑入 160ms；内容 `settle` 被 M1 关后硬切；抽屉/聚焦面板瞬时 | 覆盖层 R3-04：`.settled .body` 160ms 淡入 | **已用覆盖层修好** | probe：`.settled .body` → `calm-surface-in` 160ms；`shellpanel` calm-on/full 0.003、动画 0 |
+| SH-05 | `layout/notifications.module.css:1-28` | 通知中心 `drop` 被 M1 关 | 覆盖层 `calm-surface-drop`（role=dialog）接管 | **已用覆盖层修好** | probe：`role="dialog"`、`calm-surface-drop` 160ms；落位 right=1016=铃铛 right、top=45=铃铛底 39+6 |
+| SH-06 | `layout/Shell.module.css:55-70` | 全局 toast `toastIn` 180ms 上移 | 覆盖层 `calm-surface-drop` 160ms；同一时刻一条（M2） | **已用覆盖层修好** | probe：calm `calm-surface-drop` 160ms、calm-off `_toastIn_` 180ms；`shellcollapse` 拍到真实 toast |
+| SH-08 | `fork/calm/hold-order.ts:115-130` | 整组冻结导致「需要你」标记晚到 | 改为只冻结顺序、内容取最新；新行等释放 | **已改上游文件并登记**（fork 接口，上游行已有） | `tests/fork-calm-hold-order.test.ts` 5 passed；`shellsidebar` calm-on/full 0.003 |
+| SH-09 | `fork/calm/hold-order.ts:32-42` | 菜单启发式只认 `role=menu` | 扩到 `role=dialog`/`role=listbox` | **已改上游文件并登记**（fork 接口） | 单测按新选择器更新并通过；本次重跑未复现换序 |
+
+**迁移出问题表（BLG-173 收敛，BLG-175 落地）**
+
+- **SH-07 → §5**：面板首次取回 changes 后自动选中文件造成的分栏位移是异步加载的固有位移；§5 已归因（上游 PR 候选，不在本轮实施）。
+- **SH-10 → §7**：被压制的撤销不响应 ⌘Z 是 M2 明示的取舍（不可见的提示不应响应快捷键），不是新问题。
 
 ## 7 审计备注
 
@@ -187,3 +192,22 @@ calm-on/reduce 下 CSS 动画为 0；通知中心、面板的过渡为 0ms（`--
 
 - `e2e/unread.spec.ts:55`（SH-02）与 `overlay.md §10.5` 的「抽屉/面板瞬时出现」「Dialog.Overlay 背板」「行内 listbox 淡入」需要在 173 一并定案；本报告给出的是现状与可选改法。
 - `hooks.md §9.2`（SH-08）与 §9.6（SH-09、SH-10）按设计必须在 M3 裁决；本报告的建议分别是「只冻结顺序」「人工确认上限」「确认取舍」。
+
+**BLG-175 复核补充**
+
+- 复核运行：`BELUGA_URL=http://localhost:1421 node packages/mac/scripts/calm-check.mjs room workspace shellsidebar shellpanel shellcollapse shellnotifications overview search shared diff files terminal dock`（2026-11-12 02:35 起，HEAD `120d2b06d`，全新演示 home；数字与 170 采集时不同是演示状态差异）。
+- **SH-02 的实施偏差**：S2 的「只留颜色」没有产生颜色差异——行名的基础色本来就是 `--text`，与 `.unreadName` 相同；沉稳下未读名字与普通行完全一致（probe 实测两者都是 `400`/`rgb(29,29,31)`），未读只由计数徽标表示。覆盖层规则不变；`e2e/unread.spec.ts` 的断言已改为 400 + 徽标。若产品要「名字本身也有区别」，需要在 BLG-173 另立一条颜色规则（本里程碑未做）。
+- **SH-10（被压制的撤销）**：维持 M2 设计（不可见、不响应 ⌘Z），从问题表移出，作为已知取舍记录。
+- `shellsidebar` 的 `calm-on/reduce` 这一次记录到 42 个 `jsMotion` 元素：是一个正在工作的 plan 行里的 DotMatrix 被 live-gate 在 reduce 下**画一次静止帧**（每元素 1 次写），不是循环；calm-on/full 同场景为 0。
+- body 0.0028 的整页微小位移在本次重跑的多数场景仍出现（room/workspace/shellsidebar/shellpanel/…），reduce 下为 0；与 M2 的结论相同，继续作为「首屏后页面自身的微小移动」记录，不是覆盖层规则引起。
+
+## 8 判定标准 → 证据（BLG-175）
+
+| 判定标准 | 证据 |
+| --- | --- |
+| 本区报告有截图 | §2 的 `m3-*.png`（room/workspace/shellsidebar/shellpanel/shellnotifications/dock/search） |
+| 报告有仍在播放的动画清单及理由 | §3（calm-on/full CSS 0、jsMotion 0；calm-off 的 `_scan_` 与 DotMatrix 为对照） |
+| 报告有 reduced-motion 结果 | §4（calm-on/reduce 动画 0；DotMatrix 只画冻结帧） |
+| 问题表每条状态是三种之一 | §6 八行：覆盖层 6 条、keep-decor 1 条、上游文件 1 条（SH-08/09）；SH-07/10 已迁移 |
+| data-calm 从进入到加载完成 CLS 0 或逐条原因 | §5：room/workspace/diff/dock 的个位数位移逐条归因（面板异步内容、活内容、body 微移）；其余 0 |
+| 改动的上游文件登记 fork.md、sync-upstream 无 `!` | 侧栏 hold-order 的两处改动在 `docs/fork.md`「沉稳界面」与「M3 逐页补改」；`sync-upstream --report` 0 个 `!` |
