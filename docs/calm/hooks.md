@@ -270,6 +270,12 @@ if (!toast || !show) return null;                         // :54
 - 已知取舍：被压制的撤销既不可见也不响应 ⌘Z（设计稿明确「永不复活」）。用户若在这几秒内想撤销，要等下一次操作——M3 验收时人查是否可接受；可复议的改法是「撤销并入后到的 toast 作为动作」，但要改两套的渲染，接入面变大。
 - 登记行：`App.tsx`、`lib/undo-toast.tsx`——两套提示的**可见性仲裁**必须发生在渲染两套的地方；`one-toast.ts`/`.css` 放不下 toast 的定时器与 ⌘Z。
 
+### 3.7 证据（BLG-167）
+
+- `fork/calm/one-toast.ts`：模块级「最新一条」仲裁；注册用 `useLayoutEffect`（绘制前），被压制的返回 null（DOM 里不存在，所以 `[role=status]` 也只有一条）；最新的一条注销后不揭示旧的（永不复活）。`fork/calm/one-toast.css` 已进 `calm.css` 的 `@import` 链末位。
+- `e2e/fork-calm-toast.spec.ts`：calm 开——Settings › Environment 存一条变量出全局 toast，随后 Hide Project 出撤销 toast，`[data-one-toast]` 只有 1 个且是撤销；隐藏的撤销对 ⌘Z 无反应。calm-off 变体——两条同时可见，撤销的 Undo 照常可用。按计划在里程碑最终步骤统一跑。
+- 现有撤销 e2e（`native-sheets.spec.ts` 的 Hide Project）默认在 calm 开下跑，没有第二条 toast 时行为未变；同样在最终步骤跑。
+
 ## 4. 挂钩四：只放行一种循环（BLG-168）
 
 ### 4.1 上游现状（消费方已全查）

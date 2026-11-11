@@ -27,6 +27,7 @@ import { usePrefs } from './lib/prefs.js';
 import { joinRoom, runMenuItem, useMenuState, useNative, useNotificationTaps, useTrayStatus, useTraySpout, useWindowFocus } from './lib/native.js';
 import { AddProjectSheet } from './dialogs/AddProjectSheet.js';
 import { UndoToast } from './lib/undo-toast.js';
+import { useOneToast } from './fork/calm/one-toast.js';
 import { brandText } from './lib/brand.js';
 import { NativeSheets } from './dialogs/native/WorkSheets.js';
 import { JoinSheet } from './dialogs/JoinSheet.js';
@@ -51,15 +52,16 @@ const TOAST_MS = 3500;
 function Toasts() {
   const { client } = useBeluga();
   const toast = useApp((st) => st.toast);
+  const one = useOneToast('global', toast?.id);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => client.store.dispatch({ type: 'toast_clear', id: toast.id }), TOAST_MS);
     return () => clearTimeout(t);
   }, [toast, client]);
-  if (!toast) return null;
+  if (!toast || !one) return null;
   const icon = toast.level === 'success' ? 'check' : toast.level === 'warn' || toast.level === 'error' ? 'alert' : 'spark';
   return (
-    <div className={s.toasts} role="status" aria-live="polite">
+    <div className={s.toasts} role="status" aria-live="polite" data-one-toast="global">
       <div key={toast.id} className={s.toast} style={{ color: toast.level === 'error' ? 'var(--error)' : toast.level === 'warn' ? 'var(--warn)' : undefined }}>
         <Icon name={icon} size={13} />
         <span className={s.toastText} style={{ color: 'var(--text)' }}>

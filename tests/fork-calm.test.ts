@@ -35,6 +35,8 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'packages/mac/src/layout/Sidebar.tsx', match: /useSidebarHold\(drop\.ref\)/, why: 'the sidebar probe that holds its order (BLG-165)' },
   { file: 'packages/mac/src/layout/EntryRow.tsx', match: /useHeldEntries\(/, why: 'the frozen order both sidebar lists read (BLG-165)' },
   { file: 'packages/mac/src/chat/ChatLog.tsx', match: /<JumpLabel rows=\{rows\.length\} \/>/, why: 'the count of messages below, on the way back down (BLG-166)' },
+  { file: 'packages/mac/src/App.tsx', match: /useOneToast\('global', toast\?\.id\)/, why: 'one toast at a time: the app toast steps aside (BLG-167)' },
+  { file: 'packages/mac/src/lib/undo-toast.tsx', match: /useOneToast\('undo', toast\?\.id\)/, why: 'one toast at a time: the undo toast steps aside (BLG-167)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
