@@ -101,7 +101,7 @@ node scripts/sync-upstream.mjs --report
 
 ### 中文输入法组字时 Enter 只选词（BLG-133：留在 fork，不提回上游）
 
-原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown（keyCode 229，`isComposing` 已是 false），输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），只有一处用它：`packages/mac/src/fork/ime-guard.ts` 在 window 的捕获阶段拦下组字中的 Enter（`stopImmediatePropagation`，从不 `preventDefault`，否则会吃掉上屏的字），终端（`.xterm` 里）放行。各输入框与上游一致。测试：`tests/ime.test.ts`、`tests/ime-guard.test.ts`、`packages/mac/e2e/fork-ime.spec.ts`。
+原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown（keyCode 229，`isComposing` 已是 false），输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），只有一处用它：`packages/mac/src/fork/ime-guard.ts` 在 window 的捕获阶段拦下组字中的 Enter，以及组字时的 Tab、Esc 和方向键（各输入框以前自己的判断也挡这些；字母不拦，快捷键照常）（`stopImmediatePropagation`，从不 `preventDefault`，否则会吃掉上屏的字），终端（`.xterm` 里）放行。各输入框与上游一致。测试：`tests/ime.test.ts`、`tests/ime-guard.test.ts`、`packages/mac/e2e/fork-ime.spec.ts`。
 
 - 上游文件只有 `packages/mac/src/main.tsx` 一行（见上面“只有一行接入点”）。
 

@@ -89,3 +89,35 @@ e2e 锁当时被另一个工作树的整套 e2e 占着（`waiting for m7-v5's e2
 | `PlanChat.tsx`、`PlanOutline.tsx` | +12/-5、+4/-3 | 各 +2/-1 输入法 | 与 `f66c38b0^1` 相同 | PR #17 的计划分工 |
 
 其余 54 个文件与上游逐字相同。超过 3 行的 6 个（PlanChat、PlanPage、plans-model、ProjectHome、pilot.ts，以及菜单的 PickMenu）全是 PR #20 之前或之后别的 fork 功能，PR #20 在它们里面要么已经是 0，要么 ≤2 行。
+
+## 试合上游与审计（BLG-191）
+
+### 试合 upstream/main
+
+在临时工作树（`/tmp/blg191-before`、`/tmp/blg191-after`，`git worktree add --detach`，`rerere` 关掉）里各合一次 `upstream/main`（`29014be78`，fork 落后 5 个提交），合完即删。输出在 `.beluga/scratch/trial-merge-{before,after}.txt`。
+
+| | 改前（`78ccc5013^`） | 改后（本分支） |
+|---|---|---|
+| 合并结果 | `Merge made by the 'ort' strategy.`，0 个冲突 | `Merge made by the 'ort' strategy.`，0 个冲突 |
+| fork 改到的上游文件里，上游这 5 个提交也改了的 | 3 个：`chat/Composer.tsx`、`layout/workspace-row.tsx`、`sentinel/SentinelCards.tsx`（都是输入法那两行；这次没冲突只因为改的不是相邻行） | 0 个 |
+| fork 改到的上游文件里，上游最近 300 个提交改过的 | 146 个 | 95 个 |
+
+### 独立审计（Sonnet 子 agent，只读）
+
+- fixer 搬运（`53a0a5932`）：纯搬运。函数体、动态文字、副作用顺序逐字相同；`this.fix` 在 `TaskWatchdog` 之前创建，`escalate` 是惰性调用；`followWork` 里改成 `this.fix.forget(channel)` 等价。
+- 新建计划与 forkSheet（`84571b740`）：fork 版 `NewPlanSheet` 函数体与原来逐字相同；`forkSheet` 在 `NativeSheets` 的所有 hook 之后调用，本身不含 hook。上游的 `case 'new_plan'` 成了死分支，有意留着以便合并。
+- 输入法拦截：Enter 路径全覆盖（旧的判断都在 keydown 的 Enter 上，都用 `e.key`；没有比拦截更早注册的 window 捕获监听；没有承载输入框的 iframe 或新窗口）。`.xterm` 例外成立（xterm.js 给根元素加 `xterm` 类，helper textarea 在里面）。
+- 审计指出一处小回归，已修：以前有 5 处（`BoxSuggestions`、`workspace-row`、`PlanChat`、`NewTaskSheet`/`Activity` 的标签）对组字中的 Tab、方向键、Esc 也提前返回。拦截现在也挡组字中的这几个键（`IME_KEYS`），字母不挡，单字母快捷键照常；有单测。
+- 记一笔的行为变化（更安全的方向，不修）：组字时的 ⌘↩ 以前会触发全局快捷键（`App.tsx` 不看输入法），现在不会；录快捷键时组字中的 Enter 也不再被录进去。
+
+### 测试
+
+- 单测：`tests/ime.test.ts`、`tests/ime-guard.test.ts`、`tests/plan-fix-agent.test.ts`、`tests/plans.test.ts`、`tests/plans-watchdog.test.ts`、`tests/plan-*-agent.test.ts`、`tests/plan-roles*.test.ts`、`tests/fork-plans.test.ts`、`tests/mac-plans.test.ts`、`tests/sentinel-kept-data.test.ts`、`tests/upstream-sync.test.ts`、`tests/i18n.test.ts`、`tests/boundaries.test.ts` 全过；`npm run typecheck`、`packages/mac` 的 `tsc --noEmit` 通过。
+- 全量 `npx vitest run`（负载 29–46，10 核）：652 个文件里 648 过、3 个失败（7758 个用例过）。单独重跑：`tests/test-lock.test.ts` 过；`tests/machines/linux-computer.test.ts`（真的起一个无头 Beluga 配对，37 秒后 waitFor 超时）和 `tests/friend-share/handoff.test.ts`（网络交接，60 秒超时，重跑时换了一个用例超时）还是超时。两个都是 P2P/真实进程的长测试，不碰本里程碑改的任何文件。没有拿到 Tested-on，见遗留。
+- e2e（`fork-ime`、`plan-chat`、`plan-settings`、`plan-roles`、`plan-roles-walk`、`plan-zh` 一起跑一次）：9 过、3 失败、4 跳过。失败的：`fork-ime` 的新建任务（用例自己漏了 `page.goto('/')`，已改）；`plan-roles`、`plan-zh` 是 “The demo daemon did not start”（负载 3.6 倍）。重跑这 3 个时 e2e 锁一直被别的工作树占着（m7-v5、BLG-159），见遗留。
+
+### 遗留
+
+- 全量 vitest 的 Tested-on：等 Mac 不忙时在本分支再跑一次 `npx vitest run`；`linux-computer`、`handoff` 两个超时要在空闲时确认。
+- e2e 重跑：`npm run e2e -- e2e/fork-ime.spec.ts e2e/plan-roles.spec.ts e2e/plan-zh.spec.ts`（锁空出来后）。
+- `pilot.ts` 里 PR #17 的建筑师（约 100 行）还在上游文件里，下一步抽到 `src/fork/plans/architect.ts`。

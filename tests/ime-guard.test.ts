@@ -11,10 +11,21 @@ describe('the IME guard on the window (fork, BLG-187)', () => {
     expect(swallowsImeEnter({ key: 'Enter', keyCode: 13, isComposing: true, target: elsewhere as never })).toBe(true);
   });
 
-  it('leaves a plain Enter, and every other key, to the boxes', () => {
+  it('swallows the other keys while composing too (Tab, arrows, Escape), as each box’s own check did', () => {
+    expect(swallowsImeEnter({ key: 'ArrowDown', keyCode: 229, isComposing: true, target: elsewhere as never })).toBe(true);
+    expect(swallowsImeEnter({ key: 'Escape', keyCode: 229, target: elsewhere as never })).toBe(true);
+    expect(swallowsImeEnter({ key: 'Tab', keyCode: 9, isComposing: true, target: elsewhere as never })).toBe(true);
+  });
+
+  it('leaves letters to the page even with keyCode 229 (shortcuts keep working)', () => {
+    expect(swallowsImeEnter({ key: 'j', keyCode: 229, isComposing: false, target: elsewhere as never })).toBe(false);
+    expect(swallowsImeEnter({ key: 'Backspace', keyCode: 229, isComposing: true, target: elsewhere as never })).toBe(false);
+  });
+
+  it('leaves plain keys to the boxes', () => {
     expect(swallowsImeEnter({ key: 'Enter', keyCode: 13, isComposing: false, target: elsewhere as never })).toBe(false);
-    expect(swallowsImeEnter({ key: 'ArrowDown', keyCode: 229, isComposing: true, target: elsewhere as never })).toBe(false);
-    expect(swallowsImeEnter({ key: 'Escape', keyCode: 229, target: elsewhere as never })).toBe(false);
+    expect(swallowsImeEnter({ key: 'ArrowDown', keyCode: 40, isComposing: false, target: elsewhere as never })).toBe(false);
+    expect(swallowsImeEnter({ key: 'Escape', keyCode: 27, target: elsewhere as never })).toBe(false);
   });
 
   it('leaves the terminal alone: xterm reads keyCode 229 itself', () => {

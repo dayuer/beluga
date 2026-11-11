@@ -74,6 +74,7 @@ test('the main chat box: Enter that picks an IME’s words doesn’t send', asyn
 });
 
 test('New Task: ⌘↩ that picks an IME’s words doesn’t create it; a plain ⌘↩ does', async ({ page }) => {
+  await page.goto('/');
   await openTasks(page);
   await page.getByRole('button', { name: 'New Task', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'New Task' });

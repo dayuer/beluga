@@ -1,15 +1,17 @@
 import { isImeComposing } from '../lib/ime.js';
 
 /**
- * Fork (BLG-118, BLG-187): Enter that picks an input method's words (Chinese, Japanese, Korean…)
- * never reaches the app's own key handlers, so no box sends, submits or closes on it. One place
+ * Fork (BLG-118, BLG-187): Enter that picks an input method's words (Chinese, Japanese, Korean…),
+ * and Tab, Escape and the arrows pressed while it composes (they move through its candidates), never
+ * reach the app's own key handlers, so no box sends, submits, closes, completes or moves on them, as
+ * each box's own check did before (IME_KEYS; letters are left alone, so shortcuts are too). One place
  * instead of a check in every box: a keydown listener on the window, capture phase, installed in
  * main.tsx before anything else listens. It runs before React (whose listeners sit on the root)
  * and before every other window listener (dictation's ↩, the sheets'), and only stops the event's
  * propagation: never preventDefault, which would also drop the characters the IME is committing.
  *
- * Left alone: the terminal (xterm reads keyCode 229 itself to pick up what the IME typed) and any
- * key but Enter (arrows and Escape move through the IME's candidates as before).
+ * Left alone: the terminal (xterm reads keyCode 229 itself to pick up what the IME typed). The IME
+ * itself never sees the difference: it handles its keys before the page does.
  */
 export interface GuardedKey {
   readonly key: string;
@@ -18,9 +20,12 @@ export interface GuardedKey {
   readonly target?: EventTarget | null;
 }
 
-/** Does this keydown pick an IME's words with Enter, outside the terminal? */
+/** The keys the boxes act on that an IME uses while it composes. */
+export const IME_KEYS: ReadonlySet<string> = new Set(['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+/** Is this keydown the IME's (Enter picking its words, or a key that moves through them), outside the terminal? */
 export function swallowsImeEnter(e: GuardedKey): boolean {
-  if (e.key !== 'Enter' || !isImeComposing(e)) return false;
+  if (!IME_KEYS.has(e.key) || !isImeComposing(e)) return false;
   const el = e.target as { closest?: (sel: string) => unknown } | null | undefined;
   return !(typeof el?.closest === 'function' && el.closest('.xterm'));
 }
