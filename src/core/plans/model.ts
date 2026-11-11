@@ -290,6 +290,8 @@ export interface TaskWatch {
   readonly wokeAt?: number;
   /** It stalled again soon after a wake: it waits for you (Resume, or Open Chat). */
   readonly needsYou?: boolean;
+  /** It stalled again soon after a wake and went to the plan's fix agent, woken once more there. */
+  readonly escalated?: boolean;
   /** The one line it's shown with: “KLD-36 stopped, woke it at 11:13”. */
   readonly line: string;
   /** Stopped by your usage limit: when it goes on by itself (see shared/run-failure.ts). */
@@ -345,6 +347,11 @@ export interface Plan {
   readonly checkAgent?: AgentRef;
   /** The agent that writes each milestone's technical design before its work starts; none: no architect step. */
   readonly archAgent?: AgentRef;
+  /**
+   * The agent that takes over what's hard: a milestone's fix tasks after its check failed, a
+   * conflict, a task that stopped twice. None: auto route's strongest, else whoever was at it.
+   */
+  readonly fixAgent?: AgentRef;
   readonly paused: boolean;
   readonly runs: Readonly<Record<string, MilestoneRun>>;
   /** Tasks whose start is being combined from several branches (by plan task id). */
@@ -551,6 +558,9 @@ export function planTaskOfIssue(state: PlansState, issueId: string): { readonly 
 
 /** Who checks a plan's milestones and reviews its drafts: its check agent, else its work agent, else your default. */
 export const checkerAgentOf = (plan: Pick<Plan, 'agent' | 'checkAgent'>): AgentRef | undefined => plan.checkAgent ?? plan.agent;
+
+/** Who the plan's own conversation plans on (cutting it into milestones is design work): its architect, else its work agent, else your default. */
+export const homeAgentOf = (plan: Pick<Plan, 'agent' | 'archAgent'>): AgentRef | undefined => plan.archAgent ?? plan.agent;
 
 /** A milestone's own autonomy, else its plan's. */
 export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => milestone?.autonomy ?? plan.autonomy;

@@ -654,7 +654,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `team.answerKnock` | ✓ the knock's card in the worktree's chat (Let In as Editor, Let In as Viewer; ••• › Not Now) and the bell's row; the phone's card (Let In as Editor / Not Now / Let In as Viewer) |
 | `team.befriend` | ✓ the team badge on a project's row › its card › Add Friend beside someone on the team who isn't a friend (BLG-510); they Accept like any friend request |
 | `team.leave` | ✓ project ••• › Leave Team with Ata (Leave Team with several teammates: off it for everyone, BLG-510) |
-| `plans.create` | ✓ Plans › New Plan (a goal; the agent plans in a conversation of its own in the project's main folder; More options › Agent picks who works its milestones and tasks, BLG-497); the phone's Ask › a project › Plan (1.5); Your Mac's `start_plan` (quietly) |
+| `plans.create` | ✓ Plans › New Plan (a goal; the agent plans in a conversation of its own in the project's main folder; More options › Architecture, Coding, Audit, Hard fixes: who does each part, starting as the tiers say — the strongest model designs it and takes over what's hard, an everyday one codes, one in between audits; BLG-497); the phone's Ask › a project › Plan (1.5); Your Mac's `start_plan` (quietly) |
 | `plans.here` | ✓ the composer's mode menu › Plan with Tasks (the agent plans in the conversation you're in) |
 | `plans.approve` | ✓ Approve Plan / Apply Changes on a plan's page and its strip above the conversation; Approve Plan's ▾ › Approve, worked by ▸ (BLG-506: `plans.setWorkAgent`, then approve) |
 | `plans.discard` | ✓ Discard Draft / Discard Changes on a plan's page |
@@ -667,6 +667,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `plans.setWorkAgent` | ✓ a plan's ⋯ › Agent for Its Work ▸ (BLG-498): who works the milestones and tasks that start from now on (ones at work keep theirs, the toast says so); the phone's plan page › ⋯ › Agent for its work (1.35) |
 | `plans.setCheckAgent` | ✓ a plan's ⋯ › Agent for Its Checks ▸: who runs its milestone checkers and Verify the Plan from now on, say a stronger model than the work's (Same as Its Work: the work's agent); the phone's plan page › ⋯ › Agent for its checks (1.50) |
 | `plans.setArchAgent` | ✓ a plan's ⋯ › Agent for Its Architecture ▸: who writes each milestone's technical design before its work starts (No Architect (Start Right Away): no architect step); a designed milestone shows its Design in its details; the phone's plan page › ⋯ › Agent for its architecture, and a milestone's Design (1.53) |
+| `plans.setFixAgent` | ✓ a plan's ⋯ › Agent for Hard Fixes ▸: who takes over fix tasks after a failed check, conflicts and a task that stopped twice (Strongest Model (Auto Route): auto route's strong list, else whoever is at it); New Plan › More options › Hard fixes; the phone's plan page › ⋯ › Agent for hard fixes (1.54) |
 | `plans.setTestsAt` | ✓ a plan's ⋯ › When to Run Tests ▸ (each milestone, or once at the end) |
 | `plans.pass` | ✓ Pass Milestone on a plan's page |
 | `plans.recheck` | ✓ Check Again on a milestone the agent is checking or that failed its check |

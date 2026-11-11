@@ -959,6 +959,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
     ...(plan.agent ? { agent: agentRefView(plan.agent) } : {}),
     ...(plan.checkAgent ? { checkAgent: agentRefView(plan.checkAgent) } : {}),
     ...(plan.archAgent ? { archAgent: agentRefView(plan.archAgent) } : {}),
+    ...(plan.fixAgent ? { fixAgent: agentRefView(plan.fixAgent) } : {}),
     ...(plan.status !== 'done' ? { agents: workPicker(state, plan.agent) } : {}),
     // 1.45 (BLG-772): its decisions, and its draft's review.
     ...decisionsAndReview(state, plan),

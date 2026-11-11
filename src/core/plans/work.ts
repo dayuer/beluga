@@ -1,6 +1,6 @@
 import type { PlanTools } from '../../agent/types.js';
 import type { AgentRef } from '../../protocol.js';
-import { autoAutonomy, autoChecker } from '../../shared/auto-route.js';
+import { autoAutonomy, autoChecker, autoFixer } from '../../shared/auto-route.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
 import type { BoardWork } from '../board/work.js';
@@ -13,13 +13,13 @@ import { coherenceWarnings, warningsText } from './coherence.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, architectOf, checkerAgentOf, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, architectOf, checkerAgentOf, checkerOf, homeAgentOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { PlanMover } from './move-work.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
 import { liveFrom } from './progress.js';
 import { type PlanGit, planGitOf } from './plan-git.js';
-import { type Plans, UNTITLED } from './plans.js';
+import { type PlanRoles, type Plans, UNTITLED } from './plans.js';
 import { architectBrief, checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
 
 /**
@@ -135,6 +135,10 @@ export class PlansWork {
             },
           }
         : {}),
+      // What's hard (fix tasks, conflicts, a task that stopped twice): the plan's fix agent, else auto route's strongest.
+      fixer: (plan: Plan) => plan.fixAgent ?? autoFixer(deps.store.getState()),
+      homeAgent: (plan: Plan) => homeAgentOf(plan),
+      ...(deps.followAgent ? { switchAgent: deps.followAgent } : {}),
       ...(deps.alive ? { alive: deps.alive } : {}),
       ...(deps.takeOver ? { takeOver: deps.takeOver } : {}),
       ...(deps.promote ? { promote: deps.promote } : {}),
@@ -182,7 +186,7 @@ export class PlansWork {
    * the code there and changes nothing), and the plan's page. Claude starts planning from `goal`.
    */
   /** `quiet`: started from elsewhere (Your Mac), so the Mac's window stays where it is. */
-  async create(input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef }, opts: { readonly quiet?: boolean } = {}): Promise<Plan> {
+  async create(input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt } & PlanRoles, opts: { readonly quiet?: boolean } = {}): Promise<Plan> {
     const controller = this.deps.controller;
     if (!controller) throw new Error('Plans need a project folder');
     const goal = input.goal.trim();
@@ -190,9 +194,11 @@ export class PlansWork {
     const chat = await controller.newChat(input.projectId, UNTITLED, undefined, { quiet: true });
     if (!chat) throw new Error('Couldn’t start the plan’s conversation');
     const home = `${WS}${chat.id}`;
-    const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
-    // Its conversation plans on the agent picked for its work (a new conversation: nothing to hand off).
-    if (input.agent) controller.manager.setAgent(chat.id, input.agent);
+    const roles: PlanRoles = { ...(input.agent ? { agent: input.agent } : {}), ...(input.checkAgent ? { checkAgent: input.checkAgent } : {}), ...(input.archAgent ? { archAgent: input.archAgent } : {}), ...(input.fixAgent ? { fixAgent: input.fixAgent } : {}) };
+    const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...roles }, this.me());
+    // Its conversation plans on its architect, else the agent picked for its work (a new conversation: nothing to hand off).
+    const planner = homeAgentOf(plan);
+    if (planner) controller.manager.setAgent(chat.id, planner);
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
     this.deps.askClaude(goal, home, true);
     // Named in a moment by a quick model (your message is never its name); Claude's plan_write names it after that.
@@ -368,8 +374,8 @@ export class PlansWork {
    */
   setWorkAgent(id: string, agent: AgentRef | null): string {
     const plan = this.plans.setWorkAgent(id, agent ?? undefined, this.me());
-    // The plan's own conversation follows it, so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
-    if (plan.status !== 'done' && plan.home.startsWith(WS)) this.deps.followAgent?.(plan.home, agent ?? undefined);
+    // The plan's own conversation follows it (unless it has an architect, who plans), so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
+    this.followHome(plan);
     const who = agent ? agentName(agent, { model: true }) : 'your default agent';
     const busy = Object.values(plan.runs).filter((r) => r?.agent && !r.passedAt).length;
     return busy ? `${who} works what starts next; the ${busy === 1 ? 'milestone' : `${busy} milestones`} already at work keep${busy === 1 ? 's' : ''} ${busy === 1 ? 'its' : 'their'} agent` : `${who} works this plan’s milestones and tasks`;
@@ -389,8 +395,25 @@ export class PlansWork {
    * milestones start right away, as before). Milestones already at work keep going. → in words.
    */
   setArchAgent(id: string, agent: AgentRef | null): string {
-    this.plans.setArchAgent(id, agent ?? undefined, this.me());
+    const plan = this.plans.setArchAgent(id, agent ?? undefined, this.me());
+    // The plan's own conversation plans on its architect (none: on its work agent again).
+    this.followHome(plan);
     return agent ? `${agentName(agent, { model: true })} designs each of this plan’s milestones before its work starts` : 'This plan’s milestones start without a design';
+  }
+
+  /**
+   * Who takes over what's hard in the plan: `agent` (the strongest model, say), or auto route's
+   * strongest (null; auto route off: whoever is at it). Fix tasks, conflicts and a task that
+   * stopped twice from now on go to it. → in words.
+   */
+  setFixAgent(id: string, agent: AgentRef | null): string {
+    this.plans.setFixAgent(id, agent ?? undefined, this.me());
+    return agent ? `${agentName(agent, { model: true })} takes over what’s hard in this plan: fix tasks after a failed check, conflicts, a task that stopped twice` : 'What’s hard in this plan goes to auto route’s strongest model, else stays with whoever is at it';
+  }
+
+  /** The plan's own conversation onto the agent it plans on (its architect, else its work agent), while it's under way. */
+  private followHome(plan: Plan): void {
+    if (plan.status !== 'done' && plan.home.startsWith(WS)) this.deps.followAgent?.(plan.home, homeAgentOf(plan));
   }
 
   pass(id: string, milestone: string): Plan {

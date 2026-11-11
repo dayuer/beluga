@@ -96,6 +96,7 @@ const SavedPlan = z
     agent: AgentRef.optional().catch(undefined),
     checkAgent: AgentRef.optional().catch(undefined),
     archAgent: AgentRef.optional().catch(undefined),
+    fixAgent: AgentRef.optional().catch(undefined),
     body: Body.optional().catch(undefined),
     draft: Body.optional().catch(undefined),
     paused: z.boolean().default(false),
@@ -105,6 +106,14 @@ const SavedPlan = z
     updatedAt: z.number(),
   })
   .passthrough();
+
+/** Who does each part of a plan (each none: see Plan): its work, its checks, its design, what's hard. */
+export interface PlanRoles {
+  readonly agent?: AgentRef;
+  readonly checkAgent?: AgentRef;
+  readonly archAgent?: AgentRef;
+  readonly fixAgent?: AgentRef;
+}
 
 const short = (prefix: string): string => `${prefix}_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
 
@@ -142,7 +151,7 @@ export class Plans {
   // ------------------------------------------------------------------ drafting
 
   /** A new plan: an empty draft in its conversation (Claude writes it there). Your goal is never its title: a quick model names it (autoTitle), and Claude's plan_write after that. */
-  create(input: { readonly projectId: string; readonly home: string; readonly title?: string; readonly goal?: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef }, by: Actor): Plan {
+  create(input: { readonly projectId: string; readonly home: string; readonly title?: string; readonly goal?: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt } & PlanRoles, by: Actor): Plan {
     const at = this.now();
     const title = (input.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || UNTITLED;
     const plan: Plan = {
@@ -155,7 +164,10 @@ export class Plans {
       autonomy: input.autonomy ?? DEFAULT_AUTONOMY,
       maxParallel: DEFAULT_PARALLEL,
       testsAt: input.testsAt ?? 'milestone',
-      ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.agent ? { agent: agentOnly(input.agent) } : {}),
+      ...(input.checkAgent ? { checkAgent: agentOnly(input.checkAgent) } : {}),
+      ...(input.archAgent ? { archAgent: agentOnly(input.archAgent) } : {}),
+      ...(input.fixAgent ? { fixAgent: agentOnly(input.fixAgent) } : {}),
       paused: false,
       runs: {},
       activity: [event(by, 'created', 'started this plan', at)],
@@ -297,6 +309,14 @@ export class Plans {
     if (sameAgent(plan.archAgent, agent)) return plan;
     const text = agent ? `gave its milestones’ designs to ${agentName(agent, { model: true })} from here on: each one is designed before its work starts` : 'starts its milestones without a design from here on';
     return this.change(plan, { archAgent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
+  }
+
+  /** The agent that takes over what's hard from here on (fix tasks after a failed check, conflicts, a task that stopped twice); undefined: auto route's strongest, else whoever was at it. */
+  setFixAgent(id: string, agent: AgentRef | undefined, by: Actor): Plan {
+    const plan = this.need(id);
+    if (sameAgent(plan.fixAgent, agent)) return plan;
+    const text = agent ? `gave what’s hard (fix tasks, conflicts, a task that stopped twice) to ${agentName(agent, { model: true })} from here on` : 'gave what’s hard back to whoever is at it';
+    return this.change(plan, { fixAgent: agent ? agentOnly(agent) : undefined }, [event(by, 'note', text, this.now())]);
   }
 
   /** The conversation that designs a milestone (undefined: none, it was archived). */

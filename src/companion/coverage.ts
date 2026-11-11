@@ -442,6 +442,7 @@ export const PHONE: Record<Method, Side> = {
   'plans.setWorkAgent': 'phone',
   'plans.setCheckAgent': 'phone',
   'plans.setArchAgent': 'phone',
+  'plans.setFixAgent': 'phone',
   'plans.tidyUp': 'mac',
   'plans.pass': 'phone',
   'plans.recheck': 'phone',
