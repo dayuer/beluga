@@ -337,7 +337,12 @@ reduced-motion 下两者都停：CSS 走 `prefers-reduced-motion` / `:root[data-
 node packages/mac/scripts/calm-check.mjs room workspace chatrun plan tasks sentinel usage onboarding
 ```
 
-- 依赖本机 `vite`（默认 `BELUGA_URL=http://localhost:1420`）与演示 daemon；探活失败时打印两条启动命令并以 1 退出。
+- 依赖本机 `vite`（默认 `BELUGA_URL=http://localhost:1420`）与演示 daemon；探活失败时打印两条启动命令并以 1 退出：
+  ```bash
+  cd packages/mac && npm run dev
+  BELUGA_ALLOW_ORIGINS=http://localhost:1420 npm run dev
+  ```
+  `BELUGA_ALLOW_ORIGINS` 是必须的：普通 Chromium 的页面来源是 `http://localhost:1420`，不在 daemon 默认的 Tauri 来源里。想把演示数据关在临时目录里，给两条命令都加 `BELUGA_HOME=/tmp/calm-demo`。
 - 参照 `packages/mac/scripts/shots.mjs`：Playwright Chromium、1440×900、`openWs`/`tab`/`side` 辅助函数复制（shots.mjs 是上游文件，只能复制不能 import）。
 - 场景：`shots.mjs` 已有的全部场景（`room onboarding workspace chatrun diff files terminal overview usage search shared palette settings person dock picker`）+ 新增 `plan`、`tasks`、`sentinel`。
 - 四组合，各自独立 context：
@@ -348,9 +353,9 @@ node packages/mac/scripts/calm-check.mjs room workspace chatrun plan tasks senti
 - 每场景 × 组合采集：
   - `cls`：`PerformanceObserver('layout-shift')`，排除 `hadRecentInput`。
   - `shifts[]`：每次位移的 `value`、`hadRecentInput`、`sources`（最多 4 层选择器）。
-  - `animations[]`：`document.getAnimations()`，含选择器、类型（css/js）、名字或过渡属性、`duration`、`iterations`、`playState`。
+  - `animations[]`：`document.getAnimations()`，在 enter 与结束各取一次后合并，含选择器、类型（css/js）、名字或过渡属性、`duration`、`iterations`（无限为 `"infinite"`）、`playState`。
   - `jsMotion`：2 秒 `MutationObserver(style)`，按元素统计改写次数。
-  - `firstFrame`：首个 `rAF` 时 `data-calm` 是否已设。
+  - `firstFrame`：`DOMContentLoaded` 后的第一帧（应用模块已跑、真正能画第一帧的时刻）`data-calm` 是否已设。裸文档的首个 `rAF` 早于应用模块，永远看不到它。
   - `shots`：enter / loaded / hover / select（`chatrun` 另含新消息时刻）→ `.context/calm/img/<scene>-<combo>-<moment>.png`（`deviceScaleFactor: 1`）。
 - 输出：
 
