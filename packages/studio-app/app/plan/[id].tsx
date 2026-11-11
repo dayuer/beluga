@@ -3,13 +3,17 @@ import { MessageCircle, Minus, Plus } from 'lucide-react-native';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AcceptCard } from '../../components/AcceptCard';
 import { ActionDock } from '../../components/ActionDock';
 import { ActivityList } from '../../components/ActivityList';
+import { DecisionCard } from '../../components/DecisionCard';
 import { Drawer } from '../../components/Drawer';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { PlanChat } from '../../components/PlanChat';
 import { PlanHeader } from '../../components/PlanHeader';
+import { PrimaryAction } from '../../components/PrimaryAction';
+import { ReasonSheet } from '../../components/ReasonSheet';
 import { Segments, type SegmentItem } from '../../components/Segments';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
@@ -19,7 +23,7 @@ import { PlanOutline } from '../../components/plan/PlanOutline';
 import { MilestoneSheet } from '../../components/plan/MilestoneSheet';
 import { kv } from '../../lib/kv';
 import { currentMilestone, mapItems, outlineOf } from '../../lib/plan-graph';
-import { pagePhase } from '../../lib/plan-phase';
+import { applyLocal, hasPrimary, localFor, pagePhase, type LocalPlanState } from '../../lib/plan-phase';
 import { usePlanView } from '../../lib/plan-store';
 import { detectLang, t } from '../../lib/strings';
 import { color, radius, space, type } from '../../lib/theme';
@@ -49,11 +53,18 @@ export default function PlanScreen() {
   const desktop = width >= 900;
   const store = usePlanView(pid, ref);
   const view = store.view;
-  const phase = view ? pagePhase(view) : undefined;
+  const [local, setLocal] = useState<LocalPlanState | undefined>();
+  const activeLocal = localFor(store.rev, local);
+  const effective = view ? applyLocal(view, activeLocal) : undefined;
+  const phase = effective ? pagePhase(effective) : undefined;
   const [tab, setTab] = useState<TabKey>('map');
   const [picked, setPicked] = useState<string | undefined>();
   const [menu, setMenu] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [decisionIndex, setDecisionIndex] = useState(0);
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reasonMilestone, setReasonMilestone] = useState<string | undefined>();
   const [seen, setSeen] = useState(() => (pid && ref ? (kv.get<number>(`seen:chat:${pid}:${ref}`) ?? 0) : 0));
   const [openMilestones, setOpenMilestones] = useState<readonly string[]>([]);
   const [zoomIndex, setZoomIndex] = useState(() => {
@@ -73,9 +84,9 @@ export default function PlanScreen() {
     const now = Date.now();
     setSeen(now);
     kv.set(`seen:chat:${pid}:${ref}`, now);
-  }, [pid, ref, chatOpen, desktop, view?.turns]);
+  }, [pid, ref, chatOpen, desktop, effective?.turns]);
 
-  const unread = view ? unreadTurns(view.turns, seen) : 0;
+  const unread = effective ? unreadTurns(effective.turns, seen) : 0;
 
   // Open where the work is on the first view; after that the customer owns the outline.
   useEffect(() => {
@@ -85,17 +96,49 @@ export default function PlanScreen() {
     setOpenMilestones(current ? [current.ref] : []);
   }, [view]);
 
-  const items = useMemo(() => (view ? mapItems(view, lang) : []), [view, lang]);
-  const outline = useMemo(() => (view ? outlineOf(view, lang) : []), [view, lang]);
+  const items = useMemo(() => (effective ? mapItems(effective, lang) : []), [effective, lang]);
+  const outline = useMemo(() => (effective ? outlineOf(effective, lang) : []), [effective, lang]);
   const tabs: readonly SegmentItem[] = [
     { key: 'map', label: t(lang, 'plan.tabMap'), testID: 'tab-map' },
     { key: 'outline', label: t(lang, 'plan.tabOutline'), testID: 'tab-outline' },
     { key: 'activity', label: t(lang, 'plan.tabActivity'), testID: 'tab-activity' },
   ];
-  const pickedMilestone = view && picked ? view.milestones.find((m) => m.ref === picked) : undefined;
+  const pickedMilestone = effective && picked ? effective.milestones.find((m) => m.ref === picked) : undefined;
+  const openDecisions = effective ? effective.decisions.filter((d) => d.open) : [];
+  const currentDecision = openDecisions.length ? openDecisions[Math.min(decisionIndex, openDecisions.length - 1)] : undefined;
+  const reviewMilestone = effective?.milestones.find((m) => m.status === 'review');
+  const showPrimary = Boolean(phase && hasPrimary(phase));
+  const drawerOpen = chatOpen || decisionOpen || reasonOpen;
+  const mobileDockHeight = 12 + 44 + 16 + insets.bottom + (showPrimary ? 10 + 52 : 0);
+  const desktopDockHeight = showPrimary ? 12 + 52 + 16 : 0;
+  const sheetBottom = (desktop ? desktopDockHeight : mobileDockHeight) + 8;
   const zoom = ZOOMS[zoomIndex] ?? 1;
   const offlineAgo = store.fetchedAt ? ago(store.fetchedAt, lang) : t(lang, 'time.justNow');
   const offline = !store.online || store.error?.kind === 'offline';
+
+  // A decided question or a finished review closes its drawer; the page has moved on.
+  useEffect(() => {
+    if (decisionOpen && openDecisions.length === 0) setDecisionOpen(false);
+  }, [decisionOpen, openDecisions.length]);
+  useEffect(() => {
+    if (reasonOpen && !reviewMilestone) setReasonOpen(false);
+  }, [reasonOpen, reviewMilestone?.ref]);
+
+  const patchLocal = (patch: Partial<LocalPlanState>): void => {
+    setLocal((previous) => ({
+      ...(previous && store.rev <= previous.rev ? previous : {}),
+      ...patch,
+      rev: store.rev,
+    }));
+  };
+
+  const onAnswered = (decisionId: string): void => {
+    setLocal((previous) => {
+      const active: Partial<LocalPlanState> = previous && store.rev <= previous.rev ? previous : {};
+      return { ...active, answered: [...(active.answered ?? []), decisionId], rev: store.rev };
+    });
+    if (openDecisions.length <= 1) setDecisionOpen(false);
+  };
 
   const changeZoom = (next: number): void => {
     if (next < 0 || next >= ZOOMS.length) return;
@@ -128,17 +171,40 @@ export default function PlanScreen() {
     );
   }
 
+  const primaryAction =
+    effective && phase ? (
+      <PrimaryAction
+        pid={pid}
+        planRef={ref}
+        view={effective}
+        phase={phase}
+        lang={lang}
+        onDecide={() => {
+          setDecisionIndex(0);
+          setDecisionOpen(true);
+        }}
+        onReason={(milestoneRef) => {
+          setReasonMilestone(milestoneRef);
+          setReasonOpen(true);
+        }}
+        onConfirmed={() => patchLocal({ confirm: true })}
+        onApplied={() => patchLocal({ applied: true })}
+        onPassed={(milestoneRef) => patchLocal({ passedMilestoneRef: milestoneRef })}
+        onRefresh={() => void store.refresh()}
+      />
+    ) : null;
+
   return (
     <View style={styles.root} testID="plan-screen">
-      <Header title={view?.title ?? t(lang, 'plan.titleFallback')} back right={more} />
-      {offline && view ? <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" /> : null}
+      <Header title={effective?.title ?? t(lang, 'plan.titleFallback')} back right={more} />
+      {offline && effective ? <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" /> : null}
 
       <View style={[styles.body, desktop && styles.bodyRow]}>
         <View style={styles.bodyMain}>
           <View style={[styles.main, desktop && styles.mainDesktop]}>
-            {view && phase ? (
+            {effective && phase ? (
           <>
-            <PlanHeader view={view} phase={phase} lang={lang} studioOnline={store.studioOnline} fetchedAt={store.fetchedAt} />
+            <PlanHeader view={effective} phase={phase} lang={lang} studioOnline={store.studioOnline} fetchedAt={store.fetchedAt} />
             {store.error && store.error.kind !== 'offline' ? (
               <View style={styles.refreshRow}>
                 <Text style={styles.refreshText}>{store.error.kind === 'schema' ? t(lang, 'plan.needsRefresh') : t(lang, 'common.error')}</Text>
@@ -147,6 +213,11 @@ export default function PlanScreen() {
             ) : null}
             <Segments items={tabs} value={tab} onChange={(key) => setTab(key as TabKey)} />
             <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + space[6] }} testID={`tab-panel-${tab}`}>
+              {phase === 'review' && reviewMilestone ? (
+                <View style={styles.acceptWrap}>
+                  <AcceptCard milestone={reviewMilestone} review={effective.review} lang={lang} />
+                </View>
+              ) : null}
               {tab === 'map' ? (
                 <View style={styles.mapSection}>
                   <View style={styles.zoomRow}>
@@ -170,7 +241,7 @@ export default function PlanScreen() {
                   />
                 </View>
               ) : (
-                <ActivityList activity={view.activity} lang={lang} />
+                <ActivityList activity={effective.activity} lang={lang} />
               )}
             </ScrollView>
           </>
@@ -192,7 +263,7 @@ export default function PlanScreen() {
           />
         )}
           </View>
-          {!desktop && !chatOpen ? (
+          {!desktop && !drawerOpen ? (
             <ActionDock>
               <Pressable
                 accessibilityRole="button"
@@ -207,28 +278,57 @@ export default function PlanScreen() {
                 </Text>
                 {unread > 0 ? <View style={styles.unreadDot} testID="chat-unread" /> : null}
               </Pressable>
+              {showPrimary ? <View style={{ height: 10 }} /> : null}
+              {showPrimary ? primaryAction : null}
             </ActionDock>
           ) : null}
+          {desktop && !drawerOpen && showPrimary ? <ActionDock>{primaryAction}</ActionDock> : null}
+
+          <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title={t(lang, 'chat.title')}>
+            {effective ? <PlanChat pid={pid} planRef={ref} turns={effective.turns} typing={effective.typing} moreTurns={effective.moreTurns} lang={lang} /> : null}
+          </Drawer>
+
+          <Drawer open={decisionOpen} onClose={() => setDecisionOpen(false)} title={t(lang, 'decision.title')}>
+            {currentDecision && effective ? (
+              <DecisionCard
+                key={currentDecision.decisionId}
+                pid={pid}
+                planRef={ref}
+                decision={currentDecision}
+                index={Math.max(0, openDecisions.indexOf(currentDecision))}
+                total={openDecisions.length}
+                lang={lang}
+                onAnswered={onAnswered}
+                onRefresh={() => void store.refresh()}
+              />
+            ) : null}
+          </Drawer>
+
+          <Drawer open={reasonOpen} onClose={() => setReasonOpen(false)} title={t(lang, 'reason.title')}>
+            {reasonMilestone && effective ? (
+              <ReasonSheet
+                pid={pid}
+                planRef={ref}
+                milestoneRef={reasonMilestone}
+                draftRev={effective.draftRev}
+                lang={lang}
+                onSent={() => {
+                  patchLocal({ sentBackMilestoneRef: reasonMilestone });
+                  setReasonOpen(false);
+                }}
+                onRefresh={() => void store.refresh()}
+              />
+            ) : null}
+          </Drawer>
         </View>
-        {desktop && view ? (
+        {desktop && effective ? (
           <View style={styles.chatPanel}>
-            <PlanChat pid={pid} planRef={ref} turns={view.turns} typing={view.typing} moreTurns={view.moreTurns} lang={lang} docked />
+            <PlanChat pid={pid} planRef={ref} turns={effective.turns} typing={effective.typing} moreTurns={effective.moreTurns} lang={lang} docked />
           </View>
         ) : null}
       </View>
 
-      <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title={t(lang, 'chat.title')}>
-        {view ? <PlanChat pid={pid} planRef={ref} turns={view.turns} typing={view.typing} moreTurns={view.moreTurns} lang={lang} /> : null}
-      </Drawer>
-
-      {pickedMilestone ? (
-        <MilestoneSheet
-          milestone={pickedMilestone}
-          lang={lang}
-          onClose={() => setPicked(undefined)}
-          bottomInset={desktop ? 8 : insets.bottom + 12 + 44 + 16 + 8}
-        />
-      ) : null}
+      {pickedMilestone ? <MilestoneSheet milestone={pickedMilestone} lang={lang} onClose={() => setPicked(undefined)} bottomInset={sheetBottom} /> : null}
 
       {menu ? (
         <View style={StyleSheet.absoluteFill} testID="plan-menu-layer">
@@ -293,6 +393,7 @@ const styles = StyleSheet.create({
   main: { flex: 1, width: '100%' },
   mainDesktop: { maxWidth: 720, alignSelf: 'center' },
   scroll: { flex: 1 },
+  acceptWrap: { paddingHorizontal: space[4], paddingTop: space[4] },
   mapSection: { paddingTop: space[3] },
   zoomRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: space[2], paddingHorizontal: space[5], paddingBottom: space[2] },
   zoom: { width: 44, height: 44, borderRadius: radius.m, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline },

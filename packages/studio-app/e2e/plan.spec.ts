@@ -78,6 +78,71 @@ test('the plan page follows the daemon and keeps its last view offline', async (
   expect(text).not.toMatch(/\b[A-Z]{2,}-\d+\b/);
 });
 
+/** One primary per phase, and the actions behind it (BLG-93). */
+test('primary action: confirm, pass, send back, answer and apply', async ({ page }, info) => {
+  await sessionLogin(page);
+  await openHome(page);
+  await page.getByTestId('plan-row-plan1').click();
+  await page.waitForURL(/\/plan\/plan1\?project=/);
+  await page.getByTestId('plan-header').waitFor({ timeout: 20_000 });
+
+  // Confirm: the button sends, then the page waits on the studio and has no primary.
+  await controlPost('view', { view: views.confirm });
+  await expect(page.getByTestId('primary')).toContainText('确认计划', { timeout: 4000 });
+  if (info.project.name === 'phone') {
+    const box = await page.getByTestId('primary').boundingBox();
+    expect(box && box.y >= 422 && box.y + box.height <= 810).toBeTruthy();
+  }
+  await page.getByTestId('primary').click();
+  await expect(page.getByTestId('plan-status')).toContainText('在等工作室批准开工', { timeout: 4000 });
+  expect(await page.getByTestId('primary').count()).toBe(0);
+  await controlPost('approve');
+  await expect(page.getByTestId('plan-status')).not.toContainText('在等工作室批准开工', { timeout: 4000 });
+
+  // Review: the reason needs ten characters; a short one cannot be sent.
+  await controlPost('view', { view: views.review });
+  await expect(page.getByTestId('primary')).toContainText('通过', { timeout: 4000 });
+  await page.getByTestId('not-yet').click();
+  await expect(page.getByTestId('reason-input')).toBeVisible();
+  await expect(page.getByTestId('primary')).toBeDisabled();
+  await page.getByTestId('reason-input').fill('和我想的不一样，提醒时间不能改');
+  await expect(page.getByTestId('primary')).toBeEnabled();
+  const sendBacks = delivered('milestone.sendBack');
+  await page.getByTestId('primary').click();
+  await page.waitForTimeout(800);
+  expect(delivered('milestone.sendBack')).toBe(sendBacks + 1);
+  await expect(page.getByTestId('plan-status')).not.toContainText('验收', { timeout: 4000 });
+
+  // Review: approving waits ten seconds; then the pass reaches the studio.
+  await controlPost('view', { view: views.review });
+  await expect(page.getByTestId('primary')).toContainText('通过', { timeout: 4000 });
+  const passes = delivered('milestone.pass');
+  await page.getByTestId('primary').click();
+  await expect(page.getByTestId('primary')).toContainText('撤销');
+  await page.waitForTimeout(10_500);
+  expect(delivered('milestone.pass')).toBe(passes + 1);
+  await expect(page.getByTestId('plan-status')).not.toContainText('验收', { timeout: 4000 });
+
+  // A decision: one tap starts the undo; cancelling sends nothing.
+  await controlPost('view', { view: views.decide });
+  await expect(page.getByTestId('primary')).toContainText('回答', { timeout: 4000 });
+  await page.getByTestId('primary').click();
+  await expect(page.getByTestId('decision-card')).toBeVisible();
+  const answers = delivered('decision.answer');
+  await page.getByTestId('decision-option-o0').click();
+  await expect(page.getByTestId('primary')).toContainText('撤销');
+  await page.getByTestId('primary').click();
+  await page.getByTestId('drawer-close').click();
+  expect(delivered('decision.answer')).toBe(answers);
+
+  // Changes: applying sends the draft and waits for the studio's approval.
+  await controlPost('view', { view: views.changes });
+  await expect(page.getByTestId('primary')).toContainText('应用改动', { timeout: 4000 });
+  await page.getByTestId('primary').click();
+  await expect(page.getByTestId('plan-status')).toContainText('在等工作室批准改动', { timeout: 4000 });
+  expect(await page.getByTestId('primary').count()).toBe(0);
+});
+
 /** The conversation: a drawer on the phone, a docked panel on the desktop, one send per tap. */
 test('chat: drawer on phone, dock on desktop, one action per double tap', async ({ page }, info) => {
   await sessionLogin(page);

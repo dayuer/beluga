@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   newPill: { position: 'absolute', bottom: space[3], alignSelf: 'center', minHeight: 44, paddingHorizontal: space[4], justifyContent: 'center', borderRadius: radius.pill, backgroundColor: color.card, borderWidth: 1, borderColor: color.hairlineStrong },
   newText: { ...type.caption, color: color.text, fontWeight: '600' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2], paddingHorizontal: space[3], paddingTop: space[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline, backgroundColor: color.bg },
-  input: { ...type.callout, flex: 1, minHeight: 44, maxHeight: 110, color: color.text, backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.m, paddingHorizontal: 12, paddingVertical: 10 },
+  input: { ...type.callout, fontSize: 16, lineHeight: 22, flex: 1, minHeight: 44, maxHeight: 110, color: color.text, backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline, borderRadius: radius.m, paddingHorizontal: 12, paddingVertical: 10 },
   send: { width: 44, height: 44, borderRadius: radius.m, backgroundColor: color.primary, alignItems: 'center', justifyContent: 'center' },
   sendOff: { backgroundColor: '#E7E7EA' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
