@@ -736,6 +736,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
           <nav className={s.nav}>
             <Dialog.Title className={s.title}>Settings</Dialog.Title>
             <SettingsSearchField search={search} />
+            <div className={s.navList}>
             {panes.map((p) => (
               <button
                 key={p.id}
@@ -750,6 +751,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
                 {p.label}
               </button>
             ))}
+            </div>
           </nav>
           <div className={s.body}>
             <div className={s.bodyHead}>

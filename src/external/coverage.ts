@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { EXTERNAL_FORK } from '../fork/coverage.js';
 
 /**
  * What external agents may reach of the API: every method (src/ipc/api.ts) is decided here. The type
@@ -398,9 +399,6 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'plans.setParallel': 'covered',
   'plans.setTestsAt': 'covered',
   'plans.setWorkAgent': 'covered',
-  'plans.setCheckAgent': 'covered',
-  'plans.setArchAgent': 'covered',
-  'plans.setFixAgent': 'covered',
   'plans.tidyUp': 'covered',
   'plans.pass': 'covered',
   'plans.recheck': 'covered',
@@ -636,4 +634,6 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.moveReceive': { refused: COMPUTERS },
   'workspaces.moveUndo': { refused: COMPUTERS },
   'workspaces.ports': { refused: NO_TOOL },
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...EXTERNAL_FORK,
 };
