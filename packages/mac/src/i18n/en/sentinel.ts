@@ -586,6 +586,7 @@ export const sentinel = {
   'sentinel.addTile.headingLabel': 'Heading',
   'sentinel.addTile.headingPlaceholder': 'Money',
   'sentinel.addTile.showAs': 'Show it as',
+  'sentinel.dashboard.tileShowAs': 'Show as',
   'sentinel.addTile.itsLabel': 'Its label',
   'sentinel.addTile.preview': 'Preview',
   'sentinel.addTile.dragNote': 'Drag it into place on the board afterwards; drag its corner to resize.',

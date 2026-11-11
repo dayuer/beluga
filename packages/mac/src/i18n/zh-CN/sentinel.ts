@@ -573,6 +573,7 @@ export const sentinel: Translation<typeof en> = {
   'sentinel.addTile.headingLabel': '标题',
   'sentinel.addTile.headingPlaceholder': '收入',
   'sentinel.addTile.showAs': '显示为',
+  'sentinel.dashboard.tileShowAs': '显示为',
   'sentinel.addTile.itsLabel': '它的标签',
   'sentinel.addTile.preview': '预览',
   'sentinel.addTile.dragNote': '之后可以在仪表盘上拖动它的位置，拖动角落调整大小。',
