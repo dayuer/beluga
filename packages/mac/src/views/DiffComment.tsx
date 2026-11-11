@@ -9,6 +9,7 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { type DiffComment, addComment, codeRange, commentedRows, makeComment, subscribeComments, waitingComments } from './diff-comments.js';
 import s from './diff.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Commenting on a diff's lines (diff-comments.ts): a line's + picks it (Shift for a range from
@@ -75,7 +76,7 @@ export function useWaitingHere(): number {
 function CommentBox({ where, removed, text, onText, onAdd, onCancel }: { where: string; removed: boolean; text: string; onText: (v: string) => void; onAdd: () => void; onCancel: () => void }) {
   const agent = useMyAgentName();
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && !isImeComposing(e) && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       onAdd();
     } else if (e.key === 'Escape') {

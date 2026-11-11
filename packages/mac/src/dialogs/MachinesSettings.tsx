@@ -21,6 +21,7 @@ import c from '../machines/machines.module.css';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { everyWhileShown } from '../lib/window-active.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Settings › Your Computers (BLG-780): where new work runs, adding a computer (over SSH, or with
@@ -232,7 +233,7 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
     setSaid(undefined);
   };
   const enter = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') find();
+    if (e.key === 'Enter' && !isImeComposing(e)) find();
   };
   return (
     <>
@@ -374,7 +375,7 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
       <div className={c.main}>
         <div className={c.nameLine}>
           {naming !== undefined ? (
-            <input className={c.nameInput} aria-label="Name" value={naming} autoFocus onChange={(e) => setNaming(e.target.value)} onBlur={rename} onKeyDown={(e) => (e.key === 'Enter' ? rename() : e.key === 'Escape' ? setNaming(undefined) : undefined)} maxLength={64} />
+            <input className={c.nameInput} aria-label="Name" value={naming} autoFocus onChange={(e) => setNaming(e.target.value)} onBlur={rename} onKeyDown={(e) => (e.key === 'Enter' && !isImeComposing(e) ? rename() : e.key === 'Escape' ? setNaming(undefined) : undefined)} maxLength={64} />
           ) : (
             <span className={c.name} title="Rename" role="button" tabIndex={0} onClick={() => setNaming(machine.name)} onKeyDown={(e) => (e.key === 'Enter' ? setNaming(machine.name) : undefined)}>
               {machine.name}

@@ -151,3 +151,22 @@ test('an image path pasted in a sentence goes with the message as the image', as
   await expect(chat(page).getByRole('button', { name: /^Open image \d+/ }).last()).toBeVisible({ timeout: 15_000 });
   await expect(main(page).getByRole('alert')).toHaveCount(0);
 });
+
+test('Enter that picks an input method\'s words does not send; the next Enter does (BLG-118)', async ({ page }) => {
+  await newPlan(page, 'A plan typed with a Chinese input method');
+  await expect(page.getByRole('button', { name: 'Approve Plan' }).first()).toBeVisible({ timeout: 30_000 });
+  await box(page).fill('hello');
+  // WebKit ends the composition before keydown: isComposing is false, only keyCode 229 tells.
+  await box(page).evaluate((el) => {
+    const e = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'keyCode', { get: () => 229 });
+    el.dispatchEvent(e);
+  });
+  await page.waitForTimeout(300);
+  await expect(box(page)).toHaveValue('hello');
+  await expect(chat(page)).not.toContainText('Added hello');
+  // A plain Enter sends it.
+  await box(page).press('Enter');
+  await expect(box(page)).toHaveValue('');
+  await expect(chat(page)).toContainText('Added hello', { timeout: 30_000 });
+});

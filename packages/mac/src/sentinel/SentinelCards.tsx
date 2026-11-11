@@ -74,6 +74,7 @@ import { GraphBlock } from '../components/graph/GraphBlock.js';
 import s from './sentinel.module.css';
 import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
 import { computerWord } from '../lib/os-words.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /** The sentinel page's editor: When it runs, and its Steps. Everything saves as you change it. */
 
@@ -354,7 +355,7 @@ function StepItem({
             onChange={(e) => name.change(e.target.value)}
             onBlur={name.flush}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Enter' && !isImeComposing(e)) (e.target as HTMLInputElement).blur();
             }}
           />
           <span className={s.stepLine}>

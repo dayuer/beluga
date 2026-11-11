@@ -15,6 +15,7 @@ import { H264Player } from './h264.js';
 import { onWindowActive, pageShown } from '../lib/window-active.js';
 import { touchCaption } from './phone-model.js';
 import s from './phone-view.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * "Your phone" (BLG-171): a live mirror of your paired Android phone that you can touch directly —
@@ -385,7 +386,7 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
             placeholder={compact ? 'Type on the phone, ⏎ to send' : 'Type on the phone…'}
             onChange={(e) => setTyping(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') sendText(true);
+              if (e.key === 'Enter' && !isImeComposing(e)) sendText(true);
             }}
           />
           {compact ? null : (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AS_BEFORE, BY_TIER, NO_ARCHITECT, PLAN_ROLES, roleStart, rolesInput, tierLabel } from '../packages/mac/src/plans/plan-roles-model.js';
+import { AS_BEFORE, BY_TIER, NO_ARCHITECT, PLAN_ROLES, roleChanges, roleFromPlan, rolesFromPlan, roleStart, rolesInput, tierLabel } from '../packages/mac/src/plans/plan-roles-model.js';
 import type { PlanRoleDefaults } from '../src/shared/auto-route.js';
 import type { AgentRef } from '../src/protocol.js';
 
@@ -32,5 +32,34 @@ describe('a new plan’s roles', () => {
 
   it('an agent you pick wins over its tier', () => {
     expect(rolesInput({ arch: BY_TIER, work: 'codex:', check: BY_TIER, fix: NO_ARCHITECT }, TIERS, forChoice)).toEqual({ agent: CODEX, archAgent: OPUS, checkAgent: SONNET });
+  });
+});
+
+/** Plan Settings (BLG-122): the same pop-ups, starting on what the plan has, never on the tiers' recommendation. */
+describe('a plan’s roles in Plan Settings', () => {
+  const choiceOf = (a: AgentRef): string => `${a.runtime}:${a.model ?? ''}`;
+  const forValue = (v: string): AgentRef => ({ runtime: v.split(':')[0]!, label: v, ...(v.split(':')[1] ? { model: v.split(':')[1] } : {}) });
+
+  it('a role the plan has starts on its agent (the tier entry when it is the tier’s pick)', () => {
+    const plan = { agent: CODEX, archAgent: OPUS, checkAgent: OPUS, fixAgent: SONNET };
+    expect(rolesFromPlan(plan, TIERS, true, choiceOf)).toEqual({ arch: BY_TIER, work: 'codex:', check: 'claude:opus', fix: 'claude:sonnet' });
+  });
+
+  it('a role the plan hasn’t: what it really does then, not the tiers’ pick', () => {
+    // Auto route off: no architect, your agent, the work’s agent checks, whoever is at it fixes.
+    expect(rolesFromPlan({}, TIERS, false, choiceOf)).toEqual({ arch: NO_ARCHITECT, work: AS_BEFORE, check: AS_BEFORE, fix: AS_BEFORE });
+    // On: checks and hard fixes go to their lists, work to each task’s route; still no architect.
+    expect(rolesFromPlan({}, { ...TIERS, work: 'auto' }, true, choiceOf)).toEqual({ arch: NO_ARCHITECT, work: BY_TIER, check: BY_TIER, fix: BY_TIER });
+    // Nothing of a list runs here: as before even with auto route on.
+    expect(roleFromPlan('check', {}, {}, true, choiceOf)).toBe(AS_BEFORE);
+  });
+
+  it('saves only what moved: an agent, the tier’s, or unset', () => {
+    const from = rolesFromPlan({ checkAgent: OPUS }, TIERS, false, choiceOf);
+    expect(roleChanges(from, from, TIERS, forValue)).toEqual({});
+    expect(roleChanges(from, { ...from, check: BY_TIER, arch: BY_TIER }, TIERS, forValue)).toEqual({ check: SONNET, arch: OPUS });
+    expect(roleChanges(from, { ...from, check: AS_BEFORE, fix: 'codex:' }, TIERS, forValue)).toEqual({ check: null, fix: { runtime: 'codex', label: 'codex:' } });
+    // Work back to auto route: unset.
+    expect(roleChanges({ ...from, work: 'codex:' }, { ...from, work: BY_TIER }, { ...TIERS, work: 'auto' }, forValue)).toEqual({ work: null });
   });
 });

@@ -7,6 +7,7 @@ import { useIssueActions } from './use-issues.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * A comment from you, under the issue's thread: Markdown, sent with your send key, posted on
@@ -53,7 +54,7 @@ export function IssueReply({ projectId, number, posted }: { projectId: string; n
           disabled={busy}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || e.key !== 'Enter') return;
+            if (isImeComposing(e) || e.key !== 'Enter') return;
             const modKey = e.metaKey || e.ctrlKey;
             if (prefs.sendWith === 'enter' ? e.shiftKey || modKey : !modKey) return;
             e.preventDefault();

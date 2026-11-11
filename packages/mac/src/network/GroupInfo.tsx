@@ -13,6 +13,7 @@ import { expiryLabel, openGroupInvitation, presenceLine, shownState, sortMembers
 import { closeNet, openNet, useNetSheet } from './net-sheets.js';
 import { openDm, useSay } from './use-net.js';
 import s from './network.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 type Confirm = { readonly title: string; readonly message: string; readonly confirm: string; readonly run: () => void };
 
@@ -37,7 +38,7 @@ function Name({ g }: { g: GroupView }) {
       onChange={(e) => setName(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Enter' && !isImeComposing(e)) (e.target as HTMLInputElement).blur();
         if (e.key === 'Escape') {
           e.stopPropagation();
           setName(g.name);

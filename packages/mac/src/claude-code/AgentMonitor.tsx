@@ -20,6 +20,7 @@ import m from './agent-monitor.module.css';
 import o from './agent-outputs.module.css';
 import { revealLabel } from '../lib/os-words.js';
 import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * One sub-agent, followed live: what it was asked, who started it (and a way back there), its
@@ -71,7 +72,7 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
             setSent(undefined);
           }}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            if (e.key !== 'Enter' || isImeComposing(e)) return;
             const modKey = e.metaKey || e.ctrlKey;
             if (prefs.sendWith === 'enter' ? e.shiftKey || modKey : !modKey) return;
             e.preventDefault();

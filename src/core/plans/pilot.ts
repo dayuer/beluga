@@ -251,6 +251,8 @@ export class PlanPilot {
   private readonly fixAsked = new Map<string, { readonly asks: number; readonly after?: string }>();
   /** Conversations put on the plan's fix agent this session (by channel: the agent's key), so each is switched once. */
   private readonly onFixer = new Map<string, string>();
+  /** Conflicts the plan's conversation is fixing (by plan: their folders), so one gone doesn't hand it back while another is still there. */
+  private readonly fixing = new Map<string, Set<string>>();
   /** When a conflict left to you was last looked at (by board task), and the timer to look again. */
   private readonly stuckTried = new Map<string, number>();
   private stuckTimer: ReturnType<typeof setTimeout> | undefined;
@@ -964,22 +966,46 @@ export class PlanPilot {
     const fixer = this.deps.fixer?.(plan);
     if (!fixer || !this.deps.switchAgent || this.onFixer.get(channel) === agentKey(fixer)) return undefined;
     this.onFixer.set(channel, agentKey(fixer));
+    // Already on it (it was switched before the daemon restarted): nothing to hand over.
+    if (this.agentOn(channel) === agentKey(fixer)) return undefined;
     this.deps.switchAgent(channel, fixer);
     const name = agentName(fixer, { model: true });
     this.deps.plans.note(plan.id, 'note', `handed ${what} to ${name}`, { kind: 'beluga' });
     return name;
   }
 
-  /** The plan's conversation may fix a conflict in `dir` (it goes to the fix agent), or no longer (undefined: back on the agent it plans on). */
-  private fixupIn(plan: Plan, dir: string | undefined): void {
+  /** The plan's conversation may fix a conflict in `dir` (it goes to the fix agent). */
+  private fixupIn(plan: Plan, dir: string): void {
+    const open = this.fixing.get(plan.id) ?? new Set<string>();
+    this.fixing.set(plan.id, open.add(dir));
     this.deps.allowFixup?.(plan.home, dir);
-    if (dir) {
-      this.toFixer(plan, plan.home, 'the conflict');
-      return;
-    }
-    if (!this.onFixer.has(plan.home)) return;
-    this.onFixer.delete(plan.home);
-    this.deps.switchAgent?.(plan.home, this.deps.homeAgent?.(plan));
+    this.toFixer(plan, plan.home, 'the conflict');
+  }
+
+  /**
+   * The conflict in `dir` is gone (undefined: it never came, the step failed another way). Another
+   * still there: the conversation stays on the fix agent, fixing that one. None: back on the agent it
+   * plans on, also when it was put on the fix agent before the daemon restarted.
+   */
+  private fixedIn(plan: Plan, dir: string | undefined): void {
+    const open = this.fixing.get(plan.id);
+    if (dir) open?.delete(dir);
+    const next = open ? [...open].at(-1) : undefined;
+    this.deps.allowFixup?.(plan.home, next);
+    if (next) return;
+    this.fixing.delete(plan.id);
+    const fixer = this.deps.fixer?.(plan);
+    const home = this.deps.homeAgent?.(plan);
+    const on = this.agentOn(plan.home);
+    const put = this.onFixer.delete(plan.home) || (fixer !== undefined && on === agentKey(fixer));
+    if (put && !(on && home && on === agentKey(home))) this.deps.switchAgent?.(plan.home, home);
+  }
+
+  /** The agent a conversation runs on now (its key), as kept on its workspace. */
+  private agentOn(channel: string): string | undefined {
+    const id = channel.startsWith(WS_PREFIX) ? channel.slice(WS_PREFIX.length) : undefined;
+    const agent = id ? this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)?.agent : undefined;
+    return agent ? agentKey(agent) : undefined;
   }
 
   /** The watchdog's ask (a task stopped again soon after a wake): its conversation goes to the fix agent. → its name, or undefined (no fix agent, or it's on it already). */
@@ -1282,11 +1308,11 @@ export class PlanPilot {
       res = await combine(plan.projectId, issue.key, bases, plan.branch);
     } catch (err) {
       this.deps.plans.setCombining(plan.id, t.task.id, undefined);
-      this.fixupIn(plan, undefined);
+      this.fixedIn(plan, was?.conflict?.dir);
       throw new Error(`couldn’t combine ${from.join(' and ')}: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (res.ok) {
-      if (was?.conflict) this.fixupIn(plan, undefined);
+      if (was?.conflict) this.fixedIn(plan, was.conflict.dir);
       this.fixAsked.delete(issue.id);
       this.stuckTried.delete(issue.id);
       return res.branch;
@@ -1411,7 +1437,7 @@ export class PlanPilot {
         }
         return this.deps.plans.need(planId);
       }
-      if (plan.mainMerge?.conflict) this.fixupIn(plan, undefined);
+      if (plan.mainMerge?.conflict) this.fixedIn(plan, plan.mainMerge.conflict.dir);
       this.fixAsked.delete(key);
       this.stuckTried.delete(key);
       this.deps.plans.setMainMerge(planId, undefined);
@@ -1536,7 +1562,7 @@ export class PlanPilot {
         const why = err instanceof Error ? err.message : String(err);
         this.deps.plans.setMerging(planId, milestoneId, undefined);
         this.deps.plans.setMergeFailed(planId, milestoneId, why.split('\n').find((l) => l.trim())?.trim().slice(0, 300) ?? 'git said no');
-        this.fixupIn(plan, undefined);
+        this.fixedIn(plan, merge.conflict?.dir);
         this.deps.plans.note(planId, 'problem', `couldn’t merge “${m.milestone.title}” into ${branch}: ${why}`, beluga);
         return;
       }
@@ -1562,7 +1588,7 @@ export class PlanPilot {
       return;
     }
     // In: its tasks are Merged into Plan, the milestone passes, and their worktrees go.
-    if (merge.conflict) this.fixupIn(plan, undefined);
+    if (merge.conflict) this.fixedIn(plan, merge.conflict.dir);
     this.fixAsked.delete(key);
     this.stuckTried.delete(key);
     for (const t of tasks) this.deps.work.board.planMoved(t.issue!.id, 'in_plan', `merged into ${branch}: “${m.milestone.title}” passed`);
