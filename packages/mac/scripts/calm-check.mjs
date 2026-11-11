@@ -158,7 +158,54 @@ const mergeAnimations = (...lists) => {
   return [...byKey.values()];
 };
 
-/** The scenes scripts/shots.mjs has, and the three this check adds. */
+/** The first row in sight in the chat's scroller: its virtual index and where its top is. */
+const anchorNow = (page) =>
+  page.evaluate(
+    pageFn(`() => {
+      const first = document.querySelector('[data-index]');
+      const scroller = first && first.parentElement && first.parentElement.parentElement;
+      if (!scroller) return null;
+      const box = scroller.getBoundingClientRect();
+      for (const el of document.querySelectorAll('[data-index]')) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > box.top + 1 && r.top < box.bottom - 1) return { index: Number(el.getAttribute('data-index')), y: Math.round(r.top) };
+      }
+      return null;
+    }`),
+  );
+
+/**
+ * Reading further up while new messages come in (docs/calm/hooks.md §2): the row in sight must not
+ * move, and the way back down says how many arrived. Measured after a run, then again after three
+ * more prompts (the mock answers each with several rows).
+ */
+const measureAnchor = async (page) => {
+  await page.mouse.move(700, 400);
+  await page.mouse.wheel(0, -400);
+  await wait(600);
+  const before = await anchorNow(page);
+  if (!before) return { offsetPx: null, hint: null, newRows: 0 };
+  for (const text of ['And the tests?', 'Keep it small', 'One more case']) {
+    const box = page.locator('textarea:not(.xterm-helper-textarea)');
+    await box.fill(text);
+    await box.press('Enter');
+    await wait(2500);
+  }
+  await wait(6000);
+  const after = await page.evaluate(
+    pageFn(`(index) => {
+      const el = document.querySelector('[data-index="' + index + '"]');
+      return el ? Math.round(el.getBoundingClientRect().top) : null;
+    }`),
+    before.index,
+  );
+  const jump = page.locator('button').filter({ hasText: /^(Latest|\d+ new)$/ });
+  const hint = (await jump.count()) ? (await jump.first().innerText()).replace(/\s+/g, ' ').trim() : null;
+  const newRows = Number(/^(\d+) new$/.exec(hint ?? '')?.[1] ?? 0);
+  return { offsetPx: after === null ? null : after - before.y, hint, newRows };
+};
+
+/** The scenes scripts/shots.mjs has, and the three this check adds. A step may return extra fields for the combo's JSON. */
 function stepsFor(page, shot) {
   return {
     room: async () => {},
@@ -174,6 +221,7 @@ function stepsFor(page, shot) {
       await wait(1000);
       await shot('new');
       await wait(4000);
+      return { anchor: await measureAnchor(page) };
     },
     diff: async () => {
       await openWs(page);
@@ -290,7 +338,7 @@ try {
       // Arrival animations often end before the scene is ready: ask again here and once at the end.
       const animationsAtEnter = await measureAnimations(page);
 
-      await stepsFor(page, shot)[scene]?.();
+      const extra = (await stepsFor(page, shot)[scene]?.()) ?? {};
       await wait(700);
       await shot('loaded');
 
@@ -337,7 +385,7 @@ try {
         }`),
       );
 
-      combos[combo.id] = { ...shifts, animations, jsMotion, shots };
+      combos[combo.id] = { ...shifts, animations, jsMotion, ...extra, shots };
       await context.close();
     }
 
@@ -347,6 +395,7 @@ try {
     console.log(`\n${scene}  (${doc.git})`);
     for (const [id, m] of Object.entries(combos)) {
       console.log(`  ${id.padEnd(15)} cls ${m.cls.toFixed(3)} · animations ${m.animations.length} · jsMotion ${m.jsMotion.elements.length} · data-calm at first frame ${m.firstFrame.calm}`);
+      if (m.anchor) console.log(`  ${''.padEnd(15)} anchor offset ${m.anchor.offsetPx}px · hint ${JSON.stringify(m.anchor.hint)} · ${m.anchor.newRows} new rows`);
     }
     console.log(`  → ${path.relative(repo, path.join(out, `${scene}.json`))}`);
   }

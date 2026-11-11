@@ -195,6 +195,12 @@ export function JumpLabel({ rows }: { rows: number }): JSX.Element;
 - 登记行：`packages/mac/src/chat/ChatLog.tsx`：「回到底部」按钮的文案换成 `fork/calm/new-below.tsx` 的 `JumpLabel`——上游不提供「下面来了几条」，计数要跨渲染保存，只能做成组件；按钮其余部分未动。
 - PR 候选：若实测确有位移，`shouldAdjustScrollPositionOnItemSizeChange` 一行修法是通用修复（§7）；`JumpLabel` 的文案本身是沉稳界面的口味，不提。
 
+### 2.6 证据（BLG-166）
+
+- `fork/calm/new-below.tsx`：按钮挂载即离开底部，行数差就是新消息数；calm 关渲染与上游相同的 `Icon + Latest`；`{0} new` 的词条加在 `i18n/zh-CN.fork.json`（上游文件不碰）。
+- `calm-check` 的 `chatrun` 已加 `anchor` 测量（`offsetPx`、`hint`、`newRows`，字段只增不改）；`plan`/`tasks` 等其它场景的 JSON 不变。按计划在里程碑最终步骤统一跑，calm-on/full 的 `offsetPx` 应为 0。若不为 0，先试 §2.2 的一行虚拟列表补偿（upstream-ok，PR 候选）。
+- 现有 `chat-*.spec.ts` 的 e2e 同样在最终步骤统一跑。
+
 ## 3. 挂钩三：同一时间只有一条 toast（BLG-167）
 
 ### 3.1 上游现状

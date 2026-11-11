@@ -34,6 +34,7 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'tests/mac-settings-search.test.ts', match: /read\('fork\/calm\/settings\.tsx'\)/, why: 'settings search reads the fork row (M0)' },
   { file: 'packages/mac/src/layout/Sidebar.tsx', match: /useSidebarHold\(drop\.ref\)/, why: 'the sidebar probe that holds its order (BLG-165)' },
   { file: 'packages/mac/src/layout/EntryRow.tsx', match: /useHeldEntries\(/, why: 'the frozen order both sidebar lists read (BLG-165)' },
+  { file: 'packages/mac/src/chat/ChatLog.tsx', match: /<JumpLabel rows=\{rows\.length\} \/>/, why: 'the count of messages below, on the way back down (BLG-166)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
