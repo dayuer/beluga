@@ -55,3 +55,37 @@ e2e 锁当时被另一个工作树的整套 e2e 占着（`waiting for m7-v5's e2
 | 真实键入“你好” | 文字进框 | — |
 
 结论：window 捕获先于 React 19 挂在 root 上的监听（冒泡和捕获都是），`stopImmediatePropagation` 也挡住同在 window 捕获阶段、后注册的监听；从不 preventDefault，上屏不受影响；终端按规则放行。应用里的 e2e 在 BLG-187 的 `fork-ime.spec.ts` 里跑。
+
+## 改前改后对照（BLG-190）
+
+量法：`git diff --numstat 4b54e83c8 <提交> -- <文件>`；“改前”是合进 #21、#22 后、动手前（`78ccc5013^`），“改后”是本分支。`node scripts/sync-upstream.mjs --report` 现在给出每个上游文件的 `+/-`、改动行和合计。
+
+| | 改前 | 改后 |
+|---|---|---|
+| PR #20 涉及的 74 个上游文件里还和上游不同的 | 74 个，+529/-139 | 20 个，+266/-54 |
+| 其中 PR #20 自己还有改动的 | 74 个，+220/-151 | 14 个（见下表“PR #20 剩下的”），pilot.ts 以外每个 ≤3 行 |
+| 超过 3 行的 | 15 个 | 6 个（都不是 PR #20 的改动，见下） |
+| fork 改到的全部上游文件（`--report`） | 152 个，1728 改动行，64 个超 3 行 | 99 个，1468 改动行，55 个超 3 行 |
+
+还和上游不同的 20 个（加上新的接入点 `main.tsx` 和动到的 `PlanDetails.tsx`）：
+
+| 文件 | 改前 | PR #20 自己 | 改后 | 剩下的是什么 |
+|---|---|---|---|---|
+| `docs/tasks-and-plans.md` | +5/-1 | +4/-4 | +1/-0 | 指向 `docs/tasks-and-plans.fork.md` 的一行 |
+| `packages/mac/src/main.tsx` | 0 | — | +1/-0 | `import './fork/boot.js'`（输入法拦截） |
+| `packages/mac/src/dialogs/native/WorkSheets.tsx` | +3/-0 | +3/-0 | +2/-0 | `forkSheet` 的 import 和调用 |
+| `packages/mac/src/lib/sheets.ts` | +1/-0 | +1/-0 | +1/-0 | `plan_settings` 类型 |
+| `packages/mac/src/plans/PlanSheets.tsx` | +20/-15 | +5/-27 | +1/-0 | 末尾导出 `AutonomyCards`、`GoalBox` |
+| `packages/mac/src/plans/plans.module.css` | +29/-2 | +4/-2 | +3/-0 | 末尾三行窄屏换行（CSS module 的类名带哈希，fork 的 module 改不到） |
+| `packages/mac/src/plans/plans-model.ts` | +13/-6 | +2/-1 | +13/-6 | PR #20 的 2 行（`roleNote`，计划动态里角色变化的行）；其余 11 行是 PR #22（任务需要你出手） |
+| `packages/mac/src/plans/PlanPage.tsx` | +24/-7 | +3/-31 | +22/-6 | PR #20 只剩“计划设置…”一行；其余是 PR #22 的 decide。PR #20 删的 31 行是 PR #17 自己加的角色子菜单，不是上游的行：上游从来没有这些子菜单 |
+| `src/core/plans/pilot.ts` | +250/-17 | +40/-14 | +191/-17 | PR #20 的 `fixing`、`fixedIn`、`agentOn` 和 PR #17 的 `toFixer`、`onFixer` 搬进 `src/fork/plans/fixer.ts`（-59 行）；剩下的是 PR #17 的建筑师（约 100 行）、角色依赖、#21 的 `followWork`，和各处一行的调用。超过 3 行的原因：建筑师和调度深度交织，本里程碑只搬不改，留作下一步 |
+| `src/workspaces/git.ts`、`pr.ts`、`src/machines/ready.ts` | 各 +1/-1 | 同左 | 各 +1/-1 | git 输出固定英文，一行 |
+| `tests/machines-ready.test.ts` | +2/-2 | 同左 | +2/-2 | 跟着上面的 git 语言变量，必须改 |
+| `tests/sentinel-kept-data.test.ts` | +3/-1 | 同左 | +1/-1 | 固定日期过期的修复（上游一样坏，适合提回上游） |
+| `packages/mac/src/plans/PlanDetails.tsx` | +18/-5 | — | +19/-5 | PR #17 的文件；`designFold` 改用 fork 的 CSS module（+1 import，改 1 行），换来 plans.module.css 少 27 行 |
+| `PersonCards.tsx`、`PickMenu.tsx`、`TerminalTab.tsx`、`FilterBar.tsx` | 见左 | 各 +2/-1 输入法 | 与 PR #20 之前（`f66c38b0^1`）逐字相同 | 菜单完整显示（更早的 fork 改动，不属本计划） |
+| `ProjectHome.tsx` | +7/-5 | +3/-2 输入法 | 与 `f66c38b0^1` 相同 | 自动路由（更早的 fork 改动） |
+| `PlanChat.tsx`、`PlanOutline.tsx` | +12/-5、+4/-3 | 各 +2/-1 输入法 | 与 `f66c38b0^1` 相同 | PR #17 的计划分工 |
+
+其余 54 个文件与上游逐字相同。超过 3 行的 6 个（PlanChat、PlanPage、plans-model、ProjectHome、pilot.ts，以及菜单的 PickMenu）全是 PR #20 之前或之后别的 fork 功能，PR #20 在它们里面要么已经是 0，要么 ≤2 行。
