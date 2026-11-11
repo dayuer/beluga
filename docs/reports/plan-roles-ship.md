@@ -37,7 +37,7 @@
 - `docs/parity.fork.md`：没指定审计的计划由 review 列表第一个（Sonnet）审计，没指定疑难修复的交给 `autoFixer`（原来误写成“hard list 的第一个（Opus）”审计）。
 - `docs/auto-route.md`：“里程碑由 Opus 检查”改为“由 Sonnet 审计”，加一条疑难交给修复模型。
 - `docs/tasks-and-plans.md`：三个角色的入口改为 ⋯ › 计划设置…（旧子菜单在里程碑 3 去掉了）；写明 R1、R2 修后的行为。
-- `docs/fork.md`：git 语言（4 个文件）和输入法（56 个文件）放进“适合提回上游的通用修复”；计划设置接入的
+- `docs/fork.md`：git 语言（4 个文件）和输入法（56 个文件）各起一个小节，写明原因；用户在 BLG-133 定了两项都留在 fork、不提回上游；计划设置接入的
   `WorkSheets.tsx`、`sheets.ts` 和 `tests/mac-plans.test.ts` 放进“计划按档位分工”。
   `node scripts/sync-upstream.mjs --report` 不再有标 `!` 的文件（改前 60 个）。
 
@@ -49,7 +49,7 @@
 | 2 中文输入法 | `plan-roles-ime.md` | 共用 `isImeComposing`（`isComposing` 或 keyCode 229），所有文字输入框组字时 Enter 只选词；单测 + 计划对话框 e2e | 系统输入法真机手测要用户做 |
 | 3 Mac 计划设置与中文 | `plan-roles-mac-ui.md` | ⋯ › 计划设置… 一处改和新建时一样的配置，只发改了的项；角色、计划设置、动态行全部中文，有 zh e2e | 上游模板 `passed “…”` 仍是英文 |
 | 4 手机端 | `plan-roles-companion.md` | `packages/companion` 类型检查通过，符合手机端规则 | 手机端角色文案还是英文，等 BLG-129 |
-| 5 核心审计与提交 | 本页 | R1、R2 修好并有测试；R3、R5 接受；R4、R6 没问题 | 用户决定是否提回上游（BLG-133） |
+| 5 核心审计与提交 | 本页 | R1、R2 修好并有测试；R3、R5 接受；R4、R6 没问题 | 无（BLG-133：git 语言和输入法修复留在 fork，不提回上游） |
 
 行为变化（写进 PR）：没指定审计模型的计划改由 Sonnet（review 列表）审计；设了架构模型的计划，计划对话改用架构模型；
 自动路由开着时，没指定疑难修复模型的计划把疑难交给疑难档第一个（Opus）。
