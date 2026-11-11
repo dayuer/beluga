@@ -22,20 +22,45 @@
 node scripts/sync-upstream.mjs
 ```
 
-这个脚本会：
+脚本按五步走：
 
-- 打开 `git rerere`：同一处冲突解决过一次，以后会自动按同样的方式解决。
-- 拉取上游，从当前分支切出 `sync/upstream-<版本>-<日期>`，用 merge 合进 `upstream/main`。不用 rebase，因为 main 已经公开。
-- 自动处理版本号：`packages/mac/package.json` 和 `packages/mac/src-tauri/tauri.conf.json` 如果冲突，并且 fork 在这两个文件里只改了版本号，就取两边中较高的版本。
-- 列出还没解决的冲突，以及下面这份“改了上游的文件”清单。没写原因的文件会标 `!`。
+1. **合并前先看风险。** 打开 `git rerere`（同一处冲突解决过一次，以后自动按同样方式解决），拉取上游，先打印「合并时检查 (check while merging)」：这个 fork 改过、这次上游也改了的文件。标 `⚠ 沉稳界面` 的，是下面「沉稳界面」与「M3 逐页补改」两节登记过的接入点——它们最可能冲突，也最可能在自动合并后悄悄失效。然后从当前分支切出 `sync/upstream-<版本>-<日期>`，用 merge 合进 `upstream/main`。不用 rebase，因为 main 已经公开。
+2. **版本号自动处理。** `packages/mac/package.json` 和 `packages/mac/src-tauri/tauri.conf.json` 如果冲突，并且 fork 在这两个文件里只改了版本号，就取两边中较高的版本。
+3. **合并后自动跑沉稳检查。** 干净合并时脚本自己接着跑；有冲突时，解完 `git add`、`git commit --no-edit` 之后手动跑同一条命令：
 
-解决完冲突后：`git add`、`git commit --no-edit`，跑 `npm run typecheck` 和 `npx vitest run`，然后从同步分支向 main 开 PR。
+   ```bash
+   node scripts/sync-upstream.mjs --after-merge
+   ```
 
-只想看差异：
+   它做三件事：① 跑 `tests/fork-calm.test.ts`，`NEW` 段就是上游新增的动效；退出码非 0 说明某个接入点被搬走或删掉了（按 `TOUCHPOINTS` 的 `why` 重接）。② 扫描 `fork/calm/*.css` 的定点规则，列出已经失效的类名、data 属性与 aria 字面量。③ 提示重跑 calm-check。结果以 `## 沉稳检查（sync 自动附加）` 追加进合并提交的说明；说明里已有这一段就不再追加。`--after-merge` 可以重复跑，用 `git commit --amend -F -` 核对。
+4. **逐条处置三段输出。** 新增动效 → 补一条覆盖层规则（`fork/calm/*.css`）或记为例外；失效选择器 → 改覆盖层的锚点；接入点断裂 → 按 `TOUCHPOINTS` 的 `why` 重接。快照只在逐条裁决之后更新：`CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts`。
+5. **重跑 calm-check 主场景再开 PR。** 沉稳开与 reduced-motion 各走一遍：
+
+   ```bash
+   npm run dev
+   cd packages/mac && npm run dev
+   node packages/mac/scripts/calm-check.mjs room chatrun chatsteps tasks sentinel usage onboarding call
+   ```
+
+   然后跑 `npm run typecheck` 和 `npx vitest run`，从同步分支向 main 开 PR。
+
+只想看不想合并：
 
 ```bash
 node scripts/sync-upstream.mjs --report
 ```
+
+打印同样的三段：合并时检查、fork-calm 的新增/消失动效、失效的覆盖层规则；再加下面这份「改了上游的文件」清单。没写原因的文件标 `!`（退出码 1）。
+
+演练时用 `--remote` / `--ref` 指向一个本地镜像，真实的上游 remote 全程不动：
+
+```bash
+node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
+```
+
+自动追加提交说明有护栏：只改 HEAD 是双亲合并提交、标题以 `Merge upstream` 开头、且说明里还没有标记行的那一条；人写的说明不会被覆盖。
+
+已知限度：类名失效检测按「这个名字还出现在任何上游 CSS 里吗」判定，抓的是整体改名或消失；同一个类名碰巧在别的模块里出现会被判为仍在。所以它只报告、不卡退出码，在同步 PR 里逐条裁决。
 
 **同步节奏：上游每发一个版本就同步一次。** 攒的提交越少，冲突越小。
 
