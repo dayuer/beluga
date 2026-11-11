@@ -887,6 +887,8 @@
   margin-left: -1px;
   border-radius: 1px;
   background: var(--text-2);
+  /* A mark, not a target: hovering it still shows the session it crosses. */
+  pointer-events: none;
 }
 .timelineTicks {
   position: relative;
