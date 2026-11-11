@@ -4,6 +4,7 @@ import { IconButton } from '../ui.js';
 import { rangesIn, scrollParent } from './md-dom.js';
 import f from '../../chat/find.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
+import { isImeComposing } from '../../lib/ime.js';
 
 type HighlightCtor = new (...ranges: Range[]) => unknown;
 const registry = (): Map<string, unknown> | undefined => (globalThis.CSS as unknown as { highlights?: Map<string, unknown> } | undefined)?.highlights;
@@ -116,7 +117,7 @@ export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>
             e.preventDefault();
             e.stopPropagation();
             close();
-          } else if (e.key === 'Enter') {
+          } else if (e.key === 'Enter' && !isImeComposing(e)) {
             e.preventDefault();
             setAt((a) => a + (e.shiftKey ? -1 : 1));
           }

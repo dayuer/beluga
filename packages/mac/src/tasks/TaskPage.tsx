@@ -37,6 +37,7 @@ import { ProjectIcon } from '../components/ProjectIcon.js';
 import { RepoPicker, useSeveralRepos } from './boards.js';
 import { showWorktreeFolder } from '../lib/remote-open.js';
 import { revealThereLabel } from '@beluga/machines/open.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * One task: its title (click to rename), what to do next (start a worktree with Claude on it, or
@@ -180,7 +181,7 @@ function Title({ issue }: { issue: Issue }) {
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !isImeComposing(e)) {
           e.preventDefault();
           (e.target as HTMLTextAreaElement).blur();
         } else if (e.key === 'Escape') {

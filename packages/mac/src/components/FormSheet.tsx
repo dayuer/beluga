@@ -9,6 +9,7 @@ import { Select, type SelectEntry } from './Select.js';
 import { cx } from './ui.js';
 import s from './form.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
+import { isImeComposing } from '../lib/ime.js';
 
 export { Checkbox } from './Alert.js';
 
@@ -84,7 +85,7 @@ export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel,
               if (!hideSubmit) void submit();
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && primaryKey(e) && !hideSubmit) {
+              if (e.key === 'Enter' && !isImeComposing(e) && primaryKey(e) && !hideSubmit) {
                 e.preventDefault();
                 void submit();
               }

@@ -17,6 +17,7 @@ import { useBoard, usePeople, useSelf, useSolo, useTaskActions, useTasksPrefs } 
 import n from './NewTaskSheet.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /** The priority scale, left to right: its keys are 0 to 4. */
 const SCALE: readonly Priority[] = ['none', 'low', 'medium', 'high', 'urgent'];
@@ -147,7 +148,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
               placeholder={solo ? 'Say what you want done: one task, or a few. Your agent writes them.' : 'Say what you want done: one task, or a few and who each is for. Your agent writes them.'}
               onInput={(e) => grow(e.currentTarget)}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
+                if (isImeComposing(e)) return;
                 tags.onKey(e);
               }}
               data-autofocus

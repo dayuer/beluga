@@ -13,6 +13,7 @@ import { StatusSheet } from './StatusMenu.js';
 import { errorText, openGroup, quietly, useSay, useShownConversation } from './use-net.js';
 import s from './network.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /** Friends with checkboxes (a new group, adding people). */
 function FriendPicker({ friends, chosen, onChange }: { friends: readonly FriendView[]; chosen: ReadonlySet<string>; onChange: (next: Set<string>) => void }) {
@@ -95,7 +96,7 @@ function NewGroupSheet({ preset }: { preset: readonly string[] }) {
           autoFocus
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !isImeComposing(e)) {
               e.preventDefault();
               void create();
             }

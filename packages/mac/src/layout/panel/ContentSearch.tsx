@@ -5,6 +5,7 @@ import { cx } from '../../components/ui.js';
 import { useBeluga } from '../../lib/beluga.js';
 import s from './panel.module.css';
 import k from './content-search.module.css';
+import { isImeComposing } from '../../lib/ime.js';
 
 /**
  * The Files tab searching what's in the files (not their names): as you type, a moment after you
@@ -156,7 +157,7 @@ export function ContentResultsList({ state, query, listRef, onOpen, onEscape }: 
     else if (e.key === 'ArrowUp') (e.preventDefault(), move(i < 0 ? 0 : i - 1));
     else if (e.key === 'ArrowLeft' && cursor) (e.preventDefault(), fold(cursor.path, true), setCursor({ path: cursor.path, line: 0 }));
     else if (e.key === 'ArrowRight' && cursor && !cursor.line) (e.preventDefault(), fold(cursor.path, false));
-    else if (e.key === 'Enter' && cursor) {
+    else if (e.key === 'Enter' && !isImeComposing(e) && cursor) {
       e.preventDefault();
       if (cursor.line) onOpen(cursor.path, cursor.line);
       else fold(cursor.path);
