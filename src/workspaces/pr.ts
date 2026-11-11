@@ -110,7 +110,7 @@ export const fixChecksPrompt = (pr: PullRequest): string =>
   `The checks on pull request #${pr.number} (${pr.url}) are failing. Use gh pr checks ${pr.number} and gh run view --log-failed to find out why, fix it, run the tests, commit and push. Then say what was wrong.`;
 
 // Never wait on a username prompt nobody can answer (the daemon has no terminal): fail and say so.
-const QUIET_ENV = { GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1' };
+const QUIET_ENV = { LC_MESSAGES: 'C', LANGUAGE: 'C', GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1' };
 
 const run = (cmd: string, args: readonly string[], cwd: string, timeoutMs = 20_000, extraEnv: Readonly<Record<string, string>> = {}): Promise<string> =>
   new Promise((resolve, reject) => {
