@@ -70,9 +70,8 @@ export async function shot(page: Page, name: string, info: TestInfo): Promise<vo
   await page.screenshot({ path: path.join(scratch, `${name}-${info.project.name}.png`) });
 }
 
-/** How many `plan.create` actions reached the fake daemon. One after one request, however many
- * times the app asked the hub. */
-export function delivers(): number {
+/** How many actions of a kind reached the fake daemon. */
+export function delivered(kind: string): number {
   if (!daemonLog || !fs.existsSync(daemonLog)) return 0;
   return fs
     .readFileSync(daemonLog, 'utf8')
@@ -85,8 +84,12 @@ export function delivers(): number {
         return [];
       }
     })
-    .filter((entry) => entry.kind === 'deliver' && entry.actionKind === 'plan.create').length;
+    .filter((entry) => entry.kind === 'deliver' && entry.actionKind === kind).length;
 }
+
+/** How many `plan.create` actions reached the fake daemon. One after one request, however many
+ * times the app asked the hub. */
+export const delivers = (): number => delivered('plan.create');
 
 export async function controlPost(action: 'stop' | 'start' | 'view' | 'approve' | 'reset', body?: unknown): Promise<void> {
   const res = await fetch(`${control}/daemon/${action}`, {

@@ -1,11 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Minus, Plus } from 'lucide-react-native';
+import { MessageCircle, Minus, Plus } from 'lucide-react-native';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActionDock } from '../../components/ActionDock';
 import { ActivityList } from '../../components/ActivityList';
+import { Drawer } from '../../components/Drawer';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
+import { PlanChat } from '../../components/PlanChat';
 import { PlanHeader } from '../../components/PlanHeader';
 import { Segments, type SegmentItem } from '../../components/Segments';
 import { Skeleton } from '../../components/Skeleton';
@@ -21,6 +24,7 @@ import { usePlanView } from '../../lib/plan-store';
 import { detectLang, t } from '../../lib/strings';
 import { color, radius, space, type } from '../../lib/theme';
 import { ago } from '../../lib/time';
+import { unreadTurns } from '../../lib/turns';
 
 const ZOOMS = [0.8, 1, 1.25] as const;
 type TabKey = 'map' | 'outline' | 'activity';
@@ -49,6 +53,8 @@ export default function PlanScreen() {
   const [tab, setTab] = useState<TabKey>('map');
   const [picked, setPicked] = useState<string | undefined>();
   const [menu, setMenu] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [seen, setSeen] = useState(() => (pid && ref ? (kv.get<number>(`seen:chat:${pid}:${ref}`) ?? 0) : 0));
   const [openMilestones, setOpenMilestones] = useState<readonly string[]>([]);
   const [zoomIndex, setZoomIndex] = useState(() => {
     const saved = kv.get<number>('plan-zoom');
@@ -60,6 +66,16 @@ export default function PlanScreen() {
   useEffect(() => {
     if (pid && ref) kv.set(`plan-project:${ref}`, pid);
   }, [pid, ref]);
+
+  // The conversation is seen when its drawer is open (and always on the desktop's docked panel).
+  useEffect(() => {
+    if (!pid || !ref || !(chatOpen || desktop)) return;
+    const now = Date.now();
+    setSeen(now);
+    kv.set(`seen:chat:${pid}:${ref}`, now);
+  }, [pid, ref, chatOpen, desktop, view?.turns]);
+
+  const unread = view ? unreadTurns(view.turns, seen) : 0;
 
   // Open where the work is on the first view; after that the customer owns the outline.
   useEffect(() => {
@@ -117,8 +133,10 @@ export default function PlanScreen() {
       <Header title={view?.title ?? t(lang, 'plan.titleFallback')} back right={more} />
       {offline && view ? <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" /> : null}
 
-      <View style={[styles.main, desktop && styles.mainDesktop]}>
-        {view && phase ? (
+      <View style={[styles.body, desktop && styles.bodyRow]}>
+        <View style={styles.bodyMain}>
+          <View style={[styles.main, desktop && styles.mainDesktop]}>
+            {view && phase ? (
           <>
             <PlanHeader view={view} phase={phase} lang={lang} studioOnline={store.studioOnline} fetchedAt={store.fetchedAt} />
             {store.error && store.error.kind !== 'offline' ? (
@@ -173,9 +191,44 @@ export default function PlanScreen() {
             testID="plan-error"
           />
         )}
+          </View>
+          {!desktop && !chatOpen ? (
+            <ActionDock>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t(lang, 'chat.title')}
+                testID="chat-open"
+                onPress={() => setChatOpen(true)}
+                style={({ pressed }) => [styles.chatOpen, pressed && styles.pressed]}
+              >
+                <MessageCircle size={17} color={color.text2} strokeWidth={1.75} />
+                <Text style={styles.chatOpenText} numberOfLines={1}>
+                  {t(lang, 'chat.saySomething')}
+                </Text>
+                {unread > 0 ? <View style={styles.unreadDot} testID="chat-unread" /> : null}
+              </Pressable>
+            </ActionDock>
+          ) : null}
+        </View>
+        {desktop && view ? (
+          <View style={styles.chatPanel}>
+            <PlanChat pid={pid} planRef={ref} turns={view.turns} typing={view.typing} moreTurns={view.moreTurns} lang={lang} docked />
+          </View>
+        ) : null}
       </View>
 
-      {pickedMilestone ? <MilestoneSheet milestone={pickedMilestone} lang={lang} onClose={() => setPicked(undefined)} bottomInset={8} /> : null}
+      <Drawer open={chatOpen} onClose={() => setChatOpen(false)} title={t(lang, 'chat.title')}>
+        {view ? <PlanChat pid={pid} planRef={ref} turns={view.turns} typing={view.typing} moreTurns={view.moreTurns} lang={lang} /> : null}
+      </Drawer>
+
+      {pickedMilestone ? (
+        <MilestoneSheet
+          milestone={pickedMilestone}
+          lang={lang}
+          onClose={() => setPicked(undefined)}
+          bottomInset={desktop ? 8 : insets.bottom + 12 + 44 + 16 + 8}
+        />
+      ) : null}
 
       {menu ? (
         <View style={StyleSheet.absoluteFill} testID="plan-menu-layer">
@@ -220,6 +273,23 @@ function ZoomButton({ label, testID, disabled, onPress, children }: { readonly l
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
+  body: { flex: 1 },
+  bodyRow: { flexDirection: 'row' },
+  bodyMain: { flex: 1, minWidth: 0 },
+  chatPanel: { width: 360, height: '100%' },
+  chatOpen: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[4],
+    backgroundColor: color.card,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.m,
+  },
+  chatOpenText: { ...type.callout, color: color.text3, flex: 1 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.info },
   main: { flex: 1, width: '100%' },
   mainDesktop: { maxWidth: 720, alignSelf: 'center' },
   scroll: { flex: 1 },

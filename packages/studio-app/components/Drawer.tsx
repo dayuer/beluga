@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardInset } from '../lib/viewport';
 import { color, radius, space, type } from '../lib/theme';
 
@@ -26,6 +27,7 @@ const MAX_SNAP = 0.8;
 export function Drawer({ open, onClose, title, children, footer, testID = 'drawer', variant = 'sheet', initialSnap = MIN_SNAP }: DrawerProps) {
   const { width, height } = useWindowDimensions();
   const inset = useKeyboardInset();
+  const safeBottom = useSafeAreaInsets().bottom;
   const modal = variant === 'modal' || width >= 900;
   const visible = Math.max(240, height - inset);
   const [snap, setSnap] = useState<number>(initialSnap);
@@ -100,7 +102,7 @@ export function Drawer({ open, onClose, title, children, footer, testID = 'drawe
         </Pressable>
       </View>
       <View style={styles.content}>{children}</View>
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      {footer ? <View style={[styles.footer, { paddingBottom: inset > 0 ? space[3] : safeBottom + space[3] }]}>{footer}</View> : null}
     </>
   );
 
