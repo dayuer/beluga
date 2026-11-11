@@ -61,6 +61,7 @@ const errorText = (json: unknown): string =>
     : 'request-failed';
 
 const offline: R<never> = { ok: false, error: { kind: 'offline' } };
+const TIMEOUT_MS = 10_000;
 
 export function createHub(options: HubOptions): Hub {
   const base = (options.base ?? envBase() ?? '').replace(/\/+$/, '');
@@ -76,10 +77,14 @@ export function createHub(options: HubOptions): Hub {
     if (init.body !== undefined) headers.set('content-type', 'application/json');
 
     let res: Response;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      res = await doFetch(base + path, { ...init, headers });
+      res = await doFetch(base + path, { ...init, headers, signal: controller.signal });
     } catch {
       return offline;
+    } finally {
+      clearTimeout(timer);
     }
 
     const text = await res.text().catch(() => '');

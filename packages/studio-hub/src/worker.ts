@@ -20,6 +20,7 @@ import {
   type InternalAuth,
 } from '../../../src/net/studio/handler.js';
 import { authCustomer, bearerOf } from '../../../src/net/studio/session.js';
+import { resendMailer } from '../../../src/net/studio/mail.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
@@ -34,21 +35,34 @@ async function operatorTokenHash(env: Env): Promise<string> {
   return (operatorHash ??= await sha256Hex(env.OPERATOR_TOKEN ?? ''));
 }
 
-/** console (dev: the link in the log) or outbox (D1, for the admin page to forward). */
+/**
+ * `outbox` (default: keep the link in D1 for the admin page to forward), `resend` (a real email,
+ * BLG-82's choice), or `console` (only logs "link issued", never the token). The mailing rules are
+ * the hub's; this function only picks the transport.
+ */
 function mailerFor(env: Env, hub: D1HubStore, now: number): Deps['mailer'] {
   // Outbox by default: a magic link is a credential and must not be in a log by default.
   const mode = env.MAIL_MODE ?? 'outbox';
-  return {
+  const outbox: Deps['mailer'] = {
     send: async (email, link) => {
-      if (mode !== 'outbox') {
-        console.log('[studio] login link issued');
-        return;
-      }
       const customer = await hub.customerByEmail(email);
       if (!customer) return;
       await hub.addOutbox({ id: randomToken(16), customerId: customer.id, link, createdAt: now, expiresAt: now + OUTBOX_TTL_MS });
     },
   };
+  if (mode === 'resend') {
+    if (!env.RESEND_API_KEY) {
+      // Keep the link rather than lose it; the operator can still forward it from the admin page.
+      console.warn('[studio] mail: MAIL_MODE=resend without RESEND_API_KEY; using the outbox');
+      return outbox;
+    }
+    return resendMailer({
+      apiKey: env.RESEND_API_KEY,
+      from: env.MAIL_FROM ?? 'Synon Studio <login@synon.studio>',
+    });
+  }
+  if (mode === 'outbox') return outbox;
+  return { send: async () => void console.log('[studio] login link issued') };
 }
 
 async function depsFor(env: Env, hub: D1HubStore, now: number, origin: string): Promise<Deps> {

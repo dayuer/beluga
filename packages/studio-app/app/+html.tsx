@@ -23,7 +23,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="theme-color" content="#FFFFFF" />
         <title>Synon Studio</title>
         <style>{`
-          html, body, #root { height: 100%; margin: 0; background: #F6F6F7; }
+          html, body, #root { height: 100%; margin: 0; background: #F6F6F7; }\n          #root { display: flex; flex: 1; }
           body { overflow: hidden; overscroll-behavior-y: none; }
           * { -webkit-tap-highlight-color: transparent; }
         `}</style>

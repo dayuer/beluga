@@ -1,4 +1,4 @@
-import { Redirect, Stack, usePathname } from 'expo-router';
+import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { View } from 'react-native';
@@ -13,11 +13,17 @@ import { color } from '../lib/theme';
  */
 function Guard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const params = useGlobalSearchParams<{ next?: string | string[] }>();
   const token = useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   if (!token && pathname !== '/login') {
     return <Redirect href={`/login?next=${encodeURIComponent(pathname)}`} />;
   }
-  if (token && pathname === '/login') return <Redirect href="/" />;
+  if (token && pathname === '/login') {
+    // A magic link opened on /project/x remembers where the customer was going.
+    const raw = Array.isArray(params.next) ? params.next[0] : params.next;
+    const dest = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
+    return <Redirect href={dest} />;
+  }
   return <>{children}</>;
 }
 

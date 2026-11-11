@@ -31,6 +31,9 @@ export interface Env {
   readonly STUDIO: DurableObjectNamespace<StudioHub>;
   readonly OPERATOR_TOKEN?: string;
   readonly MAIL_MODE?: string;
+  /** BLG-82: Resend. `MAIL_MODE=resend` uses these; without the key it falls back to the outbox. */
+  readonly RESEND_API_KEY?: string;
+  readonly MAIL_FROM?: string;
   readonly HUB_ORIGIN?: string;
   readonly PREVIEW_SECRET?: string;
 }
