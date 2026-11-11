@@ -70,7 +70,13 @@ export default function PlanScreen() {
   const [reasonMilestone, setReasonMilestone] = useState<string | undefined>();
   const [diffOpen, setDiffOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
-  const [seen, setSeen] = useState(() => (pid && ref ? (kv.get<number>(`seen:chat:${pid}:${ref}`) ?? 0) : 0));
+  const [seen, setSeen] = useState(() => {
+    if (!pid || !ref) return 0;
+    const stored = kv.get<number>(`seen:chat:${pid}:${ref}`);
+    // A first visit has no "last seen": the conversation starts read, not with an unread dot.
+    return typeof stored === 'number' ? stored : Date.now();
+  });
+  const [seenReady, setSeenReady] = useState(false);
   const [openMilestones, setOpenMilestones] = useState<readonly string[]>([]);
   const [zoomIndex, setZoomIndex] = useState(() => {
     const saved = kv.get<number>('plan-zoom');
@@ -85,14 +91,28 @@ export default function PlanScreen() {
   }, [pid, ref]);
 
   // The conversation is seen when its drawer is open (and always on the desktop's docked panel).
+  // The latest turn's own time counts too: a studio clock a second ahead must not stay "unread".
   useEffect(() => {
     if (!pid || !ref || !(chatOpen || desktop)) return;
-    const now = Date.now();
+    const latest = effective?.turns.reduce((max, turn) => Math.max(max, turn.at), 0) ?? 0;
+    const now = Math.max(Date.now(), latest);
     setSeen(now);
     kv.set(`seen:chat:${pid}:${ref}`, now);
   }, [pid, ref, chatOpen, desktop, effective?.turns]);
 
-  const unread = effective ? unreadTurns(effective.turns, seen) : 0;
+  // The first view has no "last seen": its turns are already read, not an unread dot.
+  useEffect(() => {
+    if (!pid || !ref || seenReady) return;
+    const key = `seen:chat:${pid}:${ref}`;
+    const stored = kv.get<number>(key);
+    const latest = effective?.turns.reduce((max, turn) => Math.max(max, turn.at), 0) ?? 0;
+    const next = typeof stored === 'number' ? stored : Math.max(Date.now(), latest);
+    setSeen(next);
+    if (typeof stored !== 'number') kv.set(key, next);
+    setSeenReady(true);
+  }, [pid, ref, effective, seenReady]);
+
+  const unread = effective && seenReady ? unreadTurns(effective.turns, seen) : 0;
 
   // Open where the work is on the first view; after that the customer owns the outline.
   useEffect(() => {
@@ -219,7 +239,7 @@ export default function PlanScreen() {
 
   return (
     <View style={styles.root} testID="plan-screen">
-      <Header title={effective?.title ?? t(lang, 'plan.titleFallback')} back right={more} />
+      <Header title={effective?.title ?? t(lang, 'plan.titleFallback')} back right={more} rightPanel={desktop && effective ? 360 : 0} />
       {offline && effective ? <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" /> : null}
 
       <View style={[styles.body, desktop && styles.bodyRow]}>
@@ -397,7 +417,7 @@ export default function PlanScreen() {
           </Drawer>
         </View>
         {desktop && effective ? (
-          <View style={styles.chatPanel}>
+          <View style={styles.chatPanel} testID="chat-panel">
             <PlanChat pid={pid} planRef={ref} turns={effective.turns} typing={effective.typing} moreTurns={effective.moreTurns} lang={lang} docked />
           </View>
         ) : null}
@@ -408,7 +428,7 @@ export default function PlanScreen() {
       {menu ? (
         <View style={StyleSheet.absoluteFill} testID="plan-menu-layer">
           <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={t(lang, 'plan.close')} onPress={() => setMenu(false)} />
-          <View style={[styles.menu, { top: (desktop ? 56 : insets.top + 44) + 6 }]}>
+          <View style={[styles.menu, { top: (desktop ? 56 : insets.top + 44) + 6, right: desktop && effective ? 360 + Math.max(0, (width - 360 - 720) / 2) : space[4] }]}>
             <Pressable
               accessibilityRole="button"
               testID="menu-refresh"

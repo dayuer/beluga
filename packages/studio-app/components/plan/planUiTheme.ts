@@ -12,7 +12,8 @@ export function planUiTheme(): PlanUiTheme {
       sunken: color.sunken,
       text: color.text,
       text2: color.text2,
-      text3: color.text3,
+      // The shared parts sit on the page as well as cards; text3 on the page is 4.36:1.
+      text3: color.text2,
       ok: color.ok,
       info: color.info,
     },

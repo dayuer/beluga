@@ -22,7 +22,7 @@ export function ProjectCard({ project, onPress, testID, fill = false, todoDot = 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${project.name}, ${project.studioName}`}
+      accessibilityLabel={`${project.name}, ${project.studioName}${todoDot ? `, ${t(lang, 'todo.dotLabel')}` : ''}`}
       testID={testID ?? `project-card-${project.id}`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, fill && styles.fill, pressed && styles.pressed]}

@@ -24,7 +24,7 @@ export function MilestoneSheet({ milestone, lang, onClose, bottomInset = 8 }: Mi
   const tone = milestoneTone(milestone.status);
 
   return (
-    <View style={[styles.sheet, { bottom: bottomInset + keyboard, maxHeight }]} testID="milestone-sheet" accessibilityViewIsModal>
+    <View style={[styles.sheet, { bottom: bottomInset + keyboard, maxHeight }]} testID="milestone-sheet" accessibilityViewIsModal role="dialog">
       <View style={styles.header}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.title} numberOfLines={2}>

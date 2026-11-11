@@ -35,7 +35,7 @@ export function ActivityList({ activity, lang }: ActivityListProps) {
 const styles = StyleSheet.create({
   root: { paddingHorizontal: space[5], paddingVertical: space[3] },
   row: { flexDirection: 'row', gap: space[3], paddingVertical: space[3], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.hairline },
-  time: { ...type.caption, color: color.text3, width: 64, paddingTop: 1 },
+  time: { ...type.caption, color: color.text2, width: 64, paddingTop: 1 },
   text: { ...type.callout, color: color.text, flex: 1 },
   empty: { paddingHorizontal: space[6], paddingVertical: space[7], alignItems: 'center', gap: space[2] },
   emptyTitle: { ...type.heading, color: color.text },

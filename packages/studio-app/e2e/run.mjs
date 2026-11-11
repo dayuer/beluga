@@ -16,7 +16,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(here, '..');
 const repo = path.resolve(appDir, '../..');
 const hubDir = path.join(repo, 'packages/studio-hub');
-const scratch = path.join(repo, '.beluga/scratch/m5');
+// M6's run keeps its screenshots and logs here; the M5 files stay where they were.
+const scratch = path.join(repo, '.beluga/scratch/m6');
 const stateDir = path.join(scratch, 'hub-state');
 const keyFile = path.join(scratch, 'daemon.pem');
 const daemonLog = path.join(scratch, 'daemon.log');

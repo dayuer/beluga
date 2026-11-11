@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   mineRow: { alignSelf: 'flex-end', maxWidth: '84%', alignItems: 'flex-end', gap: 4 },
   mineBubble: { backgroundColor: color.primary, borderRadius: radius.l, paddingVertical: 10, paddingHorizontal: 12 },
   mineText: { ...type.callout, color: color.onPrimary },
-  myStatus: { ...type.caption, color: color.text3 },
+  myStatus: { ...type.caption, color: color.text2 },
   retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   retryText: { ...type.caption, color: color.error, fontWeight: '600' },
   theirRow: { alignSelf: 'flex-start', maxWidth: '84%', gap: 4 },

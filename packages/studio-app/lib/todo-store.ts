@@ -37,8 +37,9 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, run: (item: T)
 
 let lastResult: TodosResult | undefined;
 let inflight: Promise<TodosResult> | null = null;
+let generation = 0;
 
-async function run(): Promise<TodosResult> {
+async function run(gen: number): Promise<TodosResult> {
   const projects = await hub.projects();
   if (!projects.ok) throw new Error(projects.error.kind);
   const names = new Map(projects.value.projects.map((project) => [project.id, project.name]));
@@ -68,19 +69,25 @@ async function run(): Promise<TodosResult> {
   for (const todo of todos) byProject[todo.pid] = (byProject[todo.pid] ?? 0) + 1;
 
   const result: TodosResult = { todos, byProject, fetchedAt: Date.now(), failed: results.reduce((n, r) => n + r.failed, 0) };
-  lastResult = result;
-  cache.set('todos', result, result.fetchedAt);
+  // A forced load that started later owns the cache; an older answer must not overwrite it.
+  if (gen === generation) {
+    lastResult = result;
+    cache.set('todos', result, result.fetchedAt);
+  }
   return result;
 }
 
 /** The aggregation, cached 60 seconds and shared by the home screen and the to-do screen. */
 export async function fetchTodos(force = false): Promise<TodosResult> {
   if (!force && lastResult && Date.now() - lastResult.fetchedAt < 60_000) return lastResult;
-  if (inflight) return inflight;
-  inflight = run().finally(() => {
-    inflight = null;
+  if (inflight && !force) return inflight;
+  if (inflight) await inflight.catch(() => undefined);
+  const gen = ++generation;
+  const current = run(gen).finally(() => {
+    if (inflight === current) inflight = null;
   });
-  return inflight;
+  inflight = current;
+  return current;
 }
 
 export interface TodosStore {

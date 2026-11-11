@@ -54,6 +54,7 @@ export function MilestoneMap({ items, onPick, scale = 1, nodeWidth = 156, wrapNo
                   onPress={() => onPick(item.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.title}, ${item.statusLabel}, ${item.done} of ${item.total}`}
+                  testID={`map-node-${item.index}`}
                   style={({ pressed }) => [{ opacity: pressed ? 0.55 : 1 }]}
                 >
                   {node}

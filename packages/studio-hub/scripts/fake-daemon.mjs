@@ -62,10 +62,13 @@ const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
 
+// The first view's turn time is fixed for the process: a new `at` on every tick would look like
+// a new unread message to the app (the real daemon keeps the turn's own time).
+const T0 = Date.now();
 const view = (planRef, rev) => ({
   planRef,
   draftRev: 1,
-  title: `客户 App · ${planRef}`,
+  title: '客户 App',
   goal: '做一个客户预约页面',
   stage: 'running',
   waitingOn: 'ai',
@@ -81,10 +84,10 @@ const view = (planRef, rev) => ({
     },
   ],
   decisions: [],
-  turns: [{ id: 't1', who: 'ai', text: '开始做登录页了', at: Date.now() }],
+  turns: [{ id: 't1', who: 'ai', text: '开始做登录页了', at: T0 }],
   typing: false,
   moreTurns: false,
-  activity: [{ at: Date.now(), text: '开始了一项工作' }],
+  activity: [{ at: T0, text: '开始了一项工作' }],
 });
 
 let ws;
@@ -106,6 +109,36 @@ function snapshot(entry) {
   const custom = customViews.get(entry.project);
   const next = custom ? { ...custom, planRef: entry.planRef } : view(entry.planRef, rev);
   send({ t: 'for', project: entry.project, frame: { t: 'plan', rev, view: next } });
+}
+
+/** What the daemon's plan would look like after the customer's action; M6's local patch needs it. */
+function applyAction(entry, action) {
+  const current = customViews.get(entry.project) ?? view(entry.planRef, rev);
+  const payload = action?.payload ?? {};
+  let next = current;
+  if (action?.kind === 'milestone.sendBack') {
+    next = { ...current, milestones: current.milestones.map((m) => (m.ref === payload.milestoneRef ? { ...m, status: 'working' } : m)) };
+  } else if (action?.kind === 'milestone.pass') {
+    next = { ...current, milestones: current.milestones.map((m) => (m.ref === payload.milestoneRef ? { ...m, status: 'passed' } : m)) };
+  } else if (action?.kind === 'plan.requestStart') {
+    next = { ...current, gate: { kind: 'start', state: 'pending', draftRev: payload.draftRev ?? current.draftRev } };
+  } else if (action?.kind === 'decision.answer') {
+    next = { ...current, decisions: (current.decisions ?? []).map((d) => (d.decisionId === payload.decisionId ? { ...d, open: false } : d)) };
+  } else if (action?.kind === 'draft.apply') {
+    next = { ...current, gate: { kind: 'changes', state: 'pending', draftRev: payload.draftRev ?? current.draftRev } };
+  } else if (action?.kind === 'draft.discard') {
+    const { draftDiff, ...rest } = current;
+    next = rest;
+  } else if (action?.kind === 'chat.send') {
+    next = {
+      ...current,
+      turns: [...(current.turns ?? []), { id: `act-${action.opId}`, who: 'customer', text: String(payload.text ?? ''), at: Date.now(), opId: action.opId }],
+    };
+  }
+  if (next !== current) {
+    customViews.set(entry.project, next);
+    snapshot(entry);
+  }
 }
 
 /** The Mac's NeedsYou approval: the start gate is approved and the plan is running. */
@@ -163,6 +196,8 @@ function connect() {
     else if (frame.t === 'deliver') {
       // The hub delivered a customer action; say it ran. M3 would use the daemon's own OpLog here.
       log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
+      const entry = plans.find((p) => p.project === frame.project);
+      if (entry) applyAction(entry, frame.action);
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
     } else if (frame.t === 'resync') {
       const entry = plans.find((p) => p.project === frame.project);

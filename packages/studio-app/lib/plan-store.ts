@@ -85,6 +85,20 @@ export function usePlanView(pid: string | undefined, ref: string | undefined): P
     setError(null);
   }, [pid, ref]);
 
+  // The hub's plan response has no studio status; the project list does. While the page is open,
+  // check it so a daemon that goes away (or comes back) shows in the header without a plan frame.
+  const checkStudio = useCallback(async () => {
+    if (!pid) return;
+    const answer = await hub.plans(pid);
+    if (answer.ok) setStudioOnline(answer.value.studio.online);
+  }, [pid]);
+
+  useEffect(() => {
+    void checkStudio();
+    const id = setInterval(() => void checkStudio(), 5000);
+    return () => clearInterval(id);
+  }, [checkStudio]);
+
   // One socket per project, shared with the project page and the request screen.
   useEffect(() => {
     if (!pid || !ref) return;

@@ -99,5 +99,5 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   dot: { width: 7, height: 7, borderRadius: 999, flexShrink: 0 },
   status: { ...type.callout, color: color.text, flex: 1 },
-  offline: { ...type.caption, color: color.text3 },
+  offline: { ...type.caption, color: color.text2 },
 });

@@ -62,7 +62,7 @@ export function DraftDiff({ pid, planRef, diff, draftRev, lang, onApplied, onRef
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {diff.added.length ? (
           <View style={styles.group} testID="diff-added">
-            <Text style={[styles.groupTitle, { color: color.ok }]}>{t(lang, 'diff.added')}</Text>
+            <Text style={[styles.groupTitle, { color: color.text }]}>{t(lang, 'diff.added')}</Text>
             {diff.added.map((item, i) => (
               <View key={`a-${i}`} style={styles.row}>
                 <Text style={[styles.sign, { color: color.ok }]}>+</Text>
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   meta: { ...type.caption, color: color.text3 },
   removed: { textDecorationLine: 'line-through', color: color.text2 },
   beforeAfter: { marginTop: space[2], gap: 2, padding: space[3], backgroundColor: color.sunken, borderRadius: radius.m },
-  before: { ...type.caption, color: color.text3, textDecorationLine: 'line-through' },
+  before: { ...type.caption, color: color.text2, textDecorationLine: 'line-through' },
   arrow: { ...type.caption, color: color.text2 },
   after: { ...type.caption, color: color.text },
   footer: { paddingHorizontal: space[4], paddingTop: space[2], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },

@@ -170,6 +170,7 @@ const zh = {
   'todo.reviewSub': '里程碑「{m}」等你验收',
   'todo.changesSub': '计划有改动：+{a} ~{c} −{r}',
   'todo.confirmSub': '计划已拟好，等你确认',
+  'todo.dotLabel': '有待办',
 
   'new.title': '新需求',
   'new.intro': '描述你想做的，越具体越好。工作室会先拆成里程碑，等你确认。',
@@ -377,6 +378,7 @@ const en: Record<StringKey, string> = {
   'todo.reviewSub': 'Review “{m}”',
   'todo.changesSub': 'The plan changed: +{a} ~{c} −{r}',
   'todo.confirmSub': 'The plan is ready for you to confirm',
+  'todo.dotLabel': 'To-dos waiting',
 
   'new.title': 'New request',
   'new.intro': 'Describe what you want, as specifically as you can. The studio will break it into milestones for you to confirm.',

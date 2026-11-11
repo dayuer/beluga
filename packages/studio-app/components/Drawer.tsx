@@ -111,12 +111,12 @@ export function Drawer({ open, onClose, title, children, footer, testID = 'drawe
       <Pressable accessibilityLabel="关闭" onPress={onClose} style={styles.scrim} testID={`${testID}-scrim`} />
       {modal ? (
         <View style={styles.centered} pointerEvents="box-none">
-          <View style={styles.modal} accessibilityViewIsModal testID={testID}>
+          <View style={styles.modal} accessibilityViewIsModal role="dialog" testID={testID}>
             {body}
           </View>
         </View>
       ) : (
-        <View style={[styles.sheet, { height: sheetHeight, bottom: inset }]} accessibilityViewIsModal testID={testID}>
+        <View style={[styles.sheet, { height: sheetHeight, bottom: inset }]} accessibilityViewIsModal role="dialog" testID={testID}>
           {body}
         </View>
       )}

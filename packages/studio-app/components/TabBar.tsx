@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   segment: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', flexDirection: 'row', gap: space[2], paddingBottom: 0 },
   segmentLabel: { ...type.callout, color: color.text2, paddingBottom: 10 },
   segmentOn: { color: color.text, fontWeight: '600' },
-  segmentCount: { ...type.caption, color: color.text3, paddingBottom: 10 },
+  segmentCount: { ...type.caption, color: color.text2, paddingBottom: 10 },
   segmentLine: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: 'transparent' },
   segmentLineOn: { backgroundColor: color.text },
   pressed: { backgroundColor: color.press },
