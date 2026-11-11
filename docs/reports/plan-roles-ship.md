@@ -17,3 +17,17 @@
 | R6 | 看门狗升级只给一次 | 没问题 | `escalated` 存在 watch 记录里（持久），升级过一次后再停就等你处理；对话已经在修复模型上时 `escalate` 返回 undefined，也直接等你处理，不会空转。 |
 
 要修的 R1、R2 在 BLG-131 修，测试加在 `tests/plan-fix-agent.test.ts`。
+
+## 二、修审计发现的问题（BLG-131）
+
+都是普通问题，没有标为疑难的。
+
+- **R1**：`pilot.ts` 按计划记下计划对话正在修的冲突目录（`fixing`）。冲突开始走 `fixupIn(plan, dir)`，
+  解决或失败走新的 `fixedIn(plan, dir)`：还有别的冲突时留在修复模型上，`allowFixup` 指向剩下那个；
+  一个都没有了才切回规划模型。测试：“two conflicts at once (BLG-131)”。
+- **R2**：`toFixer` 先看对话当前的 agent（工作区记录里的），已经是修复模型就不再切、不再记“handed … to …”；
+  `fixedIn` 在内存里没记录、但对话当前是修复模型（而规划模型不是它）时也切回。测试：“put on the fix agent before a restart (BLG-131)”。
+
+两个新测试在没改 `pilot.ts` 时都失败，改了以后通过；`tests/plan-fix-agent.test.ts` 10 个、
+含 conflict/combine/mainMerge 的 6 个计划测试文件 173 个全部通过。
+留下的已知限制：重启后同时有两个冲突时，内存里的冲突列表要等它们各自重试才补全，期间可能多切一次（与改前相同）。

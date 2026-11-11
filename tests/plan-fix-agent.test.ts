@@ -209,6 +209,48 @@ describe('a plan’s agent for hard fixes', () => {
     expect(t.switched.at(-1)).toMatchObject({ channel: 'ws:main', agent: CHEAP });
   });
 
+  it('two conflicts at once (BLG-131): one gone keeps the conversation on the fix agent; both gone, it goes back', async () => {
+    const fixed = new Set<string>();
+    const dirOf = (key: string) => `/tmp/.bases/p/${key.toLowerCase()}-base`;
+    const t = setup({ workers: 'task', combine: async (_p, key) => (fixed.has(key) ? { ok: true, branch: `beluga/${key.toLowerCase()}-base` } : { ok: false, branch: `beluga/${key.toLowerCase()}-base`, dir: dirOf(key), merging: 'beluga/b', files: ['shared.txt'] }) });
+    await approved(t, { title: 'Stack', goal: '', milestones: [{ id: 'm', title: 'Everything', criteria: ['works'], tasks: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }, { id: 'd', title: 'D' }, { id: 'two', title: 'Two', blockedBy: ['a', 'b'] }, { id: 'four', title: 'Four', blockedBy: ['c', 'd'] }] }] }, { autonomy: 'gated' });
+    await waitFor(() => ['A', 'B', 'C', 'D'].every((x) => t.issue(x).worktrees.length));
+    for (const title of ['A', 'B', 'C', 'D']) t.board.update(t.issue(title).id, { status: 'in_review' }, t.claude);
+    const [two, four] = [t.issue('Two').key, t.issue('Four').key];
+    await waitFor(() => t.asked.some((a) => a.prompt.includes(dirOf(two))) && t.asked.some((a) => a.prompt.includes(dirOf(four))));
+    expect(t.switched).toEqual([{ channel: 'ws:main', agent: STRONG, at: expect.any(Number) }]);
+    // Two's conflict is fixed; Four's is still there: no handing back.
+    fixed.add(two);
+    t.run('ws:main', 'started', 'fix-1');
+    t.run('ws:main', 'done', 'fix-1');
+    await waitFor(() => t.issue('Two').status === 'in_progress');
+    expect(t.switched.map((s) => s.agent)).toEqual([STRONG]);
+    // Four's too: back on the work's agent.
+    fixed.add(four);
+    t.run('ws:main', 'started', 'fix-2');
+    t.run('ws:main', 'done', 'fix-2');
+    await waitFor(() => t.issue('Four').status === 'in_progress');
+    expect(t.switched.map((s) => s.agent)).toEqual([STRONG, CHEAP]);
+  });
+
+  it('put on the fix agent before a restart (BLG-131): no second handover, and back on the work’s agent once the conflict is gone', async () => {
+    let fixed = false;
+    const t = setup({ workers: 'task', combine: async (_p, key) => (fixed ? { ok: true, branch: `beluga/${key.toLowerCase()}-base` } : { ok: false, branch: `beluga/${key.toLowerCase()}-base`, dir: '/tmp/.bases/p/two-base', merging: 'beluga/b', files: ['shared.txt'] }) });
+    // What the daemon kept on the plan's conversation from before: it's on the fix agent (this session never switched it).
+    t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((w) => (w.id === 'main' ? ({ ...w, agent: STRONG } as Workspace) : w)) })) });
+    const plan = await approved(t, { title: 'Stack', goal: '', milestones: [{ id: 'm', title: 'Everything', criteria: ['works'], tasks: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'two', title: 'Two', blockedBy: ['a', 'b'] }] }] }, { autonomy: 'gated' });
+    await waitFor(() => t.issue('A').worktrees.length && t.issue('B').worktrees.length);
+    for (const title of ['A', 'B']) t.board.update(t.issue(title).id, { status: 'in_review' }, t.claude);
+    await waitFor(() => t.asked.some((a) => a.channel === 'ws:main' && a.prompt.includes('/tmp/.bases/p/two-base')));
+    expect(t.switched).toEqual([]);
+    expect(t.plans.need(plan.id).activity.some((e) => e.text === 'handed the conflict to Claude (Opus)')).toBe(false);
+    fixed = true;
+    t.run('ws:main', 'started', 'fix-1');
+    t.run('ws:main', 'done', 'fix-1');
+    await waitFor(() => t.issue('Two').status === 'in_progress');
+    expect(t.switched).toEqual([{ channel: 'ws:main', agent: CHEAP, at: expect.any(Number) }]);
+  });
+
   it('a task that stops twice goes to the fix agent and is woken once more; a third time, it waits for you', async () => {
     let now = Date.now();
     const t = setup({ workers: 'task', now: () => now });
