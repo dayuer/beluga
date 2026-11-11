@@ -18,6 +18,19 @@ export const scratch = process.env.E2E_SCRATCH ?? path.resolve(process.cwd(), '.
 export const home = (page: Page) => page.getByTestId('project-home').last();
 export const fresh = (page: Page) => page.getByTestId('new-screen').last();
 
+/**
+ * Wait for what a screen shows once it is drawn (BLG-153), never a fixed pause; when it doesn't
+ * come, say which screen, where the page is and what it shows (a spinner, an error, the login).
+ */
+export async function ready(page: Page, testId: string, what: string, timeout = 20_000): Promise<void> {
+  try {
+    await page.getByTestId(testId).last().waitFor({ state: 'visible', timeout });
+  } catch {
+    const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+    throw new Error(`${what}: [data-testid=${testId}] did not show in ${timeout} ms. The page is ${page.url()} and shows: ${text || '(nothing yet)'}`);
+  }
+}
+
 /** A single-use link, minted for this test; the customer's token never goes to a log. */
 export async function freshLink(): Promise<string> {
   const res = await fetch(`${hub}/v1/admin/customers/${customerId}/login-link`, {
@@ -36,7 +49,7 @@ export async function login(page: Page): Promise<void> {
   await page.goto('about:blank');
   await page.goto(link, { waitUntil: 'networkidle' });
   await page.waitForURL(`${base}/`, { timeout: 20_000 });
-  await page.getByTestId(`project-card-${projectId}`).waitFor({ timeout: 20_000 });
+  await ready(page, `project-card-${projectId}`, 'the projects after the magic link');
 }
 
 /** For the tests after the first: the same session, set before the app boots, so one magic link
@@ -45,12 +58,13 @@ export async function sessionLogin(page: Page): Promise<void> {
   if (!sessionJson) throw new Error('E2E_SESSION is missing');
   await page.addInitScript((raw: string) => localStorage.setItem('synon:session', raw), sessionJson);
   await page.goto(`${base}/`, { waitUntil: 'networkidle' });
-  await page.getByTestId(`project-card-${projectId}`).waitFor({ timeout: 20_000 });
+  await ready(page, `project-card-${projectId}`, 'the projects with the saved session');
 }
 
 export async function openHome(page: Page): Promise<void> {
   await page.getByTestId(`project-card-${projectId}`).click();
   await page.waitForURL(new RegExp(`/project/${projectId}$`));
+  await ready(page, 'project-home', 'the project home');
   await home(page).getByTestId('plan-row-plan1').waitFor({ timeout: 20_000 });
 }
 

@@ -1,12 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { base, controlPost, delivers, fresh, goNew, home, login, openHome, project2Id, projectId, sessionLogin, shot } from './helpers';
+import { base, controlPost, ready, delivers, fresh, goNew, home, login, openHome, project2Id, projectId, sessionLogin, shot } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 /** The four screens, then a request that reaches the fake daemon exactly once. */
 test('signs in, sees the projects, opens a plan and sends one request', async ({ page }, info) => {
   await page.goto(`${base}/login`);
-  await page.waitForTimeout(400);
+  // The login screen drawn (its field and its button), not a fixed pause: boundingBox() doesn't wait.
+  await ready(page, 'email', 'the login screen');
+  await ready(page, 'primary', 'the login screen’s button');
   await shot(page, 'login', info);
 
   const email = await page.getByTestId('email').boundingBox();

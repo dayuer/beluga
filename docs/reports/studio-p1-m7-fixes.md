@@ -51,3 +51,17 @@ M7 复检时，准则 3（`npx vitest run` 全量通过）有三项阻断。下�
 - 覆盖 `的`、`a.`、空格、`x/`、空格换行、制表符空格、`&& ` 七种形状，`sanitizeText` 和 `sanitizeLine` 都测。
 
 **验证**：单独连跑两次都通过。把 `&&` 那条临时改回 `\s*…\s*`，用例失败：`sanitizeText on " ": 230.4 vs 27.0: expected 8.55 to be less than 4`。验证完已改回。
+
+## d · packages/studio-app 的 e2e 时序敏感（BLG-153）
+
+**现象**：复检时连跑三次都失败：flow.spec 和 plan.spec 在 phone、desktop 下都超时，登录页的 `getByTestId('email')` 一直没出现，而 hub 日志里 login/verify 和 plans GET 都是 200。同一提交早些时候跑过一次是全过的。
+
+**复现**：本机在负载约 31 时跑了两次，两次都全过（16 passed，4 skipped），没有复现出来。日志：`.beluga/scratch/m7/e2e/studio-app-before.txt`、`studio-app-after.txt`。
+
+**找到的两处隐患**：
+1. **flow.spec 第一步是固定等待**：`goto('/login')` 之后固定等 400 ms，接着直接读 `getByTestId('email').boundingBox()`。`boundingBox()` 不会等元素出现，负载一高，打包后的 JS 400 ms 内还没画出登录页，就拿到 null，失败信息还说不清是什么情况。
+2. **`run.mjs` 不检查端口有没有被占**：8787 和 8790 也是真实全流程演练（BLG-98）用的端口。如果另一次运行留下的 wrangler 或 proxy 还在监听，新起的服务绑不上端口，但 `waitFor('/healthz')`、`waitFor('/login')` 会被旧服务应答，测试实际驱动的是别人的构建和数据。这和「中台接口都是 200，页面却不对」的现象吻合，但当时的日志里看不出确证。
+
+**修法**（没有普遍加长超时，也没有靠失败后重跑）：
+- 新增 `ready(page, testId, 说明)`：等某个 testid 真正可见。等不到时报错写明是哪一屏、当前 URL、页面上显示的前 300 字（转圈、错误还是登录页）。登录页改为等 `email` 和 `primary` 都可见以后再量尺寸，原来的固定 400 ms 去掉了。`login`、`sessionLogin`、`openHome` 也都改用 `ready`。
+- `run.mjs` 启动前检查 8787、8790、8791、8792 都空着，有被占的就立刻停下，并给出 `lsof` 命令。我人为占住 8790 验证过：`port 8790 is already in use (another hub, proxy or e2e run?)`。wrangler 和 proxy 如果在就绪之前退出，会带上日志末尾 30 行报错，而不是一直等到 60 s 超时。日志路径的提示也从 `m5` 改成了实际的 `m6`。
