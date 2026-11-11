@@ -44,7 +44,7 @@ WorktreeItem、OverviewRows、FilesTab 列表、ci/parts、issues/parts）；Por
 - `packages/mac` 下 `tsc --noEmit` 通过。
 - `npx vitest run tests/ime.test.ts`：3 个通过。
 - e2e（plan-chat、issues、network）按计划在最后一步统一跑。
-- 真实 Mac 应用里用简体中文输入法手测：待 BLG-120 审计补上（截图放这里）。
+- 真实 Mac 应用里用简体中文输入法手测：用户决定接受不做（BLG-148），靠 `tests/ime.test.ts` 和计划对话框的 e2e（keyCode 229）覆盖。
 
 ## 审计（BLG-120）
 
@@ -71,4 +71,6 @@ WorktreeItem、OverviewRows、FilesTab 列表、ci/parts、issues/parts）；Por
 
 **遗留：真机手测。** agent 驱动不了系统的简体中文输入法：切换输入法属于改系统设置，用 System Events 模拟按键也需要辅助功能权限。
 所以手测要由用户在真实 Mac 应用里做：切到简体拼音，在上面四个框里各输入 hello 并按 Enter，应该只上屏、不发送；
-再按一次 Enter 才发送。截图放到本节。
+再按一次 Enter 才发送。
+
+**结论（BLG-148）：用户决定接受不做手测**，这一项不再遗留。

@@ -46,10 +46,15 @@
 | 里程碑 | 页面 | 结论 | 遗留 |
 |---|---|---|---|
 | 1 git 输出语言 | `plan-roles-git-locale.md` | `git.ts`、`pr.ts`、`ready.ts` 固定 `LC_MESSAGES=C LANGUAGE=C`，中文系统上全量测试能拿到 Tested-on；会展示给用户的 git 报错有中文模板 | 另一台电脑经 ssh 跑的 git（`ready-model.ts`）不在范围 |
-| 2 中文输入法 | `plan-roles-ime.md` | 共用 `isImeComposing`（`isComposing` 或 keyCode 229），所有文字输入框组字时 Enter 只选词；单测 + 计划对话框 e2e | 系统输入法真机手测要用户做 |
+| 2 中文输入法 | `plan-roles-ime.md` | 共用 `isImeComposing`（`isComposing` 或 keyCode 229），所有文字输入框组字时 Enter 只选词；单测 + 计划对话框 e2e | 无（真机手测：用户决定接受不做，BLG-148） |
 | 3 Mac 计划设置与中文 | `plan-roles-mac-ui.md` | ⋯ › 计划设置… 一处改和新建时一样的配置，只发改了的项；角色、计划设置、动态行全部中文，有 zh e2e | 上游模板 `passed “…”` 仍是英文 |
 | 4 手机端 | `plan-roles-companion.md` | `packages/companion` 类型检查通过，符合手机端规则 | 手机端角色文案还是英文，等 BLG-129 |
 | 5 核心审计与提交 | 本页 | R1、R2 修好并有测试；R3、R5 接受；R4、R6 没问题 | 无（BLG-133：git 语言和输入法修复留在 fork，不提回上游） |
 
 行为变化（写进 PR）：没指定审计模型的计划改由 Sonnet（review 列表）审计；设了架构模型的计划，计划对话改用架构模型；
 自动路由开着时，没指定疑难修复模型的计划把疑难交给疑难档第一个（Opus）。
+
+## 五、补上的两项（BLG-146、BLG-147）
+
+- BLG-146：`tests/companion-supports-fix-agent.test.ts` 同时 mock 裸名 `react-native` 和手机端 node_modules 里的文件，只装了根目录依赖也能跑。
+- BLG-147：BLG-133（git 语言、输入法修复留在 fork）和 BLG-148（接受不做真机手测）的决定已写进 `docs/fork.md` 和 `plan-roles-ime.md`；全量 `npx vitest run` 通过，Tested-on 在 BLG-147 的提交信息末尾。
