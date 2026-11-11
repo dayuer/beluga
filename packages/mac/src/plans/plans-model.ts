@@ -1,4 +1,5 @@
 import type { BoardState } from '../../../../src/core/board/model.js';
+import { roleNote } from './plan-roles-model.js';
 import type { Actor } from '../../../../src/core/board/model.js';
 import { AUTONOMY_INFO, type Autonomy, type Plan, type PlanBody, type PlanEvent, type PlanPr, type PlansState, diffBodies, milestoneDeps, planTitle, reviewState, shownBody } from '../../../../src/core/plans/model.js';
 import { type MilestoneState, type MilestoneView, type NextStep, type PlanView, type TaskState, type TaskView, agentNowWords, designing } from '../../../../src/core/plans/progress.js';
@@ -390,7 +391,7 @@ function feedKind(e: PlanEvent): FeedKind | undefined {
       return 'mode';
     // Where the work goes: the plan's branch made, its pull request opened (other notes stay out).
     case 'note':
-      return /^(made the plan’s branch|collects the plan’s work on)\b/.test(e.text) ? 'branch' : /^opened pull request #\d+/.test(e.text) ? 'pr' : undefined;
+      return /^(made the plan’s branch|collects the plan’s work on)\b/.test(e.text) ? 'branch' : /^opened pull request #\d+/.test(e.text) ? 'pr' : roleNote(e.text) ? 'changed' : undefined;
     default:
       return undefined;
   }

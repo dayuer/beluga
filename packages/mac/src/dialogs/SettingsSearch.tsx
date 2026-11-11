@@ -6,6 +6,7 @@ import { type PaneResults, SETTINGS_FIND_EVENT, type SettingHit, flatHits, hitAn
 import { PANES, SETTINGS, THREAD_LIMITS_GROUP } from './settings-index.js';
 import s from './settings.module.css';
 import { locale, t } from '../i18n/index.js';
+import { isImeComposing } from '../lib/ime.js';
 
 type Pane = (typeof PANES)[number];
 type Hit = SettingHit<SettingsPane>;
@@ -187,7 +188,7 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             search.move(active + (e.key === 'ArrowDown' ? 1 : -1));
-          } else if (e.key === 'Enter' && hits[active]) {
+          } else if (e.key === 'Enter' && !isImeComposing(e) && hits[active]) {
             e.preventDefault();
             search.pick(hits[active]);
           }

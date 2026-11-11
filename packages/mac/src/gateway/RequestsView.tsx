@@ -5,6 +5,7 @@ import { Avatar, Button, Dot, Empty, Segmented, cx } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { TaskCard } from './TaskCard.js';
 import s from './gateway.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Requests: tasks between Claudes in one place. Sent (what you and your Claude asked of others)
@@ -96,7 +97,7 @@ function Note() {
         maxLength={280}
         onChange={(e) => setText(e.target.value)}
         onBlur={save}
-        onKeyDown={(e) => e.key === 'Enter' && save()}
+        onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && save()}
       />
     </label>
   );

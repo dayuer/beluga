@@ -3,11 +3,9 @@ import { useDefaultAutonomy } from './use-default-autonomy.js';
 import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, DEFAULT_AUTONOMY, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { planRoleDefaults } from '@beluga/shared/auto-route.js';
-import { runtimeMark } from '@beluga/shared/agent-marks.js';
-import type { SelectEntry, SelectOption } from '../components/select-parts.js';
-import { AS_BEFORE, BY_TIER, NO_ARCHITECT, PLAN_ROLES, type PlanRole, ROLE_INFO, roleStart, rolesInput, tierLabel } from './plan-roles-model.js';
+import { PLAN_ROLES, type PlanRole, roleStart, rolesInput } from './plan-roles-model.js';
+import { PlanRoles } from './PlanRoles.js';
 import { Field, FormSheet, Popup, TextArea } from '../components/FormSheet.js';
-import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
@@ -43,7 +41,6 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
   const startsAs = useDefaultAutonomy();
   const [autonomy, setAutonomy] = useState<Autonomy>(startsAs);
   const [testsAt, setTestsAt] = useState<TestsAt>('milestone');
-  const agents = useAgentEntries();
   const runtimes = useApp((s) => s.runtimes);
   const route = useApp((s) => s.prefs.autoRoute);
   const tiers = useMemo(() => planRoleDefaults(route, runtimes), [route, runtimes]);
@@ -109,32 +106,13 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
         </button>
         {more ? (
           <>
-            {PLAN_ROLES.map((role) => (
-              <div className={p.newPlanRow} key={role}>
-                <span className={p.newPlanLabel}>{ROLE_INFO[role].label}</span>
-                <Popup label={ROLE_INFO[role].label} value={picks[role]} options={roleEntries(role, tiers, agents)} onChange={(v) => setPicked((was) => ({ ...was, [role]: v }))} />
-              </div>
-            ))}
-            <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in the plan’s ••• menu.</div>
+            <PlanRoles tiers={tiers} picks={picks} onPick={(role, v) => setPicked((was) => ({ ...was, [role]: v }))} reveal />
+            <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in Plan Settings.</div>
           </>
         ) : null}
       </div>
     </FormSheet>
   );
-}
-
-/** A role's pop-up: its tier's model first, then what it did before this (no architect, your agent…), then every agent you can pick. */
-function roleEntries(role: PlanRole, tiers: ReturnType<typeof planRoleDefaults>, agents: readonly SelectEntry<string>[]): SelectEntry<string>[] {
-  const tier = tierLabel(role, tiers);
-  const tierAgent = role === 'work' ? tiers.work : tiers[role];
-  const yours = agents.find((e): e is SelectOption<string> => 'value' in e && e.value === YOUR_AGENT);
-  const before: SelectOption<string> =
-    role === 'work' && yours ? yours : { value: role === 'arch' ? NO_ARCHITECT : AS_BEFORE, label: ROLE_INFO[role].asBefore };
-  return [
-    ...(tier ? [{ value: BY_TIER, label: tier, ...(tierAgent && tierAgent !== 'auto' ? { icon: runtimeMark(tierAgent.runtime) } : {}), description: 'As the tiers say (Settings › Auto Route)' }] : []),
-    before,
-    ...agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)),
-  ];
 }
 
 /** The goal: six lines to start, growing with what you write (to about 60% of the sheet, then it scrolls). */
@@ -161,7 +139,7 @@ function GoalBox({ value, onChange }: { value: string; onChange: (v: string) => 
 }
 
 /** Step by Step, Check-ins, Autopilot: three cards you can read without hovering (a radio group; the arrows move). */
-function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange: (a: Autonomy) => void; current?: Autonomy }) {
+export function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange: (a: Autonomy) => void; current?: Autonomy }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;

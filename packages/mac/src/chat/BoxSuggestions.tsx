@@ -10,6 +10,7 @@ import { sameDeep } from '../lib/stable.js';
 import { handleInvite } from '../lib/invite-command.js';
 import { MAX_LISTED, SuggestionBody, sectionOf } from './Suggestions.js';
 import s from './composer.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * The chat box's / and @ suggestions for another text box (the project home's New Worktree):
@@ -82,7 +83,7 @@ export function useBoxSuggestions({
     setText(sug.value);
   };
   const onKey = (e: React.KeyboardEvent): boolean => {
-    if (!suggestions.length || e.nativeEvent.isComposing) return false;
+    if (!suggestions.length || isImeComposing(e)) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       byKeys.current = true;
       setSelected((n) => (Math.min(n, listed - 1) + (e.key === 'ArrowDown' ? 1 : -1) + listed) % listed);

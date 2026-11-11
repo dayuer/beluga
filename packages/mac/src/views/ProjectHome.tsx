@@ -72,6 +72,7 @@ import d from "../chat/draft.module.css";
 import s from "./project-home.module.css";
 import a from "../lib/arrive.module.css";
 import { TeamOffers } from "../team/Team.js";
+import { isImeComposing } from "../lib/ime.js";
 
 /**
  * A project's home: what you see when you click a project. Its main folder is never worked in,
@@ -401,7 +402,7 @@ function HomeComposer({ project }: { project: Project }) {
   // Speaking instead of typing (Settings › Voice), as in every chat's box.
   useDictationTarget(ref, () => void send(), `new-chat:${project.id}`);
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (isImeComposing(e)) return;
     if (box.onKey(e)) return;
     if (att.onRefKey(e)) return;
     if (e.key !== "Enter") return;
@@ -550,7 +551,7 @@ function HomeComposer({ project }: { project: Project }) {
                   spellCheck={false}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) =>
-                    e.key === "Enter" && (e.preventDefault(), void send())
+                    e.key === "Enter" && !isImeComposing(e) && (e.preventDefault(), void send())
                   }
                 />
               </label>

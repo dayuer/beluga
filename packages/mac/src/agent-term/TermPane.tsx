@@ -31,6 +31,7 @@ const keyFor = (keys: readonly TermKey[], action: TermAction): string | undefine
   return k ? chordLabel(k.chord) : undefined;
 };
 import s from './agent-term.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /** What a pane is: the agent's own terminal on the conversation, or a shell beside it. */
 export type PaneKind = 'agent' | 'shell';
@@ -100,7 +101,7 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
           }
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !isImeComposing(e)) {
             e.preventDefault();
             go(e.shiftKey);
           } else if (e.key === 'Escape') {

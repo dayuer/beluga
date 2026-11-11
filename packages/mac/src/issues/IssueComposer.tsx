@@ -9,6 +9,7 @@ import { useIssueActions } from './use-issues.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Handing an issue to Claude, the way a project's home starts work: pick what Claude does
@@ -115,7 +116,7 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
           spellCheck
           onChange={(e) => setNote(e.target.value)}
           onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || e.key !== 'Enter') return;
+            if (isImeComposing(e) || e.key !== 'Enter') return;
             const modKey = e.metaKey || e.ctrlKey;
             if (prefs.sendWith === 'enter' ? e.shiftKey || modKey : !modKey) return;
             e.preventDefault();
