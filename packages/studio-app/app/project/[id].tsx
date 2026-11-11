@@ -159,7 +159,7 @@ export default function ProjectHomeScreen() {
     <View style={styles.root} testID="project-home">
       <Header title={project?.name ?? t(lang, 'projects.title')} back onRefresh={() => void load()} refreshing={refreshing} />
 
-      {offline ? (
+      {offline && plans ? (
         <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" />
       ) : socket === 'closed' ? (
         <SyncBanner kind="reconnecting" text={t(lang, 'home.reconnecting')} testID="reconnecting-banner" />
@@ -200,11 +200,11 @@ export default function ProjectHomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
-  column: { width: '100%' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
+  column: { flex: 1, width: '100%' },
   columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
   head: { marginBottom: space[5] },
-  eyebrow: { ...type.eyebrow, color: color.text3 },
-  syncLine: { ...type.caption, color: color.text3, marginTop: 6 },
+  eyebrow: { ...type.caption, fontWeight: '600', color: color.text2, letterSpacing: 0.2 },
+  syncLine: { ...type.caption, color: color.text2, marginTop: 6 },
   syncOffline: { color: color.warn },
 });

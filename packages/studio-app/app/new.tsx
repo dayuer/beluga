@@ -10,6 +10,7 @@ import { ReceiptLine, type ReceiptTone } from '../components/ReceiptLine';
 import { SyncBanner } from '../components/SyncBanner';
 import { LIMITS, type StudioPlatform } from '../../../src/studio/protocol';
 import { cache } from '../lib/cache';
+import { hub } from '../lib/client';
 import { clearDraft, readDraft, writeDraft } from '../lib/drafts';
 import type { ProjectSummary } from '../lib/hub-schema';
 import { useOnline } from '../lib/net';
@@ -74,11 +75,28 @@ export default function NewRequestScreen() {
   const [goal, setGoal] = useState('');
   const [platforms, setPlatforms] = useState<StudioPlatform[]>([]);
   const [restored, setRestored] = useState<string | null>(null);
+  const [project, setProject] = useState<ProjectSummary | undefined>(() => (pid ? cache.get<ProjectSummary[]>('projects')?.value.find((p) => p.id === pid) : undefined));
   const lockedRef = useRef(false);
 
   useEffect(() => {
     if (!pid) router.replace('/');
   }, [pid, router]);
+
+  // A reload or a deep link to /new has no projects cache: fetch just the name for the context
+  // line, so the screen still says which project and studio this request belongs to.
+  useEffect(() => {
+    if (!pid || project) return;
+    let alive = true;
+    void hub.projects().then((r) => {
+      if (!alive || !r.ok) return;
+      cache.set('projects', r.value.projects, Date.now());
+      const found = r.value.projects.find((p) => p.id === pid);
+      if (found) setProject(found);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [pid, project]);
 
   useEffect(() => {
     if (!pid) return;
@@ -141,9 +159,9 @@ export default function NewRequestScreen() {
   lockedRef.current = state.phase === 'queued' || state.phase === 'done';
 
   const visibleHeight = Math.max(240, height - keyboard);
+  const compact = keyboard > 0;
   const maxGoal = Math.max(120, Math.round(visibleHeight * 0.4));
   const count = goal.length >= 3600 ? t(lang, 'new.left', { n: LIMITS.text - goal.length }) : null;
-  const project = pid ? cache.get<ProjectSummary[]>('projects')?.value.find((p) => p.id === pid) : undefined;
   const receipt = useMemo(() => receiptOf(state, lang), [state, lang]);
   const busy = state.phase === 'sending';
   const locked = busy || state.phase === 'queued' || state.phase === 'done';
@@ -169,8 +187,8 @@ export default function NewRequestScreen() {
         <View style={[styles.column, desktop && styles.columnDesktop]}>
           <View style={styles.intro}>
             {project ? <Text style={styles.eyebrow}>{project.name} · {project.studioName}</Text> : null}
-            <Text style={styles.introText}>{t(lang, 'new.intro')}</Text>
-            {!desktop ? <Hint lang={lang} /> : null}
+            {!compact ? <Text style={styles.introText}>{t(lang, 'new.intro')}</Text> : null}
+            {!compact && !desktop ? <Hint lang={lang} /> : null}
           </View>
 
           <View style={[styles.composer, desktop && styles.composerDesktop]}>
@@ -198,9 +216,9 @@ export default function NewRequestScreen() {
             </View>
 
             <View style={[styles.platformCol, desktop && styles.platformColDesktop]}>
-              <Text style={styles.label}>{t(lang, 'new.platforms')}</Text>
+              <Text style={[styles.label, styles.platformLabel]}>{t(lang, 'new.platforms')}</Text>
               <PlatformPicker value={platforms} onChange={setPlatforms} />
-              {desktop ? <Hint lang={lang} /> : null}
+              {desktop && !compact ? <Hint lang={lang} /> : null}
             </View>
           </View>
         </View>
@@ -229,11 +247,11 @@ const styles = StyleSheet.create({
   column: { flex: 1, width: '100%' },
   columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
   intro: { marginBottom: space[5] },
-  eyebrow: { ...type.eyebrow, color: color.text3, marginBottom: space[3] },
+  eyebrow: { ...type.caption, fontWeight: '600', color: color.text2, letterSpacing: 0.2, marginBottom: space[3] },
   introText: { ...type.body, color: color.text2 },
   hint: { marginTop: space[5], paddingTop: space[4], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
   hintTitle: { ...type.callout, fontWeight: '500', color: color.text2, marginBottom: 6 },
-  hintLine: { ...type.callout, color: color.text3, lineHeight: 21 },
+  hintLine: { ...type.callout, color: color.text2, lineHeight: 21 },
   composer: { marginTop: 'auto' },
   composerDesktop: { marginTop: space[6], flexDirection: 'row', gap: space[7], alignItems: 'flex-start' },
   goalCol: { width: '100%' },
@@ -241,7 +259,8 @@ const styles = StyleSheet.create({
   platformCol: { width: '100%' },
   platformColDesktop: { width: 264 },
   label: { ...type.callout, fontWeight: '500', color: color.text2, marginBottom: space[3] },
+  platformLabel: { marginTop: space[3] },
   goalMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 18, marginTop: space[2], gap: space[4] },
-  caption: { ...type.caption, color: color.text3, flexShrink: 1 },
+  caption: { ...type.caption, color: color.text2, flexShrink: 1 },
   warn: { color: color.warn },
 });

@@ -34,7 +34,7 @@ const zh = {
   'login.sendAnother': '再发一封',
   'login.invalidLink': '链接已失效，请重新发一封。',
   'login.offline': '没发出去：你现在没有网络。',
-  'login.serviceDown': '中台暂时不可用，稍后再试。',
+  'login.serviceDown': '服务暂时不可用，稍后再试。',
 
   'projects.title': '项目',
   'projects.active': '进行中',
@@ -92,7 +92,7 @@ const zh = {
   'refusal.not-open': '这件事已经关闭了。',
   'refusal.unknown-plan': '这个计划不存在或已被删除。',
   'refusal.offline': '没发出去：你现在没有网络。文字已保留。',
-  'refusal.http': '中台暂时不可用。文字已保留，稍后重试。',
+  'refusal.http': '服务暂时不可用。文字已保留，稍后重试。',
   'refusal.expired': '没来得及处理，请重新发送。',
 
   'time.justNow': '刚刚',
@@ -206,11 +206,15 @@ export function t(lang: Lang, key: StringKey, vars?: Record<string, string | num
   return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
 }
 
-/** Chinese first: the product is made for Chinese-speaking clients, and `en` is always there. */
+/** Chinese first: P1 has no language switcher, and the product is made for Chinese-speaking
+ * clients. A stored `synon:lang` wins when one exists (a future switcher); the browser's language
+ * alone must not turn a Chinese customer's screen into English. */
 export function detectLang(): Lang {
-  if (typeof navigator === 'undefined') return 'zh';
-  const language = (navigator.language || '').toLowerCase();
-  return language.startsWith('zh') ? 'zh' : 'en';
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('synon:lang');
+    if (saved === 'zh' || saved === 'en') return saved;
+  }
+  return 'zh';
 }
 
 export { zh, en };

@@ -26,6 +26,18 @@ export default function Root({ children }: PropsWithChildren) {
           html, body, #root { height: 100%; margin: 0; background: #F6F6F7; }\n          #root { display: flex; flex: 1; }
           body { overflow: hidden; overscroll-behavior-y: none; }
           * { -webkit-tap-highlight-color: transparent; }
+          button:focus-visible, [role='button']:focus-visible, input:focus-visible, textarea:focus-visible {
+            outline: 2px solid #2f64d0 !important;
+            outline-offset: 2px;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+              animation-duration: 0.01ms !important;
+              animation-iteration-count: 1 !important;
+              transition-duration: 0.01ms !important;
+              scroll-behavior: auto !important;
+            }
+          }
         `}</style>
       </head>
       <body>{children}</body>

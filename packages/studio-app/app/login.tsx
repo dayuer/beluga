@@ -37,36 +37,42 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const hash = window.location.hash;
-    if (!hash.startsWith('#token=')) return;
-    const token = decodeURIComponent(hash.slice('#token='.length));
-    if (!token || verified.current === token) return;
-    verified.current = token;
-    try {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    } catch {
-      /* file:// and old browsers */
-    }
     let alive = true;
-    setVerifying(true);
-    void hub.verify(token).then((r) => {
-      if (!alive) return;
-      setVerifying(false);
-      if (r.ok) {
-        session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
-        return; // the guard in _layout.tsx sends us to ?next= or /
+    const handle = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#token=')) return;
+      const token = decodeURIComponent(hash.slice('#token='.length));
+      if (!token || verified.current === token) return;
+      verified.current = token;
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch {
+        /* file:// and old browsers */
       }
-      setPhase('error');
-      setMessage(
-        r.error.kind === 'denied' && r.error.error === 'bad-link'
-          ? t(lang, 'login.invalidLink')
-          : r.error.kind === 'offline'
-            ? t(lang, 'login.offline')
-            : t(lang, 'login.serviceDown'),
-      );
-    });
+      setVerifying(true);
+      void hub.verify(token).then((r) => {
+        if (!alive) return;
+        setVerifying(false);
+        if (r.ok) {
+          session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
+          return; // the guard in _layout.tsx sends us to ?next= or /
+        }
+        setPhase('error');
+        setMessage(
+          r.error.kind === 'denied' && r.error.error === 'bad-link'
+            ? t(lang, 'login.invalidLink')
+            : r.error.kind === 'offline'
+              ? t(lang, 'login.offline')
+              : t(lang, 'login.serviceDown'),
+        );
+      });
+    };
+    handle();
+    // A second magic link opened in the same tab only changes the hash; treat it like a load.
+    window.addEventListener('hashchange', handle);
     return () => {
       alive = false;
+      window.removeEventListener('hashchange', handle);
     };
     // One verification per token; lang only affects the error sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,7 +156,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-      <ActionDock>
+      <ActionDock maxWidth={400}>
         <PrimaryButton
           label={phase === 'sent' ? t(lang, 'login.sendAnother') : t(lang, 'login.continue')}
           onPress={() => void submit()}
@@ -195,7 +201,7 @@ const styles = StyleSheet.create({
     color: color.text,
   },
   inputFocused: { borderColor: color.info },
-  note: { ...type.caption, color: color.text3, marginTop: space[3] },
+  note: { ...type.caption, color: color.text2, marginTop: space[3] },
   panel: {
     marginTop: space[4],
     padding: 12,

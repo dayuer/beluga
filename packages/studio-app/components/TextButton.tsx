@@ -18,10 +18,13 @@ export function TextButton({ label, onPress, testID }: { label: string; onPress:
 const styles = StyleSheet.create({
   button: {
     minHeight: 44,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: radius.s,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: color.sunken,
+    borderWidth: 1,
+    borderColor: color.hairline,
   },
   pressed: { backgroundColor: color.press },
   label: { ...type.callout, fontWeight: '500', color: color.text2 },

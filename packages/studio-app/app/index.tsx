@@ -118,7 +118,7 @@ export default function ProjectsScreen() {
     <View style={styles.root} testID="projects-screen">
       <Header title={t(lang, 'projects.title')} onRefresh={() => void load()} refreshing={refreshing} />
 
-      {offline ? (
+      {offline && projects ? (
         <SyncBanner kind="offline" text={t(lang, 'common.offlineYou', { ago: offlineAgo })} testID="offline-banner" />
       ) : stale > 0 ? (
         <SyncBanner kind="offline" text={t(lang, 'projects.refreshFailed')} testID="refresh-failed" />
@@ -159,8 +159,8 @@ export default function ProjectsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
-  column: { width: '100%' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
+  column: { flex: 1, width: '100%' },
   columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
   grid: { width: '100%' },
   gridDesktop: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },

@@ -115,6 +115,10 @@ server.on('upgrade', (req, socket, head) => {
     if (head?.length) up.write(head);
     up.pipe(socket);
     socket.pipe(up);
+    // A daemon dying (or the hub closing the socket) must close the app's socket too: a half-open
+    // WebSocket would leave the customer's "reconnecting" banner off.
+    up.on('close', () => socket.destroy());
+    socket.on('close', () => up.destroy());
   });
   up.on('error', () => socket.destroy());
   socket.on('error', () => up.destroy());

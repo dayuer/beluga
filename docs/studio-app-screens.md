@@ -74,14 +74,14 @@ safe-top 47
 |---|---|---|
 | `Header` | 实色 `color.bar`，底部 hairline，返回/刷新是 44×44 图标按钮 | 手机 44+safe-top；桌面 56 |
 | `PrimaryButton` | `color.primary` 实底、`onPrimary` 字、`type.heading`、圆角 12 | 高 52，宽 100% 内容列 |
-| `TextButton` | 透明底、`color.text2`，按压 `color.press` | 高 ≥44 |
-| `SyncBanner` | `tint.warn` 底、`color.warn` 字、左侧 7pt 圆点 | 高 34 |
+| `TextButton` | `color.sunken` 底、1px hairline、`color.text2`，按压 `color.press` | 高 ≥44 |
+| `SyncBanner` | `tint.warn` 底、墨色字、左侧 7pt warn 圆点/spinner | 高 34 |
 | `Card` | `color.card`、1px `card-border`、`radius.l`（14）、`padding` 16 | — |
 | 状态圆点 | 8pt 实心，`warn` 或 `ok` | — |
 | `ProgressRing` | 44×44 SVG，轨道 `hairlineStrong`、进度 `color.text`（等客户时 `warn`），线宽 3 | 44 |
 | `GoalInput` | 白底、1px hairline、圆角 12、16px 字；最小 120，最大 40% 视口 | 宽 100% |
 | `PlatformPicker` | 2×2，每块白底、1px hairline、圆角 12；选中整块描边 `color.text` + 勾 | 每块高 52 |
-| `ReceiptLine` | 16pt 图标 + `type.callout`，一行；进行中 `text2`、成功 `ok`、问题 `error`、排队 `warn` | 高 20+ |
+| `ReceiptLine` | 16pt 图标 + `type.callout`，一行；进行中 `text2`、成功勾 `ok`/句子 `text`、问题 `error`、排队 `warn` | 高 20+ |
 | `EmptyState` | 居左的标题 + 一句说明 + 可选一个 44 的文字按钮 | — |
 | `Skeleton` | 静态灰块 `#EFEFF1`，卡片/行形状，无 shimmer | 与真实卡片同高 |
 
@@ -177,7 +177,7 @@ safe-top 47
 | 链接失效 | 回执面板换成 `tint.error` 底、`error` 字；不自动重发 | 链接已失效，请重新发一封。 / This link has expired. Request a new one. |
 | 你已离线 | 顶部 `SyncBanner`；点「继续」后回执显示失败 | 你已离线 · 上次同步 x 分钟前 / You're offline · last synced x min ago |
 | 发送失败 | 回执面板 `error`；按钮回「继续」可重试 | 没发出去：你现在没有网络。 / Not sent: you're offline. |
-| 后端 5xx | 同上，文案换服务不可用 | 中台暂时不可用，稍后再试。 / The service is temporarily unavailable. Try again soon. |
+| 后端 5xx | 同上，文案换服务不可用 | 服务暂时不可用，稍后再试。 / The service is temporarily unavailable. Try again soon. |
 
 - **空态**：邮箱空不是错误；主按钮保持可点，点了才校验并聚焦输入框。
 - **出错**：只显示客户语言，不显示状态码、不显示「邮箱不存在」之类的差异（中台恒 202）。
@@ -517,7 +517,7 @@ safe-top 47
 | `Header` | 实色标题栏 | `title`, `back?`, `right?`；44×44 图标位；长标题单行省略 |
 | `ActionDock` | 底部主操作区 | `children`；每屏最多一个 `PrimaryButton`；键盘弹起时 `bottom = inset` |
 | `PrimaryButton` | 唯一实底主按钮 | `label`, `onPress`, `disabled?`, `loading?`, `testID`；高 52 |
-| `TextButton` | 次要动作 | `label`, `onPress`；高 ≥44，透明底 |
+| `TextButton` | 次要动作 | `label`, `onPress`；高 ≥44，sunken 底 + hairline（错误/空态的重试要一眼可点） |
 | `SyncBanner` | 离线 / 重连提示 | `kind: 'offline' \| 'reconnecting' \| 'restored'`, `since?` |
 | `ProjectCard` | 项目卡片 | `project {id,name,studioName}`, `headline?`, `waitingOnCustomer?`, `studio {online,lastSyncAt}`, `onPress`；`platforms?` 预留但 M5 不传不画（§7 决定 1） |
 | `PlanRow` | 计划行 | `plan {planRef,title,stage,waitingOn,headline,progress,updatedAt}`, `onPress?`（M5 不传） |

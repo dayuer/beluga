@@ -27,7 +27,9 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   root: {
+    flexGrow: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: space[8],
     paddingHorizontal: space[6],
   },

@@ -5,7 +5,7 @@ import { color, space } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
 
 /** The bottom action area: one primary button, inside the screen's content column. */
-export function ActionDock({ children, testID = 'dock' }: { children: ReactNode; testID?: string }) {
+export function ActionDock({ children, testID = 'dock', maxWidth }: { children: ReactNode; testID?: string; maxWidth?: number }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -23,7 +23,7 @@ export function ActionDock({ children, testID = 'dock' }: { children: ReactNode;
       ]}
       testID={testID}
     >
-      <View style={[styles.inner, desktop && styles.innerDesktop]}>{children}</View>
+      <View style={[styles.inner, desktop && styles.innerDesktop, desktop && maxWidth ? { maxWidth } : null]}>{children}</View>
     </View>
   );
 }

@@ -9,6 +9,8 @@ export type ReceiptTone = 'info' | 'warn' | 'ok' | 'error';
 export function ReceiptLine({ text, tone = 'info', testID = 'receipt-line' }: { text: string | null; tone?: ReceiptTone; testID?: string }) {
   if (!text) return null;
   const tint = tone === 'ok' ? color.ok : tone === 'error' ? color.error : tone === 'warn' ? color.warn : color.text2;
+  // The ok ink is 4.24:1 on the page; the green check carries the meaning, the sentence stays ink.
+  const textColor = tone === 'ok' ? color.text : tint;
 
   return (
     <View style={styles.row} accessibilityLiveRegion="polite" testID={testID}>
@@ -21,7 +23,7 @@ export function ReceiptLine({ text, tone = 'info', testID = 'receipt-line' }: { 
       ) : (
         <AlertCircle size={16} strokeWidth={stroke} color={tint} />
       )}
-      <Text style={[styles.text, { color: tint }]}>{text}</Text>
+      <Text style={[styles.text, { color: textColor }]}>{text}</Text>
     </View>
   );
 }

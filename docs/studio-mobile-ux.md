@@ -225,10 +225,10 @@ refused / expired ──用户修改/重新发送──▶ sending（新 opId）
 | `not-open` | 这件事已经关闭了。 | This is no longer open. |
 | `unknown-plan` | 这个计划不存在或已被删除。 | This plan doesn't exist or was removed. |
 | `offline`（本地） | 没发出去：你现在没有网络。文字已保留。 | Not sent: you're offline. Your text is saved. |
-| `http`（本地） | 中台暂时不可用。文字已保留，稍后重试。 | The service is temporarily unavailable. Your text is saved. |
+| `http`（本地） | 服务暂时不可用。文字已保留，稍后重试。 | The service is temporarily unavailable. Your text is saved. |
 | `expired` | 没来得及处理，请重新发送。 | It wasn't processed in time. Send it again. |
 
-回执的视觉形状（`ReceiptLine`）：一行 16pt 图标 + `type.callout` 文字，位于主按钮上方 8pt；颜色：进行中 `color.text2`，成功 `color.ok`，问题 `color.error`，排队 `color.warn`。不弹 toast、不自动消失（用户滚动或离开屏幕才消失）。
+回执的视觉形状（`ReceiptLine`）：一行 16pt 图标 + `type.callout` 文字，位于主按钮上方 8pt；颜色：进行中 `color.text2`，成功的勾 `color.ok`、句子 `color.text`（绿字在 bg 上只有 4.24:1），问题 `color.error`，排队 `color.warn`。不弹 toast、不自动消失（用户滚动或离开屏幕才消失）。
 
 ### 6.4 乐观显示（对话专用，M6）
 

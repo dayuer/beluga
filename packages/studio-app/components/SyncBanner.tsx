@@ -19,7 +19,8 @@ export function SyncBanner({ kind, text, testID = 'sync-banner' }: { kind: SyncK
       ) : (
         <View style={[styles.dot, { backgroundColor: tone }]} />
       )}
-      <Text style={[styles.text, { color: tone }]} numberOfLines={2}>
+      {/* The dot/spinner carries the meaning; the sentence is ink so it stays above 4.5:1. */}
+      <Text style={[styles.text, { color: color.text }]} numberOfLines={2}>
         {text}
       </Text>
     </View>
