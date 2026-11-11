@@ -377,3 +377,208 @@ M0 已登记的 3 处（`main.tsx`、`Settings.tsx`、`tests/mac-settings-search
 4. **e2e 时序**（600ms 宽限、3.5s toast 窗口）：一律 `expect.poll`；toast 用例若在负载下偶发，优先换更快触发全局 toast 的路径，不加长 `TOAST_MS`。
 5. **chatrun 新增字段**：只增不改，`baseline.md` 的旧字段对比照旧。
 6. **菜单启发式**（§1.5）与**被压制的撤销不可达**（§3.6）：都是行为上的已知上限，M3 验收时人工确认。
+
+## 10. 审计（BLG-169）
+
+### 10.1 本里程碑对上游文件的改动
+
+`git diff e8db48f4b..HEAD`（`e8db48f4b` = plan/mac-fork 合入 M0 之后，本分支的起点）：
+
+| 文件 | 增 / 删 | 改动 | 原因 | docs/fork.md |
+| --- | ---: | --- | --- | :---: |
+| `packages/mac/src/layout/Sidebar.tsx` | +2 / -0 | import + 一行 `useSidebarHold(drop.ref)` | 侧栏「在操作」的探针只有 nav 自己知道 | ✅ |
+| `packages/mac/src/layout/EntryRow.tsx` | +7 / -1 | import、`useHeldEntries` + 过滤 kept 的重复行、return | 两种侧栏模式共同消费排序结果的唯一缝 | ✅ |
+| `packages/mac/src/chat/ChatLog.tsx` | +2 / -3 | import 换成 `JumpLabel`、按钮 children 一行 | 上游没有「下面来了几条」，计数要跨渲染 | ✅ |
+| `packages/mac/src/App.tsx` | +4 / -2 | import、`useOneToast`、`!one` 返回 null、`data-one-toast` | 全局 toast 的渲染与 store 定时器都在这里 | ✅ |
+| `packages/mac/src/lib/undo-toast.tsx` | +7 / -4 | import、`useOneToast`、`!one` 返回 null、⌘Z 只对可见的那条挂、`data-one-toast` | 撤销是模块级状态，两套要在同一判据下 | ✅ |
+| `packages/mac/src/lib/live-motion.ts` | +13 / -6 | import + `tick`/`wake`/`watch`/`joinLive` 的门 | 时钟的 `seen`/`marks` 是模块私有的 | ✅ |
+
+合计 **6 个上游文件、+35 / −16 行**。其余改动都在 fork 自己的文件里：`fork/calm/hold-order.ts`、`new-below.tsx`、`one-toast.ts`、`one-toast.css`、`live-gate.ts`、`i18n/zh-CN.fork.json`、`scripts/calm-check.mjs`、两个 e2e、三个单测、本文档与 `docs/fork.md`。M0 的 3 处上游接入（`main.tsx`、`dialogs/Settings.tsx`、`tests/mac-settings-search.test.ts`）在本分支起点就已登记，不在上面的 diff 里。
+
+### 10.2 `sync-upstream.mjs --report`
+
+2026-11-11，本分支（`73b178b21` 之后）：
+
+```console
+This fork: 116 commits ahead of upstream, 4 behind.
+It changes 159 upstream files (each one can conflict on a sync):
+    docs/parity.md
+    docs/tasks-and-plans.md
+    packages/companion/app/(tabs)/_layout.tsx
+    packages/companion/app/_layout.tsx
+    packages/companion/app/index.tsx
+    packages/companion/app/plan/[id].tsx
+    packages/companion/app/task/[id].tsx
+    packages/companion/components/AgentPicker.tsx
+    packages/companion/lib/link/calls.ts
+    packages/companion/lib/store.ts
+    packages/mac/e2e/plan-chat.spec.ts
+    packages/mac/src-tauri/src/i18n.rs
+    packages/mac/src/App.tsx
+    packages/mac/src/agent-term/TermPane.tsx
+    packages/mac/src/call/NotesBox.tsx
+    packages/mac/src/chat/BoxSuggestions.tsx
+    packages/mac/src/chat/ChatLog.tsx
+    packages/mac/src/chat/Composer.tsx
+    packages/mac/src/chat/EditPrompt.tsx
+    packages/mac/src/chat/FindBar.tsx
+    packages/mac/src/chat/RunsOn.tsx
+    packages/mac/src/chat/WorktreeDraft.tsx
+    packages/mac/src/chat/images.ts
+    packages/mac/src/claude-code/AgentMonitor.tsx
+    packages/mac/src/components/FormSheet.tsx
+    packages/mac/src/components/SelectMenu.tsx
+    packages/mac/src/components/SpecMenu.module.css
+    packages/mac/src/components/SpecMenu.tsx
+    packages/mac/src/components/markdown/CodeEditor.tsx
+    packages/mac/src/components/markdown/DocFind.tsx
+    packages/mac/src/dialogs/MachinesSettings.tsx
+    packages/mac/src/dialogs/MenuSheet.tsx
+    packages/mac/src/dialogs/Settings.tsx
+    packages/mac/src/dialogs/SettingsSearch.tsx
+    packages/mac/src/dialogs/native/PeerSheets.tsx
+    packages/mac/src/dialogs/native/PersonCards.tsx
+    packages/mac/src/dialogs/native/PersonMenu.tsx
+    packages/mac/src/dialogs/native/ShareFolderSheet.tsx
+    packages/mac/src/dialogs/native/WorkSheets.tsx
+    packages/mac/src/dialogs/native/parts.tsx
+    packages/mac/src/dialogs/settings-index.ts
+    packages/mac/src/dialogs/settings.module.css
+    packages/mac/src/gateway/AccessSettings.tsx
+    packages/mac/src/gateway/RequestsView.tsx
+    packages/mac/src/i18n/index.ts
+    packages/mac/src/issues/IssueComposer.tsx
+    packages/mac/src/issues/IssueReply.tsx
+    packages/mac/src/issues/IssuesView.tsx
+    packages/mac/src/layout/EntryRow.tsx
+    packages/mac/src/layout/ProjectGroups.tsx
+    packages/mac/src/layout/Sidebar.tsx
+    packages/mac/src/layout/SidebarSearch.tsx
+    packages/mac/src/layout/panel/ContentSearch.tsx
+    packages/mac/src/layout/workspace-row.tsx
+    packages/mac/src/lib/dictation.ts
+    packages/mac/src/lib/live-motion.ts
+    packages/mac/src/lib/sheets.ts
+    packages/mac/src/lib/undo-toast.tsx
+    packages/mac/src/main.tsx
+    packages/mac/src/network/ConversationView.tsx
+    packages/mac/src/network/EmojiPicker.tsx
+    packages/mac/src/network/GroupInfo.tsx
+    packages/mac/src/network/NetComposer.tsx
+    packages/mac/src/network/NetworkSheets.tsx
+    packages/mac/src/network/NetworkSidebar.tsx
+    packages/mac/src/network/StatusMenu.tsx
+    packages/mac/src/onboarding/Onboarding.tsx
+    packages/mac/src/onboarding/SetupSteps.tsx
+    packages/mac/src/phone/Phone.tsx
+    packages/mac/src/phone/PhoneView.tsx
+    packages/mac/src/phone/phone-model.ts
+    packages/mac/src/plans/PlanChat.tsx
+    packages/mac/src/plans/PlanDetails.tsx
+    packages/mac/src/plans/PlanOutline.tsx
+    packages/mac/src/plans/PlanPage.tsx
+    packages/mac/src/plans/PlanSheets.tsx
+    packages/mac/src/plans/plan-ask-model.ts
+    packages/mac/src/plans/plans-model.ts
+    packages/mac/src/plans/plans.module.css
+    packages/mac/src/pr/PrConversation.tsx
+    packages/mac/src/sentinel/DashboardPage.tsx
+    packages/mac/src/sentinel/SentinelCards.tsx
+    packages/mac/src/sentinel/SentinelHome.tsx
+    packages/mac/src/sentinel/SentinelPage.tsx
+    packages/mac/src/tasks/Activity.tsx
+    packages/mac/src/tasks/Brief.tsx
+    packages/mac/src/tasks/NewTaskSheet.tsx
+    packages/mac/src/tasks/PickMenu.tsx
+    packages/mac/src/tasks/TaskPage.tsx
+    packages/mac/src/tasks/TaskSections.tsx
+    packages/mac/src/tasks/parts.tsx
+    packages/mac/src/tasks/use-task-start.ts
+    packages/mac/src/team/SharedPlans.tsx
+    packages/mac/src/views/DiffComment.tsx
+    packages/mac/src/views/ProjectHome.tsx
+    packages/mac/src/views/SearchView.tsx
+    packages/mac/src/views/TerminalTab.tsx
+    packages/mac/src/views/overview/FilterBar.tsx
+    packages/mac/src/views/reader/FileEditor.tsx
+    scripts/i18n-extract.mjs
+    src/agent/plan-tools.ts
+    src/agent/policy.ts
+    src/agent/prompt.ts
+    src/agent/run-instructions.ts
+    src/agent/runtime/local.ts
+    src/agent/types.ts
+    src/companion/calls.ts
+    src/companion/coverage.ts
+    src/companion/devices.ts
+    src/companion/host.ts
+    src/companion/needs-you.ts
+    src/companion/pair.ts
+    src/companion/protocol.ts
+    src/companion/views.ts
+    src/core/board/launch.ts
+    src/core/board/work.ts
+    src/core/claude-code/skills.ts
+    src/core/notify.ts
+    src/core/plans/model.ts
+    src/core/plans/move-work.ts
+    src/core/plans/move.ts
+    src/core/plans/owner.ts
+    src/core/plans/pilot.ts
+    src/core/plans/plans.ts
+    src/core/plans/progress.ts
+    src/core/plans/prompt.ts
+    src/core/plans/watchdog.ts
+    src/core/plans/work.ts
+    src/core/store.ts
+    src/external/adapters/tools/state-rows.ts
+    src/external/coverage.ts
+    src/external/domain/tools.ts
+    src/ipc/api.ts
+    src/ipc/companion-api.ts
+    src/ipc/companion-handlers.ts
+    src/ipc/plans-api.ts
+    src/ipc/plans-handlers.ts
+    src/machines/coverage.ts
+    src/machines/ready.ts
+    src/machines/sync.ts
+    src/shared/settings-schema.ts
+    src/workspaces/git.ts
+    src/workspaces/pr.ts
+    tests/agent-change.test.ts
+    tests/companion-coverage.test.ts
+    tests/companion-views.test.ts
+    tests/i18n.test.ts
+    tests/local-endpoints.test.ts
+    tests/mac-chat-images-cache.test.ts
+    tests/mac-plans.test.ts
+    tests/mac-settings-search.test.ts
+    tests/machines-ready.test.ts
+    tests/notify.test.ts
+    tests/parity.test.ts
+    tests/plan-milestone-agent.test.ts
+    tests/plans-watchdog.test.ts
+    tests/plans.test.ts
+    tests/sentinel-kept-data.test.ts
+    tests/skills.test.ts
+```
+
+本 fork 整体领先上游 116 个提交、落后 4 个；相对上游改动了 159 个文件（其中绝大多数是本 fork 早期功能的既有改动，见 `docs/fork.md` 的各节）。**输出里没有任何带 `!` 的文件**——即没有改了上游却没在 `docs/fork.md` 写明原因的文件。
+
+### 10.3 里程碑判定标准的证据
+
+| 判定标准 | 现在有的证据 |
+| --- | --- |
+| 指针停在侧栏上时会话变「需要你」，顺序不变；离开 600ms 后才重排 | 单测 `tests/fork-calm-hold-order.test.ts`（5 条，全过）；e2e `fork-calm-sidebar.spec.ts`（calm 开 + calm-off）已写好，按计划在最终步骤统一跑 |
+| 不在底部时来 20 条新消息，第一条可见消息偏移 0px，并出现「有新内容」提示 | `calm-check` chatrun 的 `anchor` 测量已就绪（最终步骤跑，取 calm-on/full 的 `offsetPx` / `hint` / `newRows`）；`chat-*.spec.ts` 在最终步骤跑 |
+| 同时触发全局 toast 和撤销 toast，屏幕上只有一条 | e2e `fork-calm-toast.spec.ts`（calm 开 + calm-off）已写好，最终步骤跑；判定用 `[data-one-toast]` 数量（页面上另有 `role=status` 的其它元素，不数它们） |
+| 多任务并行时 JS 动效 + CSS 循环只有一种 | 单测 `tests/fork-calm-live-gate.test.ts`（3 条，全过）；M1 白名单核对：本分支的 `calm-motion.css` 仍是空骨架，没有 CSS 关键帧循环；calm-check 的 plan/tasks/dock/chatrun + onboarding/call 对比在最终步骤跑 |
+| 每个改动的上游文件登记 `docs/fork.md` 并写明原因；关掉 data-calm 与上游一致 | §10.1 的 6 个文件全部有登记；`--report` 无 `!`；`canary` 共 9 行（M0 3 + M2 6），测试全过；calm-off 的代码路径（§1.3/§2.3/§3.2/§4.3）与三个 e2e 的 calm-off 变体（最终步骤跑） |
+
+九条 canary（`tests/fork-calm.test.ts`）：`main.tsx`、`dialogs/Settings.tsx`、`tests/mac-settings-search.test.ts`、`layout/Sidebar.tsx`、`layout/EntryRow.tsx`、`chat/ChatLog.tsx`、`App.tsx`、`lib/undo-toast.tsx`、`lib/live-motion.ts`。
+
+### 10.4 结论与留给 M3 的
+
+- 挂钩本身在代码层面已闭合：逻辑全在 `fork/calm/`，六处上游接入都能被 canary 与 e2e 发现失效，关掉 `data-calm` 走的是上游原值。
+- 需要真机/浏览器证的三个验收项（侧栏冻结 e2e、滚动锚定 calm-check、单条 toast e2e）与 calm-check 的动效计数，按计划在里程碑最终步骤统一跑；它们跑出来的数字记在 `docs/calm/` 的验收记录里，不回填本文的「预期」列。
+- 已知上限（§9）：菜单启发式、抑制期间撤销不可达、冻结期间行内容不更新、M1 白名单若填了 CSS 循环会变成两种循环——都留给 M3 人工确认。
