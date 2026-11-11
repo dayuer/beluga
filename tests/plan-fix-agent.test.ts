@@ -136,6 +136,21 @@ describe('a plan’s agent for hard fixes', () => {
     expect(again.need(plan.id)).toMatchObject({ agent: CHEAP, checkAgent: MID, fixAgent: STRONG });
   });
 
+  it('what Plan Settings saves (BLG-123) is still there after the daemon restarts', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'plan-settings-'));
+    const t = setup({ dir });
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CHEAP }, { quiet: true });
+    t.work.setAutonomy(plan.id, 'gated');
+    t.work.setTestsAt(plan.id, 'end');
+    t.work.setWorkAgent(plan.id, MID);
+    t.work.setCheckAgent(plan.id, STRONG);
+    t.work.setArchAgent(plan.id, STRONG);
+    t.work.setFixAgent(plan.id, MID);
+    t.plans.flush();
+    const again = new Plans({ store: new Store(initialState('room')), dir });
+    expect(again.need(plan.id)).toMatchObject({ autonomy: 'gated', testsAt: 'end', agent: MID, checkAgent: STRONG, archAgent: STRONG, fixAgent: MID });
+  });
+
   it('fix tasks after a failed check: the milestone’s worktree goes to the fix agent before it’s told about them, once', async () => {
     const t = setup({ workers: 'milestone' });
     const plan = await approved(t, ONE);

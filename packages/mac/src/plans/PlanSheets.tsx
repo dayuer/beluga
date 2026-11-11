@@ -107,7 +107,7 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
         {more ? (
           <>
             <PlanRoles tiers={tiers} picks={picks} onPick={(role, v) => setPicked((was) => ({ ...was, [role]: v }))} reveal />
-            <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in the plan’s ••• menu.</div>
+            <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in Plan Settings.</div>
           </>
         ) : null}
       </div>
@@ -139,7 +139,7 @@ function GoalBox({ value, onChange }: { value: string; onChange: (v: string) => 
 }
 
 /** Step by Step, Check-ins, Autopilot: three cards you can read without hovering (a radio group; the arrows move). */
-function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange: (a: Autonomy) => void; current?: Autonomy }) {
+export function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange: (a: Autonomy) => void; current?: Autonomy }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
