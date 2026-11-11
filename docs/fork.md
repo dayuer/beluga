@@ -101,6 +101,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/sentinel/DashboardPage.tsx` ✓：`still()` 加 `calmOn()`，沉稳时仪表盘瓦片不做 220/260ms 的 glide（DA-02）。
 - `packages/mac/src/onboarding/onboarding.module.css`：`@media (prefers-reduced-motion: reduce)` 停掉 `heroSoft` 的 sheen 与 `beam`（RE-01，上游缺口；沉稳模式 M5 已停）。
 - `packages/mac/src/call/NotesBox.tsx`：跳到一条发言的高亮 900ms → 160ms，Reduce motion 下不做（overlay §8.1 遗留）。
+- `packages/mac/src/call/PointerMark.tsx` ✓：点击指针标记的 1.16 弹跳在沉稳模式下不做（`calmOn()` 加进 `paintTag` 的守卫；reduced-motion 上游本来就停）。上游 3.2.0 新增，M4 同步跟进（`docs/calm/overlay.md` §12.2）。
 - `packages/mac/e2e/unread.spec.ts`：未读断言从 `font-weight:650` 改为 400 + 计数徽标（沉稳 S2 的配套；fork-only 测试改动，见 `docs/calm/overlay.md` §12）。
 
 ### 版本号（脚本自动处理）

@@ -148,7 +148,53 @@ node scripts/sync-upstream.mjs --after-merge --remote calm-rehearsal
 
 ## 3. 真实同步记录
 
-（BLG-178 填：对真实 upstream 跑 `node scripts/sync-upstream.mjs` 的过程、冲突与结果。）
+日期 2026-11-12（同步分支名里的日期取 UTC，为 `2026-11-11`）。
+
+```bash
+node scripts/sync-upstream.mjs
+```
+
+- 上游这次领先 8 个提交，`upstream/main` 为 `0f1358f92`，`packages/mac` 3.2.0。
+- 合并前脚本标出 8 个「合并时检查」文件：
+
+  ```
+  docs/parity.md
+  ⚠ 沉稳界面  packages/mac/src/App.tsx
+  packages/mac/src/chat/Composer.tsx
+  ⚠ 沉稳界面  packages/mac/src/chat/flight.ts
+  ⚠ 沉稳界面  packages/mac/src/chat/steps/AgentSteps.tsx
+  ⚠ 沉稳界面  packages/mac/src/layout/EntryRow.tsx
+  packages/mac/src/layout/workspace-row.tsx
+  packages/mac/src/sentinel/SentinelCards.tsx
+  ```
+
+  （`chat/Composer.tsx` 与 `layout/workspace-row.tsx` 不在沉稳登记里，没有 ⚠。）
+
+- 合并时只有 1 个冲突：`packages/mac/src/layout/EntryRow.tsx`（上游新增 `import type { WorkspaceRowActions }`，与 fork 的 `useHeldEntries` 同一段）。**rerere 直接套用了 BLG-177 演练里记住的解法**——两次冲突的内容相同——无需手改，脚本打印 `Staged '…/EntryRow.tsx' using previous resolution`。
+- 合并后：fork-calm `NEW` 6 条、`GONE` 0、失效覆盖层规则 0；`tests/fork-calm.test.ts` 3 个测试通过。
+- 合并提交 `59832b9a7` 的说明里已自动带「沉稳检查」段（`## 沉稳检查（sync 自动附加）`）。
+- 同步分支 `sync/upstream-3.2.0-2026-11-11` 已合回 M4 工作分支 `beluga/blg-176-m4-2`；下面的三项检查都跑在这棵合并后的代码上。
+
+NEW 的 6 条（都是这次真实上游带来的，不是演练种子）：
+
+```
+call/PointerMark.tsx:59            element-animate|call/PointerMark.tsx|animate
+call/PointerMark.tsx:59            overscale|call/PointerMark.tsx|scale(1.16)
+components/SelectionBar.module.css:25  keyframes|components/SelectionBar.module.css|rise
+components/SelectionBar.module.css:31  keyframes|components/SelectionBar.module.css|drop
+call/pointer.module.css:44         long-duration|call/pointer.module.css|transition=320ms
+call/pointer.module.css:61         long-duration|call/pointer.module.css|transition=420ms
+```
+
+逐条裁决（fork.md 第 ④ 步）：
+
+| 动效 | 处置 |
+| --- | --- |
+| `SelectionBar` 的 `rise`/`drop` | 覆盖层已管：M1 的全局 `animation-name: none` 在沉稳模式下停掉 |
+| `pointer.module.css` 的 320/420ms 过渡 | 覆盖层已管：M3 的过渡 clamp 收到 160ms |
+| `PointerMark` 点击时的 1.16 弹跳（WAAPI，CSS 管不到） | 加一行挂钩：`calmOn()` 进 `paintTag` 的守卫，沉稳模式下不放大；登记 `docs/fork.md`、`tests/fork-calm.test.ts` 的 TOUCHPOINTS 与 `docs/calm/overlay.md` §12.2 |
+
+裁决后 `CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts` 把快照更新到 446 条；再跑一次报告 NEW/GONE 都为 0。
 
 ## 4. 全量验证
 

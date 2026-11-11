@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Avatar, personColor } from '../components/ui.js';
+import { calmOn } from '../fork/calm/calm-state.js';
 import { POINTER_PATH } from './ink.js';
 import { type PointerTag, TAG_IDLE_MS, newTag, tagClicked, tagMoved, tagOpen } from './pointer-tag.js';
 import p from './pointer.module.css';
@@ -55,7 +56,8 @@ export function paintTag(el: HTMLElement, tag: PointerTag, now: number): void {
   if (el.dataset['click'] === click) return;
   el.dataset['click'] = click;
   const pill = el.lastElementChild;
-  if (!click || !pill || reducedMotion() || typeof pill.animate !== 'function') return;
+  // Calm mode leaves the face still: a click is shown, not scaled up (docs/calm-ui.md §2, §7).
+  if (!click || !pill || reducedMotion() || calmOn() || typeof pill.animate !== 'function') return;
   pill.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: 0.35 }, { transform: 'scale(1)' }], { duration: POP_MS, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
 }
 
