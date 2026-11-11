@@ -1,5 +1,6 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react';
 import f from './flight.module.css';
+import { calmOn } from '../fork/calm/index.js';
 import { reducedMotion } from '../lib/reduced-motion.js';
 
 /**
@@ -80,7 +81,7 @@ export function launchFlight(input: { channel: string; target: 'chat' | 'queue';
   const now = Date.now();
   flights = [...flights.filter((x) => now - x.at < FLIGHT_TTL_MS), { id: ++nextId, channel: input.channel, target: input.target, text, from: input.from.getBoundingClientRect(), at: now, live: input.live }];
   // The box empties with a soft fade instead of blinking clear.
-  if (!reducedMotion()) input.from.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+  if (!reducedMotion() && !calmOn()) input.from.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
   // Make sure the chat is at its newest message, where this one lands.
   if (input.target === 'chat') document.dispatchEvent(new CustomEvent('beluga:chat-bottom'));
 }
@@ -114,7 +115,7 @@ function land(flight: Flight, row: HTMLElement): void {
     if (!reducedMotion()) row.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
     return;
   }
-  if (reducedMotion()) {
+  if (reducedMotion() || calmOn()) {
     row.dataset.flown = 'instant';
     row.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out' });
     return;

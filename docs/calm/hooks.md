@@ -124,7 +124,7 @@ return frozen.current;
 
 - canary：`Sidebar.tsx` ↔ `useSidebarHold(drop.ref)`；`EntryRow.tsx` ↔ `useHeldEntries(`。上游改 `useFolderDrop` 的返回或 `useEntryList` 的返回形状时测试失败。
 - 行为兜底：e2e 的 calm-off 变体若「也不冻结」，说明挂钩被绕过。
-- 已知弱点：`[role="menu"]` 是启发式。非 `role=menu` 的浮层（`role=dialog` 的选择器等）从侧栏打开时，指针离开侧栏 600ms 后仍可能换序。失效上限是「菜单开着时 600ms 后换序」，不崩、不误伤别处；M3 验收时人查一次。
+- 已知弱点：浮层判据是启发式。M2 只认 `role=menu`；**M3（SH-09）扩到 `role=dialog`/`role=listbox`**，非 Radix 的自绘浮层仍可能漏掉。失效上限是「浮层开着时 600ms 后换序」，不崩、不误伤别处。
 
 ### 1.6 登记行（写进 `docs/fork.md` 的「沉稳界面」一节）
 
@@ -372,7 +372,7 @@ M0 已登记的 3 处（`main.tsx`、`Settings.tsx`、`tests/mac-settings-search
 ## 9. 风险与已知弱点
 
 1. **M1/M2 白名单双重循环**：靠 §0.1 的契约与 BLG-168 落地时的核对（§4.5）；两边都在白名单里加循环就会出现两种。
-2. **冻结期间行内容整体不更新**（「需要你」标记晚到释放后）：有意为之（整组冻结），M3 可复议；若改成「只冻结顺序」，`useHeldEntries` 的返回值要按冻结的 id 顺序重排 fresh，接口不变。
+2. **冻结期间行内容整体不更新**（「需要你」标记晚到释放后）：M2 的整组冻结；**M3（SH-08）已改为「只冻结顺序」**：`useHeldEntries` 按冻结的 channel 顺序重排 fresh，标记即时到达；冻结期间新出现的行等释放后显示。
 3. **虚拟化行重测量挪位**：calm-check 的 anchor 步实测兜底；修在 `ChatLog.tsx` 属 upstream-ok，已列 PR 候选。
 4. **e2e 时序**（600ms 宽限、3.5s toast 窗口）：一律 `expect.poll`；toast 用例若在负载下偶发，优先换更快触发全局 toast 的路径，不加长 `TOAST_MS`。
 5. **chatrun 新增字段**：只增不改，`baseline.md` 的旧字段对比照旧。

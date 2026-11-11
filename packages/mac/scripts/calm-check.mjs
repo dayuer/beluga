@@ -229,7 +229,8 @@ function stepsFor(page, shot) {
     },
     diff: async () => {
       await openWs(page);
-      await tab(page, 'Diff');
+      // The tab reads "Changes" now (it was "Diff"; History is its second view).
+      await tab(page, 'Changes');
     },
     files: async () => {
       await openWs(page);
@@ -252,7 +253,8 @@ function stepsFor(page, shot) {
       await wait(200);
       await page.keyboard.type('auth');
     },
-    shared: async () => side(page, 'Shared files').click(),
+    // The row reads "Files" now (its old name, "Shared files", is the view's kind).
+    shared: async () => side(page, 'Files').click(),
     palette: async () => page.keyboard.press('Meta+K'),
     settings: async () => page.keyboard.press('Meta+,'),
     person: async () => page.getByRole('button', { name: 'bob', exact: true }).click(),
@@ -277,6 +279,369 @@ function stepsFor(page, shot) {
     sentinel: async () => {
       await side(page, 'Sentinel').click();
       await wait(1200);
+    },
+
+    // BLG-170 chat/shell scenes
+    /** A run's steps while it works: the current row, then the same row opened and closed. */
+    chatsteps: async () => {
+      // A /btw card from an earlier run stays in the daemon's state: it would change the composer's height here.
+      const oldBtw = page.getByRole('button', { name: 'Close the side question' });
+      if (await oldBtw.count().catch(() => 0)) {
+        await oldBtw.first().click();
+        await wait(400);
+      }
+      await openWs(page);
+      const box = page.locator('textarea:not(.xterm-helper-textarea)');
+      await box.fill('Add rate limiting to the login endpoint and write tests');
+      await box.press('Enter');
+      await wait(2200);
+      await shot('running');
+      const current = page.locator('[data-step][data-current]').first();
+      let currentRow = null;
+      let workingRow = null;
+      if (await current.count().catch(() => 0)) {
+        const id = await current.getAttribute('data-step');
+        const box = (locator) => locator.boundingBox({ timeout: 3000 }).catch(() => null);
+        const before = await box(current);
+        const work = page.locator('[data-working="true"]').first();
+        const workingBefore = (await work.count().catch(() => 0)) ? await box(work) : null;
+        await current.hover({ timeout: 5000 }).catch(() => undefined);
+        await wait(400);
+        await shot('step-hover');
+        const head = current.locator('button').first();
+        if (await head.count().catch(() => 0)) {
+          await head.click({ timeout: 5000 }).catch(() => undefined);
+          await wait(900);
+          await shot('step-open');
+          await head.click({ timeout: 5000 }).catch(() => undefined);
+          await wait(400);
+          await shot('step-closed');
+        }
+        await wait(3000);
+        const after = id ? await box(page.locator(`[data-step="${id}"]`)) : null;
+        const afterCurrent = id ? await page.locator(`[data-step="${id}"][data-current]`).count().catch(() => 0) : 0;
+        const workingAfter = (await work.count().catch(() => 0)) ? await box(work) : null;
+        currentRow = {
+          id,
+          heightBefore: before ? Math.round(before.height) : null,
+          heightAfter: after ? Math.round(after.height) : null,
+          stillCurrent: afterCurrent > 0,
+        };
+        workingRow = {
+          topBefore: workingBefore ? Math.round(workingBefore.y) : null,
+          topAfter: workingAfter ? Math.round(workingAfter.y) : null,
+        };
+      }
+      await wait(3000);
+      return { steps: await page.locator('[data-step]').count().catch(() => 0), currentRow, workingRow };
+    },
+    /** A side question (/btw): the card above the box while it thinks, and once answered. */
+    chatbtw: async () => {
+      await openWs(page);
+      const box = page.locator('textarea:not(.xterm-helper-textarea)');
+      await box.fill('/btw what does the login middleware do');
+      await box.press('Enter');
+      await wait(600);
+      await shot('thinking');
+      // The thinking tag loops (twinkle) only in this moment; the end-of-scene pass would miss it.
+      const thinkingAnimations = await measureAnimations(page);
+      await wait(4000);
+      await shot('answer');
+      const count = await page.locator('[aria-label="Side question"]').count().catch(() => 0);
+      // Leave the daemon's state as it was: a card here would sit in every later scene's composer.
+      const close = page.getByRole('button', { name: 'Close the side question' });
+      if (await close.count().catch(() => 0)) {
+        await close.first().click();
+        await wait(400);
+      }
+      return { sideQuestions: count, thinkingAnimations };
+    },
+    /** The composer's voice: the strip while it gets ready (the model is not on this machine). */
+    chatdictation: async () => {
+      const oldBtw = page.getByRole('button', { name: 'Close the side question' });
+      if (await oldBtw.count().catch(() => 0)) {
+        await oldBtw.first().click();
+        await wait(400);
+      }
+      await openWs(page);
+      const mic = page.getByRole('button', { name: 'Speak instead of typing' });
+      if (await mic.count().catch(() => 0)) {
+        await mic.click();
+        await wait(700);
+        await shot('getting');
+        // The busy dots loop only while the strip says it is getting ready.
+        const gettingAnimations = await measureAnimations(page);
+        await wait(1500);
+        return { gettingAnimations };
+      }
+    },
+    /** A message hovered (its quiet actions), then Edit opened and closed. */
+    chathover: async () => {
+      await openWs(page);
+      const own = page.locator('[data-index]').filter({ has: page.locator('button[aria-label="Edit message"]') });
+      const last = own.last();
+      if (await last.count().catch(() => 0)) {
+        await last.hover({ timeout: 5000 }).catch(() => undefined);
+        await wait(400);
+        await shot('message-hover');
+        const edit = page.getByRole('button', { name: 'Edit message' });
+        if (await edit.count().catch(() => 0)) {
+          await edit.first().click({ timeout: 5000 }).catch(() => undefined);
+          await wait(800);
+          await shot('edit-open');
+          await page.keyboard.press('Escape');
+          await wait(300);
+          await shot('edit-closed');
+        }
+      }
+    },
+    /** The sidebar's signal marks: hover and select a row that needs you. */
+    shellsidebar: async () => {
+      await wait(600);
+      const needs = page.locator('[data-signal-row="needs"], [class*="_needsRow_"]').first();
+      if (await needs.count().catch(() => 0)) {
+        await needs.hover({ timeout: 5000 }).catch(() => undefined);
+        await wait(400);
+        await shot('needs-hover');
+        await needs.click({ timeout: 5000 }).catch(() => undefined);
+        await wait(900);
+        await shot('needs-select');
+      }
+    },
+    /** The right panel: open on Changes, closed from the toolbar, opened again. */
+    shellpanel: async () => {
+      await openWs(page);
+      await tab(page, 'Changes');
+      await wait(500);
+      await shot('panel-open');
+      const hide = page.getByRole('button', { name: 'Hide the panel' });
+      if (await hide.count().catch(() => 0)) {
+        await hide.click();
+        await wait(500);
+        await shot('panel-closed');
+      }
+      const show = page.getByRole('button', { name: /^Show the panel/ });
+      if (await show.count().catch(() => 0)) {
+        await show.click();
+        await wait(500);
+        await shot('panel-reopened');
+      }
+    },
+    /** The shell's two folds: the sidebar and the right panel, each hidden and back (their buttons;
+     *  ⌘B did not reach the window from the web view). */
+    shellcollapse: async () => {
+      await openWs(page);
+      const hideSide = page.getByRole('button', { name: 'Hide sidebar' });
+      if (await hideSide.count().catch(() => 0)) {
+        await hideSide.first().click();
+        await wait(500);
+        await shot('sidebar-hidden');
+      }
+      const showSide = page.getByRole('button', { name: 'Show sidebar' });
+      if (await showSide.count().catch(() => 0)) {
+        await showSide.first().click();
+        await wait(500);
+        await shot('sidebar-shown');
+      }
+      const hidePanel = page.getByRole('button', { name: 'Hide the panel' });
+      if (await hidePanel.count().catch(() => 0)) {
+        await hidePanel.first().click();
+        await wait(500);
+        await shot('panel-hidden');
+      }
+      const showPanel = page.getByRole('button', { name: /^Show the panel/ });
+      if (await showPanel.count().catch(() => 0)) {
+        await showPanel.first().click();
+        await wait(500);
+        await shot('panel-shown');
+      }
+    },
+    /** The notification centre under the bell, opened and closed. */
+    shellnotifications: async () => {
+      await openWs(page);
+      const bell = page.getByRole('button', { name: /^Notifications/ });
+      if (await bell.count().catch(() => 0)) {
+        await bell.click();
+        await wait(600);
+        await shot('open');
+        const waiting = page.getByRole('tab', { name: /^Needs you/ });
+        if (await waiting.count().catch(() => 0)) {
+          await waiting.first().click();
+          await wait(500);
+          await shot('filter');
+        }
+        await page.keyboard.press('Escape');
+        await wait(400);
+        await shot('closed');
+      }
+    },
+
+    // BLG-171 work/data scenes
+    /** The plan canvas (React Flow): nodes, edges and the transitions they keep. */
+    plancanvas: async () => {
+      await side(page, 'Card checkout for launch').click();
+      await wait(2500);
+      await shot('canvas');
+      return {
+        flow: await page.evaluate(
+          pageFn(`() => {
+            const node = document.querySelector('.react-flow__node');
+            const edge = document.querySelector('.react-flow__edge-path');
+            const cs = node ? getComputedStyle(node) : null;
+            return {
+              nodes: document.querySelectorAll('.react-flow__node').length,
+              edges: document.querySelectorAll('.react-flow__edge').length,
+              nodeDuration: cs ? cs.transitionDuration : null,
+              nodeTiming: cs ? cs.transitionTimingFunction : null,
+              edgeDuration: edge ? getComputedStyle(edge).transitionDuration : null,
+            };
+          }`),
+        ),
+      };
+    },
+    /** A task's page, opened from its card on the board. */
+    taskdetail: async () => {
+      await workPage(page, 'Tasks');
+      const card = page.locator('[role="list"][aria-label="Board"] [role="button"][aria-label]').first();
+      if (await card.count().catch(() => 0)) {
+        await card.click({ timeout: 8000 }).catch(() => undefined);
+        await wait(1800);
+        await shot('task');
+      }
+    },
+    /** A task created on the board: where its card lands and what the column does to the others. */
+    tasknew: async () => {
+      await workPage(page, 'Tasks');
+      const places = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('[role="list"][aria-label="Board"] [role="button"][aria-label]')].map((el) => ({
+            label: el.getAttribute('aria-label'),
+            y: Math.round(el.getBoundingClientRect().top),
+            h: Math.round(el.getBoundingClientRect().height),
+          })),
+        );
+      const before = await places();
+      const newTask = page.getByRole('button', { name: 'New Task', exact: true });
+      if (await newTask.count().catch(() => 0)) {
+        await newTask.first().click();
+        await wait(700);
+        // The sheet starts asking the agent; write the title here instead (deterministic).
+        const myself = page.getByRole('button', { name: 'Write title and goal myself' });
+        if (await myself.count().catch(() => 0)) {
+          await myself.first().click();
+          await wait(300);
+        }
+        const title = page.locator('#task-title');
+        if (await title.count().catch(() => 0)) {
+          await title.fill('Board insert probe');
+          await wait(300);
+        }
+        const create = page.getByRole('button', { name: /^Create Task/ });
+        if (await create.count().catch(() => 0)) {
+          await create.first().click();
+          await wait(2000);
+        }
+      }
+      if (await page.getByRole('dialog').count().catch(() => 0)) await page.keyboard.press('Escape');
+      await wait(1200);
+      const after = await places();
+      await shot('after-create');
+      return { before, after };
+    },
+    /** GitHub issues, from Work. */
+    issues: async () => {
+      await workPage(page, 'Issues');
+      await shot('issues');
+    },
+    /** Sentinel's dashboard: tiles and charts, and whether the numbers sit in fixed-width digits. */
+    sentineldash: async () => {
+      await page.getByRole('button', { name: 'Settings and menus' }).click();
+      await wait(300);
+      await page.getByRole('menuitem', { name: 'Go' }).hover();
+      await wait(300);
+      await page.getByRole('menuitem', { name: 'Dashboard', exact: true }).click();
+      await wait(2000);
+      await shot('dashboard');
+      return {
+        numbers: await page.evaluate(
+          pageFn(`() => {
+            const out = [];
+            for (const el of document.querySelectorAll('span, div, b, strong')) {
+              const t = (el.textContent ?? '').trim();
+              if (!/^[-+$€£]?[\\d,.]+[%KMB]?$/.test(t) || el.children.length) continue;
+              const r = el.getBoundingClientRect();
+              if (!r.width) continue;
+              const cs = getComputedStyle(el);
+              out.push({ text: t, width: Math.round(r.width), numeric: cs.fontVariantNumeric });
+              if (out.length >= 20) break;
+            }
+            return out;
+          }`),
+        ),
+      };
+    },
+    /** A project's home page: its numbers, plans, worktrees and tasks. */
+    projecthome: async () => {
+      await side(page, 'bob-api').click();
+      await wait(2000);
+      await shot('project');
+    },
+
+    // BLG-172 rest scenes
+    /** The room's group chat (network page), with its pending requests. */
+    network: async () => {
+      await side(page, 'Group chat').click();
+      await wait(1500);
+      await shot('group');
+      const decision = page.getByRole('button', { name: 'Let in' });
+      if (await decision.count().catch(() => 0)) {
+        await decision.first().hover({ timeout: 5000 }).catch(() => undefined);
+        await wait(300);
+        await shot('decision-hover');
+      }
+      return { pending: await page.locator('[role="button"]').filter({ hasText: /wants to join|trust/i }).count().catch(() => 0) };
+    },
+    /** A call in the room: the in-call strip and its controls (the ring itself is for incoming calls). */
+    call: async () => {
+      await side(page, 'Group chat').click();
+      await wait(1200);
+      const start = page.getByRole('button', { name: /^Call the Room/ });
+      if (await start.count().catch(() => 0)) {
+        await start.first().click();
+        await wait(2500);
+        await shot('in-call');
+        const inCall = await measureAnimations(page);
+        const leave = page.getByRole('button', { name: 'Leave Call' });
+        const left = await leave.count().catch(() => 0);
+        if (left) {
+          await leave.first().click({ timeout: 5000 }).catch(() => undefined);
+          await wait(800);
+        }
+        return { inCall, leaveVisible: left };
+      }
+    },
+    /** A destructive dialog: removing a friend from the room, its copy and its buttons. */
+    confirmremove: async () => {
+      await side(page, 'Group chat').click();
+      await wait(900);
+      const bob = page.getByRole('button', { name: 'bob', exact: true });
+      if (await bob.count().catch(() => 0)) {
+        await bob.first().click({ timeout: 5000 }).catch(() => undefined);
+        await wait(700);
+        const remove = page.getByRole('button', { name: /Remove from Room/ });
+        if (await remove.count().catch(() => 0)) {
+          await remove.first().click({ timeout: 5000 }).catch(() => undefined);
+          await wait(800);
+          await shot('remove');
+          const text = (await page.getByRole('dialog').first().innerText().catch(() => '')).slice(0, 700);
+          // Never confirm it: back out with Escape.
+          await page.keyboard.press('Escape');
+          await wait(300);
+          await page.keyboard.press('Escape');
+          await wait(300);
+          return { dialogText: text };
+        }
+      }
     },
   };
 }
@@ -310,7 +675,7 @@ try {
               for (const entry of list.getEntries()) {
                 const sources = (entry.sources ?? []).slice(0, 4).map((s) => selectorOf(s.node));
                 if (!entry.hadRecentInput) window.__calm.cls += entry.value;
-                if (window.__calm.shifts.length < 50) window.__calm.shifts.push({ value: entry.value, hadRecentInput: entry.hadRecentInput, sources });
+                if (window.__calm.shifts.length < 50) window.__calm.shifts.push({ value: entry.value, hadRecentInput: entry.hadRecentInput, t: Math.round(entry.startTime), sources });
               }
             }).observe({ type: 'layout-shift', buffered: true });
           } catch {
@@ -349,16 +714,22 @@ try {
       await wait(700);
       await shot('loaded');
 
-      // Hover and select something in the sidebar (a real action, watched for what moves).
+      // Hover and select something in the sidebar (a real action, watched for what moves). A dialog
+      // or popover can be over the sidebar (palette, settings): its overlay intercepts the pointer,
+      // and the scene's own shots already cover that moment.
       if (scene !== 'onboarding') {
         const row = page.locator('nav[aria-label="Sidebar"] [role="button"]').first();
         if (await row.count().catch(() => 0)) {
-          await row.hover();
-          await wait(400);
-          await shot('hover');
-          await row.click();
-          await wait(600);
-          await shot('select');
+          try {
+            await row.hover({ timeout: 3000 });
+            await wait(400);
+            await shot('hover');
+            await row.click({ timeout: 3000 });
+            await wait(600);
+            await shot('select');
+          } catch {
+            // Covered by the scene itself (an open dialog's overlay, a pointer outside the window).
+          }
         }
       }
 
