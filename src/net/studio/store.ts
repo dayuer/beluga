@@ -192,6 +192,8 @@ export interface HubStore {
   /** `false` when this customer already got `maxPerHour` login tokens in the last hour. */
   createLoginToken(input: { readonly tokenHash: string; readonly customerId: string; readonly now: number; readonly ttl: number; readonly maxPerHour: number }): Promise<boolean>;
   takeLoginToken(tokenHash: string, now: number): Promise<string | undefined>;
+  /** Remove a token whose mail could not be sent, so a retry does not use up the hourly limit. */
+  removeLoginToken(tokenHash: string): Promise<void>;
   createSession(input: { readonly tokenHash: string; readonly customerId: string; readonly now: number; readonly ttl: number }): Promise<void>;
   session(tokenHash: string): Promise<Session | undefined>;
   touchSession(tokenHash: string, expiresAt: number): Promise<void>;
@@ -450,6 +452,9 @@ export function memoryHub(): HubStore {
       if (!t || t.usedAt !== undefined || t.expiresAt <= now) return undefined;
       loginTokens.set(tokenHash, { ...t, usedAt: now });
       return t.customerId;
+    },
+    removeLoginToken: async (tokenHash) => {
+      loginTokens.delete(tokenHash);
     },
     createSession: async ({ tokenHash, customerId, now, ttl }) => {
       sessions.set(tokenHash, { tokenHash, customerId, createdAt: now, expiresAt: now + ttl });

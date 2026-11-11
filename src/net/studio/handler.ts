@@ -67,6 +67,7 @@ export {
 // --- Shared shapes (docs/studio-hub.md §1.1) ---
 
 export interface Mailer {
+  /** May throw when the transport fails; the login route turns that into a retryable 503. */
   send(email: string, link: string): Promise<void>;
 }
 

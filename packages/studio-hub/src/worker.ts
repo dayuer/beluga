@@ -7,6 +7,7 @@
  */
 
 import {
+  LOGIN_TOKEN_TTL_MS,
   OUTBOX_TTL_MS,
   randomToken,
   sha256Hex,
@@ -59,6 +60,7 @@ function mailerFor(env: Env, hub: D1HubStore, now: number): Deps['mailer'] {
     return resendMailer({
       apiKey: env.RESEND_API_KEY,
       from: env.MAIL_FROM ?? 'Synon Studio <login@synon.studio>',
+      ttlMinutes: Math.round(LOGIN_TOKEN_TTL_MS / 60_000),
     });
   }
   if (mode === 'outbox') return outbox;

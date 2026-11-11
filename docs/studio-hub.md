@@ -230,22 +230,70 @@ handler 在 DO 内按顺序判（全部失败都关闭握手，不建套接字�
 P1 用邮箱魔法链接。**没有开放注册**；只有运营者邀请过、且未被删除的邮箱才可能收到链接。
 
 **`POST /v1/login {email}`**
-- 一律 `202 {"ok":true}`，无论邮箱是否存在、是否被邀请、是否超频。不泄露任何信息。
+- 对不是被邀请客户（不存在 / 已删除 / 格式不对 / 超频）的邮箱一律 `202 {"ok":true}`，不泄露任何信息。
+- 对被邀请客户（`customers.status IN ('invited','active')`）正常发信后也是 202；**发信失败时回
+  `503 {"error":"mail-unavailable"}`**，让 App 显示可重试的「服务暂时不可用」，不吐内部细节。
+  这是一个系统故障，不是可靠的「邮箱是否存在」信号（未邀请的邮箱根本不会走到发信），但邮件服务持续
+  故障时状态码会不同；频率限制与下面「失败删 token」把可利用窗口压到最小。
 - 邮箱先规范化：`trim().toLowerCase()`，长度 ≤ 320；不合格也回 202，不发信。
-- 找到 `customers.status IN ('invited','active')` 的客户才继续；否则静默结束。
 - 频率：同一邮箱每小时最多 5 次（按 `login_tokens.created_at` 数）。用一条条件插入，
-  `COUNT < 5` 才插，避免并发多插。超了静默结束。
+  `COUNT < 5` 才插，避免并发多插。超了静默结束。**发信失败的 token 会被删除，重试不占这 5 次。**
 - 生成 32 字节令牌 → `b64url`（43 字符），存 `sha256Hex(token)`，15 分钟，单用。
-- 链接：`<HUB_ORIGIN>/login#token=<token>`（`HUB_ORIGIN` 是 Worker 变量，本地 `http://localhost:8787`）。
+- 链接：`<HUB_ORIGIN>/login#token=<token>`（`HUB_ORIGIN` 是 Worker 变量，本地 `http://localhost:8790` 时
+  由 dev-proxy 同源；直连中台时 `http://localhost:8787`）。
   **token 放 fragment**，不会进服务器日志或 Referer。
   `HUB_ORIGIN` 缺失或不是绝对 http(s) origin 时**拒发链接**：`POST /v1/login` 仍 202 但不发信，管理页的
   `login-link` 回 503 `hub-origin-missing`。**绝不用请求的 Host 兜底**（否则攻击者的 Host 能把 token 引到
   自己的域名）。
-- 交给 `Mailer.send(email, link)`。P1 两种实现，按变量 `MAIL_MODE` 选：
-  - `console`：只在开发日志里打印链接（整条链接是凭证，线上不要用）；
-  - `outbox`：写 D1 `outbox(id, customer_id, link, created_at, expires_at=now+15min)`，管理页显示，
+- 交给 `Mailer.send(email, link)`，按 `MAIL_MODE` 选三种实现：
+  - `outbox`（默认）：写 D1 `outbox(id, customer_id, link, created_at, expires_at=now+15min)`，管理页显示，
     由运营者人工转发；读管理页时先删除过期行。
-  真发信留给 M5 `login-choice`。
+  - `console`：只打印「login link issued」，不打印邮箱或链接（凭证不进日志）。
+  - **`resend`**：用 Resend 真发信（BLG-82/114），见 §3.4.1。
+
+#### 3.4.1 用 Resend 发魔法链接
+
+| 变量 | 值 / 说明 |
+|---|---|
+| `MAIL_MODE` | `resend`（默认是 `outbox`；没配 key 时 `resend` 会回落到 outbox，避免丢链接） |
+| `RESEND_API_KEY` | Resend 的 API key；**只放在 secret / `.dev.vars`，永远不进代码与 git** |
+| `MAIL_FROM` | 发件人，例如 `Synon Studio <login@your-verified-domain>`；域名必须先在 Resend 验证 |
+| `HUB_ORIGIN` | App 的公开 origin，链接落在 `<HUB_ORIGIN>/login#token=…` |
+
+**本地 `wrangler dev`**（key 放 gitignored 的 `.dev.vars`；Wrangler 本地 dev 不读远端的 secret）：
+
+```sh
+cd packages/studio-hub
+# .dev.vars 已被 .gitignore；不要把 key 写进代码、wrangler.toml 或提交记录
+cat >> .dev.vars <<'EOF'
+MAIL_MODE=resend
+RESEND_API_KEY=re_...
+MAIL_FROM=Synon Studio <login@your-verified-domain>
+HUB_ORIGIN=http://localhost:8790
+EOF
+npm run dev
+```
+
+**部署到 Cloudflare**（密钥用 wrangler secret 注入）：
+
+```sh
+cd packages/studio-hub
+npx wrangler secret put RESEND_API_KEY   # 交互粘贴 key；不会写进 wrangler.toml
+npx wrangler secret put MAIL_FROM        # 或把非机密的 MAIL_FROM 放 wrangler.toml [vars]
+npx wrangler secret put MAIL_MODE        # 值填 resend；或放 wrangler.toml [vars]
+npx wrangler deploy
+```
+
+- **发件域名**：先在 Resend 控制台验证域名（SPF/DKIM），再把 `MAIL_FROM` 设成该域名下的地址；用未验证
+  的域名 Resend 会拒绝，登录页会收到 503 并把错误显示为「服务暂时不可用」。
+- **邮件文案**：中文，标题「登录 Synon Studio」，正文含链接、`15 分钟内有效，只能使用一次`、落款
+  `—— Synon Studio`；分钟数来自 `LOGIN_TOKEN_TTL_MS`（15），不是另写的常量。
+- **失败**：Resend 非 2xx 或网络错误 → `issueLoginLink` 删除这次 token → `POST /v1/login` 503
+  `mail-unavailable`；App 显示「服务暂时不可用，稍后再试。」和可重试的主按钮，不显示 Resend 的状态或正文。
+  管理页的 `POST /v1/admin/customers/:cid/login-link` 不受影响：仍返回链接（`delivered:false`），运营者可以
+  手动转发。
+- **日志**：只记 `[studio] mail: resend answered <status>` 或 `[studio] mail: resend request failed`；
+  不记邮箱、链接或 key。
 
 **`POST /v1/login/verify {token}`**
 - token 是 43 字符 b64url；`sha256Hex` 后原子消耗：
@@ -617,6 +665,7 @@ Worker 只在验证/查询之后调用；请求仍带 `x-studio-auth`。handler 
 | 404 | `unknown-plan` / `unknown-project` / `unknown-daemon-project` | 不存在 |
 | 409 | `key-taken` / `already-bound` / `already-mapped` / `replayed` | 冲突 |
 | 429 | `rate-limited` | 频率 |
+| 503 | `mail-unavailable` | 被邀请客户的登录邮件发不出去（可重试；不返回邮件服务细节） |
 | 500 | `internal` | 未预期错误；不返回堆栈、不记正文 |
 
 日志只记 `{route, status, ms}` 与帧类型/大小；**不记请求体、邮箱、令牌、链接、客户文字**。`MAIL_MODE`
@@ -926,8 +975,9 @@ P1 的规模远低于上限。
   Worker + DO + 本地 D1。数据在 `.wrangler/state/`，重启保留。
 - `wrangler.toml` 的 `database_id` 用占位 UUID（如 `00000000-0000-0000-0000-000000000000`）；
   `npx wrangler d1 execute DB --local --file schema.sql` 建表。
-- `.dev.vars`：`OPERATOR_TOKEN=<dev 令牌>`、`MAIL_MODE=outbox`（或 `console`）、
-  `HUB_ORIGIN=http://localhost:8787`、`PREVIEW_SECRET=`（P1 不用）。
+- `.dev.vars`：`OPERATOR_TOKEN=<dev 令牌>`、`MAIL_MODE=outbox`（或 `console` / `resend`）、
+  `HUB_ORIGIN=http://localhost:8790`（App 同源代理）或 `http://localhost:8787`（只直连中台）、
+  `PREVIEW_SECRET=`（P1 不用）；用 Resend 时再加 `RESEND_API_KEY` 与 `MAIL_FROM`（§3.4.1）。
 - 只有本机能连；客户与真实 daemon 用不了。适合开发、单测之外的手工联调、M2 截图。
 - BLG-60 需要：dev 脚本、本地 D1 建表步骤、README 的 dev 一节；不写 `database_id` 的真实值，不写部署。
 
@@ -935,7 +985,8 @@ P1 的规模远低于上限。
 
 - `npx wrangler login` → `npx wrangler d1 create synon-studio` → 把返回的 `database_id` 写进
   `wrangler.toml` → `npx wrangler d1 execute DB --remote --file schema.sql` →
-  `npx wrangler secret put OPERATOR_TOKEN`（以及需要时的 `PREVIEW_SECRET`）→ `npx wrangler deploy`。
+  `npx wrangler secret put OPERATOR_TOKEN`（以及需要时的 `PREVIEW_SECRET`）→ 用 Resend 时
+  `npx wrangler secret put RESEND_API_KEY` / `MAIL_FROM` / `MAIL_MODE=resend`（§3.4.1）→ `npx wrangler deploy`。
 - `HUB_ORIGIN` 设为部署后的 Worker URL（如 `https://studio.example.workers.dev`）。
 - Free 计划够用：D1（有行数与写入限额）、SQLite 后端的 DO（`new_sqlite_classes`）。DO 与 D1 在
   Cloudflare 全球网络，可能跨境；客户条款要写（设计 §5.6）。

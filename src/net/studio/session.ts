@@ -45,35 +45,59 @@ export const isOrigin = (value: string): boolean => {
   }
 };
 
+export interface IssuedLoginLink {
+  readonly link: string;
+  readonly expiresAt: number;
+  /** False only when the mailer threw. The admin page may still show the link. */
+  readonly delivered: boolean;
+}
+
 /**
  * Make one magic link for a customer (already invited or active), mail it, and hand it back; the
  * admin page shows it for a manual forward. `rate-limited` after five an hour for one email, and
  * `no-origin` when HUB_ORIGIN is missing or not an absolute http(s) origin: a link built from the
  * request's Host would point wherever an attacker's Host header says.
+ *
+ * If the mailer fails, the customer's login route answers a retryable 503 and the token is removed,
+ * so retries do not use up the hourly limit. The admin path keeps the token (`keepOnMailFailure`)
+ * because the operator can still forward the link.
  */
-export async function issueLoginLink(customer: Customer, deps: SessionDeps): Promise<{ readonly link: string; readonly expiresAt: number } | 'rate-limited' | 'no-origin'> {
+export async function issueLoginLink(
+  customer: Customer,
+  deps: SessionDeps,
+  options: { readonly keepOnMailFailure?: boolean } = {},
+): Promise<IssuedLoginLink | 'rate-limited' | 'no-origin'> {
   if (!isOrigin(deps.origin)) return 'no-origin';
   const token = randomToken(32, deps.random);
-  const kept = await deps.hub.createLoginToken({ tokenHash: await sha256Hex(token), customerId: customer.id, now: deps.now, ttl: LOGIN_TOKEN_TTL_MS, maxPerHour: LOGIN_PER_EMAIL_PER_HOUR });
+  const tokenHash = await sha256Hex(token);
+  const kept = await deps.hub.createLoginToken({ tokenHash, customerId: customer.id, now: deps.now, ttl: LOGIN_TOKEN_TTL_MS, maxPerHour: LOGIN_PER_EMAIL_PER_HOUR });
   if (!kept) return 'rate-limited';
   const link = `${deps.origin.replace(/\/$/, '')}/login#token=${token}`;
+  let delivered = true;
   try {
     await deps.mailer.send(customer.email, link);
   } catch {
-    // The admin page can still show the link; the customer just didn't get a mail.
+    delivered = false;
+    if (!options.keepOnMailFailure) await deps.hub.removeLoginToken(tokenHash);
   }
-  return { link, expiresAt: deps.now + LOGIN_TOKEN_TTL_MS };
+  return { link, expiresAt: deps.now + LOGIN_TOKEN_TTL_MS, delivered };
 }
 
 /**
- * `POST /v1/login {email}`: always 202, whether or not the email is invited. The token goes in the
- * link's fragment, so it never reaches a server log or a Referer.
+ * `POST /v1/login {email}`: 202 for every email that is not an invited customer, and for invited
+ * customers when the mail went out. If an invited customer's mail cannot be sent, it answers 503
+ * `mail-unavailable` so the app can show a retryable service error — a system failure, not a
+ * reliable "this email exists" oracle (a non-invited address never reaches the mailer). The token
+ * goes in the link's fragment, so it never reaches a server log or a Referer.
  */
 export async function requestLogin(body: unknown, deps: SessionDeps): Promise<HubReply> {
   const email = normalizeEmail((body as { email?: unknown } | null)?.email);
   if (email) {
     const customer = await deps.hub.customerByEmail(email);
-    if (customer && (customer.status === 'invited' || customer.status === 'active')) await issueLoginLink(customer, deps);
+    if (customer && (customer.status === 'invited' || customer.status === 'active')) {
+      const issued = await issueLoginLink(customer, deps);
+      if (typeof issued === 'object' && !issued.delivered) return failure(503, 'mail-unavailable');
+    }
   }
   return { status: 202, body: { ok: true } };
 }

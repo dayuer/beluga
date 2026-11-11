@@ -26,9 +26,27 @@ describe('the Resend mailer', () => {
     expect(body.from).toBe('Synon Studio <login@example.test>');
     expect(body.subject).toBe('登录 Synon Studio');
     expect(String(body.text)).toContain('https://hub.test/login#token=secret-token');
+    expect(String(body.text)).toContain('15 分钟内有效');
+    expect(String(body.text)).toContain('—— Synon Studio');
   });
 
-  it('swallows a failed send without logging the address or the link', async () => {
+  it('uses the token TTL in the message', async () => {
+    const calls: Array<{ init?: RequestInit }> = [];
+    const mailer = resendMailer({
+      apiKey: 're_test',
+      from: 'login@example.test',
+      ttlMinutes: 30,
+      fetch: (async (_url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ init });
+        return new Response('{"id":"m1"}', { status: 200 });
+      }) as typeof fetch,
+    });
+    await mailer.send('c1@example.test', 'https://hub.test/login#token=t');
+    const body = JSON.parse(String(calls[0]!.init?.body)) as { text: string };
+    expect(body.text).toContain('30 分钟内有效');
+  });
+
+  it('throws on a failed send without logging the address or the link', async () => {
     const logs: string[] = [];
     const original = console.warn;
     console.warn = (...args: unknown[]) => void logs.push(args.join(' '));
@@ -38,7 +56,7 @@ describe('the Resend mailer', () => {
         from: 'login@example.test',
         fetch: (async () => new Response('nope', { status: 500 })) as typeof fetch,
       });
-      await expect(mailer.send('c1@example.test', 'https://hub.test/login#token=secret-token')).resolves.toBeUndefined();
+      await expect(mailer.send('c1@example.test', 'https://hub.test/login#token=secret-token')).rejects.toThrow('resend-failed');
       const all = logs.join('\n');
       expect(all).toContain('500');
       expect(all).not.toContain('c1@example.test');
@@ -48,7 +66,7 @@ describe('the Resend mailer', () => {
     }
   });
 
-  it('swallows a network error too', async () => {
+  it('throws on a network error too', async () => {
     const mailer = resendMailer({
       apiKey: 're_test',
       from: 'login@example.test',
@@ -56,6 +74,6 @@ describe('the Resend mailer', () => {
         throw new Error('network');
       }) as typeof fetch,
     });
-    await expect(mailer.send('c1@example.test', 'https://hub.test/login#token=secret-token')).resolves.toBeUndefined();
+    await expect(mailer.send('c1@example.test', 'https://hub.test/login#token=secret-token')).rejects.toThrow('resend-failed');
   });
 });

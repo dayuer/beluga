@@ -185,6 +185,34 @@ describe('a customer logs in with a magic link', () => {
   });
 });
 
+describe('mail failures on the login route', () => {
+  it('answers a retryable 503 for an invited email, and 202 for everyone else', async () => {
+    const w = await world();
+    const failing: StudioDeps = { ...w.deps, mailer: { send: async () => { throw new Error('down'); } } };
+
+    const invited = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), failing);
+    expect(invited.status).toBe(503);
+    expect(bodyOf(invited).error).toBe('mail-unavailable');
+
+    const unknown = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'nobody@example.test' } }), failing);
+    expect(unknown.status).toBe(202);
+
+    // The failed attempt removed its token; a retry with a working mailer sends once.
+    const retry = await handleHubRequest(request('POST', '/v1/login', { body: { email: 'c1@example.test' } }), w.deps);
+    expect(retry.status).toBe(202);
+    expect(w.sent).toHaveLength(1);
+  });
+
+  it('still gives the operator the link when the mail fails; it is marked not delivered', async () => {
+    const w = await world();
+    const failing: StudioDeps = { ...w.deps, mailer: { send: async () => { throw new Error('down'); } } };
+    const link = await handleHubRequest(request('POST', '/v1/admin/customers/c1/login-link', { token: 'operator' }), failing);
+    expect(link.status).toBe(200);
+    expect(bodyOf(link).link).toContain('/login#token=');
+    expect(bodyOf(link).delivered).toBe(false);
+  });
+});
+
 describe('a view is read by its own project only', () => {
   it('refuses no identity, another project, and a customer who is not a member', async () => {
     const w = await world();
