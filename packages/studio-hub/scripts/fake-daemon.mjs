@@ -13,7 +13,9 @@
  * Every important step is one JSON line on stdout: {"kind":"registered"|"open"|"sent"|"recv"|"closed",...}.
  */
 
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import WebSocket from 'ws';
 
 const args = process.argv.slice(2);
@@ -28,15 +30,30 @@ const code = flag('code');
 const name = flag('name', 'Fake Studio Mac');
 const projects = flags('project');
 const interval = Number(flag('interval', '4000'));
-
-if (!code || projects.length === 0) {
-  console.error('usage: node scripts/fake-daemon.mjs --hub <origin> --code <XXXX-XXXX> --project <id> [--project <id>] [--name <name>] [--interval ms]');
-  process.exit(2);
-}
+const keyFile = flag('key-file');
 
 const log = (kind, extra = {}) => console.log(JSON.stringify({ kind, at: Date.now(), ...extra }));
 
-const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+const keyExists = keyFile !== undefined && existsSync(keyFile);
+if ((!keyExists && !code) || projects.length === 0) {
+  console.error('usage: node scripts/fake-daemon.mjs --hub <origin> (--code <XXXX-XXXX> | --key-file <pem>) --project <id> [--project <id>] [--name <name>] [--interval ms]');
+  process.exit(2);
+}
+
+// Reuse the same Ed25519 key across restarts (the e2e kills and restarts the daemon): the hub
+// then sees the same daemon and the project mapping survives. A first run writes the key.
+let privateKey;
+if (keyExists) {
+  privateKey = createPrivateKey(readFileSync(keyFile));
+  log('reused-key', { file: keyFile });
+} else {
+  privateKey = generateKeyPairSync('ed25519').privateKey;
+  if (keyFile) {
+    mkdirSync(dirname(keyFile), { recursive: true });
+    writeFileSync(keyFile, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+  }
+}
+const publicKey = createPublicKey(privateKey);
 const der = publicKey.export({ type: 'spki', format: 'der' });
 const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
@@ -124,6 +141,7 @@ function connect() {
     if (frame.t === 'welcome') pushAll();
     else if (frame.t === 'deliver') {
       // The hub delivered a customer action; say it ran. M3 would use the daemon's own OpLog here.
+      log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
     } else if (frame.t === 'resync') {
       const entry = plans.find((p) => p.project === frame.project);
@@ -156,7 +174,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-await register();
+if (!keyExists) await register();
 connect();
 setInterval(() => {
   if (synced) for (const entry of plans) snapshot(entry);

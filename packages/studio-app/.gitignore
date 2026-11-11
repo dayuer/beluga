@@ -5,3 +5,7 @@ web-build/
 tmp/
 *.log
 .dev.vars
+test-results/
+playwright-report/
+e2e/test-results/
+e2e/playwright-report/
