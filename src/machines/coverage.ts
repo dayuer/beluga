@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { MACHINE_FORK } from '../fork/coverage.js';
 
 /**
  * What your own app may do on one of your computers while it drives it (BLG-776): every API method
@@ -453,9 +454,6 @@ export const MACHINE: Record<Method, MachineSide> = {
   'plans.setParallel': 'drive',
   'plans.setTestsAt': 'drive',
   'plans.setWorkAgent': 'drive',
-  'plans.setCheckAgent': 'drive',
-  'plans.setArchAgent': 'drive',
-  'plans.setFixAgent': 'drive',
   'plans.tidyUp': 'drive',
   'plans.pass': 'drive',
   'plans.recheck': 'drive',
@@ -685,6 +683,8 @@ export const MACHINE: Record<Method, MachineSide> = {
   'external.status': 'drive',
   'external.stopAgent': 'drive',
   'external.stopAll': 'drive',
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...MACHINE_FORK,
 };
 
 /** A method a screen driving a computer may not call (unknown names are left to the API, which refuses them). */

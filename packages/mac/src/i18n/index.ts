@@ -60,8 +60,9 @@ export async function loadLocale(pref: LanguagePref = languagePref()): Promise<L
   document.documentElement.lang = current === 'en' ? 'en' : current;
   if (current === 'en') return current;
   try {
-    const mod = (await import('./zh-CN.json')) as { default: Record<string, string> };
-    catalog = compile(mod.default);
+    // This fork's own strings live beside upstream's catalog, so syncing upstream never conflicts there (docs/fork.md).
+    const [mod, fork] = (await Promise.all([import('./zh-CN.json'), import('./zh-CN.fork.json')])) as { default: Record<string, string> }[];
+    catalog = compile({ ...mod!.default, ...fork!.default });
   } catch {
     // A catalog that can't load leaves the window in English rather than empty.
     current = 'en';

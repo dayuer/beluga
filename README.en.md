@@ -15,7 +15,7 @@
 <p align="center">
   <sub>macOS 13+ (Apple Silicon) · Linux x64 (AppImage, .deb, .rpm) · Windows 10+ x64 · updates itself</sub>
 </p>
-<p align="center"><a href="README.md">简体中文</a> · <b>English</b></p>
+<p align="center"><a href=".github/README.md">简体中文</a> · <b>English</b></p>
 
 ## What it does
 
