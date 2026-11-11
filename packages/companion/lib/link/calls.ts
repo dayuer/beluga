@@ -113,6 +113,8 @@ export const calls = {
   setPlanCheckAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setCheckAgent', [planId, agent], `Plan's checks: ${label}`),
   /** 1.53 (fork): who designs a plan's milestones before their work starts (null: no architect step) → in words. Only to a Mac with SINCE.archAgent. */
   setPlanArchAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setArchAgent', [planId, agent], `Plan's architecture: ${label}`),
+  /** 1.54 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words. Only to a Mac with SINCE.fixAgent. */
+  setPlanFixAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setFixAgent', [planId, agent], `Plan's hard fixes: ${label}`),
   /** A task described in words: Claude's draft first, then it's added. */
   // 1.24 (BLG-322) `several`: only to a Mac that has it (SINCE.severalTasks); an older one drafts one task.
   draftTask: (projectId: string, text: string, several = false): Call => make('companion.draftTask', [{ projectId, text, ...(several ? { several } : {}) }], 'Draft a task'),

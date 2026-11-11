@@ -348,12 +348,22 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     { label: 'No Architect (Start Right Away)', checked: !plan.archAgent, onSelect: () => archAgent(YOUR_AGENT) },
     ...agentMenuItems(agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)), plan.archAgent, archAgent).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
   ];
+  // Agent for Hard Fixes ▸: who takes over fix tasks after a failed check, conflicts, a task that stopped twice; none: auto route's strongest.
+  const fixAgent = (v: string): void =>
+    void act(() => api.setFixAgent(plan.id, v === YOUR_AGENT ? null : agentForChoice(v, runtimes))).then((said) => {
+      if (typeof said === 'string') toast(client, said, 'success');
+    });
+  const fixItems: ActionItem[] = [
+    { label: 'Strongest Model (Auto Route)', checked: !plan.fixAgent, onSelect: () => fixAgent(YOUR_AGENT) },
+    ...agentMenuItems(agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)), plan.fixAgent, fixAgent).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
+  ];
   const more: ActionItem[] = [
     ...(plan.body && plan.status === 'active' ? [{ label: plan.paused ? 'Resume' : 'Pause', onSelect: () => void act(() => api.setPaused(plan.id, !plan.paused)) }] : []),
     { label: 'Run at Once', submenu: [1, 2, 3, 4, 6, MAX_PARALLEL].map((n) => ({ label: `${n} ${n === 1 ? 'milestone' : 'milestones'}`, checked: plan.maxParallel === n, onSelect: () => void act(() => api.setParallel(plan.id, n)) })), onSelect: () => undefined },
     ...(plan.status !== 'done' ? [{ label: 'Agent for Its Work', submenu: agentMenuItems(agents, plan.agent, workAgent), onSelect: () => undefined }] : []),
     ...(plan.status !== 'done' ? [{ label: 'Agent for Its Checks', submenu: checkItems, onSelect: () => undefined }] : []),
     ...(plan.status !== 'done' ? [{ label: 'Agent for Its Architecture', submenu: archItems, onSelect: () => undefined }] : []),
+    ...(plan.status !== 'done' ? [{ label: 'Agent for Hard Fixes', submenu: fixItems, onSelect: () => undefined }] : []),
     { label: 'When to Run Tests', submenu: TESTS_AT.map((t) => ({ label: TESTS_AT_INFO[t].label, hint: TESTS_AT_INFO[t].hint, checked: plan.testsAt === t, onSelect: () => void act(() => api.setTestsAt(plan.id, t), t === 'end' ? 'From now on, milestone checks skip the test suites; they all run once, in the final step' : 'From now on, each milestone’s check runs the full suites once, on its combined work') })), onSelect: () => undefined },
     ...(review === 'reviewing' ? [{ label: 'Approve Without Waiting', onSelect: approvePlan }] : []),
     ...(review !== 'off' && review !== 'reviewing' ? [{ label: review === 'none' ? 'Verify the Plan' : 'Verify the Plan Again', onSelect: () => verify(false) }] : []),

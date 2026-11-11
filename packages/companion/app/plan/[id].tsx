@@ -50,6 +50,7 @@ export default function Plan() {
   const [picking, setPicking] = useState(false);
   const [pickingCheck, setPickingCheck] = useState(false);
   const [pickingArch, setPickingArch] = useState(false);
+  const [pickingFix, setPickingFix] = useState(false);
   // Who works its milestones and tasks (1.35, BLG-498): its own pick, else your default; changed from ⋯.
   const defaultGroup = p?.agents?.groups.find((g) => g.isDefault);
   const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
@@ -73,6 +74,14 @@ export default function Plan() {
   const setArchAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanArchAgent(id ?? '', agent, label)).then(
       (said) => store.toast({ text: typeof said === 'string' ? said : `${label} designs this plan's milestones`, tone: 'ok' }),
+      (e: Error) => store.toast({ text: e.message, tone: 'error' }),
+    );
+  };
+  // Who takes over what's hard (1.54): fix tasks after a failed check, conflicts, a task that stopped twice. None: auto route's strongest.
+  const fixWords = p?.fixAgent ? agentName(p.fixAgent, { model: true }) : 'Strongest model';
+  const setFixAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
+    void store.call<string>(calls.setPlanFixAgent(id ?? '', agent, label)).then(
+      (said) => store.toast({ text: typeof said === 'string' ? said : `${label} takes over what's hard`, tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
@@ -110,6 +119,7 @@ export default function Plan() {
           { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Agent for its work', sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
           { Icon: markIcon(runtimeMark(p?.checkAgent?.runtime ?? agentRuntime)), label: 'Agent for its checks', sub: checkWords, tone: 'lavender', hidden: !p?.agents || !store.supports('checkAgent'), onPress: () => setPickingCheck(true) },
           { Icon: markIcon(runtimeMark(p?.archAgent?.runtime ?? agentRuntime)), label: 'Agent for its architecture', sub: archWords, tone: 'lavender', hidden: !p?.agents || !store.supports('archAgent'), onPress: () => setPickingArch(true) },
+          { Icon: markIcon(runtimeMark(p?.fixAgent?.runtime ?? agentRuntime)), label: 'Agent for hard fixes', sub: fixWords, tone: 'lavender', hidden: !p?.agents || !store.supports('fixAgent'), onPress: () => setPickingFix(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
@@ -139,6 +149,15 @@ export default function Plan() {
         onClose={() => setPickingArch(false)}
         yours={{ on: !p?.archAgent, onPick: () => setArchAgent(null, 'No architect'), label: 'No architect', caption: 'Each milestone starts right away, without a design' }}
         onPick={(g, value, label) => setArchAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
+      />
+      <AgentChoiceSheet
+        title="Agent for hard fixes"
+        caption="Takes over fix tasks after a failed check, conflicts, and a task that stopped twice"
+        picker={p?.agents}
+        visible={pickingFix}
+        onClose={() => setPickingFix(false)}
+        yours={{ on: !p?.fixAgent, onPick: () => setFixAgent(null, 'Strongest model'), label: 'Strongest model', caption: 'Auto route’s strongest model; with auto route off, whoever is at it keeps it' }}
+        onPick={(g, value, label) => setFixAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
       />
       <Options
         visible={howOpen}

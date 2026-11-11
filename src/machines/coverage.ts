@@ -455,6 +455,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'plans.setWorkAgent': 'drive',
   'plans.setCheckAgent': 'drive',
   'plans.setArchAgent': 'drive',
+  'plans.setFixAgent': 'drive',
   'plans.tidyUp': 'drive',
   'plans.pass': 'drive',
   'plans.recheck': 'drive',
