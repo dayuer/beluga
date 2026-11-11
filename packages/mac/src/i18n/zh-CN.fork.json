@@ -190,6 +190,8 @@
  "{0} screen.png": "{0} 的屏幕.png",
  "{0} stopped again: gave it to {1}, woke it at {2}": "{0} 又停了：已交给 {1}，并在 {2} 唤醒它",
  "{0} takes over what’s hard in this plan: fix tasks after a failed check, conflicts, a task that stopped twice": "{0} 接手这个计划里的疑难问题：检查没过的修复任务、合并冲突、卡住两次的任务",
+ "{0} works this plan’s milestones and tasks, the {1} already at work included": "{0} 负责这个计划的里程碑和任务，已在工作的 {1} 也一起换过去",
+ "{0} works what starts next and the {1} not running now; the {2} mid-turn keep{3} {4} agent": "{0} 负责接下来开始的工作，以及此刻没在运行的 {1}；正在运行的 {2} 保留{4}智能体",
  "{0} works what starts next; the milestone already at work keeps its agent": "{0} 负责接下来开始的工作；已在工作的里程碑保留它的智能体",
  "{0} works what starts next; the {1} milestones already at work keep their agent": "{0} 负责接下来开始的工作；已在工作的 {1} 个里程碑保留各自的智能体",
  "“{0}” runs on {1} now. Pick how it runs from here on.": "“{0}”现在按{1}运行。选择从现在起怎么运行。",

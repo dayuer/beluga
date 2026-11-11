@@ -666,7 +666,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `plans.setAutonomy` | ✓ Step by Step · Check-ins · Autopilot on a plan's page (a milestone's own from its menu); the phone plan page's autonomy chip (1.5) |
 | `plans.setPaused` | ✓ Pause / Resume on a plan's page |
 | `plans.setParallel` | ✓ a plan's ⋯ › Run at Once ▸ |
-| `plans.setWorkAgent` | ✓ a plan's ⋯ › Agent for Its Work ▸ (BLG-498): who works the milestones and tasks that start from now on (ones at work keep theirs, the toast says so); the phone's plan page › ⋯ › Agent for its work (1.35) |
+| `plans.setWorkAgent` | ✓ a plan's ⋯ › Agent for Its Work ▸ (BLG-498): who works the milestones and tasks that start from now on, and the ones at work that aren't mid-turn (paused on a usage limit, stopped: moved at once, a usage-limited task going on there now); one mid-turn keeps its agent, the toast says so; the phone's plan page › ⋯ › Agent for its work (1.35) |
 | `plans.setTestsAt` | ✓ a plan's ⋯ › When to Run Tests ▸ (each milestone, or once at the end) |
 | `plans.pass` | ✓ Pass Milestone on a plan's page |
 | `plans.recheck` | ✓ Check Again on a milestone the agent is checking or that failed its check |

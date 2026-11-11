@@ -299,3 +299,28 @@ describe('a plan’s agent for hard fixes', () => {
     expect(PlanView.parse(view).fixAgent).toEqual(STRONG);
   });
 });
+
+/** The agent for the work, changed while a milestone is at work (TRC-179: paused on a usage limit, picking another agent changed nothing). */
+describe('the agent for the work, changed while a milestone is at work', () => {
+  it('one mid-turn keeps its agent; paused on a usage limit, it goes to the new agent now and goes on there', async () => {
+    const t = setup();
+    const plan = await approved(t, ONE, { fix: null });
+    const channel = `ws:${await waitFor(() => t.issue('Idempotent webhooks').worktrees.at(-1))}`;
+    const toIt = () => t.switched.filter((s) => s.channel === channel);
+    const asks = () => t.asked.filter((a) => a.channel === channel).length;
+    // Mid-turn: switching would cut the turn, so it keeps its agent.
+    t.run(channel, 'started', 'r1');
+    expect(t.work.setWorkAgent(plan.id, MID)).toBe('Claude (Sonnet) works what starts next; the milestone already at work keeps its agent');
+    expect(toIt()).toEqual([]);
+    // Its turn ended on your usage limit: paused until the reset.
+    t.run(channel, 'done', 'r1');
+    const now = Date.now();
+    t.plans.setWatch(plan.id, 'retries', { at: now, reason: 'You hit your Claude plan usage limit', run: 'r1', limitUntil: now + 60 * MIN, line: 'paused: usage limit · resumes at 16:45' });
+    const before = asks();
+    expect(t.work.setWorkAgent(plan.id, MID)).toBe('Claude (Sonnet) works this plan’s milestones and tasks, the milestone already at work included');
+    expect(toIt()).toEqual([{ channel, agent: MID, at: expect.any(Number) }]);
+    // It goes on now, on the new agent, instead of waiting for the reset.
+    await waitFor(() => asks() > before);
+    expect(t.plans.need(plan.id).watch?.retries?.limitUntil).toBeUndefined();
+  });
+});
