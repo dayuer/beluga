@@ -50,6 +50,15 @@ node scripts/sync-upstream.mjs --report
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
 
+### 沉稳界面（docs/calm-ui.md）
+
+界面气质（布局稳定、动效克制、状态安静、反馈分级、一致可预期、逐页验收）由 `packages/mac/src/fork/calm/` 的覆盖层实现，规则只在 `:root[data-calm]` 下生效。上游文件只留这几处接入点：
+
+- `packages/mac/src/main.tsx`：在 `tokens.css`、`base.css` 之后加一行 `import './fork/calm/index.js'`；它在首帧前设置 `data-calm`，并引入 `fork/calm/calm.css`。
+- `packages/mac/src/dialogs/Settings.tsx`：Appearance 的 Layout 组、Reduce motion 行后加一行 `<CalmRow />`；开关本体在 `packages/mac/src/fork/calm/settings.tsx`。
+- `tests/mac-settings-search.test.ts`：appearance 的 `PANE_SOURCES` 加 `read('fork/calm/settings.tsx')`，让「索引的标签必须在面板源码里」这条校验读得到 fork 自己的行。
+- `CLAUDE.md`：原来的《The Mac app's look: calm, not lively》一节搬进 `docs/calm-ui.md`，原处只留一行指向；规则本体的改动都在 fork 文件里，不碰上游。
+
 ### 版本号（脚本自动处理）
 
 - `packages/mac/package.json`、`packages/mac/src-tauri/tauri.conf.json`
