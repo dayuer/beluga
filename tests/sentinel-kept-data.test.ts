@@ -28,10 +28,11 @@ describe('a metric’s history as a file', () => {
 });
 
 describe('what a sentinel keeps', () => {
-  function kept() {
+  function kept(now = T + 3_600_000) {
     const home = mkdtempSync(path.join(os.tmpdir(), 'beluga-kept-'));
     dirs.push(home);
-    const s = setup({ home });
+    // Its own clock, an hour after the run: on the wall clock, 14 days after T swept the documents (files keep 14 days).
+    const s = setup({ home, now: () => now });
     const sn = s.sentinels.create(brief);
     const run = s.sentinels.addHistory(sn.id, { by: 'schedule', trigger: { kind: 'schedule', summary: 'On its schedule' }, state: 'done', startedAt: T, endedAt: T + 1000, headline: 'Kept it', steps: sn.steps.map((st) => ({ id: st.id, state: 'done' as const })), tasks: [] }, { outputs: ['token=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 and more'], report: '# Today\n\nAll good.' });
     s.sentinels.demoKeep(sn.id, run.id, [{ name: 'issues', label: 'Open issues', better: 'down', value: 9 }, { name: 'jobs', label: 'Jobs', better: 'none', columns: ['job', 'log'], columnTypes: [{ key: 'log', type: 'html', name: '{{job}}.html' }], rows: [{ job: 'deploy', log: '<p>done</p>' }] }]);
@@ -50,6 +51,12 @@ describe('what a sentinel keeps', () => {
     expect(files.map((f) => [f.name, f.label, f.kind])).toEqual(expect.arrayContaining([['report.md', 'Report', 'report'], ['step-1.txt', k.sn.steps[0]!.name, 'step'], ['files/deploy.html', 'deploy.html', 'document']]));
     expect(files.some((f) => f.name.includes('trigger'))).toBe(false);
     expect(data.keepsDays).toBe(14);
+  });
+
+  it('a run’s documents go once its 14 days are up; its report and steps stay', () => {
+    const k = kept(T + 15 * 24 * 3_600_000);
+    const names = k.sentinels.dataList(k.sn.id).runs[0]!.files.map((f) => f.name);
+    expect(names.sort()).toEqual(['report.md', 'step-1.txt']);
   });
 
   it('reads a run’s file for the viewer: a step’s output redacted, by its step’s name; a document as kept', () => {
