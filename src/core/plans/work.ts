@@ -368,17 +368,22 @@ export class PlansWork {
 
   /**
    * Who works the plan's milestones and tasks (BLG-498): `agent`, or your default (null). Work that
-   * starts from now on gets it; milestones and tasks already at work keep the agent they opened with
-   * (switching mid-run would lose their sessions). A task's own agent still beats it. The plan's own
-   * conversation moves to it too. → in words.
+   * starts from now on gets it, and so does a milestone at work that isn't mid-turn (paused on a
+   * usage limit, stopped: PlanPilot.followWork), its conversation coming along; one mid-turn keeps
+   * the agent it opened with. A task's own agent still beats it. The plan's own conversation moves
+   * to it too. → in words.
    */
   setWorkAgent(id: string, agent: AgentRef | null): string {
     const plan = this.plans.setWorkAgent(id, agent ?? undefined, this.me());
     // The plan's own conversation follows it (unless it has an architect, who plans), so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
     this.followHome(plan);
     const who = agent ? agentName(agent, { model: true }) : 'your default agent';
-    const busy = Object.values(plan.runs).filter((r) => r?.agent && !r.passedAt).length;
-    return busy ? `${who} works what starts next; the ${busy === 1 ? 'milestone' : `${busy} milestones`} already at work keep${busy === 1 ? 's' : ''} ${busy === 1 ? 'its' : 'their'} agent` : `${who} works this plan’s milestones and tasks`;
+    // Milestones at work between turns (a usage limit, stopped) go to it now; one mid-turn keeps its agent.
+    const { moved, kept } = plan.status === 'done' ? { moved: 0, kept: 0 } : this.pilot.followWork(id, agent ?? undefined);
+    const them = (n: number): string => (n === 1 ? 'milestone' : `${n} milestones`);
+    if (kept && moved) return `${who} works what starts next and the ${them(moved)} not running now; the ${them(kept)} mid-turn keep${kept === 1 ? 's' : ''} ${kept === 1 ? 'its' : 'their'} agent`;
+    if (kept) return `${who} works what starts next; the ${them(kept)} already at work keep${kept === 1 ? 's' : ''} ${kept === 1 ? 'its' : 'their'} agent`;
+    return moved ? `${who} works this plan’s milestones and tasks, the ${them(moved)} already at work included` : `${who} works this plan’s milestones and tasks`;
   }
 
   /**

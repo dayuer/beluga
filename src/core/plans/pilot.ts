@@ -982,6 +982,41 @@ export class PlanPilot {
     this.deps.switchAgent?.(plan.home, this.deps.homeAgent?.(plan));
   }
 
+  /**
+   * The agent for the plan's work changed: each milestone at work whose turn isn't running now
+   * (paused on a usage limit, stopped, between turns) goes to it at once, as its own picker would
+   * (its conversation comes along), and a task of it paused on a usage limit goes on there now
+   * instead of waiting for the reset. One mid-turn keeps its agent: switching would cut the turn.
+   * → how many milestones moved, and how many kept theirs.
+   */
+  followWork(planId: string, agent: AgentRef | undefined): { readonly moved: number; readonly kept: number } {
+    const plan = this.deps.plans.need(planId);
+    const live = liveFrom(this.deps.store.getState());
+    let moved = 0;
+    let kept = 0;
+    for (const run of Object.values(plan.runs)) {
+      if (!run?.agent || run.passedAt) continue;
+      const channel = `${WS_PREFIX}${run.agent.worktree}`;
+      if (!this.deps.switchAgent || live.busy(channel) || live.asking(channel) || this.deps.alive?.(channel)) {
+        kept++;
+        continue;
+      }
+      // On the one you picked now, not on the fix agent it may have been handed to.
+      this.onFixer.delete(channel);
+      this.deps.switchAgent(channel, agent);
+      moved++;
+      for (const [taskId, w] of Object.entries(plan.watch ?? {})) {
+        if (w?.limitUntil === undefined || !run.agent.tasks.includes(taskId)) continue;
+        try {
+          this.resume(planId, taskId, 'beluga');
+        } catch {
+          // Going already: nothing to wake.
+        }
+      }
+    }
+    return { moved, kept };
+  }
+
   /** The watchdog's ask (a task stopped again soon after a wake): its conversation goes to the fix agent. → its name, or undefined (no fix agent, or it's on it already). */
   private escalate(plan: Plan, channel: string): string | undefined {
     return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}`);
