@@ -152,11 +152,35 @@ describe('the M1 audit (docs/reports/studio-m1-audit.md)', () => {
       expect(sanitizeText(s)).toBe(s);
   });
 
+  /**
+   * Linear, whatever this Mac's speed or load (S-1, BLG-151): one long input against eight short
+   * ones of the same total length, in the same round, the best of five. Linear work costs the same
+   * both ways (about 1×; the bounded windows of some rules make it up to 2× here); a rule that went
+   * quadratic costs eight times as much on the long one. No milliseconds: only the ratio.
+   * The input is cut at 4 × max (sanitize.ts), so `max` sets how long each one really is.
+   */
   it('runs in linear time on long input (S-1)', () => {
-    for (const s of ['的'.repeat(100_000), 'a.'.repeat(50_000), `${' '.repeat(50_000)}x`, 'x/'.repeat(50_000)]) {
+    const SHORT = 2000;
+    const LONG = 8 * SHORT;
+    const cost = (f: () => void): number => {
       const t0 = performance.now();
-      sanitizeText(s);
-      expect(performance.now() - t0).toBeLessThan(1500);
+      f();
+      return performance.now() - t0;
+    };
+    for (const unit of ['的', 'a.', ' ', 'x/', ' \n', '\t ', '&& ']) {
+      const text = (n: number) => `${unit.repeat(n / unit.length)}x`;
+      const short = text(SHORT);
+      const long = text(LONG);
+      for (const f of [sanitizeText, sanitizeLine]) {
+        f(short, SHORT / 4); // warm
+        let shortCost = Infinity;
+        let longCost = Infinity;
+        for (let round = 0; round < 5; round++) {
+          shortCost = Math.min(shortCost, cost(() => { for (let i = 0; i < LONG / SHORT; i++) f(short, SHORT / 4); }));
+          longCost = Math.min(longCost, cost(() => f(long, LONG / 4)));
+        }
+        expect(longCost / shortCost, `${f.name} on ${JSON.stringify(unit)}: ${longCost.toFixed(1)} vs ${shortCost.toFixed(1)}`).toBeLessThan(4);
+      }
     }
   });
 });

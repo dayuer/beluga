@@ -98,7 +98,8 @@ const replacers: ReadonlyArray<readonly [RegExp, Replacer]> = [
   [/\b(?:plans|session|questions|host|companion|board|files|git|studio|views|voice|sentinel|workspace|worktree|issues|tasks)\.[a-z][\w]{1,60}(?:\.[a-z]\w{0,60}){0,3}\b/g, ''],
   // Shell commands.
   [/\b(?:npm|npx|yarn|pnpm|bun|git|pip3?|brew|curl|wget|sudo|sshpass|docker|kubectl|cargo|mysql|psql|mongo|mongosh|redis-cli|sqlcmd|aws|gcloud|az|gh|openssl|xcodebuild|gradlew?|pod|tsc|vitest|jest|node|python3?|deno|wrangler|expo|eas|fastlane|asc|beluga|rm|mkdir|chmod|cd|export|ssh|scp)\s+[-\w:@./=~]{1,200}(?:\s+[-\w:@./=~]{1,200}){0,4}/g, ''],
-  [/\s*(?:&&|\|\|)\s*/g, ' '],
+  // From the start of a run of spaces only (?<!\s): else each space of a long run went over the rest of it (S-1).
+  [/(?<!\s)\s*(?:&&|\|\|)\s*/g, ' '],
   // Branches.
   [/\b(?:plan|beluga|feature|feat|fix|bugfix|hotfix|release|chore|refs\/heads|origin|claude|codex|spike|refactor|dev|wip|exp|experiment|docs|test|tests|ci|perf|deps|renovate|dependabot)\/[\w./-]{1,200}/gi, ''],
   [/\b[a-z]{2,8}-\d{1,6}-[\w-]{1,100}\b/gi, ''],
@@ -147,7 +148,8 @@ function codeLike(line: string): boolean {
 }
 
 /** A fence's opening (``` or ~~~), after any quote, list marker or indentation. */
-const FENCE = /^(?:[ \t]*(?:>[ \t]?)*(?:[-*+]|\d{1,3}[.)])?[ \t]*)(`{3,}|~{3,})/;
+// One way to read each space (no [ \t]* on both sides of what may be absent): a line of spaces is gone over once (S-1).
+const FENCE = /^[ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,3}[.)])[ \t]*)?(`{3,}|~{3,})/;
 
 /** Fenced blocks (closed or not, quoted, in a list, indented) → one placeholder each. */
 function dropFences(text: string): string {
@@ -244,7 +246,7 @@ function tidy(s: string): string {
   return s
     .replace(/[ \t]+/g, ' ')
     .replace(/\(\s*\)|（\s*）|\[\s*\]|「\s*」|“\s*”|"\s*"|'\s*'|<\s*>/g, '')
-    .replace(/\s+([，。、；：！？,.;:!?）)])/g, '$1')
+    .replace(/(?<!\s)\s+([，。、；：！？,.;:!?）)])/g, '$1')
     .replace(/([（(])\s+/g, '$1')
     .replace(/([，。、；：！？])\s+/g, '$1')
     .replace(/(?:和|与|及|或|(?<![\w/])(?:and|or))\s{0,3}(?=[，,、；;。.！!？?]|$)/gm, '')
@@ -293,4 +295,4 @@ export function sanitizeText(input: string, max = 4000, opts: SanitizeOptions = 
 }
 
 /** One line (a title, a criterion): sanitized, newlines folded. */
-export const sanitizeLine = (input: string, max = 400, opts: SanitizeOptions = {}): string => sanitizeText(input.slice(0, MAX_INPUT).replace(/\s*\n\s*/g, ' '), max, opts);
+export const sanitizeLine = (input: string, max = 400, opts: SanitizeOptions = {}): string => sanitizeText(input.slice(0, MAX_INPUT).replace(/(?<!\s)\s*\n\s*/g, ' '), max, opts);
