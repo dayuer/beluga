@@ -9,6 +9,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,9 +70,38 @@ function stop(child, signal = 'SIGTERM') {
   }
 }
 
-async function waitFor(url, timeout = 60_000) {
+/**
+ * A port this run will listen on, free before it starts (BLG-153): a hub or proxy left by another
+ * run (the real-flow run uses 8787 and 8790 too) would answer the readiness checks below, and the
+ * tests would drive someone else's build. Say so and stop instead.
+ */
+function portFree(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
+  });
+}
+
+async function needFree(ports) {
+  const busy = [];
+  for (const port of ports) if (!(await portFree(port))) busy.push(port);
+  if (busy.length) throw new Error(`port ${busy.join(', ')} is already in use (another hub, proxy or e2e run?): see \`lsof -nP -iTCP:${busy[0]} -sTCP:LISTEN\` and stop it first`);
+}
+
+const tail = (file) => {
+  try {
+    return fs.readFileSync(file, 'utf8').split('\n').slice(-30).join('\n');
+  } catch {
+    return '';
+  }
+};
+
+/** Up when `url` answers; `child` (and its log) say why when it stopped first. */
+async function waitFor(url, timeout = 60_000, child, childLog) {
   const from = Date.now();
   while (Date.now() - from < timeout) {
+    if (child && child.exitCode !== null) throw new Error(`it stopped (exit ${child.exitCode}) before ${url} answered:\n${childLog ? tail(childLog) : ''}`);
     try {
       const res = await fetch(url);
       if (res.ok) return;
@@ -124,6 +154,7 @@ function stopDaemon() {
 }
 
 async function setup() {
+  await needFree([8787, 8790, controlPort, daemonControlPort]);
   fs.mkdirSync(scratch, { recursive: true });
   fs.rmSync(stateDir, { recursive: true, force: true });
   fs.rmSync(keyFile, { force: true });
@@ -140,7 +171,7 @@ async function setup() {
   );
 
   log('starting wrangler dev');
-  start('wrangler', 'npx', [
+  const wrangler = start('wrangler', 'npx', [
     'wrangler',
     'dev',
     '--port',
@@ -154,15 +185,15 @@ async function setup() {
     '--var',
     `HUB_ORIGIN:${appUrl}`,
   ], { cwd: hubDir, log: wranglerLog });
-  await waitFor(`${hubUrl}/healthz`);
+  await waitFor(`${hubUrl}/healthz`, 60_000, wrangler, wranglerLog);
 
   log('starting the same-origin proxy');
-  start('proxy', process.execPath, [path.join(appDir, 'scripts/dev-proxy.mjs'), '--dist'], {
+  const proxy = start('proxy', process.execPath, [path.join(appDir, 'scripts/dev-proxy.mjs'), '--dist'], {
     cwd: appDir,
     env: { ...process.env, PORT: '8790', HUB_PORT: '8787' },
     log: proxyLog,
   });
-  await waitFor(`${appUrl}/login`);
+  await waitFor(`${appUrl}/login`, 60_000, proxy, proxyLog);
 
   log('creating the studio and the daemon');
   const studio = await api('/v1/admin/studios', 'POST', { name: 'E2E Studio' });
@@ -179,7 +210,7 @@ async function setup() {
   }
   const dp1 = entries.find((e) => e.projectId === 'dp1');
   const dp2 = entries.find((e) => e.projectId === 'dp2');
-  if (!dp1 || !dp2) throw new Error('the fake daemon did not report dp1 and dp2; see .beluga/scratch/m5/daemon.log');
+  if (!dp1 || !dp2) throw new Error('the fake daemon did not report dp1 and dp2; see .beluga/scratch/m6/daemon.log');
 
   log('creating two projects, mapping them and inviting the customer');
   const p1 = await api(`/v1/admin/studios/${sid}/projects`, 'POST', { name: '饮水打卡' });
@@ -220,7 +251,7 @@ async function setup() {
     }
     await sleep(500);
   }
-  if (!cached) throw new Error('the plans never reached the hub; see .beluga/scratch/m5/daemon.log');
+  if (!cached) throw new Error('the plans never reached the hub; see .beluga/scratch/m6/daemon.log');
 
   return {
     projectId,
@@ -302,7 +333,7 @@ async function main() {
   } catch (error) {
     failed = true;
     console.error('[e2e] failed:', error instanceof Error ? error.message : error);
-    console.error('[e2e] logs: .beluga/scratch/m5/{wrangler,proxy,daemon}.log');
+    console.error('[e2e] logs: .beluga/scratch/m6/{wrangler,proxy,daemon}.log');
   } finally {
     if (control) {
       control.closeAllConnections?.();

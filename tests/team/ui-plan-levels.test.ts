@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { milestoneLevels } from '../../packages/ui-plan/levels';
+import { milestoneLevels } from '../../packages/ui-plan/levels.js';
 
 describe('milestoneLevels (shared by the companion and the customer app)', () => {
   it('draws a chain when a Mac sends no dependsOn', () => {

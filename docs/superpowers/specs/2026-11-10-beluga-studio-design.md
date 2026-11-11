@@ -1,7 +1,9 @@
 # Synon Studio — 把 Plans 做成客户用的远程 App（设计）
 
-日期：2026-11-10 · 状态：按 Opus 审计（`docs/reports/studio-design-audit-opus.md`）修订，待复审
-（`docs/reports/studio-design-recheck.md`）。
+日期：2026-11-10 · 状态：**P1 已落地（M1–M7）**。设计经 Opus 审计
+（`docs/reports/studio-design-audit-opus.md`）修订并复审（`docs/reports/studio-design-recheck.md`）；
+真实链路的一次完整运行见 `docs/reports/studio-p1-run.md`，P1 的独立审计见
+`docs/reports/studio-p1-audit.md`，运营手册见 `docs/studio.md`。
 
 产品对外叫 **Synon Studio**；内部包名、目录、协议名仍用 `studio-hub`、`studio-app`、`src/studio`、
 `STUDIO_PROTO`，本文件名也不改。只有客户看得到的文案、App 名、登录页、邮件里写 Synon Studio。

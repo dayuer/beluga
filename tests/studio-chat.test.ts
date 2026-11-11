@@ -286,6 +286,26 @@ describe('the customer turn’s tools (BLG-78)', () => {
     customerTurns.end('ws:c1');
   });
 
+  it('a customer turn cannot set how a milestone runs (autonomy)', () => {
+    const t = setup();
+    const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.boardWork.myClaude());
+    t.plans.writeDraft(
+      plan.id,
+      { title: 'Shop', goal: 'Go', milestones: [{ title: 'M', criteria: ['works'], tasks: [{ title: 'T' }] }] },
+      t.boardWork.myClaude(),
+    );
+    customerTurns.begin('ws:main');
+    const tools = t.work.forRun('ws:main', 'p-me')!.tools!;
+    const id = t.plans.need(plan.id).draft!.milestones[0]!.id;
+    // The design's §10 boundary: autonomy is the operator's, never a customer's.
+    expect(() => tools.update([{ op: 'update_milestone', id, autonomy: 'autopilot' }], 'x')).toThrow(/operator/);
+    expect(() => tools.update([{ op: 'add_milestone', milestone: { title: 'Next', autonomy: 'autopilot' } }], 'x')).toThrow(/operator/);
+    expect(() => tools.write({ title: 'Shop', goal: 'Go', milestones: [{ title: 'M2', autonomy: 'autopilot', tasks: [{ title: 'T2' }] }] })).toThrow(/operator/);
+    // Everything else a customer's turn may do still changes the draft.
+    expect(tools.update([{ op: 'update_milestone', id, criteria: ['still works'] }], 'more')).toContain('Saved the draft');
+    customerTurns.end('ws:main');
+  });
+
   it('a milestone sent back by the customer limits the turn it starts', () => {
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.boardWork.myClaude());

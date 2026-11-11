@@ -484,6 +484,7 @@ export const views: Translation<typeof en> = {
   "views.diff.asItIs": "文件的当前样子",
   "views.diff.theFile": "文件",
   "views.diff.waiting": "{count} 条评论待发送",
+  "views.diff.waitingOne": "1 条评论待发送",
   "views.diff.goToChat": "去聊天",
   "views.diff.theChanges": "改动",
   "views.diff.loading": "正在加载差异…",

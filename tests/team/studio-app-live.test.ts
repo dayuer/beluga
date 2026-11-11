@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { AppFrame } from '../../src/studio/protocol';
-import type { WatchHandlers } from '../../packages/studio-app/lib/hub';
-import { createLive } from '../../packages/studio-app/lib/live';
+import type { AppFrame } from '../../src/studio/protocol.js';
+import type { WatchHandlers } from '../../packages/studio-app/lib/hub.js';
+import { createLive } from '../../packages/studio-app/lib/live.js';
 
 /** BLG-91: one socket per project, shared by every screen that needs it. */
 

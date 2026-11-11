@@ -739,6 +739,29 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `web.tailscale` | ✓ Settings › Advanced › Web access › Reached from › Tailscale (the ts.net address, whose login gets in, a join link under it); `beluga web --tailscale` (with a QR), `beluga web --off`; `beluga status` shows it |
 | `web.public` | ✓ Settings › Advanced › Web access › Reached from › Public link (what it exposes, its current address, refreshed while shown, so a new one after a cloudflared restart appears); `beluga web --public`, `beluga web --off`; `beluga status` shows the current address |
 | `web.download` | ✓ in a browser the web port served: a chat file's Download, Show in Finder / Open on a file, Save on a shared file (docs/web.md) |
+
+## Synon Studio customer actions
+
+The nine things a Synon Studio customer may do (`ACTION_KINDS` in `src/studio/protocol.ts`), where they do
+them in the customer web app (docs/studio.md §6–§8), and what the daemon runs for each. Nothing else is a
+customer action: the whitelist in `src/studio/actions.ts` refuses any other kind, and only a start or a
+change request raises a Gate — `plans.approve` is never reached from here.
+
+| Action | Where the customer does it | What the daemon runs |
+|---|---|---|
+| `plan.create` | 项目 › 新需求 (goal plus platforms) | `plans.create` with the wrapped goal and the operator's defaults (gated, quiet, a restricted first turn); the project comes from the binding, never the request |
+| `chat.send` | 计划页的对话输入框 | `session.submit` with the wrapped words to the plan's own conversation; the agent's reply becomes a turn only after the run ends and the sanitizer |
+| `plan.verify` | 计划页 › 检查这份计划 | `plans.verify(planId)` — never with `thenApprove` (a plan starts only from its Gate) |
+| `plan.requestStart` | 计划页主按钮「确认计划」 | nothing: raises the `start` Gate bound to that `draftRev`, for the operator's Approve/Decline |
+| `decision.answer` | 计划页的决策卡（只有 `audience: customer` 的） | `questions.answer` for the plan decision card `decide:<plan>:<task>` |
+| `milestone.pass` | 计划页验收「通过」 | `plans.pass(planId, milestoneId)` (the milestone must be at its review gate and not already passed) |
+| `milestone.sendBack` | 计划页验收「还不行」加一句原因 | `plans.sendBack(planId, milestoneId, wrapped reason)` — the plan's agent gets the fix work |
+| `draft.apply` | 计划页草稿差异「应用改动」 | nothing: raises the `changes` Gate for the operator; approving it applies the draft through the same one `plans.approve` |
+| `draft.discard` | 计划页草稿差异「放弃改动」 | `plans.discard(planId)` (a plan never approved goes with it) |
+
+The hub checks the same list before it queues an action (`src/net/studio/queue.ts`), and the daemon looks
+again in `StudioInbox` (`callRefusal`): a customer can't reach an internal method by naming it.
+
 ## Sending while the agent works, and images
 
 | What | Core | Mac |

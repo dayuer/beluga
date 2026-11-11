@@ -382,6 +382,9 @@ export class StudioService {
       config: cfg,
       identity,
       source: this.publisher,
+      // The service's clock, like the inbox's and the chat's: one click of time for the whole run
+      // (production passes Date.now, so this changes nothing there; a test hand-drives it).
+      now: this.now,
       ...(this.ws ? { ws: this.ws } : {}),
       ...(this.timers ? { timers: this.timers } : {}),
       // The hub refuses an `at` it has already seen, and its record survives our restarts.

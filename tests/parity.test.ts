@@ -9,6 +9,7 @@ import type { RuntimeCapabilities } from '../src/agent/runtime/types.js';
 import { COMMANDS } from '../src/core/commands.js';
 import { METHODS } from '../src/ipc/api.js';
 import { RUNTIME_FALLBACKS, RUNTIME_MISSING } from '../src/shared/runtime-fallbacks.js';
+import { ACTION_KINDS } from '../src/studio/protocol.js';
 
 /**
  * Every way into klaud is listed in docs/parity.md with where each client shows it, so a feature
@@ -41,6 +42,10 @@ describe('docs/parity.md', () => {
 
   it('lists every API method', () => {
     expect(METHODS.filter((m) => !listed(m))).toEqual([]);
+  });
+
+  it('lists every Studio customer action', () => {
+    expect(ACTION_KINDS.filter((kind) => !listed(kind))).toEqual([]);
   });
 });
 

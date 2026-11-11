@@ -651,6 +651,28 @@ export class PlansWork {
     };
   }
 
+  /**
+   * How a plan runs (autonomy) is the operator's: a customer's turn and an external agent may
+   * change what the plan says, never whether it runs autopilot (docs/studio-design §10: a milestone
+   * op that carries `autonomy` is refused). Without this, a customer's `plan_update` could set a
+   * milestone to autopilot in the draft and, once approved, skip the pass Gate.
+   */
+  private refuseAutonomy(ops: readonly PlanOp[]): void {
+    const no = (): never => {
+      throw new Error('Only the operator sets how a milestone runs (autonomy): a customer or an external agent can’t.');
+    };
+    for (const op of ops) {
+      if (op.op === 'update_milestone' && op.autonomy !== undefined) no();
+      if (op.op === 'add_milestone' && op.milestone.autonomy !== undefined) no();
+    }
+  }
+
+  private refuseBodyAutonomy(body: BodyInput): void {
+    if (body.milestones.some((m) => m.autonomy !== undefined)) {
+      throw new Error('Only the operator sets how a milestone runs (autonomy): a customer or an external agent can’t.');
+    }
+  }
+
   private toolsFor(planId: string, external?: Actor): PlanTools {
     const by = (): Actor => external ?? this.claude();
     const plans = this.plans;
@@ -672,16 +694,21 @@ export class PlansWork {
     };
     return {
       get: () => describePlan(this.pilot.view(plans.need(planId))),
-      write: (body: BodyInput) => after(() => plans.writeDraft(planId, { ...body, milestones: body.milestones.map((m) => ({ ...m, tasks: (m.tasks ?? []).map((t) => this.adopt(t, planId)) })) }, by())),
+      write: (body: BodyInput) =>
+        after(() => {
+          if (external) this.refuseBodyAutonomy(body);
+          return plans.writeDraft(planId, { ...body, milestones: body.milestones.map((m) => ({ ...m, tasks: (m.tasks ?? []).map((t) => this.adopt(t, planId)) })) }, by());
+        }),
       update: (ops: readonly PlanOp[], reason?: string) =>
-        after(() =>
-          plans.editDraft(
+        after(() => {
+          if (external) this.refuseAutonomy(ops);
+          return plans.editDraft(
             planId,
             ops.map((o) => (o.op === 'add_task' ? { ...o, task: this.adopt(o.task, planId) } : o.op === 'update_task' ? { ...o, patch: this.adopt(o.patch, planId) } : o.op === 'add_milestone' ? { ...o, milestone: { ...o.milestone, tasks: (o.milestone.tasks ?? []).map((t) => this.adopt(t, planId)) } } : o)),
             by(),
             reason,
-          ),
-        ),
+          );
+        }),
       gate: (milestone, verdict, notes) => {
         const plan = plans.need(planId);
         const m = plan.body?.milestones.find((x) => x.id === milestone || x.title.toLowerCase() === milestone.toLowerCase());

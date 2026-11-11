@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { StudioMilestone, StudioPlanView } from '../../src/studio/protocol';
-import { applyLocal, hasPrimary, localFor, pagePhase, type LocalPlanState } from '../../packages/studio-app/lib/plan-phase';
+import type { StudioMilestone, StudioPlanView } from '../../src/studio/protocol.js';
+import { applyLocal, hasPrimary, localFor, pagePhase, type LocalPlanState } from '../../packages/studio-app/lib/plan-phase.js';
 
 /** BLG-91: the plan page's one phase, and therefore its one primary action. */
 

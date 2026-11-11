@@ -341,7 +341,7 @@ export function DiffView() {
         {waiting && mode !== 'file' ? (
           <div className={s.waiting}>
             <Icon name="chat" size={12} />
-            {t('views.diff.waiting', { count: waiting })}
+            {waiting === 1 ? t('views.diff.waitingOne') : t('views.diff.waiting', { count: waiting })}
             <span className={s.flex} />
             <Button size="small" variant="quiet" onClick={toChat}>
               {t('views.diff.goToChat')}

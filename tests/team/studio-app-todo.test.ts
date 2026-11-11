@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { views } from '../../packages/studio-app/e2e/fixtures/views';
-import { todosOf } from '../../packages/studio-app/lib/todo';
+import { views } from '../../packages/studio-app/e2e/fixtures/views.js';
+import { todosOf } from '../../packages/studio-app/lib/todo.js';
 
 /** BLG-94: what a plan puts in the customer's to-do list, with the plan page's priority. */
 

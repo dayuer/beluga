@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { StudioTurn } from '../../src/studio/protocol';
-import { mergeTurns, unreadTurns } from '../../packages/studio-app/lib/turns';
+import type { StudioTurn } from '../../src/studio/protocol.js';
+import { mergeTurns, unreadTurns } from '../../packages/studio-app/lib/turns.js';
 
 /** BLG-92: the chat's pure merge, without a browser. */
 

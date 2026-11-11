@@ -366,7 +366,8 @@ and its Approve / Decline call `studio.answerGate(gateId, {approve:true}` or
 moved since answers `stale`, and the card says to ask them to confirm again. Decline opens the
 card's sheet for a sentence the customer reads; approving from the phone is the same answer as on
 the Mac. An older phone draws it as a plain card with "Open on your Mac"; an older Mac never sends
-one.
+one. The whole flow on the operator's side, the customer web app included, is
+[docs/studio.md](studio.md) (§7 is this card).
 
 **Typed calls.** `src/companion/calls.ts` `PhoneCalls`: every `phone` method with its argument
 tuple (the API's own zod) and its result; the app imports it rather than keeping a list.
