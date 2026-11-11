@@ -163,7 +163,7 @@ function stepsFor(page, shot) {
   return {
     room: async () => {},
     onboarding: async () => {
-      await page.getByRole('dialog', { name: 'Welcome to Beluga' }).waitFor();
+      await page.getByRole('dialog', { name: 'Welcome to Beluga' }).waitFor({ timeout: 60000 });
       await wait(3600);
     },
     workspace: async () => openWs(page),
@@ -281,7 +281,9 @@ try {
         shots.push(`img/${path.basename(file)}`);
       };
 
-      await page.goto(url);
+      // `?welcome` forces the onboarding: the reduce combos have preferences, which otherwise mean
+      // "used Beluga before onboarding existed" and skip it (onboarding/onboarding-model.ts).
+      await page.goto(scene === 'onboarding' ? `${url}${url.includes('?') ? '&' : '?'}welcome` : url);
       await page.waitForSelector('nav[aria-label="Sidebar"]', { timeout: 20000 }).catch(() => undefined);
       await wait(1200);
       await shot('enter');

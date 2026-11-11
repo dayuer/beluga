@@ -24,7 +24,7 @@ const BANNED = ['pop', 'hop', 'bounce', 'ripple', 'sheen', 'shimmer', 'breathe',
 /** Categories that fail when they appear in fork/calm/ (the overlay may only fade and shorten). */
 const FORBIDDEN_IN_FORK = new Set(['spring', 'overscale', 'long-duration']);
 
-type Category = 'keyframes' | 'infinite' | 'element-animate' | 'inline-motion' | 'live-motion' | 'hover-size' | 'spring' | 'overscale' | 'long-duration';
+type Category = 'keyframes' | 'infinite' | 'element-animate' | 'inline-motion' | 'live-motion' | 'framer-motion' | 'hover-size' | 'spring' | 'overscale' | 'long-duration';
 
 interface Finding {
   readonly category: Category;
@@ -105,6 +105,9 @@ function scan(file: string, text: string, out: Finding[]): void {
   if (/\.tsx?$/.test(file)) {
     if (/\.animate\s*\(/.test(text)) add('element-animate', 'animate', text.search(/\.animate\s*\(/));
     if (/from\s+['"][^'"]*live-motion(?:\.js)?['"]/.test(text) || /import\(\s*['"][^'"]*live-motion/.test(text)) add('live-motion', 'live-motion', text.search(/live-motion/));
+    // framer-motion animates through props, which no CSS rule can stop (the runtime calm-check sees
+    // these as unnamed `js` animations; this makes them visible to the static report too).
+    if (/from\s+['"](framer-motion|motion\/react)['"]/.test(text)) add('framer-motion', 'motion', text.search(/framer-motion|motion\/react/));
     if (file.endsWith('.tsx')) {
       for (const style of text.matchAll(/style=\{\{([\s\S]*?)\}\}/g)) {
         for (const prop of style[1]!.matchAll(/\b(animation|transition)[A-Za-z]*\s*:/g)) add('inline-motion', prop[1]!, (style.index ?? 0) + (prop.index ?? 0));
