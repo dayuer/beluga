@@ -12,6 +12,7 @@
 //      the ones docs/fork.md doesn't explain yet.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const UPSTREAM_URL = 'https://github.com/beluga-labs/beluga.git';
@@ -45,6 +46,13 @@ export const withVersion = (text, version) => text.replace(/("version"\s*:\s*")[
 
 /** True when `ours` differs from `base` only in its version (so taking theirs loses nothing of ours). */
 export const onlyVersionChanged = (base, ours) => base !== undefined && ours !== undefined && withVersion(ours, versionOf(base) ?? '') === base;
+
+/** Changed files that stop a merge, from `git diff --name-only HEAD`: all but Finder's .DS_Store (upstream tracks some, and Finder rewrites them). */
+export const blocking = (names) =>
+  names
+    .split('\n')
+    .map((f) => f.trim())
+    .filter((f) => f && path.basename(f) !== '.DS_Store');
 
 /** The upstream files a fork changes that `doc` (docs/fork.md) doesn't name in backticks. */
 export const unexplained = (touched, doc) => touched.filter((f) => !doc.includes(`\`${f}\``));
@@ -96,8 +104,9 @@ function settleVersions() {
 }
 
 function sync() {
-  if (git(['status', '--porcelain', '--untracked-files=no'])) {
-    console.error('Commit or stash your changes first: the merge needs a clean tree.');
+  const dirty = blocking(git(['diff', '--name-only', 'HEAD']));
+  if (dirty.length) {
+    console.error(`Commit or stash these first: the merge needs a clean tree.\n${dirty.map((f) => `  ${f}`).join('\n')}`);
     process.exit(1);
   }
   if (!tryGit(['remote', 'get-url', 'upstream'])) git(['remote', 'add', 'upstream', UPSTREAM_URL]);

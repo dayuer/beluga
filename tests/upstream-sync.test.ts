@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { compareVersions, onlyVersionChanged, unexplained, versionOf, withVersion } from '../scripts/sync-upstream.mjs';
+import { blocking, compareVersions, onlyVersionChanged, unexplained, versionOf, withVersion } from '../scripts/sync-upstream.mjs';
 import { withForkSettings } from '../packages/mac/src/fork/settings-index.js';
 
 /** Syncing upstream into this fork (docs/fork.md, scripts/sync-upstream.mjs). */
@@ -24,6 +24,12 @@ describe('syncing upstream', () => {
     expect(onlyVersionChanged(base, base.replace('3.1.0', '3.1.1'))).toBe(true);
     expect(onlyVersionChanged(base, base.replace('true', 'false'))).toBe(false);
     expect(onlyVersionChanged(undefined, base)).toBe(false);
+  });
+
+  it('lets Finder’s .DS_Store through and names what else stops the merge', () => {
+    expect(blocking('.DS_Store\ndocs/guide/.DS_Store')).toEqual([]);
+    expect(blocking('.DS_Store\nsrc/a.ts\npackages/mac/package.json')).toEqual(['src/a.ts', 'packages/mac/package.json']);
+    expect(blocking('')).toEqual([]);
   });
 
   it('names the touch points docs/fork.md doesn’t explain', () => {
