@@ -25,6 +25,7 @@ export interface LocalPlanState {
   readonly rev: number;
   readonly confirm?: boolean;
   readonly applied?: boolean;
+  readonly discarded?: boolean;
   readonly passedMilestoneRef?: string;
   readonly sentBackMilestoneRef?: string;
   readonly answered?: readonly string[];
@@ -43,6 +44,9 @@ export function applyLocal(view: StudioPlanView, local?: LocalPlanState): Studio
       if (m.ref === local.sentBackMilestoneRef) return { ...m, status: 'working' as const };
       return m;
     });
+  }
+  if (local.discarded) {
+    delete next.draftDiff;
   }
   if (local.confirm) {
     next.gate = { kind: 'start', state: 'pending', draftRev: view.draftRev };

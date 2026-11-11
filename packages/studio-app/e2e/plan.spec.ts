@@ -143,6 +143,41 @@ test('primary action: confirm, pass, send back, answer and apply', async ({ page
   expect(await page.getByTestId('primary').count()).toBe(0);
 });
 
+/** A changed draft: the summary opens the diff, applying it waits for the studio, discarding sends. */
+test('draft diff: added, changed, removed; apply or discard', async ({ page }, info) => {
+  await sessionLogin(page);
+  await openHome(page);
+  await page.getByTestId('plan-row-plan1').click();
+  await page.waitForURL(/\/plan\/plan1\?project=/);
+  await page.getByTestId('plan-header').waitFor({ timeout: 20_000 });
+
+  await controlPost('view', { view: views.changes });
+  await expect(page.getByTestId('changes-summary')).toBeVisible({ timeout: 4000 });
+  await page.getByTestId('changes-summary').click();
+  await expect(page.getByTestId('draft-diff')).toBeVisible();
+  await expect(page.getByTestId('diff-added')).toContainText('每周统计');
+  await expect(page.getByTestId('diff-changed')).toContainText('每日提醒');
+  await expect(page.getByTestId('diff-removed')).toContainText('固定文案提醒');
+  await page.getByTestId('diff-changed-0').click();
+  await expect(page.getByTestId('draft-diff')).toContainText('可以自己设次数');
+  await shot(page, 'plan-diff', info);
+  await page.getByTestId('primary').click();
+  await expect(page.getByTestId('plan-status')).toContainText('在等工作室批准改动', { timeout: 4000 });
+  expect(await page.getByTestId('primary').count()).toBe(0);
+
+  // Discard needs the ••• confirmation.
+  await controlPost('view', { view: views.changes });
+  await expect(page.getByTestId('changes-summary')).toBeVisible({ timeout: 4000 });
+  await page.getByTestId('more').click();
+  const discards = delivered('draft.discard');
+  await page.getByTestId('menu-discard').click();
+  await expect(page.getByTestId('discard-cancel')).toBeVisible();
+  await page.getByTestId('primary').click();
+  await page.waitForTimeout(800);
+  expect(delivered('draft.discard')).toBe(discards + 1);
+  await expect(page.getByTestId('changes-summary')).toBeHidden({ timeout: 4000 });
+});
+
 /** The conversation: a drawer on the phone, a docked panel on the desktop, one send per tap. */
 test('chat: drawer on phone, dock on desktop, one action per double tap', async ({ page }, info) => {
   await sessionLogin(page);

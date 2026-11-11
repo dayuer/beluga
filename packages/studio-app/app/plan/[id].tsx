@@ -7,6 +7,8 @@ import { AcceptCard } from '../../components/AcceptCard';
 import { ActionDock } from '../../components/ActionDock';
 import { ActivityList } from '../../components/ActivityList';
 import { DecisionCard } from '../../components/DecisionCard';
+import { DiscardSheet } from '../../components/DiscardSheet';
+import { DraftDiff } from '../../components/DraftDiff';
 import { Drawer } from '../../components/Drawer';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
@@ -65,6 +67,8 @@ export default function PlanScreen() {
   const [decisionIndex, setDecisionIndex] = useState(0);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [reasonMilestone, setReasonMilestone] = useState<string | undefined>();
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [seen, setSeen] = useState(() => (pid && ref ? (kv.get<number>(`seen:chat:${pid}:${ref}`) ?? 0) : 0));
   const [openMilestones, setOpenMilestones] = useState<readonly string[]>([]);
   const [zoomIndex, setZoomIndex] = useState(() => {
@@ -108,7 +112,7 @@ export default function PlanScreen() {
   const currentDecision = openDecisions.length ? openDecisions[Math.min(decisionIndex, openDecisions.length - 1)] : undefined;
   const reviewMilestone = effective?.milestones.find((m) => m.status === 'review');
   const showPrimary = Boolean(phase && hasPrimary(phase));
-  const drawerOpen = chatOpen || decisionOpen || reasonOpen;
+  const drawerOpen = chatOpen || decisionOpen || reasonOpen || diffOpen || discardOpen;
   const mobileDockHeight = 12 + 44 + 16 + insets.bottom + (showPrimary ? 10 + 52 : 0);
   const desktopDockHeight = showPrimary ? 12 + 52 + 16 : 0;
   const sheetBottom = (desktop ? desktopDockHeight : mobileDockHeight) + 8;
@@ -188,7 +192,10 @@ export default function PlanScreen() {
           setReasonOpen(true);
         }}
         onConfirmed={() => patchLocal({ confirm: true })}
-        onApplied={() => patchLocal({ applied: true })}
+        onApplied={() => {
+          patchLocal({ applied: true });
+          setDiffOpen(false);
+        }}
         onPassed={(milestoneRef) => patchLocal({ passedMilestoneRef: milestoneRef })}
         onRefresh={() => void store.refresh()}
       />
@@ -213,6 +220,24 @@ export default function PlanScreen() {
             ) : null}
             <Segments items={tabs} value={tab} onChange={(key) => setTab(key as TabKey)} />
             <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + space[6] }} testID={`tab-panel-${tab}`}>
+              {phase === 'changes' && effective.draftDiff ? (
+                <View style={styles.acceptWrap}>
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="changes-summary"
+                    onPress={() => setDiffOpen(true)}
+                    style={({ pressed }) => [styles.summary, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.summaryText} numberOfLines={2}>
+                      {t(lang, 'plan.changesSummary', {
+                        a: effective.draftDiff.added.length,
+                        c: effective.draftDiff.changed.length,
+                        r: effective.draftDiff.removed.length,
+                      })}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
               {phase === 'review' && reviewMilestone ? (
                 <View style={styles.acceptWrap}>
                   <AcceptCard milestone={reviewMilestone} review={effective.review} lang={lang} />
@@ -304,6 +329,40 @@ export default function PlanScreen() {
             ) : null}
           </Drawer>
 
+          <Drawer open={diffOpen} onClose={() => setDiffOpen(false)} title={t(lang, 'diff.title')}>
+            {effective?.draftDiff ? (
+              <DraftDiff
+                pid={pid}
+                planRef={ref}
+                diff={effective.draftDiff}
+                draftRev={effective.draftRev}
+                lang={lang}
+                onApplied={() => {
+                  patchLocal({ applied: true });
+                  setDiffOpen(false);
+                }}
+                onRefresh={() => void store.refresh()}
+              />
+            ) : null}
+          </Drawer>
+
+          <Drawer open={discardOpen} onClose={() => setDiscardOpen(false)} title={t(lang, 'plan.discard')}>
+            {effective ? (
+              <DiscardSheet
+                pid={pid}
+                planRef={ref}
+                draftRev={effective.draftRev}
+                lang={lang}
+                onCancel={() => setDiscardOpen(false)}
+                onDiscarded={() => {
+                  patchLocal({ discarded: true });
+                  setDiscardOpen(false);
+                }}
+                onRefresh={() => void store.refresh()}
+              />
+            ) : null}
+          </Drawer>
+
           <Drawer open={reasonOpen} onClose={() => setReasonOpen(false)} title={t(lang, 'reason.title')}>
             {reasonMilestone && effective ? (
               <ReasonSheet
@@ -345,6 +404,19 @@ export default function PlanScreen() {
             >
               <Text style={styles.menuText}>{t(lang, 'common.refresh')}</Text>
             </Pressable>
+            {phase === 'changes' ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="menu-discard"
+                onPress={() => {
+                  setMenu(false);
+                  setDiscardOpen(true);
+                }}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+              >
+                <Text style={[styles.menuText, { color: color.error }]}>{t(lang, 'plan.discard')}</Text>
+              </Pressable>
+            ) : null}
             <Pressable accessibilityRole="button" testID="menu-close" onPress={() => setMenu(false)} style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
               <Text style={styles.menuText}>{t(lang, 'plan.close')}</Text>
             </Pressable>
@@ -394,6 +466,8 @@ const styles = StyleSheet.create({
   mainDesktop: { maxWidth: 720, alignSelf: 'center' },
   scroll: { flex: 1 },
   acceptWrap: { paddingHorizontal: space[4], paddingTop: space[4] },
+  summary: { minHeight: 44, padding: space[4], backgroundColor: color.card, borderRadius: radius.m, borderWidth: 1, borderColor: color.hairlineStrong, justifyContent: 'center' },
+  summaryText: { ...type.callout, color: color.text },
   mapSection: { paddingTop: space[3] },
   zoomRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: space[2], paddingHorizontal: space[5], paddingBottom: space[2] },
   zoom: { width: 44, height: 44, borderRadius: radius.m, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline },

@@ -98,6 +98,10 @@ describe('the local patch between a receipt and the next frame', () => {
     expect(pagePhase(changes, local({ applied: true }))).toBe('awaiting-changes');
   });
 
+  it('hides a discarded draft diff at once', () => {
+    expect(pagePhase(changes, local({ discarded: true }))).toBe('running');
+  });
+
   it('removes a passed or sent-back milestone from review', () => {
     expect(pagePhase(review, local({ passedMilestoneRef: 'm1' }))).toBe('running');
     expect(pagePhase(review, local({ sentBackMilestoneRef: 'm1' }))).toBe('running');
