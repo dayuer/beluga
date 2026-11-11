@@ -46,8 +46,7 @@ const group = (pane: SettingsPane, label: string, detail?: string, keywords?: st
  * here, or loses one listed here. Labels are the panes' own words, so the jump finds the row
  * (Row and Group carry data-setting anchors made from them).
  */
-// This fork's own rows go in with withForkSettings (packages/mac/src/fork/settings-index.ts, docs/fork.md).
-export const SETTINGS: readonly Entry[] = withForkSettings([
+const UPSTREAM_SETTINGS: readonly Entry[] = [
   // General
   ...rows('general', undefined, [
     ['Your name', 'What friends see in the room.', 'profile display name'],
@@ -335,4 +334,7 @@ export const SETTINGS: readonly Entry[] = withForkSettings([
     ['Report a Problem', undefined, 'bug report issue feedback'],
   ]),
   ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub, or buy a coffee.', 'donate star github coffee support sponsor']]),
-]);
+];
+
+// Upstream's list with this fork's own rows in place (packages/mac/src/fork/settings-index.ts, docs/fork.md).
+export const SETTINGS: readonly Entry[] = withForkSettings(UPSTREAM_SETTINGS);
