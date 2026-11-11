@@ -1,7 +1,51 @@
 /*
- * Calm mode: menus, dialogs and popovers (docs/calm-ui.md §5).
- * M1 (BLG-162) fills this: one place, one way to open, fades and small offsets only.
- * Empty in M0 on purpose: calm mode is on by default, so this skeleton must change nothing yet.
+ * Calm mode: menus, dialogs, popovers and toasts (docs/calm-ui.md §5; rules in docs/calm/overlay.md §3).
+ *
+ * One way in, everywhere: opacity from 0 and a 4 px drop, at --dur. The offset is written with the
+ * standalone `translate` property and never `transform`: radix and Popper position their floating
+ * elements with transform, and touching it tears the position apart. The layer's own animation
+ * (whether it had one or not) is replaced, so a menu, a dialog and both toasts open alike.
+ *
+ * This rule outranks the global animation stop in calm-motion.css on specificity: :root[data-calm]
+ * plus one attribute selector is (0,3,0) against (0,2,0).
  */
-:root[data-calm] {
+
+@keyframes calm-surface-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+:root[data-calm] :is(
+  [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
+  [class*='_toast_'], [class*='_toasts_']
+):not(:where(
+  /* The incoming call is an alertdialog too: it belongs to keep-decor. */
+  [data-welcome], [data-welcome] *,
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *
+)) {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* Reduced motion: no entrance at all. A 0 s animation is invisible but would still leave an entry
+   in getAnimations(); the calm-on/reduce check expects none. */
+:root[data-calm][data-motion='reduce'] :is(
+  [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
+  [class*='_toast_'], [class*='_toasts_']
+) {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-calm] :is(
+    [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
+    [class*='_toast_'], [class*='_toasts_']
+  ) {
+    animation: none !important;
+  }
 }

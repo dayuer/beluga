@@ -708,6 +708,39 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 强调色的降饱和是渐进的：Epic 徽标、epic 卡片底色这类 6–20% 混色的地方变化很小，这正是目的——
 强调色退到主操作与关键状态，而不是换一套皮肤。
 
+### 10.7 浮层与状态：实测（BLG-161）
+
+**出现方式一致**——在页面里读 `getComputedStyle` 与 `getAnimations()`（菜单＝标题栏的「Settings and menus」，
+对话框＝设置；两个读法给出同一个值）：
+
+| 浮层 | animation-name | duration | timing-function |
+| --- | --- | --- | --- |
+| 菜单 `[role='menu']` | `calm-surface-in` | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
+| 对话框 `[role='dialog']` | `calm-surface-in` | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
+
+下面两张图把动画暂停在 **70 / 160 ms**：菜单半透明地落进位置，设置对话框同样（内容已就位，只是还淡着）。
+行内 `role='listbox'` 与 toast 没有在演示数据里当场打开，它们与菜单是同一条规则（§3.2）；BLG-163 补拍。
+
+| 菜单（暂停在 70ms） | 对话框（暂停在 70ms） |
+| --- | --- |
+| ![menu](img/overlay-menu-70ms.png) | ![dialog](img/overlay-dialog-70ms.png) |
+
+**悬停不位移**：workspace 场景，依次悬停侧栏前 4 行、标题栏 3 个按钮、右侧 4 个标签页，
+`PerformanceObserver('layout-shift')` 共记录 **0** 条（hadRecentInput 除外），CLS 0。
+
+**计时 / 计数宽度不变**：
+
+| 元素 | 文字变化 | 宽度 |
+| --- | --- | --- |
+| 运行中步骤的用时（`.time`） | `0s` → `1s` | 11.938px → 11.938px |
+| 侧栏未读徽标 | `5` / `9` → `12` / `15` / `99` | 17px → 23.891px（同位数完全相同） |
+
+两者都是 `font-variant-numeric: tabular-nums`（前者上游就有，后者来自 `.badge`，§4.2）。
+
+**当前步骤不改变行高**：发一条消息、让某一步变成当前后实测——
+`.head` 高度 **22px**（与已完成行相同）、行 `margin-top: 0`、标题 `font-weight: 400`。
+当前状态只剩底色和图标颜色不同（S7/S8）。截图：![current step](img/step-current.png)
+
 ---
 
 ## 11. 实施对照（任务 → 检查）
