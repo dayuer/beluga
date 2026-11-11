@@ -14,3 +14,20 @@
   - 1.53 时，架构和审计两个角色仍然显示。
   - 也就是说，旧 Mac 上不会出现这一项，也不会发出它不认识的 `plans.setFixAgent`。
   - 这个测试要求 `packages/companion/node_modules` 已经装好。worktree 的 setup 本来就会装。
+
+## BLG-128 审计：手机端改动与手机限制规则
+
+结论：**符合手机端规则**，修了一处文档里的版本号，还有一项遗留留给用户决定。
+
+- **coverage 分类**：`src/fork/coverage.ts` 把 `plans.setCheckAgent`、`setArchAgent`、`setFixAgent` 都归为 `phone`。这是对的。
+  - 它们和上游已归为 `phone` 的 `plans.setWorkAgent`、`plans.setAutonomy` 是同一类：从计划自带的 `agents` 列表（`workPicker`）里选一个，只改这一个计划的状态。
+  - 它们不是 settings，也没有给手机编辑源码、看 diff 或做 Merge 以外 git 操作的能力。
+  - 外部访问归为 `covered`，机器归为 `drive`，和 setArchAgent 一样，也有测试（`tests/plan-fix-agent.test.ts`）。
+- **参数校验**：handler 收到的参数先经 zod `AgentRef.nullish()` 校验，和 `setWorkAgent` 一样。手机发来的 agent 不会再拿列表去核对，这一点和上游 setWorkAgent 的做法相同，所以不算新增的风险。
+- **协议**：只增不改，仍是 major 1（见上一节）。
+  - `PlanView.fixAgent` 是可选字段，只在计划设置了它时才发（`src/companion/views.ts` 里的 `...(plan.fixAgent ? …)`）。旧手机收到不认识的字段会忽略。
+  - `SINCE.fixAgent = 54`，和 `COMPANION_PROTO.minor` 一致。
+- **新旧协议下的显示**：计划页 ⋯ 菜单里检查、架构、疑难修复三项，各自用 `store.supports('checkAgent' | 'archAgent' | 'fixAgent')` 判断显示或隐藏。在 1.53 的 Mac 上只隐藏疑难修复这一项（有测试，见上一节）。
+- **其他规则**：没碰 `worktree-files.ts`、`isSecretPath` 或 `stripCode` 的路径。`docs/parity.fork.md` 三个方法都写了。
+- **已修**：`docs/parity.fork.md` 里 `plans.setCheckAgent` 标的是“(1.50)”，实际 `SINCE.checkAgent = 51`，改成了 1.51。
+- **遗留**：手机端这几项的文案还是英文（“Agent for hard fixes”“Strongest model”等）。要不要中文、怎么做，等用户在 BLG-129“决定手机端的中文怎么做”里定，这里没有改。
