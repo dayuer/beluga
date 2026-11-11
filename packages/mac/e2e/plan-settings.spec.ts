@@ -51,6 +51,8 @@ test('Plan Settings: change the audit agent and when tests run; they’re kept w
   await expect(roles.getByRole('combobox')).toHaveCount(4);
   const tests = sheet.getByRole('combobox', { name: 'When to run tests' });
   await expect(tests).toContainText('Each Milestone');
+  // Save and Cancel in view at once, without scrolling the sheet (1280×900).
+  await expect(sheet.getByRole('button', { name: 'Save' })).toBeInViewport({ ratio: 1 });
   // Nothing moved yet: nothing to save.
   await expect(sheet.getByRole('button', { name: 'Save' })).toBeDisabled();
   await sheet.screenshot({ path: path.join(SHOTS, 'plan-settings-en.png') });

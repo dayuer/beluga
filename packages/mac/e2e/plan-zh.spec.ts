@@ -12,7 +12,7 @@ const SHOTS = process.env.E2E_SHOTS ?? path.join(import.meta.dirname, '../../../
 const main = (page: Page) => page.locator('main');
 
 /** Names that stay as they are: models and agents, the demo's project and plan, things like Mac and Markdown. */
-const NAMES = /Card checkout for launch|bob-api|Claude|Opus|Sonnet|Haiku|Codex|OpenCode|Copilot|GLM|DeepSeek|Deepseek|Glm|flash|Agent|Mac|Markdown|Issue|Actions|Overview|\d+(\.\d+)?/g;
+const NAMES = /Card checkout for launch|bob-api|Claude|Opus|Sonnet|Haiku|Codex|OpenCode|Copilot|GLM|DeepSeek|Deepseek|Glm|flash|Mac|Markdown|Issue|Actions|Overview|\d+(\.\d+)?/g;
 
 /** The English words left in what `box` shows. */
 async function english(box: Locator): Promise<string[]> {

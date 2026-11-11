@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AUTONOMY_INFO, type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
+import { type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
 import { agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { autoRouteOn, planRoleDefaults } from '@beluga/shared/auto-route.js';
 import { FormSheet, Popup } from '../components/FormSheet.js';
@@ -36,12 +36,14 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
   const [picks, setPicks] = useState(start);
   const [mode, setMode] = useState<Autonomy | undefined>(plan?.autonomy);
   const [testsAt, setTestsAt] = useState<TestsAt | undefined>(plan?.testsAt);
-  if (!plan || !view || !start || !picks || !mode || !testsAt) return <FormSheet title="Plan Settings" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
+  // How it ran when the sheet opened: what Save compares with, so a change made elsewhere meanwhile isn't undone.
+  const [was] = useState(() => (plan ? { autonomy: plan.autonomy, testsAt: plan.testsAt } : undefined));
+  if (!plan || !was || !view || !start || !picks || !mode || !testsAt) return <FormSheet title="Plan Settings" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
 
   // Another mode only (milestones of their own keep theirs here; How It Runs evens them out).
-  const change = mode !== plan.autonomy ? modeChange(view, mode) : undefined;
+  const change = mode !== was.autonomy ? modeChange(view, mode) : undefined;
   const roles = roleChanges(start, picks, tiers, (v) => agentForChoice(v, runtimes));
-  const dirty = Boolean(change) || testsAt !== plan.testsAt || Object.keys(roles).length > 0;
+  const dirty = Boolean(change) || testsAt !== was.testsAt || Object.keys(roles).length > 0;
 
   return (
     <FormSheet
@@ -62,7 +64,7 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
           else if (typeof r === 'string' && r) said.push(r);
         };
         if (change) await run(async () => (await api.setAutonomy(plan.id, mode)) ?? true);
-        if (testsAt !== plan.testsAt) {
+        if (testsAt !== was.testsAt) {
           await run(async () => (await api.setTestsAt(plan.id, testsAt)) ?? true);
           // The same words as ••• › When to Run Tests.
           said.push(testsAt === 'end' ? 'From now on, milestone checks skip the test suites; they all run once, in the final step' : 'From now on, each milestone’s check runs the full suites once, on its combined work');
@@ -73,26 +75,23 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
       }}
     >
       <div className={p.newPlan}>
+        {/* Its project, and where it runs (BLG-786; only with a computer paired): shown, never changed here (••• › Move To moves it). One line, so Save stays in view. */}
         <div className={p.newPlanRow}>
           <span className={p.newPlanLabel}>Project</span>
           <span>{projectName ?? plan.projectId}</span>
-        </div>
-        {/* Where it runs (BLG-786): shown, never changed here (Move To in its ••• menu moves it). Only with a computer paired. */}
-        <div className={p.newPlanRow}>
           <RunsOnLabel tip="It runs on the computer it was made on until you move it." />
         </div>
         <div className={p.newPlanLabel} id="plan-runs">
           How it runs
         </div>
         <AutonomyCards value={mode} onChange={setMode} current={plan.autonomy} />
+        {/* What changes, before Save confirms it (as How It Runs says it); unchanged, the cards say enough (as in New Plan). */}
         {change ? (
           <div className={p.modeConfirm} role="status" aria-label="What changes">
             <p>{change.from}</p>
             {change.now ? <p className={p.modeConfirmNow}>{change.now}</p> : null}
           </div>
-        ) : (
-          <p className={p.newPlanHint}>{AUTONOMY_INFO[plan.autonomy].hint}.</p>
-        )}
+        ) : null}
         <div className={p.newPlanRow}>
           <span className={p.newPlanLabel}>When to run tests</span>
           <Popup label="When to run tests" value={testsAt} options={TESTS_AT.map((t) => ({ value: t, label: TESTS_AT_INFO[t].label }))} onChange={setTestsAt} />

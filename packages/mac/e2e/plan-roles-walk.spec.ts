@@ -4,7 +4,7 @@ import { openWork } from './helpers.js';
 
 /**
  * A walk through the plan's role screens (BLG-121), for its design review: New Plan › More options,
- * a role's pop-up, the plan's ••• menu and its submenus, How It Runs, Settings › Auto Route, in
+ * a role's pop-up, the plan's ••• menu and its submenus (the role ones moved to Plan Settings, BLG-123), How It Runs, Settings › Auto Route, in
  * English and Simplified Chinese, wide and narrow. Screenshots only: WALK=1 SHOTS=dir npx playwright test e2e/plan-roles-walk.spec.ts
  */
 
@@ -64,10 +64,7 @@ for (const lang of ['en', 'zh-CN'] as const) {
         await page.waitForTimeout(400);
         await page.screenshot({ path: shot(`${name}-${tag}`) });
       };
-      await sub('Agent for Its Work', /工作|Agent for Its Work/, '07-menu-work');
-      await sub('Agent for Its Checks', /验收|检查|审计|Agent for Its Checks/, '08-menu-checks');
-      await sub('Agent for Its Architecture', /架构|Agent for Its Architecture/, '09-menu-arch');
-      await sub('Agent for Hard Fixes', /疑难|Agent for Hard Fixes/, '10-menu-fix');
+      await sub('Agent for Its Work', /编码|工作|Agent for Its Work/, '07-menu-work');
       await sub('When to Run Tests', /测试|When to Run Tests/, '11-menu-tests');
       await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');
@@ -93,7 +90,7 @@ for (const lang of ['en', 'zh-CN'] as const) {
       await page.waitForTimeout(500);
       await sw.scrollIntoViewIfNeeded();
       await page.screenshot({ path: shot(`14-auto-route-on-${tag}`) });
-      await settings.getByText(/^(Checking the Work|审计)$/).first().scrollIntoViewIfNeeded();
+      await settings.getByText(/^(Plan Audits|计划审计)$/).first().scrollIntoViewIfNeeded();
       await page.waitForTimeout(300);
       await page.screenshot({ path: shot(`15-auto-route-review-${tag}`) });
       // Leave it as the demo had it.

@@ -10,6 +10,7 @@
  "Agent for Hard Fixes": "疑难修复智能体",
  "Agent for Its Architecture": "架构用的 Agent",
  "Agent for Its Checks": "验收用的 Agent",
+ "Agent for Its Work": "编码智能体",
  "Agents on your Tailscale network connect over https. Nobody else reaches it.": "你 Tailscale 网络里的 Agent 通过 https 连进来。别人都连不到。",
  "All projects and chats": "所有项目和聊天",
  "All, allowed, asked or refused.": "全部、已允许、问过你或已拒绝。",

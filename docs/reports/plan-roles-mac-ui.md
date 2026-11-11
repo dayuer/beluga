@@ -119,3 +119,82 @@ cd packages/mac && WALK=1 npx playwright test e2e/plan-roles-walk.spec.ts --proj
 截图（本工作树 `.beluga/scratch/`）：`zh-new-plan.png`、`zh-plan-menu.png`、`zh-plan-settings.png`、`zh-toast.png`、
 `zh-feed.png`、`zh-auto-route.png`；英文与窄宽度：`plan-settings-en.png`、`plan-settings-760.png`、`new-plan-roles-760.png`、
 `plan-header-760.png`、`auto-route-plan-audits.png`。
+
+## 四、审计（BLG-126）
+
+独立复查 `f10e4ced..c4011bf2`。运行：`plan-zh.spec.ts` + `plan-roles.spec.ts`（4 个用例全过，31 秒）；
+`WALK=1 … plan-roles-walk.spec.ts -g "zh-CN"` 失败两次（见“新问题 4”，不是产品问题）。
+为拿到修改后的中文截图，另用一份去掉旧子菜单的临时副本重拍了 1440 宽（用完已删，不在仓库里）。
+证据都在 `.beluga/scratch/agents/G4foXS3ny7/`（下称 `A/`）和 `.beluga/scratch/`。
+
+### 1. 问题清单 1–10 逐条对照（中文截图）
+
+| # | 结论 | 证据 |
+|---|---|---|
+| 1 子菜单叫法不一、没有计划设置 | 基本修好（部分） | `.beluga/scratch/zh-plan-menu.png`：••• 里有“计划设置…”，验收/架构/疑难修复三个子菜单已没了。但保留的上游子菜单仍叫“执行工作的智能体”，而计划设置里同一件事叫“编码”，两个说法还在；这是设计里写明的取舍（不改上游行） |
+| 2 同一个“没设”两处意思不同 | 修好 | `.beluga/scratch/zh-new-plan.png`（新建：按档位的四项）与 `A/zh-plan-settings-full.png`（计划设置：不设架构 / 你的智能体 (Claude) / 与编码相同 / 由当前在做的智能体处理，因为演示计划没设角色且自动路由关）；两处共用 `PlanRoles.tsx`，初始值由 `roleFromPlan`（plan-roles-model.ts:87 起）按计划现状算。`plan-roles.spec.ts` 用例 1 过 |
+| 3 底部说明还说“在 ••• 菜单里改” | 修好 | `zh-new-plan.png` 底部“以后可以在计划设置里改。” |
+| 4 四个下拉框没对齐 | 修好 | `zh-new-plan.png`、`zh-plan-settings.png`：标签一列，下拉框同一起点（`plan-roles.module.css` 两列网格） |
+| 5 “当前使用”/“正在使用”两种译法 | 修好 | `zh-auto-route.png`：行内、组底都是“当前使用”（zh-CN.fork.json 把旧条目改了） |
+| 6 看不出计划用哪一组；审计组叫法不一 | 修好 | `A/walk-after/14-auto-route-on-zh-CN-1440.png`：疑难任务组底“这类任务、计划的架构和疑难修复，都从标着‘当前使用’的模型开始”；`zh-auto-route.png`：组名“计划审计” |
+| 7 窄宽度计划名压住按钮 | 修好 | `.beluga/scratch/walk/05-plan-page-zh-CN-760.png`、`plan-header-760.png`：操作行换到标题下面，不再重叠。（窄宽度下“画布/列表”标签自己折成竖排，是原有的，不属于这条） |
+| 8 展开“更多选项”后角色在可视区外 | 修好 | `walk/02-new-plan-more-zh-CN-760.png`：展开后四个角色都在视野内（`PlanRoles` 的 `reveal`） |
+| 9 候选显示原始 id | 修好 | `zh-auto-route.png`：“Haiku 5.5 · 本地模型”“Sonnet 5.5 · 本地模型”，不再是 `local:anthropic/…` |
+| 10 “现在运行于逐步进行”不通 | 修好（还算通顺） | `A/walk-after/12-how-it-runs-zh-CN-1440.png`：“Card checkout for launch”现在按逐步进行运行。选择从现在起怎么运行。 |
+
+### 2. 新建计划与计划设置的对应
+
+| 新建计划里能设的 | 计划设置里 | 说明 |
+|---|---|---|
+| 目标（Goal） | 无 | 目标是计划的内容，不是设置；改它走计划对话/`plans.edit`，设计里本来就没有 |
+| 项目（只在没从项目进来时可选） | 项目，只读 | PlanSettingsSheet.tsx 的 Project 行 |
+| 运行于（RunsOnRow） | 运行于，只读（`RunsOnLabel`，没配对电脑不显示） | 移动用 ••• › 迁移到 |
+| 如何运行（`AutonomyCards`） | 如何运行（同一组件，标“现在”，改了先说会变什么） | PlanSheets.tsx 导出 `AutonomyCards` |
+| 何时运行测试（`TESTS_AT`） | 何时运行测试（同样的选项和说明） | |
+| 更多选项 › 架构 / 编码 / 审计 / 疑难修复 | 谁来做哪部分 › 同四项 | 都是 `<PlanRoles>`（PlanSheets.tsx:109，PlanSettingsSheet.tsx:102），选项来自同一个 `roleEntries`，顺序同为 `PLAN_ROLES` = arch, work, check, fix；只有“新建里折叠、设置里常开”不同 |
+
+结论：每一项都有对应，通过。
+
+### 3. 切换角色、改测试时机的中文提示和动态
+
+通过。`plan-zh.spec.ts` 的断言是真的在查：保存后 toast 必须含“计划设置已保存”和“Claude (Opus) 负责审计这个计划的里程碑”，
+且 toast 里除模型名外没有英文字母词；动态里必须含“从现在起把审计交给 Claude (Opus)”和“只在最后一步运行测试套件”。
+看了 `.beluga/scratch/zh-toast.png`（“计划设置已保存 · 从现在起，里程碑检查跳过测试套件；……· Claude (Opus) 负责审计这个计划的里程碑，并审阅它的草稿”）
+和 `zh-feed.png`（“你 从现在起把审计交给 Claude (Opus)”“你 只在最后一步运行测试套件”）。
+保留的一条英文：`你 passed “Test-mode foundations”`，上游模板，文档第三节已写明不修。
+注意：`zh-feed.png` 是对话框元素截图，toast 盖在它下面，不影响内容。
+
+### 4. 手机端
+
+通过。
+- `packages/companion/app/plan/[id].tsx` 里没有“Plan Settings”，仍是自己的 ⋯ 条目（Agent for its checks / architecture / hard fixes，第 141–160 行）和自动驾驶卡片；本次改动没动 `src/`、`packages/companion`，也没新增 API 方法（`git diff 4673d3ba..HEAD --stat` 里没有这些路径）。
+- `src/companion/coverage.ts:443`：`'plans.setTestsAt': 'mac',`。
+- `src/fork/coverage.ts:13-17`：`setCheckAgent / setArchAgent / setFixAgent` 仍是 `'phone'`（手机各有自己的选择行），`setAutonomy`、`setWorkAgent` 在 `src/companion/coverage.ts:440、445` 也是 `'phone'`。
+- `docs/parity.fork.md:25` 写明“Mac only；the phone keeps its plan page’s ⋯ items”，和实际一致。
+
+### 5. 新问题（按严重度）
+
+1. **中（体验）“保存/取消”在 1280×900 下被折在可视区外。**`A/zh-plan-settings-full.png`：计划设置高 648 像素，底下“取消/保存”只露上半截。
+   原因是 `components/form.module.css:7-13` 整个 `.form`（标题、字段、按钮）一起滚动，按钮不固定；计划设置比其他表单高得多，改完角色后看不到保存键，要自己往下滚（⌘↩ 可以保存）。
+   这是共用表单的行为，不是新代码的错，但计划设置是第一个高到触发它的表单。修法：给 `.buttons` 加 `position: sticky; bottom: 0`，或让 `.fields` 滚、按钮固定（改 fork 之外的共用样式，需单独决定）。
+2. **低（逻辑）`PlanSettingsSheet.tsx` 的“只发改了的”对角色是对的（对比的是打开时的快照 `start`，`roleChanges` plan-roles-model.ts:102 起，`v === from[role]` 跳过），但对运行方式和测试时机对比的是实时的 `plan.autonomy` / `plan.testsAt`（第 42、44、65 行）。**
+   打开后别处把测试时机或运行方式改了、而你没碰这两项，保存会把它们改回打开时的旧值，且会写一条动态。和上面“角色以打开时为准”的注释不一致。修法：这两项也存一份打开时的值再比。
+3. **低（保存失败的反馈）**`onSubmit` 先 `close()` 再逐项保存；中途某项失败只有 `act` 自己的错误提示，没有“保存了哪几项”的说明，已成功的几项不会回滚。可接受，但文档第二节“一次保存一次说清”在失败时不成立。
+4. **低（工具）`e2e/plan-roles-walk.spec.ts` 已过时，WALK 运行必失败（中英文各两个用例）。**第 68–70 行还去悬停已被删掉的“验收/架构/疑难修复”子菜单（超时），第 96 行还找旧组名 `Checking the Work|审计`（现在是 Plan Audits / 计划审计）。
+   它是 BLG-121 的“改动前走查”脚本，改完没跟着改；修法：删掉 08–10 三行，第 96 行换成 `Plan Audits|计划审计`。我这次的 08–15 号旧图（`.beluga/scratch/walk/08-…` 起，时间戳 15:06–15:07）是改动前的，别当证据用。
+5. **低（测试）`plan-zh.spec.ts:19` 的 `NAMES` 白名单含 `Agent|Issue|Actions|Overview|Mac|Markdown`，会把中文界面里漏掉的“Agent”一并放过**（侧栏“外部 Agent”就是这样留着的，设置侧栏同理）。建议只在有名字的位置放行。
+6. **低（fork 文件规则）**新代码基本在新文件里：`PlanSettingsSheet.tsx`、`PlanRoles.tsx`、`plan-roles-model.ts`、`plan-roles.module.css`。上游文件的改动：`PlanPage.tsx` 净删 31 行并加 1 行菜单项；`WorkSheets.tsx` 1 个 case；`sheets.ts` 1 行；`PlanSheets.tsx` 把角色行换成 `<PlanRoles>` 并导出 `AutonomyCards`（净删）。
+   略超“只加接入行”的是 `plans-model.ts` 的 `feedKind` 一行改动外加新正则常量 `ROLE_NOTE`（4 行）和 `plans.module.css` 三行换行样式——都小，但按 docs/fork.md 严格说该放到 fork 文件里，由 `feedKind` 只留一行调用。
+7. **低（中文）**其余中文界面里没发现漏掉的英文（`english()` 检查过新建计划、••• 菜单、计划设置、保存提示、自动路由四组）。唯一英文是上面的 `passed “…”`，设计里已记。`This plan is gone.` 的兜底提示在 `zh-CN.json` 里已有译文。
+
+### 审计之后的处理（实施方）
+
+| 审计新问题 | 处理 |
+|---|---|
+| 1 中：1280×900 下保存键在可视区外 | 没改共用表单（上游）；计划设置变矮：项目和“运行于”并成一行，运行方式没改时不再重复卡片下的说明（新建对话框本来也不显示）。`plan-settings.spec.ts` 加断言：1280×900 打开时“保存”完整在视野内。截图 `zh-plan-settings.png` |
+| 2 低：运行方式和测试时机对比实时值 | 改成和角色一样，对比打开时的值；别处同时改过的不会被改回 |
+| 3 低：中途失败没有汇总 | 不改：每项失败各有错误提示，有失败时不显示“已保存”。写在这里备查 |
+| 4 低：走查脚本过时 | 删掉 08–10 三个已不存在的子菜单，组名换成 Plan Audits / 计划审计；`WALK=1` 四个用例重新全过 |
+| 5 低：白名单含 Agent | `plan-zh.spec.ts` 白名单去掉 Agent，仍然通过 |
+| 6 低：feedKind 正则在上游文件里 | 正则挪到 fork 自己的 `plan-roles-model.ts`（`roleNote`），`plans-model.ts` 只留一个 import 和一次调用 |
+| 问题 1“部分”：上游子菜单叫“执行工作的智能体” | fork 词表覆盖为“编码智能体”，和计划设置的“编码”一致；英文原文不动 |

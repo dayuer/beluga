@@ -108,3 +108,6 @@ export function roleChanges(from: Readonly<Record<PlanRole, string>>, to: Readon
   }
   return out;
 }
+
+/** A plan note worth its feed (fork, BLG-125): who does each part changed, what's hard handed to the fix agent, when tests run. */
+export const roleNote = (text: string): boolean => /^(gave its (work|checks|milestones’ designs)\b|gave what’s hard\b|handed .+ to .+|starts its milestones without a design|runs the test suites\b)/.test(text);
