@@ -420,20 +420,30 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 - **偏差登记**：任务文案写「浮层 150ms」，规范 §5 只允许令牌档位 120/160/200，浮层统一用 `var(--dur)`=160ms。
 - `--ease-out`（上游 `cubic-bezier(0.22, 1, 0.36, 1)`）不覆盖：它本身合规，重叠的浮层/过渡统一用 `--ease-standard`。
 
+**为什么颜色选择器要带 `[data-theme]`（BLG-162 实测发现）**：tokens.css 的浅色值是
+`:root[data-theme='light']`（(0,2,0)），和裸 `:root[data-calm]` 同特异性；而 Vite 开发模式下样式表的注入
+顺序并不保证（实测 calm.css 在 sheet 27、tokens.css 在 sheet 142），同特异性时后注入的赢——裸写法会让浅色
+主题回到上游的鲜艳色。带上主题后 (0,3,0) 靠特异性取胜，与顺序无关。用户自选的调色板
+（`:root[data-theme][data-palette]`，同样 (0,3,0)、运行时注入且最晚）**仍然赢我们**：自选调色板保留用户
+自己的颜色，沉稳模式只收 Beluga 自带的浅色/深色。
+
 ### 5.2 强调色降饱和
 
 方法：HSL 色相与明度不变，饱和度降到约 70%，让强调色只出现在主操作与关键状态上。
 
-| 令牌 | 浅色 · 上游 `tokens.css:69-74` | 浅色 · 沉稳 | 深色 · 上游 `:108-111` | 深色 · 沉稳 |
+| 令牌 | 浅色 · 上游 `tokens.css:41-84` | 浅色 · 沉稳 | 深色 · 上游 `:85-117` | 深色 · 沉稳 |
 | --- | --- | --- | --- | --- |
-| `--subagent` | `#7656c9` | `#7d6bb3` | `#ab93f3` | `#a2b3e4` |
-| `--worktree` | `#24877f` | `#436865` | `#66c6bb` | `#74b8b0` |
+| `--subagent` | `#7656c9` | `#7d6bb3` | `#ab93f3` | `#b2a1e5` |
+| `--worktree` | `#24877f` | `#337873` | `#66c6bb` | `#74b8b0` |
 | `--plan` | `#b84d8a` | `#a85d88` | `#e892c3` | `#db9fc1` |
 | `--epic` | `#5a62cf` | `#6e74bb` | `#a4aaf6` | `#aeb3ea` |
 
-- 首发值，BLG-162 用浅/深两套主题截图核对后可微调，**终值回填本表**。
-- 两处需要特别看：深色 `--subagent` 的色相从 255° 偏到 225°（如果看起来「变蓝了」，换成严格 70% 的
-  `#b2a1e5`）；浅色 `--worktree` 比其他三个更灰（已经接近 60% 去饱和，若发闷换 `#337873`）。
+- **实测值**（BLG-162 在 Chromium 里读 `getComputedStyle`，见 §10.6）：开启时浅色、深色都正是上表；
+  关闭时四个令牌分别回到上游的 `#7656c9/#24877f/#b84d8a/#5a62cf` 与 `#ab93f3/#66c6bb/#e892c3/#a4aaf6`，
+  `--dur` 回到 180ms。
+- 计划给的首发值里有两个偏离了「同色相、饱和度 70%」的方法，已按方法改正：
+  浅色 `--worktree` 原写 `#436865`（实际去饱和到 38%，明显更灰）→ `#337873`；
+  深色 `--subagent` 原写 `#a2b3e4`（色相从 255° 偏到 225°，看起来是另一种蓝）→ `#b2a1e5`。
 - 其余颜色令牌不动：中性色与语义色（`--error`/`--warn`/`--ok`）保持上游。
 
 ### 5.3 完整 CSS（照抄）
@@ -444,15 +454,17 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   --dur: 160ms;
   --dur-slow: 200ms;
   --ease-standard: cubic-bezier(0.3, 0.7, 0.3, 1);
+}
 
+:root[data-calm][data-theme='light'] {
   --subagent: #7d6bb3;
-  --worktree: #436865;
+  --worktree: #337873;
   --plan: #a85d88;
   --epic: #6e74bb;
 }
 
-:root[data-theme='dark'][data-calm] {
-  --subagent: #a2b3e4;
+:root[data-calm][data-theme='dark'] {
+  --subagent: #b2a1e5;
   --worktree: #74b8b0;
   --plan: #db9fc1;
   --epic: #aeb3ea;
@@ -672,6 +684,29 @@ toast 合流）。M1 之后如需补充：`call/NotesBox.tsx:157` 的 900ms 背�
 | radix 关闭动画 | 被全局关闭后立即卸载 | 验收看有无闪烁；有则在 M3 给关闭补 `[data-state='closed']` 例外 | 待验证 |
 | 行内 `role='listbox'` | 挂载时淡入一次（160ms、不占布局） | 可接受；嫌吵就在 M3 收窄 O2 | 登记 |
 | 深色 `--subagent` | 色相偏蓝（255°→225°） | BLG-162 截图核对，需要就换 `#b2a1e5` | 待定 |
+
+### 10.6 令牌：两主题实测（BLG-162）
+
+`BELUGA_THEME=light|dark node packages/mac/scripts/calm-check.mjs tasks`（`calm-check` 为此加了
+`BELUGA_THEME`，fork 自己的脚本）。同一场景、同一份演示数据，只切沉稳开关：
+
+| 主题 | calm on | calm off（上游原样） |
+| --- | --- | --- |
+| 浅色 | ![tokens light on](img/tokens-light-calm-on.png) | ![tokens light off](img/tokens-light-calm-off.png) |
+| 深色 | ![tokens dark on](img/tokens-dark-calm-on.png) | ![tokens dark off](img/tokens-dark-calm-off.png) |
+
+在页面里读 `getComputedStyle(document.documentElement)`（Chromium，`appearance` 经 `beluga.prefs.v1` 设置）：
+
+```console
+calm on  light: --subagent #7d6bb3  --worktree #337873  --plan #a85d88  --epic #6e74bb  --dur 160ms
+calm off light: --subagent #7656c9  --worktree #24877f  --plan #b84d8a  --epic #5a62cf  --dur 180ms
+calm on  dark : --subagent #b2a1e5  --worktree #74b8b0  --plan #db9fc1  --epic #aeb3ea  --dur 160ms
+calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #a4aaf6  --dur 180ms
+```
+
+关掉 `data-calm` 时四个颜色令牌与 `--dur` 全部回到上游值（§9 的「与上游一致」由此佐证）。
+强调色的降饱和是渐进的：Epic 徽标、epic 卡片底色这类 6–20% 混色的地方变化很小，这正是目的——
+强调色退到主操作与关键状态，而不是换一套皮肤。
 
 ---
 

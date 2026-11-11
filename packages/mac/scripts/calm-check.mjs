@@ -19,6 +19,10 @@ const imgOut = path.join(out, 'img');
 const url = process.env.BELUGA_URL ?? process.env.KLAUD_URL ?? 'http://localhost:1420';
 const scenes = process.argv.slice(2);
 
+/** BELUGA_THEME=light|dark draws the window in that theme and tags its files (docs/calm/overlay.md §5). */
+const theme = process.env.BELUGA_THEME === 'dark' ? 'dark' : process.env.BELUGA_THEME === 'light' ? 'light' : null;
+const themeTag = theme ? `${theme}-` : '';
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** The four combinations, each its own browser context. */
@@ -244,10 +248,13 @@ try {
       // Before the app draws: the two switches, past the welcome, layout shifts from the first frame,
       // and whether data-calm was on before the first frame.
       await page.addInitScript(
-        pageFn(`({ calm, reduce, onboarding }) => {
+        pageFn(`({ calm, reduce, onboarding, theme }) => {
           const selectorOf = ${selectorFn};
           localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm }));
-          if (reduce) localStorage.setItem('beluga.prefs.v1', JSON.stringify({ reduceMotion: true }));
+          const prefs = {};
+          if (reduce) prefs.reduceMotion = true;
+          if (theme) prefs.appearance = theme;
+          if (reduce || theme) localStorage.setItem('beluga.prefs.v1', JSON.stringify(prefs));
           if (!onboarding) localStorage.setItem('beluga.onboarding.v1', JSON.stringify({ version: 'calm-check', at: 0, how: 'finished' }));
           window.__calm = { cls: 0, shifts: [], firstFrame: { calm: false } };
           try {
@@ -270,13 +277,13 @@ try {
             });
           });
         }`),
-        { calm: combo.calm, reduce: combo.reduce, onboarding: scene === 'onboarding' },
+        { calm: combo.calm, reduce: combo.reduce, onboarding: scene === 'onboarding', theme },
       );
       if (combo.reduce) await page.emulateMedia({ reducedMotion: 'reduce' });
 
       const shots = [];
       const shot = async (moment) => {
-        const file = path.join(imgOut, `${scene}-${fileOf(combo.id)}-${moment}.png`);
+        const file = path.join(imgOut, `${scene}-${themeTag}${fileOf(combo.id)}-${moment}.png`);
         await page.screenshot({ path: file, animations: 'allow' });
         shots.push(`img/${path.basename(file)}`);
       };
@@ -342,13 +349,13 @@ try {
     }
 
     const doc = { scene, at: new Date().toISOString(), git: gitSha(), combos };
-    writeFileSync(path.join(out, `${scene}.json`), `${JSON.stringify(doc, null, 2)}\n`);
+    writeFileSync(path.join(out, `${themeTag}${scene}.json`), `${JSON.stringify(doc, null, 2)}\n`);
 
     console.log(`\n${scene}  (${doc.git})`);
     for (const [id, m] of Object.entries(combos)) {
       console.log(`  ${id.padEnd(15)} cls ${m.cls.toFixed(3)} · animations ${m.animations.length} · jsMotion ${m.jsMotion.elements.length} · data-calm at first frame ${m.firstFrame.calm}`);
     }
-    console.log(`  → ${path.relative(repo, path.join(out, `${scene}.json`))}`);
+    console.log(`  → ${path.relative(repo, path.join(out, `${themeTag}${scene}.json`))}`);
   }
 } finally {
   await browser.close();
