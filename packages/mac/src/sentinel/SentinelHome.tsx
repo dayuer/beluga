@@ -24,6 +24,7 @@ import { sentinelMenu, useRunsFolder, useSentinelActions, useSentinelState, type
 import s from './home.module.css';
 import { thisComputer } from '../lib/os-words.js';
 import { useOpenFolderLabel } from '../lib/remote-open.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Sentinel, one page (BLG-300): what needs you, your board's numbers at a glance, and every
@@ -490,7 +491,7 @@ function FirstVisit() {
           aria-label="What should Beluga keep an eye on?"
           onChange={(e) => setWords(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) {
               e.preventDefault();
               send();
             }

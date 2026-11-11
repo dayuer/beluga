@@ -28,6 +28,7 @@ import { befriend, openFriendCard } from '../../network/use-net.js';
 import m from '../../components/SpecMenu.module.css';
 import p from './person.module.css';
 import { thisComputer } from '../../lib/os-words.js';
+import { isImeComposing } from '../../lib/ime.js';
 
 interface CardProps {
   readonly peer: PeerInfo;
@@ -349,7 +350,7 @@ export function AccountCard({ peer, menu, close, confirm }: CardProps & { menu: 
             onChange={(e) => setName(e.target.value.replace(/[^\w.-]/g, ''))}
             onBlur={rename}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Enter' && !isImeComposing(e)) (e.target as HTMLInputElement).blur();
             }}
           />
         }
