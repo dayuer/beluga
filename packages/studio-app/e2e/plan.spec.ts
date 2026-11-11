@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { controlPost, delivered, openHome, sessionLogin, shot } from './helpers';
+import { base, controlPost, delivered, openHome, sessionLogin, shot } from './helpers';
 import { views } from './fixtures/views';
 
 test.describe.configure({ mode: 'serial' });
@@ -176,6 +176,31 @@ test('draft diff: added, changed, removed; apply or discard', async ({ page }, i
   await page.waitForTimeout(800);
   expect(delivered('draft.discard')).toBe(discards + 1);
   await expect(page.getByTestId('changes-summary')).toBeHidden({ timeout: 4000 });
+});
+
+/** To-dos: a dot on the project card, the list across projects, and an action from a card. */
+test('to-dos: dot, list and acting on a card', async ({ page }, info) => {
+  await sessionLogin(page);
+  await controlPost('view', { view: views.review });
+  await page.goto(`${base}/todo`, { waitUntil: 'networkidle' });
+  await expect(page.getByTestId('todo-screen')).toBeVisible();
+  await expect(page.getByTestId('todo-card')).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.getByTestId('todo-card')).toContainText('记录喝水');
+  await expect(page.getByTestId('tab-todo-count')).toContainText('1');
+  await shot(page, 'todo', info);
+
+  // The project card carries the same dot.
+  await page.goto(`${base}/`, { waitUntil: 'networkidle' });
+  await expect(page.getByTestId('project-dot').first()).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('tab-todo').click();
+  await page.waitForURL(`${base}/todo`);
+
+  const passes = delivered('milestone.pass');
+  await page.getByTestId('todo-approve').click();
+  await expect(page.getByTestId('todo-approve')).toContainText('撤销');
+  await page.waitForTimeout(10_500);
+  expect(delivered('milestone.pass')).toBe(passes + 1);
+  await expect(page.getByTestId('todo-card')).toHaveCount(0, { timeout: 4000 });
 });
 
 /** The conversation: a drawer on the phone, a docked panel on the desktop, one send per tap. */

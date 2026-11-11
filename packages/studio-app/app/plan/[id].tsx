@@ -44,9 +44,10 @@ const first = (v: string | string[] | undefined): string | undefined => (Array.i
  */
 export default function PlanScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string | string[]; project?: string | string[] }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; project?: string | string[]; open?: string | string[] }>();
   const ref = first(params.id);
   const queryPid = first(params.project);
+  const openParam = first(params.open);
   const [remembered] = useState(() => (ref ? kv.get<string>(`plan-project:${ref}`) : undefined));
   const pid = queryPid ?? remembered;
   const lang = detectLang();
@@ -77,6 +78,7 @@ export default function PlanScreen() {
     return found >= 0 ? found : 1;
   });
   const defaulted = useRef(false);
+  const consumedOpen = useRef(false);
 
   useEffect(() => {
     if (pid && ref) kv.set(`plan-project:${ref}`, pid);
@@ -127,6 +129,20 @@ export default function PlanScreen() {
   useEffect(() => {
     if (reasonOpen && !reviewMilestone) setReasonOpen(false);
   }, [reasonOpen, reviewMilestone?.ref]);
+
+  // A to-do card opens the plan page with ?open=decide|reason; consume it once.
+  useEffect(() => {
+    if (!effective || !openParam || consumedOpen.current) return;
+    if (openParam === 'decide' && openDecisions.length > 0) {
+      consumedOpen.current = true;
+      setDecisionIndex(0);
+      setDecisionOpen(true);
+    } else if (openParam === 'reason' && reviewMilestone) {
+      consumedOpen.current = true;
+      setReasonMilestone(reviewMilestone.ref);
+      setReasonOpen(true);
+    }
+  }, [effective, openParam, openDecisions.length, reviewMilestone]);
 
   const patchLocal = (patch: Partial<LocalPlanState>): void => {
     setLocal((previous) => ({
