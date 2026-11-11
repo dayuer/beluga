@@ -10,6 +10,10 @@ interface HeaderProps {
   readonly back?: boolean;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
+  /** A screen's own 44pt right slot (the plan page's •••); it replaces the refresh icon. */
+  readonly right?: ReactNode;
+  /** Desktop only: the title row centers in the page minus this right panel (the plan's chat). */
+  readonly rightPanel?: number;
   readonly testID?: string;
 }
 
@@ -29,14 +33,14 @@ function IconButton({ label, testID, onPress, children }: { label: string; testI
 
 /** The solid title bar: mobile 44 + safe top with a centered title; desktop 56 with the title
  * beside the back button. A 1px hairline always; no gradient, no blur. */
-export function Header({ title, back = false, onRefresh, refreshing = false, testID = 'header' }: HeaderProps) {
+export function Header({ title, back = false, onRefresh, refreshing = false, right, rightPanel = 0, testID = 'header' }: HeaderProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
   return (
-    <View style={[styles.bar, { paddingTop: desktop ? 0 : insets.top }]} testID={testID}>
+    <View style={[styles.bar, { paddingTop: desktop ? 0 : insets.top, paddingRight: desktop ? rightPanel : 0 }]} testID={testID}>
       <View style={[styles.row, desktop && styles.rowDesktop]}>
         {back ? (
           <IconButton label="返回" testID="back" onPress={() => router.back()}>
@@ -48,7 +52,9 @@ export function Header({ title, back = false, onRefresh, refreshing = false, tes
         <Text style={[styles.title, desktop && styles.titleDesktop]} numberOfLines={1} accessibilityRole="header">
           {title}
         </Text>
-        {onRefresh ? (
+        {right ? (
+          right
+        ) : onRefresh ? (
           <IconButton label="刷新" testID="refresh" onPress={onRefresh}>
             {refreshing ? <ActivityIndicator size="small" color={color.text2} /> : <RotateCw size={19} strokeWidth={stroke} color={color.text2} />}
           </IconButton>

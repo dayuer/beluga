@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefusalCode, StudioAction, StudioPlatform, StudioReceipt } from '../../../src/studio/protocol';
 import { hub } from './client';
 import { clearDraft, clearPending, readPending, writePending } from './drafts';
+import { live } from './live';
 import { isOnline } from './net';
 import { session } from './session';
 import type { StringKey } from './strings';
@@ -57,7 +58,7 @@ const samePlatforms = (a: readonly StudioPlatform[], b: readonly StudioPlatform[
   return left.every((v, i) => v === right[i]);
 };
 
-const randomOpId = (): string => {
+export const randomOpId = (): string => {
   const c = (globalThis as { crypto?: Crypto }).crypto;
   if (c && typeof c.randomUUID === 'function') return c.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
@@ -195,7 +196,7 @@ export function useNewRequest(pid: string, onDone: () => void): NewRequest {
   // the same opId in case the receipt was sent before the socket was listening.
   useEffect(() => {
     if (state.phase !== 'queued' || !state.opId) return;
-    const close = hub.watch(pid, {
+    const close = live.subscribe(pid, {
       frame: (f) => {
         if (f.t === 'receipt' && f.opId === state.opId) settle(f);
       },

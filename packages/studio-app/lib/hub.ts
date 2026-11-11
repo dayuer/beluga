@@ -1,13 +1,17 @@
 import { AppFrame, StudioAction, type StudioReceipt } from '../../../src/studio/protocol';
 import {
+  PlanRes,
   PlansRes,
   ProjectsRes,
   ReceiptRes,
+  TurnsRes,
   VerifyRes,
   formatIssues,
   parse,
+  type PlanRes as PlanResponse,
   type PlansRes as PlansResponse,
   type ProjectsRes as ProjectsResponse,
+  type TurnsRes as TurnsResponse,
   type VerifyRes as VerifyResponse,
 } from './hub-schema';
 
@@ -36,6 +40,8 @@ export interface Hub {
   logout(): Promise<R<void>>;
   projects(): Promise<R<ProjectsResponse>>;
   plans(pid: string): Promise<R<PlansResponse>>;
+  plan(pid: string, ref: string): Promise<R<PlanResponse>>;
+  turns(pid: string, ref: string, before?: string): Promise<R<TurnsResponse>>;
   send(pid: string, action: StudioAction): Promise<R<StudioReceipt>>;
   watch(pid: string, handlers: WatchHandlers): () => void;
 }
@@ -141,6 +147,17 @@ export function createHub(options: HubOptions): Hub {
     plans(pid: string): Promise<R<PlansResponse>> {
       const path = `/v1/app/projects/${encodeURIComponent(pid)}/plans`;
       return request(path, { method: 'GET' }, decodeWith<PlansResponse>(path, PlansRes));
+    },
+
+    plan(pid: string, ref: string): Promise<R<PlanResponse>> {
+      const path = `/v1/app/projects/${encodeURIComponent(pid)}/plans/${encodeURIComponent(ref)}`;
+      return request(path, { method: 'GET' }, decodeWith<PlanResponse>(path, PlanRes));
+    },
+
+    turns(pid: string, ref: string, before?: string): Promise<R<TurnsResponse>> {
+      const base = `/v1/app/projects/${encodeURIComponent(pid)}/plans/${encodeURIComponent(ref)}/turns`;
+      const path = before === undefined ? base : `${base}?before=${encodeURIComponent(before)}`;
+      return request(path, { method: 'GET' }, decodeWith<TurnsResponse>(path, TurnsRes));
     },
 
     send(pid: string, action: StudioAction): Promise<R<StudioReceipt>> {

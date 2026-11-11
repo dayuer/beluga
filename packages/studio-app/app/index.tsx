@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { ProjectCard } from '../components/ProjectCard';
 import { Skeleton } from '../components/Skeleton';
 import { SyncBanner } from '../components/SyncBanner';
+import { TabBar } from '../components/TabBar';
 import { TextButton } from '../components/TextButton';
 import { cache } from '../lib/cache';
 import { cardFor, type ProjectCardData } from '../lib/cards';
@@ -16,6 +17,7 @@ import { session } from '../lib/session';
 import { detectLang, t } from '../lib/strings';
 import { ago } from '../lib/time';
 import { color, space } from '../lib/theme';
+import { useTodos } from '../lib/todo-store';
 
 type LoadError = 'offline' | 'error' | null;
 
@@ -41,6 +43,9 @@ export default function ProjectsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<LoadError>(null);
   const [stale, setStale] = useState(0);
+  const { result: todos, refresh: refreshTodos } = useTodos();
+  const todoByProject = todos?.byProject ?? {};
+  const todoCount = todos?.todos.length ?? 0;
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -96,7 +101,8 @@ export default function ProjectsScreen() {
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load]),
+      void refreshTodos();
+    }, [load, refreshTodos]),
   );
 
   // "刷新失败" is a 3-second line, not a state the customer has to dismiss.
@@ -123,6 +129,7 @@ export default function ProjectsScreen() {
       ) : stale > 0 ? (
         <SyncBanner kind="offline" text={t(lang, 'projects.refreshFailed')} testID="refresh-failed" />
       ) : null}
+      {desktop ? <TabBar todoCount={todoCount} /> : null}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
@@ -145,13 +152,19 @@ export default function ProjectsScreen() {
             <View style={[styles.grid, desktop && styles.gridDesktop]}>
               {cards.map((card) => (
                 <View key={card.id} style={[styles.cardWrap, desktop && styles.cardWrapDesktop]}>
-                  <ProjectCard project={card} onPress={() => router.push(`/project/${encodeURIComponent(card.id)}`)} fill={desktop} />
+                  <ProjectCard
+                    project={card}
+                    onPress={() => router.push(`/project/${encodeURIComponent(card.id)}`)}
+                    fill={desktop}
+                    todoDot={Boolean(todoByProject[card.id])}
+                  />
                 </View>
               ))}
             </View>
           )}
         </View>
       </ScrollView>
+      {!desktop ? <TabBar todoCount={todoCount} /> : null}
     </View>
   );
 }

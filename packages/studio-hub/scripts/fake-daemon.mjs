@@ -15,6 +15,7 @@
 
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
 import { dirname } from 'node:path';
 import WebSocket from 'ws';
 
@@ -31,6 +32,8 @@ const name = flag('name', 'Fake Studio Mac');
 const projects = flags('project');
 const interval = Number(flag('interval', '4000'));
 const keyFile = flag('key-file');
+// The e2e runner's control port: push a fixture view (BLG-91) or approve the start gate.
+const controlPort = Number(flag('control-port', '0'));
 
 const log = (kind, extra = {}) => console.log(JSON.stringify({ kind, at: Date.now(), ...extra }));
 
@@ -59,10 +62,13 @@ const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
 
+// The first view's turn time is fixed for the process: a new `at` on every tick would look like
+// a new unread message to the app (the real daemon keeps the turn's own time).
+const T0 = Date.now();
 const view = (planRef, rev) => ({
   planRef,
   draftRev: 1,
-  title: `客户 App · ${planRef}`,
+  title: '客户 App',
   goal: '做一个客户预约页面',
   stage: 'running',
   waitingOn: 'ai',
@@ -78,10 +84,10 @@ const view = (planRef, rev) => ({
     },
   ],
   decisions: [],
-  turns: [{ id: 't1', who: 'ai', text: '开始做登录页了', at: Date.now() }],
+  turns: [{ id: 't1', who: 'ai', text: '开始做登录页了', at: T0 }],
   typing: false,
   moreTurns: false,
-  activity: [{ at: Date.now(), text: '开始了一项工作' }],
+  activity: [{ at: T0, text: '开始了一项工作' }],
 });
 
 let ws;
@@ -89,6 +95,8 @@ let synced = false;
 let stopping = false;
 let rev = 0;
 const plans = projects.map((project, i) => ({ project, planRef: `plan${i + 1}` }));
+/** Views pushed by the e2e runner (`POST /view`, `POST /approve`), per daemon project id. */
+const customViews = new Map();
 
 function send(frame) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -98,7 +106,53 @@ function send(frame) {
 
 function snapshot(entry) {
   rev += 1;
-  send({ t: 'for', project: entry.project, frame: { t: 'plan', rev, view: view(entry.planRef, rev) } });
+  const custom = customViews.get(entry.project);
+  const next = custom ? { ...custom, planRef: entry.planRef } : view(entry.planRef, rev);
+  send({ t: 'for', project: entry.project, frame: { t: 'plan', rev, view: next } });
+}
+
+/** What the daemon's plan would look like after the customer's action; M6's local patch needs it. */
+function applyAction(entry, action) {
+  const current = customViews.get(entry.project) ?? view(entry.planRef, rev);
+  const payload = action?.payload ?? {};
+  let next = current;
+  if (action?.kind === 'milestone.sendBack') {
+    next = { ...current, milestones: current.milestones.map((m) => (m.ref === payload.milestoneRef ? { ...m, status: 'working' } : m)) };
+  } else if (action?.kind === 'milestone.pass') {
+    next = { ...current, milestones: current.milestones.map((m) => (m.ref === payload.milestoneRef ? { ...m, status: 'passed' } : m)) };
+  } else if (action?.kind === 'plan.requestStart') {
+    next = { ...current, gate: { kind: 'start', state: 'pending', draftRev: payload.draftRev ?? current.draftRev } };
+  } else if (action?.kind === 'decision.answer') {
+    next = { ...current, decisions: (current.decisions ?? []).map((d) => (d.decisionId === payload.decisionId ? { ...d, open: false } : d)) };
+  } else if (action?.kind === 'draft.apply') {
+    next = { ...current, gate: { kind: 'changes', state: 'pending', draftRev: payload.draftRev ?? current.draftRev } };
+  } else if (action?.kind === 'draft.discard') {
+    const { draftDiff, ...rest } = current;
+    next = rest;
+  } else if (action?.kind === 'chat.send') {
+    next = {
+      ...current,
+      turns: [...(current.turns ?? []), { id: `act-${action.opId}`, who: 'customer', text: String(payload.text ?? ''), at: Date.now(), opId: action.opId }],
+    };
+  }
+  if (next !== current) {
+    customViews.set(entry.project, next);
+    snapshot(entry);
+  }
+}
+
+/** The Mac's NeedsYou approval: the start gate is approved and the plan is running. */
+function approve(entry) {
+  const base = customViews.get(entry.project) ?? view(entry.planRef, rev);
+  const next = {
+    ...base,
+    planRef: entry.planRef,
+    stage: 'running',
+    waitingOn: 'ai',
+    gate: { kind: 'start', state: 'approved', draftRev: base.draftRev ?? 1 },
+  };
+  customViews.set(entry.project, next);
+  snapshot(entry);
 }
 
 function pushAll() {
@@ -142,6 +196,8 @@ function connect() {
     else if (frame.t === 'deliver') {
       // The hub delivered a customer action; say it ran. M3 would use the daemon's own OpLog here.
       log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
+      const entry = plans.find((p) => p.project === frame.project);
+      if (entry) applyAction(entry, frame.action);
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
     } else if (frame.t === 'resync') {
       const entry = plans.find((p) => p.project === frame.project);
@@ -157,6 +213,51 @@ function connect() {
     if (!stopping) setTimeout(connect, 800);
   });
   ws.on('error', (err) => log('error', { message: String(err?.message ?? err) }));
+}
+
+// The e2e runner's controls: push a plan view fixture, approve the start gate, or go back to the
+// default ticking view. The interface stays stable for M7's soak test.
+if (controlPort) {
+  const pick = (data) => plans.find((p) => p.project === data.project) ?? plans[0];
+  http
+    .createServer((req, res) => {
+      let body = '';
+      req.on('data', (chunk) => (body += chunk));
+      req.on('end', () => {
+        const answer = (status, json) => {
+          res.writeHead(status, { 'content-type': 'application/json' });
+          res.end(JSON.stringify(json));
+        };
+        let data;
+        try {
+          data = body ? JSON.parse(body) : {};
+        } catch {
+          return answer(400, { error: 'bad-json' });
+        }
+        const entry = pick(data);
+        try {
+          if (req.method === 'POST' && req.url === '/view') {
+            if (!data.view || typeof data.view !== 'object') return answer(400, { error: 'view-required' });
+            customViews.set(entry.project, data.view);
+            snapshot(entry);
+            return answer(200, { ok: true, rev });
+          }
+          if (req.method === 'POST' && req.url === '/approve') {
+            approve(entry);
+            return answer(200, { ok: true });
+          }
+          if (req.method === 'POST' && req.url === '/reset') {
+            customViews.delete(entry.project);
+            snapshot(entry);
+            return answer(200, { ok: true });
+          }
+          return answer(404, { error: 'unknown' });
+        } catch (error) {
+          return answer(400, { error: String(error?.message ?? error) });
+        }
+      });
+    })
+    .listen(controlPort, '127.0.0.1', () => log('control', { port: controlPort }));
 }
 
 process.on('SIGUSR2', () => {

@@ -16,13 +16,15 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(here, '..');
 const repo = path.resolve(appDir, '../..');
 const hubDir = path.join(repo, 'packages/studio-hub');
-const scratch = path.join(repo, '.beluga/scratch/m5');
+// M6's run keeps its screenshots and logs here; the M5 files stay where they were.
+const scratch = path.join(repo, '.beluga/scratch/m6');
 const stateDir = path.join(scratch, 'hub-state');
 const keyFile = path.join(scratch, 'daemon.pem');
 const daemonLog = path.join(scratch, 'daemon.log');
 const wranglerLog = path.join(scratch, 'wrangler.log');
 const proxyLog = path.join(scratch, 'proxy.log');
 const controlPort = 8791;
+const daemonControlPort = 8792;
 
 const operator = 'e2e-operator';
 const hubUrl = 'http://127.0.0.1:8787';
@@ -108,6 +110,8 @@ function startDaemon(code) {
     'E2E Studio Mac',
     '--interval',
     '1000',
+    '--control-port',
+    String(daemonControlPort),
   ];
   if (code) args.push('--code', code);
   daemon = start('daemon', process.execPath, args, { cwd: hubDir, log: daemonLog });
@@ -246,6 +250,21 @@ async function main() {
         if (daemon && daemon.exitCode === null) return send(200, { ok: true, already: true });
         startDaemon();
         return send(200, { ok: true });
+      }
+      // The fake daemon's own control port: push a view fixture, approve the start gate, reset.
+      if (req.method === 'POST' && (req.url === '/daemon/view' || req.url === '/daemon/approve' || req.url === '/daemon/reset')) {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        try {
+          const answer = await fetch(`http://127.0.0.1:${daemonControlPort}${req.url.replace('/daemon', '')}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body,
+          });
+          return send(answer.status, await answer.json().catch(() => ({})));
+        } catch (error) {
+          return send(502, { error: String(error instanceof Error ? error.message : error) });
+        }
       }
       return send(404, { error: 'unknown' });
     });

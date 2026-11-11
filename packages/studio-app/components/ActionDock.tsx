@@ -5,7 +5,7 @@ import { color, space } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
 
 /** The bottom action area: one primary button, inside the screen's content column. */
-export function ActionDock({ children, testID = 'dock', maxWidth }: { children: ReactNode; testID?: string; maxWidth?: number }) {
+export function ActionDock({ children, testID = 'dock', maxWidth, safeBottom = true }: { children: ReactNode; testID?: string; maxWidth?: number; safeBottom?: boolean }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -17,7 +17,7 @@ export function ActionDock({ children, testID = 'dock', maxWidth }: { children: 
         styles.dock,
         {
           // The keyboard covers the home indicator, so the safe area is not added on top of it.
-          paddingBottom: keyboard > 0 ? space[5] : insets.bottom + space[5],
+          paddingBottom: keyboard > 0 ? space[5] : (safeBottom ? insets.bottom : 0) + space[5],
           marginBottom: keyboard,
         },
       ]}

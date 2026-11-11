@@ -7,7 +7,7 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const project = __dirname;
 const repo = path.resolve(project, '../..');
-const shared = [path.join(repo, 'src/studio')];
+const shared = [path.join(repo, 'src/studio'), path.join(repo, 'packages/ui-plan')];
 
 const config = getDefaultConfig(project);
 config.watchFolders = shared;

@@ -1,12 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { waitingKey, stageKey, type PlanRowData } from '../lib/plan-rows';
 import { detectLang, t } from '../lib/strings';
-import { color, radius, space, type } from '../lib/theme';
+import { color, radius, space, stroke, type } from '../lib/theme';
 import { ProgressRing } from './ProgressRing';
 
-/** A plan on the project page: ring, title, who it is waiting on, progress. M5 rows are not
- * pressable and carry no chevron; M6 connects them to the plan page. */
-export function PlanRow({ plan }: { plan: PlanRowData }) {
+/** A plan on the project page: ring, title, who it is waiting on, progress. The whole row opens
+ * the plan page (M6 §1). */
+export function PlanRow({ plan, pid }: { readonly plan: PlanRowData; readonly pid: string }) {
+  const router = useRouter();
   const lang = detectLang();
   const waiting = plan.waitingOn === 'customer';
   const tone = waiting ? 'warn' : plan.waitingOn === 'ai' ? 'ok' : 'text';
@@ -14,11 +17,12 @@ export function PlanRow({ plan }: { plan: PlanRowData }) {
   const detail = plan.headline.trim() || t(lang, stageKey(plan.stage));
 
   return (
-    <View
-      style={styles.row}
-      accessible
+    <Pressable
+      onPress={() => router.push(`/plan/${encodeURIComponent(plan.planRef)}?project=${encodeURIComponent(pid)}`)}
+      accessibilityRole="button"
       accessibilityLabel={`${plan.title}, ${status}, ${detail}, ${plan.progress.done} / ${plan.progress.total}`}
       testID={`plan-row-${plan.planRef}`}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <ProgressRing done={plan.progress.done} total={plan.progress.total} tone={tone} />
       <View style={styles.main}>
@@ -38,7 +42,8 @@ export function PlanRow({ plan }: { plan: PlanRowData }) {
       <Text style={styles.progress}>
         {plan.progress.done} / {plan.progress.total}
       </Text>
-    </View>
+      <ChevronRight color={color.text3} size={17} strokeWidth={stroke} />
+    </Pressable>
   );
 }
 
@@ -59,6 +64,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 2,
   },
+  pressed: { backgroundColor: color.press },
   main: { flex: 1, minWidth: 0 },
   title: { ...type.heading, color: color.text, fontSize: 15.5, lineHeight: 20 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, minWidth: 0 },

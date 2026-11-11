@@ -6,7 +6,7 @@ import { color, radius, space, type } from '../lib/theme';
 
 /** One project: its name and studio, the latest plan's line, a dot when the customer is needed,
  * and the studio's offline line. No platform icons in M5: the hub has no platform field yet. */
-export function ProjectCard({ project, onPress, testID, fill = false }: { project: ProjectCardData; onPress: () => void; testID?: string; fill?: boolean }) {
+export function ProjectCard({ project, onPress, testID, fill = false, todoDot = false }: { project: ProjectCardData; onPress: () => void; testID?: string; fill?: boolean; todoDot?: boolean }) {
   const lang = detectLang();
   const line = project.plansLoading
     ? t(lang, 'projects.plansLoading')
@@ -22,7 +22,7 @@ export function ProjectCard({ project, onPress, testID, fill = false }: { projec
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${project.name}, ${project.studioName}`}
+      accessibilityLabel={`${project.name}, ${project.studioName}${todoDot ? `, ${t(lang, 'todo.dotLabel')}` : ''}`}
       testID={testID ?? `project-card-${project.id}`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, fill && styles.fill, pressed && styles.pressed]}
@@ -31,6 +31,7 @@ export function ProjectCard({ project, onPress, testID, fill = false }: { projec
         <Text style={styles.name} numberOfLines={1}>
           {project.name}
         </Text>
+        {todoDot ? <View style={styles.todoDot} testID="project-dot" /> : null}
         <Text style={styles.studio} numberOfLines={1}>
           {project.studioName}
         </Text>
@@ -70,6 +71,7 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: '#FBFBFC' },
   top: { flexDirection: 'row', alignItems: 'baseline', gap: space[3] },
   name: { ...type.heading, color: color.text, flex: 1 },
+  todoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.info },
   studio: { ...type.caption, color: color.text3, maxWidth: '46%' },
   line: { ...type.callout, color: color.text2, marginTop: space[2] },
   status: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space[3] },
