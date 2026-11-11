@@ -333,7 +333,7 @@ const UPSTREAM_SETTINGS: readonly Entry[] = [
     ['Log', '~/.beluga/logs/daemon.log', 'logs console daemon log debug'],
     ['Report a Problem', undefined, 'bug report issue feedback'],
   ]),
-  ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub, or buy a coffee.', 'donate star github coffee support sponsor']]),
+  ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub.', 'star github support sponsor']]),
 ];
 
 // Upstream's list with this fork's own rows in place (packages/mac/src/fork/settings-index.ts, docs/fork.md).
