@@ -54,6 +54,11 @@ const zh = {
   'home.reconnecting': '连接中断，正在重连…',
   'home.reconnected': '已重新连接',
   'home.newRequest': '新需求',
+  'stage.drafting': '整理需求',
+  'stage.awaitingStart': '等你确认计划',
+  'stage.running': '进行中',
+  'stage.awaitingReview': '等你验收',
+  'stage.done': '已完成',
 
   'new.title': '新需求',
   'new.intro': '描述你想做的，越具体越好。工作室会先拆成里程碑，等你确认。',
@@ -145,6 +150,11 @@ const en: Record<StringKey, string> = {
   'home.reconnecting': 'Reconnecting…',
   'home.reconnected': 'Reconnected',
   'home.newRequest': 'New request',
+  'stage.drafting': 'Drafting',
+  'stage.awaitingStart': 'Waiting for you to confirm',
+  'stage.running': 'Running',
+  'stage.awaitingReview': 'Waiting for your review',
+  'stage.done': 'Done',
 
   'new.title': 'New request',
   'new.intro': 'Describe what you want, as specifically as you can. The studio will break it into milestones for you to confirm.',

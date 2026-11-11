@@ -147,7 +147,12 @@ export function createHub(options: HubOptions): Hub {
       const checked = parse(StudioAction, action);
       if (!checked.ok) return Promise.resolve({ ok: false, error: { kind: 'schema', where: 'action', detail: checked.detail } });
       const path = `/v1/app/projects/${encodeURIComponent(pid)}/actions`;
-      return request(path, { method: 'POST', body: JSON.stringify(checked.value) }, decodeWith<StudioReceipt>(path, ReceiptRes));
+      return request(path, { method: 'POST', body: JSON.stringify(checked.value) }, (json) => {
+        const result = parse(ReceiptRes, json);
+        return result.ok
+          ? { ok: true, value: result.value.receipt }
+          : { ok: false, error: { kind: 'schema', where: path, detail: result.detail } };
+      });
     },
 
     watch(pid: string, handlers: WatchHandlers): () => void {

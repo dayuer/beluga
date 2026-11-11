@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { StudioAction } from '../../src/studio/protocol.js';
 import { createHub } from '../../packages/studio-app/lib/hub';
 import { PlansRes, parse } from '../../packages/studio-app/lib/hub-schema';
 
@@ -47,6 +48,20 @@ describe('the studio app hub client', () => {
       throw new Error('network');
     }).projects();
     expect(r).toMatchObject({ ok: false, error: { kind: 'offline' } });
+  });
+
+  it('unwraps the receipt envelope of a plan.create answer', async () => {
+    const action: StudioAction = {
+      t: 'action',
+      opId: '11111111-1111-4111-8111-111111111111',
+      kind: 'plan.create',
+      payload: { goal: '做一个喝水提醒', platforms: ['ios'] },
+    };
+    const answer = { receipt: { t: 'receipt', opId: action.opId, state: 'queued' } };
+    const r = await hubWith(async () => reply(JSON.stringify(answer))).send('p1', action);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toEqual({ t: 'receipt', opId: action.opId, state: 'queued' });
   });
 
   it('requires the studio status in a plan list', () => {
