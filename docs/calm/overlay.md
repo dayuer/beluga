@@ -250,7 +250,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 | O1 | 统一出现关键帧 | 160ms `--ease-standard`，同一曲线 | §5.1：同一方式 |
 | O2 | 对话框与 toast | `calm-surface-drop`：`opacity: 0` + `translate: 0 -4px` | 浮层「自上 4px 落下」 |
 | O3 | 菜单 / 选择列表 / tooltip | `calm-surface-in`：只 `opacity: 0` | **Popper 会量元素定位**，带位移会量错 |
-| O4 | 全部授予 | `[role='menu'|'listbox'|'dialog'|'alertdialog'|'tooltip']` + `_toast_`/`_toasts_`，排除 keep-decor | 菜单/对话框/弹出层/toast 同一方式 |
+| O4 | 全部授予 | `[role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip']` + `_toast_`/`_toasts_`，排除 keep-decor | 菜单/对话框/弹出层/toast 同一方式 |
 
 **为什么菜单类只淡入、不带位移（BLG-163 的 e2e 发现）**：radix/Popper 用 `transform` 定位，而且是在元素
 **被量出来的那一刻**定位。给浮层加 `translate` 时，量到的矩形偏了 4px，最终位置就一直差 4px——实测选择器
@@ -841,3 +841,101 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 | BLG-163 | §10 全部 | 对比页、animationend 核查、e2e、问题表 |
 
 **每步都要**：`packages/mac` 的 `npm run typecheck`；改动只落在 `fork/calm/*.css` 与 `docs/calm/*`。
+
+---
+
+## 12. 补充规则（M3 · BLG-173）
+
+来源：五份逐页验收报告（`chat.md`、`shell.md`、`work.md`、`data.md`、`rest.md`）的问题收敛，见 `docs/calm/upstream-prs.md` §1。本节只写**新增**的规则块；已有规则（S1–S8、M1–M5、O1–O2）不改，除 R3-02 显式修订 M4 的时长。
+
+规则表：
+
+| 编号 | 关闭的问题 | 做法（选择器/机制） | 目标文件 | 验收（场景 × 指标 → 期望） |
+| --- | --- | --- | --- | --- |
+| R3-01 | CH-02（覆盖层半） | `:root[data-calm] [class*='_folding_'] { transition: none !important }`（`.folding` 的 grid-template-rows 过渡归零；`[data-opening]` 的 `unfold` 仍走 R3-02） | `calm-motion.css` | `chatsteps` calm-on/full：`.folding` 计算 `transition-duration: 0s`；CLS 不再含折叠过渡帧 |
+| R3-02 | WK-03 / DA-01 | **修订 M4**：`:root[data-calm] [data-opening] { animation-duration: 0s !important }`（0s 仍触发 animationend；Ask 面板、步骤折叠的状态推进不变） | `calm-motion.css`（替换 M4 的 `var(--dur)`） | `sentinel`/`sentineldash` calm-on/full：`aside[data-opening]` 计算 0s；CLS ≤0.005（原 0.037/0.142）；Sentinel Ask 面板仍能打开；`e2e` 折叠用例仍过 |
+| R3-03 | RE-03 | `:root[data-calm] :is([data-state='open'][class*='_overlay_']) { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（对话框背板与内容同步淡入；必须先做锚点碰撞核对） | `calm-overlays.css` | 设置/命令面板打开：背板 `calm-surface-in` 160ms、内容 `calm-surface-drop` 160ms；`document.getAnimations()` 在打开瞬间有这两条 |
+| R3-04 | SH-04 | `:root[data-calm] [class*='_settled_'] [class*='_body_'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（面板滑动结束后的内容淡入，替回被 M1 关掉的 `settle`） | `calm-overlays.css` | `shellpanel`：面板内容在滑动后 160ms 淡入；CLS 仍 0（只改 opacity） |
+| R3-05 | CH-07（可选半） | `:root[data-calm] [aria-label='Side question'] { animation: calm-surface-in var(--dur) var(--ease-standard) !important }`（侧问卡的 `rise` 被 M1 关后补一条淡入；`transform` 不参与） | `calm-overlays.css` | `chatbtw`：卡片 `calm-surface-in` 160ms；截图/CLS 不变 |
+| R3-06 | WK-02（覆盖层半） | `:root[data-calm] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: var(--dur) !important; transition-timing-function: var(--ease-standard) !important }`（节点与边同 160ms，解决 520/160 不一致） | `calm-motion.css` | `plancanvas` calm-on/full：节点与边的 `transition-duration` 均 0.16s；**必须**重跑 `e2e/plans.spec.ts` 确认边线跟得上；失败则回退为 keep-decor 例外（见 upstream-prs §7） |
+| R3-07 | WK-02（reduce 半） | `:root[data-calm][data-motion='reduce'] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) { transition-duration: 0s !important }` | `calm-motion.css` | `plancanvas` calm-on/reduce：节点 `transition-duration` 0s（原 0.52s） |
+
+完整新增块（照抄）。**R3-01/02/06/07 进 `calm-motion.css`（追加到文件末）；R3-03/04/05 进 `calm-overlays.css`（追加到 reduce 分支之前）。**
+
+`calm-motion.css`：
+
+```css
+/* ---- R3 (M3) ---- */
+/* R3-01: a finished answer's steps fold without an animated height (CH-02). */
+:root[data-calm] [class*='_folding_'] {
+  transition: none !important;
+}
+
+/* R3-02: the two functional [data-opening] animations advance state on animationend; a 0s
+   animation still fires it, and nothing lays out on the way (WK-03/DA-01; replaces M4's 160ms). */
+:root[data-calm] [data-opening] {
+  animation-duration: 0s !important;
+}
+
+/* R3-06 / R3-07: React Flow's own nodes keep 520ms through their inline styles; the edges are
+   clamped to 160ms. Same length for both (WK-02). Under reduce, no transition at all. */
+:root[data-calm] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) {
+  transition-duration: var(--dur) !important;
+  transition-timing-function: var(--ease-standard) !important;
+}
+:root[data-calm][data-motion='reduce'] :is([class*='react-flow__node'], [class*='react-flow__edge-path']) {
+  transition-duration: 0s !important;
+}
+
+```
+
+`calm-overlays.css`：
+
+```css
+/* R3-03: a dialog's backdrop fades in with its content (RE-03; collision-checked). */
+:root[data-calm] :is([data-state='open'][class*='_overlay_']) {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* R3-04: the panel's content fades in as the slide ends (SH-04). */
+:root[data-calm] [class*='_settled_'] [class*='_body_'] {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+/* R3-05: a side question card fades in (CH-07). */
+:root[data-calm] [aria-label='Side question'] {
+  animation: calm-surface-in var(--dur) var(--ease-standard) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-calm] :is([data-state='open'][class*='_overlay_']),
+  :root[data-calm] [class*='_settled_'] [class*='_body_'],
+  :root[data-calm] [aria-label='Side question'] {
+    animation-name: none !important;
+  }
+}
+```
+
+注意：
+
+- **R3-02 修订 M4**：M4 原文「保留名字、时长 160ms」在本节改为 0s；`docs/calm/overlay.md §2` 的 M4 说明与 `calm-motion.css` 的注释一并更新（174 做）。animationend 在 0s 仍触发（M4 已核对）。
+- **R3-03 的锚点**：全库 grep 得到 `.overlay` 出现在 settings/palette/native parts/alert/support/add-project/person/onboarding/chat images/proof-preview/zoom-avatar/update/form/MenuSheet/MergeReview/StatusMenu 等模块；规则用 `[data-state='open'][class*='_overlay_']`，只命中 **Radix 的 `Dialog.Overlay`**（含图片 lightbox、各种 sheet 的背板）——这正是想要的范围；非 Radix 的 `.overlay`（onboarding、calloverlay 等）没有 `data-state='open'`，不会命中。若 174 落地时发现新的 `[data-state='open']` 浮层背板不属于对话框，再收窄。
+- **R3-06 的风险**：`e2e/plans.spec.ts` 逐帧比对；若边线跟不上节点，按 upstream-prs §7 的回退：保留 520ms，把「图引擎自身动效」记为 keep-decor 例外（同时更新 §7.4 与 KEEP_DECOR）。
+- **R3-01/R3-02 与 [data-opening] 的关系**：折叠容器 `unfold` 由 R3-02 归零；`.folding` 的 grid-template-rows 过渡由 R3-01 归零。两者都保留 `animationend` 语义。
+
+### 12.1 一并裁决的遗留项（关闭）
+
+| 遗留 | 决定 |
+| --- | --- |
+| `overlay.md §10.5`：`e2e/unread.spec.ts:55` 断言 650 | 改 fork 侧 e2e 断言为颜色（fork-only，登记 fork.md；upstream-prs.md §3） |
+| `overlay.md §10.5`：抽屉/聚焦面板被关后瞬时出现 | 接受瞬时（沉稳一致）；SH-04 只补内容淡入 |
+| `overlay.md §10.5`：Dialog.Overlay 背板瞬时出现 | R3-03 修 |
+| `overlay.md §10.5`：行内 `role='listbox'` 淡入 | 保持（160ms 属规格内），不收窄 |
+| baseline 的 `max-fire` 「待定」 | 范围外：用户显式开启的装饰效果（§8.4） |
+| `overlay.md §8.1`：TaskBoard / AgentSteps 的 framer | 改为挂钩（upstream-prs.md §3：TaskBoard、AgentSteps） |
+| `overlay.md §8.1`：Recap 的 framer | keep-decor：用户点「Play Your Recap」才播的一次性成就回放（双登记） |
+| `overlay.md §8.1`：flight.ts 141 的 WAAPI | 挂钩（CH-06，upstream-prs.md §3） |
+| `overlay.md §8.1`：NotesBox.tsx 157 的 900ms | 上游改 160ms / reduce 下不做（upstream-prs.md §3） |
+| `hooks.md §9.2` 冻结组内容不更新 | 改为「只冻结顺序」（SH-08，fork/calm/hold-order.ts） |
+| `hooks.md §9.6` 菜单启发式 | 扩到 dialog/listbox（SH-09） |
+| `hooks.md §9.6` 被压制的撤销不响应 ⌘Z | 维持 M2 设计；报告 §7 记录，175 迁出问题表 |
