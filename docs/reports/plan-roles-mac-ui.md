@@ -104,3 +104,18 @@ cd packages/mac && WALK=1 npx playwright test e2e/plan-roles-walk.spec.ts --proj
 - 接入点：`lib/sheets.ts` 一行 kind `plan_settings`；`dialogs/native/WorkSheets.tsx` 一个 case；
   `PlanPage.tsx` 一行菜单项（并删掉 fork 的三个子菜单）；`PlanSheets.tsx` 导出 AutonomyCards、角色行换成 `<PlanRoles>`。
 - 词条在 `zh-CN.fork.json`；菜单项写进 `docs/parity.fork.md`。
+
+## 三、中文（BLG-125）
+
+中文环境检查：`packages/mac/e2e/plan-zh.spec.ts`（新建计划展开更多选项、••• 菜单、计划设置、保存后的弹出提示、
+“发生了什么”、设置 › 自动路由四组，模型名、项目名和计划名之外没有英文）；句子级检查：`tests/plan-roles-i18n.test.ts`
+（界面、各角色切换的提示、计划动态里的“交给 …”“又停了：已交给 …”、何时跑测试、git-locale 页列出的 git 原话）。
+
+- 词条只加在 `zh-CN.fork.json`；顺手把 fork 词条里夹的 “agent” 统一成“智能体”。
+- 计划动态：角色变更、疑难问题交给修复模型、何时跑测试，原来只写进计划记录、Mac 上看不到；
+  现在作为“改动”出现在“发生了什么”里（`plans-model.ts` 的 `feedKind` 一行，`tests/mac-plans.test.ts` 有用例）。
+- 没修的一条：上游的 `passed “{0}”`（“你 passed “…””）。match.ts 规定短模板不包住多词标题，要改上游的匹配规则，不在本里程碑。
+
+截图（本工作树 `.beluga/scratch/`）：`zh-new-plan.png`、`zh-plan-menu.png`、`zh-plan-settings.png`、`zh-toast.png`、
+`zh-feed.png`、`zh-auto-route.png`；英文与窄宽度：`plan-settings-en.png`、`plan-settings-760.png`、`new-plan-roles-760.png`、
+`plan-header-760.png`、`auto-route-plan-audits.png`。

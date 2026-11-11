@@ -390,11 +390,14 @@ function feedKind(e: PlanEvent): FeedKind | undefined {
       return 'mode';
     // Where the work goes: the plan's branch made, its pull request opened (other notes stay out).
     case 'note':
-      return /^(made the plan’s branch|collects the plan’s work on)\b/.test(e.text) ? 'branch' : /^opened pull request #\d+/.test(e.text) ? 'pr' : undefined;
+      return /^(made the plan’s branch|collects the plan’s work on)\b/.test(e.text) ? 'branch' : /^opened pull request #\d+/.test(e.text) ? 'pr' : ROLE_NOTE.test(e.text) ? 'changed' : undefined;
     default:
       return undefined;
   }
 }
+
+/** Fork (BLG-125): who does each part changed, what's hard handed to the fix agent, when tests run: worth seeing. */
+const ROLE_NOTE = /^(gave its (work|checks|milestones’ designs)\b|gave what’s hard\b|handed .+ to .+|starts its milestones without a design|runs the test suites\b)/;
 
 /** Repeats this close together are one line. */
 const FOLD_MS = 30 * 60 * 1000;
