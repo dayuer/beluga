@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { PHONE_FORK } from '../fork/coverage.js';
 
 /**
  * What your phone may ask your Mac to do: every API method (src/ipc/api.ts) is `phone` or `mac`.
@@ -323,14 +324,16 @@ export const PHONE: Record<Method, Side> = {
   'revenuecat.refresh': 'mac',
   'revenuecat.setApps': 'mac',
 
-  // ---- supporting Beluga: the star and coffee asks are the Mac's (they open web pages there)
+  // ---- supporting Beluga: the star ask is the Mac's (it opens GitHub there)
   'support.answer': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',
+  'stats.leaderboard': 'mac',
   'stats.note': 'mac',
   'stats.saveImage': 'mac',
   'diagnostics.report': 'mac',
   'diagnostics.windowProblem': 'mac',
+  'diagnostics.windowCrash': 'mac',
 
   // ---- browsers on the web port (BLG-650): let in and revoked from the Mac's Settings or `beluga web`
   'web.link': 'mac',
@@ -440,8 +443,6 @@ export const PHONE: Record<Method, Side> = {
   'plans.setTestsAt': 'mac',
   // Who works the plan's milestones and tasks from here on (BLG-498): a pick from a list.
   'plans.setWorkAgent': 'phone',
-  'plans.setCheckAgent': 'phone',
-  'plans.setArchAgent': 'phone',
   'plans.tidyUp': 'mac',
   'plans.pass': 'phone',
   'plans.recheck': 'phone',
@@ -719,6 +720,8 @@ export const PHONE: Record<Method, Side> = {
   'external.stopAll': 'phone',
   'external.setPaused': 'mac',
   'external.activity': 'phone',
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...PHONE_FORK,
 };
 
 /** A method the phone may call (unknown names are not). */

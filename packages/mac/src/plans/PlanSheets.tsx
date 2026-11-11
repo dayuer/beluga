@@ -2,6 +2,10 @@ import { type KeyboardEvent, useLayoutEffect, useMemo, useRef, useState } from '
 import { useDefaultAutonomy } from './use-default-autonomy.js';
 import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, DEFAULT_AUTONOMY, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
+import { planRoleDefaults } from '@beluga/shared/auto-route.js';
+import { runtimeMark } from '@beluga/shared/agent-marks.js';
+import type { SelectEntry, SelectOption } from '../components/select-parts.js';
+import { AS_BEFORE, BY_TIER, NO_ARCHITECT, PLAN_ROLES, type PlanRole, ROLE_INFO, roleStart, rolesInput, tierLabel } from './plan-roles-model.js';
 import { Field, FormSheet, Popup, TextArea } from '../components/FormSheet.js';
 import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
 import { Icon, type IconName } from '../components/Icon.js';
@@ -21,8 +25,9 @@ const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag',
 
 /**
  * A new plan: what it's for (Claude plans from it, reading the code) and how far it runs on its
- * own. Opened from a project it's that project's (no picker). More options: who works its
- * milestones and tasks (BLG-497; your default agent unless you pick another).
+ * own. Opened from a project it's that project's (no picker). More options: who does each part
+ * of it (BLG-497), as the tiers say unless you pick another: the strongest model designs it and
+ * takes over what's hard, an everyday one writes the code, one between checks it (plan-roles-model.ts).
  */
 export function NewPlanSheet({ projectId, close }: { projectId?: string; close: () => void }) {
   const startDeps = useStartDeps();
@@ -40,7 +45,11 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
   const [testsAt, setTestsAt] = useState<TestsAt>('milestone');
   const agents = useAgentEntries();
   const runtimes = useApp((s) => s.runtimes);
-  const [agent, setAgent] = useState(YOUR_AGENT);
+  const route = useApp((s) => s.prefs.autoRoute);
+  const tiers = useMemo(() => planRoleDefaults(route, runtimes), [route, runtimes]);
+  // Each role's pick (undefined: where the tiers start it, which follows your models as they come and go).
+  const [picked, setPicked] = useState<Partial<Record<PlanRole, string>>>({});
+  const picks = Object.fromEntries(PLAN_ROLES.map((r) => [r, picked[r] ?? roleStart(r, tiers)])) as Record<PlanRole, string>;
   const [more, setMore] = useState(false);
   if (!projects.length) {
     // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
@@ -61,10 +70,10 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
       canSubmit={Boolean(goal.trim() && project)}
       onCancel={close}
       onSubmit={async () => {
-        const chosen = agent !== YOUR_AGENT ? agentForChoice(agent, runtimes) : undefined;
-        const input = { goal: goal.trim(), autonomy, testsAt, ...(chosen ? { agent: chosen } : {}) };
+        const roles = rolesInput(picks, tiers, (v) => agentForChoice(v, runtimes));
+        const input = { goal: goal.trim(), autonomy, testsAt, ...roles };
         // Runs on one of your computers (BLG-788): the plan is made there and opens at once; held, the sheet stays.
-        const sent = sendToComputer(startDeps, project, chosen?.runtime ?? myRuntime(prefsNow()), { kind: 'plan', input });
+        const sent = sendToComputer(startDeps, project, roles.agent?.runtime ?? myRuntime(prefsNow()), { kind: 'plan', input });
         if (sent === 'held') return;
         close();
         if (sent === 'sent') return;
@@ -100,16 +109,32 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
         </button>
         {more ? (
           <>
-            <div className={p.newPlanRow}>
-              <span className={p.newPlanLabel}>Agent</span>
-              <Popup label="Agent" value={agent} options={agents} onChange={setAgent} />
-            </div>
-            <div className={p.newPlanHint}>Who works its milestones and tasks: each worktree runs this agent and model.</div>
+            {PLAN_ROLES.map((role) => (
+              <div className={p.newPlanRow} key={role}>
+                <span className={p.newPlanLabel}>{ROLE_INFO[role].label}</span>
+                <Popup label={ROLE_INFO[role].label} value={picks[role]} options={roleEntries(role, tiers, agents)} onChange={(v) => setPicked((was) => ({ ...was, [role]: v }))} />
+              </div>
+            ))}
+            <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in the plan’s ••• menu.</div>
           </>
         ) : null}
       </div>
     </FormSheet>
   );
+}
+
+/** A role's pop-up: its tier's model first, then what it did before this (no architect, your agent…), then every agent you can pick. */
+function roleEntries(role: PlanRole, tiers: ReturnType<typeof planRoleDefaults>, agents: readonly SelectEntry<string>[]): SelectEntry<string>[] {
+  const tier = tierLabel(role, tiers);
+  const tierAgent = role === 'work' ? tiers.work : tiers[role];
+  const yours = agents.find((e): e is SelectOption<string> => 'value' in e && e.value === YOUR_AGENT);
+  const before: SelectOption<string> =
+    role === 'work' && yours ? yours : { value: role === 'arch' ? NO_ARCHITECT : AS_BEFORE, label: ROLE_INFO[role].asBefore };
+  return [
+    ...(tier ? [{ value: BY_TIER, label: tier, ...(tierAgent && tierAgent !== 'auto' ? { icon: runtimeMark(tierAgent.runtime) } : {}), description: 'As the tiers say (Settings › Auto Route)' }] : []),
+    before,
+    ...agents.filter((e) => !('value' in e && e.value === YOUR_AGENT)),
+  ];
 }
 
 /** The goal: six lines to start, growing with what you write (to about 60% of the sheet, then it scrolls). */

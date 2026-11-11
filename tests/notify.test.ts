@@ -587,7 +587,7 @@ describe('plans: you hear from the plan, not each task', () => {
     // What it said last (usually what it waits on you for) is what the notification says.
     const asking = apply(woken, { type: 'plan_put', plan: plan({ watch: { t1: { at: 5, reason: 'it ended its turn without handing off', line: 'KLD-12 stopped', wokeAt: 2, needsYou: true, said: 'Put the .env in /opt/app on the server, then I deploy.' } } }) });
     expect(detectNotices(woken, asking)).toMatchObject([
-      { kind: 'needsYou', title: 'Auth: “Login form” needs you', body: 'It says: “Put the .env in /opt/app on the server, then I deploy.” Do what it asks, then Resume it', need: 'plan:pl1:stalled:t1' },
+      { kind: 'needsYou', title: 'Auth: “Login form” waits for you', body: 'It last said: “Put the .env in /opt/app on the server, then I deploy.” If it asks for something, do it, then Resume it', need: 'plan:pl1:stalled:t1' },
     ]);
     const rescued = apply(before, { type: 'plan_put', plan: plan({ rescue: { m1: { sig: 's', tries: 3, at: 7, tried: ['woke KLD-12', 'restarted it'], yours: true } } }) });
     expect(detectNotices(before, rescued)).toMatchObject([{ kind: 'needsYou', title: 'Auth: stuck on “API”', body: 'Beluga tried: woke KLD-12; restarted it', need: 'plan:pl1:rescue:m1' }]);

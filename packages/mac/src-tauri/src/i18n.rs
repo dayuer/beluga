@@ -12,13 +12,23 @@ use tauri::menu::{Menu, MenuItemKind};
 use tauri::{AppHandle, Manager, Runtime};
 
 const ZH_CN: &str = include_str!("../../src/i18n/zh-CN.json");
+/// This fork's own strings, kept apart from upstream's catalog (docs/fork.md).
+const ZH_CN_FORK: &str = include_str!("../../src/i18n/zh-CN.fork.json");
+
+fn zh_cn() -> Option<HashMap<String, String>> {
+    let mut all = serde_json::from_str::<HashMap<String, String>>(ZH_CN).ok()?;
+    if let Ok(fork) = serde_json::from_str::<HashMap<String, String>>(ZH_CN_FORK) {
+        all.extend(fork);
+    }
+    Some(all)
+}
 
 static CATALOG: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
 static LOCALE: RwLock<String> = RwLock::new(String::new());
 
 fn use_locale(locale: &str) {
     let catalog = match locale {
-        "zh-CN" => serde_json::from_str::<HashMap<String, String>>(ZH_CN).ok(),
+        "zh-CN" => zh_cn(),
         _ => None,
     };
     if let Ok(mut c) = CATALOG.write() {
@@ -113,7 +123,11 @@ pub fn menu_bar<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 /// so the window knows the native side isn't in step.
 #[tauri::command]
 pub fn set_ui_language(app: AppHandle, locale: String) -> Result<(), String> {
-    let same = LOCALE.read().map(|l| *l == locale).unwrap_or(false);
+    // Nothing saved yet (a first launch) built the menus in English already: no redraw for "en".
+    let same = LOCALE
+        .read()
+        .map(|l| *l == locale || (l.is_empty() && locale == "en"))
+        .unwrap_or(false);
     let mut problems: Vec<String> = Vec::new();
     match saved_at(&app) {
         Some(p) => {
@@ -130,6 +144,12 @@ pub fn set_ui_language(app: AppHandle, locale: String) -> Result<(), String> {
     }
     if !same {
         use_locale(&locale);
+        // The old menu bar comes off the window without a word from GTK (menu::clear_keys); the
+        // window gives the new one your keys again as it reloads.
+        #[cfg(target_os = "linux")]
+        if let Some(Ok(items)) = app.menu().map(|m| m.items()) {
+            crate::menu::clear_keys(items);
+        }
         match menu_bar(&app).and_then(|menu| app.set_menu(menu).map(|_| ())) {
             Ok(()) => {}
             Err(e) => problems.push(format!("can't redraw the menu bar: {e}")),

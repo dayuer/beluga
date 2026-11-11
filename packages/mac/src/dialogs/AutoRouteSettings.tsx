@@ -1,5 +1,5 @@
 import { agentChoices } from '@beluga/ui/agent-choice.js';
-import { type AutoRoute, type AutoTier, HARD_LABEL, MAX_CANDIDATES, autoRouteOn, candidateRuns, tierList } from '@beluga/shared/auto-route.js';
+import { type AutoRoute, type RouteList, HARD_LABEL, MAX_CANDIDATES, autoRouteOn, candidateRuns, tierList } from '@beluga/shared/auto-route.js';
 import { agentEntries } from '../chat/ModelPicker.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
@@ -8,7 +8,8 @@ import { Group, Row, Select, Switch } from './settings-controls.js';
 /**
  * Settings › Agent › Auto Route (fork, shared/auto-route.ts): a task nobody picked an agent for
  * goes, when it starts, to the first model of its list that runs here: hard work (the `hard`
- * label, urgent or high) to the strong list, the rest to the cheap one. Unset, it's on once one of its local candidates runs here.
+ * label, urgent or high) to the strong list, the rest to the cheap one. A plan's checks go to the
+ * list in between, its design and its hard fixes to the strong one. Unset, it's on once one of its local candidates runs here.
  */
 export function AutoRouteSettings() {
   const api = useApi();
@@ -21,14 +22,14 @@ export function AutoRouteSettings() {
     const next: AutoRoute = { ...route, ...patch };
     void api.session.setPrefs({ autoRoute: next });
   };
-  const setList = (tier: AutoTier, list: readonly string[]): void => save({ [tier]: [...list] });
+  const setList = (tier: RouteList, list: readonly string[]): void => save({ [tier]: [...list] });
 
-  const tierRows = (tier: AutoTier) => {
+  const tierRows = (tier: RouteList) => {
     const list = tierList(tier, route);
     const used = list.find((v) => candidateRuns(runtimes, v));
     const custom = route?.[tier];
     return (
-      <Group title={(tier === 'hard' ? 'Hard Work' : 'Everything Else')}>
+      <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Checking the Work' : 'Everything Else'}>
         {list.map((value, i) => {
           const runs = candidateRuns(runtimes, value);
           const detail = value === used ? 'Used now' : runs ? 'If the one above stops working' : 'Not set up on this Mac: skipped';
@@ -44,7 +45,7 @@ export function AutoRouteSettings() {
             </Row>
           );
         })}
-        <Row label={used ? 'Its tasks start on the one marked Used now' : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
+        <Row label={tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? 'Its tasks start on the one marked Used now' : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
           {list.length < MAX_CANDIDATES ? (
             <Button size="small" onClick={() => setList(tier, [...list, 'claude:'])}>
               {'Add'}
@@ -74,6 +75,7 @@ export function AutoRouteSettings() {
       </Group>
       {on ? tierRows('hard') : null}
       {on ? tierRows('build') : null}
+      {on ? tierRows('review') : null}
     </>
   );
 }

@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { EXTERNAL_FORK } from '../fork/coverage.js';
 
 /**
  * What external agents may reach of the API: every method (src/ipc/api.ts) is decided here. The type
@@ -398,8 +399,6 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'plans.setParallel': 'covered',
   'plans.setTestsAt': 'covered',
   'plans.setWorkAgent': 'covered',
-  'plans.setCheckAgent': 'covered',
-  'plans.setArchAgent': 'covered',
   'plans.tidyUp': 'covered',
   'plans.pass': 'covered',
   'plans.recheck': 'covered',
@@ -532,6 +531,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'local.browse': 'gated',
   'diagnostics.report': 'gated',
   'diagnostics.windowProblem': { refused: WINDOW_LOAD },
+  'diagnostics.windowCrash': { refused: WINDOW_LOAD },
   'voice.load': 'gated',
   'calls.start': 'gated',
   'calls.join': 'gated',
@@ -561,6 +561,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'agentTerm.takeOver': { refused: AGENT_TERM },
   'agentTerm.visual': 'ui_only',
   'stats.get': { refused: STATS },
+  'stats.leaderboard': { refused: STATS },
   'stats.note': { refused: STATS },
   'stats.saveImage': { refused: SAVE_PANEL },
   'preview.open': { refused: PREVIEW },
@@ -635,4 +636,6 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.moveReceive': { refused: COMPUTERS },
   'workspaces.moveUndo': { refused: COMPUTERS },
   'workspaces.ports': { refused: NO_TOOL },
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...EXTERNAL_FORK,
 };

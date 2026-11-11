@@ -169,13 +169,13 @@ describe('a stalled task is woken once, then it asks you', () => {
     expect(t.plans.need(t.plan.id).activity.at(-1)?.text).toContain('stopped again: it ended its turn without handing off');
     // What it said last is kept and shown: often what it waits on you for.
     expect(t.task().watch?.said).toBe('Still partway.');
-    expect(t.plans.need(t.plan.id).activity.at(-1)?.text).toContain('It said: “Still partway.” Do what it asks');
+    expect(t.plans.need(t.plan.id).activity.at(-1)?.text).toContain('It last said: “Still partway.” If it asks for something, do it');
     expect(v.next.kind === 'stalled' && v.next.tasks[0]?.watch?.said).toBe('Still partway.');
     // The Mac's next step and the phone's card say it, with what to do: not a bare Resume.
-    expect(nextWords(v.next)).toEqual({ title: `${t.issue().key} needs you`, detail: 'It says: “Still partway.” Do what it asks, then Resume it.' });
+    expect(nextWords(v.next)).toEqual({ title: `${t.issue().key} waits for you`, detail: 'It last said: “Still partway.” If it asks for something, do it (or answer in its chat), then Resume it.' });
     expect(needsYou(t.store.getState()).find((n) => n.id.includes(':stalled:'))).toMatchObject({
-      title: '“Auth on payment routes” needs you',
-      detail: 'It says: “Still partway.” Do what it asks, then Resume it.',
+      title: '“Auth on payment routes” waits for you',
+      detail: 'It last said: “Still partway.” If it asks for something, do it (or answer in its chat), then Resume it.',
       actions: [{ label: 'Resume', method: 'plans.resumeTask' }],
     });
     // It stays yours: nothing wakes it behind your back.

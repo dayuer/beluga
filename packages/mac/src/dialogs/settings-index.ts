@@ -4,6 +4,7 @@ import type { PaneInfo, SettingEntry, SettingsPane } from '../lib/settings-searc
 // Relative, not @beluga/ui: the root's tests and typecheck read this file too.
 import { HIDEABLE_BUTTONS } from '../../../../src/ui/settings-menus.js';
 import { EXPERIMENTS, EXPERIMENT_INFO } from '../../../../src/shared/experiments.js';
+import { withForkSettings } from '../fork/settings-index.js';
 
 /** Settings' panes, in sidebar order, with other words people use for them. */
 export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; keywords?: string }> = [
@@ -45,7 +46,7 @@ const group = (pane: SettingsPane, label: string, detail?: string, keywords?: st
  * here, or loses one listed here. Labels are the panes' own words, so the jump finds the row
  * (Row and Group carry data-setting anchors made from them).
  */
-export const SETTINGS: readonly Entry[] = [
+const UPSTREAM_SETTINGS: readonly Entry[] = [
   // General
   ...rows('general', undefined, [
     ['Your name', 'What friends see in the room.', 'profile display name'],
@@ -95,11 +96,6 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('claude', 'Your agents', 'Each agent Beluga can run, and how to set it up.', 'sign in install login claude code codex'),
   ...rows('claude', 'Your agents', [['Signed in or installed one just now?', 'Check Again looks for your agents now.', 'check again refresh']]),
-  group('claude', 'Auto Route', 'Which model a task without an agent goes to', 'auto route model glm deepseek haiku opus hard'),
-  ...rows('claude', 'Auto Route', [
-    ['Pick a model for each task', 'Which model a task without an agent goes to', 'auto route autopilot model pick'],
-    ['Urgent and high are hard too', undefined, 'urgent high priority hard opus'],
-  ]),
   group('claude', 'Launch flags', 'Your own flags for claude and codex.', 'args arguments cli flags dangerously skip permissions'),
   ...rows('claude', 'Launch flags', [
     ['Claude Code', 'Your own flags for claude.', 'flags arguments cli'],
@@ -303,11 +299,6 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('phone', 'Pair a phone', 'Show the code to pair a new phone.', 'pair qr code android iphone companion app'),
   ...rows('phone', 'Pair a phone', [['The Beluga app', 'Your phone gets its own key.', 'app download install']]),
-  group('phone', 'Invite a customer', 'The customer sees only this project: its conversations, cards and screenshots.', 'invite customer client project link expires share'),
-  ...rows('phone', 'Invite a customer', [
-    ['Project', 'The customer sees only this project: its conversations, cards and screenshots.', 'invite customer client project'],
-    ['Link valid for', 'After that the link stops working; a phone already paired stays until you remove it.', 'invite link expires days validity'],
-  ]),
 
   // Voice
   ...rows('voice', 'Writing it down', [
@@ -342,5 +333,8 @@ export const SETTINGS: readonly Entry[] = [
     ['Log', '~/.beluga/logs/daemon.log', 'logs console daemon log debug'],
     ['Report a Problem', undefined, 'bug report issue feedback'],
   ]),
-  ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub, or buy a coffee.', 'donate star github coffee support sponsor']]),
+  ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub.', 'star github support sponsor']]),
 ];
+
+// Upstream's list with this fork's own rows in place (packages/mac/src/fork/settings-index.ts, docs/fork.md).
+export const SETTINGS: readonly Entry[] = withForkSettings(UPSTREAM_SETTINGS);

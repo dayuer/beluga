@@ -23,6 +23,7 @@ export const PLANS_HANDLERS = {
   'plans.setWorkAgent': (s, id, agent) => needPlans(s).setWorkAgent(id, agent ?? null),
   'plans.setCheckAgent': (s, id, agent) => needPlans(s).setCheckAgent(id, agent ?? null),
   'plans.setArchAgent': (s, id, agent) => needPlans(s).setArchAgent(id, agent ?? null),
+  'plans.setFixAgent': (s, id, agent) => needPlans(s).setFixAgent(id, agent ?? null),
   'plans.tidyUp': (s, id, yes) => needPlans(s).tidyUp(id, yes),
   'plans.pass': (s, id, milestone) => needPlans(s).pass(id, milestone),
   'plans.recheck': (s, id, milestone) => needPlans(s).recheck(id, milestone),

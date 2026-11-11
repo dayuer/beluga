@@ -53,7 +53,7 @@ import { PhoneSettings } from '../phone/Phone.js';
 import { MachinesSettings } from './MachinesSettings.js';
 import { AccessSettings } from '../gateway/AccessSettings.js';
 import { UpdateAboutRow, UpdateSettingsGroup } from './UpdateSettings.js';
-import { GITHUB_URL, openSupport } from '../lib/support.js';
+import { GITHUB_URL } from '../lib/support.js';
 import { openExternal } from '../lib/system.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
@@ -641,22 +641,11 @@ function About() {
       <Group title="Support Beluga">
         <Row label="Beluga is free, and a passion project" detail={
             <>
-              Built and maintained by <MaintainerChip />. A star helps others find it; a coffee keeps it going.
+              Built and maintained by <MaintainerChip />. Stars are how other developers find it.
             </>
           }>
           <Button size="small" icon="star" onClick={() => void openExternal(GITHUB_URL)}>
             Star on GitHub
-          </Button>
-          <Button
-            size="small"
-            icon="cup"
-            onClick={() => {
-              // The sheet opens where Settings was (Settings sits above sheets).
-              ui.patch({ settings: undefined });
-              openSupport('coffee');
-            }}
-          >
-            Buy a Coffee…
           </Button>
         </Row>
       </Group>
@@ -736,6 +725,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
           <nav className={s.nav}>
             <Dialog.Title className={s.title}>Settings</Dialog.Title>
             <SettingsSearchField search={search} />
+            <div className={s.navList}>
             {panes.map((p) => (
               <button
                 key={p.id}
@@ -750,6 +740,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
                 {p.label}
               </button>
             ))}
+            </div>
           </nav>
           <div className={s.body}>
             <div className={s.bodyHead}>
