@@ -1,7 +1,66 @@
 /*
- * Calm mode: dots, badges, counts and "needs you" (docs/calm-ui.md §3).
- * M1 (BLG-162) fills this: states swap in place or fade, and needing you is a steady mark.
- * Empty in M0 on purpose: calm mode is on by default, so this skeleton must change nothing yet.
+ * Calm mode: states (docs/calm-ui.md §1, §3; rules in docs/calm/overlay.md §4).
+ *
+ * Hover, selection and focus change colour only; "needs you" is a steady mark; the current step
+ * neither changes the row's height nor bolds its title; numbers sit in a fixed-width slot. Each
+ * rule names its upstream file:line in docs/calm/overlay.md §4.1, and how to notice it going
+ * quiet if upstream renames a class.
+ *
+ * `[class*="_name_"]` needs both underscores: without them a rule for `_head_` would also catch
+ * `_headStatic_`. The anchors that collide are listed in the doc.
  */
-:root[data-calm] {
+
+/* S1 — Needs you: amber fill and lit left edge stay, the 4.2 s sweep does not. signal.module.css:22-39 */
+:root[data-calm] [class*='_needsRow_']::after {
+  display: none !important;
+}
+
+/* S2 — Unread: colour, not weight (also the network view's unreadName, same idea). signal.module.css:7-10 */
+:root[data-calm] [class*='_unreadName_'] {
+  font-weight: inherit !important;
+}
+
+/* S3–S5 — Hover changes colour only. zoom-avatar.module.css:12, room.module.css:105, inline.module.css:46 */
+:root[data-calm] [class*='_trigger_']:hover {
+  transform: none !important;
+}
+:root[data-calm] [class*='_avatarButton_']:hover {
+  transform: none !important;
+}
+:root[data-calm] [class*='_stripCell_']:hover {
+  transform: none !important;
+}
+
+/* S6 — The outline's current item: no bolding. No :hover here: upstream bolds the selected item
+   itself (markdown.module.css:538-543). */
+:root[data-calm] [class*='_outlineOn_'] {
+  font-weight: inherit !important;
+}
+
+/* S7 — The current step keeps the row height it has when finished (steps.module.css:434-442). */
+:root[data-calm] [data-step][data-current] {
+  margin-top: 0;
+}
+:root[data-calm] [data-step][data-current] [class*='_head_'] {
+  min-height: 22px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+/* S8 — ... and its title keeps the weight (steps.module.css:443-446). */
+:root[data-calm] [data-step][data-current] [class*='_title_'] {
+  font-weight: inherit !important;
+}
+
+/* Numbers in fixed-width slots. Every live counter already sets it upstream; this covers new ones
+   and the badges inside the sidebar's count and tally. */
+:root[data-calm] [data-signal],
+:root[data-calm] [data-tally] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The waiting stack bar stops on a flat track instead of a frozen gradient band (usage.module.css:634). */
+:root[data-calm] [class*='_stackWaiting_'] {
+  animation-name: none;
+  background: var(--track);
 }
