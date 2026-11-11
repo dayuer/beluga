@@ -63,6 +63,7 @@ node scripts/sync-upstream.mjs --report
 - `packages/mac/src/chat/ChatLog.tsx`：回到底部按钮的 children 换成 `fork/calm/new-below.tsx` 的 `<JumpLabel rows={rows.length} />`——上游不提供「下面来了几条」，计数要跨渲染保存，只能做成组件；按钮本体、`stick` 滚动逻辑一行未动（`docs/calm/hooks.md` §2）。
 - `packages/mac/src/App.tsx`：`Toasts` 里加 `useOneToast('global', toast?.id)`，被后到的 toast 压制时不渲染，外层加 `data-one-toast="global"`——全局 toast 的渲染和 store 定时器都在这里（`docs/calm/hooks.md` §3）。
 - `packages/mac/src/lib/undo-toast.tsx`：`UndoToast` 里加 `useOneToast('undo', toast?.id)`，被压制时不渲染、不响应 ⌘Z（定时器照旧收尾），外层加 `data-one-toast="undo"`——撤销 toast 是模块级状态，两套必须在同一个判据下；样式在 `fork/calm/one-toast.css`（`docs/calm/hooks.md` §3）。
+- `packages/mac/src/lib/live-motion.ts`：`tick`/`wake`/`watch`/`joinLive` 里加 `calmLive` 门（同一文件 5 行）——时钟的 `seen`/`marks` 是模块私有的，外部拿不到，无法在 fork 文件里过滤；沉稳模式下只放行 `[data-current]` 里的标记，其余停在静止帧（`docs/calm/hooks.md` §4）。
 - `packages/mac/src/i18n/zh-CN.fork.json`：fork 自己的 `{0} new` 词条；上游文件不碰。
 
 ### 版本号（脚本自动处理）

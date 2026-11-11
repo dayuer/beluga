@@ -37,6 +37,7 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'packages/mac/src/chat/ChatLog.tsx', match: /<JumpLabel rows=\{rows\.length\} \/>/, why: 'the count of messages below, on the way back down (BLG-166)' },
   { file: 'packages/mac/src/App.tsx', match: /useOneToast\('global', toast\?\.id\)/, why: 'one toast at a time: the app toast steps aside (BLG-167)' },
   { file: 'packages/mac/src/lib/undo-toast.tsx', match: /useOneToast\('undo', toast\?\.id\)/, why: 'one toast at a time: the undo toast steps aside (BLG-167)' },
+  { file: 'packages/mac/src/lib/live-motion.ts', match: /calmLive\(/, why: 'only the current step row loops in calm mode (BLG-168)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */

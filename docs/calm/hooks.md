@@ -306,13 +306,14 @@ calm 关时 `calmLive` 恒真，五处全部退化为上游原行为。
 
 ### 4.5 与 M1 的核对（BLG-168 落地时做）
 
-- 看 `fork/calm/calm-motion.css` 的白名单选择器里有没有填 CSS 关键帧。有 → 删掉 CSS 循环，只留 JS 的 Shimmer，把结论写进本节。没有 → 记录「核对于某 commit，白名单无 CSS 循环」。
+- **核对结果（2026-11-11，本分支）**：`fork/calm/calm-motion.css` 仍是 M0 的空骨架（只有 `:root[data-calm] {}`），白名单里**没有** CSS 关键帧循环 → 眼下只有 JS 这一种循环，无需删。M1 合并后若在 `:root[data-calm] [data-current]` 里填了 CSS 循环，就删掉 CSS 的那一个（JS 的 Shimmer 是唯一放行位），并把结论补记在此。
 - calm-check：`plan`、`tasks`、`dock` 的 `jsMotion` 元素数应降到 0 或只剩 `[data-current]`；`chatrun` 只剩 `[data-current]` 的 Shimmer；`onboarding`、`call` 与 calm-off 对比一致。
 
-### 4.6 失效检测与登记行
+### 4.6 失效检测、证据与登记行
 
 - canary：`live-motion.ts` ↔ `calmLive(`。
 - 登记行：`packages/mac/src/lib/live-motion.ts`——时钟的分发在模块内部（`tick`/`wake`/`joinLive`），外部拿不到 `seen`/`marks`，无法在 fork 文件里过滤；每处 1 行。
+- 证据（BLG-168）：单测 `tests/fork-calm-live-gate.test.ts`（沉稳开只放行 `[data-current]`、关则全放行、跟随设置开关）；calm-check 的 plan/tasks/dock/chatrun 的 `jsMotion` 与 onboarding/call 的对比按计划在里程碑最终步骤统一跑。
 
 ## 5. 接入点失效检测（`tests/fork-calm.test.ts` 的 `touchpoints` 段）
 
