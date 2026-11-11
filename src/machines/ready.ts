@@ -150,7 +150,7 @@ export class Readying {
     this.step(id, 'clone', { state: 'active', detail: target.replace(this.deps.home, '~') });
     const gh = await this.deps.gh().catch(() => 'missing' as const);
     const slug = githubSlug(run.origin);
-    const command = slug && gh === 'signed_in' ? `gh repo clone ${q(slug)} ${q(target)}` : `GIT_TERMINAL_PROMPT=0 git clone ${q(run.origin)} ${q(target)}`;
+    const command = `LC_MESSAGES=C LANGUAGE=C ${slug && gh === 'signed_in' ? `gh repo clone ${q(slug)} ${q(target)}` : `GIT_TERMINAL_PROMPT=0 git clone ${q(run.origin)} ${q(target)}`}`;
     const cloned = await this.deps.sh(command, { cwd: folder, timeoutMs: CLONE_MS });
     if (cloned.code !== 0) {
       const trouble = cloneTrouble(cloned.out, run.computer, gh);

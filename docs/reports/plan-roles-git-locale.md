@@ -85,7 +85,38 @@ Homebrew 的 git 2.56 带 gettext：**即使 `LANG`/`LC_*` 全没设，它也会
 - 去掉两行修复时前两条失败、第三条仍过（红→绿已验证）；加上修复后
   `npx vitest run tests/main-sync.test.ts tests/plan-branch.test.ts tests/git-locale.test.ts` 在本机（系统语言 zh-Hans-CN）36/36 通过，`npm run typecheck` 通过。
 
+## 审计（BLG-117，独立的 Sonnet agent）
+
+做法：grep `src/` 里所有运行 git 的地方（execFile/execFileSync/spawn/bash 命令串）和所有匹配 git 提示文字的正则，逐个看走哪个 runner。
+同时在 /tmp 实测：`stash drop`（“丢弃了 stash@{0}”）、`fatal:`、`Could not read from remote repository` 会本地化；
+`--shortstat`、`reflog --format=%gs`、`status -sb` 不会。`LC_ALL=zh_CN` + 本方案仍是英文。
+
+| 位置 | 依赖的 git 文字 | 走哪个 runner | 结论 |
+|---|---|---|---|
+| `sync.ts:28-48` `classifyFetchError`（AUTH / OFFLINE / no such remote） | fetch 报错 | `git()` | 已覆盖 |
+| `sync.ts:244,270,368` `IN_THE_WAY`、`filesInTheWay` | would be overwritten… | `git()` | 已覆盖 |
+| `sync.ts:325` `stashDrop` 从 “Dropped …(sha)” 取 sha | stash drop 输出（**会**本地化） | `git()` | 已覆盖（原来中文下“放回改动”会悄悄跳过） |
+| `git.ts:433` index.lock 重试 | index.lock 报错 | `git()` | 已覆盖 |
+| `git.ts:148` `deleteMergedBranch` | not fully merged | `git()` | 已覆盖 |
+| `pr.ts:369,402,458,500-502` push 报错、`classifyGitError` | rejected / non-fast-forward / fatal… | `run()`、`gitOut()`（QUIET_ENV） | 已覆盖 |
+| `new-project.ts:116-124` `cloneError` | clone 报错 | `git()` | 已覆盖 |
+| `core/plans/move-git.ts:80` `said()` | `^error\|fatal` 行 | `git()` | 已覆盖 |
+| `merge-preview.ts:60` `parseShortstat` | shortstat（不本地化） | `git()` | 不需要，也已覆盖 |
+| `core/merge-counter.ts:54` reflog `%gs` | 不本地化 | `tryGit()` | 不需要 |
+| **`machines/ready.ts:154` → `ready-model.ts:274-282` `cloneTrouble`** | clone 报错 | 自己的 `bash -lc`（`shAt`），不走 GIT_ENV | **漏了 → 已修**：clone 命令前加 `LC_MESSAGES=C LANGUAGE=C`（gh repo clone 内部的 git 也继承） |
+| `archive-git.ts:28-38` `run` | 报错只作为 ArchiveError 文字展示，不解析 | 自己的 execFile | 不需要（遗留：那里的 git 报错会照用户语言显示，属合理） |
+| `merge-preview.ts:49`、`pr.ts:448` merge-tree；`env.ts`、`workspace-files.ts:272` ls-files；`archive-git.ts:51` check-ignore；`agent/sync-main.ts:182`；`env-send.ts:150`、`cli/chat.ts:249`；`cli/project.ts:66` clone（只转发终端） | 路径 / 退出码 / 值 | 各自直接调用 | 不需要 |
+
+另外核实：没有调用点给 `git()` 传会覆盖 `LC_*`/`LANGUAGE` 的 `env`；`src/` 里没有设 `LC_ALL` 的地方；`pr.ts:118` 把 QUIET_ENV 放在最后，优先级最高。
+没有经 ssh 在别的机器上跑 git 解析其输出的地方（`withSshRoutes` 只改本机 git 的参数）。
+
+ready.ts 修复后 `tests/machines-ready.test.ts`（更新了两条命令串断言）与 `tests/machines/ready-real.test.ts` 通过（35 过、1 跳过），typecheck 通过。
+
+遗留：zh-CN.fork.json 的 git 原话模板（上面“会展示给用户的 git 报错”一节）交给 mac-ui 的 zh-sweep。
+
 ## 改到的上游文件（供 ship-pr 补进 docs/fork.md）
 
 - `src/workspaces/git.ts`（一行：`GIT_ENV` 加两个变量）
 - `src/workspaces/pr.ts`（一行：`QUIET_ENV` 加两个变量）
+- `src/machines/ready.ts`（一行：clone 命令前加 `LC_MESSAGES=C LANGUAGE=C`）
+- `tests/machines-ready.test.ts`（两条断言跟着改）
