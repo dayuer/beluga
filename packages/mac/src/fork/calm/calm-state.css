@@ -61,6 +61,6 @@
 
 /* The waiting stack bar stops on a flat track instead of a frozen gradient band (usage.module.css:634). */
 :root[data-calm] [class*='_stackWaiting_'] {
-  animation: none;
+  animation-name: none;
   background: var(--track);
 }

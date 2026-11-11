@@ -16,6 +16,11 @@
 
 /* ---------------------------------------------------------------------------------------------
  * M1. Keyframes off, except the keep-decor subtrees and [data-opening].
+ *
+ * `animation-name: none`, not the `animation` shorthand: the shorthand also resets
+ * animation-play-state to running, which would fight base.css's `html[data-window='idle'] *
+ * { animation-play-state: paused !important }` — the rule that keeps Beluga quiet while its window
+ * is not looked at (KLD-40, e2e/cool-window.spec.ts).
  * ------------------------------------------------------------------------------------------- */
 
 :root[data-calm] *:not(:where(
@@ -30,7 +35,7 @@
   section[aria-label='Your card'], section[aria-label='Your card'] *,
   [data-opening]
 )) {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 /* The same list again: a pseudo-element cannot be reached through :is(), and the exclusion has to
@@ -59,7 +64,7 @@
   section[aria-label='Your card'], section[aria-label='Your card'] *,
   [data-opening]
 ))::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -77,7 +82,7 @@
 :root[data-calm] [data-step][data-current] *::before,
 :root[data-calm] [data-step][data-current]::after,
 :root[data-calm] [data-step][data-current] *::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -88,6 +93,14 @@
  *
  * This list is §7.0 without [data-opening]: the folding transition has to stay clamped so it
  * matches the 160 ms unfold animation.
+ *
+ * Two more things are taken out (BLG-163, e2e/select.spec.ts and e2e/live-tail.spec.ts): the
+ * browser's initial `transition-property` is `all` with a 0 s duration, so clamping the duration
+ * gives every JS-written value a 160 ms transition. Popper writes the wrapper's `transform` on
+ * each placement (a select glided to its place, was measured mid-glide and stayed 4 px off), and
+ * the chat log writes each row's `transform` from its virtual list (rows glided on every relayout
+ * and overlapped). `[style*="transform"]` covers those and every other element positioned by
+ * JavaScript, including React Flow's nodes; those keep whatever motion their own CSS declares.
  * ------------------------------------------------------------------------------------------- */
 
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
@@ -99,7 +112,9 @@
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 )),
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
   [data-welcome], [data-welcome] *,
@@ -110,7 +125,9 @@
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 ))::before,
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
   [data-welcome], [data-welcome] *,
@@ -121,7 +138,9 @@
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 ))::after {
   transition-duration: var(--dur) !important;
   transition-timing-function: var(--ease-standard) !important;
@@ -149,13 +168,13 @@
 :root[data-calm][data-motion='reduce'] *:not([data-opening]),
 :root[data-calm][data-motion='reduce'] ::before,
 :root[data-calm][data-motion='reduce'] ::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-calm] *:not([data-opening]),
   :root[data-calm] ::before,
   :root[data-calm] ::after {
-    animation: none !important;
+    animation-name: none !important;
   }
 }

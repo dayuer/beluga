@@ -1,27 +1,51 @@
 /*
  * Calm mode: menus, dialogs, popovers and toasts (docs/calm-ui.md §5; rules in docs/calm/overlay.md §3).
  *
- * One way in, everywhere: opacity from 0 and a 4 px drop, at --dur. The offset is written with the
- * standalone `translate` property and never `transform`: radix and Popper position their floating
- * elements with transform, and touching it tears the position apart. The layer's own animation
- * (whether it had one or not) is replaced, so a menu, a dialog and both toasts open alike.
+ * One way in, everywhere: opacity from 0 at --dur on the same curve. Dialogs and toasts also drop
+ * 4 px; menus, popovers and tooltips fade only.
+ *
+ * Why the split (BLG-163, e2e/select.spec.ts): radix and Popper position their floating elements by
+ * measuring the element's rect. A `translate` running while it measures makes the measured rect 4 px
+ * off, and the final position keeps that error — a select popup sat 4 px below its trigger forever,
+ * and during the entrance it could be seen far from its trigger. Transform-like properties are
+ * therefore kept off anything Popper places. Nothing here touches `transform` at all.
  *
  * This rule outranks the global animation stop in calm-motion.css on specificity: :root[data-calm]
  * plus one attribute selector is (0,3,0) against (0,2,0).
  */
 
-@keyframes calm-surface-in {
+@keyframes calm-surface-drop {
   from {
     opacity: 0;
     translate: 0 -4px;
   }
 }
 
+@keyframes calm-surface-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Dialogs and the toasts: opacity and a small drop. */
 :root[data-calm] :is(
-  [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
-  [class*='_toast_'], [class*='_toasts_']
+  [role='dialog'], [role='alertdialog'], [class*='_toast_'], [class*='_toasts_']
 ):not(:where(
   /* The incoming call is an alertdialog too: it belongs to keep-decor. */
+  [data-welcome], [data-welcome] *,
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *
+)) {
+  animation: calm-surface-drop var(--dur) var(--ease-standard) !important;
+}
+
+/* Menus, select lists and tooltips: opacity only — Popper places them. */
+:root[data-calm] :is(
+  [role='menu'], [role='listbox'], [role='tooltip']
+):not(:where(
   [data-welcome], [data-welcome] *,
   .glass-surface, .glass-surface *,
   [class*="_incoming_"], [class*="_incoming_"] *,
@@ -38,7 +62,7 @@
   [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
   [class*='_toast_'], [class*='_toasts_']
 ) {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -46,6 +70,6 @@
     [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
     [class*='_toast_'], [class*='_toasts_']
   ) {
-    animation: none !important;
+    animation-name: none !important;
   }
 }

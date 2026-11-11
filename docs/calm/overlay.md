@@ -67,8 +67,8 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 
 | # | 规则 | 声明 | 解决 |
 | --- | --- | --- | --- |
-| M1 | 全局关关键帧 | `animation: none !important`，排除 §7 锚点与 `[data-opening]` | §2.3：不留装饰性循环 |
-| M2 | 白名单槽位 | `:root[data-calm] [data-step][data-current]` 及其子元素/伪元素 `animation: none !important`（M1 占位） | §7：唯一允许的循环，M2 换视觉 |
+| M1 | 全局关关键帧 | `animation-name: none !important`，排除 §7 锚点与 `[data-opening]` | §2.3：不留装饰性循环 |
+| M2 | 白名单槽位 | `:root[data-calm] [data-step][data-current]` 及其子元素/伪元素 `animation-name: none !important`（M1 占位） | §7：唯一允许的循环，M2 换视觉 |
 | M3 | 过渡统一 | `transition-duration: var(--dur)`、`transition-timing-function: var(--ease-standard)`、`transition-delay: 0s`，全部 `!important`；**拖动时整体退场** | §2.1：120–200ms、ease-out |
 | M4 | 功能例外 | `[data-opening]` 的 `animation-duration: var(--dur)`、`animation-timing-function: var(--ease-standard)` | 让折叠/面板开合的 animationend 照常触发 |
 | M5 | reduce | 无锚点排除的全局关闭重申（装饰也停），只留 `[data-opening]` | §2.5 |
@@ -80,7 +80,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 
 **M4 为什么只收时长、不换动画**：全应用只有两处靠 `animationend` 推进状态（全量 grep 已证，见 §8.3）——
 `AgentSteps` 的折叠（`steps.module.css:661` `unfold`）与 Sentinel 面板（`sentinel/home.module.css:37` `askIn`）。
-它们既要能开合，又必须落进 120–200ms。`animation: none` 不触发任何事件，而 **0s 时长的动画照样发
+它们既要能开合，又必须落进 120–200ms。`animation-name: none` 不触发任何事件，而 **0s 时长的动画照样发
 `animationend`**，所以只覆盖 `animation-duration`/`timing-function`，名字与关键帧留给上游。
 折叠的开合对称性：折叠走 `transition`（`steps.module.css:652-657`，上游 `calc(var(--dur) * 2)`），由 M3 统一成
 `var(--dur)`；展开走 `unfold` 动画，由 M4 统一成 `var(--dur)` —— 同档、同曲线。
@@ -103,7 +103,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   section[aria-label='Your card'], section[aria-label='Your card'] *,
   [data-opening]
 )) {
-  animation: none !important;
+  animation-name: none !important;
 }
 /* 同一份 §7.0 列表再写两遍（:where() 不能复用变量）：伪元素也要排除 keep-decor 的宿主 */
 :root[data-calm] *:not(:where(
@@ -130,7 +130,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   section[aria-label='Your card'], section[aria-label='Your card'] *,
   [data-opening]
 ))::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 
 /* M2 白名单槽位（唯一循环）：M1 先占位为关；M2 在此换成唯一指示的 animation，锚点不变 */
@@ -140,10 +140,10 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 :root[data-calm] [data-step][data-current] *::before,
 :root[data-calm] [data-step][data-current]::after,
 :root[data-calm] [data-step][data-current] *::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 
-/* M3 过渡统一；拖动中退场。排除表 = §7.0 去掉 [data-opening]（折叠的 transition 要被压到 160ms） */
+/* M3 过渡统一；拖动中退场。排除表 = §7.0 去掉 [data-opening]，再加 Popper 定位 wrapper 与所有带内联样式的元素 */
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
   [data-welcome], [data-welcome] *,
   [data-arriving],
@@ -153,7 +153,9 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 )),
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
   [data-welcome], [data-welcome] *,
@@ -164,7 +166,9 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 ))::before,
 :root[data-calm]:not([data-dragging]):not([data-arranging]) *:not(:where(
   [data-welcome], [data-welcome] *,
@@ -175,7 +179,9 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   [class*="_askCard_"], [class*="_askCard_"] *,
   [class*="_askPill_"], [class*="_askPill_"] *,
   [class*="_scene_"], [class*="_scene_"] *,
-  section[aria-label='Your card'], section[aria-label='Your card'] *
+  section[aria-label='Your card'], section[aria-label='Your card'] *,
+  [data-radix-popper-content-wrapper], [data-radix-popper-content-wrapper] *,
+  [style]
 ))::after {
   transition-duration: var(--dur) !important;
   transition-timing-function: var(--ease-standard) !important;
@@ -192,13 +198,13 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 :root[data-calm][data-motion='reduce'] *:not([data-opening]),
 :root[data-calm][data-motion='reduce'] ::before,
 :root[data-calm][data-motion='reduce'] ::after {
-  animation: none !important;
+  animation-name: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
   :root[data-calm] *:not([data-opening]),
   :root[data-calm] ::before,
   :root[data-calm] ::after {
-    animation: none !important;
+    animation-name: none !important;
   }
 }
 ```
@@ -213,6 +219,17 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 
 ### 2.3 边界与自检
 
+- **用 `animation-name: none`，不用 `animation: none` 简写**（BLG-163 的 e2e 发现）：简写会把
+  `animation-play-state` 重置回 `running`，和 `styles/base.css:146-149` 的
+  `html[data-window='idle'] * { animation-play-state: paused !important }` 打架——窗口在后台时
+  「暂停全部动画」的规则失效，`e2e/cool-window.spec.ts:63` 因此失败。只关名字，play-state 留给上游。
+- **带内联样式 `[style]` 的元素从过渡 clamp 里排除**（BLG-163 的 e2e 发现）：浏览器的
+  `transition-property` 初始值就是 `all`、时长 0s，把时长统一成 160ms 等于给**所有 JS 写进去的值**加了过渡。
+  三个实测：聊天记录的虚拟列表每行用内联 `transform` 定位，重排时每行滑 160ms、行压行
+  （`e2e/live-tail.spec.ts`）；Popper 的定位 wrapper 同理（选择器弹出层偏 4px，见 §3）；图片 chip 的宽度由
+  测试内联设置，改 `right` 时量到的是过渡中间态（`e2e/chat-image-chips.spec.ts`）。结论：**内联样式就是 JS
+  在写值**，一律不加过渡；它们自己声明的过渡（如 React Flow 的 520ms）原样保留，这是「120–200ms」的已知
+  例外（§10.5）。
 - **静止帧不崩**：被关掉的循环会停在基础样式。已逐条核对基础样式（§4.3）：`.working i` 停成三颗实心点、
   `.countNow` 直接显示新数字、`.statusLive .dot` 停成实心点——都可接受；只有等待中的堆叠条需要静态底色（§4.3）。
 - **不写进本文件的字面值**：`>200ms` 时长、超界 bezier（y 不在 [0,1]）、`scale(...>1)`、禁用动画名
@@ -230,13 +247,19 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 
 | # | 规则 | 声明 | 解决 |
 | --- | --- | --- | --- |
-| O1 | 统一出现关键帧 | `from { opacity: 0; translate: 0 -4px }`，160ms `--ease-standard` | §5.1：同一方式、同一位置 |
-| O2 | 授予浮层 | `[role='menu'|'listbox'|'dialog'|'alertdialog'|'tooltip']`，排除 keep-decor | 菜单/对话框/弹出层一致 |
-| O3 | 授予 toast | `[class*="_toast_"]`、`[class*="_toasts_"]`，同一关键帧 | 两套 toast（App/Undo）视觉一致 |
+| O1 | 统一出现关键帧 | 160ms `--ease-standard`，同一曲线 | §5.1：同一方式 |
+| O2 | 对话框与 toast | `calm-surface-drop`：`opacity: 0` + `translate: 0 -4px` | 浮层「自上 4px 落下」 |
+| O3 | 菜单 / 选择列表 / tooltip | `calm-surface-in`：只 `opacity: 0` | **Popper 会量元素定位**，带位移会量错 |
+| O4 | 全部授予 | `[role='menu'|'listbox'|'dialog'|'alertdialog'|'tooltip']` + `_toast_`/`_toasts_`，排除 keep-decor | 菜单/对话框/弹出层/toast 同一方式 |
 
-**O1 只动 `translate` + `opacity`，绝不动 `transform`**：radix/Popper 用 `transform` 给浮层定位，覆盖 `transform`
-会撕掉位置。独立 `translate` 属性与 `transform` 叠加，不冲突。方向统一「自上 4px 落下」——多数浮层自触发器
-向下展开。
+**为什么菜单类只淡入、不带位移（BLG-163 的 e2e 发现）**：radix/Popper 用 `transform` 定位，而且是在元素
+**被量出来的那一刻**定位。给浮层加 `translate` 时，量到的矩形偏了 4px，最终位置就一直差 4px——实测选择器
+弹出层永远压在触发器下方 4px（`e2e/select.spec.ts` 要求 <4px），动画进行中还会被量出几十像素的偏差。
+所以 Popper 定位的东西（`menu`/`listbox`/`tooltip`）只淡入；对话框与 toast 不归 Popper 管，保留 4px 落下。
+两者曲线与时长相同，「出现方式一致」靠的是同一条 160ms 淡入，不是同一条位移。
+
+**O2/O3 只动 `translate` + `opacity`，绝不动 `transform`**（对话框与 toast 的位移也一样）：radix 可能用
+`transform` 做居中/定位，覆盖会撕掉位置。独立 `translate` 属性与 `transform` 叠加，不冲突。
 
 **O2 的特异性**：`:root[data-calm]` (0,2,0) + `:is(...)` 里最高的属性选择器 (0,1,0) = **(0,3,0)**，高于 M1 的
 (0,2,0)，所以授予能压过「全局关」。同特异性时 `overlays` 在 `motion` 之后 import，顺序也赢。
@@ -255,16 +278,36 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 ### 3.2 完整 CSS（照抄）
 
 ```css
-@keyframes calm-surface-in {
+@keyframes calm-surface-drop {
   from {
     opacity: 0;
     translate: 0 -4px;
   }
 }
 
+@keyframes calm-surface-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 对话框与 toast：淡入 + 4px 落下 */
 :root[data-calm] :is(
-  [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
-  [class*='_toast_'], [class*='_toasts_']
+  [role='dialog'], [role='alertdialog'], [class*='_toast_'], [class*='_toasts_']
+):not(:where(
+  [data-welcome], [data-welcome] *,
+  .glass-surface, .glass-surface *,
+  [class*="_incoming_"], [class*="_incoming_"] *,
+  [class*="_askCard_"], [class*="_askCard_"] *,
+  [class*="_askPill_"], [class*="_askPill_"] *,
+  [class*="_scene_"], [class*="_scene_"] *
+)) {
+  animation: calm-surface-drop var(--dur) var(--ease-standard) !important;
+}
+
+/* 菜单、选择列表、tooltip：只淡入（Popper 定位，见上） */
+:root[data-calm] :is(
+  [role='menu'], [role='listbox'], [role='tooltip']
 ):not(:where(
   [data-welcome], [data-welcome] *,
   .glass-surface, .glass-surface *,
@@ -281,20 +324,20 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
   [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
   [class*='_toast_'], [class*='_toasts_']
 ) {
-  animation: none !important;
+  animation-name: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
   :root[data-calm] :is(
     [role='menu'], [role='listbox'], [role='dialog'], [role='alertdialog'], [role='tooltip'],
     [class*='_toast_'], [class*='_toasts_']
   ) {
-    animation: none !important;
+    animation-name: none !important;
   }
 }
 ```
 
 - 来电横幅是 `role='alertdialog'`（`call/CallLayer.tsx:28`），必须排除——它属 keep-decor（§7）。
-- reduce 下浮层**不播动画**（`animation: none`）：令牌为 0 时动画虽然看不见，但 0ms 动画仍会留下
+- reduce 下浮层**不播动画**（`animation-name: none`）：令牌为 0 时动画虽然看不见，但 0ms 动画仍会留下
   `getAnimations()` 记录，否则「reduce 下 CSS 动画为 0」的验收会多出一串 0ms 条目。
 - 设计稿写的是 `var(--ease-out)`；实施统一用 `var(--ease-standard)`，让浮层与过渡同一条曲线（两种都在
   §2.1 允许范围内，这是一处有意偏差）。
@@ -358,7 +401,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 
 | 上游位置 | 关掉后停在什么 | 处置 |
 | --- | --- | --- |
-| `views/usage/usage.module.css:634-637` `.stackWaiting`（`sheen` 1.3s infinite） | 静态渐变带（背景是 200% 宽的渐变） | **补平底色**：`[class*='_stackWaiting_'] { animation: none; background: var(--track) }` |
+| `views/usage/usage.module.css:634-637` `.stackWaiting`（`sheen` 1.3s infinite） | 静态渐变带（背景是 200% 宽的渐变） | **补平底色**：`[class*='_stackWaiting_'] { animation-name: none; background: var(--track) }` |
 | `components/ui.module.css:313-340` `.working i`（`blink` 1.2s infinite） | 三颗实心点（基础 opacity 1） | 保持，读起来就是一个省略号 |
 | `layout/signal.module.css:22-39` `.needsRow::after` | 已被 S1 隐藏 | — |
 | `chat/steps/steps.module.css:482-485` `.countNow`（`tick` 270ms） | 新数字直接出现 | 保持 |
@@ -397,7 +440,7 @@ motion 侧同理：reduce 下的全局关闭**不带装饰排除**（引导页�
 :root[data-calm] [data-tally] { font-variant-numeric: tabular-nums; }
 
 /* 冻帧：等待中的堆叠条用平底色 */
-:root[data-calm] [class*='_stackWaiting_'] { animation: none; background: var(--track); }
+:root[data-calm] [class*='_stackWaiting_'] { animation-name: none; background: var(--track); }
 ```
 
 > `[data-step][data-current]` 是**结构性锚点**，不是类名：`chat/steps/StepRow.tsx:138` 的当前步骤行。
@@ -506,7 +549,7 @@ M2 的 `live-gate` 会把它收束成「同一时刻只有一个」。
 | `layout/ProjectTree.tsx:224`（`data-current`） | 项目树里的当前项目标记 | ❌ |
 
 所以白名单选择器固定为 **`:root[data-calm] [data-step][data-current]` + 其子元素/伪元素**。
-M1 里它写 `animation: none !important` 占位；M2 只把这个槽位换成最终视觉（小、安静、不前推布局），
+M1 里它写 `animation-name: none !important` 占位；M2 只把这个槽位换成最终视觉（小、安静、不前推布局），
 **锚点与位置不变**。这是 M1→M2 的契约。
 
 其余 JS 动效（DotMatrix、LiveDot、framer-motion、WAAPI）不在 CSS 覆盖层范围内，见 §8。
@@ -632,7 +675,7 @@ toast 合流）。M1 之后如需补充：`call/NotesBox.tsx:157` 的 900ms 背�
 ## 9. 关掉开关：与上游一致
 
 - 覆盖层所有选择器都以 `:root[data-calm]` 开头；`data-calm` 不在 `<html>` 上时**零匹配**。
-- 唯一不在选择器里的东西是 `@keyframes calm-surface-in` 的定义本身——没人引用它，不影响任何元素。
+- 唯一不在选择器里的东西是 `@keyframes calm-surface-drop` / `calm-surface-in` 的定义本身——没人引用它们，不影响任何元素。
 - `calm.css` 的 `@import` 顺序（tokens→motion→overlays→state）只影响覆盖层内部；对上游模块 CSS 无影响。
 - 验证：`calm-check` 的 `calm-off/*` 四组合与 `docs/calm/baseline.md` 的代表截图逐像素比对（BLG-163），
   以及 `git diff upstream/main -- packages/mac/src` 为空（只看 M1 的文件清单：`fork/calm/*.css`、`docs/calm/*`）。
@@ -645,35 +688,75 @@ toast 合流）。M1 之后如需补充：`call/NotesBox.tsx:157` 的 900ms 背�
 
 ### 10.1 场景 × 组合（`node packages/mac/scripts/calm-check.mjs room workspace chatrun plan tasks sentinel usage onboarding`）
 
-| 场景 | 组合 | CLS | 动画数 | 无限循环（除白名单） | JS 动效元素 | 截图 |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| … | calm-on/full | | | | | |
-| … | calm-off/full | | | | | |
+一次运行（git `aae9bc08a` + 本任务改动，演示 daemon + vite，`BELUGA_HOME` 指向临时目录）：
 
-要写清的结论：`calm-on/full` 的 CSS 动画归零（onboarding 只剩 keep-decor 的 sheen/beam，记为批准例外；
-当前步骤的循环是 JS Shimmer，体现在 `jsMotion`）；`calm-on/reduce` 的 CSS 动画为 0；CLS 不高于基线；
-`firstFrame.calm` 全为 true。
+| 场景 | `calm-on/full` CLS · 动画 | `calm-off/full` CLS · 动画 | `calm-on/reduce` 动画 | `calm-off/reduce` 动画 |
+| --- | --- | --- | ---: | ---: |
+| room | 0.003 · 0 | 0.000 · 0 | 0 | 0 |
+| workspace | 0.000 · 0 | 0.000 · 0 | 0 | 0 |
+| chatrun | 0.019 · 0 | 0.021 · 0 | 0 | 0 |
+| plan | 0.007 · 0 | 0.000 · 1 | 0 | 0 |
+| tasks | 0.000 · 0 | 0.000 · 1 | 0 | 0 |
+| sentinel | 0.037 · 0 | 0.051 · 1 | 0 | 0 |
+| usage | 0.003 · 0 | 0.000 · 1 | 0 | 0 |
+| onboarding | 0.004 · 5 | 0.000 · 10 | 0 | **2** |
+
+怎么读这张表：
+
+- **`calm-on/full` 的 CSS 动画为 0**（onboarding 除外）：没有关键帧、没有无限循环，也没有任何过渡停在
+  采样时刻。
+- **onboarding 的 5 条**：`_sheen_`（6s）、`_beam_`（3.2s）两条 keep-decor 循环，加上 3 条 framer-motion
+  的 JS 入场（900/650/650ms，一次性）——全部是 §7 批准的例外。对照 `calm-off/full` 的 10 条：多出来的
+  正是 `_scan_`（4.2s infinite）与 4 条更长的 JS 入场。
+- **reduce 一列**：`calm-on/reduce` 全 0；`calm-off/reduce` 的 onboarding 仍有 2 条（基线的「reduce 下
+  sheen/beam 还在跑」问题），覆盖层把它压住了。
+- **CLS**：chatrun（0.019 对 0.021）与 sentinel（0.037 对 0.051）calm-on 更低；plan/usage 的 0.003–0.007
+  是演示数据在四个组合之间继续演化的噪声（基线文件已说明这类数字不能跨运行比较），全部低于基线记录的
+  最大值（sentinel 0.039/0.079、chatrun 0.018/0.018）。
+- **`firstFrame.calm`**：8 个场景的 `calm-on` 全为 `true`，`calm-off` 全为 `false`。
 
 ### 10.2 开关前后截图
 
-| 场景 | calm on | calm off（基线） |
-| --- | --- | --- |
-| workspace | | `img/workspace-calm-off-full-loaded.png` |
+同一场景、同一次运行，只切开关：
 
-四组合 × enter/loaded/hover/select（chatrun 另含新消息时刻）截图放 `docs/calm/img/`。
+| workspace · calm on | workspace · calm off |
+| --- | --- |
+| ![on](img/after-workspace-calm-on.png) | ![off](img/after-workspace-calm-off.png) |
+
+**与 M0 基线逐像素比对**（`docs/calm/img/workspace-calm-off-full-loaded.png` 对本次 calm-off）：
+整图 **2.9%** 的像素不同；标题栏/工具栏 **0.74%**、右侧面板 **0.59%**、侧栏 **16.7%**。前两块几乎
+逐像素相同；侧栏的差异来自演示数据本身变了（M0 基线里展开的项目、未读行与今天不同），不是覆盖层——
+覆盖层的所有选择器都以 `:root[data-calm]` 开头，关掉时零匹配（§9）。
+
+四组合 × enter/loaded/hover/select（chatrun 另含新消息时刻）截图在 `.context/calm/img/`（gitignore，可重跑）。
 
 ### 10.3 依赖 `animationend` 的组件核查
 
-- [ ] AgentSteps 折叠后能展开（`unfold` 的 `animationend` 已触发）
-- [ ] Sentinel Ask 面板滑入后宽度/overflow 正常
-- [ ] 全量再 grep 一次 `animationend`，没有新增的第三处
+全量 grep（`onAnimationEnd` / `animationend`，排除 `fork/`）仍然只有 §8.3 那两处：
+
+- [x] **AgentSteps 折叠后能展开**：点「Show Steps」时 `.folding` 带 `data-opening`，动画
+  `_unfold_313uy_1` 时长 160ms（M4 收的）；500ms 后 `data-opening` 已清、步骤行渲染出来、
+  容器高度 114.66px。
+- [x] **Sentinel Ask 面板**：进入 Sentinel 时 `aside[aria-label='Ask Sentinel']` 带 `data-opening`，
+  动画 `_askIn_103jh_1` 160ms，宽度 1px → 148ms 后 `opening=false`、宽度 380px、overflow 恢复。
+- [x] 没有新增的第三处。
 
 ### 10.4 e2e 与检查
 
-- [ ] `npm run typecheck`（`packages/mac`）
-- [ ] `npx vitest run tests/fork-calm.test.ts`
-- [ ] `npm run e2e`
-- [ ] 拖动（`data-dragging`）跟手：卡片/tile 拖动时无 160ms 缓动延迟
+- [x] `npm run typecheck`（`packages/mac`）通过
+- [x] `npx vitest run tests/fork-calm.test.ts` 通过（2 tests）
+- [x] 拖动：拖动中（`data-dragging='card' | 'tile' | 'resize'` 或 `data-arranging`）M3 整条退场，
+  已核对三个写入点（`tasks/TaskBoard.tsx:280`、`sentinel/DashboardPage.tsx:376,667`、
+  `layout/arrange-drag.ts:141`），实测普通按钮 160ms、拖动中回到上游 120ms。
+- [x] `npm run e2e`（全量）：538 个用例，第一次跑 409 passed。e2e-lock 自己判定那次是机器过载
+  （load 6.8×10 核），把失败的用例单独重跑了一遍，只剩 **8 个**真的失败：cool-window、select ×2、
+  live-tail、plans、tasks、chat-image-chips、unread。逐个查完后修了三类根因（都在 §2.3/§3/§10.5）：
+  1. `animation: none` 简写压掉了 `animation-play-state`（cool-window）；
+  2. 过渡 clamp 把 Popper 定位 wrapper 的 `transform` 也加了过渡（select）；
+  3. 过渡 clamp 同样给虚拟列表行、图片 chip 等**JS 内联写值**的元素加了过渡（live-tail、chat-image-chips）。
+  修完后把 7 个文件单独重跑：**22 passed、1 failed**，剩下的只有 `unread.spec.ts:43`——它断言未读名字
+  `font-weight: 650`，而沉稳模式有意只换颜色（S2），这是设计与旧测试的冲突，见 §10.5。plans 的逐帧用例
+  随 `[style]` 排除一起恢复（React Flow 节点保留自己的 520ms）。
 
 ### 10.5 问题表（现象 / 文件 / 改法 / 状态）
 
@@ -681,9 +764,14 @@ toast 合流）。M1 之后如需补充：`call/NotesBox.tsx:157` 的 900ms 背�
 | --- | --- | --- | --- |
 | `layout/panel/panel.module.css:793,833` | 抽屉/聚焦面板被关后瞬时出现（无 role） | M1 接受；M3 决定补锚点 | 登记 |
 | `dialogs/native/parts.tsx`（Dialog.Overlay） | 背板瞬时出现（无结构锚点） | 同上 | 登记 |
-| radix 关闭动画 | 被全局关闭后立即卸载 | 验收看有无闪烁；有则在 M3 给关闭补 `[data-state='closed']` 例外 | 待验证 |
+| radix 关闭动画 | 被全局关闭后立即卸载 | 实测菜单/对话框开关无闪烁 | 已验证 |
 | 行内 `role='listbox'` | 挂载时淡入一次（160ms、不占布局） | 可接受；嫌吵就在 M3 收窄 O2 | 登记 |
-| 深色 `--subagent` | 色相偏蓝（255°→225°） | BLG-162 截图核对，需要就换 `#b2a1e5` | 待定 |
+| 深色 `--subagent` | 色相偏蓝（255°→225°） | BLG-162 已改为同色相 `#b2a1e5` | 已修 |
+| `e2e/cool-window.spec.ts:63` | 窗口失焦后动画不暂停：`animation: none` 简写把 `animation-play-state` 重置成 running | 全局关改用 `animation-name: none`（§2.3） | 已修 |
+| `e2e/select.spec.ts:47,114` | 选择器弹出层偏 4px、入场时位置乱：Popper 量到了带 `translate` 的矩形 | 菜单/选择列表/tooltip 只淡入不带位移（§3） | 已修 |
+| `e2e/live-tail.spec.ts:53` | 聊天重排时行与行压在一起：虚拟列表的内联 `transform` 被加了 160ms 过渡 | 过渡 clamp 排除带内联样式的元素 `[style]`（§2.3） | 已修 |
+| `e2e/plans.spec.ts:168` | 计划画布：React Flow 节点用内联 transform 定位、自己声明 520ms 过渡。压到 160ms 时边线跟不上节点（逐帧比对失败） | 已由 `[style]` 排除出 clamp，节点保留自己的时长，用例恢复。代价：计划画布的过渡不在 120–200ms 内——记为「图引擎自己的动效」例外；要收拢得靠上游让边线随节点 transform 一起动 | 已修（带例外） |
+| `e2e/unread.spec.ts:55` | 断言未读名字 `font-weight: 650`；S2 只留颜色，实测 400 | 计划有意改的视觉（§1、§3），测试写死了旧行为。两条路：① fork 侧把这一行断言改成检查颜色（改的是上游 e2e 文件，需计划负责人点头）；② 进上游 PR，让「未读只换颜色」成为上游行为（§8.5）。在那之前它单独重跑仍失败，属**预期内** | 待决定 |
 
 ### 10.6 令牌：两主题实测（BLG-162）
 
@@ -715,11 +803,11 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 
 | 浮层 | animation-name | duration | timing-function |
 | --- | --- | --- | --- |
-| 菜单 `[role='menu']` | `calm-surface-in` | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
-| 对话框 `[role='dialog']` | `calm-surface-in` | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
+| 菜单 `[role='menu']` | `calm-surface-in`（只淡入） | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
+| 对话框 `[role='dialog']` | `calm-surface-drop`（淡入 + 4px） | 160ms | `cubic-bezier(0.3, 0.7, 0.3, 1)` |
 
-下面两张图把动画暂停在 **70 / 160 ms**：菜单半透明地落进位置，设置对话框同样（内容已就位，只是还淡着）。
-行内 `role='listbox'` 与 toast 没有在演示数据里当场打开，它们与菜单是同一条规则（§3.2）；BLG-163 补拍。
+下面两张图把动画暂停在 **70 / 160 ms**：菜单半透明地淡进来，设置对话框淡入并下落 4px（内容已就位，只是
+还淡着）。行内 `role='listbox'` 与 toast 没有在演示数据里当场打开，它们与菜单同一条淡入规则（§3.2）。
 
 | 菜单（暂停在 70ms） | 对话框（暂停在 70ms） |
 | --- | --- |
