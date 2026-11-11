@@ -10,7 +10,7 @@ import { withSshRoutes } from './ssh-routes.js';
 export class GitError extends Error {}
 
 /** Git must never ask for a password on Beluga's screen: fail instead, and say why. */
-const GIT_ENV: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes' };
+const GIT_ENV: NodeJS.ProcessEnv = { ...process.env, LC_MESSAGES: 'C', LANGUAGE: 'C', GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes' };
 
 /**
  * Run git in a directory; resolves stdout, rejects with git's own message. `env`: more of git's

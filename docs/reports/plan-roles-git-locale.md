@@ -75,10 +75,15 @@ Homebrew 的 git 2.56 带 gettext：**即使 `LANG`/`LC_*` 全没设，它也会
 
 原则：Beluga 自己的句子（外层）全部走已有中文；git 的原话只给最常见的几条加模板，其余保持英文原文（它们本来就是技术细节，英文还便于搜索）。
 
-## 回归测试（BLG-116 实施）
+## 回归测试（BLG-116 已实施）
 
-- `tests/git-locale.test.ts`：在 `LANG=zh_CN.UTF-8`、`LC_ALL=zh_CN.UTF-8` 下（并清掉 `LANGUAGE`），`updateDefault` 遇到挡路的改动仍返回 `dirty`；
-  `dropBranch` 仍报 “not fully merged”；含中文文件名的 `status --porcelain` 与不设环境时逐字节一致。
+- `tests/git-locale.test.ts`：导入 git.ts 之前把 `LANG`/`LC_ALL`/`LC_MESSAGES` 设成 `zh_CN.UTF-8` 并清掉 `LANGUAGE`，然后：
+  - `updateDefault` 遇到挡路的改动仍返回 `dirty`（files `notes.txt`，behind 1）；
+  - `deleteMergedBranch`（`git branch -d`）仍报 “not fully merged”；
+  - 含中文文件名、中文提交信息的 `status --porcelain`（含 `-z`、`core.quotePath=false`）、`log --format=%s`、`diff --stat`、`diff`，
+    经 Beluga 的 `git()` 与用户自己终端（中文环境）跑出来**逐字节相同**。
+- 去掉两行修复时前两条失败、第三条仍过（红→绿已验证）；加上修复后
+  `npx vitest run tests/main-sync.test.ts tests/plan-branch.test.ts tests/git-locale.test.ts` 在本机（系统语言 zh-Hans-CN）36/36 通过，`npm run typecheck` 通过。
 
 ## 改到的上游文件（供 ship-pr 补进 docs/fork.md）
 
