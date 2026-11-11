@@ -586,6 +586,63 @@ function stepsFor(page, shot) {
       await wait(2000);
       await shot('project');
     },
+
+    // BLG-172 rest scenes
+    /** The room's group chat (network page), with its pending requests. */
+    network: async () => {
+      await side(page, 'Group chat').click();
+      await wait(1500);
+      await shot('group');
+      const decision = page.getByRole('button', { name: 'Let in' });
+      if (await decision.count().catch(() => 0)) {
+        await decision.first().hover({ timeout: 5000 }).catch(() => undefined);
+        await wait(300);
+        await shot('decision-hover');
+      }
+      return { pending: await page.locator('[role="button"]').filter({ hasText: /wants to join|trust/i }).count().catch(() => 0) };
+    },
+    /** A call in the room: the in-call strip and its controls (the ring itself is for incoming calls). */
+    call: async () => {
+      await side(page, 'Group chat').click();
+      await wait(1200);
+      const start = page.getByRole('button', { name: /^Call the Room/ });
+      if (await start.count().catch(() => 0)) {
+        await start.first().click();
+        await wait(2500);
+        await shot('in-call');
+        const inCall = await measureAnimations(page);
+        const leave = page.getByRole('button', { name: 'Leave Call' });
+        const left = await leave.count().catch(() => 0);
+        if (left) {
+          await leave.first().click({ timeout: 5000 }).catch(() => undefined);
+          await wait(800);
+        }
+        return { inCall, leaveVisible: left };
+      }
+    },
+    /** A destructive dialog: removing a friend from the room, its copy and its buttons. */
+    confirmremove: async () => {
+      await side(page, 'Group chat').click();
+      await wait(900);
+      const bob = page.getByRole('button', { name: 'bob', exact: true });
+      if (await bob.count().catch(() => 0)) {
+        await bob.first().click({ timeout: 5000 }).catch(() => undefined);
+        await wait(700);
+        const remove = page.getByRole('button', { name: /Remove from Room/ });
+        if (await remove.count().catch(() => 0)) {
+          await remove.first().click({ timeout: 5000 }).catch(() => undefined);
+          await wait(800);
+          await shot('remove');
+          const text = (await page.getByRole('dialog').first().innerText().catch(() => '')).slice(0, 700);
+          // Never confirm it: back out with Escape.
+          await page.keyboard.press('Escape');
+          await wait(300);
+          await page.keyboard.press('Escape');
+          await wait(300);
+          return { dialogText: text };
+        }
+      }
+    },
   };
 }
 
