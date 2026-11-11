@@ -116,8 +116,14 @@ e2e 锁当时被另一个工作树的整套 e2e 占着（`waiting for m7-v5's e2
 - 全量 `npx vitest run`（负载 29–46，10 核）：652 个文件里 648 过、3 个失败（7758 个用例过）。单独重跑：`tests/test-lock.test.ts` 过；`tests/machines/linux-computer.test.ts`（真的起一个无头 Beluga 配对，37 秒后 waitFor 超时）和 `tests/friend-share/handoff.test.ts`（网络交接，60 秒超时，重跑时换了一个用例超时）还是超时。两个都是 P2P/真实进程的长测试，不碰本里程碑改的任何文件。没有拿到 Tested-on，见遗留。
 - e2e（`fork-ime`、`plan-chat`、`plan-settings`、`plan-roles`、`plan-roles-walk`、`plan-zh` 一起跑一次）：9 过、3 失败、4 跳过。失败的：`fork-ime` 的新建任务（用例自己漏了 `page.goto('/')`，已改）；`plan-roles`、`plan-zh` 是 “The demo daemon did not start”（负载 3.6 倍）。重跑这 3 个时 e2e 锁一直被别的工作树占着（m7-v5、BLG-159），见遗留。
 
+### 类型声明与全量测试（BLG-193）
+
+- BLG-190 给 `scripts/sync-upstream.mjs` 加了 `parseNumstat`、`reportLines`、`stale` 三个导出，`scripts/sync-upstream.d.mts` 没跟上，根目录 `tsc --noEmit` 在 `tests/upstream-sync.test.ts` 报 3 个 TS2305（BLG-188 时说的“typecheck 通过”是在这之前）。补了声明（`NumstatRow` 和三个函数），`.mjs` 没改；根目录 `npm run typecheck` 和 `packages/mac` 的 `tsc --noEmit` 退出码都是 0。
+- 全量 `npx vitest run`（负载 20–37，10 核）：7758 过，5 个超时，都在真实 P2P/进程的长测试里：`friend-share/fork.test.ts`（2 个）、`friend-share/handoff.test.ts`、`friend-share/projects.test.ts`、`machines/linux-computer.test.ts`。单独重跑：handoff、projects 过；fork 的“someone who only follows along can’t fork”（30 秒超时）和 linux-computer（终端里的 `echo` 20 秒没回来）在负载约 30 时仍超时。同样两个文件在 `origin/main` 的临时工作树里也超时（fork.test.ts 还多 2 个），所以是机器忙，不是本分支的改动。等了 10 分钟负载仍在 20–34；之后整套又跑一次（负载约 34），11 个超时，全在 `friend-share/`（fork、handoff、projects）和 `project-invites`，其余全过。所以还没拿到 Tested-on：要在 Mac 空闲时（负载低于 10 左右）再跑整套。
+
 ### 遗留
 
-- 全量 vitest 的 Tested-on：等 Mac 不忙时在本分支再跑一次 `npx vitest run`；`linux-computer`、`handoff` 两个超时要在空闲时确认。
+- Tested-on：Mac 空闲时在本分支跑 `npx vitest run`，通过后用它打印的那行补一个提交（tree 要和 HEAD 一致）。
 - e2e 重跑：`npm run e2e -- e2e/fork-ime.spec.ts e2e/plan-roles.spec.ts e2e/plan-zh.spec.ts`（锁空出来后）。
+- `packages/mac/e2e/git.spec.ts:126` 在 main 上也失败，不是本里程碑的问题，这里不修。
 - `pilot.ts` 里 PR #17 的建筑师（约 100 行）还在上游文件里，下一步抽到 `src/fork/plans/architect.ts`。
