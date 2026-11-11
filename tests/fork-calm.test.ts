@@ -18,6 +18,22 @@ const SNAPSHOT = path.join(__dirname, 'fork-calm.snapshot.json');
 /** One-off decoration that may keep its motion (docs/calm-ui.md §7.4). */
 const KEEP_DECOR = ['onboarding/', 'dialogs/star-scene.module.css', 'components/PixelBurst.tsx', 'components/pixel-burst-model.ts'];
 
+/** Files are named from the repository root here, as docs/fork.md names them. */
+const REPO = path.join(__dirname, '..');
+
+/**
+ * Every place this fork reaches into an upstream file (docs/fork.md's touch points; each one is
+ * designed in docs/calm/hooks.md). `match` is the line the fork relies on: a missing match means an
+ * upstream change moved or removed the hook and the fork's behaviour is silently gone. That is a
+ * broken fork integration, not an upstream style finding, so it fails the run (unlike the report
+ * below). Each task that adds a hook adds its row here.
+ */
+const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; readonly why: string }[] = [
+  { file: 'packages/mac/src/main.tsx', match: /import '\.\/fork\/calm\/index\.js'/, why: 'calm overlay loads before the first frame (M0)' },
+  { file: 'packages/mac/src/dialogs/Settings.tsx', match: /<CalmRow \/>/, why: 'the calm switch in Settings › Appearance (M0)' },
+  { file: 'tests/mac-settings-search.test.ts', match: /read\('fork\/calm\/settings\.tsx'\)/, why: 'settings search reads the fork row (M0)' },
+];
+
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
 const BANNED = ['pop', 'hop', 'bounce', 'ripple', 'sheen', 'shimmer', 'breathe', 'pulse', 'shake', 'blink', 'glow'];
 
@@ -185,5 +201,13 @@ describe('fork-calm: what the overlay cannot reach', () => {
       return FORBIDDEN_IN_FORK.has(f.category) || BANNED.some((word) => lower.includes(word));
     });
     expect(violations.map((f) => `${f.category}|${f.file}|${f.name}`)).toEqual([]);
+  });
+
+  it('keeps every line into an upstream file that the fork relies on', () => {
+    const missing = TOUCHPOINTS.filter((t) => {
+      const full = path.join(REPO, t.file);
+      return !existsSync(full) || !t.match.test(readFileSync(full, 'utf8'));
+    });
+    expect(missing.map((t) => `${t.file}: ${t.why}`)).toEqual([]);
   });
 });
