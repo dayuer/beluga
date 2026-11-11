@@ -137,6 +137,15 @@ Mac 上同样的两件事不用命令行：项目的 ⋯ 菜单 › **Connect to
 **Synon Studio…**，那里有 Reconnect 与 Disconnect。手机不连接中台；手机只是你的另一个屏，用来看开工卡
 并点批准（§7）。
 
+**用 Vite dev server 跑 Mac 前端时**（不是 Tauri 窗口，例如做验收或截图），daemon 要放行它的 origin：
+
+```sh
+BELUGA_HOME=… BELUGA_ALLOW_ORIGINS=http://localhost:1420 npx tsx src/cli.ts daemon --keep-alive
+```
+
+不放行时前端会显示「Beluga isn't running yet」，浏览器控制台是 WebSocket 的 `HTTP Authentication failed`。
+Tauri 原生窗口不需要这一行。
+
 ## 5. 起客户 Web
 
 ```sh
@@ -170,7 +179,7 @@ npm run proxy -- --dist       # 同源代理，http://localhost:8790
 
 - **Mac**：铃铛（Needs You）里出现 `studio-start` 卡：计划标题、里程碑数、预估点数、是谁确认的。
   **Approve** 调用 `studio.answerGate(gateId, {approve:true})`；**Decline** 展开一句话输入框，客户会读到
-  这句话。
+  这句话。第一次启动 Mac 应用会先看到欢迎页，点 **Skip Setup** 之后铃铛才可点。
 - **手机**：同一张卡（`studio-start`），Approve / Decline 走同一个 `studio.answerGate`。
 - Gate 绑定客户确认时的那一版草稿（`draftRev`）。批准时 draft 已经变了 → 回答 `stale`，不批准任何东西，
   卡上提示让客户再看一眼重新确认。
@@ -183,7 +192,8 @@ npm run proxy -- --dist       # 同源代理，http://localhost:8790
 1. 里程碑的任务全部完成、检查（checker）写出结论后，里程碑进入 `gate`，客户页显示 **等你验收**，主按钮
    变成「通过 / 还不行」。
 2. **通过**：`milestone.pass{milestoneRef, draftRev}` → 直接完成这个里程碑（客户点通过不经你确认，这是
-   设计决定）；最后一个里程碑通过，计划变成 done。
+   设计决定）；最后一个里程碑通过，计划变成 done。点「通过」后有 **10 秒撤销窗**，过后才真正发送——给
+   客户留一次反悔的机会。
 3. **还不行**：`milestone.sendBack{milestoneRef, draftRev, reason}`（原因 10–4000 字，会被包成客户的
    话）→ 计划页的 agent 得到这条反馈，补任务或提问；你会在计划的历史里看到。
 4. 客户确认/验收用的 `draftRev` 必须是当前版本；旧版本一律 `stale`，让客户刷新。
