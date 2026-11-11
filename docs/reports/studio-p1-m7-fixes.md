@@ -69,3 +69,23 @@ M7 复检时，准则 3（`npx vitest run` 全量通过）有三项阻断。下�
 **低负载通过记录**：开始时负载 8.1（10 核），16 passed，4 skipped，结束时负载 24（别的进程）。日志：`.beluga/scratch/m7/e2e/studio-app-lowload.txt`。在这之前那次被新的端口检查拦了下来：8790 上留着我自己验证端口检查时起的监听进程。也就是说，「旧服务占着端口、冒充就绪」这种情况在这台机器上确实会发生。
 
 **为什么不能只靠重跑**：两种失败都和负载、时机有关。重跑能碰巧过，但下次还会在同样的条件下再失败，而且失败信息说不清原因。现在等待的是「元素真的画出来了」，端口被占时直接说是哪个端口，失败时也会写明卡在哪一屏。
+
+## e · 修复后全量验证（BLG-152）
+
+### 全量 `npx vitest run`
+- 开始时负载 **9.46**（10 核），结束时 24（别的工作区的 Mac e2e 正好开始）。
+- **656 个文件通过，1 个跳过（`tests/machines/ready-real.test.ts`，本来就按设计跳过）；7931 个用例通过，7 个跳过。** 结尾有 `Tested-on: macOS c403d8b0…` 行。
+- 本轮修过的三个文件都在这次全量里通过：`linux-computer`（21 s，没有被 skip）、`studio-sanitize`（92 个用例）、`sentinel-kept-data`（5 个用例）。
+- 日志：`.beluga/scratch/m7/full/vitest-blg152.txt`
+
+### packages/studio-app 的 `npm run e2e`
+- 开始时负载 **8.1**：16 passed，4 skipped。日志：`.beluga/scratch/m7/e2e/studio-app-lowload.txt`（详见 §d）
+
+### packages/mac 的 `npm run e2e`（第三轮，full-3）
+- 20:26 时负载 9.4，开始排队；e2e-lock 一直在等另一个工作区（`ship-check-wt2`）跑了一个多小时的 Mac e2e，**20:37 才真正开跑，当时负载 12.8**。跑的过程中，别的会话又把负载推到 30 以上（lock 记的是 4.3×）。
+- 第一遍：469 passed，15 failed，26 did not run，用时 24.5 min。lock 单独重跑失败项：22 passed，2 failed，17 did not run。日志：`.beluga/scratch/m7/e2e/full-3.txt`
+- 重跑后剩下的两个失败：
+  1. **`sentinel.spec.ts:37`：夹具问题，已修。** 每个 worker 会在当前文件跑的时候预先起好下一个文件的 demo daemon（预热）。demo 里 "Watch the web" 那次运行从 daemon 启动起 90 秒后结束（`src/core/sentinel/demo.ts`），而用例要看到它还在 Running。前一个文件跑得久的时候（有用例卡满 45 秒超时、负载高），预热的 daemon 轮到 sentinel.spec 时已经超过 90 秒，运行早已结束。所以它总在前面有失败的重跑阶段出问题，单独跑却能过（BLG-145 的第二轮也是这样）。修法：`e2e/fixtures.ts` 里，预热超过 45 秒的 daemon 丢掉，换一个新起的。**验证**：在它前面放一个空等 100 秒的临时 spec，旧夹具下 sentinel:37 失败，新夹具下通过（`.beluga/scratch/m7/e2e/stale-warm-check.txt` 是没有长文件时的对照）。
+  2. **`instant-worktrees.spec.ts:51` / `:68`：没有修，是已知的偶发问题。** 用例读完右键菜单的文字、截完图以后，菜单自己关掉了，接下来的 `dispatchEvent('click')` 等不到菜单项，直到超时。单独跑整个文件全过；用 `--repeat-each=6` 在负载约 16 时重复 6 遍，失败 1 次，快照里菜单确实已经不见了。用例里的注释说「demo 的流式输出让侧栏和它的菜单一直在重画」，最可能的原因是侧栏重新挂载了那一行，Radix 的 ContextMenu 跟着被卸载了。这算一个产品体验问题：右键菜单开着时可能自己关掉。但要确认得深入侧栏组件，超出了本轮的范围。我没有改测试去掩盖它，留作单独的任务。
+
+**没有做到的**：没有一轮 Mac e2e 是在负载始终不超过核数的情况下一次全过的。这台机器上同时有别的工作区在跑 Mac e2e，还有别的 Claude 会话，负载反复涨到 30 以上，不是这个工作区能控制的。
