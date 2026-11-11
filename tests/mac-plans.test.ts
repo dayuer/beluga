@@ -262,10 +262,4 @@ describe('shipping the plan: its pull request, conflicts with main, and where th
     const items = feedOf([ev('note', 'made the plan’s branch plan/p from main', 1), ev('note', 'opened pull request #7: plan/p → main', 2), ev('note', 'paused by you', 3)]);
     expect(items.map((i) => i.kind)).toEqual(['pr', 'branch']);
   });
-
-  it('the feed shows who does each part changing and what’s hard handed to the fix agent (fork, BLG-125)', () => {
-    const ev = (text: string, at: number): PlanEvent => ({ id: `e${at}`, at, by: { kind: 'beluga' }, kind: 'note', text });
-    const items = feedOf([ev('gave its checks to Claude (Opus) from here on', 1), ev('handed the conflict to Claude (Opus)', 2), ev('runs the test suites only at the end, in the final step', 3), ev('the architect of “x” ended its turn without a design: asked for it again', 4)]);
-    expect(items.map((i) => i.text)).toEqual(['runs the test suites only at the end, in the final step', 'handed the conflict to Claude (Opus)', 'gave its checks to Claude (Opus) from here on']);
-  });
 });

@@ -33,9 +33,7 @@ describe('what a sentinel keeps', () => {
     dirs.push(home);
     const s = setup({ home });
     const sn = s.sentinels.create(brief);
-    // A run of a minute ago: its files are kept 14 days from it (FILES_KEEP_DAYS), so a fixed date would expire.
-    const at = Date.now() - 60_000;
-    const run = s.sentinels.addHistory(sn.id, { by: 'schedule', trigger: { kind: 'schedule', summary: 'On its schedule' }, state: 'done', startedAt: at, endedAt: at + 1000, headline: 'Kept it', steps: sn.steps.map((st) => ({ id: st.id, state: 'done' as const })), tasks: [] }, { outputs: ['token=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 and more'], report: '# Today\n\nAll good.' });
+    const run = s.sentinels.addHistory(sn.id, { by: 'schedule', trigger: { kind: 'schedule', summary: 'On its schedule' }, state: 'done', startedAt: Date.now() - 60_000, endedAt: Date.now() - 59_000, headline: 'Kept it', steps: sn.steps.map((st) => ({ id: st.id, state: 'done' as const })), tasks: [] }, { outputs: ['token=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 and more'], report: '# Today\n\nAll good.' });
     s.sentinels.demoKeep(sn.id, run.id, [{ name: 'issues', label: 'Open issues', better: 'down', value: 9 }, { name: 'jobs', label: 'Jobs', better: 'none', columns: ['job', 'log'], columnTypes: [{ key: 'log', type: 'html', name: '{{job}}.html' }], rows: [{ job: 'deploy', log: '<p>done</p>' }] }]);
     return { ...s, sn, run, home };
   }
