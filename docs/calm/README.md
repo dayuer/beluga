@@ -222,6 +222,19 @@ call/pointer.module.css:61         long-duration|call/pointer.module.css|transit
 
 `Tested-on` 行取最终一次全量运行的输出，写在 BLG-178 的提交说明末尾（本文件写完、运行之后不再改动任何文件）。
 
+**BLG-208：空闲机（load < 10 起跑）的最终全量尝试，结果是没有一次零失败**
+
+- 全量 `npx vitest run`，6 次，每次 `Test Files 654 通过 / 1 跳过`，约 195–255 秒：
+  - 前 5 次各有 1 个失败：`tests/test-lock.test.ts`「nices a run that carries KLAUD_WORKTREE…」（第 2 次另有 `machines-settings-sync` 的 `waitFor` 超时，单独重跑 3/3 通过，属负载）。第 6 次是 `Tests 1 failed | 7827 passed`，仍是 test-lock 这一条。`Tested-on` 行只在零失败时才打印，所以**没有 Tested-on 行**。
+  - test-lock 这一条单独跑 3/3 通过（11/11），在全量里 6 次里有 5 次失败；加了日志的那次全量里它通过过。失败时 `os.setPriority` 对刚 spawn 的 shell 报 `ESRCH`。我试过「失败就换个 shell 重试」「改成先 nice 再放行的 node 进程」，都没能让它在全量里稳定通过，两处改动已经撤回（`git revert`）。没有查出原因，不是 nice 逻辑出错（生产代码没动，单跑通过）。这一条留作未解决项（§7.2 P-6）。
+- 全量 `npm run e2e`，2 次（load 6.8 与 9.5 起跑）：
+  - 第 1 次：490 通过、30 失败（多数是 0–4ms 的「演示 daemon 没起来」，机器 load 升到 23 时 fixture 起不来）。e2e-lock 对失败的重跑里 6 条是真失败，逐条查出：
+    1. `steps.spec.ts:126/:191/:220`：BLG-196 在 `beforeEach` 已 `goto('/')` 的文件里用 `addInitScript` 关沉稳，init script 要到下一次加载才生效，所以这三条一直在沉稳开下跑。加 `page.reload()`。
+    2. `fork-calm-toast.spec.ts:63`（沉稳关）：App toast 几秒内自己消失，先出的话右键菜单操作完它已没了；改成先撤销 toast、再 App toast，且用 `waitForFunction`（raf 轮询）在同一时刻判定两条都在，连跑 5 次通过。
+    3. `sidebar-categories.spec.ts:222`：新建聊天发送后指针留在侧栏，沉稳冻结顺序，行不出现；按 SH-08 先把指针移出（同 unread.spec）。
+    4. `tasks.spec.ts:495`：**真回归**。沉稳让看板 `reduce` 为真，隐藏列「立即展开」没有动画帧，拖拽「展开后重读列位置」的窗口（`foldMoved`）开不起来，Ready 列的放置间隙不出现。`Fold` 的 layout effect 展开时也调 `onMove()`，修复后该条前半段稳定通过。**后半段仍有约 50% 的波动**（`Backlog` 从左边展开后 `Ready` 列有 2–3px 位移，断言要求 < 2px）：我试过再补一帧 `hold`，更糟，已撤回；原因未查清（P-7）。
+  - 第 2 次：508 通过、6 失败（`app.spec:202`、`drafts:106`、`instant-worktrees:28`、`sentinel:37`、`threads-categories:24` 这 5 条被 e2e-lock 单独重跑通过，属负载；`fork-calm-toast:63` 重跑仍失败，即上面第 2 条，随后已修）。这一轮没有包含 toast 与 tasks 的修后复跑，所以**也没有一次零失败的全量**。
+
 ### 4.2 `packages/mac` 的 `npm run e2e`
 
 首次在不安静的时间段跑，大量演示 daemon 在 60 秒内没凑齐假朋友（fixture 超时），另有若干逐帧/时序用例超时。凡失败先单 worker 单独重跑定性，再逐条裁决：
@@ -429,6 +442,8 @@ reduced-motion 下这些仍然全停：`calm-on/reduce` 的网格 36 组全是 0
 | P-2 | `docs/calm/README.md` §4.3 | 沉稳关 reduce 的 chatrun 锚点这轮没抓到 | 只在沉稳关档，下一轮网格补测 | 已知，不影响沉稳开的判定 |
 | P-3 | e2e 全量 | 一遍完整 `npm run e2e` 因机器负载没有一次全绿 | 由 BLG-208 在空闲机上跑 | 待 BLG-208 |
 | P-5 | 对话区场景（chatrun/chatsteps） | 沉稳开 CLS 0.084–0.104，高于其它页（≤0.004） | 来自长回合里新行/新步骤到达，沉稳关同量级（0.058–0.078）；锚定测量里阅读位置位移 0px，不是沉稳引入的回归；上游的流式渲染如要更低需上游改 | 已知，已批准 |
+| P-6 | `tests/test-lock.test.ts` nice 用例 | 全量 vitest 里 6 次有 5 次失败（`setPriority` 对刚 spawn 的 shell 报 ESRCH），单跑通过 | 原因未查清；试过重试与改成先 nice 再放行，均无效，已撤回 | **未解决**，挡着 Tested-on |
+| P-7 | `tasks.spec.ts:495` 后半段 | 沉稳开时 Backlog 从左展开后 Ready 列位移 2–3px（断言 < 2），约 50% 波动 | `Fold` 立即展开没有动画帧，`hold` 的滚动补偿留下尾差；补一帧 `hold` 更糟，已撤回 | **未解决** |
 | P-4 | 沉稳关的 `selection-bar` | 该 spec 没有 calm 开关，只测了默认（沉稳开） | 沉稳关下选择条动画是上游原样，风险低 | 已批准例外 |
 
 没有不通过项；P-3 是验证缺口，不是实现缺陷。

@@ -108,7 +108,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/e2e/plan-black-box.spec.ts`：等计划行进入 Unread 前先 `mouse.move` 出侧栏（SH-08：指针在侧栏里时沉稳冻结顺序，新行不插入），同 `unread.spec.ts`。
 - `packages/mac/e2e/fork-calm-sidebar.spec.ts`：沉稳开那条结尾回答 new-hero 的提问。同一 worker 共用一个演示 daemon，不回答的话沉稳关那条打开 new-hero 看到的是「等你回答」的输入框，等不到 `new-hero` 占位符。
 - `packages/mac/e2e/steps.spec.ts`：三条以沉稳关运行的用例（折叠、飞入、飞进队列）在设置 `beluga.fork.calm.v1` 之后 `page.reload()`——文件的 `beforeEach` 已经 `goto('/')`，init script 只在下一次加载才跑，之前沉稳其实一直是开的（BLG-196 的改法没生效）。
-- `packages/mac/e2e/fork-calm-toast.spec.ts`（沉稳关那条）：先撤销 toast、后 App toast。App toast 几秒内自己消失，先出的话右键菜单操作完它已经没了。
+- `packages/mac/e2e/fork-calm-toast.spec.ts`（沉稳关那条）：先撤销 toast、后 App toast，并在页面里按帧轮询「两条同时在」。两条 toast 都会自己消失，先后和判定时刻对不上就测不到重叠。
 - `packages/mac/e2e/sidebar-categories.spec.ts`：新建聊天发送后把指针移出侧栏再等行出现（SH-08，同 `unread.spec.ts`）。
 - `packages/mac/e2e/send-no-blank.spec.ts`：消息飞行动画的上游用例以沉稳关运行；沉稳模式让消息直接落位、没有飞行（CH-06），这条测的是上游的飞行实现。
 - `packages/mac/e2e/steps.spec.ts`：步骤滑入折叠、消息飞行/飞入队列的上游用例以沉稳关运行；沉稳模式下步骤与 reduced-motion 一样瞬时进折叠（CH-02）、消息直接落位（CH-06），同文件后面的 reduced-motion 用例覆盖了那一档。
