@@ -235,6 +235,13 @@ call/pointer.module.css:61         long-duration|call/pointer.module.css|transit
     4. `tasks.spec.ts:495`：**真回归**。沉稳让看板 `reduce` 为真，隐藏列「立即展开」没有动画帧，拖拽「展开后重读列位置」的窗口（`foldMoved`）开不起来，Ready 列的放置间隙不出现。`Fold` 的 layout effect 展开时也调 `onMove()`，修复后该条前半段稳定通过。**后半段仍有约 50% 的波动**（`Backlog` 从左边展开后 `Ready` 列有 2–3px 位移，断言要求 < 2px）：我试过再补一帧 `hold`，更糟，已撤回；原因未查清（P-7）。
   - 第 2 次：508 通过、6 失败（`app.spec:202`、`drafts:106`、`instant-worktrees:28`、`sentinel:37`、`threads-categories:24` 这 5 条被 e2e-lock 单独重跑通过，属负载；`fork-calm-toast:63` 重跑仍失败，即上面第 2 条，随后已修）。这一轮没有包含 toast 与 tasks 的修后复跑，所以**也没有一次零失败的全量**。
 
+**BLG-210：最终树（`58b5913b5`，含 selection-bar 修复）上的全量 e2e**
+
+- load 8.5 起跑，运行中升到 25–35（其它 worktree 同时在跑），用时 32.6 分钟。第一遍：505 通过、23 失败、17 跳过、4 未运行。
+- 23 个失败里 22 个被 e2e-lock 单独重跑通过，属负载（多数是 fixture 起不来的 0–4ms 失败）：`changes-files:37`、`copilot-flow:16`、`mcp-chip:9`、`mcp-servers:9`、`no-main-conversation:47/:67`、`popup-preview:9`、`project-files:23`、`pull-requests:23`、`select:47`、`settings-search:24`、`sharing:20`、`sidebar-calm:12/:25`、`sidebar-search:27`、`slot-wait:19`、`steps:50`、`support:8`、`task-agent:21`、`task-boards-delete:5`、`usage-limit-continue:13`、`wants-to:35`。
+- `selection-bar:26` 在这次全量里一遍通过（11.1s）。
+- 剩下 1 个：`tasks.spec.ts:495`（P-7），单独重跑仍败，我又单跑 4 次：沉稳开 2 败 2 过，沉稳关 4/4 通过。按任务要求，单独仍败的算真实失败，**这一轮不结案**。
+
 ### 4.2 `packages/mac` 的 `npm run e2e`
 
 首次在不安静的时间段跑，大量演示 daemon 在 60 秒内没凑齐假朋友（fixture 超时），另有若干逐帧/时序用例超时。凡失败先单 worker 单独重跑定性，再逐条裁决：
