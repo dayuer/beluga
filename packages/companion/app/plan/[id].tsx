@@ -19,6 +19,7 @@ import type { ConvView, PlanView, Topic } from '../../lib/link/protocol';
 import { color } from '../../lib/theme';
 import { calls } from '../../lib/link/calls';
 import { store } from '../../lib/store';
+import { MilestoneRoles } from '../../components/fork/MilestoneRoles';
 
 /** How a plan runs (src/core/plans/model.ts AUTONOMY_INFO), as the Mac says it. */
 const AUTONOMY = {
@@ -410,6 +411,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                 </View>
               </Press>
             ) : null}
+            <MilestoneRoles {...(m.roles ? { roles: m.roles } : {})} />
             <Card r={16}>
               {m.tasks.map((t, ti) => {
                 const tt = toneOf(t.state);
