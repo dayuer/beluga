@@ -140,15 +140,8 @@ describe.skipIf(process.platform === 'win32')("a worktree's Claude Code runs at 
   it('nices a run that carries KLAUD_WORKTREE, and what it starts inherits it', async () => {
     // What it starts reads its own niceness (macOS's ps once said -10 for a process niced to 10 on CI).
     const own = `${JSON.stringify(process.execPath)} -e 'console.log(require("os").getPriority())'`;
-    // In a full run on a busy Mac the shell can be gone before we reach it (setPriority says ESRCH), so a
-    // shell that is already dead is replaced by a fresh one, up to three times.
-    let child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
-    let niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
-    for (let attempt = 1; !niced && attempt < 3; attempt++) {
-      child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
-      niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
-    }
-    expect(niced).toBe(true);
+    const child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    expect(niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' })).toBe(true);
     expect(os.getPriority(child.pid!)).toBe(10);
     let out = '';
     child.stdout.on('data', (d) => (out += d));
