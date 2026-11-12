@@ -198,7 +198,112 @@ call/pointer.module.css:61         long-duration|call/pointer.module.css|transit
 
 ## 4. 全量验证
 
-（BLG-178 填：根目录 vitest、packages/mac e2e、calm-check 场景 × 组合表，与 M3 终值对比。）
+三项检查都跑在同步上游 3.2.0 之后的代码上（`59832b9a7` 合并提交 + 本任务的沉稳挂钩 `call/PointerMark.tsx` 与 `fork/calm/calm-state.ts` 拆分）。
+
+### 4.1 根目录 `npx vitest run`
+
+全量运行（机器同时被其它 worktree 打满，load 400+）：**7818 通过、10 失败、16 跳过**，失败的 6 个文件全部是等待超时（`cli-project`、`cli-pty`、`external-stop`、`machines/linux-computer`、`smart-archive`、`web-security`）。把这 6 个文件单独重跑：5 个全过；`machines/linux-computer` 仍超时，等负载降到 ~19 再单跑，**18.7 秒通过**——都是负载超时，不是代码失败。
+
+`Tested-on` 行取最终一次全量运行的输出，写在 BLG-178 的提交说明末尾（本文件写完、运行之后不再改动任何文件）。
+
+### 4.2 `packages/mac` 的 `npm run e2e`
+
+首次在不安静的时间段跑，大量演示 daemon 在 60 秒内没凑齐假朋友（fixture 超时），另有若干逐帧/时序用例超时。凡失败先单 worker 单独重跑定性，再逐条裁决：
+
+**适配沉稳默认（改 spec，沉稳关保持上游原测）**
+
+- `packages/mac/e2e/cool-window.spec.ts`：上游的“Working 光带走动”以沉稳关运行（沉稳模式故意让当前步骤以外的 live 标记停住）。
+- `packages/mac/e2e/send-no-blank.spec.ts`、`e2e/steps.spec.ts`（飞入、折叠两条）：上游的飞行动效用例以沉稳关运行（CH-06/CH-02 在沉稳下是瞬时）。
+- `packages/mac/e2e/threads-panel.spec.ts`：“threads 关时无标记”“子线程折在父行下”两条，在等新行（Unread 行、子线程行）前先把指针移出侧栏（SH-08）。
+
+**BLG-196 的五条真实失败**
+
+| 用例 | 现象 | 裁决与依据 | 改动 |
+| --- | --- | --- | --- |
+| `fork-calm-sidebar:47` | 指针离开 600ms 后顺序仍不更新 | **代码回归**。合并后右侧面板默认开着 Changes 标签，它的 `listbox "Changed files"` 被 `release()` 当成「侧栏打开的浮层」，每 600ms 续期、永不释放。浮层判据改为「portal 到 `#root` 之外」（菜单/对话框/选择器都是 portal；页面自己的列表在 `#root` 里） | `fork/calm/hold-order.ts` `popupOpen()`；单测加“页面内 listbox 不冻结” |
+| `unread:43`、`unread:81` | Unread 区始终没有 add-auth / new-hero 行 | **代码回归 + spec 补一步**。不是上游 #434/#463 改了结构：快照里 Unread 区在、按钮名格式没变，只是新行被冻结的顺序挡着。两个原因：① 上面的 listbox 续期；② 鼠标点过侧栏按钮后焦点留在按钮上，`focusin` 记了 `keys`，指针离开也一直冻结。`keys` 改为只认键盘焦点（`:focus-visible`）。spec 依 SH-08 设计在断言前把指针移出侧栏——指针在侧栏里时新行不插入，这是沉稳的既定行为 | `fork/calm/hold-order.ts` `focusIn`；`e2e/unread.spec.ts` 两处 `mouse.move` |
+| `fork-calm-toast:27`、`:54` | `[data-one-toast]` 计数 0 / 1，期望 1 / 2 | **spec 过期**。它用 Settings › Environment 的「Saved」当 App 全局 toast，但那是设置页里的内联状态（`EnvironmentSettings.tsx` 的 `role="status"` span），从来不经 `<Toasts>`；`global` toast 根本没出现。改用 `⌘.`（Stop the Agent）在没有对话时给出的说明 toast（`lib/commands.ts runCommand`）。并补上反方向：撤销 toast 在先、App toast 在后时，撤销被替换，被替换的撤销不响应 ⌘Z。沉稳关两条同时可见、Undo 可用 | `e2e/fork-calm-toast.spec.ts` |
+
+`sidebar-calm:12/:25` 单独重跑通过（启动抖动），复跑确认。上述 spec 与 `chat-*`、撤销相关 spec 的复跑结果见 BLG-196 的证据附件。
+
+整套 `npm run e2e` 这次没能一次全绿：机器长时间被其它 worktree 打满（load 150–500），e2e 的 fixture 要在 60 秒内等演示 daemon 凑齐假朋友。安静窗口里（load 15–30，2 workers）前 45 个用例零失败。完整一遍需要在空闲的 Mac 上重跑。
+
+### 4.3 calm-check：36 个场景 × 4 组合
+
+```bash
+npm run dev                                            # 演示 daemon，用隔离 home
+cd packages/mac && npm run dev                         # vite，同样用隔离 home
+node packages/mac/scripts/calm-check.mjs $(tr '\n' ' ' < scenes.txt)
+```
+
+- 场景数以脚本的场景表为准：**36 个场景 × 4 组合 = 144 次**（设计文档里的 31 是 M3 时的数量，脚本后来加了 5 个）。JSON 留在 `.context/calm/`（gitignore），代表截图拷到 `docs/calm/img/m4-*.png`。
+- 分批跑：第一批 `room` + `onboarding`；其余 34 个第二批。第一轮被演示 daemon 的 origin 挡住（vite 的 `http://localhost:1420` 不在 `APP_ORIGINS` 里），重跑时用 `BELUGA_HOME=/tmp/calm-demo-home`、`BELUGA_ALLOW_ORIGINS=http://localhost:1420` 隔离，顺带避开机器上别的 agent 共用 `~/.beluga/daemon.json` 的 token 冲突。
+- 表格格式：`CLS · CSS 动画数 · JS 动效元素数`；首帧列只对 `calm-on/full`。
+
+| 场景 | on/full | on/reduce | off/full | off/reduce | 首帧 data-calm |
+| --- | --- | --- | --- | --- | :---: |
+| call | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| chatbtw | 0.005 · 0 · 0 | 0.005 · 0 · 0 | 0.003 · 2 · 0 | 0.005 · 0 · 0 | ✅ |
+| chatdictation | 0.001 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 0 | 0.000 · 0 · 0 | ✅ |
+| chathover | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 0 | 0.000 · 0 · 0 | ✅ |
+| chatrun | 0.046 · 0 · 0 | 0.045 · 0 · 0 | 0.053 · 1 · 21 | 0.053 · 0 · 0 | ✅ |
+| chatsteps | 0.095 · 0 · 0 | 0.084 · 0 · 0 | 0.058 · 2 · 42 | 0.080 · 0 · 0 | ✅ |
+| confirmremove | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.006 · 0 · 0 | ✅ |
+| diff | 0.004 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| dock | 0.003 · 0 · 0 | 0.002 · 0 · 0 | 0.003 · 1 · 21 | 0.003 · 0 · 0 | ✅ |
+| files | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| issues | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| network | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| onboarding | 0.003 · 2 · 0 | 0.000 · 0 · 0 | 0.000 · 6 · 42 | 0.000 · 0 · 0 | ✅ |
+| overview | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.006 · 0 · 0 | ✅ |
+| palette | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| person | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| picker | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| plan | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| plancanvas | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| projecthome | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| room | 0.004 · 0 · 0 | 0.001 · 0 · 0 | 0.001 · 0 · 0 | 0.001 · 0 · 0 | ✅ |
+| search | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| sentinel | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.040 · 1 · 21 | 0.001 · 0 · 0 | ✅ |
+| sentineldash | 0.001 · 0 · 0 | 0.001 · 0 · 0 | 0.051 · 1 · 21 | 0.008 · 0 · 0 | ✅ |
+| settings | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| shared | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| shellcollapse | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| shellnotifications | 0.004 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| shellpanel | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| shellsidebar | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 0 | ✅ |
+| taskdetail | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| tasknew | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| tasks | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 21 | 0.000 · 0 · 0 | ✅ |
+| terminal | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
+| usage | 0.003 · 1 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.000 · 0 · 3 | ✅ |
+| workspace | 0.014 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 0 · 0 | ✅ |
+
+**与 M3 终值对比**（漂移阈值：CLS ±0.02；on 档的动画数或 JS 动效数上升即信号）。7 处数字不同，逐条判定都不是回归：
+
+- `chatrun` on/full 0.082→0.046、off/full 0.080→0.053、off/reduce 0.030→0.053：CLS 由演示 daemon 在四组合之间继续演化决定（同场景不同批次会变）；on/full 下降，上升的两处都在 calm 关档，与覆盖层无关。
+- `sentinel` on/full 0.037→0.000、`sentineldash` on/full 0.142→0.001、off/full 0.129→0.051：M3 的 R3-02（`[data-opening]` 0s）之后这些位移本就不该出现；本次是更干净的终值。
+- `usage` on/full 动画数 0→1：`_titleIn_` 600ms、`iterations: 1`、`playState: finished`，是 Your card（`section[aria-label='Your card']`，§7.4 keep-decor）的一次性标题进场；M3 测量时它已从 `getAnimations()` 丢弃。不是循环，也不在覆盖层应关的范围里。
+
+其余 29 个场景的 on 档与 M3 一致；**全部 calm-on/reduce 组合都是 0 动画、0 JS 动效**；144 个组合里面向沉稳的档位首帧 `data-calm` 全 ✅。
+
+代表截图（沉稳开、motion full）：
+
+| room | chatrun |
+| --- | --- |
+| ![room](img/m4-room-calm-on-full-loaded.png) | ![chatrun](img/m4-chatrun-calm-on-full-new.png) |
+
+| chatsteps | tasks |
+| --- | --- |
+| ![chatsteps](img/m4-chatsteps-calm-on-full-running.png) | ![tasks](img/m4-tasks-calm-on-full-loaded.png) |
+
+| sentinel | call |
+| --- | --- |
+| ![sentinel](img/m4-sentinel-calm-on-full-loaded.png) | ![call](img/m4-call-calm-on-full-in-call.png) |
+
+| onboarding | |
+| --- | --- |
+| ![onboarding](img/m4-onboarding-calm-on-full-loaded.png) | |
 
 ## 5. 仍在播放的动画及理由
 

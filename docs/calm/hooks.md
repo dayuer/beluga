@@ -89,14 +89,14 @@ export function useHeldEntries<E>(fresh: readonly E[]): readonly E[];
 
 - `reasons: Set<HoldReason>` + 一个 `grace` 计时器；任一在场即冻结。
 - `holdBegin` 清计时器并加入原因；`holdEnd` 移除原因，全空后 `setTimeout(release, 600)`。
-- `release`：查 `document.querySelector('[role="menu"]')`。菜单还开着就**续期 600ms**（不新增原因——见下）；关了就通知，下一次渲染换上新顺序。
+- `release`：查页面里的 `[role="menu"]` / `[role="dialog"]` / `[role="listbox"]`，**只看 React 根（`#root`）之外、portal 到 body 的那些**。浮层还开着就**续期 600ms**（不新增原因——见下）；关了就通知，下一次渲染换上新顺序。M4 的 e2e 抓到一个真实缺陷：Changes 标签页自己的 `listbox "Changed files"` 在右侧面板里（`complementary`，不是 `main`），原来的宽判据让它永远挡住了释放——现在页面自己的列表不算。
 - `menu` 原因位保留但不用：Radix 菜单在 portal 里，关菜单时没有人会调用 `holdEnd('menu')`，用它会让侧栏永久冻结。释放计时器自己续期就够了（**这是对设计稿的修正**）。
 - 宽限期内 `holdBegin('keys')` 等会清掉计时器，继续冻结——即「松手后 600ms 内又操作」不会闪一次序。
 
 `useSidebarHold(ref)`（`useCalm()` 为假时完全不挂）：
 
 - `pointerenter`/`pointerleave` → `pointer`。
-- `focusin` / `focusout`（冒泡即可）→ `keys`；`focusout` 在下一帧查 `el.contains(document.activeElement)`，焦点仍在侧栏就不释放。
+- `focusin` / `focusout`（冒泡即可）→ `keys`，**只认键盘焦点**（目标 `:focus-visible`；M4 e2e 抓到：鼠标点过侧栏按钮后焦点留在按钮上，指针离开也一直冻结，直到点别处）；`focusout` 在下一帧查 `el.contains(document.activeElement)`，焦点仍在侧栏就不释放。
 - `MutationObserver` 看 `<html data-arranging>` → `drag`。
 - effect 清理时移除自己加过的所有原因（StrictMode 双挂载、侧栏被隐藏时不留下悬空原因）。
 
@@ -124,7 +124,7 @@ return frozen.current;
 
 - canary：`Sidebar.tsx` ↔ `useSidebarHold(drop.ref)`；`EntryRow.tsx` ↔ `useHeldEntries(`。上游改 `useFolderDrop` 的返回或 `useEntryList` 的返回形状时测试失败。
 - 行为兜底：e2e 的 calm-off 变体若「也不冻结」，说明挂钩被绕过。
-- 已知弱点：浮层判据是启发式。M2 只认 `role=menu`；**M3（SH-09）扩到 `role=dialog`/`role=listbox`**，非 Radix 的自绘浮层仍可能漏掉。失效上限是「浮层开着时 600ms 后换序」，不崩、不误伤别处。
+- 已知弱点：浮层判据是启发式。M2 只认 `role=menu`；**M3（SH-09）扩到 `role=dialog`/`role=listbox`**，M4 再收窄为「portal 到 React 根之外的浮层」，非 Radix 的自绘浮层（若渲染在 `#root` 里）会被漏掉。失效上限是「浮层开着时 600ms 后换序」，不崩、不误伤别处。
 
 ### 1.6 登记行（写进 `docs/fork.md` 的「沉稳界面」一节）
 

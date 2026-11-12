@@ -50,6 +50,9 @@ async function watchFrames(page: Page): Promise<void> {
 
 test('sending a message keeps the chat in sight while its copy flies in', async ({ page }) => {
   test.setTimeout(90_000);
+  // The fork's calm mode (on by default) lands the message at once, with no flight (CH-06);
+  // this is upstream's flight test, so it runs with calm off.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
   await page.goto('/');
   await expect(sidebar(page)).toBeVisible();
   await openWorkspace(page, 'new-hero', 'landing');

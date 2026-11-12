@@ -10,18 +10,14 @@ import { expect, test, type Page } from './fixtures.js';
 const sidebar = (page: Page) => page.getByRole('navigation', { name: 'Sidebar' });
 const toasts = (page: Page) => page.locator('[data-one-toast]');
 
-/** Settings › Environment saves a variable and says so: a quick app toast, no project needed. */
-async function savedToast(page: Page, name: string): Promise<void> {
-  await page.keyboard.press('Meta+,');
-  const settings = page.getByRole('dialog');
-  await settings.getByRole('button', { name: 'Environment', exact: true }).click();
-  await settings.getByRole('button', { name: 'Add variable' }).click();
-  await settings.getByLabel('Name', { exact: true }).last().fill(name);
-  await settings.getByLabel(/^Value of/).last().fill('one line');
-  // Saving happens when the row is done, so leave the name field.
-  await settings.getByLabel('Name', { exact: true }).last().click();
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
-  await page.keyboard.press('Escape');
+/**
+ * A quick app toast with no project needed: ⌘. (Stop the Agent) where no conversation is open
+ * says why it can't run (lib/commands.ts runCommand). Settings › Environment only shows an inline
+ * "Saved" (not the app toast), so it can't stand in for one.
+ */
+async function appToast(page: Page): Promise<void> {
+  await page.keyboard.press('Meta+.');
+  await expect(page.locator('[data-one-toast="global"]').filter({ hasText: 'Open a conversation' })).toBeVisible();
 }
 
 test('a newer toast replaces the older one: the undo toast takes the app toast’s place', async ({ page }) => {
@@ -30,7 +26,7 @@ test('a newer toast replaces the older one: the undo toast takes the app toast�
   await expect(sidebar(page)).toBeVisible();
 
   // The app's toast first …
-  await savedToast(page, 'BELUGA_CALM_ONE');
+  await appToast(page);
   await expect(toasts(page)).toHaveCount(1);
   await expect(page.locator('[data-one-toast="global"]')).toBeVisible();
 
@@ -43,9 +39,22 @@ test('a newer toast replaces the older one: the undo toast takes the app toast�
   // One on screen — the newer one; the app toast is gone, not waiting behind it.
   await expect(toasts(page)).toHaveCount(1);
   await expect(page.getByRole('status').filter({ hasText: 'Hidden landing' })).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Open a conversation' })).toHaveCount(0);
 
-  // The hidden undo does nothing: ⌘Z leaves the project hidden.
+  // The undo toast on screen is the live one: ⌘Z brings the project back.
+  await page.keyboard.press('Meta+z');
+  await expect(sidebar(page).getByRole('button', { name: 'landing' }).first()).toBeVisible();
+
+  // The other way round: hide it again, then an app toast replaces the undo toast …
+  await sidebar(page).getByRole('button', { name: 'landing' }).first().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Hide Project' }).click();
+  await expect(page.locator('[data-one-toast="undo"]').filter({ hasText: 'Hidden landing' })).toBeVisible();
+  await page.mouse.move(900, 450);
+  await appToast(page);
+  await expect(toasts(page)).toHaveCount(1);
+  await expect(page.locator('[data-one-toast="undo"]')).toHaveCount(0);
+
+  // … and the replaced undo does nothing: ⌘Z leaves the project hidden.
   await page.keyboard.press('Meta+z');
   await page.waitForTimeout(300);
   await expect(sidebar(page).getByRole('button', { name: 'landing' })).toHaveCount(0);
@@ -57,7 +66,7 @@ test('with calm mode off both toasts show, as upstream does', async ({ page }) =
   await page.goto('/');
   await expect(sidebar(page)).toBeVisible();
 
-  await savedToast(page, 'BELUGA_CALM_OFF');
+  await appToast(page);
   await sidebar(page).getByRole('button', { name: 'bob-api' }).first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Hide Project' }).click();
 
