@@ -71,3 +71,18 @@
 - `packages/companion/app/plan/[id].tsx`：一行组件加 import
 
 问题 3 的修复放在 `src/fork/plans/fixer.ts`（fork 文件）。
+
+## 实施结果（BLG-199～202）
+
+**修掉的生效问题**（`tests/fork-plan-roles-visible.test.ts`，修之前失败，修之后通过）
+- 问题 1、2、4：里程碑工作树用哪个 agent，改由 `src/fork/plans/roles.ts` 的 `workAgentFor` 决定。顺序是：“用…启动”另选的 → 第一个任务自己的 agent → 检查没过时的疑难修复 agent → 计划设置的 agent → 自动路由按这个任务选的 → 你的默认 Agent。启动时用了谁、为什么，记在 `MilestoneAgent.agent` 和 `via` 里；直接交给疑难修复的那次也会写进计划动态。
+- 问题 3：“停了两次的任务”交接现在写成 “handed a task that stopped twice in “里程碑” to …”。BLG-200 的 e2e 实跑时真的触发了一次，界面上挂在对应里程碑下面。
+- 新发现的问题 5：工作区的模型单独存在 `Workspace.model` 里（`manager.ts` 的 `agentFields`），`Workspace.agent` 上没有 model。一开始界面把 Opus 显示成“Claude”并标成不一致，e2e 抓到了这个问题。同样的问题也会让 `fixer.ts` 判断“已经在疑难修复 agent 上了”时不比较模型。现在两处都用 `workspaceAgent()` 把模型拼回去，测试里的模拟管理器也改成按真实方式分开存。
+
+**在哪里看**
+- Mac：计划页 → 点里程碑的“通过标准”卡（列表视图点里程碑）→ 详情里的“谁做的”。四行依次是架构、编码、审计、疑难修复。实际和设置不一样时，那一行会出现提示：设置为 X，以及原因。疑难修复下面列出每次交接。
+- Mac 任务卡：画布和列表里，任务旁边的小标签显示正在做它的工作树用的模型。列表里还没开始的任务显示“将由”谁做（半透明）。
+- 手机：计划页每个里程碑在 Design 下面有 “Who did it” 卡片，只读，文字按 phone-zh-later 保持英文。守护进程低于 1.55 时不显示。
+- 说明文档：`docs/tasks-and-plans.fork.md` 的 “Who did it” 和 “Task titles don't pick models” 两段。任务标题里的【设计】【审计】不会换模型，同一个里程碑的任务都由编码模型做。
+
+截图：`.beluga/scratch/roles-visible-en.png`、`roles-visible-section-zh.png`（BLG-200 的附件里也有）。
