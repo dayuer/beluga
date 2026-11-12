@@ -51,8 +51,14 @@ export type MilestoneRoles = Readonly<Record<RoleKey, RoleSeen>>;
 export interface RolesState {
   readonly prefs: { readonly autoRoute?: AutoRoute };
   readonly runtimes: readonly RuntimeChoice[];
-  readonly projects: ReadonlyArray<{ readonly workspaces: ReadonlyArray<{ readonly id: string; readonly agent?: AgentRef }> }>;
+  readonly projects: ReadonlyArray<{ readonly workspaces: ReadonlyArray<SeenWorkspace> }>;
 }
+
+/** A workspace as the store keeps it: its agent's model apart, in `model` (the manager's agentFields). */
+type SeenWorkspace = { readonly id: string; readonly agent?: AgentRef; readonly model?: string };
+
+/** A workspace's agent, its model put back (none: your default agent). */
+export const workspaceAgent = (w: SeenWorkspace | undefined): AgentRef | undefined => (w?.agent ? { ...w.agent, ...(w.model ? { model: w.model } : {}) } : undefined);
 
 const sameAgent = (a: AgentRef | undefined, b: AgentRef | undefined): boolean => (a?.runtime ?? '') === (b?.runtime ?? '') && (a?.model ?? '') === (b?.model ?? '');
 
@@ -105,7 +111,7 @@ export function milestoneRoles(
   st: RolesState,
 ): MilestoneRoles {
   const workspaces = st.projects.flatMap((p) => p.workspaces);
-  const seen = (id: string): AgentRef | undefined => workspaces.find((w) => w.id === id)?.agent;
+  const seen = (id: string): AgentRef | undefined => workspaceAgent(workspaces.find((w) => w.id === id));
   const ran = (agent: AgentRef | undefined): Pick<RoleSeen, 'agent' | 'mine'> => (agent ? { agent } : { mine: true });
   const begun = Boolean(m.agent ?? m.run.agent);
 
@@ -129,7 +135,7 @@ export function milestoneRoles(
     const there = workspaces.find((w) => w.id === agent.worktree);
     const started = agent.via ? agent.agent : undefined;
     const handed = handoffs.length > 0 || agent.via === 'fix';
-    const who = there && !(handed && agent.via) ? there.agent : (started ?? there?.agent);
+    const who = there && !(handed && agent.via) ? workspaceAgent(there) : (started ?? workspaceAgent(there));
     // As it started: why it started there; moved since: against what's set.
     const via = agent.via && sameAgent(who, started) ? agent.via : undefined;
     const why: RoleWhy | undefined =
@@ -161,7 +167,8 @@ export function milestoneRoles(
 export function taskAgentSeen(plan: Pick<Plan, 'agent'>, t: { readonly worktree?: string; readonly issue?: { readonly agent?: AgentRef } }, st: Pick<RolesState, 'projects'>): { readonly agent?: AgentRef; readonly ran: boolean } {
   if (t.worktree) {
     const w = st.projects.flatMap((p) => p.workspaces).find((x) => x.id === t.worktree);
-    if (w) return { ...(w.agent ? { agent: w.agent } : {}), ran: true };
+    const agent = workspaceAgent(w);
+    if (w) return { ...(agent ? { agent } : {}), ran: true };
   }
   const own = t.issue?.agent ?? plan.agent;
   return { ...(own ? { agent: own } : {}), ran: false };

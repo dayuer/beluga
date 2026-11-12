@@ -3,7 +3,7 @@ import { agentName } from '../../shared/agent-label.js';
 import type { Plan } from '../../core/plans/model.js';
 import type { PilotDeps } from '../../core/plans/pilot.js';
 import type { Routable } from '../../shared/auto-route.js';
-import { milestoneOfChannel, type WorkVia, workAgentFor } from './roles.js';
+import { milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
 
 /**
  * Fork (plan roles, PR #17 and #20): what's hard in a plan goes to its fix agent (PilotDeps.fixer):
@@ -95,7 +95,8 @@ export class PlanFixer {
   /** The agent a conversation runs on now (its key), as kept on its workspace. */
   private agentOn(channel: string): string | undefined {
     const id = channel.startsWith(WS_PREFIX) ? channel.slice(WS_PREFIX.length) : undefined;
-    const agent = id ? this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)?.agent : undefined;
+    // Its model kept apart on the workspace (the manager's agentFields): put back, so “on it already” compares models too.
+    const agent = id ? workspaceAgent(this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)) : undefined;
     return agent ? agentKey(agent) : undefined;
   }
 }

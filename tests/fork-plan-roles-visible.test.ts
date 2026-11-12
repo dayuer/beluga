@@ -12,7 +12,7 @@ import type { Project, Workspace } from '../src/workspaces/types.js';
 import { waitFor } from './helpers.js';
 import { planView } from '../src/core/plans/progress.js';
 import type { Plan } from '../src/core/plans/model.js';
-import { handoffsIn, milestoneRoles, milestoneOfChannel, taskAgentSeen, workAgentFor } from '../src/fork/plans/roles.js';
+import { handoffsIn, workspaceAgent, milestoneRoles, milestoneOfChannel, taskAgentSeen, workAgentFor } from '../src/fork/plans/roles.js';
 import { PlanFixer } from '../src/fork/plans/fixer.js';
 import type { PilotDeps } from '../src/core/plans/pilot.js';
 import { planPageView } from '../src/companion/views.js';
@@ -33,7 +33,7 @@ const RUNTIMES = [
 ] as unknown as RuntimeChoice[];
 
 const ws = (id: string, projectId: string, name: string, kind: Workspace['kind'] = 'worktree', agent?: AgentRef): Workspace =>
-  ({ id, projectId, name, path: `/tmp/${name}`, kind, projectRoot: '/tmp/p', branch: `beluga/${name}`, createdAt: 0, external: false, askOnly: kind === 'chat', ...(agent ? { agent } : {}) }) as unknown as Workspace;
+  ({ id, projectId, name, path: `/tmp/${name}`, kind, projectRoot: '/tmp/p', branch: `beluga/${name}`, createdAt: 0, external: false, askOnly: kind === 'chat', ...(agent ? { agent: { runtime: agent.runtime, label: agent.label }, ...(agent.model ? { model: agent.model } : {}) } : {}) }) as unknown as Workspace;
 const project = (id: string, name: string, workspaces: Workspace[] = []): Project => ({ id, name, root: `/tmp/${name}`, base: 'main', workspaces });
 
 /** A daemon in small: workspaces keep the agent they were made with or switched to, as the manager does. */
@@ -47,8 +47,10 @@ export function setup(opts: { autoRoute?: boolean } = {}) {
   const listeners: Array<(e: WorktreeEvent) => void> = [];
   const asked: Array<{ prompt: string; channel: string }> = [];
   let n = 0;
+  // As the manager keeps it (agentFields): the agent without its model, the model on the workspace.
+  const fields = (agent: AgentRef | undefined) => (agent ? { agent: { runtime: agent.runtime, label: agent.label }, ...(agent.model ? { model: agent.model } : {}) } : {});
   const patch = (id: string, agent: AgentRef | undefined): void =>
-    store.dispatch({ type: 'projects', projects: store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((w) => (w.id === id ? ({ ...w, agent } as Workspace) : w)) })) });
+    store.dispatch({ type: 'projects', projects: store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((w) => (w.id === id ? ({ ...w, agent: undefined, model: undefined, ...fields(agent) } as Workspace) : w)) })) });
   const add = (w: Workspace): void => store.dispatch({ type: 'projects', projects: store.getState().projects.map((p) => (p.id === w.projectId ? { ...p, workspaces: [...p.workspaces, w] } : p)) });
   const controller = {
     onWorktree: (l: (e: WorktreeEvent) => void) => (listeners.push(l), () => undefined),
@@ -85,7 +87,7 @@ export function setup(opts: { autoRoute?: boolean } = {}) {
   const claude = boardWork.myClaude();
   const me = boardWork.me();
   const issue = (title: string) => store.getState().board.issues.find((i) => i.title === title)!;
-  const agentOf = (id: string | undefined): AgentRef | undefined => store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)?.agent;
+  const agentOf = (id: string | undefined): AgentRef | undefined => workspaceAgent(store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id));
   const run = (channel: string, status: 'started' | 'done', id: string): void => store.dispatch({ type: 'agent_event', owner: 'p-me', requestId: id, requester: 'p-me', event: status, text: '', ts: Date.now(), channel });
   return { store, board, boardWork, plans, work, asked, claude, me, issue, agentOf, run };
 }

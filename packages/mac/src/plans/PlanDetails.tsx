@@ -21,6 +21,7 @@ import type { AgentRef } from '@beluga/protocol.js';
 import { WaitingLine } from './WaitingLine.js';
 import p from './plans.module.css';
 import f from '../fork/plans/plans-fork.module.css';
+import { MilestoneRoles } from '../fork/plans/MilestoneRoles.js';
 import { revealLabel } from '../lib/os-words.js';
 
 /** The details pane shows what the plan did when this is picked. */
@@ -432,6 +433,7 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
           </details>
         </section>
       ) : null}
+      <MilestoneRoles plan={plan} m={m} />
       {check ? (
         <section className={p.detailsSection}>
           <h4>{check.verdict === 'pass' ? 'The agent’s check: passes' : 'The agent’s check: not yet'}</h4>
