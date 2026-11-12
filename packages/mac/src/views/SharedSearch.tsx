@@ -5,14 +5,12 @@ import { Empty, Working, cx } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import f from './files.module.css';
 import s from './shared-search.module.css';
-import { useT } from '../i18n/index.js';
 
 /** A search typed for the shell: quoted so spaces stay in it. */
 const quoted = (q: string): string => (q.includes('"') ? `'${q.replace(/'/g, '')}'` : `"${q}"`);
 
 /** The search box above the files of a workspace shared with you: Return searches names and contents. */
 export function SearchField({ value, onChange, onSearch }: { value: string; onChange: (v: string) => void; onSearch: (q: string | undefined) => void }) {
-  const t = useT();
   return (
     <form
       className={s.field}
@@ -26,8 +24,8 @@ export function SearchField({ value, onChange, onSearch }: { value: string; onCh
       <input
         className={s.input}
         value={value}
-        placeholder={t('views.shared.placeholder')}
-        aria-label={t('views.shared.aria')}
+        placeholder="Search names and contents"
+        aria-label="Search the files"
         spellCheck={false}
         onChange={(e) => {
           onChange(e.target.value);
@@ -43,7 +41,7 @@ export function SearchField({ value, onChange, onSearch }: { value: string; onCh
         }}
       />
       {value ? (
-        <button type="button" className={s.clear} aria-label={t('views.shared.clear')} onClick={() => (onChange(''), onSearch(undefined))}>
+        <button type="button" className={s.clear} aria-label="Clear the search" onClick={() => (onChange(''), onSearch(undefined))}>
           <Icon name="x" size={9} />
         </button>
       ) : null}
@@ -70,7 +68,6 @@ function Marked({ text, query }: { text: string; query: string }) {
  */
 export function SearchResults({ id, owner, share, query }: { id: string; owner: string; share: string; query: string }) {
   const api = useApi();
-  const t = useT();
   const shell = useApp((st) => st.shells[id]);
   const [ran, setRan] = useState<{ find: string; grep: string }>();
   const seq = useRef(0);
@@ -97,9 +94,9 @@ export function SearchResults({ id, owner, share, query }: { id: string; owner: 
   const busy = !names || !lines || Boolean(shell?.busy);
   const nothing = !busy && !hits(names).length && !hits(lines).length;
   return (
-    <div className={f.list} role="list" aria-label={t('views.shared.results')}>
-      {nothing ? <Empty icon="search" title={t('views.shared.nothing', { query })} detail={t('views.shared.nothingDetail')} /> : null}
-      {hits(names).length ? <div className={s.group}>{t('views.shared.names')}</div> : null}
+    <div className={f.list} role="list" aria-label="Search results">
+      {nothing ? <Empty icon="search" title={`Nothing matches “${query}”`} detail="Names and file contents were searched. Secrets like .env files are never searched." /> : null}
+      {hits(names).length ? <div className={s.group}>Names</div> : null}
       {hits(names).map((o) => (
         <div key={`n:${o.open}`} role="listitem" className={f.row} onClick={() => open(o.open!)} title={o.open}>
           <Icon name="file" size={14} className={f.fileIcon} />
@@ -108,7 +105,7 @@ export function SearchResults({ id, owner, share, query }: { id: string; owner: 
           </span>
         </div>
       ))}
-      {hits(lines).length ? <div className={s.group}>{t('views.shared.contents')}</div> : null}
+      {hits(lines).length ? <div className={s.group}>Contents</div> : null}
       {hits(lines).map((o, i) => {
         const m = /^(.*?):(\d+): (.*)$/.exec(o.text);
         return (
@@ -130,7 +127,7 @@ export function SearchResults({ id, owner, share, query }: { id: string; owner: 
       ))}
       {busy ? (
         <div className={s.busy}>
-          <Working /> {t('views.shared.searching')}
+          <Working /> Searching…
         </div>
       ) : null}
     </div>

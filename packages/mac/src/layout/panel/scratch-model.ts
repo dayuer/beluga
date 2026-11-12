@@ -4,7 +4,6 @@
  */
 
 import { isImageFile, isVideoFile } from '../../components/markdown/md-paths.js';
-import { t } from '../../i18n/index.js';
 
 export interface ScratchEntry {
   readonly path: string;
@@ -137,7 +136,8 @@ export function scratchBytes(files: readonly ScratchEntry[], total?: ScratchTota
 /** The summary's title: "68 files", "300 of 5,578 files" when the list shows only the newest. */
 export function scratchCount(listed: number, total?: ScratchTotal): string {
   const all = Math.max(listed, total?.files ?? 0);
-  return all > listed ? t('layout.scratch.countOf', { listed: listed.toLocaleString('en-US'), all: all.toLocaleString('en-US'), count: all }) : t('layout.scratch.count', { all: all.toLocaleString('en-US'), count: all });
+  const word = all === 1 ? 'file' : 'files';
+  return all > listed ? `${listed.toLocaleString('en-US')} of ${all.toLocaleString('en-US')} ${word}` : `${all.toLocaleString('en-US')} ${word}`;
 }
 
 // ---- what you sent, kept apart from what Claude saves (BLG-771)

@@ -10,7 +10,6 @@ import { thisComputer, upFirst } from '../lib/os-words.js';
 import { MachineMark } from '../machines/MachineMark.js';
 import { BEST, HERE, type RunsOn, rememberPick, runsOnName, runsOnRows, startingPick } from '../machines/runs-on-model.js';
 import { useMachines } from '../machines/use-machines.js';
-import { useT } from '../i18n/index.js';
 import { myRuntime } from './ModelPicker.js';
 import s from './composer.module.css';
 import r from './runs-on.module.css';
@@ -79,7 +78,6 @@ function Mark({ value, machines }: { value: RunsOn; machines: readonly MachineVi
  * (BLG-784) new work there runs there: the label instead.
  */
 export function RunsOnPicker({ project, runtime, folder, bare = false }: { project?: string; runtime?: string; /** A folder chat's folder, on this Mac (BLG-841). */ folder?: string; bare?: boolean }) {
-  const t = useT();
   const machine = useMachine();
   const { value, set, machines } = useRunsOn(project);
   const agentRuntime = useApp((st) => runtime ?? myRuntime(st.prefs));
@@ -90,12 +88,12 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
   const name = runsOnName(value, machines, here);
   // The computer it names can't take it now, or the folder is this Mac's: said on the chip, and sending waits (BLG-841).
   const picked = machines.find((x) => x.id === value);
-  const why = picked ? (rows.find((row) => row.value === value)?.disabled ? rows.find((row) => row.value === value)!.line : folder ? t('chat.runsOn.folderHere', { here }) : undefined) : undefined;
+  const why = picked ? (rows.find((row) => row.value === value)?.disabled ? rows.find((row) => row.value === value)!.line : folder ? `this folder is on ${here}` : undefined) : undefined;
   return (
     <Dropdown.Root modal={false}>
       <Dropdown.Trigger asChild>
-        <button type="button" className={cx(s.chip, r.chip, bare && r.bare, why && r.held)} aria-label={why ? t('chat.runsOn.namedWhy', { name, why }) : t('chat.runsOn.named', { name })} title={why ? t('chat.runsOn.waits', { why }) : undefined} data-runs-on={value}>
-          {bare ? null : <span className={r.words} data-runs-on-words>{t('chat.runsOn.words')}</span>}
+        <button type="button" className={cx(s.chip, r.chip, bare && r.bare, why && r.held)} aria-label={`Runs on ${name}${why ? `: ${why}` : ''}`} title={why ? `Nothing starts until it can: ${why}` : undefined} data-runs-on={value}>
+          {bare ? null : <span className={r.words} data-runs-on-words>Runs on</span>}
           <Mark value={value} machines={machines} />
           <span className={s.chipLabel}>{name}</span>
           {why ? <span className={r.why}>· {why}</span> : null}
@@ -103,8 +101,8 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
         </button>
       </Dropdown.Trigger>
       <Dropdown.Portal>
-        <FitContent className={cx(m.menu, r.menu)} align="start" aria-label={t('chat.runsOn.words')}>
-          <Dropdown.Label className={r.head}>{t('chat.runsOn.words')}</Dropdown.Label>
+        <FitContent className={cx(m.menu, r.menu)} align="start" aria-label="Runs on">
+          <Dropdown.Label className={r.head}>Runs on</Dropdown.Label>
           {rows.map((row) => (
             <Dropdown.Item key={row.value} className={m.item} disabled={row.disabled} onSelect={() => set(row.value)} data-checked={row.value === value || undefined} aria-label={`${row.label}: ${row.line}`}>
               <span className={m.line}>
@@ -125,8 +123,7 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
  * Where this chat, plan or sentinel runs, as a label: the computer whose page it is, or This Mac.
  * Only when you have a computer paired.
  */
-export function RunsOnLabel({ tip }: { tip?: string }) {
-  const t = useT();
+export function RunsOnLabel({ tip = 'New work can run elsewhere.' }: { tip?: string }) {
   const machine = useMachine();
   const { home } = useBeluga();
   const machines = useMachines(home);
@@ -134,9 +131,9 @@ export function RunsOnLabel({ tip }: { tip?: string }) {
   const here = upFirst(thisComputer());
   const name = machine ? runsOnName(machine, machines, here) : here;
   return (
-    <Tip label={tip ?? t('chat.runsOn.tip')}>
-      <span className={cx(s.chip, r.chip, r.label)} aria-label={t('chat.runsOn.named', { name })} data-runs-on={machine ?? HERE}>
-        <span className={r.words} data-runs-on-words>{t('chat.runsOn.words')}</span>
+    <Tip label={tip}>
+      <span className={cx(s.chip, r.chip, r.label)} aria-label={`Runs on ${name}`} data-runs-on={machine ?? HERE}>
+        <span className={r.words} data-runs-on-words>Runs on</span>
         <Mark value={machine ?? HERE} machines={machines} />
         <span className={s.chipLabel}>{name}</span>
       </span>
@@ -146,12 +143,11 @@ export function RunsOnLabel({ tip }: { tip?: string }) {
 
 /** The picker as a sheet's row ("Runs on" beside it), for New Plan and New Sentinel; nothing without a computer paired. */
 export function RunsOnRow({ project, className, labelClassName }: { project?: string; className?: string; labelClassName?: string }) {
-  const t = useT();
   const { home } = useBeluga();
   if (!useMachines(home).length) return null;
   return (
     <div className={className}>
-      <span className={labelClassName}>{t('chat.runsOn.words')}</span>
+      <span className={labelClassName}>Runs on</span>
       <RunsOnPicker {...(project ? { project } : {})} bare />
     </div>
   );

@@ -7,7 +7,7 @@ import { PlansWork } from '../src/core/plans/work.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController } from '../src/core/workspace-controller.js';
 import type { RuntimeChoice } from '../src/shared/agent-runtimes.js';
-import { AutoRoute, autoAutonomy, autoChecker, autoTierOf } from '../src/shared/auto-route.js';
+import { AutoRoute, REVIEW_DEFAULT, autoAutonomy, autoChecker, autoFixer, autoTierOf, planRoleDefaults } from '../src/shared/auto-route.js';
 import type { Workspace } from '../src/workspaces/types.js';
 
 /** Auto route (fork) for plans: a plan's big tasks go hard, Opus checks its milestones, and a new plan runs on autopilot. */
@@ -28,11 +28,40 @@ describe('a plan’s big tasks are hard', () => {
 });
 
 describe('who checks a plan nobody named a checker for', () => {
-  it('the hard list’s first that runs here (Opus); auto route off or nothing runs: none (as before)', () => {
-    expect(autoChecker({ prefs: {}, runtimes: [CLAUDE, LOCAL] })).toEqual({ runtime: 'local', label: 'Local model', model: 'anthropic/claude-opus-5-5' });
-    expect(autoChecker({ prefs: { autoRoute: { on: true } }, runtimes: [CLAUDE] })).toEqual({ runtime: 'claude', label: 'Claude', model: 'opus' });
+  it('the review list’s first that runs here (Sonnet, between the code’s model and the design’s); auto route off or nothing runs: none (as before)', () => {
+    const withSonnet: RuntimeChoice = { ...LOCAL, models: [...LOCAL.models!, model('anthropic/claude-sonnet-5-5')] };
+    expect(autoChecker({ prefs: {}, runtimes: [CLAUDE, withSonnet] })).toEqual({ runtime: 'local', label: 'Local model', model: 'anthropic/claude-sonnet-5-5' });
+    expect(autoChecker({ prefs: {}, runtimes: [CLAUDE, LOCAL] })).toEqual({ runtime: 'claude', label: 'Claude', model: 'sonnet' });
+    expect(autoChecker({ prefs: { autoRoute: { on: true } }, runtimes: [CLAUDE] })).toEqual({ runtime: 'claude', label: 'Claude', model: 'sonnet' });
+    expect(autoChecker({ prefs: { autoRoute: { review: ['claude:opus'] } }, runtimes: [CLAUDE, LOCAL] })).toEqual({ runtime: 'claude', label: 'Claude', model: 'opus' });
     expect(autoChecker({ prefs: { autoRoute: { on: false } }, runtimes: [CLAUDE, LOCAL] })).toBeUndefined();
     expect(autoChecker({ prefs: {}, runtimes: [CLAUDE] })).toBeUndefined();
+    expect(AutoRoute.safeParse({ review: REVIEW_DEFAULT }).success).toBe(true);
+  });
+});
+
+describe('who takes over what’s hard in a plan nobody named a fix agent for', () => {
+  it('the hard list’s first that runs here (Opus); auto route off: none (whoever is at it keeps it)', () => {
+    expect(autoFixer({ prefs: {}, runtimes: [CLAUDE, LOCAL] })).toEqual({ runtime: 'local', label: 'Local model', model: 'anthropic/claude-opus-5-5' });
+    expect(autoFixer({ prefs: { autoRoute: { on: false } }, runtimes: [CLAUDE, LOCAL] })).toBeUndefined();
+  });
+});
+
+describe('a new plan’s roles by tier (New Plan › More options)', () => {
+  it('strongest designs and fixes, everyday codes (auto route: per task), in between audits; each the first that runs here, auto route on or not', () => {
+    expect(planRoleDefaults(undefined, [CLAUDE, LOCAL])).toEqual({
+      arch: { runtime: 'local', label: 'Local model', model: 'anthropic/claude-opus-5-5' },
+      fix: { runtime: 'local', label: 'Local model', model: 'anthropic/claude-opus-5-5' },
+      work: 'auto',
+      check: { runtime: 'claude', label: 'Claude', model: 'sonnet' },
+    });
+    expect(planRoleDefaults(undefined, [CLAUDE])).toEqual({
+      arch: { runtime: 'claude', label: 'Claude', model: 'opus' },
+      fix: { runtime: 'claude', label: 'Claude', model: 'opus' },
+      work: { runtime: 'claude', label: 'Claude', model: 'haiku' },
+      check: { runtime: 'claude', label: 'Claude', model: 'sonnet' },
+    });
+    expect(planRoleDefaults(undefined, [])).toEqual({});
   });
 });
 

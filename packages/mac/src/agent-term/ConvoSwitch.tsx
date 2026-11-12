@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { Segmented } from '../components/ui.js';
 import { type ConvoMode, convoModeOf, withConvoMode } from '../lib/convo-mode.js';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs.js';
@@ -17,21 +16,20 @@ export function setConvoMode(wsId: string, mode: ConvoMode): void {
 /** The header's Chat · Terminal · Both, for a conversation that can have a terminal. */
 export function ConvoSwitch({ wsId, iconOnly }: { readonly wsId: string; readonly iconOnly?: boolean }) {
   const prefs = usePrefs();
-  const t = useT();
   const capable = useTerminalCapable(wsId);
   // Only for people who turned the terminal view on (Settings › Terminal): everyone else has the chat.
   if (!capable || !prefs.termView) return null;
   const mode = convoModeOf(prefs.convoModes, prefs.convoDefault, wsId);
   return (
     <Segmented
-      label={t('agentTerm.switch.label')}
+      label="Show the conversation as"
       value={mode}
       iconOnly={iconOnly}
       onChange={(m) => setConvoMode(wsId, m)}
       options={[
-        { value: 'chat', label: t('agentTerm.switch.chat'), icon: 'chat', hint: t('agentTerm.switch.chatHint') },
-        { value: 'terminal', label: t('agentTerm.switch.terminal'), icon: 'terminal', hint: t('agentTerm.switch.terminalHint'), ...(shortcutKeys('conv-terminal') ? { keys: shortcutKeys('conv-terminal')! } : {}) },
-        { value: 'both', label: t('agentTerm.switch.both'), icon: 'columns', hint: t('agentTerm.switch.bothHint') },
+        { value: 'chat', label: 'Chat', icon: 'chat', hint: 'The conversation, drawn: graphs, tables, tasks' },
+        { value: 'terminal', label: 'Terminal', icon: 'terminal', hint: 'Your agent’s own terminal, on the same conversation', ...(shortcutKeys('conv-terminal') ? { keys: shortcutKeys('conv-terminal')! } : {}) },
+        { value: 'both', label: 'Both', icon: 'columns', hint: 'The terminal, with the chat beside it' },
       ]}
     />
   );

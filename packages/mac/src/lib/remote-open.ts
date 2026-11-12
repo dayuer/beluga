@@ -1,10 +1,9 @@
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
-import { remoteEditorUrl, revealThere } from '@beluga/machines/open.js';
+import { remoteEditorUrl, revealThere, revealThereLabel } from '@beluga/machines/open.js';
 import { joinPath } from '@beluga/shared/os-path.js';
 import { useMachine } from './beluga.js';
 import { revealLabel } from './os-words.js';
 import { currentMachines } from '../machines/use-machines.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Open in Finder and editors on a computer's page (BLG-794, src/machines/open.ts): what names a
@@ -29,7 +28,7 @@ async function where(client: SocketClient): Promise<There | undefined> {
   if (!on) return undefined;
   const { currentMachines } = await import('../machines/use-machines.js');
   const view = currentMachines().find((m) => m.id === on.id);
-  return { ...on, name: view?.name ?? t('common.remoteOpen.yourComputer'), ...(view?.ssh ? { sshHost: view.ssh } : {}) };
+  return { ...on, name: view?.name ?? 'your computer', ...(view?.ssh ? { sshHost: view.ssh } : {}) };
 }
 
 const say = (client: SocketClient, text: string, level: 'info' | 'success' | 'warn' | 'error' = 'info'): void => client.store.dispatch({ type: 'toast', text, level });
@@ -52,22 +51,22 @@ export async function openThere(client: SocketClient, path: string, how: 'reveal
     }
     const [info] = await client.api.local.statFiles([path]);
     if (!info || info.kind === 'missing') {
-      say(on.home, t('common.remoteOpen.cantFind', { path, name: on.name }), 'warn');
+      say(on.home, `Can’t find ${path} on ${on.name}`, 'warn');
       return true;
     }
     if (revealThere(info.kind) === 'download') {
-      say(on.home, t('common.remoteOpen.downloading', { file: info.name, name: on.name }));
+      say(on.home, `Downloading ${info.name} from ${on.name}…`);
       const saved = await on.home.call('machines.download.fetch', on.id, path);
-      say(on.home, t('common.remoteOpen.downloaded', { file: info.name, saved }), 'success');
+      say(on.home, `Downloaded ${info.name} to ${saved}`, 'success');
       const { revealInFinder } = await import('./files.js');
       await revealInFinder(on.home, saved);
       return true;
     }
     const { copyText } = await import('./copy.js');
     await copyText(path);
-    say(on.home, t('common.remoteOpen.copiedPath', { name: on.name, path }), 'success');
+    say(on.home, `Copied the path on ${on.name}: ${path}`, 'success');
   } catch (err) {
-    say(on.home, t('common.remoteOpen.couldntOpen', { name: on.name, error: errorText(err) }), 'error');
+    say(on.home, `Couldn’t open it from ${on.name}: ${errorText(err)}`, 'error');
   }
   return true;
 }
@@ -109,7 +108,7 @@ export async function openFolderThere(client: SocketClient, dir: string): Promis
 
 /** The words of a Show in Finder button for a folder: on a computer's page, Copy Path. */
 export function useRevealLabel(what?: string): string {
-  return useMachine() ? t('common.blocks.copyPath') : revealLabel(what);
+  return useMachine() ? revealThereLabel('folder') : revealLabel(what);
 }
 
 /**
@@ -119,12 +118,12 @@ export function useRevealLabel(what?: string): string {
 export function useOpenFolderLabel(open: string, copy: string): string {
   const machine = useMachine();
   if (!machine) return open;
-  return currentMachines().find((m) => m.id === machine)?.ssh ? t('common.remoteOpen.inYourEditor', { open }) : copy;
+  return currentMachines().find((m) => m.id === machine)?.ssh ? `${open} in Your Editor` : copy;
 }
 
 /** The same for a single file: on a computer's page, Download (it comes to this Mac). */
 export function useRevealFileLabel(what?: string): string {
-  return useMachine() ? (what ? t('common.remoteOpen.download', { what }) : t('network.files.download')) : revealLabel(what);
+  return useMachine() ? (what ? `Download ${what}` : revealThereLabel('file')) : revealLabel(what);
 }
 
 /** An editor's own link (vscode://, cursor://): the system hands it to the editor. */

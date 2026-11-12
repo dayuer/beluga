@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, createElement, useCallback } from 'react';
+import { useCallback } from 'react';
 import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
 import { useActions } from '../../lib/actions.js';
 import { useBeluga } from '../../lib/beluga.js';
@@ -23,7 +23,3 @@ export function usePick(menu: MenuKind): (id: string, confirmed?: boolean) => bo
 
 /** "3 files", "1 file". */
 export const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
-
-/** Words with React parts in them: each `{name}` in `text` (a `t()` result) becomes `parts[name]`. */
-export const rich = (text: string, parts: Readonly<Record<string, ReactNode>>): ReactNode[] =>
-  text.split(/\{(\w+)\}/g).map((piece, i) => (i % 2 ? createElement(Fragment, { key: i }, piece in parts ? parts[piece] : `{${piece}}`) : piece));

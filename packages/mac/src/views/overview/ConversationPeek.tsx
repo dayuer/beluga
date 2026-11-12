@@ -12,7 +12,6 @@ import type { OverviewItem } from './overview-model.js';
 import f from '../../components/form.module.css';
 import s from './peek.module.css';
 import { primaryKey } from '../../lib/shortcuts-model.js';
-import { useT } from '../../i18n/index.js';
 
 /**
  * Read an archived conversation without restoring it, like Quick Look: no message box, nothing
@@ -20,12 +19,11 @@ import { useT } from '../../i18n/index.js';
  */
 export function ConversationPeek({ item, onClose, onRestore, onDelete }: { item: OverviewItem; onClose: () => void; onRestore: () => void; onDelete: () => void }) {
   const api = useApi();
-  const t = useT();
   const w = item.ws;
   useEffect(() => {
     void api.workspaces.load(w.id).catch(() => undefined);
   }, [api, w.id]);
-  const where = item.project.root ? item.project.name : t('views.overview.chats');
+  const where = item.project.root ? item.project.name : 'Chats';
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onClose())}>
       <Dialog.Portal>
@@ -55,37 +53,37 @@ export function ConversationPeek({ item, onClose, onRestore, onDelete }: { item:
             <div className={s.headText}>
               <Dialog.Title className={s.title}>
                 {w.name}
-                <span className={s.badge}>{t('views.overview.filterArchived')}</span>
+                <span className={s.badge}>Archived</span>
               </Dialog.Title>
               <div className={s.subtitle}>
                 {where}
                 {w.branch ? (
                   <>
-                    {t('views.peek.branch')}
+                    {' · branch '}
                     <code>{w.branch}</code>
-                    {t('views.peek.kept')}
+                    {' kept'}
                   </>
                 ) : null}
-                {t('views.peek.readOnly')}
+                {' · read only'}
               </div>
             </div>
-            <button type="button" className={s.close} aria-label={t('views.peek.close')} onClick={onClose}>
+            <button type="button" className={s.close} aria-label="Close" onClick={onClose}>
               <Icon name="x" size={12} />
             </button>
           </header>
           <div className={s.body}>
-            <ChatLog channel={`ws:${w.id}`} empty={<Empty icon="chat" title={t('views.peek.emptyTitle')} detail={t('views.peek.emptyDetail')} />} />
+            <ChatLog channel={`ws:${w.id}`} empty={<Empty icon="chat" title="Nothing was said here" detail="This conversation has no messages." />} />
           </div>
           <footer className={s.buttons}>
             <button type="button" className={f.linkDanger} onClick={onDelete}>
-              {t('views.overview.deletePermanently')}
+              Delete Permanently…
             </button>
             <span className={s.flex} />
             <button type="button" className={f.button} onClick={onClose}>
-              {t('views.peek.done')}
+              Done
             </button>
             <button type="button" data-default className={cx(f.button, f.default)} onClick={onRestore}>
-              {t('views.overview.restore')}
+              Restore
             </button>
           </footer>
         </Dialog.Content>
@@ -98,28 +96,27 @@ export function ConversationPeek({ item, onClose, onRestore, onDelete }: { item:
 export function DeleteArchivedAlert({ item, onCancel, onDelete }: { item: OverviewItem; onCancel: () => void; onDelete: (children?: ThreadChildren) => void }) {
   const w = item.ws;
   const threads = useThreadsChoice(w.id, 'delete');
-  const t = useT();
   const branch = w.kind === 'worktree' && w.branch && !w.external;
   return (
     <Alert
       icon="alert"
       tone="danger"
-      title={t('views.peek.deleteTitle', { name: w.name })}
+      title={`Delete “${w.name}” permanently?`}
       message={
         <>
           <p>
             {branch ? (
               <>
-                {t('views.peek.deletesBranch')}<code>{w.branch}</code>{t('views.peek.deletesBranchRest')}
+                This deletes its branch <code>{w.branch}</code> and the conversation. Commits that aren’t on another branch are lost.
               </>
             ) : (
-              t('views.peek.deletesChat')
+              'This deletes the conversation and removes it from Beluga.'
             )}
           </p>
-          <p>{t('views.peek.cantUndo')}</p>
+          <p>You can’t undo this.</p>
         </>
       }
-      confirm={{ label: t('views.peek.delete'), destructive: true, onClick: () => onDelete(threads.children) }}
+      confirm={{ label: 'Delete', destructive: true, onClick: () => onDelete(threads.children) }}
       onCancel={onCancel}
     >
       {threads.box}

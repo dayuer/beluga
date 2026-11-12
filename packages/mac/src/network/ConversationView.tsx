@@ -36,28 +36,28 @@ import { agentMark } from '@beluga/shared/agent-marks.js';
 import { PersonButton } from './PersonProfile.js';
 import s from './network.module.css';
 import { computerTitle, thisComputer, yourComputer } from '../lib/os-words.js';
-import { currentLocale, t, useT } from '../i18n/index.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /** Messages the shared state keeps per conversation; with that many, there may be earlier ones. */
 const KEPT = 200;
 const PAGE = 100;
 
-const time = (ts: number): string => new Date(ts).toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' });
-const fullTime = (ts: number): string => new Date(ts).toLocaleString(currentLocale(), { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const time = (ts: number): string => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fullTime = (ts: number): string => new Date(ts).toLocaleString([], { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 function messageItems(m: MessageView, ctx: { say: (t: string) => void; mark: ActionItem['icon']; resend?: () => void; edit?: () => void; remove?: () => void }): ActionItem[] {
-  if (m.status === 'locked') return ctx.remove ? [{ label: t('network.view.delete'), icon: 'trash', danger: true, onSelect: ctx.remove }] : [];
-  const copy = (text: string, what: string): void => void copyText(text).then(() => ctx.say(t('network.add.copied', { what })));
+  if (m.status === 'locked') return ctx.remove ? [{ label: 'Delete…', icon: 'trash', danger: true, onSelect: ctx.remove }] : [];
+  const copy = (text: string, what: string): void => void copyText(text).then(() => ctx.say(`Copied ${what}`));
   const quote = (): void => void document.dispatchEvent(new CustomEvent(QUOTE_EVENT, { detail: m.text }));
   return [
-    ...(ctx.resend ? [{ label: t('network.view.sendAgain'), icon: 'refresh' as const, onSelect: ctx.resend }] : []),
+    ...(ctx.resend ? [{ label: 'Send Again', icon: 'refresh' as const, onSelect: ctx.resend }] : []),
     ...(m.text.trim()
       ? [
-          { label: t('network.view.copy'), icon: 'copy' as const, separate: Boolean(ctx.resend), onSelect: () => copy(plainText(m.text), t('network.view.theMessage')) },
-          { label: t('network.view.copyMarkdown'), onSelect: () => copy(m.text, t('network.view.asMarkdown')) },
-          { label: t('network.view.quote'), icon: 'chat' as const, separate: true, onSelect: quote },
+          { label: 'Copy', icon: 'copy' as const, separate: Boolean(ctx.resend), onSelect: () => copy(plainText(m.text), 'the message') },
+          { label: 'Copy as Markdown', onSelect: () => copy(m.text, 'as Markdown') },
+          { label: 'Quote in Reply', icon: 'chat' as const, separate: true, onSelect: quote },
           {
-            label: t('network.view.askAgent'),
+            label: 'Ask Your Agent About This',
             icon: ctx.mark,
             onSelect: () => {
               quote();
@@ -66,14 +66,13 @@ function messageItems(m: MessageView, ctx: { say: (t: string) => void; mark: Act
           },
         ]
       : []),
-    ...(ctx.edit ? [{ label: t('network.view.edit'), icon: 'pencil' as const, separate: true, onSelect: ctx.edit }] : []),
-    ...(ctx.remove ? [{ label: t('network.view.delete'), icon: 'trash' as const, danger: true, separate: !ctx.edit, onSelect: ctx.remove }] : []),
+    ...(ctx.edit ? [{ label: 'Edit', icon: 'pencil' as const, separate: true, onSelect: ctx.edit }] : []),
+    ...(ctx.remove ? [{ label: 'Delete…', icon: 'trash' as const, danger: true, separate: !ctx.edit, onSelect: ctx.remove }] : []),
   ];
 }
 
 /** Your message's words in place of its bubble: Return saves, Esc puts it back. */
 function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
-  const t = useT();
   const { client } = useBeluga();
   const [text, setText] = useState(m.text);
   const [busy, setBusy] = useState(false);
@@ -83,7 +82,7 @@ function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
     setBusy(true);
     client.api.network['messages.edit'](m.conversation, m.id, next).then(done, (err: unknown) => {
       setBusy(false);
-      client.store.dispatch({ type: 'toast', text: t('network.view.couldntEdit', { error: errorText(err) }), level: 'error' });
+      client.store.dispatch({ type: 'toast', text: `Couldn’t edit it: ${errorText(err)}`, level: 'error' });
     });
   };
   return (
@@ -93,7 +92,7 @@ function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
         value={text}
         disabled={busy}
         autoFocus
-        aria-label={t('network.view.editMessage')}
+        aria-label="Edit message"
         rows={Math.min(8, text.split('\n').length)}
         onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
         onChange={(e) => setText(e.target.value)}
@@ -101,7 +100,7 @@ function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
           if (e.key === 'Escape') {
             e.preventDefault();
             done();
-          } else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          } else if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) {
             e.preventDefault();
             save();
           }
@@ -109,10 +108,10 @@ function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
       />
       <div className={s.editHint}>
         <button type="button" onClick={done}>
-          {t('network.view.cancel')}
+          Cancel
         </button>
         <button type="button" className={s.editSave} disabled={busy || !text.trim()} onClick={save}>
-          {t('network.view.save')}
+          Save
         </button>
       </div>
     </div>
@@ -128,7 +127,6 @@ const tintOf = (peerId: string): React.CSSProperties => ({ ['--person' as string
  * and a Claude's answer full width under "<owner>'s Claude". `place`: where it sits in its run.
  */
 const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, world, offer }: { m: MessageView; place: RunPlace; dm: boolean; last: boolean; resend: (m: MessageView) => void; me?: { name: string; peerId: string }; nameOf: (peerId: string) => string; world: MentionWorld; offer?: boolean }) {
-  const t = useT();
   const prefs = usePrefs();
   const say = useSay();
   const [editing, setEditing] = useState(false);
@@ -143,14 +141,14 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
     m.mine && m.status === 'waiting' ? (
       <div className={s.state}>
         <Icon name="clock" size={11} />
-        {t('network.view.waitingDelivery')}
+        Waiting to be delivered
       </div>
     ) : expired ? (
       <div className={cx(s.state, s.stateExpired)}>
         <Icon name="alert" size={11} />
-        {t('network.view.notDelivered')}
+        Not delivered.
         <button type="button" onClick={() => resend(m)}>
-          {t('network.view.sendAgain')}
+          Send Again
         </button>
       </div>
     ) : null;
@@ -170,7 +168,7 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
       ...(editable ? { edit: () => setEditing(true) } : {}),
       ...(dm ? { remove: () => openNet({ kind: 'delete_message', conversation: m.conversation, id: m.id, mine: m.mine }) } : {}),
     });
-  const edited = m.edited ? <span title={t('network.view.editedAt', { time: fullTime(m.edited) })}>{t('network.view.edited')}</span> : null;
+  const edited = m.edited ? <span title={`Edited ${fullTime(m.edited)}`}>Edited</span> : null;
   // Emoji reactions (BLG-702): the chips under it, and the button a hover shows (on the bubble's top corner, `on`).
   const react = useNetReact(m);
   const chips = <ReactionChips reactions={m.reactions} nameOf={nameOf} mine={m.mine && !m.claude} me={me?.peerId} onReact={react} />;
@@ -197,7 +195,7 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
             {deliveryState ??
               (place.last || edited ? (
                 <div className={s.under}>
-                  {[edited, place.last ? time(m.ts) : null, place.last && dm && last && m.status === 'seen' ? t('network.view.seen') : place.last && dm && last && m.status === 'delivered' ? t('network.view.delivered') : null]
+                  {[edited, place.last ? time(m.ts) : null, place.last && dm && last && m.status === 'seen' ? 'Seen' : place.last && dm && last && m.status === 'delivered' ? 'Delivered' : null]
                     .filter(Boolean)
                     .map((part, i) => (
                       <span key={i}>
@@ -243,7 +241,7 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
             </div>
             {chips}
             {edited ? <div className={s.under}>{edited}</div> : null}
-            {m.via ? <div className={s.under} data-sent-by={m.via.id}>{t('more.ext.sentBy', { name: m.via.name })}</div> : null}
+            {m.via ? <div className={s.under} data-sent-by={m.via.id}>Sent by {m.via.name}</div> : null}
             {askedChip}
           </div>
         </div>
@@ -267,14 +265,14 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
                   {agentBadge(m.claude.agent)}
                 </span>
               ) : null}
-              {m.claude ? <span className={s.claudeTag}>{m.mine ? t('network.view.onComputer', { computer: yourComputer() }) : t('network.view.onTheirs', { name: m.name })}</span> : null}
+              {m.claude ? <span className={s.claudeTag}>on {m.mine ? yourComputer() : `${m.name}’s computer`}</span> : null}
               {prefs.timestamps ? <span className={s.runTime}>{time(m.ts)}</span> : null}
             </div>
           ) : null}
           {locked ? (
             <div className={s.locked}>
               <Icon name="lock" size={12} />
-              {t('network.view.cantRead', { computer: thisComputer() })}
+              Can’t be read on {thisComputer()}
             </div>
           ) : (
             <>
@@ -299,12 +297,11 @@ const Message = memo(function Message({ m, place, dm, last, resend, me, nameOf, 
 function TaskRow({ task, me }: { task: TaskView; me?: { name: string; peerId: string } }) {
   const sent = task.direction === 'sent';
   const agent = task.by === 'agent';
-  const t = useT();
   const myAgent = useMyAgent();
   const owner = sent ? (me?.peerId ?? 'me') : task.peerId;
-  const ownerName = sent ? (me?.name ?? t('network.view.you')) : task.peerName;
-  const label = agent ? (sent ? t('network.view.yourAgent') : t('network.view.theirAgent', { name: task.peerName })) : sent ? t('network.view.you') : task.peerName;
-  const asked = t('network.view.asked', { who: sent ? targetLabel(task) : task.kind === 'ask' ? t('network.view.askedYourAgent') : yourComputer() });
+  const ownerName = sent ? (me?.name ?? 'You') : task.peerName;
+  const label = agent ? (sent ? 'Your agent' : `${task.peerName}’s agent`) : sent ? 'You' : task.peerName;
+  const asked = sent ? `asked ${targetLabel(task)}` : `asked ${task.kind === 'ask' ? 'your agent' : yourComputer()}`;
   return (
     <div className={cx(s.row, s.rowClaude)} data-task-row={task.id}>
       <div className={s.side}>
@@ -340,7 +337,6 @@ const sentRequests = (): Record<string, string> => {
  * the button is only for one that couldn't go (their Mac didn't take requests then).
  */
 function RequestOffer({ m }: { m: MessageView }) {
-  const t = useT();
   const { client } = useBeluga();
   const say = useSay();
   const [sending, setSending] = useState(false);
@@ -349,13 +345,13 @@ function RequestOffer({ m }: { m: MessageView }) {
   const request = m.claude?.request;
   if (!request) return null;
   if (task) return <TaskCard task={task} inChat />;
-  if (taskId) return <div className={s.asked}>{t('network.view.sentAsRequest', { name: m.name })}</div>;
+  if (taskId) return <div className={s.asked}>Sent as a request to {m.name}’s computer</div>;
   const send = (): void => {
     setSending(true);
     void client.api.gateway
       .ask(m.from, request.ask, { ...(request.needs?.length ? { needs: [...request.needs] } : {}), answer: { conversation: m.conversation, id: m.id } })
       .then((t) => setTaskId(t.id))
-      .catch((err: unknown) => say(t('network.view.couldntSend', { error: errorText(err) })))
+      .catch((err: unknown) => say(`Couldn’t send it: ${errorText(err)}`))
       .finally(() => setSending(false));
   };
   return (
@@ -365,7 +361,7 @@ function RequestOffer({ m }: { m: MessageView }) {
         {request.ask}
       </span>
       <Button size="small" variant="primary" disabled={sending} onClick={send}>
-        {sending ? t('network.view.sending') : t('network.view.askOn', { name: m.name })}
+        {sending ? 'Sending…' : `Ask on ${m.name}’s computer`}
       </Button>
     </div>
   );
@@ -386,24 +382,22 @@ function TaskMessage({ id, plain, me }: { id: string; plain: ReactElement; me?: 
  * "Waiting on Ata: …" (your requests they haven't taken yet). Each one scrolls to its card.
  */
 function WaitingBand({ waiting }: { waiting: readonly WaitingItem[] }) {
-  const t = useT();
   if (!waiting.length) return null;
   return (
-    <div className={s.waitBand} role="region" aria-label={t('network.view.waiting')}>
+    <div className={s.waitBand} role="region" aria-label="Waiting">
       {waiting.slice(0, 4).map((w) => (
         <button key={`${w.target.kind}:${w.target.id}`} type="button" className={cx(s.waitItem, w.on === 'you' && s.waitYou, w.kind === 'secret' && s.waitSecret)} title={waitingLabel(w)} onClick={() => showWaiting(w)}>
           <Icon name={w.on === 'you' ? (w.kind === 'secret' ? 'lock' : 'alert') : 'clock'} size={12} />
           <span>{waitingLabel(w)}</span>
         </button>
       ))}
-      {waiting.length > 4 ? <span className={s.waitMore}>{t('network.view.more', { n: waiting.length - 4 })}</span> : null}
+      {waiting.length > 4 ? <span className={s.waitMore}>+{waiting.length - 4} more</span> : null}
     </div>
   );
 }
 
 /** The start of a conversation: who it's with, and that it stays between you. */
 function Intro({ friend, group }: { friend?: FriendView; group?: GroupView }) {
-  const t = useT();
   const net = useNetwork();
   if (friend) {
     return (
@@ -413,7 +407,7 @@ function Intro({ friend, group }: { friend?: FriendView; group?: GroupView }) {
         <div className={s.introLine}>{presenceLine(friend)}</div>
         <div className={s.introPrivacy}>
           <Icon name="lock" size={12} />
-          {t('network.view.privacyDm', { name: friend.name })}
+          End-to-end encrypted, straight to {friend.name}’s computer
         </div>
       </div>
     );
@@ -423,22 +417,18 @@ function Intro({ friend, group }: { friend?: FriendView; group?: GroupView }) {
     <div className={s.intro}>
       <GroupAvatar name={group.name} id={group.id} size={64} />
       <div className={s.introName}>{channelName(net, group)}</div>
-      <div className={s.introLine}>{isMain(net, group) ? t('network.view.mainLine', { members: membersLine(group.members) }) : membersLine(group.members)}</div>
+      <div className={s.introLine}>{isMain(net, group) ? `Your main channel: all your friends, and everyone you add later · ${membersLine(group.members)}` : membersLine(group.members)}</div>
       <div className={s.introPrivacy}>
         <Icon name="lock" size={12} />
-        {t('network.view.privacyGroup')}
+        End-to-end encrypted, kept on each member’s computer
       </div>
       <div className={s.introHint}>
-        {t('network.view.hintBefore', { computer: yourComputer() })}
-        <b>@claude</b>
-        {t('network.view.hintMiddle')}
-        <b>{t('network.view.hintAsk')}</b>
-        {t('network.view.hintAfter')}
+        Drop files here to share them straight from {yourComputer()}. Your agent answers only when you ask: type <b>@claude</b> (whichever agent you run), or click <b>Ask: your agent</b> under the message box.
       </div>
       {group.admin && group.active ? (
         <div className={s.introActions}>
           <Button icon="plus" onClick={() => openNet({ kind: 'add_people', groupId: group.id })}>
-            {t('network.view.addPeople')}
+            Add People…
           </Button>
         </div>
       ) : null}
@@ -592,7 +582,6 @@ export function ConversationView({ id }: { id: string }) {
 }
 
 function Conversation({ id }: { id: string }) {
-  const t = useT();
   const { client } = useBeluga();
   const net = useNetwork();
   const target = conversationOf(id);
@@ -643,18 +632,18 @@ function Conversation({ id }: { id: string }) {
     return (
       <Empty
         icon="people"
-        title={t('network.view.offTitle')}
-        detail={t('network.view.offDetail')}
+        title="Talking with friends is off"
+        detail="Turn it on to see your friends and groups."
         action={
           <Button variant="primary" onClick={() => void client.api.network.setEnabled(true)}>
-            {t('network.view.turnOn')}
+            Turn On
           </Button>
         }
       />
     );
   }
   if (!target || (!friend && !group)) {
-    return <Empty icon="people" title={target?.kind === 'group' ? t('network.view.channelGone') : t('network.view.friendGone')} detail={t('network.view.goneDetail', { computer: thisComputer() })} />;
+    return <Empty icon="people" title={target?.kind === 'group' ? 'This channel isn’t here any more' : 'Not a friend any more'} detail={`Its messages stay on ${thisComputer()}, but you can’t write here.`} />;
   }
 
   const loadEarlier = async (): Promise<void> => {
@@ -664,7 +653,7 @@ function Conversation({ id }: { id: string }) {
       const page = target.kind === 'dm' ? await quietly(client, client.api.network['dm.history'](target.peerId, { before: first.ts, limit: PAGE })) : await quietly(client, client.api.network['groups.history'](target.groupId, { before: first.ts, limit: PAGE }));
       setEarlier({ id, list: [...page, ...older.list], more: page.length >= PAGE });
     } catch (err) {
-      client.store.dispatch({ type: 'toast', text: t('network.view.couldntLoad', { error: errorText(err) }), level: 'error' });
+      client.store.dispatch({ type: 'toast', text: `Couldn’t load earlier messages: ${errorText(err)}`, level: 'error' });
     }
   };
   const send = (out: Outgoing): Promise<unknown> => client.api.network.post(id, { text: out.text, ...(out.files.length ? { files: [...out.files] } : {}), ...(out.ask ? { ask: out.ask === 'all' ? 'all' : [...out.ask] } : {}) });
@@ -675,7 +664,7 @@ function Conversation({ id }: { id: string }) {
   // A request sent from a friend's Claude's answer (RequestOffer) has its card under that answer:
   // its own message would be the same card again, so it isn't drawn twice.
   const offered = new Set([...Object.values(sentRequests()), ...tasks.filter((t) => t.answer).map((t) => t.id)]);
-  const nameOf = (peerId: string): string => net.friends.find((f) => f.peerId === peerId)?.name ?? group?.members.find((m) => m.peerId === peerId)?.name ?? t('network.view.someone');
+  const nameOf = (peerId: string): string => net.friends.find((f) => f.peerId === peerId)?.name ?? group?.members.find((m) => m.peerId === peerId)?.name ?? 'someone';
   const title = group ? channelName(net, group) : (friend?.name ?? '');
   const note = offlineNote(here);
   const firstUnread = messages.find((m) => unread.has(m.id))?.id;
@@ -684,11 +673,11 @@ function Conversation({ id }: { id: string }) {
   return (
     <div ref={drop.ref} className={cx(s.conversation, drop.over && s.dropping)} {...drop.html}>
       <WaitingBand waiting={waiting} />
-      <div ref={ref} className={s.log} onScroll={onScroll} role="log" aria-label={friend ? t('network.view.conversationWith', { name: friend.name }) : t('network.view.channelNamed', { name: title })}>
+      <div ref={ref} className={s.log} onScroll={onScroll} role="log" aria-label={friend ? `Conversation with ${friend.name}` : `Channel ${title}`}>
         {more ? (
           <div className={s.earlier}>
             <button type="button" onClick={() => void loadEarlier()}>
-              {t('network.view.showEarlier')}
+              Show Earlier Messages
             </button>
           </div>
         ) : (
@@ -702,7 +691,7 @@ function Conversation({ id }: { id: string }) {
           return (
             <div key={m.id}>
               {notesBefore(m.ts, prev?.ts).map((n) => (
-                <NotesBox key={n.id} notes={n} place={group ? `#${title}` : t('network.view.yourChatWith', { name: title })} />
+                <NotesBox key={n.id} notes={n} place={group ? `#${title}` : `your chat with ${title}`} />
               ))}
               {missedBefore(m.ts, prev?.ts).map((x) => (
                 <MissedCall key={`missed-${x.id}`} missed={x} />
@@ -716,7 +705,7 @@ function Conversation({ id }: { id: string }) {
         {(callNotes ?? [])
           .filter((n) => !messages.length || n.endedAt > messages[messages.length - 1]!.ts)
           .map((n) => (
-            <NotesBox key={n.id} notes={n} place={group ? `#${title}` : t('network.view.yourChatWith', { name: title })} />
+            <NotesBox key={n.id} notes={n} place={group ? `#${title}` : `your chat with ${title}`} />
           ))}
         {(missedCalls ?? [])
           .filter((x) => !messages.length || x.at > messages[messages.length - 1]!.ts)
@@ -731,16 +720,16 @@ function Conversation({ id }: { id: string }) {
       {drop.over ? (
         <div className={s.dropHint} aria-hidden="true">
           <Icon name="clip" size={18} />
-          {t('network.view.dropTo', { name: title })}
+          Drop to send to {title}
         </div>
       ) : null}
       {group && !group.active ? (
         <div className={s.closed}>
           <div className={s.closedBox}>
             <Icon name="lock" size={13} />
-            <span>{t('network.view.noLongerIn', { name: group.name })}</span>
+            <span>You’re no longer in {group.name}. Its messages stay here, read-only.</span>
             <Button size="small" onClick={() => openNet({ kind: 'delete_group', groupId: group.id })}>
-              {t('network.view.deleteFrom', { computer: computerTitle() })}
+              Delete from This {computerTitle()}…
             </Button>
           </div>
         </div>
@@ -750,7 +739,7 @@ function Conversation({ id }: { id: string }) {
           <div data-attention="">
             <Attention channel={id} />
           </div>
-          <NetComposer id={id} placeholder={t('network.view.messageTo', { name: friend ? friend.name : title })} people={people} send={send} {...(note ? { note } : {})} {...(me ? { me } : {})} {...(group?.admin ? { addPeople: () => openNet({ kind: 'add_people', groupId: group.id }) } : {})} />
+          <NetComposer id={id} placeholder={friend ? `Message ${friend.name}` : `Message ${title}`} people={people} send={send} {...(note ? { note } : {})} {...(me ? { me } : {})} {...(group?.admin ? { addPeople: () => openNet({ kind: 'add_people', groupId: group.id }) } : {})} />
         </>
       )}
     </div>

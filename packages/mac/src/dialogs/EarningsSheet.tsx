@@ -16,8 +16,6 @@ import { useApi, useApp } from '../lib/beluga.js';
 import { openExternal } from '../lib/system.js';
 import s from './earnings.module.css';
 import { thisComputer } from '../lib/os-words.js';
-import { rich } from './native/pick.js';
-import { t, useT } from '../i18n/index.js';
 
 /**
  * Earnings for a project, from Stripe and RevenueCat: its home says what both brought in and
@@ -34,7 +32,6 @@ export function EarningsSheet() {
 type View = 'home' | 'stripe' | 'revenuecat' | 'apps';
 
 function EarningsSheetBody({ initial, source }: { initial: string | undefined; source: 'stripe' | 'revenuecat' | undefined }) {
-  const t = useT();
   const all = useApp((st) => st.projects);
   const combined = useCombinedEarnings();
   const projects = all.filter((p) => p.root);
@@ -45,7 +42,7 @@ function EarningsSheetBody({ initial, source }: { initial: string | undefined; s
   const project = projects.find((p) => p.id === projectId);
   const connected = useProjectEarnings(project?.root);
   if (!project) {
-    return <FormSheet title={t('dialogs.earnings.connect')} icon="coin" intro={t('dialogs.stripe.noProject')} submitLabel={t('dialogs.stripe.done')} hideSubmit onSubmit={() => undefined} onCancel={closeEarnings} />;
+    return <FormSheet title="Connect Earnings" icon="coin" intro="Add a project first: earnings show beside each project in the sidebar." submitLabel="Done" hideSubmit onSubmit={() => undefined} onCancel={closeEarnings} />;
   }
   const stripe = connected?.stripe;
   const rc = connected?.revenuecat;
@@ -56,15 +53,15 @@ function EarningsSheetBody({ initial, source }: { initial: string | undefined; s
     const rest = confirm === 'stripe' ? rc : stripe;
     return (
       <Alert
-        title={t('dialogs.earnings.disconnectTitle', { source: confirm === 'stripe' ? 'Stripe' : 'RevenueCat', name: project.name })}
+        title={`Disconnect ${confirm === 'stripe' ? 'Stripe' : 'RevenueCat'} from ${project.name}?`}
         message={
           confirm === 'stripe'
-            ? t('dialogs.stripe.disconnectMessage')
-            : t('dialogs.earnings.rcDisconnectMessage')
+            ? 'Beluga forgets the key and the totals. Your Stripe account isn’t touched; you can delete the key in Stripe too.'
+            : 'Beluga forgets the key and everything it counted. Your RevenueCat data isn’t touched; you can delete the key in RevenueCat too.'
         }
         tone="danger"
         confirm={{
-          label: t('dialogs.stripe.disconnect'),
+          label: 'Disconnect',
           destructive: true,
           onClick: () => {
             void (confirm === 'stripe' ? api.stripe.disconnect(project.id) : api.revenuecat.disconnect(project.id));
@@ -95,7 +92,6 @@ function EarningsSheetBody({ initial, source }: { initial: string | undefined; s
 }
 
 function ConnectForm({ project, replacing, onBack, onDone }: { project: Project; replacing: boolean; onBack: (() => void) | undefined; onDone: () => void }) {
-  const t = useT();
   const api = useApi();
   const [key, setKey] = useState('');
   const [reveal, setReveal] = useState(false);
@@ -107,15 +103,17 @@ function ConnectForm({ project, replacing, onBack, onDone }: { project: Project;
   const showProblem = problem && (touched || pasted);
   return (
     <FormSheet
-      title={replacing ? t('dialogs.stripe.replaceTitle', { name: project.name }) : t('dialogs.stripe.connectTo', { name: project.name })}
+      title={replacing ? `Replace the Stripe key for ${project.name}` : `Connect Stripe to ${project.name}`}
       icon="coin"
       intro={
-        <p>{t('dialogs.stripe.intro', { name: project.name, computer: thisComputer() })}</p>
+        <p>
+          See {project.name}’s earnings beside it in the sidebar, and how it’s doing lately on its home. Beluga looks for new payments every few minutes; the key stays on {thisComputer()}.
+        </p>
       }
-      submitLabel={t('dialogs.stripe.connectButton')}
+      submitLabel="Connect"
       canSubmit={Boolean(trimmed) && !problem}
       onCancel={onBack ?? closeEarnings}
-      cancelLabel={onBack ? t('dialogs.stripe.back') : t('dialogs.stripe.cancel')}
+      cancelLabel={onBack ? 'Back' : 'Cancel'}
       width={560}
       onSubmit={async () => {
         const result = await api.stripe.connect(project.id, trimmed);
@@ -126,25 +124,25 @@ function ConnectForm({ project, replacing, onBack, onDone }: { project: Project;
       }}
     >
       <Field
-        label={t('dialogs.stripe.restricted')}
+        label="Restricted key"
         htmlFor="stripe-key"
         error={showProblem ? problem : undefined}
         hint={
           kind.secret && !problem ? (
             <span className={s.caution}>
               <Icon name="alert" size={11} />
-              {t('dialogs.stripe.fullSecret')}
+              This is a full secret key: it can do anything in your Stripe account. It works, but a restricted key that only reads charges is safer.
             </span>
           ) : pasted && !problem ? (
-            t('dialogs.stripe.pasted')
+            'Pasted. Connect checks it with Stripe.'
           ) : (
-            t('dialogs.stripe.startsWith')
+            'Starts with rk_live_ (or rk_test_ to try it out).'
           )
         }
         aside={
           <>
             {kind.mode && !problem ? <ModeBadge mode={kind.mode} /> : null}
-            <button type="button" className={s.reveal} aria-label={reveal ? t('dialogs.stripe.hideKey') : t('dialogs.stripe.showKey')} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
+            <button type="button" className={s.reveal} aria-label={reveal ? 'Hide key' : 'Show key'} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
               <Icon name="eye" size={13} />
             </button>
           </>
@@ -176,26 +174,29 @@ function ConnectForm({ project, replacing, onBack, onDone }: { project: Project;
       </Field>
       <div className={s.howto}>
         <div className={s.howtoHead}>
-          <span>{t('dialogs.stripe.noneYet')}</span>
+          <span>Don’t have one yet?</span>
           <button type="button" className={f.linkButton} onClick={() => void openExternal(STRIPE_KEY_URL)}>
-            {t('dialogs.stripe.create')}
+            Create a restricted key in Stripe
             <Icon name="forward" size={10} />
           </button>
         </div>
         <ol className={s.steps}>
-          <li>{rich(t('dialogs.stripe.step1'), { charges: <b>{t('prefs.stripe.charges')}</b>, read: <b>{t('prefs.stripe.read')}</b> })}</li>
-          <li>{rich(t('dialogs.stripe.step2'), { accounts: <b>{t('prefs.stripe.accounts')}</b>, read: <b>{t('prefs.stripe.read')}</b> })}</li>
-          <li>{t('dialogs.stripe.step3')}</li>
+          <li>
+            Set <b>Charges</b> to <b>Read</b>: all Beluga needs, refunds included.
+          </li>
+          <li>
+            Optional: under Connect, set <b>Accounts</b> to <b>Read</b> to show the account’s name here.
+          </li>
+          <li>Create the key, copy it, and paste it above.</li>
         </ol>
-        <div className={s.counted}>{t('dialogs.stripe.counted')}</div>
+        <div className={s.counted}>Counted: every successful charge, what was captured minus refunds, before Stripe’s fees.</div>
       </div>
     </FormSheet>
   );
 }
 
 function ModeBadge({ mode }: { mode: 'live' | 'test' }) {
-  const t = useT();
-  return <span className={cx(s.badge, mode === 'live' ? s.live : s.testMode)}>{mode === 'live' ? t('dialogs.stripe.live') : t('dialogs.stripe.test')}</span>;
+  return <span className={cx(s.badge, mode === 'live' ? s.live : s.testMode)}>{mode === 'live' ? 'Live' : 'Test'}</span>;
 }
 
 
@@ -215,14 +216,12 @@ const storeLabel = (store: string): string => STORES[store] ?? store.replace(/_/
 
 /** What a source brought in: all-time, in the currency earnings show in (≈ when converted). */
 function useAmount(totals: readonly MoneyTotal[] | undefined): string {
-  const t = useT();
   const money = useConverted(totals);
-  return totals ? `${money.converted ? '≈ ' : ''}${formatMoney(money.amount, money.currency)}` : t('dialogs.stripe.counting');
+  return totals ? `${money.converted ? '≈ ' : ''}${formatMoney(money.amount, money.currency)}` : 'Counting…';
 }
 
 /** Connect, or the connected controls, for the project: both sources at a glance. */
 function Home({ project, projects, onProject, stripe, rc, onOpen, onDisconnect }: { project: Project; projects: readonly Project[] | undefined; onProject: (id: string) => void; stripe: ProjectEarnings | undefined; rc: ProjectRevenueCat | undefined; onOpen: (v: View) => void; onDisconnect: (source: 'stripe' | 'revenuecat') => void }) {
-  const t = useT();
   const api = useApi();
   const earnings = useProjectEarnings(project.root);
   const totals = earnings?.totals ?? [];
@@ -233,17 +232,17 @@ function Home({ project, projects, onProject, stripe, rc, onOpen, onDisconnect }
   const monthMoney = useConverted(month?.totals);
   const picker =
     projects && projects.length > 1 ? (
-      <Field label={t('dialogs.stripe.project')} htmlFor="earnings-project">
-        <Popup id="earnings-project" label={t('dialogs.stripe.project')} value={project.id} options={projects.map((p) => ({ value: p.id, label: p.name }))} onChange={onProject} />
+      <Field label="Project" htmlFor="earnings-project">
+        <Popup id="earnings-project" label="Project" value={project.id} options={projects.map((p) => ({ value: p.id, label: p.name }))} onChange={onProject} />
       </Field>
     ) : null;
   if (!earnings) {
     return (
       <FormSheet
-        title={t('dialogs.earnings.connectTo', { name: project.name })}
+        title={`Connect Earnings to ${project.name}`}
         icon="coin"
-        intro={<p>{t('dialogs.earnings.intro', { name: project.name, computer: thisComputer() })}</p>}
-        submitLabel={t('dialogs.stripe.done')}
+        intro={<p>See {project.name}’s earnings beside it in the sidebar, and how it’s doing lately on its home. Beluga looks for new sales every few minutes; the keys stay on {thisComputer()}.</p>}
+        submitLabel="Done"
         hideSubmit
                 width={520}
         onSubmit={() => undefined}
@@ -251,41 +250,41 @@ function Home({ project, projects, onProject, stripe, rc, onOpen, onDisconnect }
       >
         {picker}
         <div className={s.cards}>
-          <SourceCard name="Stripe" detail={t('dialogs.earnings.stripeCard')} onConnect={() => onOpen('stripe')} />
-          <SourceCard name="RevenueCat" detail={t('dialogs.earnings.rcCard')} onConnect={() => onOpen('revenuecat')} />
+          <SourceCard name="Stripe" detail="Charges, refunds included, from a key that can only read them." onConnect={() => onOpen('stripe')} />
+          <SourceCard name="RevenueCat" detail="Subscriptions, one-time purchases and ads from your App Store and Google Play apps." onConnect={() => onOpen('revenuecat')} />
         </div>
       </FormSheet>
     );
   }
   return (
     <FormSheet
-      title={t('dialogs.stripe.earnings', { name: project.name })}
+      title={`${project.name} earnings`}
       icon="coin"
       intro={
         <span className={s.account}>
           {stripe ? (
             <>
-              {stripe.account ?? t('dialogs.stripe.yourAccount')}
+              {stripe.account ?? 'Your Stripe account'}
               <ModeBadge mode={stripe.mode} />
             </>
           ) : null}
           {rc ? <span>{rc.project.name}</span> : null}
         </span>
       }
-      submitLabel={t('dialogs.stripe.done')}
+      submitLabel="Done"
       hideSubmit
-      cancelLabel={t('dialogs.stripe.done')}
+      cancelLabel="Done"
       width={480}
       onSubmit={() => undefined}
       onCancel={closeEarnings}
     >
       {picker}
       <div className={cx(s.total, earnings.refreshing && s.counting)} aria-live="polite">
-        <span className={s.totalLabel}>{t('dialogs.stripe.allTime')}</span>
-        <span className={s.totalValue}>{earnings.totals ? `${money.converted ? '≈ ' : ''}${formatMoney(money.amount, money.currency)}` : t('dialogs.stripe.counting')}</span>
+        <span className={s.totalLabel}>All-time earnings</span>
+        <span className={s.totalValue}>{earnings.totals ? `${money.converted ? '≈ ' : ''}${formatMoney(money.amount, money.currency)}` : 'Counting…'}</span>
         {breakdown ? (
           <span className={s.others}>
-            <span className={s.othersLabel}>{t('dialogs.earnings.in', { sources: sourcesOf([earnings]) })}</span>
+            <span className={s.othersLabel}>In {sourcesOf([earnings])}</span>
             {totals.map((t) => (
               <span key={t.currency}>{formatMoney(t.amount, t.currency)}</span>
             ))}
@@ -294,33 +293,35 @@ function Home({ project, projects, onProject, stripe, rc, onOpen, onDisconnect }
         {note ? <span className={s.note}>{note}</span> : null}
         {month ? (
           <span className={s.lately} data-last-30>
-            {t('dialogs.stripe.last30', { approx: monthMoney.converted ? '≈ ' : '', money: formatMoney(monthMoney.amount, monthMoney.currency), n: month.payments, payers: month.payers ?? '' })}
+            Last 30 days: {monthMoney.converted ? '≈ ' : ''}
+            {formatMoney(monthMoney.amount, monthMoney.currency)} from {month.payments} {month.payments === 1 ? 'payment' : 'payments'}
+            {month.payers !== undefined ? ` by ${month.payers} ${month.payers === 1 ? 'customer' : 'customers'}` : ''}
           </span>
         ) : null}
         <span className={s.meta}>
-          {earnings.refreshing ? t('dialogs.stripe.counting') : t('dialogs.stripe.updated', { when: updatedAgo(earnings.updatedAt) })}
+          {earnings.refreshing ? 'Counting…' : `Updated ${updatedAgo(earnings.updatedAt)}`}
           <button type="button" className={f.linkButton} disabled={earnings.refreshing} onClick={() => refreshEarnings(api, project.id)}>
-            {t('dialogs.stripe.refresh')}
+            Refresh Now
           </button>
         </span>
       </div>
-      <Field label={t('dialogs.stripe.currency')} htmlFor="earnings-currency" hint={t('dialogs.stripe.currencyHint')}>
+      <Field label="Currency" htmlFor="earnings-currency" hint="Every project’s earnings show in it, in the sidebar and the Usage view. Also in Settings › General.">
         <CurrencySelect id="earnings-currency" className={f.popup} />
       </Field>
       <div className={s.sources}>
-        {stripe ? <StripeRow earnings={stripe} alone={!rc} onReplace={() => onOpen('stripe')} onDisconnect={() => onDisconnect('stripe')} /> : <SourceCard name="Stripe" detail={t('dialogs.earnings.stripeAdd')} onConnect={() => onOpen('stripe')} />}
-        {rc ? <RevenueCatRow rc={rc} alone={!stripe} onChoose={() => onOpen('apps')} onReplace={() => onOpen('revenuecat')} onDisconnect={() => onDisconnect('revenuecat')} /> : <SourceCard name="RevenueCat" detail={t('dialogs.earnings.rcAdd')} onConnect={() => onOpen('revenuecat')} />}
+        {stripe ? <StripeRow earnings={stripe} alone={!rc} onReplace={() => onOpen('stripe')} onDisconnect={() => onDisconnect('stripe')} /> : <SourceCard name="Stripe" detail="Add charges from a Stripe key." onConnect={() => onOpen('stripe')} />}
+        {rc ? <RevenueCatRow rc={rc} alone={!stripe} onChoose={() => onOpen('apps')} onReplace={() => onOpen('revenuecat')} onDisconnect={() => onDisconnect('revenuecat')} /> : <SourceCard name="RevenueCat" detail="Add what your apps earn through RevenueCat." onConnect={() => onOpen('revenuecat')} />}
       </div>
       {stripe?.secretKey ? (
         <div className={s.caution}>
           <Icon name="alert" size={11} />
-          {t('dialogs.stripe.secretNote')}
+          This is a full secret key. A restricted key that only reads charges is safer: Replace Key… to switch.
         </div>
       ) : null}
       <div className={s.counted}>
-        {stripe ? t('dialogs.earnings.countedStripe') : ''}
-        {rc ? t('dialogs.earnings.countedRc') : ''}
-        {t('dialogs.earnings.looksBy')}
+        {stripe ? 'Stripe: successful charges, captured minus refunds, before Stripe’s fees. ' : ''}
+        {rc ? 'RevenueCat: revenue from the apps you tick, net of refunds, before store fees and taxes. ' : ''}
+        Beluga looks for new sales every few minutes by itself.
       </div>
     </FormSheet>
   );
@@ -328,7 +329,6 @@ function Home({ project, projects, onProject, stripe, rc, onOpen, onDisconnect }
 
 /** A source that isn't connected yet, with its way in. */
 function SourceCard({ name, detail, onConnect }: { name: string; detail: string; onConnect: () => void }) {
-  const t = useT();
   return (
     <section className={cx(s.source, s.card)} aria-label={name}>
       <span className={s.sourceMain}>
@@ -336,14 +336,13 @@ function SourceCard({ name, detail, onConnect }: { name: string; detail: string;
         <span className={s.sourceDetail}>{detail}</span>
       </span>
       <button type="button" className={f.linkButton} onClick={onConnect}>
-        {t('dialogs.earnings.connectName', { name })}
+        Connect {name}
       </button>
     </section>
   );
 }
 
 function ProblemLine({ error, onReplace }: { error: NonNullable<ProjectEarnings['error']>; onReplace: () => void }) {
-  const t = useT();
   const needsKey = error.code === 'revoked' || error.code === 'permission';
   return (
     <div className={s.problem} role="status">
@@ -351,7 +350,7 @@ function ProblemLine({ error, onReplace }: { error: NonNullable<ProjectEarnings[
       <span>{brandText(error.message)}</span>
       {needsKey ? (
         <button type="button" className={f.linkButton} onClick={onReplace}>
-          {t('dialogs.stripe.newKey')}
+          Connect a New Key…
         </button>
       ) : null}
     </div>
@@ -359,21 +358,20 @@ function ProblemLine({ error, onReplace }: { error: NonNullable<ProjectEarnings[
 }
 
 function StripeRow({ earnings, alone, onReplace, onDisconnect }: { earnings: ProjectEarnings; alone: boolean; onReplace: () => void; onDisconnect: () => void }) {
-  const t = useT();
   const amount = useAmount(earnings.totals);
   return (
     <section className={s.source} aria-label="Stripe">
       <span className={s.sourceMain}>
         <span className={s.sourceName}>Stripe</span>
-        <span className={s.sourceDetail}>{earnings.refreshing ? t('dialogs.stripe.counting') : t('dialogs.stripe.updated', { when: updatedAgo(earnings.updatedAt) })}</span>
+        <span className={s.sourceDetail}>{earnings.refreshing ? 'Counting…' : `Updated ${updatedAgo(earnings.updatedAt)}`}</span>
       </span>
       {alone ? null : <span className={s.sourceAmount}>{amount}</span>}
       <span className={s.sourceLinks}>
         <button type="button" className={f.linkButton} onClick={onReplace}>
-          {t('dialogs.stripe.replaceKey')}
+          Replace Key…
         </button>
         <button type="button" className={f.linkDanger} onClick={onDisconnect}>
-          {t('dialogs.stripe.disconnectMore')}
+          Disconnect…
         </button>
       </span>
       {earnings.error ? <ProblemLine error={earnings.error} onReplace={onReplace} /> : null}
@@ -382,7 +380,6 @@ function StripeRow({ earnings, alone, onReplace, onDisconnect }: { earnings: Pro
 }
 
 function RevenueCatRow({ rc, alone, onChoose, onReplace, onDisconnect }: { rc: ProjectRevenueCat; alone: boolean; onChoose: () => void; onReplace: () => void; onDisconnect: () => void }) {
-  const t = useT();
   const amount = useAmount(rc.totals);
   const counted = rc.apps.filter((a) => a.counted).length;
   return (
@@ -390,31 +387,31 @@ function RevenueCatRow({ rc, alone, onChoose, onReplace, onDisconnect }: { rc: P
       <span className={s.sourceMain}>
         <span className={s.sourceName}>RevenueCat</span>
         <span className={s.sourceDetail}>
-          {rc.refreshing ? t('dialogs.stripe.counting') : t('dialogs.stripe.updated', { when: updatedAgo(rc.updatedAt) })}
-          {rc.apps.length ? t('dialogs.earnings.appsCounted', { counted, n: rc.apps.length }) : ''}
+          {rc.refreshing ? 'Counting…' : `Updated ${updatedAgo(rc.updatedAt)}`}
+          {rc.apps.length ? ` · ${counted} of ${rc.apps.length} ${rc.apps.length === 1 ? 'app' : 'apps'} counted` : ''}
         </span>
       </span>
       {alone ? null : <span className={s.sourceAmount}>{counted ? amount : '—'}</span>}
       <span className={s.sourceLinks}>
         <button type="button" className={f.linkButton} onClick={onChoose}>
-          {t('dialogs.earnings.chooseApps')}
+          Choose apps…
         </button>
         <button type="button" className={f.linkButton} onClick={onReplace}>
-          {t('dialogs.stripe.replaceKey')}
+          Replace Key…
         </button>
         <button type="button" className={f.linkDanger} onClick={onDisconnect}>
-          {t('dialogs.stripe.disconnectMore')}
+          Disconnect…
         </button>
       </span>
       {rc.apps.length && !counted ? (
         <div className={s.sourceNote}>
-          {t('dialogs.earnings.noApps')}{' '}
+          No apps are counted.{' '}
           <button type="button" className={f.linkButton} onClick={onChoose}>
-            {t('dialogs.earnings.chooseApps')}
+            Choose apps…
           </button>
         </div>
       ) : null}
-      {rc.warning === 'shared' ? <div className={s.sourceNote}>{t('dialogs.earnings.shared')}</div> : null}
+      {rc.warning === 'shared' ? <div className={s.sourceNote}>This RevenueCat project is connected to another project here too, so both count it.</div> : null}
       {rc.error ? <ProblemLine error={rc.error} onReplace={onReplace} /> : null}
     </section>
   );
@@ -422,7 +419,6 @@ function RevenueCatRow({ rc, alone, onChoose, onReplace, onDisconnect }: { rc: P
 
 /** The RevenueCat key form: checked as you type, then (with several RevenueCat projects) which one. */
 function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Project; replacing: boolean; onBack: (() => void) | undefined; onDone: () => void }) {
-  const t = useT();
   const api = useApi();
   const [key, setKey] = useState('');
   const [reveal, setReveal] = useState(false);
@@ -435,13 +431,13 @@ function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Proje
   const showProblem = problem && (touched || pasted);
   return (
     <FormSheet
-      title={replacing ? t('dialogs.earnings.rcReplaceTitle', { name: project.name }) : t('dialogs.earnings.rcConnectTo', { name: project.name })}
+      title={replacing ? `Replace the RevenueCat key for ${project.name}` : `Connect RevenueCat to ${project.name}`}
       icon="coin"
-      intro={<p>{t('dialogs.earnings.rcIntro', { name: project.name, computer: thisComputer() })}</p>}
-      submitLabel={t('dialogs.stripe.connectButton')}
+      intro={<p>See what {project.name}’s apps earn through RevenueCat beside it in the sidebar, and how it’s doing lately on its home. Beluga looks for new sales every few minutes; the key stays on {thisComputer()}.</p>}
+      submitLabel="Connect"
       canSubmit={Boolean(trimmed) && !problem && (!pick || Boolean(chosen))}
       onCancel={onBack ?? closeEarnings}
-      cancelLabel={onBack ? t('dialogs.stripe.back') : t('dialogs.stripe.cancel')}
+      cancelLabel={onBack ? 'Back' : 'Cancel'}
       width={560}
       onSubmit={async () => {
         const result = await api.revenuecat.connect(project.id, trimmed, pick ? chosen : undefined);
@@ -457,12 +453,12 @@ function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Proje
       }}
     >
       <Field
-        label={t('dialogs.earnings.secretKey')}
+        label="Secret key"
         htmlFor="revenuecat-key"
         error={showProblem ? problem : undefined}
-        hint={pick ? t('dialogs.earnings.checked') : pasted && !problem ? t('dialogs.earnings.rcPasted') : t('dialogs.earnings.rcStarts')}
+        hint={pick ? 'Checked. Choose the RevenueCat project to count.' : pasted && !problem ? 'Pasted. Connect checks it with RevenueCat.' : 'A V2 secret key: it starts with sk_.'}
         aside={
-          <button type="button" className={s.reveal} aria-label={reveal ? t('dialogs.stripe.hideKey') : t('dialogs.stripe.showKey')} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
+          <button type="button" className={s.reveal} aria-label={reveal ? 'Hide key' : 'Show key'} aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
             <Icon name="eye" size={13} />
           </button>
         }
@@ -494,24 +490,28 @@ function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Proje
         />
       </Field>
       {pick ? (
-        <Field label={t('dialogs.earnings.rcProject')} htmlFor="revenuecat-project">
-          <Popup id="revenuecat-project" label={t('dialogs.earnings.rcProject')} value={chosen} options={pick.map((p) => ({ value: p.id, label: p.name }))} onChange={setChosen} />
+        <Field label="RevenueCat project" htmlFor="revenuecat-project">
+          <Popup id="revenuecat-project" label="RevenueCat project" value={chosen} options={pick.map((p) => ({ value: p.id, label: p.name }))} onChange={setChosen} />
         </Field>
       ) : null}
       <div className={s.howto}>
         <div className={s.howtoHead}>
-          <span>{t('dialogs.stripe.noneYet')}</span>
+          <span>Don’t have one yet?</span>
           <button type="button" className={f.linkButton} onClick={() => void openExternal(REVENUECAT_KEY_URL)}>
-            {t('dialogs.earnings.rcHowTo')}
+            How to create a secret key
             <Icon name="forward" size={10} />
           </button>
         </div>
         <ol className={s.steps}>
-          <li>{rich(t('dialogs.earnings.rcStep1'), { where: <b>{t('prefs.rc.apiKeys')}</b>, v2: <b>V2</b> })}</li>
-          <li>{rich(t('dialogs.earnings.rcStep2'), { charts: <b>{t('prefs.rc.charts')}</b>, config: <b>{t('prefs.rc.config')}</b> })}</li>
-          <li>{t('dialogs.earnings.rcStep3')}</li>
+          <li>
+            In RevenueCat open <b>Project settings › API keys</b> and create a <b>V2</b> secret key.
+          </li>
+          <li>
+            Allow reading <b>Charts & metrics</b> and <b>Project configuration</b> (read only is enough).
+          </li>
+          <li>Copy it and paste it above.</li>
         </ol>
-        <div className={s.counted}>{t('dialogs.earnings.rcCounted')}</div>
+        <div className={s.counted}>Counted: revenue from the apps you tick (subscriptions, one-time purchases and ads), net of refunds, before store fees and taxes. “You keep” is RevenueCat’s proceeds, after fees and taxes.</div>
       </div>
     </FormSheet>
   );
@@ -519,30 +519,29 @@ function RevenueCatForm({ project, replacing, onBack, onDone }: { project: Proje
 
 /** Why an app is, or isn't, counted by default (what Beluga decided; a tick of yours needs no note). */
 function reasonNote(app: RevenueCatApp, holder: string | undefined): string | undefined {
-  if (app.reason === 'sandbox') return t('dialogs.earnings.sandbox');
-  if (app.reason === 'stripe') return t('dialogs.earnings.fromStripe', { project: holder ?? t('dialogs.earnings.anotherProject') });
-  if (app.reason === 'maybe-stripe') return t('dialogs.earnings.maybeStripe');
+  if (app.reason === 'sandbox') return 'Looks like a test or sandbox app';
+  if (app.reason === 'stripe') return `Counted from your Stripe key on ${holder ?? 'another project'}`;
+  if (app.reason === 'maybe-stripe') return 'Beluga can’t tell if this is already counted from Stripe: tick it if it isn’t';
   return undefined;
 }
 
 /** "Count revenue from": the RevenueCat apps, ticked when they count. */
 function ChooseApps({ project, rc, onBack }: { project: Project; rc: ProjectRevenueCat; onBack: () => void }) {
-  const t = useT();
   const api = useApi();
   const projects = useApp((st) => st.projects);
   const stripes = useApp((st) => st.earnings);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set(rc.apps.filter((a) => a.counted).map((a) => a.id)));
   // The Beluga project that holds each connected Stripe account.
   const holders = new Map<string, string>();
-  for (const [root, e] of Object.entries(stripes)) if (e.accountId) holders.set(e.accountId, projects.find((p) => p.root === root)?.name ?? t('dialogs.earnings.anotherProject'));
+  for (const [root, e] of Object.entries(stripes)) if (e.accountId) holders.set(e.accountId, projects.find((p) => p.root === root)?.name ?? 'another project');
   const twice = rc.apps.some((a) => ticked.has(a.id) && a.stripeAccount && holders.has(a.stripeAccount));
   return (
     <FormSheet
-      title={t('dialogs.earnings.chooseTitle', { name: project.name })}
+      title={`Choose apps for ${project.name}`}
       icon="coin"
-      intro={<p>{t('dialogs.earnings.chooseIntro')}</p>}
-      submitLabel={t('dialogs.earnings.save')}
-      cancelLabel={t('dialogs.stripe.back')}
+      intro={<p>Count revenue from the apps you tick. A new app that RevenueCat adds later is counted too, as long as you tick all of them.</p>}
+      submitLabel="Save"
+      cancelLabel="Back"
       onCancel={onBack}
       width={520}
       onSubmit={async () => {
@@ -551,8 +550,8 @@ function ChooseApps({ project, rc, onBack }: { project: Project; rc: ProjectReve
         return undefined;
       }}
     >
-      <div className={s.appsHead}>{t('dialogs.earnings.countFrom')}</div>
-      <div className={s.apps} role="group" aria-label={t('dialogs.earnings.countFrom')}>
+      <div className={s.appsHead}>Count revenue from</div>
+      <div className={s.apps} role="group" aria-label="Count revenue from">
         {rc.apps.length ? (
           rc.apps.map((a) => {
             const note = reasonNote(a, a.stripeAccount ? holders.get(a.stripeAccount) : undefined);
@@ -567,13 +566,13 @@ function ChooseApps({ project, rc, onBack }: { project: Project; rc: ProjectReve
             );
           })
         ) : (
-          <span className={s.sourceDetail}>{t('dialogs.earnings.noAppsYet')}</span>
+          <span className={s.sourceDetail}>RevenueCat lists no apps for this project yet.</span>
         )}
       </div>
       {twice ? (
         <div className={s.caution}>
           <Icon name="alert" size={11} />
-          {t('dialogs.earnings.twice')}
+          Counting both adds the same sales twice in All projects.
         </div>
       ) : null}
     </FormSheet>

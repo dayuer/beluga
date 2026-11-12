@@ -8,8 +8,6 @@ import { toast, useBeluga } from '../lib/beluga.js';
 import { LabelMark } from './marks.js';
 import { useBoard, useTaskActions } from './use-tasks.js';
 import n from './NewTaskSheet.module.css';
-import { colorLabel } from './tasks-model.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * A new label for a project's set, made on purpose: a name, an icon and a named color (and what
@@ -20,7 +18,6 @@ export function NewLabelSheet({ projectId, issueId, close }: { projectId: string
   const board = useBoard();
   const { client } = useBeluga();
   const { api, act } = useTaskActions();
-  const t = useT();
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<LabelIcon>('tag');
   const [color, setColor] = useState<LabelColor>('blue');
@@ -29,15 +26,15 @@ export function NewLabelSheet({ projectId, issueId, close }: { projectId: string
   const own = board.projects[projectId]?.labels ?? [];
   const clean = cleanLabelName(name);
   const taken = set.some((l) => l.name === clean);
-  const error = !clean ? undefined : taken ? t('tasks.label.taken') : !LABEL_NAME.test(clean) ? t('tasks.label.badName') : undefined;
+  const error = !clean ? undefined : taken ? 'There’s a label called that already' : !LABEL_NAME.test(clean) ? 'One or two short words (letters, digits and dashes)' : undefined;
   const def = { name: clean || 'label', icon, color };
   const tone = { ['--hue' as string]: String(LABEL_COLOR_INFO[color].hue), ['--sat' as string]: `${LABEL_COLOR_INFO[color].sat}%` };
   return (
     <FormSheet
-      title={t('tasks.label.title')}
+      title="New Label"
       icon="tag"
-      intro={t('tasks.label.intro')}
-      submitLabel={issueId ? t('tasks.label.createAdd') : t('tasks.label.create')}
+      intro="Labels are a small set everyone shares: the built-in ones, and a few of your own that mean something."
+      submitLabel={issueId ? 'Create and Add' : 'Create Label'}
       canSubmit={Boolean(clean) && !error}
       onCancel={close}
       onSubmit={async () => {
@@ -45,14 +42,14 @@ export function NewLabelSheet({ projectId, issueId, close }: { projectId: string
         const issue = issueId ? issueById(board, issueId) : undefined;
         close();
         if (issue) await act(() => api.update(issue.id, { labels: [...issue.labels, made.name] }));
-        else toast(client, t('tasks.label.toast.added', { name: labelTitle(made.name) }), 'success');
+        else toast(client, `Added ${labelTitle(made.name)}`, 'success');
       }}
     >
-      <Field label={t('tasks.boards.name')} htmlFor="label-name" error={error} aside={<span className={n.labelPreview} style={tone}><LabelMark def={def} label={def.name} />{labelTitle(def.name)}</span>}>
-        <TextInput id="label-name" autoFocus value={name} placeholder={t('tasks.label.namePlaceholder')} invalid={Boolean(error)} onChange={setName} maxLength={24} />
+      <Field label="Name" htmlFor="label-name" error={error} aside={<span className={n.labelPreview} style={tone}><LabelMark def={def} label={def.name} />{labelTitle(def.name)}</span>}>
+        <TextInput id="label-name" autoFocus value={name} placeholder="Performance" invalid={Boolean(error)} onChange={setName} maxLength={24} />
       </Field>
-      <Field label={t('tasks.label.icon')}>
-        <div className={n.iconGrid} role="radiogroup" aria-label={t('tasks.label.icon')}>
+      <Field label="Icon">
+        <div className={n.iconGrid} role="radiogroup" aria-label="Icon">
           {LABEL_ICONS.map((i) => (
             <button key={i} type="button" role="radio" aria-checked={i === icon} aria-label={i} className={cx(n.iconPick, i === icon && n.iconPickOn)} style={tone} onClick={() => setIcon(i)}>
               <Icon name={i} size={14} />
@@ -60,25 +57,25 @@ export function NewLabelSheet({ projectId, issueId, close }: { projectId: string
           ))}
         </div>
       </Field>
-      <Field label={t('tasks.label.color')}>
-        <div className={n.colorRow} role="radiogroup" aria-label={t('tasks.label.color')}>
+      <Field label="Color">
+        <div className={n.colorRow} role="radiogroup" aria-label="Color">
           {LABEL_COLORS.map((c) => (
-            <button key={c} type="button" role="radio" aria-checked={c === color} title={colorLabel(c)} aria-label={colorLabel(c)} className={cx(n.swatch, c === color && n.swatchOn)} style={{ ['--hue' as string]: String(LABEL_COLOR_INFO[c].hue), ['--sat' as string]: `${LABEL_COLOR_INFO[c].sat}%` }} onClick={() => setColor(c)} />
+            <button key={c} type="button" role="radio" aria-checked={c === color} title={LABEL_COLOR_INFO[c].label} aria-label={LABEL_COLOR_INFO[c].label} className={cx(n.swatch, c === color && n.swatchOn)} style={{ ['--hue' as string]: String(LABEL_COLOR_INFO[c].hue), ['--sat' as string]: `${LABEL_COLOR_INFO[c].sat}%` }} onClick={() => setColor(c)} />
           ))}
-          <span className={n.colorName}>{colorLabel(color)}</span>
+          <span className={n.colorName}>{LABEL_COLOR_INFO[color].label}</span>
         </div>
       </Field>
-      <Field label={t('tasks.label.whatFor')} hint={t('tasks.label.whatForHint')} htmlFor="label-hint">
-        <TextInput id="label-hint" value={hint} placeholder={t('tasks.label.hintPlaceholder')} onChange={setHint} maxLength={80} />
+      <Field label="What it’s for" hint="Optional. Your agent reads it when it picks labels." htmlFor="label-hint">
+        <TextInput id="label-hint" value={hint} placeholder="Slow screens and heavy queries" onChange={setHint} maxLength={80} />
       </Field>
       {own.length ? (
-        <Field label={t('tasks.label.projectLabels')}>
+        <Field label="This project’s labels">
           <div className={n.ownLabels}>
             {own.map((l) => (
               <span key={l.name} className={n.ownLabel}>
                 <LabelMark def={l} label={l.name} />
                 {labelTitle(l.name)}
-                <IconButton icon="x" label={t('tasks.label.removeFromSet', { name: labelTitle(l.name) })} onClick={() => void act(() => api.removeLabel(projectId, l.name), t('tasks.label.toast.removed', { name: labelTitle(l.name) }))} />
+                <IconButton icon="x" label={`Remove ${labelTitle(l.name)} from the set`} onClick={() => void act(() => api.removeLabel(projectId, l.name), `Removed ${labelTitle(l.name)}: tasks that have it keep it, plainly`)} />
               </span>
             ))}
           </div>

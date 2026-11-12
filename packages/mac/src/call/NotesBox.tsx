@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { CallNotesView } from '@beluga/shared/calls.js';
 import { Icon } from '../components/Icon.js';
@@ -10,6 +9,7 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { namesOf } from './CallStrip.js';
 import { clockOf, findTurns, lengthOf, marks, minuteMarks, timeline, turns, wordCount } from './notes-model.js';
 import c from './notes.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /* ---------- Which notes are open (one reader at a time, over its conversation) ---------- */
 
@@ -46,21 +46,20 @@ export function notesMarkdown(v: CallNotesView, place: string): string {
  * thousands of lines. A click opens them in the reader beside the chat.
  */
 export function NotesBox({ notes }: { notes: CallNotesView; place: string }) {
-  const tr = useT();
   const open = useOpenNotes() === notes.id;
   const waiting = notes.people.filter((p) => !p.sent && p.name !== 'You');
   const words = wordCount(notes.lines);
   return (
     <div className={c.chipRow}>
-      <button type="button" className={cx(c.chip, open && c.chipOpen)} aria-label={tr('call.notes')} aria-expanded={open} onClick={() => setOpen(open ? undefined : notes.id)}>
+      <button type="button" className={cx(c.chip, open && c.chipOpen)} aria-label="Call notes" aria-expanded={open} onClick={() => setOpen(open ? undefined : notes.id)}>
         <span className={c.mark} aria-hidden="true">
           <Icon name="book" size={13} />
         </span>
-        <strong>{tr('call.notes')}</strong>
+        <strong>Call notes</strong>
         <span className={c.chipMeta}>
           {lengthOf(notes)} · {peopleWords(notes.people)}
-          {words ? tr('call.nWords', { n: words.toLocaleString() }) : ''}
-          {waiting.length ? tr('call.waitingFor', { names: namesOf(waiting) }) : ''}
+          {words ? ` · ${words.toLocaleString()} words` : ''}
+          {waiting.length ? ` · waiting for ${namesOf(waiting)}` : ''}
         </span>
         <Icon name="chevronRight" size={12} className={c.chipGo} />
       </button>
@@ -74,7 +73,6 @@ export function NotesBox({ notes }: { notes: CallNotesView; place: string }) {
  */
 export function CallNotesChip({ id }: { id: string }) {
   const { client } = useBeluga();
-  const tr = useT();
   // Two plain picks (the store's own objects), so nothing new is made on each read.
   const conversation = useApp((st) => Object.entries(st.network.callNotes ?? {}).find(([, list]) => list.some((x) => x.id === id))?.[0]);
   const notes = useApp((st) => (conversation ? st.network.callNotes?.[conversation]?.find((x) => x.id === id) : undefined));
@@ -88,9 +86,9 @@ export function CallNotesChip({ id }: { id: string }) {
   });
   if (!found) {
     return (
-      <span className={cx(c.inlineChip, c.inlineGone)} title={tr('call.notesGone')}>
+      <span className={cx(c.inlineChip, c.inlineGone)} title="These notes aren’t on this Mac">
         <Icon name="book" size={11} />
-        {tr('call.notes')}
+        Call notes
       </span>
     );
   }
@@ -100,9 +98,9 @@ export function CallNotesChip({ id }: { id: string }) {
     setOpen(found.notes.id);
   };
   return (
-    <button type="button" className={c.inlineChip} onClick={open} title={tr('call.openNotes')}>
+    <button type="button" className={c.inlineChip} onClick={open} title="Open the notes beside their chat">
       <Icon name="book" size={11} />
-      {tr('call.callIn', { place })} · {dayOf(found.notes.startedAt)} · {lengthOf(found.notes)}
+      Call in {place} · {dayOf(found.notes.startedAt)} · {lengthOf(found.notes)}
     </button>
   );
 }
@@ -140,7 +138,6 @@ function Said({ text, query }: { text: string; query: string }) {
  */
 function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) {
   const { client } = useBeluga();
-  const tr = useT();
   const agent = useMyAgentName();
   const all = useMemo(() => turns(notes.lines), [notes.lines]);
   const [query, setQuery] = useState('');
@@ -204,31 +201,31 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
     // A chip, never the transcript: the agent looks up what it needs with its call notes tools.
     // Its first words name the chat (Call in #launch · Nov 5); the chip says which call.
     const prompt = `Call in ${place} · ${dayOf(notes.startedAt)}: let’s talk about it. \`call:${notes.id}\`, with ${peopleWords(notes.people)}. Look up what was said with your call notes tools. Start with a short summary: what was decided, who’s doing what, and what’s still open.`;
-    void client.api.workspaces.startChat('chats', prompt).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: tr('call.couldntOpenChat', { error: err instanceof Error ? err.message : String(err) }), level: 'error' }));
+    void client.api.workspaces.startChat('chats', prompt).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn’t open the chat: ${err instanceof Error ? err.message : String(err)}`, level: 'error' }));
   };
   const items: ActionItem[] = [
-    { label: tr('call.talkAbout', { agent }), icon: 'sparkles', hint: tr('call.talkAboutHint'), onSelect: talk },
-    { label: tr('call.copyNotes'), icon: 'copy', separate: true, onSelect: () => void copyText(notesMarkdown(notes, place)).then(() => client.store.dispatch({ type: 'toast', text: tr('call.copiedNotes'), level: 'success' })) },
-    { label: tr('call.forgetNotes'), icon: 'trash', danger: true, separate: true, onSelect: () => void client.api.calls.forgetNotes(notes.id).then(() => setOpen(undefined)) },
+    { label: `Talk About It with ${agent}`, icon: 'sparkles', hint: 'A chat of your own, that only you see', onSelect: talk },
+    { label: 'Copy the Notes', icon: 'copy', separate: true, onSelect: () => void copyText(notesMarkdown(notes, place)).then(() => client.store.dispatch({ type: 'toast', text: 'Copied the notes', level: 'success' })) },
+    { label: 'Forget These Notes…', icon: 'trash', danger: true, separate: true, onSelect: () => void client.api.calls.forgetNotes(notes.id).then(() => setOpen(undefined)) },
   ];
   const meId = notes.people.find((p) => p.name === 'You')?.peerId;
 
   return (
-    <aside className={c.reader} aria-label={tr('call.notesReader')}>
+    <aside className={c.reader} aria-label="Call notes reader">
       <header className={c.readerHead}>
         <span className={c.mark} aria-hidden="true">
           <Icon name="book" size={14} />
         </span>
         <div className={c.readerTitle}>
-          <strong>{tr('call.notes')}</strong>
+          <strong>Call notes</strong>
           <span>
-            {dayOf(notes.startedAt)} · {lengthOf(notes)} · {peopleWords(notes.people)}{tr('call.nWords', { n: wordCount(notes.lines).toLocaleString() })}
+            {dayOf(notes.startedAt)} · {lengthOf(notes)} · {peopleWords(notes.people)} · {wordCount(notes.lines).toLocaleString()} words
           </span>
         </div>
         <ActionsDropdown items={items}>
-          <IconButton icon="more" label={tr('call.moreNotes')} />
+          <IconButton icon="more" label="More for these notes" />
         </ActionsDropdown>
-        <IconButton icon="x" label={tr('call.closeNotes')} onClick={() => setOpen(undefined)} />
+        <IconButton icon="x" label="Close the Notes" onClick={() => setOpen(undefined)} />
       </header>
 
       <div className={c.tools}>
@@ -237,8 +234,8 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
           <input
             ref={search}
             value={query}
-            placeholder={tr('call.searchCall')}
-            aria-label={tr('call.searchCall')}
+            placeholder="Search the call"
+            aria-label="Search the call"
             onChange={(e) => {
               setQuery(e.target.value);
               setHit(0);
@@ -246,7 +243,7 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
               if (first !== undefined) goTo(first, false);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') step(e.shiftKey ? -1 : 1);
+              if (e.key === 'Enter' && !isImeComposing(e)) step(e.shiftKey ? -1 : 1);
               if (e.key === 'Escape') {
                 setQuery('');
                 search.current?.blur();
@@ -255,19 +252,19 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
           />
           {query ? (
             <span className={c.found} aria-live="polite">
-              {found.length ? tr('call.nOf', { at: hit + 1, of: found.length }) : tr('call.none')}
-              <button type="button" aria-label={tr('call.previous')} onClick={() => step(-1)} disabled={!found.length}>
+              {found.length ? `${hit + 1} of ${found.length}` : 'None'}
+              <button type="button" aria-label="Previous" onClick={() => step(-1)} disabled={!found.length}>
                 <Icon name="chevronUp" size={12} />
               </button>
-              <button type="button" aria-label={tr('call.next')} onClick={() => step(1)} disabled={!found.length}>
+              <button type="button" aria-label="Next" onClick={() => step(1)} disabled={!found.length}>
                 <Icon name="chevronDown" size={12} />
               </button>
             </span>
           ) : null}
         </label>
-        <div className={c.people} role="radiogroup" aria-label={tr('call.whoseWords')}>
+        <div className={c.people} role="radiogroup" aria-label="Whose words">
           <button type="button" role="radio" aria-checked={!only} className={cx(c.person, !only && c.personOn)} onClick={() => setOnly(undefined)}>
-            {tr('call.everyoneTitle')}
+            Everyone
           </button>
           {speakers.map((p) => (
             <button key={p.peerId} type="button" role="radio" aria-checked={only === p.peerId} className={cx(c.person, only === p.peerId && c.personOn)} onClick={() => setOnly(only === p.peerId ? undefined : p.peerId)}>
@@ -279,13 +276,13 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
       </div>
 
       {/* The whole call at a glance: a stripe per turn in its speaker's color; click to jump there. */}
-      <div className={c.timeline} role="group" aria-label={tr('call.timeline')}>
+      <div className={c.timeline} role="group" aria-label="The call’s timeline">
         {stripes.map((s) => (
           <button
             key={s.index}
             type="button"
             tabIndex={-1}
-            aria-label={tr('call.nameAt', { name: all[s.index]!.name, at: clockOf(notes.startedAt, all[s.index]!.at) })}
+            aria-label={`${all[s.index]!.name} at ${clockOf(notes.startedAt, all[s.index]!.at)}`}
             className={cx(c.stripe, only && only !== s.by && c.stripeDim, found.includes(s.index) && c.stripeHit)}
             style={{ left: `${s.from * 100}%`, width: `${s.width * 100}%`, background: personColor(s.by) }}
             onClick={() => goTo(s.index)}
@@ -329,10 +326,10 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
             );
           })
         ) : (
-          <li className={c.empty}>{notes.lines.length ? tr('call.nothingFromThem') : tr('call.nothingWritten')}</li>
+          <li className={c.empty}>{notes.lines.length ? 'Nothing from them in this call.' : 'Nothing was written down.'}</li>
         )}
       </ol>
-      <footer className={c.readerFoot}>{tr('call.readerFoot')}</footer>
+      <footer className={c.readerFoot}>Each person’s own words, written down on their Mac: expect small mistakes.</footer>
     </aside>
   );
 }

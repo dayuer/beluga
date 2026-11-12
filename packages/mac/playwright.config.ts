@@ -31,8 +31,6 @@ export default defineConfig<object, { demoLinkMs: number }>({
   use: {
     baseURL: `http://localhost:${port}`,
     viewport: { width: 1440, height: 900 },
-    // English whatever this Mac's language: Settings › Appearance › Language follows the system by default (e2e/language.spec.ts switches it).
-    locale: 'en-US',
     trace: 'retain-on-failure',
     // Every spec starts past the first-run welcome (src/onboarding); e2e/onboarding.spec.ts clears this.
     // And on Tasks' list (the board is the default since BLG-216; the specs pick it when they mean it).

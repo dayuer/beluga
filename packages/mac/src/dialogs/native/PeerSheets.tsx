@@ -7,7 +7,7 @@ import { useActions } from '../../lib/actions.js';
 import { type Recipient, type UiStore, toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { Field, Sheet } from './parts.js';
 import s from './sharing.module.css';
-import { useT } from '../../i18n/index.js';
+import { isImeComposing } from '../../lib/ime.js';
 
 /** A conversation is on screen (where a message, or a command's output, shows up). */
 const chatShown = (v: View): boolean => v.kind === 'room' || ((v.kind === 'workspace' || v.kind === 'shared') && v.tab === 'chat');
@@ -25,7 +25,6 @@ export function addressTo(ui: UiStore, actions: Actions, view: View, to: Recipie
 
 /** Run a command on a friend's computer: type it here, they approve (unless they fully trust you). */
 export function RunCommandSheet({ peer, close }: { peer: PeerInfo; close: () => void }) {
-  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { client } = useBeluga();
@@ -42,31 +41,30 @@ export function RunCommandSheet({ peer, close }: { peer: PeerInfo; close: () => 
   };
   return (
     <Sheet
-      title={t('dialogs.peer.runTitle', { name: peer.name })}
-      subtitle={level === 'full' ? t('dialogs.peer.runNow') : t('dialogs.peer.runApprove', { name: peer.name })}
+      title={`Run a Command on ${peer.name}’s Computer`}
+      subtitle={level === 'full' ? 'It runs right away. The output shows in the chat.' : `${peer.name} approves it first. The output shows in the chat.`}
       icon="terminal"
       close={close}
       onReturn={run}
       footer={
         <>
           <span />
-          <ButtonRow onCancel={close} onOk={run} ok={t('dialogs.peer.run')} disabled={!cmd.trim()} />
+          <ButtonRow onCancel={close} onOk={run} ok="Run" disabled={!cmd.trim()} />
         </>
       }
     >
-      <Field label={t('dialogs.peer.command')} htmlFor="peer-command">
-        <input id="peer-command" className={s.input} style={{ fontFamily: 'var(--font-mono)' }} value={cmd} placeholder="npm test" spellCheck={false} autoFocus onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), run())} />
-        <span className={s.hint}>{t('dialogs.peer.where', { name: peer.name })}</span>
+      <Field label="Command" htmlFor="peer-command">
+        <input id="peer-command" className={s.input} style={{ fontFamily: 'var(--font-mono)' }} value={cmd} placeholder="npm test" spellCheck={false} autoFocus onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && (e.preventDefault(), run())} />
+        <span className={s.hint}>It runs in the folder {peer.name} shares, as {peer.name}.</span>
       </Field>
     </Sheet>
   );
 }
 
 function ButtonRow({ onCancel, onOk, ok, disabled }: { onCancel: () => void; onOk: () => void; ok: string; disabled?: boolean }) {
-  const t = useT();
   return (
     <>
-      <Button onClick={onCancel}>{t('dialogs.peer.cancel')}</Button>
+      <Button onClick={onCancel}>Cancel</Button>
       <Button variant="primary" disabled={disabled} onClick={onOk}>
         {ok}
       </Button>

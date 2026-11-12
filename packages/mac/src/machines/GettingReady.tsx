@@ -6,7 +6,6 @@ import { Button } from '../components/ui.js';
 import { copyText } from '../lib/copy.js';
 import side from '../layout/Sidebar.module.css';
 import c from './machines.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * Getting a computer ready for a project (BLG-787), as it happens, on the new worktree: each step
@@ -52,7 +51,6 @@ function StepMark({ step }: { step: ReadyStep }) {
 }
 
 export function GettingReady({ client, run: first, onRetry }: { client: SocketClient; run: ReadyRun; onRetry?: () => void }) {
-  const t = useT();
   const run = useReadyRun(client, first);
   const [installing, setInstalling] = useState(false);
   const install = (): void => {
@@ -61,7 +59,7 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
   };
   const blocked = run.missing?.filter((p) => !p.can) ?? [];
   return (
-    <section className={c.ready} aria-label={t('machines.ready.aria', { computer: run.computer })} data-ready={run.state}>
+    <section className={c.ready} aria-label={`Getting ${run.computer} ready`} data-ready={run.state}>
       <div className={c.readyTitle} role="status">
         {readyLine(run)}
       </div>
@@ -81,7 +79,7 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
                     <>
                       : <code>{step.fix.command}</code>
                       <Button size="small" variant="quiet" icon="copy" onClick={() => void copyText(step.fix!.command!)}>
-                        {t('machines.ready.copy')}
+                        Copy
                       </Button>
                     </>
                   ) : null}
@@ -93,7 +91,7 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
       </ol>
       {run.state === 'asking' && run.missing?.length ? (
         <div className={c.asking}>
-          <div>{t('machines.ready.toInstall', { computer: run.computer })}</div>
+          <div>To install on {run.computer}:</div>
           <ul>
             {run.missing.map((p) => (
               <li key={p.tool}>{p.can ? p.words : p.why}</li>
@@ -101,14 +99,14 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
           </ul>
           {blocked.length ? null : (
             <Button size="small" onClick={install} disabled={installing}>
-              {installing ? t('machines.ready.installing') : t('machines.ready.install')}
+              {installing ? 'Installing…' : 'Install Them'}
             </Button>
           )}
         </div>
       ) : null}
       {run.state === 'failed' && onRetry ? (
         <Button size="small" onClick={onRetry}>
-          {t('machines.tryAgain')}
+          Try Again
         </Button>
       ) : null}
     </section>

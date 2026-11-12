@@ -9,7 +9,6 @@ import { type MoveTarget, useMoveTargets } from './move-targets.js';
 import { onMachine } from './pane-model.js';
 import { noteStarted } from './started.js';
 import { placeMark } from './MachineMark.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Continue On ▸ in a worktree's ••• (BLG-808): your other computers (This Mac from a computer's
@@ -25,7 +24,7 @@ export function useContinueOn(ws: Workspace | undefined): ActionItem | undefined
   const name = ws.name;
 
   const go = async (target: MoveTarget, opts: { readonly commit?: boolean; readonly wait?: boolean }): Promise<void> => {
-    toast(home, t('machines.continueOn.continuing', { name, place: target.place.name }), 'info');
+    toast(home, `Continuing ${name} on ${target.place.name}…`, 'info');
     try {
       const to = await where.clientFor(target);
       const made = await continueOn({
@@ -38,25 +37,25 @@ export function useContinueOn(ws: Workspace | undefined): ActionItem | undefined
         ...opts,
       });
       if (target.machine) noteStarted(target.machine.id, `ws:${made}`);
-      toast(home, t('machines.continueOn.done', { name, place: target.place.name }), 'success');
+      toast(home, `${name} continues on ${target.place.name}, with its branch and conversation`, 'success');
       const page = { kind: 'workspace' as const, id: made, tab: 'chat' as const };
       actions.run({ type: 'view', view: target.machine ? onMachine(target.machine.id, page) : page });
     } catch (err) {
       if (err instanceof MoveAsk) {
         openSheet(
           err.kind === 'dirty'
-            ? { kind: 'confirm', title: t('machines.continueOn.dirtyTitle', { place: target.place.name }), message: t('machines.continueOn.dirtyMessage', { name, items: err.items.join(', '), branch: ws.branch ?? '' }), confirm: t('machines.continueOn.dirtyConfirm'), run: () => void go(target, { ...opts, commit: true }) }
-            : { kind: 'confirm', title: t('machines.continueOn.busyTitle', { place: target.place.name }), message: t('machines.continueOn.busyMessage'), confirm: t('machines.continueOn.busyConfirm'), run: () => void go(target, { ...opts, wait: true }) },
+            ? { kind: 'confirm', title: `Commit the changes and continue on ${target.place.name}?`, message: `${name} has changes not committed: ${err.items.join(', ')}. They’re committed on ${ws.branch}, which goes there; nothing is dropped.`, confirm: 'Commit Them and Continue', run: () => void go(target, { ...opts, commit: true }) }
+            : { kind: 'confirm', title: `Continue on ${target.place.name} once its turn ends?`, message: `Its agent is at work. It continues there as soon as this turn ends.`, confirm: 'Continue Then', run: () => void go(target, { ...opts, wait: true }) },
         );
         return;
       }
-      toast(home, t('machines.continueOn.failed', { name, place: target.place.name, error: err instanceof Error ? err.message : String(err) }), 'error');
+      toast(home, `Couldn’t continue ${name} on ${target.place.name}: ${err instanceof Error ? err.message : String(err)}. It stays here as it was.`, 'error');
     }
   };
 
   return {
-    label: t('machines.continueOn.label'),
-    hint: t('machines.continueOn.hint'),
+    label: 'Continue On',
+    hint: 'Its branch and conversation go along',
     separate: true,
     disabled: !where.targets.length,
     submenu: where.targets.map((t) => ({ label: t.place.name, mark: placeMark(t.machine), onSelect: () => void go(t, {}) })),

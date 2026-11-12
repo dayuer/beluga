@@ -12,25 +12,23 @@ import { TrendChart, type TrendMode } from './TrendChart.js';
 import { trendOf } from './trend-model.js';
 import { type GotStats, usePicked } from './use-stats.js';
 import s from './stats.module.css';
-import { type Key, useT } from '../../i18n/index.js';
 
-// Dictionary keys: each is looked up where it's shown, in the language shown.
-const RANGES: ReadonlyArray<{ value: StatRange; label: Key; hint: Key }> = [
-  { value: 'week', label: 'views.statsSec.week', hint: 'views.statsSec.weekHint' },
-  { value: 'month', label: 'views.statsSec.month', hint: 'views.statsSec.monthHint' },
-  { value: 'year', label: 'views.statsSec.year', hint: 'views.statsSec.yearHint' },
-  { value: 'all', label: 'views.statsSec.all', hint: 'views.statsSec.allHint' },
+const RANGES: ReadonlyArray<{ value: StatRange; label: string; hint: string }> = [
+  { value: 'week', label: 'Week', hint: 'The last 7 days' },
+  { value: 'month', label: 'Month', hint: 'The last 30 days' },
+  { value: 'year', label: 'Year', hint: 'The last 52 weeks' },
+  { value: 'all', label: 'All Time', hint: 'Since Beluga started counting' },
 ];
-const GROUPS: ReadonlyArray<{ value: GroupBy; label: Key; icon: 'folder' | 'bot' }> = [
-  { value: 'project', label: 'views.statsSec.projects', icon: 'folder' },
-  { value: 'agent', label: 'views.statsSec.agents', icon: 'bot' },
+const GROUPS: ReadonlyArray<{ value: GroupBy; label: string; icon: 'folder' | 'bot' }> = [
+  { value: 'project', label: 'Projects', icon: 'folder' },
+  { value: 'agent', label: 'Agents', icon: 'bot' },
 ];
-const MODES: ReadonlyArray<{ value: TrendMode; label: Key; hint: Key }> = [
-  { value: 'stacked', label: 'views.statsSec.stacked', hint: 'views.statsSec.stackedHint' },
-  { value: 'share', label: 'views.statsSec.share', hint: 'views.statsSec.shareHint' },
+const MODES: ReadonlyArray<{ value: TrendMode; label: string; hint: string }> = [
+  { value: 'stacked', label: 'Stacked', hint: 'How much, each one on top of the other' },
+  { value: 'share', label: 'Share', hint: 'Who did what part of each step' },
 ];
-const BEFORE: Record<StatRange, Key> = { week: 'views.statsSec.beforeWeek', month: 'views.statsSec.beforeMonth', year: 'views.statsSec.beforeYear', all: 'views.statsSec.beforeAll' };
-const STEP: Record<StatRange, Key> = { week: 'views.statsSec.aDay', month: 'views.statsSec.aDay', year: 'views.statsSec.aWeek', all: 'views.statsSec.aMonth' };
+const BEFORE: Record<StatRange, string> = { week: 'the week before', month: 'the month before', year: 'the year before', all: '' };
+const STEP: Record<StatRange, string> = { week: 'a day', month: 'a day', year: 'a week', all: 'a month' };
 
 /** One number on the strip: pressing it shows it in the calendar and the ranking. */
 function StatCell({
@@ -50,7 +48,6 @@ function StatCell({
   onPick: () => void;
   range: StatRange;
 }) {
-  const t = useT();
   const value = m.value(totals);
   const delta = before ? change(value, m.value(before)) : undefined;
   return (
@@ -63,7 +60,7 @@ function StatCell({
       <span className={s.cellAside}>
         <span className={s.cellAsideText}>{asideOf(m, totals, noGitHub)}</span>
         {delta ? (
-          <span className={cx(s.delta, delta.up ? s.deltaUp : s.deltaDown)} title={t('views.statsSec.against', { before: t(BEFORE[range]) })}>
+          <span className={cx(s.delta, delta.up ? s.deltaUp : s.deltaDown)} title={`Against ${BEFORE[range]}`}>
             {delta.text}
           </span>
         ) : null}
@@ -80,8 +77,6 @@ function StatCell({
  */
 export function StatsSection({ state, got }: { state: AppState; got: GotStats }) {
   const { stats, at: now, failed } = got;
-  const t = useT();
-  const opts = <V extends string>(list: ReadonlyArray<{ value: V; label: Key; hint?: Key; icon?: 'folder' | 'bot' }>) => list.map((o) => ({ ...o, label: t(o.label), ...(o.hint ? { hint: t(o.hint) } : {}) }));
   // Projects change with every git status: the charts only care about their roots, names and order.
   const projectsKey = state.projects.map((p) => `${p.id}\t${p.root}\t${p.name}`).join('\n');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,46 +100,46 @@ export function StatsSection({ state, got }: { state: AppState; got: GotStats })
   }, [data, m, now]);
   const rows = useMemo(() => groupRows(data, projects, by, m, range, now), [data, projects, by, m, range, now]);
   const since = data.since ? new Date(data.since).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' }) : undefined;
-  const byWord = by === 'agent' ? t('views.statsSec.agentWord') : t('views.statsSec.projectWord');
+  const byWord = by === 'agent' ? 'agent' : 'project';
   // Pull requests come from GitHub: without its CLI, say so instead of an empty chart.
-  const why = m.github && data.noGitHub ? t('views.statsSec.needGh') : undefined;
+  const why = m.github && data.noGitHub ? 'Pull requests are counted with the GitHub CLI (gh). Sign in to it and they show up here.' : undefined;
   return (
-    <section className={s.section} aria-label={t('views.statsSec.aria')}>
+    <section className={s.section} aria-label="Your stats">
       <Chapter
-        title={t('views.statsSec.title')}
-        sub={failed ? t('views.statsSec.failed') : data.backfilling ? t('views.statsSec.backfilling') : since ? t('views.statsSec.since', { since }) : t('views.statsSec.fromToday')}
+        title="What you did"
+        sub={failed ? 'Couldn’t get your stats from Beluga' : data.backfilling ? 'Counting what came before…' : since ? `Counted since ${since}. Press a number to see it below.` : 'Counting from today. Press a number to see it below.'}
         aside={
           <>
-            <Segmented label={t('views.statsSec.groupBy')} value={by} options={opts(GROUPS)} onChange={setBy} />
-            <Segmented label={t('views.earnings.range')} value={range} options={opts(RANGES)} onChange={setRange} />
+            <Segmented label="Group by" value={by} options={GROUPS} onChange={setBy} />
+            <Segmented label="Range" value={range} options={RANGES} onChange={setRange} />
           </>
         }
       >
         <div className={s.stripFit}>
-          <div className={s.strip} role="tablist" aria-label={t('views.statsSec.whatToShow')}>
+          <div className={s.strip} role="tablist" aria-label="What to show">
             {METRICS.map((x) => (
               <StatCell key={x.id} m={x} totals={totals.now} {...(totals.before ? { before: totals.before } : {})} on={x.id === metric} onPick={() => setMetric(x.id)} range={range} noGitHub={Boolean(data.noGitHub)} />
             ))}
           </div>
         </div>
         <Card
-          label={t('views.trend.overTime', { metric: m.label })}
+          label={`${m.label} over time`}
           title={
             <span className={s.cardTitle}>
-              <Icon name="chartArea" size={14} /> {t('views.statsSec.byAtATime', { metric: m.label, by: byWord, step: t(STEP[range]) })}
+              <Icon name="chartArea" size={14} /> {m.label} by {byWord}, {STEP[range]} at a time
             </span>
           }
-          aside={<Segmented label={t('views.statsSec.chart')} value={mode} options={opts(MODES)} onChange={setMode} />}
+          aside={<Segmented label="Chart" value={mode} options={MODES} onChange={setMode} />}
         >
           <TrendChart key={by} trend={trend} m={m} mode={mode} animate={`${range}|${metric}|${mode}`} {...(why ? { why } : {})} />
         </Card>
       </Chapter>
-      <Chapter title={t('views.statsSec.rhythm')} sub={t('views.statsSec.rhythmSub', { metric: m.label.toLowerCase() })}>
+      <Chapter title="Your rhythm" sub={`Streaks, your year and your week, and who did what part of the ${m.label.toLowerCase()}.`}>
         <Highlights stats={data} now={now} rows={rows} by={by} />
         <Card
           title={
             <span className={s.cardTitle}>
-              <Icon name="calendar" size={14} /> {t('views.statsSec.everyDay', { metric: m.label })}
+              <Icon name="calendar" size={14} /> {m.label} every day, the last year
             </span>
           }
         >
@@ -152,10 +147,10 @@ export function StatsSection({ state, got }: { state: AppState; got: GotStats })
         </Card>
         <div className={s.pairFit}>
           <div className={cx(s.pair, s.pairEven)}>
-            <Card title={t('views.statsSec.shareBy', { by: byWord })}>
+            <Card title={`Share by ${byWord}`}>
               <Share rows={rows} m={m} by={by} {...(why ? { why } : {})} />
             </Card>
-            <Card title={t('views.statsSec.when')}>
+            <Card title="When you work">
               <Hours hours={data.hours} />
             </Card>
           </div>

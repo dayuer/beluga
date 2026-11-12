@@ -8,6 +8,7 @@
 mod daemon;
 mod export;
 mod focus;
+mod i18n;
 mod menu;
 mod call_float;
 mod call_overlay;
@@ -116,12 +117,6 @@ fn set_menu_state(
             },
         );
     }
-}
-
-/// The menus' words in the window's language (lib/menu-language.ts), id → text.
-#[tauri::command]
-fn set_menu_labels(app: tauri::AppHandle, labels: HashMap<String, String>) {
-    menu::set_labels(&app, labels);
 }
 
 /// Give menu-bar items your keys (Settings › Keyboard): an accelerator each, or none.
@@ -305,7 +300,6 @@ pub fn run() {
             set_menu_state,
             set_vibrancy,
             set_menu_keys,
-            set_menu_labels,
             set_tray_status,
             set_tray_presence,
             requests::set_tray_requests,
@@ -341,9 +335,14 @@ pub fn run() {
             updater::update_set_mode,
             updater::update_choose,
             updater::update_activity,
-            updater::update_dismiss_news
+            updater::update_dismiss_news,
+            i18n::set_ui_language
         ])
-        .menu(menu::build)
+        .menu(|app| {
+            // The language the window last chose (src/i18n.rs), before the menus are built.
+            i18n::load(app);
+            i18n::menu_bar(app)
+        })
         .on_menu_event(|app, event| match event.id().as_ref() {
             "check-updates" => updater::check_from_menu(app),
             id => menu::on_event(app, id),

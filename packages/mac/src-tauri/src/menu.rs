@@ -2,10 +2,9 @@
 //! does what the same command does in the app.
 
 use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex, PoisonError};
 
 use tauri::menu::{
-    AboutMetadata, CheckMenuItem, Menu, MenuId, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu,
+    AboutMetadata, CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu,
 };
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -28,30 +27,6 @@ fn item<R: Runtime>(
     MenuItem::with_id(app, id, label, true, keys)
 }
 
-/// The menus' words in the window's language (`set_labels`), id → text; empty: the English built in.
-static LABELS: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Default::default);
-/// The standard items' ids (made up by Tauri) → the key their words go by ("predefined.undo").
-static PREDEFINED: LazyLock<Mutex<HashMap<MenuId, &'static str>>> = LazyLock::new(Default::default);
-
-/// A standard item, named so the window can give it words (`set_labels`).
-fn pre<R: Runtime>(key: &'static str, p: PredefinedMenuItem<R>) -> PredefinedMenuItem<R> {
-    PREDEFINED
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .insert(p.id().clone(), key);
-    p
-}
-
-/// An item's words in the window's language, else its English.
-fn tr(id: &str, english: &str) -> String {
-    LABELS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .get(id)
-        .cloned()
-        .unwrap_or_else(|| english.to_string())
-}
-
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let about = AboutMetadata {
         name: Some("Beluga".into()),
@@ -63,36 +38,23 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "Beluga",
         true,
         &[
-            &pre(
-                "predefined.about",
-                PredefinedMenuItem::about(app, Some("About Beluga"), Some(about))?,
-            ),
+            &PredefinedMenuItem::about(app, Some("About Beluga"), Some(about))?,
             // Handled in lib.rs (updater.rs): it works even while the window can't reach Beluga.
             &item(app, "check-updates", "Check for Updates…", None)?,
             &PredefinedMenuItem::separator(app)?,
             &item(app, "settings", "Settings…", Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
-            &pre(
-                "predefined.services",
-                PredefinedMenuItem::services(app, None)?,
-            ),
+            &PredefinedMenuItem::services(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &pre("predefined.hide", PredefinedMenuItem::hide(app, None)?),
-            &pre(
-                "predefined.hide-others",
-                PredefinedMenuItem::hide_others(app, None)?,
-            ),
-            &pre(
-                "predefined.show-all",
-                PredefinedMenuItem::show_all(app, None)?,
-            ),
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &item(app, "quit", "Quit Beluga", Some("CmdOrCtrl+Q"))?,
         ],
     )?;
-    let file = Submenu::with_id_and_items(
+    let file = Submenu::with_items(
         app,
-        "submenu.file",
         "File",
         true,
         &[
@@ -118,18 +80,17 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item(app, "close-window", "Close Window", Some("CmdOrCtrl+W"))?,
         ],
     )?;
-    let edit = Submenu::with_id_and_items(
+    let edit = Submenu::with_items(
         app,
-        "submenu.edit",
         "Edit",
         true,
         &[
-            &pre("predefined.undo", PredefinedMenuItem::undo(app, None)?),
-            &pre("predefined.redo", PredefinedMenuItem::redo(app, None)?),
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &pre("predefined.cut", PredefinedMenuItem::cut(app, None)?),
-            &pre("predefined.copy", PredefinedMenuItem::copy(app, None)?),
-            &pre("predefined.paste", PredefinedMenuItem::paste(app, None)?),
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
             // ⌘V attaches a pasted file path as the file (paste-paths.ts); this keeps it as text.
             &item(
                 app,
@@ -137,10 +98,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 "Paste as Plain Text",
                 Some("CmdOrCtrl+Shift+V"),
             )?,
-            &pre(
-                "predefined.select-all",
-                PredefinedMenuItem::select_all(app, None)?,
-            ),
+            &PredefinedMenuItem::select_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &item(
                 app,
@@ -156,9 +114,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             )?,
         ],
     )?;
-    let appearance = Submenu::with_id_and_items(
+    let appearance = Submenu::with_items(
         app,
-        "submenu.appearance",
         "Appearance",
         true,
         &[
@@ -167,9 +124,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item(app, "appearance-dark", "Dark", None)?,
         ],
     )?;
-    let view = Submenu::with_id_and_items(
+    let view = Submenu::with_items(
         app,
-        "submenu.view",
         "View",
         true,
         &[
@@ -214,12 +170,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &item(app, "zoom-out", "Smaller Text", Some("CmdOrCtrl+-"))?,
             &item(app, "zoom-reset", "Actual Size", Some("CmdOrCtrl+0"))?,
             &PredefinedMenuItem::separator(app)?,
-            &pre("predefined.fullscreen", PredefinedMenuItem::fullscreen(app, None)?),
+            &PredefinedMenuItem::fullscreen(app, None)?,
         ],
     )?;
-    let go = Submenu::with_id_and_items(
+    let go = Submenu::with_items(
         app,
-        "submenu.go",
         "Go",
         true,
         &[
@@ -252,27 +207,19 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     )?;
     let conversation = conversation_menu(app)?;
     let workspace = workspace_menu(app)?;
-    let window = Submenu::with_id_and_items(
+    let window = Submenu::with_items(
         app,
-        "submenu.window",
         "Window",
         true,
         &[
-            &pre(
-                "predefined.minimize",
-                PredefinedMenuItem::minimize(app, None)?,
-            ),
-            &pre(
-                "predefined.maximize",
-                PredefinedMenuItem::maximize(app, None)?,
-            ),
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &item(app, "show", "Beluga", None)?,
         ],
     )?;
-    let help = Submenu::with_id_and_items(
+    let help = Submenu::with_items(
         app,
-        "submenu.help",
         "Help",
         true,
         &[
@@ -308,9 +255,8 @@ fn conversation_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>
         false,
         Some("Alt+CmdOrCtrl+P"),
     )?;
-    Submenu::with_id_and_items(
+    Submenu::with_items(
         app,
-        "submenu.conversation",
         "Conversation",
         true,
         &[
@@ -345,9 +291,8 @@ fn conversation_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>
 
 /// The workspace on screen: its toolbar's actions, with their keys.
 fn workspace_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>> {
-    Submenu::with_id_and_items(
+    Submenu::with_items(
         app,
-        "submenu.workspace",
         "Workspace",
         true,
         &[
@@ -408,49 +353,11 @@ pub fn apply_state<R: Runtime>(menu: &Menu<R>, state: &MenuState) {
             let _ = i.set_checked(*on);
         }
     }
-    if let Ok(top) = menu.items() {
-        set_texts(top, &state.labels);
-    }
-}
-
-/// Give items, menus (`submenu.*`) and standard items (`predefined.*`) their words, by id, all the way down.
-fn set_texts<R: Runtime>(items: Vec<MenuItemKind<R>>, labels: &HashMap<String, String>) {
-    for k in items {
-        let text = match &k {
-            MenuItemKind::Predefined(p) => PREDEFINED
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .get(p.id())
-                .and_then(|key| labels.get(*key)),
-            other => labels.get(other.id().as_ref()),
-        };
-        if let Some(text) = text {
-            let _ = match &k {
-                MenuItemKind::MenuItem(i) => i.set_text(text),
-                MenuItemKind::Check(i) => i.set_text(text),
-                MenuItemKind::Predefined(i) => i.set_text(text),
-                MenuItemKind::Submenu(i) => i.set_text(text),
-                MenuItemKind::Icon(i) => i.set_text(text),
-            };
-        }
-        if let MenuItemKind::Submenu(s) = k {
-            if let Ok(inner) = s.items() {
-                set_texts(inner, labels);
-            }
+    for (id, text) in &state.labels {
+        if let Some(MenuItemKind::MenuItem(i)) = find(id) {
+            let _ = i.set_text(text);
         }
     }
-}
-
-/// The window's language changed (lib/menu-language.ts): every menu's words, the menu bar's now
-/// and the menu-bar icon's as it's built again.
-pub fn set_labels<R: Runtime>(app: &AppHandle<R>, labels: HashMap<String, String>) {
-    if let Some(m) = app.menu() {
-        if let Ok(top) = m.items() {
-            set_texts(top, &labels);
-        }
-    }
-    *LABELS.lock().unwrap_or_else(PoisonError::into_inner) = labels;
-    crate::requests::rebuild(app);
 }
 
 /// Set menu-bar items' keys by id (None: no key). A key the menu can't take leaves the item without one.
@@ -474,6 +381,62 @@ pub fn apply_keys<R: Runtime>(menu: &Menu<R>, keys: &HashMap<String, Option<Stri
             _ => {}
         }
     }
+}
+
+/// Take every key off a menu that's about to be replaced, submenus included, while its items are
+/// still in their windows. GTK tears a menu's items down before their keys when the menu comes off
+/// a window, then warns once per key it can no longer find ("no accelerator … installed in accel
+/// group"); a menu with no keys left comes off quietly. The built-in items (Undo, Hide, Minimize…)
+/// can't lose their keys, so they leave the old menu one by one, which GTK takes quietly.
+/// Linux only: the other systems don't mind.
+#[cfg(target_os = "linux")]
+pub fn clear_keys<R: Runtime>(items: Vec<MenuItemKind<R>>) {
+    for item in items {
+        match item {
+            MenuItemKind::MenuItem(i) => {
+                let _ = i.set_accelerator(None::<&str>);
+            }
+            MenuItemKind::Check(i) => {
+                let _ = i.set_accelerator(None::<&str>);
+            }
+            MenuItemKind::Icon(i) => {
+                let _ = i.set_accelerator(None::<&str>);
+            }
+            MenuItemKind::Submenu(s) => {
+                if let Ok(inner) = s.items() {
+                    for built_in in inner.iter().filter_map(|k| k.as_predefined_menuitem()) {
+                        let _ = s.remove(built_in);
+                    }
+                    clear_keys(inner);
+                }
+            }
+            MenuItemKind::Predefined(_) => {}
+        }
+    }
+}
+
+/// A small window of ours (the request card, the call card, the call overlay) with no menu bar.
+/// Windows and Linux give every new window the app's menu bar unless it brings its own, and it's
+/// taken off once the window is made (`drop_menu_bar`). On Linux the window brings an empty one:
+/// taking the app's menu off a GTK window makes GTK warn once per key (see `clear_keys`).
+pub fn without_menu_bar<'a, R: Runtime, M: Manager<R>>(
+    app: &AppHandle<R>,
+    builder: tauri::WebviewWindowBuilder<'a, R, M>,
+) -> tauri::WebviewWindowBuilder<'a, R, M> {
+    #[cfg(target_os = "linux")]
+    if let Ok(empty) = Menu::new(app) {
+        return builder.menu(empty);
+    }
+    let _ = app;
+    builder
+}
+
+/// The menu bar off a small window made with `without_menu_bar` (macOS has none in a window).
+pub fn drop_menu_bar<R: Runtime>(window: &tauri::WebviewWindow<R>) {
+    #[cfg(not(target_os = "macos"))]
+    let _ = window.remove_menu();
+    #[cfg(target_os = "macos")]
+    let _ = window;
 }
 
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
@@ -517,26 +480,16 @@ fn status_items<R: Runtime>(
     p: &TrayPresence,
 ) -> tauri::Result<Vec<MenuItemKind<R>>> {
     let check = |id: &str, label: &str, state: &str| {
-        CheckMenuItem::with_id(app, id, tr(id, label), true, p.state == state, None::<&str>)
+        CheckMenuItem::with_id(app, id, label, true, p.state == state, None::<&str>)
             .map(MenuItemKind::Check)
     };
     let pause = Submenu::with_items(
         app,
-        tr("tray.pause", "Pause Notifications"),
+        "Pause Notifications",
         true,
         &[
-            &item(
-                app,
-                "status-dnd-hour",
-                &tr("status-dnd-hour", "For 1 Hour"),
-                None,
-            )?,
-            &item(
-                app,
-                "status-dnd-tomorrow",
-                &tr("status-dnd-tomorrow", "Until Tomorrow"),
-                None,
-            )?,
+            &item(app, "status-dnd-hour", "For 1 Hour", None)?,
+            &item(app, "status-dnd-tomorrow", "Until Tomorrow", None)?,
         ],
     )?;
     Ok(vec![
@@ -552,12 +505,7 @@ fn status_items<R: Runtime>(
         check("status-dnd", "Do Not Disturb", "dnd")?,
         check("status-offline", "Appear Offline", "offline")?,
         MenuItemKind::Submenu(pause),
-        MenuItemKind::MenuItem(item(
-            app,
-            "status-set",
-            &tr("status-set", "Set a Status…"),
-            None,
-        )?),
+        MenuItemKind::MenuItem(item(app, "status-set", "Set a Status…", None)?),
         MenuItemKind::Predefined(PredefinedMenuItem::separator(app)?),
     ])
 }
@@ -567,32 +515,18 @@ fn request_item<R: Runtime>(
     app: &AppHandle<R>,
     r: &crate::requests::TrayRequest,
 ) -> tauri::Result<Submenu<R>> {
-    let mut items: Vec<MenuItem<R>> = vec![item(
-        app,
-        &format!("req-yes:{}", r.id),
-        &tr("req-yes", "Approve"),
-        None,
-    )?];
+    let mut items: Vec<MenuItem<R>> =
+        vec![item(app, &format!("req-yes:{}", r.id), "Approve", None)?];
     if r.always {
         items.push(item(
             app,
             &format!("req-always:{}", r.id),
-            &tr("req-always", "Always Allow for a Week"),
+            "Always Allow for a Week",
             None,
         )?);
     }
-    items.push(item(
-        app,
-        &format!("req-no:{}", r.id),
-        &tr("req-no", "Decline"),
-        None,
-    )?);
-    items.push(item(
-        app,
-        &format!("req-open:{}", r.id),
-        &tr("req-open", "Review…"),
-        None,
-    )?);
+    items.push(item(app, &format!("req-no:{}", r.id), "Decline", None)?);
+    items.push(item(app, &format!("req-open:{}", r.id), "Review…", None)?);
     let refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = items
         .iter()
         .map(|i| i as &dyn tauri::menu::IsMenuItem<R>)
@@ -610,10 +544,9 @@ pub fn tray_menu<R: Runtime>(
     let menu = Menu::new(app)?;
     if !requests.is_empty() {
         let head = if requests.len() == 1 {
-            tr("req-head.one", "1 Request Waiting for You")
+            crate::i18n::tr("1 Request Waiting for You")
         } else {
-            tr("req-head.many", "{n} Requests Waiting for You")
-                .replace("{n}", &requests.len().to_string())
+            crate::i18n::tr_fmt("{0} Requests Waiting for You", &[&requests.len().to_string()])
         };
         menu.append(&MenuItem::with_id(
             app,
@@ -632,18 +565,16 @@ pub fn tray_menu<R: Runtime>(
             menu.append(&it)?;
         }
     }
-    menu.append(&item(app, "show", &tr("tray.show", "Open Beluga"), None)?)?;
-    menu.append(&item(app, "new-chat", &tr("new-chat", "New Chat"), None)?)?;
+    menu.append(&item(app, "show", "Open Beluga", None)?)?;
+    menu.append(&item(app, "new-chat", "New Chat", None)?)?;
     if presence.is_some() {
-        menu.append(&item(
-            app,
-            "add-friend",
-            &tr("add-friend", "Add a Friend…"),
-            None,
-        )?)?;
+        menu.append(&item(app, "add-friend", "Add a Friend…", None)?)?;
     }
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&item(app, "quit", &tr("quit", "Quit Beluga"), None)?)?;
+    menu.append(&item(app, "quit", "Quit Beluga", None)?)?;
+    if let Ok(items) = menu.items() {
+        crate::i18n::localize_items(items);
+    }
     Ok(menu)
 }
 
@@ -665,11 +596,7 @@ pub fn tray_picture() -> tauri::Result<tauri::image::Image<'static>> {
         .iter()
         .flat_map(|px| [r, g, b, px[3]])
         .collect::<Vec<u8>>();
-    Ok(tauri::image::Image::new_owned(
-        rgba,
-        black.width(),
-        black.height(),
-    ))
+    Ok(tauri::image::Image::new_owned(rgba, black.width(), black.height()))
 }
 
 /// The icon in the menu bar: open Beluga, or quit it (leaving the room).

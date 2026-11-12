@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { MACHINE_FORK } from '../fork/coverage.js';
 
 /**
  * What your own app may do on one of your computers while it drives it (BLG-776): every API method
@@ -257,6 +258,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'projects.create': 'drive',
   'projects.clone': 'drive',
   'projects.newHome': 'drive',
+  'projects.myRepos': 'drive',
   'projects.iconAt': 'drive',
   // ---- local
   'local.listDirs': 'drive',
@@ -331,12 +333,14 @@ export const MACHINE: Record<Method, MachineSide> = {
   'support.answer': 'drive',
   // ---- stats
   'stats.get': 'drive',
+  'stats.leaderboard': 'drive',
   'stats.note': 'drive',
   'stats.saveImage': 'drive',
   // ---- diagnostics
   'diagnostics.report': 'drive',
   // The window couldn't load a part of itself (#370): noted in that computer's black box.
   'diagnostics.windowProblem': 'drive',
+  'diagnostics.windowCrash': 'drive',
   // ---- claudeCode
   'claudeCode.steps': 'drive',
   'claudeCode.step': 'drive',
@@ -462,7 +466,6 @@ export const MACHINE: Record<Method, MachineSide> = {
   'plans.setParallel': 'drive',
   'plans.setTestsAt': 'drive',
   'plans.setWorkAgent': 'drive',
-  'plans.setCheckAgent': 'drive',
   'plans.tidyUp': 'drive',
   'plans.pass': 'drive',
   'plans.recheck': 'drive',
@@ -692,6 +695,8 @@ export const MACHINE: Record<Method, MachineSide> = {
   'external.status': 'drive',
   'external.stopAgent': 'drive',
   'external.stopAll': 'drive',
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...MACHINE_FORK,
 };
 
 /** A method a screen driving a computer may not call (unknown names are left to the API, which refuses them). */

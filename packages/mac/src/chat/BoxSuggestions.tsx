@@ -8,9 +8,9 @@ import { useActions } from '../lib/actions.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { handleInvite } from '../lib/invite-command.js';
-import { t } from '../i18n/index.js';
 import { MAX_LISTED, SuggestionBody, sectionOf } from './Suggestions.js';
 import s from './composer.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * The chat box's / and @ suggestions for another text box (the project home's New Worktree):
@@ -83,7 +83,7 @@ export function useBoxSuggestions({
     setText(sug.value);
   };
   const onKey = (e: React.KeyboardEvent): boolean => {
-    if (!suggestions.length || e.nativeEvent.isComposing) return false;
+    if (!suggestions.length || isImeComposing(e)) return false;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       byKeys.current = true;
       setSelected((n) => (Math.min(n, listed - 1) + (e.key === 'ArrowDown' ? 1 : -1) + listed) % listed);
@@ -94,7 +94,7 @@ export function useBoxSuggestions({
     return true;
   };
   const list = suggestions.length ? (
-    <div ref={ref} className={cx(s.suggestions, className)} role="listbox" aria-label={t('chat.suggestions.aria')}>
+    <div ref={ref} className={cx(s.suggestions, className)} role="listbox" aria-label="Suggestions">
       {suggestions.slice(0, MAX_LISTED).map((sug, i, all) => (
         <Fragment key={`${sug.value}:${i}`}>
         {sectionOf(sug, all[i - 1]) ? (

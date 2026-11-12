@@ -130,6 +130,8 @@ export interface AgentRunInput {
   /** "Your Mac" (core/assistant): its tools (the screen, device info, starting work) and what Claude is told it is. */
   readonly macTools?: MacTools;
   readonly macBrief?: string;
+  /** Asked in a friend's worktree (your "@claude" there): whose it is and how to read it from here. */
+  readonly sharedBrief?: string;
   /** Your phone (core/phone): tools to act on your own paired phone, and what Claude is told about it. */
   readonly phoneTools?: PhoneTools;
   readonly phoneBrief?: string;
@@ -243,6 +245,8 @@ export interface PlanTools {
   gate(milestone: string, verdict: 'pass' | 'fail', notes: string): string;
   /** The draft's reviewer records what it found (see core/plans/draft-review.ts). */
   review?(findings: readonly import('../core/plans/model.js').ReviewFinding[]): string;
+  /** A milestone's architect records its technical design (`plan_design`), before its work starts. */
+  design?(milestone: string, design: string): string;
   start(task: string): Promise<string>;
   /** `queue` (default): read when its current turn ends. `steer`: now, interrupting a long command or a dead run. */
   message(task: string, text: string, mode?: 'queue' | 'steer'): string;

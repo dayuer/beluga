@@ -13,7 +13,6 @@ import { openSheet } from '../lib/sheets.js';
 import { askBeforeWork } from '../lib/work-confirm.js';
 import { useWsBusy, whileBusy } from '../lib/ws-busy.js';
 import s from './BranchControl.module.css';
-import { type Key, t, useT } from '../i18n/index.js';
 
 const PILL_ICON: Record<BranchTone, IconName> = { merged: 'merge', ok: 'check', error: 'alert', warn: 'alert', wait: 'clock', info: 'branch', muted: 'branch' };
 
@@ -21,16 +20,13 @@ export type BranchFold = 'none' | 'pill' | 'all';
 
 const STEP_ICON: Partial<Record<BranchStep['id'], IconName>> = { merge_pr: 'merge', merge: 'merge', merge_base: 'merge', merge_auto: 'clock', cancel_auto: 'x', update_branch: 'refresh', mark_ready: 'check', open_pr: 'pr', continue_after_merge: 'branch', archive: 'archive', delete: 'x', commit: 'commit', pr: 'pr', pr_draft: 'pr', pr_original: 'pr', push: 'up', rerun_checks: 'refresh' };
 
-const STEP_SHORT: Partial<Record<BranchStep['id'], Key>> = { pr: 'layout.branchControl.short.createPr', open_pr: 'layout.branchControl.short.openPr', pr_draft: 'layout.branchControl.short.draftPr', pr_original: 'layout.branchControl.short.createPr', pr_claude: 'layout.branchControl.short.createPr', pr_custom: 'layout.branchControl.short.createPr', merge_pr: 'layout.branchControl.short.merge', merge: 'layout.branchControl.short.merge', merge_base: 'layout.branchControl.short.merge', merge_auto: 'layout.branchControl.short.autoMerge', merge_admin: 'layout.branchControl.short.merge', cancel_auto: 'layout.branchControl.short.cancel', update_branch: 'layout.branchControl.short.update', mark_ready: 'layout.branchControl.short.ready', review_claude: 'layout.branchControl.short.review', fix_checks: 'layout.branchControl.short.fixChecks', resolve_pr: 'layout.branchControl.short.resolveConflicts', merge_claude: 'layout.branchControl.short.resolveConflicts', push: 'layout.branchControl.short.push', rerun_checks: 'layout.branchControl.short.rerun' };
+const STEP_SHORT: Partial<Record<BranchStep['id'], string>> = { pr: 'Create PR', open_pr: 'Open PR', pr_draft: 'Draft PR', pr_original: 'Create PR', pr_claude: 'Create PR', pr_custom: 'Create PR', merge_pr: 'Merge', merge: 'Merge', merge_base: 'Merge', merge_auto: 'Auto-merge', merge_admin: 'Merge', cancel_auto: 'Cancel', update_branch: 'Update', mark_ready: 'Ready', review_claude: 'Review', fix_checks: 'Fix Checks', resolve_pr: 'Resolve Conflicts', merge_claude: 'Resolve Conflicts', push: 'Push', rerun_checks: 'Re-run' };
 
 /**
  * A step in a word or two, for the folded toolbar: the icon alone didn't say enough ("PR" alone didn't
  * either), and a bare "Resolve" or "Fix" read as the review comments or anything at all (BLG-753).
  */
-export const shortLabel = (step: BranchStep): string => {
-  const short = STEP_SHORT[step.id];
-  return short ? t(short) : step.label.replace(/…$/, '').split(' ')[0]!;
-};
+export const shortLabel = (step: BranchStep): string => STEP_SHORT[step.id] ?? step.label.replace(/…$/, '').split(' ')[0]!;
 
 /**
  * Folded, a quiet pill (no pull request, nothing to fix: "3 changes") is only an icon that reads as
@@ -38,18 +34,50 @@ export const shortLabel = (step: BranchStep): string => {
  */
 export const pillHidden = (branch: BranchState, fold: BranchFold): boolean => fold !== 'none' && !branch.pr && Boolean(branch.steps[0]) && (branch.tone === 'muted' || branch.tone === 'info');
 
+interface BranchProps {
+  wsId: string;
+  branch: BranchState;
+  fold?: BranchFold;
+}
+
 /**
- * The top of a worktree: where its branch stands, as a pill you can read from across the room
- * (Merged in purple, Ready to merge in green, Conflicts in red…), and the step it needs next as
- * one button (its pull request's number on the pill too). Its chevron has the other steps: one-click ones (git or GitHub does them) and the
- * ones Claude does, marked with Claude's icon. The pill opens the pull request when there is one.
- * In a narrow toolbar it folds: `pill` keeps the pill's icon and number, `all` the step's icon and
- * one short word ("PR", "Merge"), the full words moving to their tips.
+ * Where a worktree's branch stands, as a small pill beside its name on the title line (Merged in
+ * purple, Ready to merge in green, Conflicts in red…, its pull request's number too). It sits with
+ * the name rather than the buttons, so the right side keeps only what you can do. It opens the pull
+ * request when there is one. Folded (`pill` or `all`), it keeps its icon and number, its words in its tip.
  */
-export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; branch: BranchState; fold?: BranchFold }) {
+export function BranchPill({ wsId, branch, fold = 'none' }: BranchProps) {
+  const actions = useActions();
+  if (pillHidden(branch, fold)) return null;
+  const pill = (
+    <span className={cx(s.pill, s[`pill_${branch.tone}`])} data-branch-state={branch.kind}>
+      <Icon name={PILL_ICON[branch.tone]} size={10} />
+      {fold === 'none' ? branch.label : null}
+      {branch.pr ? <span className={s.pillPr}>#{branch.pr.number}</span> : null}
+    </span>
+  );
+  return (
+    <Tip label={`${fold === 'none' ? '' : `${branch.label}: `}${branch.detail}${branch.pr ? ' · open the pull request' : ''}`}>
+      {branch.pr ? (
+        <button type="button" className={s.pillButton} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'pr' })}>
+          {pill}
+        </button>
+      ) : (
+        pill
+      )}
+    </Tip>
+  );
+}
+
+/**
+ * The step a worktree's branch needs next, as one button. Its chevron has the other steps: one-click
+ * ones (git or GitHub does them) and the ones Claude does, marked with Claude's icon. In a narrow
+ * toolbar it folds: `all` keeps the step's icon and one short word ("PR", "Merge"), the full words
+ * moving to its tip. Where the branch stands is the BranchPill beside the worktree's name.
+ */
+export function BranchControl({ wsId, branch, fold = 'none' }: BranchProps) {
   const api = useApi();
   const actions = useActions();
-  const t = useT();
   const [method, setMethod] = useState<MergeMethod>(lastMethod);
   // This worktree's, not the component's: it's the same one when you switch to another worktree.
   const busy = useWsBusy(wsId);
@@ -101,9 +129,9 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
         // It pushes to the shared branch, which isn't easily undone: say so first.
         return openSheet({
           kind: 'confirm',
-          title: t('layout.branchControl.mergeBaseTitle', { branch: branch.branch, into: branch.into }),
-          message: t('layout.branchControl.mergeBaseMessage', { hint: step.hint.replace(/^No pull request: /, ''), into: branch.into }),
-          confirm: t('layout.branchControl.mergeBaseConfirm', { into: branch.into }),
+          title: `Merge ${branch.branch} into ${branch.into}?`,
+          message: `No pull request: ${step.hint.replace(/^No pull request: /, '')}. Everyone pulling ${branch.into} gets it; your main folder isn’t touched.`,
+          confirm: `Merge into ${branch.into}`,
           run: () => void whileBusy(wsId, async () => showGitTrouble(wsId, await api.workbench.mergeToBase(wsId), 'merge_base')),
         });
       default:
@@ -119,44 +147,23 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
     ...methods,
     ...rest.map((step, i) => ({ label: labelOf(step), hint: step.claude ? `Agent · ${step.hint}` : step.hint, icon: iconOf(step), ...(step.danger ? { danger: true } : {}), separate: i === 0 && methods.length > 0, onSelect: () => requestAnimationFrame(() => run(step)) })),
   ];
+  if (!main) return null;
   const hidePill = pillHidden(branch, fold);
-  const variant = main && (main.id === 'merge_pr' || main.id === 'merge') ? 'merge' : 'primary';
-  const pill = (
-    <span className={cx(s.pill, s[`pill_${branch.tone}`])} data-branch-state={branch.kind}>
-      <Icon name={PILL_ICON[branch.tone]} size={11} />
-      {fold === 'none' ? branch.label : null}
-      {branch.pr ? <span className={s.pillPr}>#{branch.pr.number}</span> : null}
-    </span>
-  );
+  const variant = main.id === 'merge_pr' || main.id === 'merge' ? 'merge' : 'primary';
 
   return (
-    <span className={s.wrap} role="group" aria-label={t('layout.branchControl.label', { label: branch.label })}>
-      {hidePill ? null : (
-        <Tip label={`${fold === 'none' ? '' : `${branch.label}: `}${branch.detail}${branch.pr ? t('layout.branchControl.openPr') : ''}`}>
-          {branch.pr ? (
-            <button type="button" className={s.pillButton} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'pr' })}>
-              {pill}
-            </button>
-          ) : (
-            pill
-          )}
-        </Tip>
-      )}
-      {main ? (
-        <span className={s.split}>
-          <Tip label={`${hidePill ? `${branch.detail} · ` : ''}${fold === 'all' ? `${labelOf(main)}: ` : ''}${main.claude ? `Agent · ${main.hint}` : main.hint}`}>
-            <Button variant={variant} icon={iconOf(main)} aria-label={fold === 'all' ? labelOf(main) : undefined} className={cx(s.main, items.length > 0 && s.mainSplit, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} data-branch-step={main.id} data-tool-ws={wsId} onClick={() => run(main)}>
-              {busy ? (fold === 'all' ? '…' : t('layout.branchControl.working')) : fold === 'all' ? shortLabel(main) : labelOf(main)}
-            </Button>
-          </Tip>
-          {items.length ? (
-            <ActionsDropdown items={items} align="end">
-              <Button variant={variant} className={cx(s.more, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} aria-label={t('layout.branchControl.more')} data-branch-more={wsId}>
-                <Icon name="chevronDown" size={11} />
-              </Button>
-            </ActionsDropdown>
-          ) : null}
-        </span>
+    <span className={s.wrap} role="group" aria-label={`Branch: ${branch.label}`}>
+      <Tip label={`${hidePill ? `${branch.detail} · ` : ''}${fold === 'all' ? `${labelOf(main)}: ` : ''}${main.claude ? `Agent · ${main.hint}` : main.hint}`}>
+        <Button variant={variant} icon={iconOf(main)} aria-label={fold === 'all' ? labelOf(main) : undefined} className={cx(s.main, items.length > 0 && s.mainSplit, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} data-branch-step={main.id} data-tool-ws={wsId} onClick={() => run(main)}>
+          {busy ? (fold === 'all' ? '…' : 'Working…') : fold === 'all' ? shortLabel(main) : labelOf(main)}
+        </Button>
+      </Tip>
+      {items.length ? (
+        <ActionsDropdown items={items} align="end">
+          <Button variant={variant} className={cx(s.more, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} aria-label="Other steps for this branch" data-branch-more={wsId}>
+            <Icon name="chevronDown" size={11} />
+          </Button>
+        </ActionsDropdown>
       ) : null}
     </span>
   );

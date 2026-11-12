@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -56,6 +56,22 @@ describe('listSkills', () => {
       { name: 'fix', description: 'Fix an issue', kind: 'command', source: 'user', args: '[issue]' },
       { name: 'sync', description: 'Sync with origin', kind: 'command', source: 'user' },
       { name: 'supabase:migrate', description: 'Run migrations', kind: 'skill', source: 'plugin' },
+    ]);
+  });
+
+  it('follows linked skills and commands, and skips broken links', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'skills-linked-'));
+    const home = path.join(root, 'home');
+    write(path.join(root, 'pack/skills/review/SKILL.md'), '---\nname: review\ndescription: Review a screen\n---\n');
+    write(path.join(root, 'pack/commands/ship.md'), 'Ship it');
+    mkdirSync(path.join(home, 'skills'), { recursive: true });
+    mkdirSync(path.join(home, 'commands'), { recursive: true });
+    symlinkSync(path.join(root, 'pack/skills/review'), path.join(home, 'skills/review'));
+    symlinkSync(path.join(root, 'nowhere'), path.join(home, 'skills/gone'));
+    symlinkSync(path.join(root, 'pack/commands/ship.md'), path.join(home, 'commands/ship.md'));
+    expect(await listSkills(undefined, home)).toEqual([
+      { name: 'review', description: 'Review a screen', kind: 'skill', source: 'user' },
+      { name: 'ship', description: 'Ship it', kind: 'command', source: 'user' },
     ]);
   });
 

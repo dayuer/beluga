@@ -13,7 +13,7 @@ import { useApp } from '../lib/beluga.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import t from './tasks.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
-import { useT } from '../i18n/index.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * What happened to a task, oldest first: changes as quiet lines ("Beluga moved this to In
@@ -57,14 +57,13 @@ export function ActivityFeed({ issue }: { issue: Issue }) {
   const projectName = useApp((s) => s.projects.find((p) => p.id === issue.projectId)?.name);
   const tagged = useTaggable(issue.projectId, selfId, projectName, self.name);
   const [all, setAll] = useState(false);
-  const tr = useT();
   const entries = issue.activity;
   const hidden = all ? 0 : Math.max(0, entries.length - 30);
   return (
     <div className={t.activity}>
       {hidden ? (
         <button type="button" className={t.activityMore} onClick={() => setAll(true)}>
-          {tr('plans.feed.showEarlier', { n: hidden })}
+          Show {hidden} earlier
         </button>
       ) : null}
       <ol className={t.activityList}>
@@ -106,7 +105,6 @@ function CommentBox({ issue, people, world }: { issue: Issue; people: ReadonlyAr
   const { api, act } = useTaskActions();
   const box = useRef<HTMLTextAreaElement>(null);
   const tags = useBoxSuggestions({ text, setText, people });
-  const tr = useT();
   // Its agent is still writing the task: comments wait until it's done (BLG-598).
   const writing = Boolean(issue.drafting);
   const send = async (): Promise<void> => {
@@ -126,13 +124,13 @@ function CommentBox({ issue, people, world }: { issue: Issue; people: ReadonlyAr
           value={text}
           rows={text.includes('\n') ? 4 : 2}
           disabled={writing}
-          placeholder={writing ? tr('tasks.activity.commentLater') : tr('tasks.activity.placeholder')}
-          aria-label={tr('tasks.activity.comment')}
+          placeholder={writing ? 'You can comment once the task is written…' : 'Leave a comment… @ mentions someone'}
+          aria-label="Comment"
           aria-haspopup="listbox"
           aria-expanded={tags.open}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || tags.onKey(e)) return;
+            if (isImeComposing(e) || tags.onKey(e)) return;
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               void send();
@@ -142,10 +140,10 @@ function CommentBox({ issue, people, world }: { issue: Issue; people: ReadonlyAr
         {tags.list}
       </div>
       <div className={t.commentBar}>
-        <span className={t.editorHint}>{tr('tasks.activity.hint', { keys: chordLabel('Cmd+Enter') })}</span>
+        <span className={t.editorHint}>{chordLabel('Cmd+Enter')} to send · @ mentions · Markdown</span>
         <span className={t.grow} />
         <Button size="small" variant="primary" disabled={!text.trim() || busy || writing} onClick={() => void send()}>
-          {tr('tasks.activity.comment')}
+          Comment
         </Button>
       </div>
     </div>

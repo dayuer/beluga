@@ -1,4 +1,3 @@
-import { useT } from '../i18n/index.js';
 import { useEffect, useState } from 'react';
 import { findIssue } from '@beluga/core/board/model.js';
 import { TASKS_FENCE } from '@beluga/shared/task-refs.js';
@@ -21,7 +20,6 @@ const blocks = new Map<string, string | null>();
 
 function VisualBody({ wsId, n }: { readonly wsId: string; readonly n: number }) {
   const api = useApi();
-  const t = useT();
   const id = `${wsId}#${n}`;
   const [block, setBlock] = useState<string | null | undefined>(blocks.get(id));
   useEffect(() => {
@@ -40,7 +38,7 @@ function VisualBody({ wsId, n }: { readonly wsId: string; readonly n: number }) 
     };
   }, [id]);
   if (block === undefined) return <div className={s.visualLoading} />;
-  if (block === null) return <p className={s.visualGone}>{t('agentTerm.visualGone')}</p>;
+  if (block === null) return <p className={s.visualGone}>This visual isn’t kept any more.</p>;
   return <Markdown text={block} tasks paths localImages />;
 }
 
@@ -51,13 +49,12 @@ function VisualBody({ wsId, n }: { readonly wsId: string; readonly n: number }) 
  */
 export function VisualsPanel({ wsId, opened, active, onPick, onClose, onCloseAll }: { readonly wsId: string; readonly opened: readonly Opened[]; readonly active: string; readonly onPick: (id: string) => void; readonly onClose: (id: string) => void; readonly onCloseAll: () => void }) {
   const visuals = useApp((st) => st.termVisuals[wsId]);
-  const tr = useT();
   const board = useApp((st) => st.board);
   const about = (o: Opened): { title: string; icon: IconName } => {
     if (o.kind === 'task') return { title: o.key, icon: 'task' };
-    if (o.kind === 'image') return { title: o.path.split('/').pop() ?? tr('agentTerm.picture'), icon: 'image' };
+    if (o.kind === 'image') return { title: o.path.split('/').pop() ?? 'Picture', icon: 'image' };
     const v: TermVisual | undefined = visuals?.find((x) => x.n === o.n);
-    return { title: v?.title ?? tr('agentTerm.visualN', { n: o.n }), icon: ICONS[v?.kind ?? 'table'] ?? 'table' };
+    return { title: v?.title ?? `Visual ${o.n}`, icon: ICONS[v?.kind ?? 'table'] ?? 'table' };
   };
   const current = opened.find((o) => openedId(o) === active) ?? opened[opened.length - 1];
   useEffect(() => {
@@ -74,8 +71,8 @@ export function VisualsPanel({ wsId, opened, active, onPick, onClose, onCloseAll
     return () => window.removeEventListener('keydown', onKey);
   }, [onCloseAll]);
   return (
-    <section className={s.visuals} aria-label={tr('agentTerm.visuals')}>
-      <div className={s.visualTabs} role="tablist" aria-label={tr('agentTerm.opened')}>
+    <section className={s.visuals} aria-label="Visuals">
+      <div className={s.visualTabs} role="tablist" aria-label="Opened from the terminal">
         {opened.map((o) => {
           const id = openedId(o);
           const { title, icon } = about(o);
@@ -86,17 +83,17 @@ export function VisualsPanel({ wsId, opened, active, onPick, onClose, onCloseAll
                 <Icon name={icon} size={12} />
                 <span className={s.visualTabTitle}>{title}</span>
               </button>
-              <button type="button" className={s.visualTabClose} aria-label={tr('agentTerm.closeNamed', { name: title })} onClick={() => onClose(id)}>
+              <button type="button" className={s.visualTabClose} aria-label={`Close ${title}`} onClick={() => onClose(id)}>
                 <Icon name="x" size={10} />
               </button>
             </div>
           );
         })}
         <span className={s.flex} />
-        <IconButton icon="x" label={tr('agentTerm.closePanel')} keys="Esc" onClick={onCloseAll} />
+        <IconButton icon="x" label="Close the Panel" keys="Esc" onClick={onCloseAll} />
       </div>
       <div className={s.visualBody} role="tabpanel">
-        {current?.kind === 'visual' ? <VisualBody key={openedId(current)} wsId={wsId} n={current.n} /> : current?.kind === 'image' ? <Markdown text={`![${current.path.split('/').pop() ?? 'Picture'}](<${current.path}>)`} paths localImages /> : current?.kind === 'task' ? findIssue(board, current.key) ? <Markdown text={'```' + TASKS_FENCE + '\n' + current.key + '\n```'} tasks /> : <p className={s.visualGone}>{tr('agentTerm.notOnBoard', { key: current.key })}</p> : null}
+        {current?.kind === 'visual' ? <VisualBody key={openedId(current)} wsId={wsId} n={current.n} /> : current?.kind === 'image' ? <Markdown text={`![${current.path.split('/').pop() ?? 'Picture'}](<${current.path}>)`} paths localImages /> : current?.kind === 'task' ? findIssue(board, current.key) ? <Markdown text={'```' + TASKS_FENCE + '\n' + current.key + '\n```'} tasks /> : <p className={s.visualGone}>{current.key} isn’t on your board.</p> : null}
       </div>
     </section>
   );

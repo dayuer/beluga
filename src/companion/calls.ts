@@ -171,6 +171,10 @@ export const PhoneCalls = {
   'plans.setWorkAgent': entry('plans.setWorkAgent', z.string()),
   // 1.50: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words.
   'plans.setCheckAgent': entry('plans.setCheckAgent', z.string()),
+  // 1.53 (fork): who designs each milestone before its work starts (null: no architect step) → in words.
+  'plans.setArchAgent': entry('plans.setArchAgent', z.string()),
+  // 1.54 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words.
+  'plans.setFixAgent': entry('plans.setFixAgent', z.string()),
   // 1.7: a worktree's files (read-only) and terminals (shared with the Mac).
   'companion.files.list': entry('companion.files.list', FolderView),
   'companion.files.find': entry('companion.files.find', FoundView),

@@ -7,7 +7,7 @@ import { type EditSession, setDraft } from './edit-store.js';
 import { alignTokens, indentOf } from './editor-model.js';
 import c from '../../components/markdown/code.module.css';
 import r from './reader.module.css';
-import { useT } from '../../i18n/index.js';
+import { isImeComposing } from '../../lib/ime.js';
 
 /**
  * A file you chose to edit: a plain text box over the same colored lines the reader shows (the
@@ -48,7 +48,6 @@ function useSettled(text: string, ms: number): string {
 }
 
 export function FileEditor({ session, lang, variant }: { session: EditSession; lang: string | undefined; variant: DocVariant }) {
-  const t = useT();
   const area = useRef<HTMLTextAreaElement>(null);
   const draft = session.draft;
   const settled = useSettled(draft, 140);
@@ -79,7 +78,7 @@ export function FileEditor({ session, lang, variant }: { session: EditSession; l
       if (e.shiftKey) return;
       e.preventDefault();
       insert(indent);
-    } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    } else if (e.key === 'Enter' && !isImeComposing(e) && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
       // A new line starts as indented as the one you were on.
       const start = el.value.lastIndexOf('\n', el.selectionStart - 1) + 1;
       const lead = /^[ \t]*/.exec(el.value.slice(start, el.selectionStart))?.[0] ?? '';
@@ -107,7 +106,7 @@ export function FileEditor({ session, lang, variant }: { session: EditSession; l
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"
-        aria-label={t('views.reader.editAria', { path: session.path })}
+        aria-label={`Edit ${session.path}`}
         onChange={(e) => setDraft(session.key, e.target.value)}
         onKeyDown={onKey}
         // Its text lines up with the lines under it only while it never scrolls by itself.

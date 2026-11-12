@@ -24,14 +24,9 @@ import { TINTS, setTintChoice, tintChoiceOf, useProjectTint } from './tint.js';
 import { SHOW_TILE } from '../lib/widget-links.js';
 import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import n from './numbers.module.css';
-import { assistantTitle } from '../lib/brand.js';
+import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
-import { tl, useT } from '../i18n/index.js';
-
-/** "vs yesterday" and "Yesterday", in the language shown (the engine's tables as the fallback). */
-const compareWords = (c: Compare): string => tl('COMPARE_WORDS', c, 'label', COMPARE_WORDS[c]);
-const compareLabel = (c: Compare): string => tl('COMPARE_LABEL', c, 'label', COMPARE_LABEL[c]);
-const widthWords = (w: TileWidth): string => tl('WIDTH_WORDS', String(w), 'label', WIDTH_WORDS[w]);
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * At a glance (docs/sentinel.md §10, BLG-300): the board on Sentinel's page. Anything your
@@ -72,28 +67,27 @@ function tileProject(state: SentinelState, tile: Tile, projects: ReadonlyArray<{
   const item = sid ? state.items.find((i) => i.id === sid) : undefined;
   if (!item) return undefined;
   const p = item.projectId ? projects.find((x) => x.id === item.projectId) : undefined;
-  return p ? { id: p.id, name: p.name, sentinel: item.name } : { name: assistantTitle(), sentinel: item.name };
+  return p ? { id: p.id, name: p.name, sentinel: item.name } : { name: ASSISTANT_TITLE, sentinel: item.name };
 }
 
 /** No board yet: a quiet strip that says what goes here, and Add (the first board is made for it). */
 function NoBoard({ onPick, children }: { onPick: (id: string) => void; children?: React.ReactNode }) {
   const api = useApi();
   const a = useSentinelActions();
-  const tr = useT();
   const add = async (): Promise<void> => {
-    const d = await a.act(() => api.dashboard.create(tr('sentinel.dash.overview')));
+    const d = await a.act(() => api.dashboard.create('Overview'));
     if (!d) return;
     onPick(d.id);
     openSheet({ kind: 'add_tile', dashboardId: d.id });
   };
   return (
-    <section className={n.glance} aria-label={tr('sentinel.dash.atAGlance')}>
-      <SectionHead title={tr('sentinel.dash.atAGlance')} />
+    <section className={n.glance} aria-label="At a glance">
+      <SectionHead title="At a glance" />
       <button type="button" className={n.noBoard} onClick={() => void add()} data-testid="board-empty">
         <Icon name="plus" size={14} />
         <span>
-          <strong>{tr('sentinel.dash.putANumber')}</strong>
-          <span>{tr('sentinel.dash.putANumberDetail')}</span>
+          <strong>Put a number here</strong>
+          <span>Revenue, open pull requests, how fast your site answers, what your agent wrote this morning: it updates each time its sentinel runs.</span>
         </span>
       </button>
       {children}
@@ -130,37 +124,36 @@ function Page({ d, all, onPick, scope, children }: { d: Dashboard; all: readonly
   };
   const { client } = useBeluga();
   const a = useSentinelActions();
-  const tr = useT();
   const state = useSentinelState();
   const refreshing = state.refreshing?.[d.id];
   const [renaming, setRenaming] = useState(false);
   const save = (patch: Args<'dashboard.update'>[1]): void => void a.act(() => api.dashboard.update(d.id, patch));
   const sentinels = dashboardSentinels(d).filter((sid) => state.items.some((i) => i.id === sid && !i.paused));
-  const copyMarkdown = (): void => void copyText(dashboardMarkdown(d, (tile) => tileWords(state, d, tile))).then(() => toast(client, tr('sentinel.dash.copiedMarkdown', { name: d.name }), 'success'));
-  const newBoard = (): void => void a.act(() => api.dashboard.create(tr('sentinel.dash.boardN', { n: all.length + 1 }))).then((x) => x && onPick(x.id));
+  const copyMarkdown = (): void => void copyText(dashboardMarkdown(d, (tile) => tileWords(state, d, tile))).then(() => toast(client, `Copied ${d.name} as Markdown`, 'success'));
+  const newBoard = (): void => void a.act(() => api.dashboard.create(`Board ${all.length + 1}`)).then((x) => x && onPick(x.id));
   const more: ActionItem[] = [
-    { label: tr('sentinel.dash.rename'), icon: 'pencil', onSelect: () => setRenaming(true) },
-    { label: tr('sentinel.dash.copyMarkdown'), icon: 'copy', onSelect: copyMarkdown },
-    { label: tr('sentinel.dash.groupByProject'), icon: 'folder', checked: grouped, hint: tr('sentinel.dash.groupByProjectHint'), onSelect: () => group(!grouped) },
-    { label: tr('sentinel.dash.newBoard'), icon: 'plus', separate: true, onSelect: newBoard },
+    { label: 'Rename…', icon: 'pencil', onSelect: () => setRenaming(true) },
+    { label: 'Copy as Markdown', icon: 'copy', onSelect: copyMarkdown },
+    { label: 'Group by Project', icon: 'folder', checked: grouped, hint: 'Each project’s tiles under its name (drag tiles in the board as one)', onSelect: () => group(!grouped) },
+    { label: 'New Board', icon: 'plus', separate: true, onSelect: newBoard },
     {
-      label: tr('sentinel.dash.deleteBoard'),
+      label: 'Delete Board…',
       danger: true,
       separate: true,
       onSelect: () =>
         openSheet({
           kind: 'confirm',
-          title: tr('sentinel.use.deleteTitle', { name: d.name }),
-          message: tr('sentinel.dash.deleteMessage'),
-          confirm: tr('sentinel.dash.deleteConfirm'),
+          title: `Delete “${d.name}”?`,
+          message: 'Its tiles go; the numbers stay with their sentinels, and other boards keep theirs.',
+          confirm: 'Delete Board',
           destructive: true,
-          run: () => void a.act(() => api.dashboard.remove(d.id), tr('sentinel.use.deleted', { name: d.name })),
+          run: () => void a.act(() => api.dashboard.remove(d.id), `Deleted ${d.name}`),
         }),
     },
   ];
   return (
-    <section className={n.glance} data-dashboard={d.id} aria-label={tr('sentinel.dash.atAGlance')}>
-      <SectionHead title={tr('sentinel.dash.atAGlance')}>
+    <section className={n.glance} data-dashboard={d.id} aria-label="At a glance">
+      <SectionHead title="At a glance">
         {renaming ? (
           <RenameTab
             name={d.name}
@@ -171,21 +164,21 @@ function Page({ d, all, onPick, scope, children }: { d: Dashboard; all: readonly
           />
         ) : (
           <PickMenu<string>
-            label={tr('sentinel.dash.boards')}
-            choices={all.map((x) => ({ value: x.id, label: x.name, mark: <Icon name="gauge" size={13} />, hint: tr('sentinel.dash.tiles', { n: x.tiles.length }) }))}
+            label="Boards"
+            choices={all.map((x) => ({ value: x.id, label: x.name, mark: <Icon name="gauge" size={13} />, hint: `${x.tiles.length} ${x.tiles.length === 1 ? 'tile' : 'tiles'}` }))}
             chosen={[d.id]}
             onPick={onPick}
-            actions={[{ label: tr('sentinel.dash.newBoard'), icon: 'plus', onSelect: newBoard }]}
+            actions={[{ label: 'New Board', icon: 'plus', onSelect: newBoard }]}
           >
-            <button type="button" className={n.headPick} aria-label={tr('sentinel.dash.boardLabel', { name: d.name })} onDoubleClick={() => setRenaming(true)}>
+            <button type="button" className={n.headPick} aria-label={`Board: ${d.name}`} onDoubleClick={() => setRenaming(true)}>
               {d.name}
               <Icon name="chevronDown" size={10} />
             </button>
           </PickMenu>
         )}
-        <PickMenu<Compare> label={tr('sentinel.dash.compareEvery')} choices={COMPARE.map((c) => ({ value: c, label: compareWords(c) }))} chosen={[d.compare]} onPick={(compare) => save({ compare })}>
-          <button type="button" className={n.headPick} aria-label={tr('sentinel.dash.compareLabel', { vs: compareWords(d.compare) })}>
-            {compareWords(d.compare)}
+        <PickMenu<Compare> label="Compare every tile with" choices={COMPARE.map((c) => ({ value: c, label: COMPARE_WORDS[c] }))} chosen={[d.compare]} onPick={(compare) => save({ compare })}>
+          <button type="button" className={n.headPick} aria-label={`Compare: ${COMPARE_WORDS[d.compare]}`}>
+            {COMPARE_WORDS[d.compare]}
             <Icon name="chevronDown" size={10} />
           </button>
         </PickMenu>
@@ -195,12 +188,12 @@ function Page({ d, all, onPick, scope, children }: { d: Dashboard; all: readonly
             {refreshLine(refreshing)}
           </span>
         ) : (
-          <Tip label={sentinels.length ? tr('sentinel.dash.refreshTip', { n: sentinels.length }) : tr('sentinel.dash.refreshNone')}>
-            <IconButton icon="refresh" label={tr('sentinel.dash.refresh')} disabled={!sentinels.length} onClick={() => void a.act(() => api.dashboard.refresh(d.id))} />
+          <Tip label={sentinels.length ? `Run its ${sentinels.length === 1 ? 'sentinel' : `${sentinels.length} sentinels`} now, one at a time` : 'Its sentinels are paused or gone'}>
+            <IconButton icon="refresh" label="Refresh" disabled={!sentinels.length} onClick={() => void a.act(() => api.dashboard.refresh(d.id))} />
           </Tip>
         )}
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label={tr('sentinel.dash.moreFor', { name: d.name })} />
+          <IconButton icon="more" label={`More for ${d.name}`} />
         </ActionsDropdown>
       </SectionHead>
       <AskLine d={d} />
@@ -218,17 +211,16 @@ function Page({ d, all, onPick, scope, children }: { d: Dashboard; all: readonly
 
 function RenameTab({ name, done }: { name: string; done: (name: string) => void }) {
   const [text, setText] = useState(name);
-  const tr = useT();
   return (
     <input
       className={n.tabInput}
       value={text}
-      aria-label={tr('sentinel.dash.dashboardName')}
+      aria-label="Dashboard name"
       autoFocus
       onChange={(e) => setText(e.target.value)}
       onBlur={() => done(text.trim())}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') done(text.trim());
+        if (e.key === 'Enter' && !isImeComposing(e)) done(text.trim());
         if (e.key === 'Escape') done(name);
       }}
     />
@@ -247,7 +239,6 @@ function AskLine({ d }: { d: Dashboard }) {
   const drafts = useApp((st) => draftsOf(st.sentinel, d.id), (x, y) => JSON.stringify(x) === JSON.stringify(y));
   const line = askLine(ask, live);
   const items = useApp((st) => st.sentinel.items);
-  const tr = useT();
   return (
     <>
       {line && ask ? (
@@ -255,7 +246,7 @@ function AskLine({ d }: { d: Dashboard }) {
           <Icon name={line.who === 'done' ? 'check' : line.who === 'claude' ? 'claude' : 'alert'} size={12} />
           <span>{namedLine(line.text, (id) => items.find((i) => i.id === id)?.name)}</span>
           <Button size="small" variant="quiet" onClick={() => a.openChannel(ask.channel)}>
-            {tr('sentinel.dash.openChat')}
+            Open Chat
           </Button>
         </div>
       ) : null}
@@ -265,15 +256,13 @@ function AskLine({ d }: { d: Dashboard }) {
         <div key={x.id} className={n.draft} data-testid="dashboard-draft" data-sentinel={x.id}>
           <ClaudeMark />
           <span className={n.draftText}>
-            {tr('sentinel.dash.draftBefore')}
-            <strong>{x.name}</strong>
-            {tr('sentinel.dash.draftAfter')}
+            Your agent set up <strong>{x.name}</strong> to fetch it. It’s a draft: nothing runs until you turn it on.
           </span>
           <Button size="small" variant="quiet" onClick={() => a.open(x.id)}>
-            {tr('sentinel.dash.review')}
+            Review
           </Button>
           <Button size="small" variant="primary" icon="play" onClick={() => void a.setPaused(x, false)}>
-            {tr('sentinel.menu.turnOn')}
+            Turn On
           </Button>
         </div>
       ))}
@@ -316,11 +305,10 @@ function gridBoxOf(el: HTMLElement): GridBox {
 
 /** Tiles under their project's name (the board's own order inside each); dividers are left out, and tiles aren't dragged here. */
 function GroupedGrid({ d, state, projects }: { d: Dashboard; state: SentinelState; projects: ReadonlyArray<{ readonly id: string; readonly name: string }> }) {
-  const tr = useT();
   const groups = new Map<string, { id?: string; name: string; tiles: Tile[] }>();
   for (const tile of d.tiles) {
     if (tile.kind === 'divider') continue;
-    const p = tileProject(state, tile, projects) ?? { name: tr('sentinel.dash.goneGroup') };
+    const p = tileProject(state, tile, projects) ?? { name: 'Gone' };
     const key = p.id ?? p.name;
     const g = groups.get(key) ?? { ...(p.id ? { id: p.id } : {}), name: p.name, tiles: [] };
     g.tiles.push(tile);
@@ -348,7 +336,6 @@ function GroupedGrid({ d, state, projects }: { d: Dashboard; state: SentinelStat
 function Grid({ d, state, tiles: only, projects = [] }: { d: Dashboard; state: SentinelState; tiles?: readonly Tile[]; projects?: ReadonlyArray<{ readonly id: string; readonly name: string }> }) {
   const api = useApi();
   const a = useSentinelActions();
-  const tr = useT();
   const grid = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag>();
   const start = useRef<{ id: string; x: number; y: number; box: DOMRect } | undefined>(undefined);
@@ -430,7 +417,7 @@ function Grid({ d, state, tiles: only, projects = [] }: { d: Dashboard; state: S
   const slots = only ? [] : emptyCells([...places.values(), ...(add && !drag && d.tiles.length ? [add] : [])], drag ? drag.maxRow + 1 : bottomOf(places));
   const onSize = (id: string, size: Size | undefined): void => setSized(size ? { id, size, tiles: d.tiles } : undefined);
   return (
-    <div ref={grid} className={n.grid} role="list" aria-label={tr('sentinel.dash.tilesOf', { name: d.name })} onPointerMove={moveStart} onPointerUp={() => (start.current = undefined)}>
+    <div ref={grid} className={n.grid} role="list" aria-label={`${d.name}’s tiles`} onPointerMove={moveStart} onPointerUp={() => (start.current = undefined)}>
       {rest.map((tile) => (
         <TileCell key={tile.id} d={d} tile={tile} state={state} source={tileProject(state, tile, projects)} movable={!only} place={placeOf(tile.id)} onSize={onSize} onPointerDown={(e) => down(e, tile.id)} />
       ))}
@@ -444,9 +431,9 @@ function Grid({ d, state, tiles: only, projects = [] }: { d: Dashboard; state: S
         </div>
       ) : null}
       {drag || only ? null : (
-        <button type="button" className={n.addCell} data-first={d.tiles.length ? undefined : ''} style={d.tiles.length && add ? ({ '--col': add.col + 1, '--row': add.row + 1 } as React.CSSProperties) : undefined} onClick={() => openSheet({ kind: 'add_tile', dashboardId: d.id })} aria-label={tr('sentinel.dash.addToBoard')}>
+        <button type="button" className={n.addCell} data-first={d.tiles.length ? undefined : ''} style={d.tiles.length && add ? ({ '--col': add.col + 1, '--row': add.row + 1 } as React.CSSProperties) : undefined} onClick={() => openSheet({ kind: 'add_tile', dashboardId: d.id })} aria-label="Add to the board">
           <Icon name="plus" size={14} />
-          <span>{d.tiles.length ? tr('sentinel.dash.add') : tr('sentinel.dash.addFirst')}</span>
+          <span>{d.tiles.length ? 'Add' : 'Add a number, a chart or what your agent wrote'}</span>
         </button>
       )}
     </div>
@@ -531,17 +518,16 @@ function emptyCells(taken: readonly TilePlace[], rows: number): Spot[] {
 const ADD = '\u0000add';
 /** The grid's gap (numbers.module.css .grid), for working out a column's width. */
 const GAP = 10;
-const SHOW_WORDS = { auto: 'sentinel.dash.show.auto', markdown: 'sentinel.dash.show.markdown', tree: 'sentinel.dash.show.tree', table: 'sentinel.dash.show.table', text: 'sentinel.dash.show.text' } as const satisfies Record<OutputShow, string>;
+const SHOW_WORDS: Readonly<Record<OutputShow, string>> = { auto: 'As it reads', markdown: 'Markdown', tree: 'A JSON tree', table: 'A table', text: 'Plain text' };
 
 type Source = ReturnType<typeof tileProject>;
 
 function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDown, ghost }: { d: Dashboard; tile: Tile; state: SentinelState; source?: Source; movable?: boolean; place?: React.CSSProperties; onSize?: (id: string, size: Size | undefined) => void; onPointerDown?: (e: React.PointerEvent<HTMLElement>) => void; ghost?: boolean }) {
   // Its project's logo in the corner, and a soft wash of the project's colour (changeable from ⋯ › Tint).
   const tint = useProjectTint(source?.id, source?.name ?? '');
-  const tr = useT();
   const mark = source ? (
-    <Tip label={tr('sentinel.dash.fromTip', { sentinel: source.sentinel ?? '', project: source.name })}>
-      <span className={n.source} aria-label={tr('sentinel.dash.fromLabel', { sentinel: source.sentinel ?? '', project: source.name })}>
+    <Tip label={`From ${source.sentinel} · ${source.name}`}>
+      <span className={n.source} aria-label={`From ${source.sentinel}, ${source.name}`}>
         {source.id ? <ProjectIcon id={source.id} name={source.name} size={14} /> : <Icon name="laptop" size={13} />}
       </span>
     </Tip>
@@ -585,36 +571,36 @@ function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDow
   const sentinelId = tile.metric?.sentinelId ?? tile.metrics?.[0]?.sentinelId ?? tile.sentinelId ?? tile.step?.sentinelId;
   const output = tile.kind === 'output' ? tileOutput(state, tile) : undefined;
   const menu: ActionItem[] = [
-    { label: tr('sentinel.dash.rename'), icon: 'pencil', onSelect: () => onRename?.() },
+    { label: 'Rename…', icon: 'pencil', onSelect: () => onRename?.() },
     ...(tile.kind === 'divider'
       ? []
       : [
-          { label: tr('sentinel.dash.width'), icon: 'columns' as const, onSelect: noop, submenu: TILE_WIDTHS.map((w) => ({ label: widthWords(w), checked: tile.width === w, onSelect: () => update({ width: w }) })) },
-          { label: tr('sentinel.dash.height'), icon: 'rows' as const, onSelect: noop, submenu: [{ label: tr('sentinel.dash.normal'), checked: tile.height !== 2, onSelect: () => update({ height: 1 }) }, { label: tr('sentinel.dash.tall'), checked: tile.height === 2, onSelect: () => update({ height: 2 }) }] },
+          { label: 'Width', icon: 'columns' as const, onSelect: noop, submenu: TILE_WIDTHS.map((w) => ({ label: WIDTH_WORDS[w], checked: tile.width === w, onSelect: () => update({ width: w }) })) },
+          { label: 'Height', icon: 'rows' as const, onSelect: noop, submenu: [{ label: 'Normal', checked: tile.height !== 2, onSelect: () => update({ height: 1 }) }, { label: 'Tall', checked: tile.height === 2, onSelect: () => update({ height: 2 }) }] },
           ...(tile.kind === 'number' || tile.kind === 'series'
-            ? [{ label: tr('sentinel.dash.compare'), icon: 'clock' as const, onSelect: noop, submenu: [{ label: tr('sentinel.dash.asDashboard', { vs: compareWords(d.compare) }), checked: !tile.compare, onSelect: () => update({ compare: null }) }, ...COMPARE.map((c) => ({ label: tr('sentinel.dash.pin', { label: compareLabel(c) }), checked: tile.compare === c, onSelect: () => update({ compare: c }) }))] }]
+            ? [{ label: 'Compare', icon: 'clock' as const, onSelect: noop, submenu: [{ label: `As the dashboard (${COMPARE_WORDS[d.compare]})`, checked: !tile.compare, onSelect: () => update({ compare: null }) }, ...COMPARE.map((c) => ({ label: `Pin: ${COMPARE_LABEL[c]}`, checked: tile.compare === c, onSelect: () => update({ compare: c }) }))] }]
             : []),
-          ...(tile.kind === 'series' ? [{ label: tr('sentinel.dash.drawAs'), icon: 'chartLine' as const, onSelect: noop, submenu: CHART_TILE_KINDS.map((k) => ({ label: k === 'line' ? tr('sentinel.dash.lines') : k === 'area' ? tr('sentinel.dash.areas') : tr('sentinel.numbers.look.bars'), checked: (tile.chart ?? 'line') === k, onSelect: () => update({ chart: k }) })) }] : []),
-          ...(tile.kind === 'output' ? [{ label: tr('sentinel.dashboard.tileShowAs'), icon: 'eye' as const, onSelect: noop, submenu: OUTPUT_SHOWS.map((k) => ({ label: tr(SHOW_WORDS[k]), checked: (tile.show ?? 'auto') === k, onSelect: () => update({ show: k }) })) }] : []),
-          ...(tile.kind === 'text' ? [{ label: tr('sentinel.dash.shows'), icon: 'eye' as const, onSelect: noop, submenu: [{ label: tr('sentinel.dash.lastHeadline'), checked: tile.text !== 'report', onSelect: () => update({ text: 'headline' }) }, { label: tr('sentinel.dash.lastReport'), checked: tile.text === 'report', onSelect: () => update({ text: 'report' }) }] }] : []),
-          ...(output?.runId ? [{ label: tr('sentinel.dash.openTheRun'), icon: 'arrowRight' as const, separate: true, onSelect: () => a.openRun(output.runId) }] : []),
-          ...(sentinelId && cap.state !== 'gone' ? [{ label: tr('sentinel.dash.openSentinel'), icon: 'sentinel' as const, ...(output?.runId ? {} : { separate: true }), onSelect: () => a.open(sentinelId) }] : []),
+          ...(tile.kind === 'series' ? [{ label: 'Draw as', icon: 'chartLine' as const, onSelect: noop, submenu: CHART_TILE_KINDS.map((k) => ({ label: k === 'line' ? 'Lines' : k === 'area' ? 'Areas' : 'Bars', checked: (tile.chart ?? 'line') === k, onSelect: () => update({ chart: k }) })) }] : []),
+          ...(tile.kind === 'output' ? [{ label: 'Show as', icon: 'eye' as const, onSelect: noop, submenu: OUTPUT_SHOWS.map((k) => ({ label: SHOW_WORDS[k], checked: (tile.show ?? 'auto') === k, onSelect: () => update({ show: k }) })) }] : []),
+          ...(tile.kind === 'text' ? [{ label: 'Shows', icon: 'eye' as const, onSelect: noop, submenu: [{ label: 'Its last headline', checked: tile.text !== 'report', onSelect: () => update({ text: 'headline' }) }, { label: 'Its last report', checked: tile.text === 'report', onSelect: () => update({ text: 'report' }) }] }] : []),
+          ...(output?.runId ? [{ label: 'Open the Run', icon: 'arrowRight' as const, separate: true, onSelect: () => a.openRun(output.runId) }] : []),
+          ...(sentinelId && cap.state !== 'gone' ? [{ label: 'Open Its Sentinel', icon: 'sentinel' as const, ...(output?.runId ? {} : { separate: true }), onSelect: () => a.open(sentinelId) }] : []),
         ]),
     // Desktop widgets are macOS's (WidgetKit): only a Mac offers them.
     ...(tile.kind === 'divider' || keyPlatform() !== 'mac'
       ? []
       : [
           {
-            label: tr('sentinel.dash.addToDesktop'),
+            label: 'Add to Desktop…',
             icon: 'laptop' as const,
-            hint: tr('sentinel.dash.addToDesktopHint'),
+            hint: 'As a macOS widget that updates when its sentinel runs',
             separate: true,
             onSelect: () =>
               openSheet({
                 kind: 'confirm',
-                title: tr('sentinel.dash.desktopTitle', { title: cap.title }),
-                message: tr('sentinel.dash.desktopMessage', { title: cap.title, board: d.name }),
-                confirm: tr('sentinel.dash.gotIt'),
+                title: `Put “${cap.title}” on your desktop`,
+                message: `Right-click your desktop and choose Edit Widgets, search for Beluga, and drag Board tile where you want it (small, medium or large). Then right-click the widget, choose Edit “Board tile”, and pick “${cap.title}” (${d.name}). It updates each time its sentinel runs, and clicking it opens this board. macOS doesn’t let an app place a widget itself.`,
+                confirm: 'Got It',
                 run: noop,
               }),
           },
@@ -622,20 +608,20 @@ function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDow
     ...(source?.id
       ? [
           {
-            label: tr('sentinel.dash.tint'),
+            label: 'Tint',
             icon: 'palette' as const,
-            hint: tr('sentinel.dash.tintHint', { project: source.name }),
+            hint: `For every tile from ${source.name}`,
             separate: true,
             onSelect: noop,
             submenu: [
-              { label: tr('sentinel.dash.fromIcon'), checked: tintChoiceOf(source.id) === 'auto', onSelect: () => setTintChoice(source.id!, 'auto') },
+              { label: 'From its icon', checked: tintChoiceOf(source.id) === 'auto', onSelect: () => setTintChoice(source.id!, 'auto') },
               ...TINTS.map((t) => ({ label: t.label, swatch: t.color, checked: tintChoiceOf(source.id!) === t.id, onSelect: () => setTintChoice(source.id!, t.id) })),
-              { label: tr('sentinel.model.signature.none.label'), checked: tintChoiceOf(source.id) === 'none', onSelect: () => setTintChoice(source.id!, 'none') },
+              { label: 'None', checked: tintChoiceOf(source.id) === 'none', onSelect: () => setTintChoice(source.id!, 'none') },
             ],
           },
         ]
       : []),
-    { label: tr('sentinel.dash.removeTile'), danger: true, separate: true, onSelect: () => void a.act(() => api.dashboard.removeTile(d.id, tile.id)) },
+    { label: 'Remove Tile', danger: true, separate: true, onSelect: () => void a.act(() => api.dashboard.removeTile(d.id, tile.id)) },
   ];
   /**
    * The corner: drag it across the grid's columns (it snaps to 1, 2, 3, 4 or 6 of 6) and down for
@@ -686,29 +672,29 @@ function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDow
   };
   const corner = ghost ? null : (
     <>
-      <span className={n.resize} data-resize="" onPointerDown={resize} role="separator" aria-label={tr('sentinel.dash.resizeLabel', { title: cap.title || tr('sentinel.dash.thisTile') })} title={tr('sentinel.dash.dragToResize')}>
+      <span className={n.resize} data-resize="" onPointerDown={resize} role="separator" aria-label={`Resize ${cap.title || 'this tile'}: drag the corner`} title="Drag to resize">
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
           <path d="M9 3.5 3.5 9M9 7 7 9" />
         </svg>
       </span>
       {sizing ? (
         <span className={n.sizing} aria-hidden="true">
-          {widthWords(sizing.w).replace(/ ?[(（].*[)）]$/, '')}
-          {sizing.h === 2 ? tr('sentinel.dash.tallSuffix') : ''}
+          {WIDTH_WORDS[sizing.w].replace(/ \(.*\)$/, '')}
+          {sizing.h === 2 ? ' · tall' : ''}
         </span>
       ) : null}
     </>
   );
   const more = ghost ? null : (
     <ActionsDropdown items={menu}>
-      <IconButton icon="more" label={tr('sentinel.dash.moreFor', { name: cap.title || tr('sentinel.dash.thisTile') })} className={n.cellMore} />
+      <IconButton icon="more" label={`More for ${cap.title || 'this tile'}`} className={n.cellMore} />
     </ActionsDropdown>
   );
   if (tile.kind === 'divider') {
     return (
       <div className={n.cell} data-tile={tile.id} data-kind="divider" style={place} role="listitem" onPointerDown={onPointerDown}>
         <div className={n.divider}>
-          {renaming ? <TitleInput title={tile.title ?? ''} done={(title) => (setRenaming(false), title !== (tile.title ?? '') && update({ title }))} /> : <span className={n.dividerTitle}>{tile.title || tr('sentinel.dash.divider')}</span>}
+          {renaming ? <TitleInput title={tile.title ?? ''} done={(title) => (setRenaming(false), title !== (tile.title ?? '') && update({ title }))} /> : <span className={n.dividerTitle}>{tile.title || 'Divider'}</span>}
         </div>
         {more ? <div style={{ position: 'absolute', right: 0, top: 4 }}>{more}</div> : null}
       </div>
@@ -721,7 +707,7 @@ function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDow
       {mark}
       {titleInput ?? <span className={n.cellTitle}>{cap.title}</span>}
       {cap.from && tile.kind !== 'text' && cap.from !== cap.title ? <span className={n.cellFrom}>{cap.from}</span> : null}
-      {note ? <span className={n.note}>{note}</span> : tile.compare && tile.kind !== 'number' ? <span className={n.note}>{compareWords(tile.compare)}</span> : null}
+      {note ? <span className={n.note}>{note}</span> : tile.compare && tile.kind !== 'number' ? <span className={n.note}>{COMPARE_WORDS[tile.compare]}</span> : null}
       {more}
     </div>
   );
@@ -738,14 +724,13 @@ function TileCell({ d, tile, state, source, movable, place, onSize, onPointerDow
 
 function TileBody({ d, tile, state, compare, note, lead, more, titleInput }: { d: Dashboard; tile: Tile; state: SentinelState; compare: Compare; note: string | undefined; lead?: React.ReactNode; more: React.ReactNode; titleInput?: React.ReactNode }) {
   const a = useSentinelActions();
-  const tr = useT();
   if (tile.kind === 'number') {
     const m = metricOf(state, tile.metric);
     if (!m)
       return (
         <div className={n.waiting}>
           {titleInput ?? <span className={n.cellTitle}>{tileCaption(state, tile).title}</span>}
-          <span className={n.quiet}>{note ?? tr('sentinel.dash.gone')}</span>
+          <span className={n.quiet}>{note ?? 'gone'}</span>
           {more}
         </div>
       );
@@ -754,7 +739,7 @@ function TileBody({ d, tile, state, compare, note, lead, more, titleInput }: { d
   const tall = tile.height === 2;
   if (tile.kind === 'series') {
     const ms = tileMetrics(state, tile);
-    if (!ms.length) return <div className={n.quiet}>{note ?? tr('sentinel.dash.gone')}</div>;
+    if (!ms.length) return <div className={n.quiet}>{note ?? 'gone'}</div>;
     const height = (tile.width === 1 ? 140 : 200) + (tall ? 200 : 0);
     // A series metric draws its latest array; numbers draw their points over time.
     if (ms[0]!.kind === 'series') return <SeriesChart metric={ms[0]!} kind={tile.chart ?? 'bar'} height={height} />;
@@ -762,7 +747,7 @@ function TileBody({ d, tile, state, compare, note, lead, more, titleInput }: { d
   }
   if (tile.kind === 'table') {
     const m = metricOf(state, tile.metric);
-    if (!m?.rows) return <div className={n.quiet}>{note ?? tr('sentinel.dash.gone')}</div>;
+    if (!m?.rows) return <div className={n.quiet}>{note ?? 'gone'}</div>;
     return <RowsTable metric={m} pageSize={tall ? 14 : 6} {...(tile.columns ? { columns: tile.columns } : {})} />;
   }
   if (tile.kind === 'output') return <OutputTile tile={tile} state={state} note={note} />;
@@ -790,18 +775,17 @@ function NumberFit({ m, compare, title, note, lead, more, titleInput, onRun }: {
 /** A tile's title, renamed in place (empty: its metric's or step's name again). */
 function TitleInput({ title, done }: { title: string; done: (title: string) => void }) {
   const [text, setText] = useState(title);
-  const tr = useT();
   return (
     <input
       className={n.tileTitleInput}
       value={text}
-      aria-label={tr('sentinel.dash.tileTitle')}
+      aria-label="Tile title"
       autoFocus
       maxLength={80}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => done(text.trim())}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') done(text.trim());
+        if (e.key === 'Enter' && !isImeComposing(e)) done(text.trim());
         if (e.key === 'Escape') done(title);
       }}
     />
@@ -815,9 +799,8 @@ function TitleInput({ title, done }: { title: string; done: (title: string) => v
  */
 function OutputTile({ tile, state, note }: { tile: Tile; state: SentinelState; note: string | undefined }) {
   const a = useSentinelActions();
-  const tr = useT();
   const o = tileOutput(state, tile);
-  if (!o) return <div className={n.quiet}>{note ?? tr('sentinel.dash.noOutput')}</div>;
+  if (!o) return <div className={n.quiet}>{note ?? 'No output yet: it shows after its step runs'}</div>;
   const look = outputLook(o, tile.show);
   let body: React.ReactNode;
   if (look === 'table') {
@@ -836,10 +819,10 @@ function OutputTile({ tile, state, note }: { tile: Tile; state: SentinelState; n
       <div className={n.outputBody}>{body}</div>
       <div className={n.outputFoot}>
         {o.at ? <span>{ago(o.at)}</span> : null}
-        {o.cut ? <span>{tr('sentinel.dash.shortened')}</span> : null}
+        {o.cut ? <span>· shortened: the run has all of it</span> : null}
         {o.runId ? (
           <button type="button" className={n.outputRun} onClick={() => a.openRun(o.runId)}>
-            {tr('sentinel.data.openRun')}
+            Open the run
             <Icon name="arrowRight" size={10} />
           </button>
         ) : null}
@@ -851,7 +834,6 @@ function OutputTile({ tile, state, note }: { tile: Tile; state: SentinelState; n
 /** A sentinel's last headline, or its last report (the chat's Markdown). */
 function TextTile({ tile, state }: { tile: Tile; state: SentinelState }) {
   const api = useApi();
-  const tr = useT();
   const last = useMemo(() => [...state.runs].reverse().find((r) => r.sentinelId === tile.sentinelId && r.endedAt), [state.runs, tile.sentinelId]);
   const [report, setReport] = useState<string>();
   useEffect(() => {
@@ -865,12 +847,12 @@ function TextTile({ tile, state }: { tile: Tile; state: SentinelState }) {
       alive = false;
     };
   }, [api, tile.text, last?.id]);
-  if (tileStateIn(state, tile) === 'gone') return <div className={n.quiet}>{tr('sentinel.dash.gone')}</div>;
-  if (tileStateIn(state, tile) === 'draft') return <div className={n.quiet}>{tr('sentinel.dash.draftTile')}</div>;
-  if (!last) return <div className={n.quiet}>{tr('sentinel.dash.noRuns')}</div>;
+  if (tileStateIn(state, tile) === 'gone') return <div className={n.quiet}>gone</div>;
+  if (tileStateIn(state, tile) === 'draft') return <div className={n.quiet}>A draft: it runs once you turn it on</div>;
+  if (!last) return <div className={n.quiet}>No runs yet</div>;
   return (
     <div className={n.text}>
-      {tile.text === 'report' && report ? <Markdown text={report} tasks /> : <p style={{ margin: 0 }}>{last.headline || tr('sentinel.dash.itRan')}</p>}
+      {tile.text === 'report' && report ? <Markdown text={report} tasks /> : <p style={{ margin: 0 }}>{last.headline || 'It ran'}</p>}
       <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-3)' }}>{ago(last.endedAt ?? last.startedAt)}</div>
     </div>
   );

@@ -7,7 +7,6 @@ import { copyText } from '../../lib/copy.js';
 import { toast, useBeluga } from '../../lib/beluga.js';
 import { useCopied } from '../markdown/CodeBlock.js';
 import b from './blocks.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * A file tree Claude wrote as text (`tree`'s output, or ├── └── by hand), drawn as one: folders
@@ -39,14 +38,13 @@ function count(roots: readonly TreeNode[]): number {
 
 export const FileTree = memo(function FileTree({ tree, code, onQuote }: { tree: Tree; code: string; onQuote?: ((fence: string) => void) | undefined }) {
   const { client } = useBeluga();
-  const t = useT();
   const all = useMemo(() => folders(tree.roots), [tree]);
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => (count(tree.roots) > MANY ? new Set(all.filter((f) => f.depth >= 2).map((f) => f.key)) : new Set()));
   const [copied, copyNow] = useCopied();
   // The row right-clicked last (its path, for Copy Path).
   const picked = useRef<readonly TreeNode[] | undefined>(undefined);
   const fence = `\`\`\`text\n${code}\n\`\`\``;
-  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, t('common.blocks.copied', { what }), 'success'));
+  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
   const toggle = (key: string): void =>
     setClosed((now) => {
       const next = new Set(now);
@@ -58,12 +56,12 @@ export const FileTree = memo(function FileTree({ tree, code, onQuote }: { tree: 
   const items = (): ActionItem[] => {
     const at = picked.current;
     return [
-      { label: t('common.ui.copy'), icon: 'copy', onSelect: () => copy(code, t('common.fileTree.theTree')) },
-      { label: t('common.fileTree.copyMarkdown'), onSelect: () => copy(fence, t('common.fileTree.asMarkdown')) },
-      ...(at?.length ? [{ label: t('common.blocks.copyPath'), icon: 'link' as const, onSelect: () => copy(nodePath(at) || at.at(-1)!.name, nodePath(at) || at.at(-1)!.name) }] : []),
-      { label: t('common.blocks.expandAll'), icon: 'chevronDown', separate: true, disabled: !closed.size, onSelect: () => setClosed(new Set()) },
-      { label: t('common.blocks.collapseAll'), icon: 'chevronRight', disabled: !all.length || closed.size === all.length, onSelect: () => setClosed(new Set(all.map((f) => f.key))) },
-      ...(onQuote ? [{ label: t('common.blocks.quote'), icon: 'chat' as const, separate: true, onSelect: () => onQuote(fence) }] : []),
+      { label: 'Copy', icon: 'copy', onSelect: () => copy(code, 'the tree') },
+      { label: 'Copy as Markdown', onSelect: () => copy(fence, 'as Markdown') },
+      ...(at?.length ? [{ label: 'Copy Path', icon: 'link' as const, onSelect: () => copy(nodePath(at) || at.at(-1)!.name, nodePath(at) || at.at(-1)!.name) }] : []),
+      { label: 'Expand All', icon: 'chevronDown', separate: true, disabled: !closed.size, onSelect: () => setClosed(new Set()) },
+      { label: 'Collapse All', icon: 'chevronRight', disabled: !all.length || closed.size === all.length, onSelect: () => setClosed(new Set(all.map((f) => f.key))) },
+      ...(onQuote ? [{ label: 'Quote in Reply', icon: 'chat' as const, separate: true, onSelect: () => onQuote(fence) }] : []),
     ];
   };
 
@@ -77,7 +75,7 @@ export const FileTree = memo(function FileTree({ tree, code, onQuote }: { tree: 
       const guides = path.map((_, d) => <span key={d} className={b.guide} aria-hidden="true" />);
       if (n.more) {
         rows.push(
-          <div key={key} className={b.treeRow} role="treeitem" aria-level={path.length + 1} aria-label={t('common.fileTree.more')}>
+          <div key={key} className={b.treeRow} role="treeitem" aria-level={path.length + 1} aria-label="More entries">
             {guides}
             <span className={b.chevronSpace} />
             <span className={b.treeMore}>…</span>
@@ -113,17 +111,17 @@ export const FileTree = memo(function FileTree({ tree, code, onQuote }: { tree: 
     });
   walk(tree.roots, '', []);
 
-  const summary = tree.summary ?? [tree.dirs ? t('common.fileTree.folders', { n: tree.dirs }) : '', t('common.fileTree.files', { n: tree.files })].filter(Boolean).join(t('common.fileTree.sep'));
+  const summary = tree.summary ?? [tree.dirs ? `${tree.dirs} ${tree.dirs === 1 ? 'folder' : 'folders'}` : '', `${tree.files} ${tree.files === 1 ? 'file' : 'files'}`].filter(Boolean).join(', ');
   return (
     <ActionsContext items={items}>
       <div className={cx(b.block, b.tree)} data-block="tree" onContextMenuCapture={() => (picked.current = undefined)}>
         <div className={b.tools}>
-          <button type="button" className={b.tool} aria-label={t('common.fileTree.copyTheTree')} onClick={() => copyNow(code)}>
+          <button type="button" className={b.tool} aria-label="Copy the tree" onClick={() => copyNow(code)}>
             <Icon name={copied ? 'check' : 'copy'} size={12} />
-            {copied ? t('common.ui.copied') : t('common.ui.copy')}
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
-        <div className={b.treeRows} role="tree" aria-label={t('common.fileTree.label')}>
+        <div className={b.treeRows} role="tree" aria-label="File tree">
           {rows}
         </div>
         <div className={b.treeSummary}>{summary}</div>

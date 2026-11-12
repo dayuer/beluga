@@ -15,7 +15,6 @@ import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { type UiStore, useBeluga } from './beluga.js';
 import { openExternal } from './system.js';
 import { chordLabel } from './shortcuts-model.js';
-import { t } from '../i18n/index.js';
 import { asksFirst, routeOption, routeTyped } from './native-routes.js';
 import { newGroupFor } from './group-edit.js';
 import { openSheet } from './sheets.js';
@@ -123,7 +122,7 @@ export function makeActions(client: SocketClient, ui: UiStore): Actions {
     menuCtx: () => menuCtx,
     runMenu: (m, i) => actions.pick(m, i),
     openLink,
-    pasteImage: () => client.store.dispatch({ type: 'toast', text: t('common.actions.pasteImage', { keys: chordLabel('Cmd+V') }) }),
+    pasteImage: () => client.store.dispatch({ type: 'toast', text: `Paste an image with ${chordLabel('Cmd+V')} in the message box` }),
   };
   const actions: Actions = {
     run: (action) => {

@@ -8,7 +8,6 @@ import { type DrawCell, DataTable } from '../components/views/Table.js';
 import { useViewData } from '../components/views/use-view-data.js';
 import { Segmented, cx } from '../components/ui.js';
 import type { Compare } from '@beluga/core/sentinel/metrics.js';
-import { useT } from '../i18n/index.js';
 import { COMPARE_CHOICES, type NumberWords, chartViewOf, drawnColumns, seriesViewOf, tableViewOf } from './numbers-model.js';
 import { typedCells } from './TypedCell.js';
 import v from '../components/views/views.module.css';
@@ -22,9 +21,8 @@ import n from './numbers.module.css';
 
 const Chart = lazy(() => import('../components/views/Chart.js'));
 
-export function CompareSwitch({ value, onChange, label }: { value: Compare; onChange: (c: Compare) => void; label?: string }) {
-  const t = useT();
-  return <Segmented<Compare> label={label ?? t('sentinel.numbers.compareWith')} value={value} onChange={onChange} options={COMPARE_CHOICES} />;
+export function CompareSwitch({ value, onChange, label = 'Compare with' }: { value: Compare; onChange: (c: Compare) => void; label?: string }) {
+  return <Segmented<Compare> label={label} value={value} onChange={onChange} options={COMPARE_CHOICES} />;
 }
 
 /** A number as a stat tile. `note`: a quiet word in its corner ("paused", "vs last week" when pinned). */

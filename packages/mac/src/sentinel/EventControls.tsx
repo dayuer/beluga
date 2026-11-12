@@ -7,9 +7,8 @@ import { Button, Tip, cx } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
 import { openSheet } from '../lib/sheets.js';
-import { type EventCard, GITHUB_MINUTES, SIGNATURES, UPTIME_MINUTES, webhookMoves, eventCards, eventSentence, looksLikeUrl, troubleOf } from './sentinel-model.js';
+import { type EventCard, GITHUB_MINUTES, SIGNATURES, UPTIME_MINUTES, WEBHOOK_MOVES, eventCards, eventSentence, looksLikeUrl, troubleOf } from './sentinel-model.js';
 import { useDraft } from './use-draft.js';
-import { useT } from '../i18n/index.js';
 import s from './sentinel.module.css';
 
 /**
@@ -21,7 +20,6 @@ import s from './sentinel.module.css';
 type Save = (patch: { trigger: Trigger }) => void;
 
 export function EventControls({ item, save }: { item: Sentinel; save: Save }) {
-  const tr = useT();
   const t = item.trigger;
   const trouble = useApp((st) => troubleOf(st.sentinel, item));
   const project = useApp((st) => st.projects.find((p) => p.id === item.projectId));
@@ -31,7 +29,7 @@ export function EventControls({ item, save }: { item: Sentinel; save: Save }) {
   const sentence = eventSentence(t, { ...(project ? { project: project.name } : {}), ...(repo ? { repo } : {}) });
   return (
     <>
-      {cards && 'what' in t ? <EventCards cards={cards} value={t.what} label={tr('sentinel.event.whatStartsIt')} onChange={(what) => set({ ...t, what } as Trigger)} /> : null}
+      {cards && 'what' in t ? <EventCards cards={cards} value={t.what} label="What starts it" onChange={(what) => set({ ...t, what } as Trigger)} /> : null}
       {t.kind === 'beluga' ? <BelugaFields t={t} set={set} /> : null}
       {t.kind === 'github' ? <GitHubFields t={t} set={set} repo={repo} hasProject={Boolean(item.projectId)} /> : null}
       {t.kind === 'stripe' ? <StripeFields t={t} project={project?.name} /> : null}
@@ -70,7 +68,6 @@ function useRepo(projectId: string | undefined): string | undefined {
 
 /** The plans' AutonomyCards pattern: cards you can read without hovering. */
 function EventCards<W extends string>({ cards, value, label, onChange }: { cards: ReadonlyArray<EventCard<W>>; value: W; label: string; onChange: (v: W) => void }) {
-  useT();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const at = Math.max(0, cards.findIndex((c) => c.value === value));
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -111,15 +108,14 @@ function EventCards<W extends string>({ cards, value, label, onChange }: { cards
 function BelugaFields({ t, set }: { t: BelugaTrigger; set: (t: Trigger) => void }) {
   const projects = useApp((st) => st.projects).filter((p) => p.root && !p.error);
   const ANY = '*';
-  const tr = useT();
   return (
     <div className={s.controlRow}>
-      <span className={s.controlLabel}>{tr('sentinel.event.in')}</span>
+      <span className={s.controlLabel}>In</span>
       <Select
-        label={tr('sentinel.event.inWhichProject')}
+        label="In which project"
         size="small"
         value={t.projectId ?? ANY}
-        options={[{ value: ANY, label: tr('sentinel.event.anyProject') }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+        options={[{ value: ANY, label: 'Any project' }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
         onChange={(v) => {
           const { projectId: _p, ...rest } = t;
           set(v === ANY ? rest : { ...rest, projectId: v });
@@ -136,41 +132,38 @@ function GitHubFields({ t, set, repo, hasProject }: { t: GitHubTrigger; set: (t:
     const { label: _l, ...rest } = t;
     set(next ? { ...rest, label: next } : rest);
   });
-  const tr = useT();
   const minutes = t.minutes ?? 2;
   const choices = GITHUB_MINUTES.includes(minutes) ? GITHUB_MINUTES : [...GITHUB_MINUTES, minutes].sort((a, b) => a - b);
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.event.repository')}</span>
-        <span className={cx(s.staticValue, repo && s.mono)}>{repo ?? (hasProject ? tr('sentinel.event.projectRepo') : tr('sentinel.event.pickProject'))}</span>
+        <span className={s.controlLabel}>Repository</span>
+        <span className={cx(s.staticValue, repo && s.mono)}>{repo ?? (hasProject ? 'The project’s GitHub repository' : 'Pick a project on the right')}</span>
       </div>
       {t.what === 'issue-labelled' ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.event.label')}</span>
-          <TextInput className={s.shortField} value={label.text} onChange={label.change} onBlur={label.flush} placeholder={tr('sentinel.event.anyLabel')} aria-label={tr('sentinel.event.label')} />
+          <span className={s.controlLabel}>Label</span>
+          <TextInput className={s.shortField} value={label.text} onChange={label.change} onBlur={label.flush} placeholder="Any label" aria-label="Label" />
         </div>
       ) : null}
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.event.look')}</span>
-        <Select label={tr('sentinel.event.howOftenGithub')} size="small" value={String(minutes)} options={choices.map((m) => ({ value: String(m), label: tr('sentinel.event.everyMinutes', { n: m }) }))} onChange={(v) => set({ ...t, minutes: Number(v) })} />
+        <span className={s.controlLabel}>Look</span>
+        <Select label="How often GitHub is asked" size="small" value={String(minutes)} options={choices.map((m) => ({ value: String(m), label: m === 1 ? 'Every minute' : `Every ${m} minutes` }))} onChange={(v) => set({ ...t, minutes: Number(v) })} />
       </div>
     </>
   );
 }
 
 function StripeFields({ project }: { t: StripeTrigger; project: string | undefined }) {
-  const tr = useT();
   return (
     <div className={s.controlRow}>
-      <span className={s.controlLabel}>{tr('sentinel.event.account')}</span>
-      <span className={s.staticValue}>{project ? tr('sentinel.event.stripeAccount', { project }) : tr('sentinel.event.pickProject')}</span>
+      <span className={s.controlLabel}>Account</span>
+      <span className={s.staticValue}>{project ? `${project}’s Stripe, connected in Earnings` : 'Pick a project on the right'}</span>
     </div>
   );
 }
 
 function UptimeFields({ t, set }: { t: UptimeTrigger; set: (t: Trigger) => void }) {
-  const tr = useT();
   const [bad, setBad] = useState(false);
   const url = useDraft(t.url, (v) => {
     const next = v.trim();
@@ -182,23 +175,23 @@ function UptimeFields({ t, set }: { t: UptimeTrigger; set: (t: Trigger) => void 
   return (
     <>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.event.address')}</span>
+        <span className={s.fieldLabel}>Address</span>
         <div className={s.urlRow}>
-          <TextInput className={s.grow} value={url.text} onChange={url.change} onBlur={url.flush} mono invalid={bad} placeholder="https://example.com" aria-label={tr('sentinel.event.addressToCheck')} />
+          <TextInput className={s.grow} value={url.text} onChange={url.change} onBlur={url.flush} mono invalid={bad} placeholder="https://example.com" aria-label="Address to check" />
         </div>
-        {bad ? <span className={s.help}>{tr('sentinel.event.wholeAddress')}</span> : null}
+        {bad ? <span className={s.help}>A whole address, like https://example.com/health</span> : null}
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.event.check')}</span>
-        <Select label={tr('sentinel.event.howOftenChecked')} size="small" value={String(t.minutes)} options={UPTIME_MINUTES.map((m) => ({ value: String(m), label: tr('sentinel.event.everyMinutes', { n: m }) }))} onChange={(v) => set({ ...t, minutes: Number(v) as UptimeTrigger['minutes'] })} />
+        <span className={s.controlLabel}>Check</span>
+        <Select label="How often it's checked" size="small" value={String(t.minutes)} options={UPTIME_MINUTES.map((m) => ({ value: String(m), label: m === 1 ? 'Every minute' : `Every ${m} minutes` }))} onChange={(v) => set({ ...t, minutes: Number(v) as UptimeTrigger['minutes'] })} />
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.event.expect')}</span>
+        <span className={s.controlLabel}>Expect</span>
         <Select
-          label={tr('sentinel.event.statusLabel')}
+          label="The status it should answer"
           size="small"
           value={String(expect)}
-          options={statuses.map((n) => ({ value: String(n), label: String(n), description: n === 200 ? tr('sentinel.event.status200') : n === 204 ? tr('sentinel.event.status204') : n === 301 || n === 302 ? tr('sentinel.event.statusRedirect') : tr('sentinel.event.statusSignIn') }))}
+          options={statuses.map((n) => ({ value: String(n), label: String(n), description: n === 200 ? 'OK (the usual)' : n === 204 ? 'No content (health checks)' : n === 301 || n === 302 ? 'It answers with a redirect' : 'Behind a sign-in' }))}
           onChange={(v) => {
             const n = Number(v);
             const { expect: _e, ...rest } = t;
@@ -213,14 +206,13 @@ function UptimeFields({ t, set }: { t: UptimeTrigger; set: (t: Trigger) => void 
 function SentryFields({ t, set }: { t: SentryTrigger; set: (t: Trigger) => void }) {
   const org = useDraft(t.org, (v) => v.trim() !== t.org && set({ ...t, org: v.trim() }));
   const project = useDraft(t.project, (v) => v.trim() !== t.project && set({ ...t, project: v.trim() }));
-  const tr = useT();
   return (
     <div className={s.controlRow}>
-      <span className={s.controlLabel}>{tr('sentinel.event.project')}</span>
+      <span className={s.controlLabel}>Project</span>
       <span className={s.pair}>
-        <TextInput className={s.shortField} value={org.text} onChange={org.change} onBlur={org.flush} mono placeholder={tr('sentinel.event.orgPlaceholder')} aria-label={tr('sentinel.event.sentryOrg')} />
+        <TextInput className={s.shortField} value={org.text} onChange={org.change} onBlur={org.flush} mono placeholder="organization" aria-label="Sentry organization" />
         <span className={s.slash}>/</span>
-        <TextInput className={s.shortField} value={project.text} onChange={project.change} onBlur={project.flush} mono placeholder={tr('sentinel.event.projectPlaceholder')} aria-label={tr('sentinel.event.sentryProject')} />
+        <TextInput className={s.shortField} value={project.text} onChange={project.change} onBlur={project.flush} mono placeholder="project" aria-label="Sentry project" />
       </span>
     </div>
   );
@@ -229,7 +221,6 @@ function SentryFields({ t, set }: { t: SentryTrigger; set: (t: Trigger) => void 
 function WebhookFields({ t, item, set }: { t: WebhookTrigger; item: Sentinel; set: (t: Trigger) => void }) {
   const api = useApi();
   const { client } = useBeluga();
-  const tr = useT();
   const tunnel = useApp((st) => st.sentinel.webhook);
   const [address, setAddress] = useState<WebhookAddress>();
   const [turn, setTurn] = useState(0);
@@ -243,20 +234,20 @@ function WebhookFields({ t, item, set }: { t: WebhookTrigger; item: Sentinel; se
       alive = false;
     };
   }, [item.id, item.paused, tunnel?.url, tunnel?.ready, turn]);
-  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, tr('sentinel.event.copied', { what }), 'success'));
+  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
   const rotate = (): void =>
     openSheet({
       kind: 'confirm',
-      title: tr('sentinel.event.rotateTitle', { name: item.name }),
-      message: tr('sentinel.event.rotateMessage'),
-      confirm: tr('sentinel.event.rotateConfirm'),
+      title: `A new secret for “${item.name}”?`,
+      message: 'Its URL and its signing secret change, and the old ones stop working at once: whatever posts to it (GitHub, Stripe) needs the new URL, and GitHub the new secret.',
+      confirm: 'Rotate Secret',
       destructive: true,
       run: () =>
         void api.sentinel.rotateSecret(item.id).then(
           (a) => {
             setAddress(a);
             setTurn((n) => n + 1);
-            toast(client, tr('sentinel.event.rotated'), 'success');
+            toast(client, 'A new secret: copy the new URL', 'success');
           },
           (err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'),
         ),
@@ -268,17 +259,17 @@ function WebhookFields({ t, item, set }: { t: WebhookTrigger; item: Sentinel; se
       <div className={s.field}>
         <span className={s.fieldLabel}>URL</span>
         <div className={s.urlRow}>
-          <input className={cx(s.copyField, 'selectable')} readOnly value={address?.url ?? ''} placeholder={address?.why ?? tr('sentinel.event.looking')} aria-label={tr('sentinel.event.webhookUrl')} data-testid="webhook-url" onFocus={(e) => e.currentTarget.select()} />
-          <Button size="small" icon="copy" disabled={!address?.url} onClick={() => address?.url && copy(address.url, tr('sentinel.event.theWebhookUrl'))}>
-            {tr('sentinel.event.copy')}
+          <input className={cx(s.copyField, 'selectable')} readOnly value={address?.url ?? ''} placeholder={address?.why ?? 'Looking…'} aria-label="Webhook URL" data-testid="webhook-url" onFocus={(e) => e.currentTarget.select()} />
+          <Button size="small" icon="copy" disabled={!address?.url} onClick={() => address?.url && copy(address.url, 'the webhook URL')}>
+            Copy
           </Button>
         </div>
-        <span className={s.hintLine}>{address?.url && address.why ? `${address.why}. ` : ''}{webhookMoves()}</span>
+        <span className={s.hintLine}>{address?.url && address.why ? `${address.why}. ` : ''}{WEBHOOK_MOVES}</span>
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.event.signature')}</span>
+        <span className={s.controlLabel}>Signature</span>
         <Select
-          label={tr('sentinel.event.signature')}
+          label="Signature"
           size="small"
           value={t.signature ?? 'none'}
           options={SIGNATURES}
@@ -288,15 +279,15 @@ function WebhookFields({ t, item, set }: { t: WebhookTrigger; item: Sentinel; se
           }}
         />
         {t.signature === 'github' && secret ? (
-          <Tip label={tr('sentinel.event.copySecretTip')}>
-            <Button size="small" variant="quiet" icon="copy" onClick={() => copy(secret, tr('sentinel.event.theSecret'))}>
-              {tr('sentinel.event.copySecret')}
+          <Tip label="GitHub’s webhook form asks for it as its Secret">
+            <Button size="small" variant="quiet" icon="copy" onClick={() => copy(secret, 'the secret')}>
+              Copy Secret
             </Button>
           </Tip>
         ) : null}
         <span className={s.grow} />
         <Button size="small" variant="quiet" icon="refresh" onClick={rotate}>
-          {tr('sentinel.event.rotateSecret')}
+          Rotate Secret…
         </Button>
       </div>
     </>

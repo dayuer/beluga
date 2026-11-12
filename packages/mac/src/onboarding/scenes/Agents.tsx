@@ -3,7 +3,6 @@ import { Icon, type IconName } from '../../components/Icon.js';
 import { SPRING } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
-import { t, useT } from '../../i18n/index.js';
 
 /**
  * Watch every agent, steer any of them: a conversation's steps arrive as Claude works, its
@@ -17,26 +16,23 @@ interface Step {
   readonly code?: string;
 }
 
-const steps = (): readonly Step[] => [
-  { icon: 'file', text: t('more.tour.agents.read'), code: 'src/auth/login.ts' },
-  { icon: 'search', text: t('more.tour.agents.searchedFor'), code: 'rateLimit(' },
-  { icon: 'pencil', text: t('more.tour.agents.edited'), code: 'login.ts  +24 −3' },
-  { icon: 'terminal', text: t('more.tour.ran'), code: 'npm test' },
+const STEPS: readonly Step[] = [
+  { icon: 'file', text: 'Read', code: 'src/auth/login.ts' },
+  { icon: 'search', text: 'Searched for', code: 'rateLimit(' },
+  { icon: 'pencil', text: 'Edited', code: 'login.ts  +24 −3' },
+  { icon: 'terminal', text: 'Ran', code: 'npm test' },
 ];
 
-const agents = (): ReadonlyArray<{ name: string; doing: string }> => [
-  { name: 'explorer', doing: t('more.tour.agents.mapping') },
-  { name: 'tests', doing: t('more.tour.agents.writing') },
-  { name: 'browser', doing: t('more.tour.agents.checking') },
+const AGENTS: ReadonlyArray<{ name: string; doing: string }> = [
+  { name: 'explorer', doing: 'Mapping the auth flow' },
+  { name: 'tests', doing: 'Writing 6 tests' },
+  { name: 'browser', doing: 'Checking the login page' },
 ];
 
 // Beats: steps arrive one by one, the screenshot lands, you steer, Claude answers.
 const BEATS = [700, 700, 700, 900, 1500, 1700, 2600] as const;
 
 export function Agents() {
-  const tr = useT();
-  const STEPS = steps();
-  const AGENTS = agents();
   const beat = useBeats(BEATS, 6);
   const shown = Math.min(STEPS.length, beat + 1);
   const shot = beat >= 4;
@@ -54,11 +50,11 @@ export function Agents() {
             </span>
             <span className={s.mono}>api · feat/rate-limits</span>
             <span className={s.live}>
-              <span className={s.liveDot} /> {tr('more.tour.live')}
+              <span className={s.liveDot} /> Live
             </span>
           </div>
           <div className={s.chat}>
-            <div className={s.ask}>{tr('more.tour.agents.ask')}</div>
+            <div className={s.ask}>Add rate limiting to login, with tests</div>
             <div className={s.steps}>
               <AnimatePresence initial={false}>
                 {STEPS.slice(0, shown).map((st, i) => (
@@ -73,15 +69,15 @@ export function Agents() {
             <AnimatePresence>
               {steered ? (
                 <motion.div key="steer" className={s.steer} initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }} transition={SPRING}>
-                  <span className={s.steerTag}>{tr('more.tour.agents.midRun')}</span>
-                  {tr('more.tour.agents.steer')} <code>lib/limits</code>
+                  <span className={s.steerTag}>You, mid-run</span>
+                  Use the limiter we already have in <code>lib/limits</code>
                 </motion.div>
               ) : null}
             </AnimatePresence>
             <AnimatePresence>
               {answered ? (
                 <motion.div key="answer" className={s.answer} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ ...SPRING, delay: 0.15 }}>
-                  <Icon name="claude" size={13} className={s.claudeMark} /> {tr('more.tour.agents.gotIt')} <code>lib/limits</code>{tr('more.tour.agents.gotItEnd')}
+                  <Icon name="claude" size={13} className={s.claudeMark} /> Got it, switching to <code>lib/limits</code>.
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -106,10 +102,10 @@ export function Agents() {
                   <span className={s.shotField} />
                   <span className={s.shotField} />
                   <span className={s.shotButton} />
-                  <span className={s.shotToast}>{tr('more.tour.agents.tooMany')}</span>
+                  <span className={s.shotToast}>Too many tries. Wait 30 s.</span>
                 </div>
                 <span className={s.shotCaption}>
-                  <Icon name="image" size={11} /> {tr('more.tour.agents.shot')}
+                  <Icon name="image" size={11} /> browser took a screenshot
                 </span>
               </motion.div>
             ) : null}

@@ -1,7 +1,7 @@
 import type { PlanTools } from '../../agent/types.js';
 import type { AgentRef } from '../../protocol.js';
 import { actingVia } from '../acting-agent.js';
-import { autoAutonomy, autoChecker } from '../../shared/auto-route.js';
+import { autoAutonomy, autoChecker, autoFixer } from '../../shared/auto-route.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
 import type { BoardWork } from '../board/work.js';
@@ -15,14 +15,14 @@ import { customerTurns } from './customer-turns.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerAgentOf, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, architectOf, checkerAgentOf, checkerOf, homeAgentOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { PlanMover } from './move-work.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
 import { liveFrom } from './progress.js';
 import { type PlanGit, planGitOf } from './plan-git.js';
-import { type Plans, UNTITLED } from './plans.js';
-import { checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
+import { type PlanRoles, type Plans, UNTITLED } from './plans.js';
+import { architectBrief, checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
 
 /**
  * Plans at work: making a plan (its own conversation, in the project's main folder where Claude
@@ -61,6 +61,11 @@ export interface PlansWorkDeps {
   readonly forYou?: PilotDeps['forYou'];
   /** How long a plan may sit quiet before Beluga moves it along: see PilotDeps.rescueMs. */
   readonly rescueMs?: number;
+  /**
+   * Put the plan's own conversation on `agent` (undefined: your default), as its own picker does:
+   * another runtime gets the recent conversation with the next message (a quiet switch, BLG-592).
+   */
+  readonly followAgent?: (channel: string, agent: AgentRef | undefined) => void;
 }
 
 const WS = 'ws:';
@@ -124,8 +129,18 @@ export class PlansWork {
               return ws?.id;
             },
             retireChat: (id) => void deps.controller!.archive(id, false, { quiet: true }).catch(() => undefined),
+            // Each milestone's design, before its work starts: on the plan's agent for its architecture.
+            architectChat: async (plan, milestone) => {
+              const ws = await deps.controller!.newChat(plan.projectId, `Design: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
+              if (ws && plan.archAgent) deps.controller!.manager.setAgent(ws.id, plan.archAgent);
+              return ws?.id;
+            },
           }
         : {}),
+      // What's hard (fix tasks, conflicts, a task that stopped twice): the plan's fix agent, else auto route's strongest.
+      fixer: (plan: Plan) => plan.fixAgent ?? autoFixer(deps.store.getState()),
+      homeAgent: (plan: Plan) => homeAgentOf(plan),
+      ...(deps.followAgent ? { switchAgent: deps.followAgent } : {}),
       ...(deps.alive ? { alive: deps.alive } : {}),
       ...(deps.takeOver ? { takeOver: deps.takeOver } : {}),
       ...(deps.promote ? { promote: deps.promote } : {}),
@@ -174,7 +189,7 @@ export class PlansWork {
    */
   /** `quiet`: started from elsewhere (Your Mac), so the Mac's window stays where it is. */
   async create(
-    input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt; readonly agent?: AgentRef },
+    input: { readonly projectId: string; readonly goal: string; readonly autonomy?: Autonomy; readonly testsAt?: TestsAt } & PlanRoles,
     // `customerTurn`: this turn is a Studio customer's (BLG-78 limits its tools, including this first one).
     opts: { readonly quiet?: boolean; readonly customerTurn?: boolean } = {},
   ): Promise<Plan> {
@@ -185,7 +200,11 @@ export class PlansWork {
     const chat = await controller.newChat(input.projectId, UNTITLED, undefined, { quiet: true });
     if (!chat) throw new Error('Couldn’t start the plan’s conversation');
     const home = `${WS}${chat.id}`;
-    const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
+    const roles: PlanRoles = { ...(input.agent ? { agent: input.agent } : {}), ...(input.checkAgent ? { checkAgent: input.checkAgent } : {}), ...(input.archAgent ? { archAgent: input.archAgent } : {}), ...(input.fixAgent ? { fixAgent: input.fixAgent } : {}) };
+    const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...roles }, this.me());
+    // Its conversation plans on its architect, else the agent picked for its work (a new conversation: nothing to hand off).
+    const planner = homeAgentOf(plan);
+    if (planner) controller.manager.setAgent(chat.id, planner);
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
     // A Studio customer's first turn is limited too (docs/studio-gates.md §5.3): the marker is up
     // before the run starts, and down again if no run could start.
@@ -380,14 +399,22 @@ export class PlansWork {
 
   /**
    * Who works the plan's milestones and tasks (BLG-498): `agent`, or your default (null). Work that
-   * starts from now on gets it; milestones and tasks already at work keep the agent they opened with
-   * (switching mid-run would lose their sessions). A task's own agent still beats it. → in words.
+   * starts from now on gets it, and so does a milestone at work that isn't mid-turn (paused on a
+   * usage limit, stopped: PlanPilot.followWork), its conversation coming along; one mid-turn keeps
+   * the agent it opened with. A task's own agent still beats it. The plan's own conversation moves
+   * to it too. → in words.
    */
   setWorkAgent(id: string, agent: AgentRef | null): string {
     const plan = this.plans.setWorkAgent(id, agent ?? undefined, this.me());
+    // The plan's own conversation follows it (unless it has an architect, who plans), so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
+    this.followHome(plan);
     const who = agent ? agentName(agent, { model: true }) : 'your default agent';
-    const busy = Object.values(plan.runs).filter((r) => r?.agent && !r.passedAt).length;
-    return busy ? `${who} works what starts next; the ${busy === 1 ? 'milestone' : `${busy} milestones`} already at work keep${busy === 1 ? 's' : ''} ${busy === 1 ? 'its' : 'their'} agent` : `${who} works this plan’s milestones and tasks`;
+    // Milestones at work between turns (a usage limit, stopped) go to it now; one mid-turn keeps its agent.
+    const { moved, kept } = plan.status === 'done' ? { moved: 0, kept: 0 } : this.pilot.followWork(id, agent ?? undefined);
+    const them = (n: number): string => (n === 1 ? 'milestone' : `${n} milestones`);
+    if (kept && moved) return `${who} works what starts next and the ${them(moved)} not running now; the ${them(kept)} mid-turn keep${kept === 1 ? 's' : ''} ${kept === 1 ? 'its' : 'their'} agent`;
+    if (kept) return `${who} works what starts next; the ${them(kept)} already at work keep${kept === 1 ? 's' : ''} ${kept === 1 ? 'its' : 'their'} agent`;
+    return moved ? `${who} works this plan’s milestones and tasks, the ${them(moved)} already at work included` : `${who} works this plan’s milestones and tasks`;
   }
 
   /**
@@ -397,6 +424,32 @@ export class PlansWork {
   setCheckAgent(id: string, agent: AgentRef | null): string {
     this.plans.setCheckAgent(id, agent ?? undefined, this.me());
     return agent ? `${agentName(agent, { model: true })} checks this plan’s milestones and reviews its drafts` : 'The agent for its work checks this plan’s milestones';
+  }
+
+  /**
+   * Who writes each milestone's technical design before its work starts: `agent`, or nobody (null:
+   * milestones start right away, as before). Milestones already at work keep going. → in words.
+   */
+  setArchAgent(id: string, agent: AgentRef | null): string {
+    const plan = this.plans.setArchAgent(id, agent ?? undefined, this.me());
+    // The plan's own conversation plans on its architect (none: on its work agent again).
+    this.followHome(plan);
+    return agent ? `${agentName(agent, { model: true })} designs each of this plan’s milestones before its work starts` : 'This plan’s milestones start without a design';
+  }
+
+  /**
+   * Who takes over what's hard in the plan: `agent` (the strongest model, say), or auto route's
+   * strongest (null; auto route off: whoever is at it). Fix tasks, conflicts and a task that
+   * stopped twice from now on go to it. → in words.
+   */
+  setFixAgent(id: string, agent: AgentRef | null): string {
+    this.plans.setFixAgent(id, agent ?? undefined, this.me());
+    return agent ? `${agentName(agent, { model: true })} takes over what’s hard in this plan: fix tasks after a failed check, conflicts, a task that stopped twice` : 'What’s hard in this plan goes to auto route’s strongest model, else stays with whoever is at it';
+  }
+
+  /** The plan's own conversation onto the agent it plans on (its architect, else its work agent), while it's under way. */
+  private followHome(plan: Plan): void {
+    if (plan.status !== 'done' && plan.home.startsWith(WS)) this.deps.followAgent?.(plan.home, homeAgentOf(plan));
   }
 
   pass(id: string, milestone: string): Plan {
@@ -528,6 +581,14 @@ export class PlansWork {
       const m = view.milestones.find((x) => x.milestone.id === checking.milestone);
       return m ? { tools: this.checkerTools(checking.plan.id, m.milestone.id), brief: checkerBrief(view, m), checker: true } : undefined;
     }
+    // A milestone's architect: its brief, and only plan_get and plan_design (it reads code, changes none).
+    const designing = architectOf(this.plans.state(), channel);
+    if (designing) {
+      if (designing.plan.status !== 'active' || !designing.plan.body || designing.plan.movedTo) return undefined;
+      const view = this.pilot.view(designing.plan);
+      const m = view.milestones.find((x) => x.milestone.id === designing.milestone);
+      return m && !m.run.passedAt ? { tools: this.architectTools(designing.plan.id, m.milestone.id), brief: architectBrief(view, m), checker: true } : undefined;
+    }
     const plan = planForHome(this.plans.state(), channel);
     if (!plan) return undefined;
     const board = this.deps.store.getState().board;
@@ -605,6 +666,36 @@ export class PlansWork {
         this.deps.store.dispatch({ type: 'system', channel: plan.home, text: `“${m.title}” didn’t pass its check: ${first}`, level: 'info' });
         this.deps.askClaude(checkFailedPrompt(m.title, notes, auto), plan.home, false);
         return 'Recorded as failed. The plan’s Claude adds the fix tasks from your notes. Your check is done: end your turn.';
+      },
+    };
+  }
+
+  /**
+   * A milestone's architect: it reads the plan (and the code) and records that milestone's design,
+   * nothing more. Recording it says so in the plan's conversation, and the milestone's work starts.
+   */
+  private architectTools(planId: string, milestoneId: string): PlanTools {
+    const full = this.toolsFor(planId);
+    const refuse = (): never => {
+      throw new Error('You design this milestone: only plan_get and plan_design are yours here');
+    };
+    return {
+      only: ['plan_get', 'plan_design'],
+      get: full.get,
+      write: refuse,
+      update: refuse,
+      gate: refuse,
+      start: async () => refuse(),
+      message: refuse,
+      design: (milestone, design) => {
+        const plan = this.plans.need(planId);
+        const m = plan.body?.milestones.find((x) => x.id === milestoneId);
+        if (!m) throw new Error('That milestone isn’t in the approved plan any more: nothing to record');
+        if (milestone !== m.id && milestone.toLowerCase() !== m.title.toLowerCase()) throw new Error(`You design “${m.title}” only (id ${m.id})`);
+        const started = Boolean(plan.runs[m.id]?.agent);
+        this.plans.recordDesign(planId, m.id, design, this.claude());
+        this.deps.store.dispatch({ type: 'system', channel: plan.home, text: started ? `“${m.title}”’s design is written: its agent was already at work.` : `“${m.title}”’s design is written: its work starts next.`, level: 'info' });
+        return 'Recorded. Your design is done: end your turn.';
       },
     };
   }

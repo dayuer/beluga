@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLAUDE_CAPABILITIES } from '../src/agent/runtime/claude/index.js';
 import { CODEX_CAPABILITIES } from '../src/agent/runtime/codex/index.js';
@@ -15,7 +15,8 @@ import { ACTION_KINDS } from '../src/studio/protocol.js';
  * Every way into klaud is listed in docs/parity.md with where each client shows it, so a feature
  * can't land in one client and be forgotten in the other.
  */
-const doc = readFileSync('docs/parity.md', 'utf8');
+// This fork's own rows sit after upstream's, in docs/parity.fork.md (docs/fork.md).
+const doc = readFileSync('docs/parity.md', 'utf8') + (existsSync('docs/parity.fork.md') ? `\n${readFileSync('docs/parity.fork.md', 'utf8')}` : '');
 const listed = (id: string): boolean => doc.includes(`\`${id}\``);
 
 const uiActions = (): string[] => {

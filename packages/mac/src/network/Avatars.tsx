@@ -1,7 +1,6 @@
 import type { PresenceState } from '@beluga/net/mesh/views.js';
 import { Avatar, cx, personColor } from '../components/ui.js';
 import { STATE_LABEL } from './net-model.js';
-import { useT } from '../i18n/index.js';
 import s from './network.module.css';
 
 /**
@@ -9,7 +8,6 @@ import s from './network.module.css';
  * offline. On an avatar it sits in the corner with a ring of the background around it.
  */
 export function PresenceDot({ state, size = 9, label }: { state: PresenceState; size?: number; label?: string }) {
-  useT();
   return <span className={cx(s.dot, s[`dot_${state}`])} style={{ width: size, height: size }} role="img" aria-label={label ?? STATE_LABEL[state]} />;
 }
 
@@ -17,7 +15,6 @@ export function PresenceDot({ state, size = 9, label }: { state: PresenceState; 
 export function PersonAvatar({ name, id, state, size = 22 }: { name: string; id: string; state?: PresenceState; size?: number }) {
   // A tiny avatar (a chat tab) gets a smaller dot tucked inside its corner: one hanging off the
   // bottom right drags the whole icon low and left of the name beside it.
-  const t = useT();
   const small = size < 18;
   const dot = small ? 5 : Math.min(16, Math.max(6, Math.round(size * 0.38)));
   return (
@@ -25,7 +22,7 @@ export function PersonAvatar({ name, id, state, size = 22 }: { name: string; id:
       <Avatar name={name} id={id} size={size} />
       {state ? (
         <span className={s.avatarDot} style={small ? { padding: 1, right: -1, bottom: -1 } : undefined}>
-          <PresenceDot state={state} size={dot} label={t('network.avatars.presence', { name, state: STATE_LABEL[state] })} />
+          <PresenceDot state={state} size={dot} label={`${name}: ${STATE_LABEL[state]}`} />
         </span>
       ) : null}
     </span>

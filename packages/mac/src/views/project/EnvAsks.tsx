@@ -9,7 +9,6 @@ import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { openSheet } from '../../lib/sheets.js';
 import { sameDeep } from '../../lib/stable.js';
 import s from './env-asks.module.css';
-import { useT } from '../../i18n/index.js';
 
 const NONE: readonly EnvChange[] = [];
 const NO_SENDS: readonly EnvSendAsk[] = [];
@@ -21,33 +20,32 @@ const NO_SENDS: readonly EnvSendAsk[] = [];
  */
 function EnvSendRow({ ask }: { ask: EnvSendAsk }) {
   const { client } = useBeluga();
-  const t = useT();
   const [busy, setBusy] = useState(false);
   const decide = (choice: EnvSendChoice): void => {
     setBusy(true);
     void client.call('machines.env.decide', ask.id, choice).finally(() => setBusy(false));
   };
   return (
-    <div className={s.ask} role="status" aria-label={t('views.envSend.aria', { machine: ask.machineName })}>
+    <div className={s.ask} role="status" aria-label={`Send env files to ${ask.machineName}`}>
       <Icon name="lock" size={13} className={s.icon} />
       <span className={s.text}>
-        <strong>{ask.machineName}</strong>{t('views.envSend.hasNo')}
+        <strong>{ask.machineName}</strong> has no
         {ask.files.map((f) => (
           <code key={f}>{f}</code>
         ))}
-        {t('views.envSend.forProject', { project: ask.projectName })}
-        <span className={s.detail}>{t('views.envSend.sendMine')}</span>
+        for {ask.projectName}
+        <span className={s.detail}> · send this Mac’s?</span>
       </span>
-      <Tip label={t('views.envSend.onceTip')}>
+      <Tip label="Sent over your encrypted link and kept only you can read it there; asked again next time">
         <Button size="small" disabled={busy} onClick={() => decide('once')}>
-          {t('views.envSend.once')}
+          Send Once
         </Button>
       </Tip>
       <Button size="small" variant="quiet" disabled={busy} onClick={() => decide('never')}>
-        {t('views.envSend.never')}
+        Don’t Send
       </Button>
-      <ActionsDropdown items={[{ label: t('views.envSend.always'), hint: t('views.envSend.alwaysHint'), onSelect: () => decide('always') }]}>
-        <IconButton icon="more" label={t('views.envSend.more')} disabled={busy} />
+      <ActionsDropdown items={[{ label: 'Always for This Project', hint: 'Settings › Your Computers takes it back', onSelect: () => decide('always') }]}>
+        <IconButton icon="more" label="More for sending env files" disabled={busy} />
       </ActionsDropdown>
     </div>
   );
@@ -60,7 +58,6 @@ function EnvSendRow({ ask }: { ask: EnvSendAsk }) {
  */
 function EnvAsk({ wsId, changes, name }: { wsId: string; changes: readonly EnvChange[]; name?: string }) {
   const api = useApi();
-  const t = useT();
   const [busy, setBusy] = useState(false);
   const files = changes.map((c) => c.file);
   const act = (run: () => Promise<unknown>): void => {
@@ -68,31 +65,31 @@ function EnvAsk({ wsId, changes, name }: { wsId: string; changes: readonly EnvCh
     void run().finally(() => setBusy(false));
   };
   return (
-    <div className={s.ask} role="status" aria-label={t('views.env.aria')}>
+    <div className={s.ask} role="status" aria-label="Env changes in this worktree">
       <Icon name="lock" size={13} className={s.icon} />
       <span className={s.text}>
         {name ? <strong>{name} </strong> : null}
-        {t('views.env.changed')} {files.length === 1 ? <code>{files[0]}</code> : t('views.env.files', { n: files.length })}
+        changed {files.length === 1 ? <code>{files[0]}</code> : `${files.length} env files`}
         {changes.length === 1 ? (
           <>
             {' '}
             <EnvKeys change={changes[0]!} />
           </>
         ) : null}
-        <span className={s.detail}>{name ? '' : t('views.env.mainLacks')}</span>
+        <span className={s.detail}>{name ? '' : ' · the main folder doesn’t have it'}</span>
       </span>
-      <Tip label={t('views.env.copyTip')}>
+      <Tip label="Write it into the main folder’s file; other worktrees that didn’t change theirs follow">
         <Button size="small" disabled={busy} onClick={() => act(() => api.workspaces.applyEnvBack(wsId))}>
-          {t('views.env.copy')}
+          Copy to Main Folder
         </Button>
       </Tip>
-      <Tip label={t('views.env.saveTip')}>
+      <Tip label="The project’s own variables in Beluga: every worktree and run gets them; the file stays as it is">
         <Button size="small" variant="quiet" disabled={busy} onClick={() => act(() => api.workspaces.saveEnvInBeluga(wsId))}>
-          {t('views.env.save')}
+          Save in Beluga
         </Button>
       </Tip>
-      <ActionsDropdown items={[{ label: t('views.env.keep'), hint: t('views.env.keepHint'), onSelect: () => act(() => api.workspaces.keepEnvHere(wsId)) }]}>
-        <IconButton icon="more" label={t('views.env.more')} disabled={busy} />
+      <ActionsDropdown items={[{ label: 'Keep in This Worktree Only', hint: 'asked again if it changes', onSelect: () => act(() => api.workspaces.keepEnvHere(wsId)) }]}>
+        <IconButton icon="more" label="More for these env changes" disabled={busy} />
       </ActionsDropdown>
     </div>
   );
@@ -147,12 +144,11 @@ export function ProjectEnvAsks({ projectId }: { projectId: string }) {
 export function EnvPill({ projectId, root }: { projectId: string; root: string }) {
   const own = useApp((st) => st.envKeys.projects[root]?.keys.length ?? 0);
   const off = useApp((st) => st.envKeys.projects[root]?.dotenv === false);
-  const t = useT();
   return (
-    <Tip label={off ? t('views.env.pillOffTip') : t('views.env.pillTip')}>
+    <Tip label={off ? 'Its variables (the main folder’s .env is switched off)' : 'Its variables and the main folder’s .env'}>
       <button type="button" className={s.pill} onClick={() => openSheet({ kind: 'project_env', projectId })}>
         <Icon name="lock" size={11} />
-        {t('views.env.environment')}
+        Environment
         {own ? <strong>{own}</strong> : null}
       </button>
     </Tip>

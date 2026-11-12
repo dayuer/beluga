@@ -14,7 +14,6 @@ import { useSay } from './use-net.js';
 import { channelName } from './chat-model.js';
 import { CallButton } from '../call/CallStrip.js';
 import s from './network.module.css';
-import { useT } from '../i18n/index.js';
 
 export interface HeaderParts {
   readonly title: ReactNode;
@@ -27,14 +26,13 @@ const PILLS = 4;
 
 /** One person in the header (BLG-210): their picture with presence, their name, what their Claude is doing. */
 function PersonPill({ p }: { p: ChatPerson }) {
-  const t = useT();
   const words = claudePill(p);
-  const tip = t(p.me ? 'network.header.yourAgentIs' : 'network.header.theirAgentIs', { who: p.me ? t('network.header.you') : p.name, state: STATE_LABEL[p.presence], what: p.claude === 'working' && p.doing ? t('network.header.isOn', { doing: p.doing }) : words });
+  const tip = `${p.me ? 'You' : p.name} · ${STATE_LABEL[p.presence]} · ${p.me ? 'your' : 'their'} agent ${p.claude === 'working' && p.doing ? `is on: ${p.doing}` : words}`;
   return (
     <Tip label={tip}>
       <span className={s.pill} data-claude={p.claude} aria-label={tip}>
         <PersonAvatar name={p.name} id={p.peerId} state={p.presence} size={18} />
-        <span className={s.pillName}>{p.me ? t('network.header.you') : p.name}</span>
+        <span className={s.pillName}>{p.me ? 'You' : p.name}</span>
         <span className={s.pillState}>
           {p.claude === 'working' || p.claude === 'idle' ? <Icon name="claude" size={11} style={{ color: claudeColor(p.peerId) }} /> : p.claude === 'update' ? <Icon name="alert" size={11} /> : null}
           {words}
@@ -46,12 +44,11 @@ function PersonPill({ p }: { p: ChatPerson }) {
 
 /** Everyone in the conversation as pills, you first. */
 function PeoplePills({ id }: { id: string }) {
-  const t = useT();
   const { people } = useChatPeople(id);
   if (!people.length) return null;
   const shown = people.slice(0, PILLS);
   return (
-    <span className={s.pills} role="list" aria-label={t('network.header.peopleHere')}>
+    <span className={s.pills} role="list" aria-label="People here">
       {shown.map((p) => (
         <span key={p.peerId} role="listitem">
           <PersonPill p={p} />
@@ -64,23 +61,22 @@ function PeoplePills({ id }: { id: string }) {
 
 /** The toolbar of a conversation with friends: its name, each person and their Claude as a pill, a ⋯ menu. */
 export function useConversationHeader(id: string): HeaderParts {
-  const t = useT();
   const { client } = useBeluga();
   const say = useSay();
   const net = useApp((st) => st.network);
   const target = conversationOf(id);
   if (target?.kind === 'dm') {
     const f = net.friends.find((x) => x.peerId === target.peerId);
-    if (!f) return { title: t('network.header.conversation') };
+    if (!f) return { title: 'Conversation' };
     const items: ActionItem[] = [
-      { label: t('network.header.newChannelWith', { name: f.name }), icon: 'people', onSelect: () => openNet({ kind: 'new_group', with: [f.peerId] }) },
-      { label: t('network.files.copyName'), icon: 'copy', onSelect: () => void copyText(f.name).then(() => say(t('network.files.copiedName', { name: f.name }))) },
-      { label: t('network.header.clearChat'), icon: 'x', separate: true, disabled: !net.messages[id]?.length, onSelect: () => openNet({ kind: 'clear_dm', peerId: f.peerId }) },
-      { label: t('network.header.remove', { name: f.name }), danger: true, separate: true, onSelect: () => openNet({ kind: 'remove_friend', peerId: f.peerId }) },
+      { label: `New Channel with ${f.name}…`, icon: 'people', onSelect: () => openNet({ kind: 'new_group', with: [f.peerId] }) },
+      { label: 'Copy Name', icon: 'copy', onSelect: () => void copyText(f.name).then(() => say(`Copied “${f.name}”`)) },
+      { label: 'Clear Chat…', icon: 'x', separate: true, disabled: !net.messages[id]?.length, onSelect: () => openNet({ kind: 'clear_dm', peerId: f.peerId }) },
+      { label: `Remove ${f.name}…`, danger: true, separate: true, onSelect: () => openNet({ kind: 'remove_friend', peerId: f.peerId }) },
     ];
     return {
       title: (
-        <span className={s.titleRow} title={f.via === 'relay' && f.online ? t('network.header.relay') : undefined}>
+        <span className={s.titleRow} title={f.via === 'relay' && f.online ? 'Through another member’s computer' : undefined}>
           <Icon name="person" size={15} />
           <span className={s.titleName}>{f.name}</span>
           <PeoplePills id={id} />
@@ -90,7 +86,7 @@ export function useConversationHeader(id: string): HeaderParts {
         <>
           <CallButton id={id} label={f.name} />
           <ActionsDropdown items={items}>
-            <IconButton icon="more" label={t('network.header.more', { name: f.name })} />
+            <IconButton icon="more" label={`More for ${f.name}`} />
           </ActionsDropdown>
         </>
       ),
@@ -98,26 +94,26 @@ export function useConversationHeader(id: string): HeaderParts {
   }
   if (target?.kind === 'group') {
     const g = net.groups.find((x) => x.id === target.groupId);
-    if (!g) return { title: t('network.header.channel') };
+    if (!g) return { title: 'Channel' };
     const copyLink = async (): Promise<void> => {
       const open = openGroupInvitation(net.invitations, g.id) ?? (await client.api.network['groups.invite'](g.id));
       await copyText(open.link);
-      say(t('network.tabs.copiedInvite', { name: g.name }));
+      say(`Copied the invite link to ${g.name}`);
     };
     const items: ActionItem[] = g.active
       ? [
-          { label: t('network.tabs.channelInfo'), icon: 'people', onSelect: () => openNet({ kind: 'group_info', groupId: g.id }) },
+          { label: 'Channel Info', icon: 'people', onSelect: () => openNet({ kind: 'group_info', groupId: g.id }) },
           ...(g.admin
             ? [
-                { label: t('network.tabs.addPeople'), icon: 'plus' as const, onSelect: () => openNet({ kind: 'add_people', groupId: g.id }) },
-                { label: t('network.tabs.copyInvite'), icon: 'link' as const, onSelect: () => void copyLink().catch(() => undefined) },
+                { label: 'Add People…', icon: 'plus' as const, onSelect: () => openNet({ kind: 'add_people', groupId: g.id }) },
+                { label: 'Copy Invite Link', icon: 'link' as const, onSelect: () => void copyLink().catch(() => undefined) },
               ]
             : []),
-          { label: t('network.tabs.leaveChannel'), danger: true, separate: true, onSelect: () => openNet({ kind: 'leave_group', groupId: g.id }) },
+          { label: 'Leave Channel…', danger: true, separate: true, onSelect: () => openNet({ kind: 'leave_group', groupId: g.id }) },
         ]
       : [
-          { label: t('network.tabs.channelInfo'), icon: 'people', onSelect: () => openNet({ kind: 'group_info', groupId: g.id }) },
-          { label: t('network.tabs.deleteChannel'), danger: true, separate: true, onSelect: () => openNet({ kind: 'delete_group', groupId: g.id }) },
+          { label: 'Channel Info', icon: 'people', onSelect: () => openNet({ kind: 'group_info', groupId: g.id }) },
+          { label: 'Delete Channel…', danger: true, separate: true, onSelect: () => openNet({ kind: 'delete_group', groupId: g.id }) },
         ];
     return {
       title: (
@@ -127,17 +123,17 @@ export function useConversationHeader(id: string): HeaderParts {
           {g.active ? <PeoplePills id={id} /> : null}
         </span>
       ),
-      ...(g.active ? {} : { subtitle: <span>{t('network.header.noLonger')}</span> }),
+      ...(g.active ? {} : { subtitle: <span>You’re no longer in this channel</span> }),
       right: (
         <>
           {g.active ? <CallButton id={id} label={`#${g.name}`} /> : null}
           <MembersButton g={g} />
           <ActionsDropdown items={items}>
-            <IconButton icon="more" label={t('network.header.more', { name: g.name })} />
+            <IconButton icon="more" label={`More for ${g.name}`} />
           </ActionsDropdown>
         </>
       ),
     };
   }
-  return { title: t('network.header.conversation') };
+  return { title: 'Conversation' };
 }

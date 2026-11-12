@@ -9,7 +9,6 @@ import { openNet } from '../../network/net-sheets.js';
 import type { NativeMenuProps } from './index.js';
 import { usePick } from './pick.js';
 import s from './menus.module.css';
-import { useT } from '../../i18n/index.js';
 
 /** What asking someone's Beluga "could you take this?" found: still asking, yes, or why not (BLG-614). */
 type Check = 'checking' | { readonly ok: boolean; readonly why?: string };
@@ -20,7 +19,6 @@ type Check = 'checking' | { readonly ok: boolean; readonly why?: string };
  * one online is asked whether their Mac has this repository, so nobody is handed what they can't take.
  */
 export function HandoffSheet({ menu, close }: NativeMenuProps<'handoff'>) {
-  const t = useT();
   const api = useApi();
   const pick = usePick(menu);
   const ws = useApp((st) => findWorkspace(st.projects, menu.id));
@@ -53,7 +51,7 @@ export function HandoffSheet({ menu, close }: NativeMenuProps<'handoff'>) {
   const whyNot = (peerId: string): string | undefined => {
     const p = people.find((x) => x.peerId === peerId);
     const c = checks[peerId];
-    return p?.why ?? (c && c !== 'checking' && !c.ok ? (c.why ?? t('dialogs.handoff.cantTake', { name: p?.name ?? t('dialogs.handoff.they') })) : undefined);
+    return p?.why ?? (c && c !== 'checking' && !c.ok ? (c.why ?? `${p?.name ?? 'They'} can’t take it`) : undefined);
   };
   const person = people.find((p) => p.peerId === who);
   const blocked = (peerId: string): boolean => Boolean(whyNot(peerId)) || checks[peerId] === 'checking';
@@ -63,15 +61,15 @@ export function HandoffSheet({ menu, close }: NativeMenuProps<'handoff'>) {
   const detail = (p: (typeof people)[number]): string => {
     const why = whyNot(p.peerId);
     if (why) return why;
-    if (checks[p.peerId] === 'checking') return t('dialogs.handoff.checking', { name: p.name });
-    return `${t('dialogs.handoff.continues', { name: p.name })}${p.online ? '' : t('dialogs.handoff.offline')}`;
+    if (checks[p.peerId] === 'checking') return `Checking ${p.name} has this repository…`;
+    return `${p.name}’s agent continues on ${p.name}’s computer${p.online ? '' : '. They’re offline: it waits for them'}`;
   };
   return (
     <FormSheet
-      title={t('dialogs.handoff.title', { name: ws.name })}
+      title={`Hand Off “${ws.name}”`}
       icon="hand"
-      intro={t('dialogs.handoff.intro')}
-      submitLabel={person ? t('dialogs.handoff.toName', { name: person.name }) : t('dialogs.handoff.handOff')}
+      intro="A friend takes over this work on their computer, with their own agent. They need the same repository. To work on it together instead, use Share."
+      submitLabel={person ? `Hand Off to ${person.name}` : 'Hand Off'}
       canSubmit={Boolean(person && !blocked(person.peerId))}
       onSubmit={() => handOff()}
       onCancel={close}
@@ -79,15 +77,15 @@ export function HandoffSheet({ menu, close }: NativeMenuProps<'handoff'>) {
       footer={
         people.length ? undefined : (
           <button type="button" className={f.linkButton} onClick={() => (close(), openNet({ kind: 'add_friend' }))}>
-            {t('dialogs.handoff.addFriend')}
+            Add a Friend…
           </button>
         )
       }
     >
-      <Field label={t('dialogs.handoff.to')}>
+      <Field label="To">
         {people.length ? (
           <PickList
-            label={t('dialogs.handoff.who')}
+            label="Who takes over"
             value={who}
             onChange={setWho}
             onChoose={handOff}
@@ -96,15 +94,15 @@ export function HandoffSheet({ menu, close }: NativeMenuProps<'handoff'>) {
         ) : (
           <div className={s.note}>
             <Icon name="people" size={14} />
-            {network.enabled ? t('dialogs.handoff.noFriends') : t('dialogs.handoff.noNetwork')}
+            {network.enabled ? 'No friends yet. Add a friend, then hand this off to them.' : 'Turn on the Beluga network in Settings to hand this to a friend, or invite someone to your room.'}
           </div>
         )}
       </Field>
-      <Field label={t('dialogs.handoff.what')}>
+      <Field label="What happens">
         <ol className={s.steps}>
-          <li>{t('dialogs.handoff.step1')}</li>
-          <li>{t('dialogs.handoff.step2')}</li>
-          <li>{t('dialogs.handoff.step3')}</li>
+          <li>Your agent writes a short handoff note: what’s done, what’s left.</li>
+          <li>Uncommitted work is committed, and the branch is sent to them, encrypted.</li>
+          <li>They accept and get a worktree with the branch and this chat. Their agent carries on, and you can follow along.</li>
         </ol>
       </Field>
     </FormSheet>

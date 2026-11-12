@@ -12,8 +12,6 @@ import { closeNet } from './net-sheets.js';
 import { errorText, openDm, openGroup, quietly, useSay } from './use-net.js';
 import s from './network.module.css';
 import { yourComputer } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
-import { fill } from './fill.js';
 
 /** What's on the clipboard, if the window may read it (the app can; a browser may refuse). */
 async function clipboardText(): Promise<string> {
@@ -40,9 +38,8 @@ function useMinute(): number {
 
 /** The code in big letters, its dashes quieter. */
 function Code({ code }: { code: string }) {
-  const t = useT();
   return (
-    <div className={s.code} aria-label={t('network.add.codeLabel', { code })}>
+    <div className={s.code} aria-label={`Invitation code ${code}`}>
       {code.split('-').map((part, i) => (
         <span key={i}>
           {i ? <span className={s.codeDash}>–</span> : null}
@@ -55,7 +52,6 @@ function Code({ code }: { code: string }) {
 
 /** Invite someone: one invitation (a code and a link), copyable, with when it ends and Cancel. */
 function InviteHalf() {
-  const t = useT();
   const { client } = useBeluga();
   const say = useSay();
   const now = useMinute();
@@ -84,20 +80,22 @@ function InviteHalf() {
   const copy = (text: string, key: string, what: string): void =>
     void copyText(text).then(() => {
       flash(key);
-      say(t('network.add.copied', { what }));
+      say(`Copied ${what}`);
     });
   const codeEnds = shown?.codeExpiresAt ?? shown?.expiresAt ?? 0;
   return (
-    <section className={s.half} aria-label={t('network.add.inviteSomeone')}>
+    <section className={s.half} aria-label="Invite someone">
       <h3 className={s.halfTitle}>
         <Icon name="link" size={13} />
-        {t('network.add.inviteSomeone')}
+        Invite someone
       </h3>
-      <p className={s.halfText}>{t('network.add.inviteText')}</p>
+      <p className={s.halfText}>Send them the code or the link. It works once, then they’re your friend.</p>
       {joined && !shown ? (
         <div className={s.done}>
           <Avatar name={joined.name} id={joined.peerId} size={40} />
-          <div>{fill(t('network.add.friendNow'), <span className={s.doneName}>{joined.name}</span>)}</div>
+          <div>
+            <span className={s.doneName}>{joined.name}</span> is your friend now
+          </div>
           <Button
             variant="primary"
             icon="chat"
@@ -106,7 +104,7 @@ function InviteHalf() {
               openDm(client, joined.peerId);
             }}
           >
-            {t('network.add.message', { name: joined.name })}
+            Message {joined.name}
           </Button>
         </div>
       ) : shown ? (
@@ -114,23 +112,23 @@ function InviteHalf() {
           <Code code={shown.code} />
           <div className={s.qrRow}>
             <div className={s.qr}>
-              <QrCode text={shown.link} size={92} label={t('network.add.qrLabel')} />
+              <QrCode text={shown.link} size={92} label="The invitation link as a QR code" />
             </div>
             <div className={s.qrSide}>
-              <Button icon={copied === 'code' ? 'check' : 'copy'} onClick={() => copy(shown.code, 'code', t('network.add.theCode'))}>
-                {copied === 'code' ? t('network.add.copiedButton') : t('network.add.copyCode')}
+              <Button icon={copied === 'code' ? 'check' : 'copy'} onClick={() => copy(shown.code, 'code', 'the code')}>
+                {copied === 'code' ? 'Copied' : 'Copy Code'}
               </Button>
-              <Button icon={copied === 'link' ? 'check' : 'link'} onClick={() => copy(shown.link, 'link', t('network.add.theLink'))}>
-                {copied === 'link' ? t('network.add.copiedButton') : t('network.add.copyLink')}
+              <Button icon={copied === 'link' ? 'check' : 'link'} onClick={() => copy(shown.link, 'link', 'the link')}>
+                {copied === 'link' ? 'Copied' : 'Copy Link'}
               </Button>
             </div>
           </div>
           <div className={s.expiry} style={{ marginTop: 12 }}>
             <Icon name="clock" size={11} />
-            {codeEnds <= now ? t('network.add.codeExpired', { link: timeLeft(shown.expiresAt, now) }) : codeEnds < shown.expiresAt ? t('network.add.codeAndLink', { code: timeLeft(codeEnds, now), link: timeLeft(shown.expiresAt, now) }) : expiryLabel(shown.expiresAt, now)}
+            {codeEnds <= now ? `The code expired; the link works for ${timeLeft(shown.expiresAt, now)}` : codeEnds < shown.expiresAt ? `The code works for ${timeLeft(codeEnds, now)}, the link for ${timeLeft(shown.expiresAt, now)}` : expiryLabel(shown.expiresAt, now)}
           </div>
           <button type="button" className={s.cancelInvite} style={{ marginTop: 8 }} onClick={() => void client.api.network['friends.cancelInvite'](shown.id).then(() => setMade(undefined))}>
-            {t('network.add.cancelInvitation')}
+            Cancel Invitation
           </button>
         </>
       ) : (
@@ -139,7 +137,7 @@ function InviteHalf() {
             <Icon name="people" size={26} />
           </span>
           <Button variant="primary" disabled={busy} onClick={() => void create()}>
-            {busy ? t('network.add.creating') : t('network.add.create')}
+            {busy ? 'Creating…' : 'Create Invitation'}
           </Button>
           {error ? (
             <div className={s.acceptError} role="alert">
@@ -157,7 +155,6 @@ type Result = { readonly kind: 'friend'; readonly peerId: string; readonly name:
 
 /** Have a code or link: paste it (it pastes itself if one is on the clipboard), Add. */
 function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
-  const t = useT();
   const { client } = useBeluga();
   const [text, setText] = useState(preset ?? '');
   const [pasted, setPasted] = useState(false);
@@ -200,21 +197,27 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
       else openGroup(client, result.groupId);
     };
     return (
-      <section className={s.half} aria-label={t('network.add.haveCode')}>
+      <section className={s.half} aria-label="Have a code or link?">
         <div className={s.done}>
           {result.kind === 'friend' ? <Avatar name={result.name} id={result.peerId} size={40} /> : <Icon name="people" size={28} />}
           <div>
             {result.kind === 'friend' ? (
-              fill(t('network.add.friendsNow'), <span className={s.doneName}>{result.name}</span>)
+              <>
+                You and <span className={s.doneName}>{result.name}</span> are friends now
+              </>
             ) : result.status === 'joined' ? (
-              fill(t('network.add.youreIn'), <span className={s.doneName}>{result.name}</span>)
+              <>
+                You’re in <span className={s.doneName}>{result.name}</span>
+              </>
             ) : (
-              fill(t('network.add.askedToJoin'), <span className={s.doneName}>{result.name}</span>)
+              <>
+                You asked to join <span className={s.doneName}>{result.name}</span>. An admin lets you in.
+              </>
             )}
           </div>
           {result.kind === 'group' && result.status === 'waiting' ? null : (
             <Button variant="primary" icon="chat" onClick={go}>
-              {result.kind === 'friend' ? t('network.add.message', { name: result.name }) : t('network.add.open', { name: result.name })}
+              {result.kind === 'friend' ? `Message ${result.name}` : `Open ${result.name}`}
             </Button>
           )}
         </div>
@@ -222,12 +225,12 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
     );
   }
   return (
-    <section className={s.half} aria-label={t('network.add.haveCode')}>
+    <section className={s.half} aria-label="Have a code or link?">
       <h3 className={s.halfTitle}>
         <Icon name="plus" size={13} />
-        {group ? t('network.add.joinChannel') : t('network.add.haveCode')}
+        {group ? 'Join a channel' : 'Have a code or link?'}
       </h3>
-      <p className={s.halfText}>{group ? t('network.add.groupText') : t('network.add.pasteText')}</p>
+      <p className={s.halfText}>{group ? 'Someone sent you an invitation to a group.' : 'Paste what your friend sent you, or type their code.'}</p>
       <form
         className={s.acceptField}
         onSubmit={(e) => {
@@ -240,8 +243,8 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
           autoFocus={!preset}
           className={cx(s.acceptInput, error && s.acceptInvalid)}
           value={text}
-          placeholder={t('network.add.fieldPlaceholder')}
-          aria-label={t('network.add.fieldLabel')}
+          placeholder="K7QM-4XPA-R2TD or beluga://add#…"
+          aria-label="Invitation code or link"
           spellCheck={false}
           autoComplete="off"
           disabled={busy}
@@ -254,7 +257,7 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
         {busy ? (
           <span className={s.busy}>
             <span className={s.spinner} />
-            {t('network.add.reaching')}
+            Reaching their computer…
           </span>
         ) : error ? (
           <div className={s.acceptError} role="alert">
@@ -264,12 +267,12 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
         ) : pasted ? (
           <span className={s.pasted}>
             <Icon name="check" size={11} />
-            {t('network.add.pasted')}
+            Pasted from the clipboard
           </span>
         ) : null}
         <div className={s.acceptButtons}>
           <Button ref={add} autoFocus={Boolean(preset)} type="submit" variant={found ? 'primary' : 'plain'} disabled={!text.trim() || busy}>
-            {group || found?.group ? t('network.add.joinChannelButton') : t('network.add.addFriend')}
+            {group || found?.group ? 'Join Channel' : 'Add Friend'}
           </Button>
         </div>
       </form>
@@ -282,20 +285,19 @@ function AcceptHalf({ preset, group }: { preset?: string; group?: boolean }) {
  * else's. A beluga://add link opens it with the invitation filled in, ready to accept.
  */
 export function AddFriendSheet({ accept }: { accept?: string }) {
-  const t = useT();
   return (
     <Sheet
-      title={t('network.add.title')}
-      subtitle={t('network.add.subtitle', { computer: yourComputer() })}
+      title="Add a Friend"
+      subtitle={`Friends connect straight to ${yourComputer()}. No server, no account.`}
       icon="people"
       close={closeNet}
       wide
       footer={
         <>
           <span className={s.dim}>
-            <Icon name="lock" size={11} /> {t('network.add.encrypted')}
+            <Icon name="lock" size={11} /> End-to-end encrypted
           </span>
-          <Button onClick={closeNet}>{t('network.add.done')}</Button>
+          <Button onClick={closeNet}>Done</Button>
         </>
       }
     >
@@ -309,9 +311,8 @@ export function AddFriendSheet({ accept }: { accept?: string }) {
 
 /** Join a group from its link: just the accepting half. */
 export function JoinGroupSheet({ accept }: { accept: string }) {
-  const t = useT();
   return (
-    <Sheet title={t('network.add.joinTitle')} subtitle={t('network.add.joinSubtitle')} icon="people" close={closeNet}>
+    <Sheet title="Join a Channel" subtitle="Channels live on their members’ computers. No server." icon="people" close={closeNet}>
       <div style={{ margin: '0 -18px' }}>
         <AcceptHalf preset={accept} group />
       </div>

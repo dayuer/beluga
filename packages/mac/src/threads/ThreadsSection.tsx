@@ -1,4 +1,3 @@
-import { t, tl, useT } from '../i18n/index.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { useMemo } from 'react';
 import { since } from '../claude-code/cc-model.js';
@@ -40,32 +39,31 @@ export function ThreadsSection({ id }: { id: string }) {
   const key = `threads-finished:${id}`;
   const showAll = useUi((u) => u.collapsed.includes(key));
   const now = useNow(Boolean(view?.running));
-  useT();
   if (!view) return null;
   const { shown, earlier } = panelRows(view.rows, FINISHED_SHOWN, showAll);
   const toggle = (): void => actions.run({ type: 'toggle_fold', key });
-  const stop = (thread: string): void => void api.threads.stop(thread).catch((err: unknown) => toast(client, err instanceof Error ? err.message : t('threads.cantStop'), 'error'));
+  const stop = (thread: string): void => void api.threads.stop(thread).catch((err: unknown) => toast(client, err instanceof Error ? err.message : 'Cannot stop the thread', 'error'));
   const open = (row: ThreadFamilyRow): void => {
     const sub = row.kind === 'agent' ? agents.find((a) => a.agent.id === row.id) : undefined;
     if (sub) openSubAgent(client, actions, sub);
     else actions.run({ type: 'open_ws', id: row.id });
   };
   const items: ActionItem[] = [
-    { label: t('threads.stopAll'), icon: 'stop', disabled: !view.stoppable.length, onSelect: () => void api.threads.stopAll(id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : t('threads.cantStopAll'), 'error')) },
-    { label: t('threads.showFinished'), checked: showAll, separate: true, onSelect: toggle },
+    { label: 'Stop All Running', icon: 'stop', disabled: !view.stoppable.length, onSelect: () => void api.threads.stopAll(id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : 'Cannot stop the threads', 'error')) },
+    { label: 'Show Finished', checked: showAll, separate: true, onSelect: toggle },
   ];
   return (
     <Panel
-      title={view.running ? t('threads.titleRunning', { n: view.running }) : t('threads.title')}
+      title={view.running ? `Threads · ${view.running} running` : 'Threads'}
       action={
         view.rows.length ? (
           <ActionsDropdown items={items}>
-            <Button size="small" variant="quiet" icon="more" aria-label={t('threads.actions')} />
+            <Button size="small" variant="quiet" icon="more" aria-label="Thread actions" />
           </ActionsDropdown>
         ) : null
       }
     >
-      <div className={s.list} role="list" aria-label={t('threads.title')}>
+      <div className={s.list} role="list" aria-label="Threads">
         {view.parent ? <ParentRow parent={view.parent} onOpen={(to) => actions.run({ type: 'open_ws', id: to })} /> : null}
         {shown.map((row) => (
           <ChildRow key={`${row.kind}:${row.id}`} row={row} now={now} onOpen={() => open(row)} onStop={() => stop(row.id)} />
@@ -73,7 +71,7 @@ export function ThreadsSection({ id }: { id: string }) {
         {earlier ? (
           <div role="listitem">
             <button type="button" className={s.earlier} onClick={toggle}>
-              {t('threads.earlier', { n: earlier })}
+              Earlier · {earlier}
             </button>
           </div>
         ) : null}
@@ -85,8 +83,7 @@ export function ThreadsSection({ id }: { id: string }) {
 function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: number; onOpen: () => void; onStop: () => void }) {
   const working = isThreadWorking(row.state);
   const stoppable = working && row.kind === 'thread';
-  useT();
-  const word = tl('THREAD_WORDS', row.state, 'text', THREAD_WORDS[row.state]);
+  const word = THREAD_WORDS[row.state];
   const duration = since((row.endedAt ?? now) - row.since);
   return (
     <div role="listitem" className={cx(s.row, stoppable && s.stoppable)} data-thread-row={row.kind} data-state={row.state}>
@@ -95,14 +92,14 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
         label={
           <span className={s.card}>
             <strong>{row.title}</strong>
-            <span>{[row.kind === 'agent' ? t('claudeCode.monitor.subAgent') : '', row.agent, row.model].filter(Boolean).join(' · ')}</span>
+            <span>{[row.kind === 'agent' ? 'Sub-agent' : '', row.agent, row.model].filter(Boolean).join(' · ')}</span>
             <span>
               {word} · {duration}
             </span>
           </span>
         }
       >
-        <button type="button" className={s.open} aria-label={t(row.kind === 'agent' ? 'threads.openSubAgent' : 'threads.open', { title: row.title, state: word })} onClick={onOpen}>
+        <button type="button" className={s.open} aria-label={`Open ${row.title}${row.kind === 'agent' ? ', sub-agent' : ''}, ${word}`} onClick={onOpen}>
           <FamilyMark row={row} />
           <FamilyTitle row={row} />
         </button>
@@ -110,8 +107,8 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
       <span className={s.end}>
         <FamilyEnd row={row} now={now} />
         {stoppable ? (
-          <button type="button" className={s.stop} aria-label={t('threads.stopNamed', { title: row.title })} onClick={onStop}>
-            {t('threads.stop')}
+          <button type="button" className={s.stop} aria-label={`Stop ${row.title}`} onClick={onStop}>
+            Stop
           </button>
         ) : null}
       </span>
@@ -122,8 +119,7 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
 /** The chat that started this one. A removed parent keeps its title and opens nothing. */
 function ParentRow({ parent, onOpen }: { parent: ThreadFamilyParent; onOpen: (id: string) => void }) {
   // An open chat with no run says Idle; a Your Mac chat's state isn't known here.
-  useT();
-  const word = parent.gone ? t('threads.removed') : parent.state ? tl('THREAD_WORDS', parent.state, 'text', THREAD_WORDS[parent.state]) : parent.openId ? t('claudeCode.model.idle') : '';
+  const word = parent.gone ? 'Removed' : parent.state ? THREAD_WORDS[parent.state] : parent.openId ? 'Idle' : '';
   const inner = (
     <>
       <span className={s.mark}>
@@ -140,7 +136,7 @@ function ParentRow({ parent, onOpen }: { parent: ThreadFamilyParent; onOpen: (id
   return (
     <div role="listitem" className={s.row} data-thread-row="parent">
       {parent.openId ? (
-        <button type="button" className={s.open} aria-label={t('threads.openParent', { title: parent.title })} onClick={() => onOpen(parent.openId!)}>
+        <button type="button" className={s.open} aria-label={`Open the parent chat, ${parent.title}`} onClick={() => onOpen(parent.openId!)}>
           {inner}
         </button>
       ) : (

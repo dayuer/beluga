@@ -1,4 +1,3 @@
-import { t, useT } from '../i18n/index.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PhoneMirrorStatus, PhoneTouchData } from '../../../../src/ipc/client.js';
 import type { DeviceView, PhoneUse } from '../../../../src/companion/protocol.js';
@@ -16,6 +15,7 @@ import { H264Player } from './h264.js';
 import { onWindowActive, pageShown } from '../lib/window-active.js';
 import { touchCaption } from './phone-model.js';
 import s from './phone-view.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * "Your phone" (BLG-171): a live mirror of your paired Android phone that you can touch directly —
@@ -27,18 +27,13 @@ import s from './phone-view.module.css';
  * what Claude does on the phone as it does it. The screen is off until you ask for it (BLG-196).
  */
 
-const LEVELS: ReadonlyArray<{ value: PhoneUse; readonly label: string; readonly long: string }> = [
-  { value: 'off', get label() { return t('phone.use.off'); }, get long() { return t('phone.use.off'); } },
-  { value: 'ask', get label() { return t('phone.view.ask'); }, get long() { return t('phone.use.ask'); } },
-  { value: 'use', get label() { return t('phone.use.use'); }, get long() { return t('phone.use.use'); } },
-  { value: 'full', get label() { return t('phone.view.full'); }, get long() { return t('phone.use.full'); } },
+const LEVELS: ReadonlyArray<{ value: PhoneUse; label: string }> = [
+  { value: 'off', label: 'Off' },
+  { value: 'ask', label: 'Ask' },
+  { value: 'use', label: 'Use' },
+  { value: 'full', label: 'Full' },
 ];
-const ROUTE_WORDS: Record<string, string> = {
-  usb: 'USB',
-  wifi: 'Wi‑Fi',
-  get link() { return t('phone.view.throughBeluga'); },
-  get accessibility() { return t('phone.view.accessibility'); },
-};
+const ROUTE_WORDS: Record<string, string> = { usb: 'USB', wifi: 'Wi‑Fi', link: 'through Beluga', accessibility: 'Accessibility' };
 
 function useAndroidPhone(): DeviceView | undefined {
   return useApp((st) => {
@@ -49,8 +44,7 @@ function useAndroidPhone(): DeviceView | undefined {
 
 export function PhoneView() {
   const phone = useAndroidPhone();
-  useT();
-  if (!phone) return <Empty icon="phone" title={t('phone.view.noPhone')} detail={t('phone.view.pairToSee')} />;
+  if (!phone) return <Empty icon="phone" title="No phone" detail="Pair a phone to see it here." />;
   const use = phone.control?.use ?? 'off';
   if (use === 'off') return <SetUp phone={phone} />;
   return <Screen phone={phone} />;
@@ -59,8 +53,7 @@ export function PhoneView() {
 /** The right panel's Phone tab (BLG-186): the same live mirror beside Your Mac's chat, to watch what Claude does on it (taps still land; the keys and typing are on the full size page). */
 export function PhonePanel() {
   const phone = useAndroidPhone();
-  useT();
-  if (!phone) return <Empty icon="phone" title={t('phone.view.noPhone')} detail={t('phone.view.pairAndroid')} />;
+  if (!phone) return <Empty icon="phone" title="No phone" detail="Pair an Android phone to see it here." />;
   if ((phone.control?.use ?? 'off') === 'off') return <SetUp phone={phone} />;
   return <Screen phone={phone} compact />;
 }
@@ -76,10 +69,9 @@ function Screen({ phone, compact = false }: { phone: DeviceView; compact?: boole
 
 function Ready({ phone, compact }: { phone: DeviceView; compact: boolean }) {
   const { client } = useBeluga();
-  useT();
   const actions = useActions();
   const routes = phone.control?.routes ?? [];
-  const how = routes.length ? (routes[0] === 'link' ? t('phone.view.reachedThrough') : t('phone.view.reachedOver', { how: ROUTE_WORDS[routes[0]!] ?? routes[0]! })) : (phone.control?.note ?? t('phone.view.notReachable'));
+  const how = routes.length ? `Reached ${routes[0] === 'link' ? 'through Beluga' : `over ${ROUTE_WORDS[routes[0]!] ?? routes[0]}`}` : (phone.control?.note ?? 'Not reachable right now');
   const busy = phone.control?.busy === true;
   const agent = useMyAgentName();
   const askClaude = (): void => {
@@ -90,8 +82,8 @@ function Ready({ phone, compact }: { phone: DeviceView; compact: boolean }) {
     <div className={s.setup}>
       <Empty
         icon="phone"
-        title={busy ? t('phone.view.using', { agent, name: phone.name }) : t('phone.view.canUse', { agent, name: phone.name })}
-        detail={t('phone.view.askInChat', { how })}
+        title={busy ? `${agent} is using ${phone.name}` : `${agent} can use ${phone.name}`}
+        detail={`${how}. Ask in the chat: “get me the newest photo”, “install Spotify”, “what did the bank text me?”. The screen stays off unless you want to watch.`}
         action={
           <div className={s.levels}>
             <span className={s.levelBar}>
@@ -102,11 +94,11 @@ function Ready({ phone, compact }: { phone: DeviceView; compact: boolean }) {
               ))}
             </span>
             <Button variant="quiet" icon="eye" onClick={() => setPrefs({ phoneScreen: true })}>
-              {t('phone.view.showScreen')}
+              Show screen
             </Button>
             {compact ? null : (
               <Button variant="quiet" icon="claude" onClick={askClaude}>
-                {t('call.askAgent', { agent })}
+                Ask {agent}
               </Button>
             )}
           </div>
@@ -120,22 +112,21 @@ function Ready({ phone, compact }: { phone: DeviceView; compact: boolean }) {
 /** Before Claude may use it: pick a level right here, or open Settings. */
 function SetUp({ phone }: { phone: DeviceView }) {
   const { client, ui } = useBeluga();
-  useT();
   return (
     <div className={s.setup}>
       <Empty
         icon="phone"
-        title={t('phone.view.letUse', { name: phone.name })}
-        detail={t('phone.view.pickHow')}
+        title={`Let your agent use ${phone.name}`}
+        detail="Pick how freely your agent can act on this phone. You can always change it in Settings › Phone, and Stop it from the phone any time."
         action={
           <div className={s.levels}>
             {LEVELS.filter((l) => l.value !== 'off').map((l) => (
               <Button key={l.value} onClick={() => void client.api.companion['phone.use'](phone.id, l.value)}>
-                {l.long}
+                {l.label === 'Ask' ? 'Ask each time' : l.label === 'Use' ? 'Use' : 'Full (shell too)'}
               </Button>
             ))}
             <Button variant="quiet" onClick={() => openSettings(ui, 'phone')}>
-              {t('phone.view.openSettings')}
+              Open Settings
             </Button>
           </div>
         }
@@ -159,7 +150,6 @@ const CAPTION_MS = 1800;
  */
 function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boolean }) {
   const { client } = useBeluga();
-  useT();
   const actions = useActions();
   const agent = useMyAgentName();
   const [frame, setFrame] = useState<{ url: string; w: number; h: number }>();
@@ -323,12 +313,12 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
   };
   const route = status?.route ? ROUTE_WORDS[status.route] ?? status.route : undefined;
   const line = status?.video === 'on' && video
-    ? `${t('phone.view.liveVideo')}${route ? ` · ${route}` : ''}`
+    ? `Live video${route ? ` · ${route}` : ''}`
     : status?.video === 'asking'
-      ? t('phone.view.startNow')
+      ? 'Tap “Start now” on your phone for smooth video'
       : status?.on
-        ? `${t('phone.view.live')} · ${route ?? ''}${status.note ? ` · ${status.note}` : ''}`
-        : status?.error ?? t('phone.view.connecting');
+        ? `Live · ${route ?? ''}${status.note ? ` · ${status.note}` : ''}`
+        : status?.error ?? 'Connecting…';
   return (
     <div className={cx(s.page, compact && s.compact)}>
       <header className={s.head}>
@@ -348,8 +338,8 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
             </button>
           ))}
         </span>
-        <IconButton icon="eyeOff" label={t('phone.view.hide')} onClick={() => setPrefs({ phoneScreen: false })} />
-        {compact ? <IconButton icon="expand" label={t('phone.view.openPhone')} onClick={() => actions.run({ type: 'view', view: { kind: 'phone' } })} /> : null}
+        <IconButton icon="eyeOff" label="Hide the screen (your agent can still use the phone)" onClick={() => setPrefs({ phoneScreen: false })} />
+        {compact ? <IconButton icon="expand" label="Open Your Phone" onClick={() => actions.run({ type: 'view', view: { kind: 'phone' } })} /> : null}
       </header>
 
       {compact ? null : <Macros />}
@@ -358,8 +348,8 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
         <div className={s.fit}>
           {/* The video's canvas is always there (pieces can come before the first picture), shown once it draws. */}
           <div ref={boxRef} className={cx(s.screenBox, !size && s.hidden)} style={size ? ({ '--ratio': size.w / size.h } as React.CSSProperties) : undefined}>
-            <canvas ref={canvasRef} className={cx(s.screen, !video && s.hidden)} aria-label={t('phone.view.screenLive')} {...touch} />
-            {video || !frame ? null : <img src={frame.url} className={s.screen} alt={t('more.phone.screen')} {...touch} />}
+            <canvas ref={canvasRef} className={cx(s.screen, !video && s.hidden)} aria-label="Your phone's screen, live" {...touch} />
+            {video || !frame ? null : <img src={frame.url} className={s.screen} alt="Your phone's screen" {...touch} />}
             {size ? <Touches touches={touches} size={size} /> : null}
             {caption ? (
               <span key={caption.id} className={s.caption}>
@@ -370,7 +360,7 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
           {size ? null : (
             <div className={s.waiting}>
               <span className={s.spinner} aria-hidden="true" />
-              {status?.error ?? t('phone.view.waking')}
+              {status?.error ?? 'Waking the mirror…'}
             </div>
           )}
         </div>
@@ -380,33 +370,33 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
       {compact ? null : (
         <footer className={s.controls}>
           <div className={s.keys}>
-            <Button size="small" variant="quiet" onClick={press('back')} title={t('phone.model.key.back')}>
+            <Button size="small" variant="quiet" onClick={press('back')} title="Back">
               <Icon name="back" size={16} />
             </Button>
-            <Button size="small" variant="quiet" onClick={press('home')} title={t('phone.model.key.home')}>
-              {t('phone.model.key.home')}
+            <Button size="small" variant="quiet" onClick={press('home')} title="Home">
+              Home
             </Button>
-            <Button size="small" variant="quiet" onClick={press('recents')} title={t('phone.view.recentApps')}>
-              {t('phone.model.key.recents')}
+            <Button size="small" variant="quiet" onClick={press('recents')} title="Recent apps">
+              Recents
             </Button>
           </div>
           <input
             className={s.type}
             value={typing}
-            placeholder={compact ? t('phone.view.typeSend') : t('phone.view.type')}
+            placeholder={compact ? 'Type on the phone, ⏎ to send' : 'Type on the phone…'}
             onChange={(e) => setTyping(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') sendText(true);
+              if (e.key === 'Enter' && !isImeComposing(e)) sendText(true);
             }}
           />
           {compact ? null : (
             <>
               <Button size="small" onClick={() => sendText(false)} disabled={!typing.trim()}>
-                {t('phone.view.send')}
+                Send
               </Button>
               <span className={s.spacer} />
-              <Button size="small" variant="quiet" onClick={askClaude} title={t('phone.view.askBeside', { agent })}>
-                <Icon name="claude" size={14} /> {t('call.askAgent', { agent })}
+              <Button size="small" variant="quiet" onClick={askClaude} title={`Ask your ${agent}, with the phone beside the chat`}>
+                <Icon name="claude" size={14} /> Ask {agent}
               </Button>
             </>
           )}
@@ -438,7 +428,6 @@ function Touches({ touches, size }: { touches: readonly Shown[]; size: { w: numb
 /** The saved flows (BLG-175): run one, or remove it. Record new ones by asking Claude. */
 function Macros() {
   const { client } = useBeluga();
-  useT();
   const [macros, setMacros] = useState<readonly Macro[]>([]);
   const [running, setRunning] = useState<string>();
   const load = useCallback(() => void client.api.companion['phone.macros']().then(setMacros).catch(() => undefined), [client]);
@@ -446,7 +435,7 @@ function Macros() {
   if (!macros.length) return null;
   return (
     <div className={s.macros}>
-      <span className={s.macrosLabel}>{t('phone.view.macros')}</span>
+      <span className={s.macrosLabel}>Macros</span>
       {macros.map((m) => (
         <span key={m.name} className={s.macro}>
           <button
@@ -459,9 +448,9 @@ function Macros() {
               setRunning(undefined);
             }}
           >
-            {running === m.name ? t('phone.view.running') : m.name}
+            {running === m.name ? 'Running…' : m.name}
           </button>
-          <button type="button" className={s.macroX} title={t('phone.view.delete')} onClick={() => void client.api.companion['phone.macroDelete'](m.name).then(load)}>
+          <button type="button" className={s.macroX} title="Delete" onClick={() => void client.api.companion['phone.macroDelete'](m.name).then(load)}>
             ×
           </button>
         </span>

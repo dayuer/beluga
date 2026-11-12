@@ -8,8 +8,7 @@ import { useDecoded } from '../components/use-decoded.js';
 import { type Size, type ZoomView, clampView, doubleClickScale, fitScale, fitView, isZoomed, panBy, transformOf, zoomAt } from '../components/zoom-model.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openWithDefaultApp } from '../lib/files.js';
-import { type ChatImage, closeLightbox, copyImage, imageLabel, loadImage, openLightbox, stepLightbox, useImage, useLightbox } from './images.js';
-import { useT } from '../i18n/index.js';
+import { type ChatImage, closeLightbox, copyImage, imageGone, loadImage, openLightbox, stepLightbox, unavailableText, useImage, useLightbox } from './images.js';
 import s from './images.module.css';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -18,18 +17,18 @@ const errorText = (err: unknown): string => (err instanceof Error ? err.message 
 export function Thumb({ image, all, index, tiled }: { image: ChatImage; all: readonly ChatImage[]; index: number; tiled: boolean }) {
   const api = useApi();
   const state = useImage(api, image);
-  const t = useT();
-  const name = `${imageLabel(image.label)}${image.detail ? ` (${image.detail})` : ''}`;
+  const name = `${image.label}${image.detail ? ` (${image.detail})` : ''}`;
   if (state.status === 'error') {
+    const why = unavailableText(state.error);
     return (
-      <div className={cx(s.thumb, s.failed, tiled && s.tile)} role="img" aria-label={t('chat.images.unavailableAria', { name })} title={state.error}>
-        <Icon name="alert" size={14} />
-        <span>{t('chat.images.unavailable')}</span>
+      <div className={cx(s.thumb, s.failed, tiled && s.tile)} role="img" aria-label={`${name}: ${why.text}`} title={why.detail}>
+        <Icon name={imageGone(state.error) ? 'image' : 'alert'} size={14} />
+        <span>{why.text}</span>
       </div>
     );
   }
   return (
-    <button type="button" className={cx(s.thumb, tiled && s.tile, state.status === 'loading' && s.loading)} aria-label={t('chat.messageMenu.open', { name })} onClick={() => openLightbox(all, index)} disabled={state.status !== 'ready'}>
+    <button type="button" className={cx(s.thumb, tiled && s.tile, state.status === 'loading' && s.loading)} aria-label={`Open ${name}`} onClick={() => openLightbox(all, index)} disabled={state.status !== 'ready'}>
       {state.status === 'ready' ? <img src={state.url} alt={name} draggable={false} /> : null}
     </button>
   );
@@ -59,7 +58,6 @@ const FIT_PAD = 24;
 function Full({ image }: { image: ChatImage }) {
   const api = useApi();
   const state = useImage(api, image, 'full');
-  const t = useT();
   // A new picture is decoded before it replaces the one on screen.
   const pic = useDecoded(state.status === 'ready' ? state.url : undefined);
   const frame = useRef<HTMLDivElement>(null);
@@ -226,7 +224,7 @@ function Full({ image }: { image: ChatImage }) {
           ref={picture}
           className={s.full}
           src={pic.url}
-          alt={imageLabel(image.label)}
+          alt={image.label}
           draggable={false}
           onDoubleClick={(e) => {
             e.stopPropagation();
@@ -235,7 +233,7 @@ function Full({ image }: { image: ChatImage }) {
           }}
         />
       ) : (
-        <div className={cx(s.fullPending, state.status === 'error' && s.failed)}>{state.status === 'error' ? t('chat.images.unavailableWhy', { error: state.error }) : null}</div>
+        <div className={cx(s.fullPending, state.status === 'error' && s.failed)}>{state.status === 'error' ? unavailableText(state.error).text : null}</div>
       )}
     </div>
   );
@@ -246,20 +244,19 @@ export function Lightbox() {
   const { client } = useBeluga();
   const api = useApi();
   const box = useLightbox();
-  const t = useT();
   const image = box?.images[box.index];
   if (!box || !image) return null;
   const many = box.images.length > 1;
   const copy = async (): Promise<void> => {
     try {
       await copyImage(await loadImage(api, image));
-      toast(client, t('chat.images.copied'), 'success');
+      toast(client, 'Copied the image', 'success');
     } catch (err) {
-      toast(client, t('chat.images.copyFailed', { error: errorText(err) }), 'error');
+      toast(client, `Couldn't copy the image: ${errorText(err)}`, 'error');
     }
   };
   const openInPreview = (): void => {
-    (image.local ? openWithDefaultApp(client, image.local) : api.attachments.open(image.owner, image.file)).catch((err: unknown) => toast(client, t('chat.images.openFailed', { error: errorText(err) }), 'error'));
+    (image.local ? openWithDefaultApp(client, image.local) : api.attachments.open(image.owner, image.file)).catch((err: unknown) => toast(client, `Couldn't open the image: ${errorText(err)}`, 'error'));
   };
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : closeLightbox())}>
@@ -286,37 +283,37 @@ export function Lightbox() {
         >
           <div className={s.bar} onClick={(e) => e.stopPropagation()}>
             <Dialog.Title className={s.title}>
-              {imageLabel(image.label)}
+              {image.label}
               {image.detail ? <span className={s.detail}>{image.detail}</span> : null}
-              {many ? <span className={s.detail}>{t('chat.attention.nOfTotal', { n: box.index + 1, total: box.images.length })}</span> : null}
+              {many ? <span className={s.detail}>{`${box.index + 1} of ${box.images.length}`}</span> : null}
             </Dialog.Title>
             {many ? (
               <>
-                <Tip label={t('chat.images.prev')} keys="←">
-                  <Button size="small" variant="quiet" icon="back" aria-label={t('chat.images.prev')} onClick={() => stepLightbox(-1)} />
+                <Tip label="Previous image" keys="←">
+                  <Button size="small" variant="quiet" icon="back" aria-label="Previous image" onClick={() => stepLightbox(-1)} />
                 </Tip>
-                <Tip label={t('chat.images.next')} keys="→">
-                  <Button size="small" variant="quiet" icon="forward" aria-label={t('chat.images.next')} onClick={() => stepLightbox(1)} />
+                <Tip label="Next image" keys="→">
+                  <Button size="small" variant="quiet" icon="forward" aria-label="Next image" onClick={() => stepLightbox(1)} />
                 </Tip>
               </>
             ) : null}
-            <Tip label={t('chat.images.copy')} keys={chordLabel('Cmd+C')}>
+            <Tip label="Copy the image" keys={chordLabel('Cmd+C')}>
               <Button size="small" variant="quiet" icon="copy" onClick={() => void copy()}>
-                {t('chat.items.copy')}
+                Copy
               </Button>
             </Tip>
-            <Tip label={t('chat.images.openPreview')}>
+            <Tip label="Open in Preview">
               <Button size="small" variant="quiet" icon="share" onClick={openInPreview}>
-                {t('chat.images.open')}
+                Open
               </Button>
             </Tip>
-            <Dialog.Close className={s.close} aria-label={t('chat.btw.close')}>
+            <Dialog.Close className={s.close} aria-label="Close">
               <Icon name="x" size={12} />
             </Dialog.Close>
           </div>
           <Full image={image} />
           <div className={s.hint}>
-            <Kbd>esc</Kbd> {t('chat.images.legendClose')} · <Kbd>{chordLabel('Cmd+C')}</Kbd> {t('chat.images.legendCopy')}{many ? ` · ← → ${t('chat.images.legendMore')}` : ''}
+            <Kbd>esc</Kbd> close · <Kbd>{chordLabel('Cmd+C')}</Kbd> copy{many ? ' · ← → more' : ''}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

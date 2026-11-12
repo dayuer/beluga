@@ -4,15 +4,14 @@ import { Icon } from '../components/Icon.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import s from './pr-strip.module.css';
-import { useT } from '../i18n/index.js';
 
+const LEVEL_WORDS: Readonly<Record<string, string>> = { ask: 'asks you', trusted: 'trusted', full: 'full trust' };
 
 /**
  * Above a chat an external agent started: which agent drives it and at what level. Stop ends all
  * the agent has going. Revoke also ends its grant. A level of nothing: its grant is gone.
  */
 export function DrivenStrip({ workspaceId }: { workspaceId: string }) {
-  const t = useT();
   const api = useApi();
   const agent = useApp((st) => findWorkspace(st.projects, workspaceId)?.startedByAgent);
   const running = useApp((st) => st.log.some((l) => l.type === 'agent' && l.channel === `ws:${workspaceId}` && !['done', 'error', 'denied', 'interrupted'].includes(l.status)));
@@ -29,15 +28,15 @@ export function DrivenStrip({ workspaceId }: { workspaceId: string }) {
         <span className={s.main}>
           <Icon name="plug" size={13} />
           <span className={s.title}>
-            {t('more.ext.driven.by', { name: agent.name, level: level ? (level === 'ask' || level === 'trusted' || level === 'full' ? t(`more.ext.driven.${level}`) : level) : t('more.ext.driven.gone') })}
+            Driven by {agent.name} · {level ? (LEVEL_WORDS[level] ?? level) : 'no longer connected'}
           </span>
         </span>
-        <Tip label={t('more.ext.driven.stopTip', { name: agent.name })}>
-          <Button size="small" disabled={!running} onClick={() => void api.external.stopAgent(agent.id)}>{t('more.ext.stop')}</Button>
+        <Tip label={`Stop all that ${agent.name} has going`}>
+          <Button size="small" disabled={!running} onClick={() => void api.external.stopAgent(agent.id)}>Stop</Button>
         </Tip>
         {level ? (
-          <Tip label={t('more.ext.driven.revokeTip', { name: agent.name })}>
-            <Button size="small" tone="error" onClick={() => void api.external.revoke(agent.id).then(() => setLevel(undefined))}>{t('more.ext.revoke')}</Button>
+          <Tip label={`End ${agent.name}'s access to this Beluga`}>
+            <Button size="small" tone="error" onClick={() => void api.external.revoke(agent.id).then(() => setLevel(undefined))}>Revoke</Button>
           </Tip>
         ) : null}
       </div>

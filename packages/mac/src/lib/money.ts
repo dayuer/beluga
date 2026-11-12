@@ -1,5 +1,4 @@
 import { type Converted, type FxRates, type MoneyTotal, convertParts } from '../../../../src/core/earnings-store.js';
-import { t } from '../i18n/index.js';
 
 /**
  * Money for people, without React: formatting amounts (a glance or exact), naming currencies,
@@ -85,15 +84,15 @@ export function currencyName(currency: string): string {
 /** How fresh the rates are: "today", "yesterday", "on Oct 12". */
 export function ratesWhen(at: number, now: number = Date.now()): string {
   const day = (t: number): string => new Date(t).toDateString();
-  if (day(at) === day(now)) return t('common.money.today');
-  if (day(at) === day(now - 86_400_000)) return t('common.money.yesterday');
-  return t('common.money.onDate', { date: new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) });
+  if (day(at) === day(now)) return 'today';
+  if (day(at) === day(now - 86_400_000)) return 'yesterday';
+  return `on ${new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
 }
 
 /** "₹269 not included (no rate yet)", for totals that couldn't be converted. */
 export function missingNote(missing: readonly MoneyTotal[]): string | undefined {
   if (!missing.length) return undefined;
-  return t('common.money.notIncluded', { list: missing.map((m) => formatGlance(m.amount, m.currency)).join(', ') });
+  return `${missing.map((t) => formatGlance(t.amount, t.currency)).join(', ')} not included (no rate yet)`;
 }
 
 /** One project's earnings, in the currency you show them in. */

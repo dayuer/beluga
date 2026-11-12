@@ -1,6 +1,5 @@
 // Relative paths (not @beluga/…) so the unit tests at the repo root can load this model too.
 import type { AppState, CompactMark, ContextInfo, LogItem } from '../../../../src/core/store.js';
-import { t } from '../i18n/index.js';
 import { type ContextTone, contextPct, contextTone, formatTokenCount } from '../../../../src/shared/context-usage.js';
 
 /** A compaction divider in the chat. */
@@ -42,7 +41,7 @@ export function meterModel(state: Pick<AppState, 'context' | 'log'>, channel: st
 
 /** "64% of 200k · 128k tokens". */
 export function usageLine(info: ContextInfo): string {
-  return t('chat.context.usageLine', { pct: contextPct(info), window: formatTokenCount(info.window), used: formatTokenCount(info.used) });
+  return `${contextPct(info)}% of ${formatTokenCount(info.window)} · ${formatTokenCount(info.used)} tokens`;
 }
 
 const clock = (ts: number): string => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -57,9 +56,10 @@ export function whenText(ts: number, now = Date.now()): string {
 /** The divider's words: "Context compacted · 152k → 21k tokens · 2:14 PM". */
 export function dividerText(item: CompactItem, stale: boolean, now = Date.now()): string {
   const m = item.compact;
-  if (m.state === 'running' && !stale) return m.trigger === 'auto' ? t('chat.context.nearlyFull') : t('chat.context.compacting');
-  if (m.state !== 'done') return t('chat.context.didntFinish', { when: whenText(item.ts, now) });
-  return t(m.trigger === 'auto' ? 'chat.context.autoCompacted' : 'chat.context.compacted', { pre: formatTokenCount(m.pre ?? 0), post: formatTokenCount(m.post ?? 0), when: whenText(item.ts, now) });
+  if (m.state === 'running' && !stale) return m.trigger === 'auto' ? 'Context nearly full · compacting…' : 'Compacting…';
+  if (m.state !== 'done') return `Compaction didn’t finish · nothing changed · ${whenText(item.ts, now)}`;
+  const what = m.trigger === 'auto' ? 'Auto-compacted' : 'Context compacted';
+  return `${what} · ${formatTokenCount(m.pre ?? 0)} → ${formatTokenCount(m.post ?? 0)} tokens · ${whenText(item.ts, now)}`;
 }
 
 /** Breakdown rows with their share of the window (for the bar), largest story first. */
@@ -67,9 +67,9 @@ export function breakdownRows(info: ContextInfo): ReadonlyArray<{ key: 'conversa
   const b = info.breakdown;
   if (!b) return [];
   const rows = [
-    { key: 'conversation' as const, label: t('chat.context.rowConversation'), tokens: b.conversation },
-    { key: 'tools' as const, label: t('chat.context.rowTools'), tokens: b.tools },
-    { key: 'system' as const, label: t('chat.context.rowSystem'), tokens: b.system },
+    { key: 'conversation' as const, label: 'Conversation', tokens: b.conversation },
+    { key: 'tools' as const, label: 'Tool results', tokens: b.tools },
+    { key: 'system' as const, label: 'System & files', tokens: b.system },
   ];
   return rows.filter((r) => r.tokens > 0).map((r) => ({ ...r, share: info.window > 0 ? Math.min(1, r.tokens / info.window) : 0 }));
 }

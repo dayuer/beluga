@@ -5,7 +5,6 @@ import { useApp, useBeluga } from '../../lib/beluga.js';
 import { Icon } from '../Icon.js';
 import { Button, cx } from '../ui.js';
 import s from './preview.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * What a preview block shows where it won't draw (Live previews off, a friend's answer, outside a
@@ -41,14 +40,13 @@ export function usePreviewHere(local: boolean): { readonly draws: boolean; reado
 /** The card for a block that can't draw here, saying why (and Turn On… when it's only off). */
 export function PreviewNotice({ code, local }: { code: string; local: boolean }) {
   const { ui } = useBeluga();
-  const t = useT();
   const { wsId, on } = usePreviewHere(local);
   const ref = parsePreviewRef(code);
-  if (!ref) return <Notice icon="info" title={t('common.previewNotice.unreadable')} detail={t('common.previewNotice.unreadableDetail')} />;
+  if (!ref) return <Notice icon="info" title="This preview can’t be read" detail="Its first line should be a component file, an .html file, or a page on this computer." />;
   const title = previewTitle(ref);
-  if (!local) return <Notice icon="lock" title={t('common.previewNotice.aPreviewOf', { name: title })} detail={t('common.previewNotice.notLocal')} />;
-  if (webServed()) return <Notice title={t('common.previewNotice.aPreviewOf', { name: title })} detail={t('common.previewNotice.web')} />;
-  if (!wsId) return <Notice title={t('common.previewNotice.aPreviewOf', { name: title })} detail={t('common.previewNotice.noWs')} />;
-  if (!on) return <Notice title={t('common.previewNotice.aPreviewOf', { name: title })} detail={t('common.previewNotice.off')} action={{ label: t('common.ui.turnOn'), run: () => ui.patch({ settings: 'experimental' }) }} />;
+  if (!local) return <Notice icon="lock" title={`A preview of ${title}`} detail="Previews run only for your own agent’s answers, on your own computer." />;
+  if (webServed()) return <Notice title={`A preview of ${title}`} detail="Live previews show in the Beluga app on the computer that runs them." />;
+  if (!wsId) return <Notice title={`A preview of ${title}`} detail="It shows in its worktree’s conversation." />;
+  if (!on) return <Notice title={`A preview of ${title}`} detail="Live previews are an experimental feature, off until you turn them on." action={{ label: 'Turn On…', run: () => ui.patch({ settings: 'experimental' }) }} />;
   return null;
 }

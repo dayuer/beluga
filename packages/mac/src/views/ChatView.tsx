@@ -24,13 +24,11 @@ import { ConnectionStatus } from './room/ConnectionStatus.js';
 import { AssistantTabs } from '../chat/AssistantTabs.js';
 import { DrivingBanner } from '../agent-term/DrivingBanner.js';
 import { computerWord, yourComputer } from '../lib/os-words.js';
-import { type Key, useT } from '../i18n/index.js';
 
 /** A conversation and the box to add to it: the room's group chat, a workspace, a shared workspace, a draft. */
 /** One-click ways to begin, under an empty conversation. */
 function Starters() {
   const actions = useActions();
-  const tr = useT();
   const view = useApp((st) => st.view);
   const project = useApp((st) => st.projects.find((p) => p.root && (view.kind !== 'workspace' || p.workspaces.some((w) => w.id === view.id))));
   if (view.kind === 'room') {
@@ -38,19 +36,19 @@ function Starters() {
       <EmptyActions>
         {project ? (
           <Button variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
-            {tr('views.home.newWorktree')}
+            New Worktree
           </Button>
         ) : (
           <Button variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-            {tr('views.overview.addProjects')}
+            Add Projects…
           </Button>
         )}
         <Button icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
-          {tr('views.overview.newChat')}
+          New Chat
         </Button>
         {project ? (
           <Button variant="quiet" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-            {tr('views.overview.addProjects')}
+            Add Projects…
           </Button>
         ) : null}
       </EmptyActions>
@@ -62,8 +60,8 @@ function Starters() {
   return (
     <EmptyActions>
       {(ask ? ASK_STARTERS : STARTERS).map((t) => (
-        <Button key={t.label} icon={t.icon} onClick={() => actions.submit(tr(t.prompt))}>
-          {tr(t.label)}
+        <Button key={t.label} icon={t.icon} onClick={() => actions.submit(t.prompt)}>
+          {t.label}
         </Button>
       ))}
     </EmptyActions>
@@ -73,51 +71,58 @@ function Starters() {
 /** First things to ask Your Mac. */
 function AssistantStarters() {
   const actions = useActions();
-  const tr = useT();
   return (
     <EmptyActions>
       {ASSISTANT_STARTERS.map((t) => (
-        <Button key={t.label} icon={t.icon} onClick={() => actions.submit(tr(t.prompt))}>
-          {tr(t.label)}
+        <Button key={t.label} icon={t.icon} onClick={() => actions.submit(t.prompt)}>
+          {t.label}
         </Button>
       ))}
     </EmptyActions>
   );
 }
 
-// Labels and prompts are dictionary keys: a starter is sent in the language shown, so the agent answers in it.
-const starter = <I extends string>(id: string, icon: I) => ({ label: `views.chat.starter.${id}` as Key, prompt: `views.chat.starter.${id}Prompt` as Key, icon });
+const ASSISTANT_STARTERS = [
+  { label: 'Take a Screenshot', icon: 'image', prompt: 'Take a screenshot of my screen and send it to me.' },
+  { label: 'What’s Using My CPU', icon: 'gauge', prompt: 'What’s using my CPU and memory right now?' },
+  { label: 'What’s Running', icon: 'pulse', prompt: 'What’s running in Beluga right now, across my projects?' },
+] as const;
 
-const ASSISTANT_STARTERS = [starter('screenshot', 'image'), starter('cpu', 'gauge'), starter('running', 'pulse')] as const;
-
-const STARTERS = [starter('explain', 'eye'), starter('bug', 'search'), starter('tests', 'check')] as const;
+const STARTERS = [
+  { label: 'Explain This Project', icon: 'eye', prompt: 'Explain how this project is organized: the main parts, how they fit together, and where to start reading.' },
+  { label: 'Find a Bug', icon: 'search', prompt: 'Look through the code for a likely bug, explain it, and fix it with a test.' },
+  { label: 'Add Tests', icon: 'check', prompt: 'Find the most important code without tests and write good tests for it.' },
+] as const;
 
 /** First questions for a chat in a main folder, where Claude only reads. */
-const ASK_STARTERS = [starter('explain', 'eye'), starter('lately', 'clock'), starter('risks', 'search')] as const;
+const ASK_STARTERS = [
+  { label: 'Explain This Project', icon: 'eye', prompt: 'Explain how this project is organized: the main parts, how they fit together, and where to start reading.' },
+  { label: 'What Changed Lately', icon: 'clock', prompt: 'Summarize what changed in this project over the last couple of weeks, from the git history.' },
+  { label: 'Where Are the Risks', icon: 'search', prompt: 'Where is this code most likely to break? Point me at the riskiest parts and explain why. Don’t change anything.' },
+] as const;
 
 export function ChatView() {
   const view = useApp((st) => st.view);
-  const t = useT();
   const channel = channelOf(view);
   const ws = useApp((st) => (view.kind === 'workspace' ? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === view.id) : undefined));
   const projectName = useApp((st) => st.projects.find((p) => p.root && (view.kind === 'draft' ? p.id === view.projectId : p.workspaces.some((w) => w.id === ws?.id)))?.name);
   const empty =
     view.kind === 'draft' ? (
       projectName ? (
-        <Empty icon="eye" title={t('views.chat.askAbout', { name: projectName })} detail={t('views.chat.draftAskDetail')} />
+        <Empty icon="eye" title={`Ask about ${projectName}`} detail="Questions only: your agent reads the main folder and changes nothing there. Ask for a change and this chat becomes a worktree." />
       ) : (
-        <Empty icon="chat" title={t('views.chat.newChat')} detail={t('views.chat.newChatDetail')} />
+        <Empty icon="chat" title="A new chat with your agent" detail="Nothing is created until you send your first message." />
       )
     ) : ws?.askOnly ? (
-      <Empty icon="eye" title={t('views.chat.askAbout', { name: projectName ?? t('views.chat.thisProject') })} detail={t('views.chat.askDetail')} action={<Starters />} />
+      <Empty icon="eye" title={`Ask about ${projectName ?? 'this project'}`} detail="Your agent reads the main folder and answers; it won’t change anything here. Ask for a change and this chat becomes a worktree." action={<Starters />} />
     ) : view.kind === 'draft_worktree' ? (
-      <Empty icon="branch" title={t('views.chat.newWorktree')} detail={t('views.chat.newWorktreeDetail')} />
+      <Empty icon="branch" title="A new worktree" detail="Describe the task below. Beluga makes a branch and a folder for it from the branch you pick, and your agent starts right away." />
     ) : view.kind === 'assistant' ? (
-      <Empty icon="laptop" title={t('views.chat.askComputer', { computer: yourComputer() })} detail={t('views.chat.assistantDetail', { computer: computerWord() })} action={<AssistantStarters />} />
+      <Empty icon="laptop" title={`Ask ${yourComputer()}`} detail={`Your agent for this whole ${computerWord()}, not one project: screenshots, what’s using the CPU, starting a worktree or a task. Keep several chats as tabs above; the open one is the one on your phone.`} action={<AssistantStarters />} />
     ) : view.kind === 'room' ? (
-      <Empty icon="claude" title={t('views.chat.sayHi')} detail={t('views.chat.sayHiDetail')} action={<Starters />} />
+      <Empty icon="claude" title="Say hi to the room" detail="Everyone here sees this chat. Mention @claude to ask your agent." action={<Starters />} />
     ) : (
-      <Empty icon="chat" title={t('views.chat.tell')} detail={t('views.chat.tellDetail')} action={<Starters />} />
+      <Empty icon="chat" title="Tell your agent what to do here" detail="It works in this folder and remembers the conversation. Start with one of these, or write your own below." action={<Starters />} />
     );
   // A worktree made outside Beluga: its info page until there's a conversation (or you start one).
   const other = ws?.kind === 'worktree' && ws.external && !ws.archived ? ws : undefined;

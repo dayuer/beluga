@@ -2,14 +2,14 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { ComponentType } from 'react';
 import { NATIVE_MENUS, type NativeMenuProps } from './native/index.js';
 import { useEffect, useRef, useState } from 'react';
-import { localMenuSpec } from '../lib/engine-words.js';
+import { menuSpec } from '@beluga/ui/menus.js';
 import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { guiHint, paragraphs } from '../lib/gui-copy.js';
 import s from './sheet.module.css';
-import { useT } from '../i18n/index.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Every choice the shared menus ask (settings sections, a person, a pull request, invites,
@@ -18,12 +18,11 @@ import { useT } from '../i18n/index.js';
  * instead (dialogs/native); this is for the rest.
  */
 export function MenuSheet() {
-  const t = useT();
   const { ui } = useBeluga();
   const actions = useActions();
   const open = useUi((u) => u.menu);
   const state = useApp((st) => st);
-  const spec = open ? localMenuSpec(state, open.menu) : undefined;
+  const spec = open ? menuSpec(state, open.menu) : undefined;
   const options = (spec?.options ?? []).map((o, index) => ({ ...o, index })).filter((o) => o.id !== 'close');
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);
@@ -54,7 +53,7 @@ export function MenuSheet() {
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && options.length) {
               e.preventDefault();
               setSelected((n) => (n + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length);
-            } else if (e.key === 'Enter') {
+            } else if (e.key === 'Enter' && !isImeComposing(e)) {
               e.preventDefault();
               pick(selected);
             }
@@ -62,7 +61,7 @@ export function MenuSheet() {
         >
           <div className={s.head}>
             <Dialog.Title className={s.title}>{spec.title}</Dialog.Title>
-            <Dialog.Close className={s.close} aria-label={t('dialogs.menuSheet.close')}>
+            <Dialog.Close className={s.close} aria-label="Close">
               <Icon name="x" size={12} />
             </Dialog.Close>
           </div>
@@ -99,7 +98,7 @@ export function MenuSheet() {
             ))}
           </div>
           <div className={s.footer}>
-            <Button onClick={close}>{t('dialogs.menuSheet.cancel')}</Button>
+            <Button onClick={close}>Cancel</Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

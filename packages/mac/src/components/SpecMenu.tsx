@@ -1,14 +1,12 @@
 import * as Context from '@radix-ui/react-context-menu';
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
 import { type ComponentPropsWithoutRef, type MouseEvent, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
-import type { MenuKind } from '@beluga/ui/menus.js';
-import { localMenuSpec } from '../lib/engine-words.js';
+import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
 import { useActions } from '../lib/actions.js';
 import { useBeluga } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
 import { guiHint } from '../lib/gui-copy.js';
 import s from './SpecMenu.module.css';
-import { menuText, t as tNow } from '../i18n/index.js';
 
 /**
  * A menu built from its shared spec (projectMenu, personMenu…): the spec's options, ids and
@@ -16,7 +14,7 @@ import { menuText, t as tNow } from '../i18n/index.js';
  */
 function useItems(menu: MenuKind, hide?: (id: string) => boolean) {
   const { client } = useBeluga();
-  const spec = localMenuSpec(client.store.getState(), menu);
+  const spec = menuSpec(client.store.getState(), menu);
   return (spec?.options ?? []).map((o, index) => ({ ...o, index })).filter((o) => o.id !== 'close' && !hide?.(o.id));
 }
 
@@ -44,7 +42,7 @@ function Items({ menu, Item, Separator, extra = [], hide, kit }: { menu: MenuKin
   const row = (o: (typeof items)[number]) => (
     <Item key={o.id} className={`${s.item} ${isDanger(o.id) ? s.danger : ''}`} onSelect={() => actions.pick(menu, o.index)} title={isKeys(guiHint(o.hint)) ? undefined : guiHint(o.hint)}>
       <span className={s.line}>
-        <span className={s.label}>{menuText(o.label)}</span>
+        <span className={s.label}>{o.label}</span>
         {isKeys(guiHint(o.hint)) ? <span className={s.keys}>{guiHint(o.hint)}</span> : null}
       </span>
     </Item>
@@ -184,7 +182,7 @@ function ActionRows({ items, Item, Separator, kit = DROPDOWN_SUB }: { items: rea
               <kit.SubTrigger className={s.item} disabled={it.disabled}>
                 <span className={s.line}>
                   {icons ? <span className={s.icon} aria-hidden="true">{it.mark ?? (it.icon ? <Icon name={it.icon} size={13} /> : null)}</span> : null}
-                  <span className={s.label}>{menuText(it.label)}</span>
+                  <span className={s.label}>{it.label}</span>
                   <Icon name="chevronRight" size={10} className={s.subArrow} />
                 </span>
                 {it.hint ? <span className={`${s.hint} ${icons ? s.hintIndent : ''}`}>{it.hint}</span> : null}
@@ -201,7 +199,7 @@ function ActionRows({ items, Item, Separator, kit = DROPDOWN_SUB }: { items: rea
               {/* A row with its own icon keeps it (a choice of icons); the check then goes after the name. */}
               {icons ? <span className={s.icon} aria-hidden="true">{it.mark ?? (it.icon ? <Icon name={it.icon} size={13} /> : it.checked ? <Icon name="check" size={12} /> : null)}</span> : null}
               {it.swatch ? <span className={s.swatch} style={{ background: it.swatch }} aria-hidden="true" /> : null}
-              <span className={s.label}>{menuText(it.label)}</span>
+              <span className={s.label}>{it.label}</span>
               {it.checked && (it.icon || it.mark) ? <Icon name="check" size={12} className={s.trailingCheck} /> : null}
               {it.keys ? <kbd className={s.keys}>{it.keys}</kbd> : null}
             </span>
@@ -233,7 +231,7 @@ export function ActionsContext({ items, children }: { items: readonly ActionItem
 
 function LazyRows({ items }: { items: readonly ActionItem[] | (() => readonly ActionItem[]) }) {
   const list = typeof items === 'function' ? items() : items;
-  if (!list.length) return <Context.Item className={s.item} disabled><span className={s.label}>{tNow('common.specMenu.nothing')}</span></Context.Item>;
+  if (!list.length) return <Context.Item className={s.item} disabled><span className={s.label}>Nothing to do here</span></Context.Item>;
   return <ActionRows items={list} Item={Context.Item as unknown as AnyItem} Separator={Context.Separator as unknown as AnySeparator} kit={CONTEXT_SUB} />;
 }
 

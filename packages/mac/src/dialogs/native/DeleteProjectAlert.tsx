@@ -1,8 +1,7 @@
 import { Alert } from '../../components/Alert.js';
 import { worktreeOrigin } from '@beluga/workspaces/origin.js';
 import { useApi, useApp } from '../../lib/beluga.js';
-import { rich } from './pick.js';
-import { useT } from '../../i18n/index.js';
+import { count } from './pick.js';
 
 /**
  * Delete Project…: it leaves Beluga, and so do the worktrees Beluga made for it (archived first,
@@ -10,7 +9,6 @@ import { useT } from '../../i18n/index.js';
  * moved to the Trash. It leaves the sidebar at once; the archiving goes on in the background.
  */
 export function DeleteProjectAlert({ projectId, close }: { projectId: string; close: () => void }) {
-  const t = useT();
   const api = useApi();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId && p.root));
   if (!project) return null;
@@ -23,19 +21,24 @@ export function DeleteProjectAlert({ projectId, close }: { projectId: string; cl
     <Alert
       icon="alert"
       tone="danger"
-      title={t('dialogs.deleteProject.title', { name: project.name })}
+      title={`Delete “${project.name}” from Beluga?`}
       message={
         <>
           <p>
-            {t('dialogs.deleteProject.leaves')}
-            {worktrees ? t('dialogs.deleteProject.worktrees', { n: worktrees, count: t('dialogs.n.worktree', { n: worktrees }) }) : null}
+            It leaves Beluga: the sidebar, its group and Hidden Projects.
+            {worktrees ? (
+              <>
+                {' '}
+                The {count(worktrees, 'worktree')} Beluga made for it {worktrees === 1 ? 'goes' : 'go'} too: archived first, so everything of yours in {worktrees === 1 ? 'it' : 'them'} is kept (uncommitted work included), then {worktrees === 1 ? 'its folder is' : 'their folders are'} removed. Add the project again to restore {worktrees === 1 ? 'it' : 'them'}.
+              </>
+            ) : null}
           </p>
           <p>
-            {rich(t('dialogs.deleteProject.untouched'), { root: <code>{project.root}</code> })}
+            Your project folder <code>{project.root}</code> isn’t touched: nothing in it is deleted or moved to the Trash.
           </p>
         </>
       }
-      confirm={{ label: t('dialogs.deleteProject.confirm'), destructive: true, onClick: remove }}
+      confirm={{ label: 'Delete from Beluga', destructive: true, onClick: remove }}
       onCancel={close}
     />
   );

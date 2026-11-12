@@ -3,14 +3,13 @@ import type { McpServerRow } from '@beluga/shared/mcp.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { toast } from './beluga.js';
 import { openExternal } from './system.js';
-import { t } from '../i18n/index.js';
 
 /** Where a server comes from, in words. */
 export const MCP_FROM: Record<McpServerRow['from'], (where?: string) => string> = {
-  user: () => t('common.mcp.fromUser'),
-  project: (where) => (where ? t('common.mcp.fromProject', { where }) : t('common.mcp.fromOneProject')),
-  plugin: (where) => (where ? t('common.mcp.fromPlugin', { where }) : t('common.mcp.fromAPlugin')),
-  'claude.ai': () => t('common.mcp.fromClaudeAi'),
+  user: () => 'Yours, in every project',
+  project: (where) => (where ? `Set for ${where}` : 'Set for one project'),
+  plugin: (where) => (where ? `From the ${where} plugin` : 'From a plugin'),
+  'claude.ai': () => 'A claude.ai connector',
 };
 
 /** How a server is, in words, with its dot. */
@@ -72,7 +71,7 @@ export async function signInMcp(client: SocketClient, row: McpServerRow, runtime
     if ('url' in started) {
       await openExternal(started.url);
       const ok = await client.api.claudeCode.mcpSignedIn(row.name, runtime);
-      toast(client, ok ? t('common.mcp.signedIn', { label: row.label }) : t('common.mcp.noAnswer', { label: row.label }), ok ? 'success' : 'warn');
+      toast(client, ok ? `Signed in to ${row.label}` : `Didn’t hear back from ${row.label}. Try again when you’re ready.`, ok ? 'success' : 'warn');
     }
     await checkMcp(client, runtime);
   } finally {
@@ -112,6 +111,6 @@ export function mcpSummary(rows: readonly McpServerRow[]): { readonly connected:
   const connected = rows.filter((r) => r.status === 'connected').length;
   const needYou = rows.filter((r) => r.status === 'needs-auth').length;
   const failed = rows.filter((r) => r.status === 'failed').length;
-  const parts = [t('common.mcp.connectedOf', { connected, total: rows.length }), ...(needYou ? [t('common.mcp.toSignIn', { n: needYou })] : []), ...(failed ? [t('common.mcp.failed', { n: failed })] : [])];
+  const parts = [`${connected} of ${rows.length} connected`, ...(needYou ? [`${needYou} to sign in`] : []), ...(failed ? [`${failed} failed`] : [])];
   return { connected, needYou, line: parts.join(' · ') };
 }

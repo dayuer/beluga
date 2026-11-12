@@ -10,21 +10,20 @@ import { NotifyStatusLine } from './sound/NotifyStatus.js';
 import { SoundSettings } from './sound/SoundSettings.js';
 import { TestNotification } from './sound/TestNotification.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
-import { type Key, useT, tl } from '../i18n/index.js';
 
 type Toggle = 'desktop' | 'onlyAway' | 'planMilestones' | 'needsYou' | 'done' | 'doneHere' | 'mentions' | 'people' | 'background' | 'sentinels' | 'problems' | 'pr';
 
-const KINDS: ReadonlyArray<readonly [Toggle, Key, Key]> = [
-  ['needsYou', 'settings.notifications.needsYou', 'settings.notifications.needsYouDetail'],
-  ['done', 'settings.notifications.done', 'settings.notifications.doneDetail'],
-  ['doneHere', 'settings.notifications.doneHere', 'settings.notifications.doneHereDetail'],
-  ['mentions', 'settings.notifications.mentions', 'settings.notifications.mentionsDetail'],
-  ['people', 'settings.notifications.people', 'settings.notifications.peopleDetail'],
-  ['background', 'settings.notifications.background', 'settings.notifications.backgroundDetail'],
-  ['sentinels', 'settings.notifications.sentinels', 'settings.notifications.sentinelsDetail'],
-  ['problems', 'settings.notifications.problems', 'settings.notifications.problemsDetail'],
-  ['pr', 'settings.notifications.pr', 'settings.notifications.prDetail'],
-  ['planMilestones', 'settings.notifications.planMilestones', 'settings.notifications.planMilestonesDetail'],
+const KINDS: ReadonlyArray<readonly [Toggle, string, string]> = [
+  ['needsYou', 'Your agent needs you', 'A question, a plan, or an approval'],
+  ['done', 'Your agent finished', 'In a conversation you’re not looking at'],
+  ['doneHere', 'Your agent finished where I’m looking', 'A run of yours that took 20 seconds or more, once nothing else is running or queued there, so you notice it ended'],
+  ['mentions', 'Mentions and messages', 'Someone writes @you, or to you when it’s just the two of you'],
+  ['people', 'People come and go', 'Someone joins, leaves, invites you, or hands work to you'],
+  ['background', 'Background tasks', 'Something your agent runs in the background, or a new worktree’s setup, finishes'],
+  ['sentinels', 'Sentinels', 'A sentinel’s run ends or fails. One that waits for you, like a merge to allow, still tells you. Each sentinel can also go quiet on its own page'],
+  ['problems', 'Problems', 'Errors, merge conflicts, failed setups'],
+  ['pr', 'Pull requests', 'Opened, checks finished, reviewed'],
+  ['planMilestones', 'Plans: milestones only', 'A plan tells you when a milestone passes, fails or waits for you, and when its agent asks you something. Its tasks finishing go quietly into the bell'],
 ];
 
 /**
@@ -34,7 +33,6 @@ const KINDS: ReadonlyArray<readonly [Toggle, Key, Key]> = [
 export function NotificationSettings() {
   const api = useApi();
   const n = useApp((st) => st.prefs.notify);
-  const t = useT();
   const save = (patch: Partial<NotifySettings>): void => void api.session.setPrefs({ notify: { ...n, ...patch } });
   const quiet = dndActive(n);
   const { access, recheck } = useNotificationAccess();
@@ -45,38 +43,38 @@ export function NotificationSettings() {
     <>
       <NotifyStatusLine status={status} onAction={act} />
       <Group>
-        <Row label={t('settings.notifications.desktop')} detail={t('settings.notifications.desktopDetail')}>
-          <Switch label={t('settings.notifications.desktop')} on={n.desktop} onChange={(v) => save({ desktop: v })} />
+        <Row label="Desktop notifications" detail="The bell in the toolbar lists everything either way.">
+          <Switch label="Desktop notifications" on={n.desktop} onChange={(v) => save({ desktop: v })} />
         </Row>
-        <Row label={t('settings.notifications.popups')} detail={t('settings.notifications.popupsDetail')}>
-          <Switch label={t('settings.notifications.popups')} on={n.popup !== false} onChange={(v) => save({ popup: v })} />
+        <Row label="Show on-screen popups when something needs me" detail="A question, an approval, a decision of yours in a plan, or a milestone to pass: a card in the corner of the screen, on top of other apps, as friends’ requests get. Not on Do Not Disturb.">
+          <Switch label="Show on-screen popups when something needs me" on={n.popup !== false} onChange={(v) => save({ popup: v })} />
         </Row>
-        <Row label={t('settings.notifications.seePopup')} detail={t('settings.notifications.seePopupDetail')}>
-          <Button onClick={previewRequestPopup}>{t('settings.notifications.preview')}</Button>
+        <Row label="See the pop-up" detail="A pretend friend’s request and a pretend decision, in the corner of the screen for a minute. Their buttons do nothing.">
+          <Button onClick={previewRequestPopup}>Preview Pop-up</Button>
         </Row>
-        <Row label={t('settings.notifications.onlyAway')} detail={t('settings.notifications.onlyAwayDetail')}>
-          <Switch label={t('settings.notifications.onlyAway')} on={n.onlyAway} onChange={(v) => save({ onlyAway: v })} />
+        <Row label="Only when Beluga isn’t in front" detail="Stay quiet while you’re using Beluga. In the conversation you’re looking at, only a long run of yours finishing is announced.">
+          <Switch label="Only when Beluga isn’t in front" on={n.onlyAway} onChange={(v) => save({ onlyAway: v })} />
         </Row>
       </Group>
       <SoundSettings n={n} save={save} test={<TestNotification n={n} onChecked={recheck} onAction={act} />} />
       <Group>
-        <Row label={t('settings.notifications.dnd')} detail={quiet ? t('settings.notifications.dndOn', { until: dndLabel(n) }) : t('settings.notifications.dndDetail')}>
+        <Row label="Do Not Disturb" detail={quiet ? `On ${dndLabel(n)}. The bell still fills.` : 'Pause desktop notifications for a while.'}>
           {quiet ? (
-            <Button onClick={() => save({ dnd: null })}>{t('settings.notifications.turnOff')}</Button>
+            <Button onClick={() => save({ dnd: null })}>Turn off</Button>
           ) : (
             <Select<'off' | DndChoice>
-              label={t('settings.notifications.dnd')}
+              label="Do Not Disturb"
               value="off"
-              options={[{ value: 'off', label: t('settings.common.off') }, ...DND_CHOICES.map((c) => ({ ...c, label: tl('DND_CHOICES', c.value, 'label', c.label) }))]}
+              options={[{ value: 'off', label: 'Off' }, ...DND_CHOICES]}
               onChange={(v) => save({ dnd: v === 'off' ? null : dndFor(v) })}
             />
           )}
         </Row>
       </Group>
-      <Group title={t('settings.notifications.tellMe')}>
+      <Group title="Tell me when">
         {KINDS.map(([key, label, detail]) => (
-          <Row key={key} label={t(label)} detail={t(detail)}>
-            <Switch label={t(label)} on={n[key]} onChange={(v) => save({ [key]: v })} />
+          <Row key={key} label={label} detail={detail}>
+            <Switch label={label} on={n[key]} onChange={(v) => save({ [key]: v })} />
           </Row>
         ))}
       </Group>

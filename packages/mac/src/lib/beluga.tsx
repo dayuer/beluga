@@ -6,8 +6,8 @@ import type { MenuKind } from '@beluga/ui/menus.js';
 import { onWindowActive, windowActive } from './window-active.js';
 import { SAVING_DRAW_MS, powerSaving } from './power.js';
 import type { SettingsPane } from './settings-search.js';
-import { t } from '../i18n/index.js';
 import { WINDOW_UI_KEYS, scopedKey, splitUiPatch } from '../machines/pane-model.js';
+import { type Snapshot, readSnapshot } from './stable.js';
 
 /**
  * This window's own UI state. It uses the shared shape (UiState) for everything the
@@ -47,7 +47,7 @@ export interface Recipient {
 export const recipientPrefix = (to: Recipient): string => (to.claude ? (to.self ? '@claude ' : `@claude:${to.name} `) : `@${to.name} `);
 
 /** "bob's Claude", "your Claude", "bob". */
-export const recipientLabel = (to: Recipient): string => (to.claude ? (to.self ? t('common.beluga.yourAgent') : t('common.beluga.theirAgent', { name: to.name })) : to.name);
+export const recipientLabel = (to: Recipient): string => (to.claude ? (to.self ? 'your agent' : `${to.name}’s agent`) : to.name);
 
 export type { SettingsPane };
 
@@ -232,26 +232,23 @@ function viewSubscribe(store: { subscribe: (listener: () => void) => () => void 
  */
 export function useApp<T>(pick: (s: AppState) => T, equal?: (a: T, b: T) => boolean): T {
   const { client } = useBeluga();
-  const last = useRef<{ readonly value: T } | undefined>(undefined);
-  return useSyncExternalStore(viewSubscribe(client.store), () => {
-    const next = pick(client.store.getState());
-    if (!equal) return next;
-    if (last.current && equal(last.current.value, next)) return last.current.value;
-    last.current = { value: next };
-    return next;
-  });
+  // Holds still while the store does, so a read can never redraw the window for good (BLG-905).
+  const last = useRef<Snapshot<AppState, T> | undefined>(undefined);
+  return useSyncExternalStore(viewSubscribe(client.store), () => (last.current = readSnapshot(last.current, client.store.getState(), pick, equal)).value);
 }
 
 /** useApp outside a BelugaProvider too: `fallback` there. */
 export function useMaybeApp<T>(pick: (s: AppState) => T, fallback: T): T {
   const store = useContext(Ctx)?.client.store;
-  return useSyncExternalStore(store ? viewSubscribe(store) : noSubscribe, () => (store ? pick(store.getState()) : fallback));
+  const last = useRef<Snapshot<AppState, T> | undefined>(undefined);
+  return useSyncExternalStore(store ? viewSubscribe(store) : noSubscribe, () => (store ? (last.current = readSnapshot(last.current, store.getState(), pick)).value : fallback));
 }
 const noSubscribe = (): (() => void) => () => undefined;
 
 export function useUi<T>(pick: (s: MacUi) => T): T {
   const { ui } = useBeluga();
-  return useSyncExternalStore(ui.subscribe, () => pick(ui.get()));
+  const last = useRef<Snapshot<MacUi, T> | undefined>(undefined);
+  return useSyncExternalStore(ui.subscribe, () => (last.current = readSnapshot(last.current, ui.get(), pick)).value);
 }
 
 export const useApi = () => useBeluga().client.api;

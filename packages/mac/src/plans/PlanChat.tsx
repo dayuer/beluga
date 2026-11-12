@@ -1,5 +1,5 @@
 import { TriageLine } from "../chat/TriageLine.js";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { queueIn } from "@beluga/ui/compose.js";
 import { activityOf } from "@beluga/ui/workspace-models.js";
 import { ChatLog } from "../chat/ChatLog.js";
@@ -21,14 +21,14 @@ import { useApi, useApp, useBeluga, useScopedKey } from "../lib/beluga.js";
 import { useMyAgentName } from "../lib/agent-words.js";
 import { LiveDot } from "./marks.js";
 import { PlanAsk } from "./PlanAsk.js";
-import { planAskOf } from "./plan-ask-model.js";
+import { onWantedDecision, planAskOf, wantedDecision } from "./plan-ask-model.js";
 import { type PlanMessage, planMessage, sendPlanMessage } from "./plan-send.js";
 import { useConversationLoaded } from "./use-plans.js";
 import s from "../chat/composer.module.css";
 import k from "./plan-ask.module.css";
 import p from "./plans.module.css";
+import { isImeComposing } from "../lib/ime.js";
 import { shortcutKeys } from "../lib/shortcuts.js";
-import { useT } from "../i18n/index.js";
 import { chordLabel } from "../lib/shortcuts-model.js";
 
 const FOLD = { fold: true };
@@ -70,7 +70,6 @@ export function PlanChat({
   const api = useApi();
   const { client } = useBeluga();
   const actions = useActions();
-  const t = useT();
   // Unsent words and a message that didn't go, per plan chat on its computer (BLG-784).
   const kept = useScopedKey(channel);
   const [text, setTextState] = useState(() => typed.get(kept) ?? "");
@@ -105,9 +104,15 @@ export function PlanChat({
     [queued],
   );
   // What it asks you here is answered right here; an approval (or a plan to approve) in the whole conversation.
+  // Decide… on a task: its card, scrolled to (wanted.at changes on every press, so a second press scrolls again).
+  const wanted = useSyncExternalStore(onWantedDecision, wantedDecision);
   const askJson = useApp((st) =>
-    JSON.stringify(planAskOf(st.questions, channel) ?? null),
+    JSON.stringify(planAskOf(st.questions, channel, wanted?.qid) ?? null),
   );
+  const askRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (wanted) askRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [wanted?.at, askJson]);
   const ask = useMemo(
     () => (JSON.parse(askJson) ?? undefined) as ReturnType<typeof planAskOf>,
     [askJson],
@@ -213,7 +218,7 @@ export function PlanChat({
       (err: unknown) =>
         client.store.dispatch({
           type: "toast",
-          text: t("plans.chat.couldntStop", { error: errorText(err) }),
+          text: `Couldn't stop the agent: ${errorText(err)}`,
           level: "error",
         }),
     );
@@ -226,7 +231,7 @@ export function PlanChat({
   };
 
   return (
-    <aside className={p.chat} aria-label={t("plans.chat.conversation")} data-drop-zone>
+    <aside className={p.chat} aria-label="Conversation" data-drop-zone>
       {att.dropTarget}
       <header className={p.chatHead}>
         <span className={p.chatTitle}>
@@ -237,20 +242,20 @@ export function PlanChat({
         {busy && !drafting ? (
           <span className={p.chatBusy}>
             <LiveDot />
-            {t("plans.chat.working")}
+            working
           </span>
         ) : null}
         <span className={p.grow} />
         {wsId ? (
           <IconButton
             icon="expand"
-            label={t("plans.chat.openWhole")}
+            label="Open the Whole Conversation"
             onClick={() =>
               actions.run({ type: "open_ws", id: wsId, tab: "chat" })
             }
           />
         ) : null}
-        <IconButton icon="x" label={t("plans.chat.hide")} onClick={onClose} />
+        <IconButton icon="x" label="Hide the Conversation" onClick={onClose} />
       </header>
       <div className={p.chatLog}>
         {/* A narrow pane: what you asked first folds to a few lines, so the conversation reads from the top; while the plan is being written, the line under it is Claude's one status. */}
@@ -263,16 +268,16 @@ export function PlanChat({
                 <Empty
                   icon="chat"
                   mark={<Working />}
-                  title={t("plans.chat.loading")}
+                  title="Loading the conversation…"
                 />
               ) : (
                 <Empty
                   icon="flag"
-                  title={t("plans.chat.emptyTitle")}
+                  title="Plan it together"
                   detail={
                     draft
-                      ? t("plans.chat.emptyDraft")
-                      : t("plans.chat.emptyPlan")
+                      ? "Your agent is reading the code and writing the plan. Tell it what to change: the plan on the left updates as it goes."
+                      : "Ask your agent about the plan, or tell it what to change."
                   }
                 />
               )
@@ -280,7 +285,7 @@ export function PlanChat({
           />
         </PaneLook.Provider>
       </div>
-      {ask ? <PlanAsk key={ask.qid} q={ask} /> : null}
+      {ask ? <div ref={askRef}><PlanAsk key={ask.qid} q={ask} /></div> : null}
       {asking && wsId ? (
         <button
           type="button"
@@ -290,7 +295,7 @@ export function PlanChat({
           }
         >
           <Icon name="alert" size={12} />
-          {t("plans.chat.askedAnswer")}
+          Your agent asked you something. Answer it in the conversation
         </button>
       ) : null}
       <div className={p.chatQueue}>
@@ -305,14 +310,14 @@ export function PlanChat({
         <div className={p.chatFailed} role="alert">
           <Icon name="alert" size={12} />
           <span className={p.chatFailedText}>
-            {t("plans.chat.notSent", { error: failed.error })}
+            Your message wasn’t sent: {failed.error}
           </span>
           <button
             type="button"
             className={p.chatRetry}
             onClick={() => deliver(failed.message)}
           >
-            {t("plans.chat.retry")}
+            Retry
           </button>
         </div>
       ) : null}
@@ -353,16 +358,16 @@ export function PlanChat({
               value={text}
               placeholder={
                 busy
-                  ? t("plans.chat.placeholderBusy")
+                  ? "Your agent is working: tell it now, or stop it…"
                   : draft
-                    ? t("plans.chat.placeholderDraft")
-                    : t("plans.chat.placeholder")
+                    ? "Tell your agent what to change…"
+                    : "Ask about the plan, or change it…"
               }
-              aria-label={t("plans.chat.messageAria")}
+              aria-label="Message your agent about the plan"
               onChange={(e) => setText(e.target.value)}
               onPaste={att.onPaste}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
+                if (isImeComposing(e)) return;
                 if (sug.onKeyDown(e)) return;
                 if (att.onRefKey(e)) return;
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -378,13 +383,13 @@ export function PlanChat({
           </div>
           {busy ? (
             <Tip
-              label={t("plans.chat.stopTip")}
+              label="Stop the agent here · your queued messages come back to the box"
               keys={shortcutKeys('conv-stop')}
             >
               <button
                 type="button"
                 className={k.stop}
-                aria-label={t("plans.chat.stop")}
+                aria-label="Stop the agent"
                 onClick={stop}
               >
                 <span className={k.stopMark} />
@@ -394,15 +399,15 @@ export function PlanChat({
           <Tip
             label={
               busy
-                ? t("plans.chat.sendNowTip", { keys: chordLabel("Alt+Enter") })
-                : t("plans.chat.send")
+                ? `Send now: your agent reads it at its next step, without stopping · ${chordLabel("Alt+Enter")} queues it instead`
+                : "Send"
             }
             keys="↩"
           >
             <button
               type="button"
               className={p.chatSend}
-              aria-label={busy ? t("plans.chat.sendNow") : t("plans.chat.send")}
+              aria-label={busy ? "Send Now" : "Send"}
               disabled={!text.trim() && !att.images.length && !att.files.length}
               onClick={() => send()}
             >

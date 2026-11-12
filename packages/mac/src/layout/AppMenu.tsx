@@ -1,13 +1,12 @@
 import { ActionsDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { IconButton } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
-import { type AppMenuRow, appMenu, appearanceOf } from '../lib/app-menu-model.js';
+import { APP_MENU, type AppMenuRow, appearanceOf } from '../lib/app-menu-model.js';
 import { inApp } from '../lib/boot.js';
 import { useBeluga } from '../lib/beluga.js';
 import { runMenuItem } from '../lib/native.js';
 import { usePrefs } from '../lib/prefs.js';
 import { useShortcutKeys } from '../lib/shortcuts.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * The menu bar in a browser (lib/app-menu-model.ts): one button where the Mac's traffic lights
@@ -18,7 +17,6 @@ export function AppMenu() {
   const actions = useActions();
   const keysOf = useShortcutKeys();
   const { appearance } = usePrefs();
-  const t = useT();
   if (inApp()) return null;
   const toItem = (r: AppMenuRow): ActionItem => {
     const picks = appearanceOf(r.id);
@@ -33,8 +31,8 @@ export function AppMenu() {
     };
   };
   return (
-    <ActionsDropdown items={appMenu().map(toItem)} align="start">
-      <IconButton icon="gear" label={t('layout.appMenu.button')} />
+    <ActionsDropdown items={APP_MENU.map(toItem)} align="start">
+      <IconButton icon="gear" label="Settings and menus" />
     </ActionsDropdown>
   );
 }

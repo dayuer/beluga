@@ -6,7 +6,6 @@ import { useAvatarUrl } from '../lib/avatars.js';
 import { DotMatrix } from './DotMatrix.js';
 import { Icon, type IconName } from './Icon.js';
 import s from './ui.module.css';
-import { t as tNow } from '../i18n/index.js';
 
 const cx = (...c: Array<string | false | undefined | null>): string => c.filter(Boolean).join(' ');
 export { cx };
@@ -164,7 +163,7 @@ export function EmptyActions({ children }: { children: ReactNode }) {
 /** Claude is thinking: three soft dots. */
 export function Working() {
   return (
-    <span className={s.working} aria-label={tNow('common.ui.working')}>
+    <span className={s.working} aria-label="working">
       <i />
       <i />
       <i />

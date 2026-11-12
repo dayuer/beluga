@@ -42,11 +42,11 @@ import {
   CLAUDE_PRESETS,
   EVERY_CHOICES,
   HOURS_CHOICES,
-  later as laterWords,
+  LATER,
   STEP_ICON,
-  templateHelp,
+  TEMPLATE_HELP,
   HTTP_METHODS,
-  secretsNote,
+  SECRETS_NOTE,
   SERVICE_CHOICES,
   WEEK,
   chatChoices,
@@ -72,11 +72,9 @@ import { useDraft } from './use-draft.js';
 import { sentinelGraph } from '@beluga/core/sentinel/workflow.js';
 import { GraphBlock } from '../components/graph/GraphBlock.js';
 import s from './sentinel.module.css';
-import { THIS_COMPUTER } from '@beluga/shared/assistant.js';
-import { assistantTitle } from '../lib/brand.js';
+import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
 import { computerWord } from '../lib/os-words.js';
-import { tl, useT } from '../i18n/index.js';
-import { localSchedule } from '../lib/ci-sentinel-words.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /** The sentinel page's editor: When it runs, and its Steps. Everything saves as you change it. */
 
@@ -89,22 +87,21 @@ const nameOf =
 
 export function WhenCard({ item, save }: { item: Sentinel; save: Save }) {
   const items = useApp((st) => st.sentinel.items);
-  const tr = useT();
   const t = item.trigger;
   const choices = triggerChoices();
   return (
-    <section className={s.card} aria-label={tr('sentinel.cards.when')}>
+    <section className={s.card} aria-label="When">
       <header className={s.cardHead}>
-        <h3 className={s.cardTitle}>{tr('sentinel.cards.when')}</h3>
+        <h3 className={s.cardTitle}>When</h3>
       </header>
       <p className={s.sentence} data-testid="sentinel-sentence">
-        {localSchedule(t, nameOf(items))}
+        {scheduleSentence(t, nameOf(items))}
       </p>
       <div className={s.controls}>
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.event.whatStartsIt')}</span>
+          <span className={s.controlLabel}>What starts it</span>
           <Select
-            label={tr('sentinel.event.whatStartsIt')}
+            label="What starts it"
             size="small"
             value={t.kind}
             options={choices}
@@ -115,7 +112,7 @@ export function WhenCard({ item, save }: { item: Sentinel; save: Save }) {
           />
         </div>
         {t.kind === 'schedule' ? <ScheduleControls t={t} save={save} /> : null}
-        {t.kind === 'manual' ? <p className={s.hint}>{tr('sentinel.cards.manualHint')}</p> : null}
+        {t.kind === 'manual' ? <p className={s.hint}>It runs only when you press Run Now: here, on its row, or from your phone.</p> : null}
         {t.kind === 'after' ? <AfterControls t={t} item={item} items={items} save={save} /> : null}
         {t.kind !== 'schedule' && t.kind !== 'manual' && t.kind !== 'after' ? <EventControls item={item} save={save} /> : null}
       </div>
@@ -124,47 +121,45 @@ export function WhenCard({ item, save }: { item: Sentinel; save: Save }) {
 }
 
 function AfterControls({ t, item, items, save }: { t: AfterTrigger; item: Sentinel; items: readonly Sentinel[]; save: Save }) {
-  const tr = useT();
   const others = otherSentinels(items, item.id);
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.after')}</span>
+        <span className={s.controlLabel}>After</span>
         {others.length ? (
-          <Select label={tr('sentinel.cards.afterWhich')} size="small" value={t.sentinelId} placeholder={tr('sentinel.cards.pickSentinel')} options={others} onChange={(sentinelId) => save({ trigger: { ...t, sentinelId } })} />
+          <Select label="After which sentinel" size="small" value={t.sentinelId} placeholder="Pick a sentinel" options={others} onChange={(sentinelId) => save({ trigger: { ...t, sentinelId } })} />
         ) : (
-          <span className={s.hint}>{tr('sentinel.cards.noOtherToFollow')}</span>
+          <span className={s.hint}>There’s no other sentinel yet to follow.</span>
         )}
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.runs')}</span>
-        <Select label={tr('sentinel.cards.whenAfter')} size="small" value={t.on} options={AFTER_ON} onChange={(on) => save({ trigger: { ...t, on } })} />
+        <span className={s.controlLabel}>Runs</span>
+        <Select label="When it runs after it" size="small" value={t.on} options={AFTER_ON} onChange={(on) => save({ trigger: { ...t, on } })} />
       </div>
-      <p className={s.hint}>{tr('sentinel.cards.afterHint')}</p>
+      <p className={s.hint}>It starts when that one’s run ends, with its last output as what fired it ({'{{trigger}}'}, {'{{trigger.json}}'}). It doesn’t run while paused.</p>
     </>
   );
 }
 
 function ScheduleControls({ t, save }: { t: ScheduleTrigger; save: Save }) {
   const set = (next: ScheduleTrigger): void => save({ trigger: next });
-  const tr = useT();
   return (
     <>
       <div className={s.every}>
-        <Segmented label={tr('sentinel.cards.howOften')} value={t.every} onChange={(every) => set(withEvery(t, every))} options={EVERY_CHOICES} />
+        <Segmented label="How often" value={t.every} onChange={(every) => set(withEvery(t, every))} options={EVERY_CHOICES} />
       </div>
       {t.every === 'hours' ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.cards.every')}</span>
-          <Select label={tr('sentinel.cards.everyHowManyHours')} size="small" value={String(t.hours ?? 1)} options={HOURS_CHOICES.map((h) => ({ value: String(h), label: tr('sentinel.cards.hours', { n: h }) }))} onChange={(h) => set({ ...t, hours: Number(h) as ScheduleTrigger['hours'] & number })} />
+          <span className={s.controlLabel}>Every</span>
+          <Select label="Every how many hours" size="small" value={String(t.hours ?? 1)} options={HOURS_CHOICES.map((h) => ({ value: String(h), label: h === 1 ? 'hour' : `${h} hours` }))} onChange={(h) => set({ ...t, hours: Number(h) as ScheduleTrigger['hours'] & number })} />
         </div>
       ) : (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.cards.at')}</span>
+          <span className={s.controlLabel}>At</span>
           <input
             type="time"
             className={s.time}
-            aria-label={tr('sentinel.cards.atWhatTime')}
+            aria-label="At what time"
             value={t.at}
             onChange={(e) => {
               if (/^\d{2}:\d{2}$/.test(e.target.value)) set({ ...t, at: e.target.value });
@@ -174,8 +169,8 @@ function ScheduleControls({ t, save }: { t: ScheduleTrigger; save: Save }) {
       )}
       {t.every === 'week' ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.cards.on')}</span>
-          <span className={s.days} role="group" aria-label={tr('sentinel.cards.daysOfWeek')}>
+          <span className={s.controlLabel}>On</span>
+          <span className={s.days} role="group" aria-label="Days of the week">
             {WEEK.map((d) => {
               const on = (t.days?.length ? t.days : [1]).includes(d);
               return (
@@ -189,19 +184,19 @@ function ScheduleControls({ t, save }: { t: ScheduleTrigger; save: Save }) {
       ) : null}
       {t.every === 'month' ? (
         <div className={s.controlRow}>
-          <span className={s.controlLabel}>{tr('sentinel.cards.onThe')}</span>
-          <Select label={tr('sentinel.cards.dayOfMonth')} size="small" value={String(t.day ?? 1)} options={Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: ordinal(i + 1) }))} onChange={(d) => set({ ...t, day: Number(d) })} />
+          <span className={s.controlLabel}>On the</span>
+          <Select label="Day of the month" size="small" value={String(t.day ?? 1)} options={Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: ordinal(i + 1) }))} onChange={(d) => set({ ...t, day: Number(d) })} />
         </div>
       ) : null}
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.asleep', { computer: computerWord() })}</span>
+        <span className={s.controlLabel}>If my {computerWord()} was asleep</span>
         <Select
-          label={tr('sentinel.cards.asleep', { computer: computerWord() })}
+          label={`If my ${computerWord()} was asleep`}
           size="small"
           value={t.missed}
           options={[
-            { value: 'catch-up', label: tr('sentinel.cards.catchUp'), description: tr('sentinel.cards.catchUpDetail') },
-            { value: 'skip', label: tr('sentinel.cards.skip'), description: tr('sentinel.cards.skipDetail') },
+            { value: 'catch-up', label: 'Run as soon as it wakes', description: 'Once, however many runs it missed' },
+            { value: 'skip', label: 'Skip that run', description: 'It waits for the next one' },
           ]}
           onChange={(missed) => set({ ...t, missed })}
         />
@@ -213,7 +208,6 @@ function ScheduleControls({ t, save }: { t: ScheduleTrigger; save: Save }) {
 export function StepsCard({ item, save }: { item: Sentinel; save: Save }) {
   const items = useApp((st) => st.sentinel.items);
   const [open, setOpen] = useState<string>();
-  const tr = useT();
   const latest = useRef(item);
   latest.current = item;
   const setSteps = (steps: Parameters<Save>[0]['steps']): void => save({ steps });
@@ -233,18 +227,18 @@ export function StepsCard({ item, save }: { item: Sentinel; save: Save }) {
   const steps = item.steps;
   const [look, setLook] = useState<'list' | 'graph'>('list');
   return (
-    <section className={s.card} aria-label={tr('sentinel.marks.steps')}>
+    <section className={s.card} aria-label="Steps">
       <header className={s.cardHead}>
-        <h3 className={s.cardTitle}>{tr('sentinel.marks.steps')}</h3>
+        <h3 className={s.cardTitle}>Steps</h3>
         <span className={s.grow} />
         {steps.length ? (
           <Segmented<'list' | 'graph'>
-            label={tr('sentinel.cards.showStepsAs')}
+            label="Show the steps as"
             value={look}
             onChange={setLook}
             options={[
-              { value: 'list', label: tr('sentinel.cards.list'), icon: 'rows' },
-              { value: 'graph', label: tr('sentinel.cards.graph'), icon: 'graph' },
+              { value: 'list', label: 'List', icon: 'rows' },
+              { value: 'graph', label: 'Graph', icon: 'graph' },
             ]}
           />
         ) : null}
@@ -271,12 +265,12 @@ export function StepsCard({ item, save }: { item: Sentinel; save: Save }) {
           ))}
         </div>
       ) : (
-        <p className={s.empty}>{tr('sentinel.cards.noSteps')}</p>
+        <p className={s.empty}>No steps yet. Add what it does, in order: ask your agent, run a script, call a service, tell you.</p>
       )}
       <div className={s.addStep}>
         <ActionsDropdown items={add} align="start">
           <Button size="small" icon="plus">
-            {tr('sentinel.cards.addStep')}
+            Add a Step
           </Button>
         </ActionsDropdown>
       </div>
@@ -332,13 +326,12 @@ function StepItem({
     const next = v.replace(/\s+/g, ' ').trim();
     if (next && next !== step.name) change({ name: next });
   });
-  const tr = useT();
   const later = !stepAvailable(step.kind);
   const menu: ActionItem[] = [
-    { label: tr('sentinel.cards.moveUp'), icon: 'up', disabled: index === 0, onSelect: () => move(-1) },
-    { label: tr('sentinel.cards.moveDown'), icon: 'chevronDown', disabled: index === count - 1, onSelect: () => move(1) },
-    { label: tr('sentinel.menu.duplicate'), icon: 'copy', separate: true, disabled: later, onSelect: duplicate },
-    { label: tr('sentinel.cards.remove'), danger: true, separate: true, onSelect: remove },
+    { label: 'Move Up', icon: 'up', disabled: index === 0, onSelect: () => move(-1) },
+    { label: 'Move Down', icon: 'chevronDown', disabled: index === count - 1, onSelect: () => move(1) },
+    { label: 'Duplicate', icon: 'copy', separate: true, disabled: later, onSelect: duplicate },
+    { label: 'Remove', danger: true, separate: true, onSelect: remove },
   ];
   return (
     <div className={s.step} role="listitem" data-step={step.kind}>
@@ -357,22 +350,22 @@ function StepItem({
           <input
             className={s.stepName}
             value={name.text}
-            aria-label={tr('sentinel.cards.stepName', { n: index + 1 })}
+            aria-label={`Step ${index + 1}’s name`}
             spellCheck={false}
             onChange={(e) => name.change(e.target.value)}
             onBlur={name.flush}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Enter' && !isImeComposing(e)) (e.target as HTMLInputElement).blur();
             }}
           />
           <span className={s.stepLine}>
-            {tl('STEP_INFO', step.kind, 'label', STEP_INFO[step.kind].label)} · {stepSentence(step, nameOf)}
+            {STEP_INFO[step.kind].label} · {stepSentence(step, nameOf)}
           </span>
-          {later ? <span className={s.stepLater}>{tr('sentinel.cards.laterStops', { later: laterWords() })}</span> : null}
+          {later ? <span className={s.stepLater}>{LATER}: a run stops here until then.</span> : null}
         </span>
-        {later ? null : <IconButton icon={open ? 'chevronUp' : 'chevronDown'} label={open ? tr('sentinel.cards.fold') : tr('sentinel.cards.showFields')} onClick={toggle} aria-expanded={open} />}
+        {later ? null : <IconButton icon={open ? 'chevronUp' : 'chevronDown'} label={open ? 'Fold' : 'Show its fields'} onClick={toggle} aria-expanded={open} />}
         <ActionsDropdown items={menu}>
-          <IconButton icon="more" label={tr('sentinel.cards.moreFor', { name: step.name })} />
+          <IconButton icon="more" label={`More for “${step.name}”`} />
         </ActionsDropdown>
       </div>
       {open && !later ? (
@@ -393,38 +386,34 @@ function StepItem({
   );
 }
 
-type Tr = ReturnType<typeof useT>;
-
-const whereInfo = (tr: Tr): ReadonlyArray<{ readonly value: ClaudeStep['where']; readonly label: string; readonly description: string }> => [
-  { value: 'project', label: tr('sentinel.cards.where.project'), description: tr('sentinel.cards.where.projectDetail') },
-  { value: 'worktree', label: tr('sentinel.cards.where.worktree'), description: tr('sentinel.cards.where.worktreeDetail') },
-  { value: 'mac', label: tr('sentinel.cards.where.mac', { mac: assistantTitle() }), description: tr('sentinel.cards.where.macDetail', { mac: assistantTitle(), computer: THIS_COMPUTER }) },
+const WHERE_INFO: ReadonlyArray<{ readonly value: ClaudeStep['where']; readonly label: string; readonly description: string }> = [
+  { value: 'project', label: 'In the project', description: 'A new chat in the project’s main folder; the agent reads and reports, never changes files' },
+  { value: 'worktree', label: 'In a new worktree', description: 'Its own branch: the agent edits, commits and runs the tests; later steps share it' },
+  { value: 'mac', label: `On ${ASSISTANT_TITLE}`, description: `A chat in ${ASSISTANT_TITLE}, for things about ${THIS_COMPUTER} itself` },
 ];
 
 function ClaudeFields({ step, item, change }: { step: ClaudeStep; item: Sentinel; change: (patch: Partial<ClaudeStep>) => void }) {
   const agents = useAgentEntries();
-  const tr = useT();
   const prompt = useDraft(step.prompt, (v) => v !== step.prompt && change({ prompt: v }));
-  const WHERE_INFO = whereInfo(tr);
   const where = WHERE_INFO.find((w) => w.value === step.where);
   return (
     <>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.cards.whatAgentDoes')}</span>
-        <div className={s.presets} role="group" aria-label={tr('sentinel.cards.startFrom')}>
+        <span className={s.fieldLabel}>What the agent does</span>
+        <div className={s.presets} role="group" aria-label="Start from">
           {CLAUDE_PRESETS.map((p) => (
             <button key={p.id} type="button" className={s.preset} onClick={() => prompt.change(p.prompt)}>
               {p.label}
             </button>
           ))}
         </div>
-        <TextArea className={s.prompt} value={prompt.text} onChange={prompt.change} onBlur={prompt.flush} rows={6} aria-label={tr('sentinel.cards.agentPrompt')} placeholder={tr('sentinel.cards.agentPromptPlaceholder')} />
-        <span className={s.help}>{templateHelp()}</span>
+        <TextArea className={s.prompt} value={prompt.text} onChange={prompt.change} onBlur={prompt.flush} rows={6} aria-label="The agent’s prompt" placeholder="What should your agent do each run? Say when to stop: “If nothing changed, say so and stop.”" />
+        <span className={s.help}>{TEMPLATE_HELP}</span>
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.where')}</span>
+        <span className={s.controlLabel}>Where</span>
         <Select
-          label={tr('sentinel.cards.whereAgentRuns')}
+          label="Where the agent runs"
           size="small"
           value={step.where}
           options={WHERE_INFO.map((w) => {
@@ -434,19 +423,19 @@ function ClaudeFields({ step, item, change }: { step: ClaudeStep; item: Sentinel
           onChange={(w) => change({ where: w })}
         />
       </div>
-      {where ? <p className={s.hint}>{tr('sentinel.cards.sentenceEnd', { text: where.description })}</p> : null}
+      {where ? <p className={s.hint}>{where.description}.</p> : null}
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.agent')}</span>
+        <span className={s.controlLabel}>Agent</span>
         {/* Which agent and model does it (BLG-497): the run's chat or worktree runs it for this step. */}
-        <Select label={tr('sentinel.cards.agentAndModel')} size="small" value={stepAgentChoice(step)} options={agents} onChange={(v) => change(agentFields(v))} />
+        <Select label="Agent and model" size="small" value={stepAgentChoice(step)} options={agents} onChange={(v) => change(agentFields(v))} />
       </div>
-      {step.where === 'mac' && stepAgentChoice(step) ? <p className={s.hint}>{tr('sentinel.cards.macDefaultAgent', { mac: assistantTitle() })}</p> : null}
+      {step.where === 'mac' && stepAgentChoice(step) ? <p className={s.hint}>On {ASSISTANT_TITLE}, your default agent does it: pick In the project or In a new worktree for this one.</p> : null}
     </>
   );
 }
 
 const TIMEOUTS = [30, 60, 120, 300, 600, 900, 1800, 3600] as const;
-const timeoutLabel = (tr: Tr, sec: number): string => (sec < 60 ? tr('sentinel.cards.seconds', { n: sec }) : sec < 3600 ? tr('sentinel.cards.minutes', { n: sec / 60 }) : tr('sentinel.cards.oneHour'));
+const timeoutLabel = (sec: number): string => (sec < 60 ? `${sec} seconds` : sec < 3600 ? `${sec / 60} minute${sec === 60 ? '' : 's'}` : '1 hour');
 
 /** What a new script starts as, by language: it prints what the next step reads. */
 const STARTER: Readonly<Record<ScriptLanguage, string>> = {
@@ -460,7 +449,6 @@ const STARTER: Readonly<Record<ScriptLanguage, string>> = {
 };
 
 function ScriptFields({ step, change }: { step: ScriptStep; change: (patch: Partial<ScriptStep>) => void }) {
-  const tr = useT();
   const command = useDraft(step.command, (v) => v !== step.command && change({ command: v }));
   const code = useDraft(step.code ?? '', (v) => v !== (step.code ?? '') && change({ code: v }));
   const own = step.code !== undefined;
@@ -477,77 +465,78 @@ function ScriptFields({ step, change }: { step: ScriptStep; change: (patch: Part
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.itRuns')}</span>
+        <span className={s.controlLabel}>It runs</span>
         <Segmented<'command' | 'script'>
-          label={tr('sentinel.cards.itRuns')}
+          label="It runs"
           value={own ? 'script' : 'command'}
           onChange={setMode}
           options={[
-            { value: 'command', label: tr('sentinel.cards.aCommand') },
-            { value: 'script', label: tr('sentinel.cards.ownScript') },
+            { value: 'command', label: 'A command' },
+            { value: 'script', label: 'Its own script' },
           ]}
         />
       </div>
       {own ? (
         <>
           <div className={s.controlRow}>
-            <span className={s.controlLabel}>{tr('sentinel.cards.language')}</span>
-            <Select label={tr('sentinel.cards.language')} size="small" value={language} options={SCRIPT_LANGUAGES.map((l) => ({ value: l, label: SCRIPT_LANGUAGE_INFO[l].label }))} onChange={(l) => change({ language: l })} />
+            <span className={s.controlLabel}>Language</span>
+            <Select label="Language" size="small" value={language} options={SCRIPT_LANGUAGES.map((l) => ({ value: l, label: SCRIPT_LANGUAGE_INFO[l].label }))} onChange={(l) => change({ language: l })} />
           </div>
           <div className={s.field}>
-            <span className={s.fieldLabel}>{tr('sentinel.cards.script')}</span>
-            <CodeEditor value={code.text} onChange={code.change} onBlur={code.flush} lang={language} minRows={8} aria-label={tr('sentinel.cards.script')} />
-            <span className={s.help}>{tr('sentinel.cards.scriptHelp', { run: SCRIPT_LANGUAGE_INFO[language].run })}</span>
+            <span className={s.fieldLabel}>Script</span>
+            <CodeEditor value={code.text} onChange={code.change} onBlur={code.flush} lang={language} minRows={8} aria-label="Script" />
+            <span className={s.help}>
+              Runs with {SCRIPT_LANGUAGE_INFO[language].run} in the folder below. What it prints is what the next step reads (a number, JSON or CSV); a non-zero exit stops the run. It gets $VAR from Settings › Environment, $SENTINEL_PREVIOUS (the step before’s output), $SENTINEL_PREVIOUS_FILE and $SENTINEL_RUN_DIR.
+            </span>
           </div>
           <div className={s.field}>
-            <span className={s.fieldLabel}>{tr('sentinel.cards.arguments')}</span>
-            <TextInput value={command.text} onChange={command.change} onBlur={command.flush} mono placeholder="--since yesterday" aria-label={tr('sentinel.cards.arguments')} />
+            <span className={s.fieldLabel}>Arguments</span>
+            <TextInput value={command.text} onChange={command.change} onBlur={command.flush} mono placeholder="--since yesterday" aria-label="Arguments" />
           </div>
         </>
       ) : (
         <div className={s.field}>
-          <span className={s.fieldLabel}>{tr('sentinel.cards.command')}</span>
-          <CodeEditor value={command.text} onChange={command.change} onBlur={command.flush} lang="bash" single placeholder="npm test" aria-label={tr('sentinel.cards.command')} />
-          <span className={s.help}>{tr('sentinel.cards.commandHelp')}</span>
+          <span className={s.fieldLabel}>Command</span>
+          <CodeEditor value={command.text} onChange={command.change} onBlur={command.flush} lang="bash" single placeholder="npm test" aria-label="Command" />
+          <span className={s.help}>One shell line or a script’s path; a non-zero exit stops the run. $VAR from Settings › Environment; $SENTINEL_PREVIOUS has the step before’s output, and $SENTINEL_PREVIOUS_FILE the file it’s in.</span>
         </div>
       )}
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.runsIn')}</span>
+        <span className={s.controlLabel}>Runs in</span>
         <Select
-          label={tr('sentinel.cards.runsIn')}
+          label="Runs in"
           size="small"
           value={step.cwd}
           options={[
-            { value: 'project', label: tr('sentinel.cards.projectFolder') },
-            { value: 'home', label: tr('sentinel.cards.homeFolder') },
+            { value: 'project', label: 'The project’s main folder' },
+            { value: 'home', label: 'Your home folder' },
           ]}
           onChange={(cwd) => change({ cwd })}
         />
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.stopAfter')}</span>
-        <Select label={tr('sentinel.cards.stopAfter')} size="small" value={String(step.timeoutSec)} options={timeouts.map((n) => ({ value: String(n), label: timeoutLabel(tr, n) }))} onChange={(v) => change({ timeoutSec: Number(v) })} />
+        <span className={s.controlLabel}>Stop it after</span>
+        <Select label="Stop it after" size="small" value={String(step.timeoutSec)} options={timeouts.map((n) => ({ value: String(n), label: timeoutLabel(n) }))} onChange={(v) => change({ timeoutSec: Number(v) })} />
       </div>
     </>
   );
 }
 
 function NotifyFields({ step, change }: { step: NotifyStep; change: (patch: Partial<NotifyStep>) => void }) {
-  const tr = useT();
   const title = useDraft(step.title ?? '', (v) => v !== (step.title ?? '') && change({ title: v }));
   const body = useDraft(step.body ?? '', (v) => v !== (step.body ?? '') && change({ body: v }));
   return (
     <>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.cards.title')}</span>
-        <TextInput value={title.text} onChange={title.change} onBlur={title.flush} placeholder={tr('sentinel.cards.titlePlaceholder')} aria-label={tr('sentinel.cards.title')} />
+        <span className={s.fieldLabel}>Title</span>
+        <TextInput value={title.text} onChange={title.change} onBlur={title.flush} placeholder="{{sentinel}} (the sentinel’s name)" aria-label="Title" />
       </div>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.cards.says')}</span>
-        <TextArea value={body.text} onChange={body.change} onBlur={body.flush} rows={2} placeholder={tr('sentinel.cards.saysPlaceholder')} aria-label={tr('sentinel.cards.whatItSays')} />
-        <span className={s.help}>{templateHelp()}</span>
+        <span className={s.fieldLabel}>Says</span>
+        <TextArea value={body.text} onChange={body.change} onBlur={body.flush} rows={2} placeholder="The report’s first line" aria-label="What it says" />
+        <span className={s.help}>{TEMPLATE_HELP}</span>
       </div>
-      <Checkbox checked={step.phone} onChange={(phone) => change({ phone })} label={tr('sentinel.cards.phoneToo')} detail={tr('sentinel.cards.phoneTooDetail')} />
+      <Checkbox checked={step.phone} onChange={(phone) => change({ phone })} label="On my phone too" detail="With the report, if your phone is paired" />
     </>
   );
 }
@@ -555,47 +544,44 @@ function NotifyFields({ step, change }: { step: NotifyStep; change: (patch: Part
 // ---------------------------------------------------------------- Call a service
 
 function HttpFields({ step, change }: { step: HttpStep; change: (patch: Partial<HttpStep>) => void }) {
-  const tr = useT();
   const url = useDraft(step.url, (v) => v !== step.url && change({ url: v }));
   const body = useDraft(step.body ?? '', (v) => v !== (step.body ?? '') && change({ body: v }));
   const preset = step.preset ?? 'url';
-  const own = SERVICE_PRESETS[preset].note;
-  const note = own ? tl('SERVICE_PRESETS', preset, 'note', own) : own;
+  const note = SERVICE_PRESETS[preset].note;
   const timeouts: number[] = [10, 30, 60, 120, 300, 600].includes(step.timeoutSec) ? [10, 30, 60, 120, 300, 600] : [10, 30, 60, 120, 300, 600, step.timeoutSec].sort((a, b) => a - b);
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.service')}</span>
-        <Select label={tr('sentinel.cards.service')} size="small" value={preset} options={SERVICE_CHOICES} onChange={(p) => change(p === 'url' ? { preset: 'url' } : presetFields(p))} />
+        <span className={s.controlLabel}>Service</span>
+        <Select label="Service" size="small" value={preset} options={SERVICE_CHOICES} onChange={(p) => change(p === 'url' ? { preset: 'url' } : presetFields(p))} />
       </div>
       {note ? <p className={s.hint}>{note}</p> : null}
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.event.address')}</span>
+        <span className={s.fieldLabel}>Address</span>
         <div className={s.urlRow}>
-          <Select label={tr('sentinel.cards.method')} size="small" value={step.method} options={HTTP_METHODS.map((m) => ({ value: m, label: m }))} onChange={(method) => change({ method })} />
+          <Select label="Method" size="small" value={step.method} options={HTTP_METHODS.map((m) => ({ value: m, label: m }))} onChange={(method) => change({ method })} />
           <TextInput className={s.grow} value={url.text} onChange={url.change} onBlur={url.flush} mono placeholder="https://api.example.com/search" aria-label="URL" />
         </div>
       </div>
       <Headers headers={step.headers} change={(headers) => change({ headers })} />
       {step.method !== 'GET' ? (
         <div className={s.field}>
-          <span className={s.fieldLabel}>{tr('sentinel.cards.body')}</span>
-          <CodeEditor value={body.text} onChange={body.change} onBlur={body.flush} lang="json" placeholder={'{"query": "{{previous}}"}'} aria-label={tr('sentinel.cards.body')} />
-          <span className={s.help}>{tr('sentinel.cards.bodyHelp', { help: templateHelp() })}</span>
+          <span className={s.fieldLabel}>Body</span>
+          <CodeEditor value={body.text} onChange={body.change} onBlur={body.flush} lang="json" placeholder={'{"query": "{{previous}}"}'} aria-label="Body" />
+          <span className={s.help}>{TEMPLATE_HELP} (filled in as JSON text in a JSON body)</span>
         </div>
       ) : null}
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.giveUpAfter')}</span>
-        <Select label={tr('sentinel.cards.giveUpAfter')} size="small" value={String(step.timeoutSec)} options={timeouts.map((n) => ({ value: String(n), label: timeoutLabel(tr, n) }))} onChange={(v) => change({ timeoutSec: Number(v) })} />
+        <span className={s.controlLabel}>Give up after</span>
+        <Select label="Give up after" size="small" value={String(step.timeoutSec)} options={timeouts.map((n) => ({ value: String(n), label: timeoutLabel(n) }))} onChange={(v) => change({ timeoutSec: Number(v) })} />
       </div>
-      <p className={s.hint}>{tr('sentinel.cards.sentenceEnd', { text: secretsNote() })}</p>
+      <p className={s.hint}>{SECRETS_NOTE}.</p>
     </>
   );
 }
 
 /** Headers as name and value rows; a new row appears as the last one is filled. */
 function Headers({ headers, change }: { headers: Readonly<Record<string, string>>; change: (headers: Record<string, string>) => void }) {
-  const tr = useT();
   const [rows, setRows] = useState(() => headerRows(headers));
   const latest = useRef(headers);
   // The daemon's copy changed under us (a preset): start again from it.
@@ -616,16 +602,16 @@ function Headers({ headers, change }: { headers: Readonly<Record<string, string>
   };
   return (
     <div className={s.field}>
-      <span className={s.fieldLabel}>{tr('sentinel.cards.headers')}</span>
-      <div className={s.headers} role="list" aria-label={tr('sentinel.cards.headers')}>
+      <span className={s.fieldLabel}>Headers</span>
+      <div className={s.headers} role="list" aria-label="Headers">
         {rows.map((r, i) => (
           <div key={i} className={s.headerRow} role="listitem">
-            <TextInput value={r.key} onChange={(key) => set(i, { key })} onBlur={flush} mono placeholder="Authorization" aria-label={tr('sentinel.cards.headerName', { n: i + 1 })} />
-            <TextInput value={r.value} onChange={(value) => set(i, { value })} onBlur={flush} mono placeholder="Bearer $API_KEY" aria-label={tr('sentinel.cards.headerValue', { n: i + 1 })} />
+            <TextInput value={r.key} onChange={(key) => set(i, { key })} onBlur={flush} mono placeholder="Authorization" aria-label={`Header ${i + 1}’s name`} />
+            <TextInput value={r.value} onChange={(value) => set(i, { value })} onBlur={flush} mono placeholder="Bearer $API_KEY" aria-label={`Header ${i + 1}’s value`} />
             {r.key || r.value ? (
               <IconButton
                 icon="x"
-                label={tr('sentinel.cards.removeHeader', { what: r.key || tr('sentinel.cards.thisHeader') })}
+                label={`Remove ${r.key || 'this header'}`}
                 onClick={() => {
                   const next = rows.filter((_, n) => n !== i);
                   setRows(next);
@@ -647,45 +633,43 @@ function Headers({ headers, change }: { headers: Readonly<Record<string, string>
 // ---------------------------------------------------------------- pull requests
 
 function PrFields({ step, change }: { step: PrStep; change: (patch: Partial<PrStep>) => void }) {
-  const tr = useT();
   return (
     <>
-      <Checkbox checked={Boolean(step.draft)} onChange={(draft) => change({ draft })} label={tr('sentinel.cards.prDraft')} detail={tr('sentinel.cards.prDraftDetail')} />
-      <p className={s.hint}>{tr('sentinel.cards.prHint')}</p>
+      <Checkbox checked={Boolean(step.draft)} onChange={(draft) => change({ draft })} label="Open it as a draft" detail="For you to look at first; a draft can’t be merged by a later step" />
+      <p className={s.hint}>From the worktree an earlier Ask Your Agent step made (in a new worktree), with your pull request instructions. Without one, the run stops here.</p>
     </>
   );
 }
 
 function MergeFields({ step, change }: { step: MergeStep; change: (patch: Partial<MergeStep>) => void }) {
-  const tr = useT();
   const setApproval = (approval: boolean): void => {
     if (approval) return change({ require: { checks: true, approval: true } });
     openSheet({
       kind: 'confirm',
-      title: tr('sentinel.cards.mergeTitle'),
-      message: tr('sentinel.cards.mergeMessage'),
-      confirm: tr('sentinel.cards.mergeConfirm'),
+      title: 'Merge without asking?',
+      message: 'This sentinel will merge its pull request by itself once every check passes and the agent’s review says ship. A hold still asks you. You can turn asking back on here any time.',
+      confirm: 'Merge Without Asking',
       destructive: true,
       run: () => change({ require: { checks: true, approval: false } }),
     });
   };
   return (
     <>
-      <Checkbox checked={step.require.approval} onChange={setApproval} label={tr('sentinel.cards.askBeforeMerge')} detail={tr('sentinel.cards.askBeforeMergeDetail', { computer: computerWord() })} />
+      <Checkbox checked={step.require.approval} onChange={setApproval} label="Ask me before merging" detail={`A card on the ${computerWord()} and your phone, with Merge and Not Now; unanswered for a day, the run stops`} />
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.mergeAs')}</span>
+        <span className={s.controlLabel}>Merge as</span>
         <Select
-          label={tr('sentinel.cards.mergeAs')}
+          label="Merge as"
           size="small"
           value={step.method}
           options={[
-            { value: 'squash', label: tr('sentinel.cards.squash'), description: 'gh pr merge --squash' },
-            { value: 'merge', label: tr('sentinel.cards.mergeCommit'), description: 'gh pr merge --merge' },
+            { value: 'squash', label: 'One squashed commit', description: 'gh pr merge --squash' },
+            { value: 'merge', label: 'A merge commit', description: 'gh pr merge --merge' },
           ]}
           onChange={(method) => change({ method })}
         />
       </div>
-      <p className={s.hint}>{mergeWords(step)} {tr('sentinel.cards.mergeNote')}</p>
+      <p className={s.hint}>{mergeWords(step)} The pull request must not be a draft or conflict; after merging, its worktree is archived.</p>
     </>
   );
 }
@@ -694,23 +678,22 @@ function MergeFields({ step, change }: { step: MergeStep; change: (patch: Partia
 
 function MessageFields({ step, change }: { step: MessageStep; change: (patch: Partial<MessageStep>) => void }) {
   const network = useApp((st) => st.network);
-  const tr = useT();
   const text = useDraft(step.text, (v) => v !== step.text && change({ text: v }));
   const chats = chatChoices(network);
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.writesIn')}</span>
+        <span className={s.controlLabel}>Writes in</span>
         {chats.length ? (
-          <Select label={tr('sentinel.cards.whichChat')} size="small" value={step.to} placeholder={tr('sentinel.cards.pickChat')} options={chats} onChange={(to) => change({ to })} />
+          <Select label="Which chat" size="small" value={step.to} placeholder="Pick a chat" options={chats} onChange={(to) => change({ to })} />
         ) : (
-          <span className={s.hint}>{network.enabled ? tr('sentinel.cards.noFriendsOrGroups') : tr('sentinel.cards.networkOff')}</span>
+          <span className={s.hint}>{network.enabled ? 'No friends or groups yet: add a friend in People.' : 'Turn on the Beluga network in Settings to message friends and groups.'}</span>
         )}
       </div>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.cards.message')}</span>
-        <TextArea value={text.text} onChange={text.change} onBlur={text.flush} rows={3} placeholder="{{sentinel}}: {{previous}}" aria-label={tr('sentinel.cards.message')} />
-        <span className={s.help}>{tr('sentinel.cards.messageHelp', { help: templateHelp() })}</span>
+        <span className={s.fieldLabel}>Message</span>
+        <TextArea value={text.text} onChange={text.change} onBlur={text.flush} rows={3} placeholder="{{sentinel}}: {{previous}}" aria-label="Message" />
+        <span className={s.help}>{TEMPLATE_HELP}; @name tags someone and tells them</span>
       </div>
     </>
   );
@@ -718,44 +701,42 @@ function MessageFields({ step, change }: { step: MessageStep; change: (patch: Pa
 
 function FriendFields({ step, change }: { step: FriendStep; change: (patch: Partial<FriendStep>) => void }) {
   const friends = useApp((st) => st.network.friends);
-  const tr = useT();
   const prompt = useDraft(step.prompt, (v) => v !== step.prompt && change({ prompt: v }));
   const project = useDraft(step.project ?? '', (v) => v !== (step.project ?? '') && change({ project: v || undefined }));
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.whoseAgent')}</span>
+        <span className={s.controlLabel}>Whose agent</span>
         {friends.length ? (
-          <Select label={tr('sentinel.cards.whoseAgent')} size="small" value={step.peerId} placeholder={tr('sentinel.cards.pickFriend')} options={[...friends].sort((a, b) => a.name.localeCompare(b.name)).map((f) => ({ value: f.peerId, label: f.name }))} onChange={(peerId) => change({ peerId })} />
+          <Select label="Whose agent" size="small" value={step.peerId} placeholder="Pick a friend" options={[...friends].sort((a, b) => a.name.localeCompare(b.name)).map((f) => ({ value: f.peerId, label: f.name }))} onChange={(peerId) => change({ peerId })} />
         ) : (
-          <span className={s.hint}>{tr('sentinel.cards.noFriends')}</span>
+          <span className={s.hint}>No friends yet: add one in People.</span>
         )}
       </div>
       <div className={s.field}>
-        <span className={s.fieldLabel}>{tr('sentinel.cards.whatToAsk')}</span>
-        <TextArea value={prompt.text} onChange={prompt.change} onBlur={prompt.flush} rows={4} placeholder={tr('sentinel.cards.whatToAskPlaceholder')} aria-label={tr('sentinel.cards.whatToAsk')} />
-        <span className={s.help}>{templateHelp()}</span>
+        <span className={s.fieldLabel}>What to ask</span>
+        <TextArea value={prompt.text} onChange={prompt.change} onBlur={prompt.flush} rows={4} placeholder="Is staging up? Look at its logs since {{date}} and say what’s wrong." aria-label="What to ask" />
+        <span className={s.help}>{TEMPLATE_HELP}</span>
       </div>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.inTheirProject')}</span>
-        <TextInput value={project.text} onChange={project.change} onBlur={project.flush} placeholder={tr('sentinel.cards.anyTheirChoice')} aria-label={tr('sentinel.cards.theirProject')} />
+        <span className={s.controlLabel}>In their project</span>
+        <TextInput value={project.text} onChange={project.change} onBlur={project.flush} placeholder="Any (their choice)" aria-label="Their project" />
       </div>
-      <p className={s.hint}>{tr('sentinel.cards.friendHint')}</p>
+      <p className={s.hint}>Asked as you; their trust in you decides what their agent may do. Their answer is this step’s output.</p>
     </>
   );
 }
 
 function TriggerFields({ step, item, change }: { step: TriggerStep; item: Sentinel; change: (patch: Partial<TriggerStep>) => void }) {
   const items = useApp((st) => st.sentinel.items);
-  const tr = useT();
   const others = otherSentinels(items, item.id);
   return (
     <>
       <div className={s.controlRow}>
-        <span className={s.controlLabel}>{tr('sentinel.cards.runs')}</span>
-        {others.length ? <Select label={tr('sentinel.cards.whichSentinel')} size="small" value={step.sentinelId} placeholder={tr('sentinel.cards.pickSentinel')} options={others} onChange={(sentinelId) => change({ sentinelId })} /> : <span className={s.hint}>{tr('sentinel.cards.noOther')}</span>}
+        <span className={s.controlLabel}>Runs</span>
+        {others.length ? <Select label="Which sentinel" size="small" value={step.sentinelId} placeholder="Pick a sentinel" options={others} onChange={(sentinelId) => change({ sentinelId })} /> : <span className={s.hint}>There’s no other sentinel yet.</span>}
       </div>
-      <p className={s.hint}>{tr('sentinel.cards.triggerHint')}</p>
+      <p className={s.hint}>It starts that one with this run’s last output and goes on without waiting for it. A paused one doesn’t start.</p>
     </>
   );
 }

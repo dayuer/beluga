@@ -5,8 +5,8 @@ import { dirName, joinPath } from '@beluga/shared/os-path.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { inApp, webServed } from './boot.js';
 import { runsWhenOpened } from './runs-when-opened.js';
-import { t } from '../i18n/index.js';
 import { openThere } from './remote-open.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Files you see in Beluga, the Mac way: where one is on this Mac (to show it in Finder or copy
@@ -47,7 +47,7 @@ async function downloadOrSay(client: SocketClient, path: string): Promise<void> 
   }
   const { copyText } = await import('./copy.js');
   await copyText(path).catch(() => undefined);
-  client.store.dispatch({ type: 'toast', text: t('common.files.onServer', { path }), level: 'info' });
+  client.store.dispatch({ type: 'toast', text: `It's on the computer Beluga runs on: ${path} (copied)`, level: 'info' });
 }
 
 /** Show a file of yours selected in Finder (in development: open its folder; in a served page: download it). */
@@ -92,9 +92,9 @@ export async function saveFile(client: SocketClient, at: Location): Promise<void
     }
     const [{ save }, { downloadDir }] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/api/path')]);
     const dir = await downloadDir().catch(() => '');
-    const to = await save({ title: t('common.files.save', { name }), defaultPath: dir ? joinPath(dir, name) : name });
+    const to = await save({ title: t(`Save ${name}`), defaultPath: dir ? joinPath(dir, name) : name });
     if (to) await client.api.files.download(at, { to });
   } catch (err) {
-    client.store.dispatch({ type: 'toast', text: t('common.files.cantSave', { name, error: errorText(err) }), level: 'error' });
+    client.store.dispatch({ type: 'toast', text: `Couldn't save ${name}: ${errorText(err)}`, level: 'error' });
   }
 }

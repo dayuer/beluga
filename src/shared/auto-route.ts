@@ -30,6 +30,9 @@ export const HARD_DEFAULT: readonly string[] = ['local:anthropic/claude-opus-5-5
 /** Everything else, cheapest first: GLM, DeepSeek, Haiku on your API key, Haiku on your subscription. */
 export const BUILD_DEFAULT: readonly string[] = ['local:bigmodel/glm-5.3[1m]', 'local:deepseek/deepseek-flash[1m]', 'local:anthropic/claude-haiku-5-5', 'claude:haiku'];
 
+/** Checking the work (a plan's milestone checks and draft reviews): a model between the two, Sonnet on your API key, then on your subscription. */
+export const REVIEW_DEFAULT: readonly string[] = ['local:anthropic/claude-sonnet-5-5', 'claude:sonnet'];
+
 /** Settings › Auto Route, kept in settings.json. Every field unset: its default. */
 export const AutoRoute = z.object({
   /** Off: tasks without an agent go to your default agent, as before. Unset: on once a local candidate runs here (autoRouteOn). */
@@ -41,10 +44,20 @@ export const AutoRoute = z.object({
   hardEstimate: z.number().int().min(0).max(8).optional(),
   hard: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
   build: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
+  /** Who checks the work: a plan's milestone checks and draft reviews. Unset: REVIEW_DEFAULT. */
+  review: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
 });
 export type AutoRoute = z.infer<typeof AutoRoute>;
 
+/** The list a task draws from when it starts. */
 export type AutoTier = 'hard' | 'build';
+
+/**
+ * Every list auto route keeps: a task's two, and `review`, the one that checks the work. A plan's
+ * roles draw from them: its architecture and its hard fixes from `hard`, its work from `build`
+ * (task by task, as any task), its checks from `review`.
+ */
+export type RouteList = AutoTier | 'review';
 
 /** From this many points a task is hard: a plan's writer sizes them 1, 2, 3 or 5 (8: split it). */
 export const HARD_ESTIMATE = 5;
@@ -74,8 +87,9 @@ export function autoTierOf(task: Routable, route: AutoRoute | undefined): AutoTi
   return 'build';
 }
 
-/** A tier's candidates, in order (yours, else the defaults). */
-export const tierList = (tier: AutoTier, route: AutoRoute | undefined): readonly string[] => (tier === 'hard' ? (route?.hard ?? HARD_DEFAULT) : (route?.build ?? BUILD_DEFAULT));
+/** A list's candidates, in order (yours, else the defaults). */
+export const tierList = (tier: RouteList, route: AutoRoute | undefined): readonly string[] =>
+  tier === 'hard' ? (route?.hard ?? HARD_DEFAULT) : tier === 'review' ? (route?.review ?? REVIEW_DEFAULT) : (route?.build ?? BUILD_DEFAULT);
 
 /** A candidate's runtime and model. */
 export function parseChoice(value: string): { readonly runtime: string; readonly model: string } | undefined {
@@ -113,7 +127,7 @@ export function autoAgentFor(task: Routable, route: AutoRoute | undefined, runti
 }
 
 /** The first candidate of a list that runs here, as an agent. */
-function firstRunning(list: readonly string[], runtimes: readonly RuntimeChoice[]): AgentRef | undefined {
+export function firstRunning(list: readonly string[], runtimes: readonly RuntimeChoice[]): AgentRef | undefined {
   for (const value of list) {
     const c = parseChoice(value);
     if (!c || !runsHere(runtimes, c.runtime, c.model)) continue;
@@ -125,10 +139,19 @@ function firstRunning(list: readonly string[], runtimes: readonly RuntimeChoice[
 
 /**
  * Who checks a plan's milestones and reviews its drafts when the plan names no one (no check
- * agent, no work agent): the hard list's first that runs here, Opus, so the work is judged by
- * the strongest model before it's called done. Undefined: auto route is off (your default, as before).
+ * agent, no work agent): the review list's first that runs here, Sonnet, a model between the one
+ * that writes the code and the one that designs it. Undefined: auto route is off (your default, as before).
  */
 export function autoChecker(st: Pick<RouteState, 'prefs' | 'runtimes'>): AgentRef | undefined {
+  return autoRouteOn(st.prefs.autoRoute, st.runtimes) ? firstRunning(tierList('review', st.prefs.autoRoute), st.runtimes) : undefined;
+}
+
+/**
+ * Who takes over what's hard in a plan when the plan names no one (no fix agent): fix tasks after
+ * a failed check, a conflict, a task that stopped twice. The hard list's first that runs here,
+ * Opus. Undefined: auto route is off (whoever was at it keeps going, as before).
+ */
+export function autoFixer(st: Pick<RouteState, 'prefs' | 'runtimes'>): AgentRef | undefined {
   return autoRouteOn(st.prefs.autoRoute, st.runtimes) ? firstRunning(tierList('hard', st.prefs.autoRoute), st.runtimes) : undefined;
 }
 
@@ -158,4 +181,24 @@ export function routedAgent(task: Routable & { readonly projectId: string; reado
 /** A routed agent's short name for a task card: its model ("Opus 5.5", "Glm 5.3"), else its runtime. */
 export function autoAgentName(ref: AgentRef): string {
   return ref.model ? modelName(ref.model).replace(/\[1m\]/gi, '').trim() : ref.label;
+}
+
+/**
+ * A new plan's roles as the tiers say (New Plan › More options): the strongest model designs it
+ * and takes over what's hard, an everyday one writes the code, one between checks it. Each is the
+ * first of its list that runs here, auto route on or not; none runs: undefined (that role as before).
+ * The work is `'auto'` with auto route on: each task routed as it starts (hard ones to the strong list).
+ */
+export interface PlanRoleDefaults {
+  readonly arch?: AgentRef;
+  readonly work?: AgentRef | 'auto';
+  readonly check?: AgentRef;
+  readonly fix?: AgentRef;
+}
+
+export function planRoleDefaults(route: AutoRoute | undefined, runtimes: readonly RuntimeChoice[]): PlanRoleDefaults {
+  const hard = firstRunning(tierList('hard', route), runtimes);
+  const work = autoRouteOn(route, runtimes) ? 'auto' : firstRunning(tierList('build', route), runtimes);
+  const check = firstRunning(tierList('review', route), runtimes);
+  return { ...(hard ? { arch: hard, fix: hard } : {}), ...(work ? { work } : {}), ...(check ? { check } : {}) };
 }

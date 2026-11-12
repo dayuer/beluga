@@ -1,4 +1,3 @@
-import { t } from '../i18n/index.js';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { CallPersonView } from '@beluga/shared/calls.js';
 import { Avatar, personColor } from '../components/ui.js';
@@ -84,7 +83,7 @@ export function Pointers({ people, me, box }: { people: readonly CallPersonView[
     <div className={c.pointers} aria-hidden="true">
       {who.map((by) => {
         const person = people.find((p) => p.peerId === by);
-        const name = person?.name ?? t('call.someone');
+        const name = person?.name ?? 'Someone';
         const g = glides.current.get(by);
         const style: CSSProperties = g ? { transform: `translate3d(${box.x + g.x * box.w}px, ${box.y + g.y * box.h}px, 0)` } : { opacity: 0 };
         return (

@@ -3,8 +3,8 @@ import { Button, Segmented, Tip, cx } from '../components/ui.js';
 import { toast, useBeluga } from '../lib/beluga.js';
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
-import { useT } from '../i18n/index.js';
 import s from './edit-prompt.module.css';
+import { isImeComposing } from '../lib/ime.js';
 
 type Mode = 'here' | 'fork';
 
@@ -19,7 +19,6 @@ let lastMode: Mode = 'here';
  */
 export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: string; lineId: string; text: string; worktree: boolean; onClose: () => void }) {
   const { client } = useBeluga();
-  const t = useT();
   const prefs = usePrefs();
   const [draft, setDraft] = useState(text);
   const [mode, setMode] = useState<Mode>(lastMode);
@@ -51,7 +50,7 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
     }
   };
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (isImeComposing(e)) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -66,18 +65,18 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
   const note =
     mode === 'here'
       ? worktree
-        ? t('chat.edit.noteHereWorktree')
-        : t('chat.edit.noteHere')
+        ? 'What came after this goes, and the files go back to how they were then.'
+        : 'What came after this goes, and your agent forgets it.'
       : worktree
-        ? t('chat.edit.noteForkWorktree')
-        : t('chat.edit.noteFork');
+        ? 'Goes on in a new worktree from this point. This one stays as it is.'
+        : 'Goes on in a new chat from this point. This one stays as it is.';
   const keys = prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter');
   return (
     <div className={cx(s.edit, busy && s.busy)} data-edit-prompt="">
       <textarea
         ref={box}
         className={cx(s.input, 'selectable')}
-        aria-label={t('chat.edit.aria')}
+        aria-label="Edit your message"
         value={draft}
         rows={1}
         onChange={(e) => setDraft(e.target.value)}
@@ -87,27 +86,27 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
       />
       <div className={s.bar}>
         <Segmented<Mode>
-          label={t('chat.edit.where')}
+          label="Where the edit goes"
           value={mode}
           onChange={(m) => {
             setMode(m);
             box.current?.focus();
           }}
           options={[
-            { value: 'here', label: t('chat.edit.rewindHere'), icon: 'back', hint: worktree ? t('chat.edit.rewindHintWorktree') : t('chat.edit.rewindHint') },
-            { value: 'fork', label: t('chat.edit.newFork'), icon: 'branch', hint: worktree ? t('chat.edit.forkHintWorktree') : t('chat.edit.forkHint') },
+            { value: 'here', label: 'Rewind Here', icon: 'back', hint: worktree ? 'This conversation goes back to this message, and its files too' : 'This conversation goes back to this message' },
+            { value: 'fork', label: 'New Fork', icon: 'branch', hint: worktree ? 'A new worktree from this point, files as they were then' : 'A new chat from this point' },
           ]}
         />
         <span className={s.note}>{note}</span>
         <span className={s.actions}>
-          <Tip label={t('chat.edit.keep')} keys="esc">
+          <Tip label="Keep the message as it was" keys="esc">
             <Button size="small" variant="quiet" onClick={onClose} disabled={busy}>
-              {t('chat.items.cancel')}
+              Cancel
             </Button>
           </Tip>
-          <Tip label={mode === 'here' ? t('chat.edit.rewindSend') : t('chat.edit.forkSend')} keys={keys}>
+          <Tip label={mode === 'here' ? 'Rewind and send' : 'Fork and send'} keys={keys}>
             <Button size="small" variant="primary" icon="send" onClick={() => void send()} disabled={busy || !draft.trim()}>
-              {mode === 'here' ? t('chat.edit.rewind') : t('chat.edit.fork')}
+              {mode === 'here' ? 'Rewind' : 'Fork'}
             </Button>
           </Tip>
         </span>

@@ -11,11 +11,11 @@ import { Button, Tip } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { toast, useApi, useApp, useBeluga, useMachine } from '../lib/beluga.js';
 import { showWorktreeFolder } from '../lib/remote-open.js';
+import { revealThereLabel } from '@beluga/machines/open.js';
 import { setWorktreeFlag, useWorktreeInfo } from './worktree-info-state.js';
 import s from './worktree-info.module.css';
 import { LivePanel } from '../claude-code/Live.js';
 import { openFolderLabel } from '../lib/os-words.js';
-import { t as tNow, useT } from '../i18n/index.js';
 
 /**
  * What a worktree made outside Beluga is (another app's, Claude Code's, a script's): where it
@@ -26,17 +26,20 @@ import { t as tNow, useT } from '../i18n/index.js';
 
 /** Claude's mark for one Claude made; a branch for the rest. */
 const iconOf = (source: WorktreeSource): IconName => (source === 'claude' ? 'claude' : 'branch');
+const MADE_OUTSIDE = 'Made outside Beluga';
+const MADE_OUTSIDE_DETAIL = 'Made by hand, by a script or by another app.';
 
 const day = (ms: number): string => new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 function ago(ms: number): string {
   const d = Math.floor((Date.now() - ms) / 86_400_000);
-  if (d <= 0) return tNow('views.info.today');
-  if (d === 1) return tNow('views.ago.yesterday');
-  if (d < 45) return tNow('views.info.daysAgo', { n: d });
+  if (d <= 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 45) return `${d} days ago`;
   const m = Math.round(d / 30);
-  return m < 18 ? tNow('views.info.monthsAgo', { n: m }) : tNow('views.info.yearsAgo', { n: Math.round(d / 365) });
+  return m < 18 ? `${m} months ago` : `${Math.round(d / 365)} years ago`;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -55,41 +58,40 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 export function RemoveWorktreeAlert({ ws, info, onDone, onCancel }: { ws: Workspace; info?: WorktreeInfo; onDone: (removed: boolean) => void; onCancel: () => void }) {
   const api = useApi();
   const { client } = useBeluga();
-  const t = useT();
   const changed = info?.changed ?? ws.status?.changed ?? 0;
   const branch = info?.branch ?? ws.branch;
   // Another app made it and may still use it.
   const anotherApp = (info?.origin.source ?? sourceFromPath(ws.path)) === 'conductor';
   const go = (): void => {
-    void api.workspaces.removeOther(ws.id, changed > 0).catch((err: unknown) => toast(client, t('views.info.removeFailed', { name: ws.name, error: err instanceof Error ? err.message : String(err) }), 'error'));
+    void api.workspaces.removeOther(ws.id, changed > 0).catch((err: unknown) => toast(client, `Couldn't remove ${ws.name}: ${err instanceof Error ? err.message : String(err)}`, 'error'));
     onDone(true);
   };
   return (
     <Alert
       icon="archive"
       tone={changed > 0 ? 'danger' : 'caution'}
-      title={t('views.info.removeTitle', { name: ws.name })}
+      title={`Remove “${ws.name}”?`}
       message={
         <>
           <p>
-            {t('views.info.deletesFolder')}{' '}
+            Beluga deletes its folder and git’s record of it.{' '}
             {branch ? (
               <>
-                {t('views.info.theBranch')}<strong>{branch}</strong>{t('views.info.branchStays')}
+                The branch <strong>{branch}</strong> stays, so nothing committed is lost.
               </>
             ) : (
-              t('views.info.noBranch')
+              'It isn’t on a branch, so commits only it has may be hard to find later.'
             )}
           </p>
           {changed > 0 ? (
             <p>
-              <strong>{t('views.info.hasChanges', { n: changed })}</strong> {t('views.info.theyllBeLost')}
+              <strong>It has {plural(changed, 'uncommitted change')}.</strong> They’ll be lost.
             </p>
           ) : null}
-          {anotherApp ? <p>{t('views.info.anotherApp')}</p> : null}
+          {anotherApp ? <p>If you still use it in the app that made it, remove it there instead: that app would show it as missing.</p> : null}
         </>
       }
-      confirm={{ label: changed > 0 ? t('views.info.removeAnyway') : t('views.info.remove'), destructive: true, onClick: go }}
+      confirm={{ label: changed > 0 ? 'Remove Anyway' : 'Remove', destructive: true, onClick: go }}
       onCancel={onCancel}
     />
   );
@@ -97,24 +99,23 @@ export function RemoveWorktreeAlert({ ws, info, onDone, onCancel }: { ws: Worksp
 
 function Conversations({ ws, info }: { ws: Workspace; info: WorktreeInfo }) {
   const api = useApi();
-  const t = useT();
   const talked = useApp((st) => st.log.some((l) => l.channel === `ws:${ws.id}` && !/^(t-\d+|import-)/.test(l.id)));
   if (!info.conversations.length) {
     return (
       <p className={s.quiet}>
-        {t('views.info.noConvo')}
-        {info.creator?.cwd ? t('views.info.madeItRanIn', { cwd: info.creator.cwd }) : ''}
+        No Claude Code conversation ran in this folder, so there’s nothing to continue.
+        {info.creator?.cwd ? ` The one that made it ran in ${info.creator.cwd}.` : ''}
       </p>
     );
   }
   return (
-    <ul className={s.convos} aria-label={t('views.info.convos')}>
+    <ul className={s.convos} aria-label="Claude Code conversations">
       {info.conversations.map((c) => (
         <li key={c.sessionId} className={s.convo}>
           <Icon name="chat" size={14} className={s.convoIcon} />
           <span className={s.convoText}>
             <span className={s.convoTitle}>{c.title}</span>
-            <span className={s.convoWhen}>{t('views.info.lastActive', { when: when(c.lastModified) })}</span>
+            <span className={s.convoWhen}>Last active {when(c.lastModified)}</span>
           </span>
           <Button
             size="small"
@@ -124,7 +125,7 @@ function Conversations({ ws, info }: { ws: Workspace; info: WorktreeInfo }) {
               void api.workspaces.showConversation(ws.id, c.sessionId);
             }}
           >
-            {t('views.info.show')}
+            Show
           </Button>
         </li>
       ))}
@@ -153,7 +154,6 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
   const actions = useActions();
   const api = useApi();
   const { client } = useBeluga();
-  const t = useT();
   // On a computer's page, its folder's path is copied instead (BLG-794).
   const machine = useMachine();
   const statusKey = `${ws.status?.changed ?? '-'}:${ws.status?.ahead ?? '-'}:${ws.status?.behind ?? '-'}:${ws.branch ?? ''}`;
@@ -176,55 +176,55 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
           </span>
           <div className={s.headText}>
             <h1 className={s.title}>{origin?.description ?? ws.name}</h1>
-            <p className={s.origin}>{origin ? `${t('views.info.startedBy', { name: origin.sessionTitle ?? t('views.wt.aSession') })}${origin.sessionCwd ? t('views.info.inDir', { dir: baseName(origin.sessionCwd) }) : ''}` : (info?.origin.label ?? t('views.wt.madeOutside'))}</p>
+            <p className={s.origin}>{origin ? `Sub-agent · started by “${origin.sessionTitle ?? 'a Claude Code session'}”${origin.sessionCwd ? ` in ${baseName(origin.sessionCwd)}` : ''}` : (info?.origin.label ?? MADE_OUTSIDE)}</p>
           </div>
           {hasChat ? (
             <Button size="small" variant="quiet" icon="back" onClick={() => setWorktreeFlag('about', ws.id, false)}>
-              {t('views.info.back')}
+              Back to Conversation
             </Button>
           ) : null}
         </header>
-        <p className={s.lead}>{agent ? t('views.info.agentLead') : (info?.origin.detail ?? t('views.info.madeOutsideDetail'))}</p>
+        <p className={s.lead}>{agent ? 'A sub-agent made this worktree to work in. It finished a while ago and Claude Code no longer has what it did step by step; its changes are in the right panel.' : (info?.origin.detail ?? MADE_OUTSIDE_DETAIL)}</p>
         <LivePanel workspaceId={ws.id} />
         {info?.stale ? (
           <p className={s.stale}>
-            <Icon name="check" size={13} /> {t('views.info.safe', { why: info.staleText?.toLowerCase() ?? '' })}
+            <Icon name="check" size={13} /> Safe to remove: {info.staleText?.toLowerCase()}.
           </p>
         ) : null}
         {info?.missing ? (
           <p className={s.warn}>
-            <Icon name="alert" size={13} /> {t('views.info.folderGone')}
+            <Icon name="alert" size={13} /> Its folder is gone. Git still lists it; removing it tidies that up.
           </p>
         ) : null}
 
         <div className={s.actions}>
           {!info?.missing && !agent ? (
             <Button variant="primary" icon="chat" onClick={start}>
-              {t('views.info.startHere')}
+              Start a Conversation Here
             </Button>
           ) : null}
           {!info?.missing ? (
             <Button icon="folder" onClick={() => void showWorktreeFolder(client, ws.id)}>
-              {machine ? t('common.blocks.copyPath') : openFolderLabel()}
+              {machine ? revealThereLabel('folder') : openFolderLabel()}
             </Button>
           ) : null}
           {!info?.missing ? (
             <Button icon="terminal" onClick={() => actions.run({ type: 'open_ws', id: ws.id, tab: 'terminal' })}>
-              {t('views.info.openTerminal')}
+              Open in Terminal
             </Button>
           ) : null}
           <span className={s.flex} />
           <Button variant="danger" icon="archive" onClick={() => setRemoving(true)}>
-            {t('views.info.removeWorktree')}
+            Remove Worktree…
           </Button>
         </div>
 
-        <section className={s.card} aria-label={t('views.info.about')}>
+        <section className={s.card} aria-label="About this worktree">
           <dl className={s.fields}>
-            <Field label={t('views.history.branchLabel')}>{info ? (info.branch ?? t('views.info.detached')) : (ws.branch ?? '…')}</Field>
-            <Field label={t('views.home.basedOn')}>{info?.base ?? ws.base ?? '…'}</Field>
-            <Field label={t('views.info.made')}>{info?.createdAt ? `${day(info.createdAt)} (${ago(info.createdAt)})` : loading ? '…' : t('views.info.unknown')}</Field>
-            <Field label={t('views.info.lastCommit')}>
+            <Field label="Branch">{info ? (info.branch ?? 'None (detached)') : (ws.branch ?? '…')}</Field>
+            <Field label="Based on">{info?.base ?? ws.base ?? '…'}</Field>
+            <Field label="Made">{info?.createdAt ? `${day(info.createdAt)} (${ago(info.createdAt)})` : loading ? '…' : 'Unknown'}</Field>
+            <Field label="Last commit">
               {info?.lastCommit ? (
                 <>
                   {ago(info.lastCommit.at)} · <span className={s.subject}>{info.lastCommit.subject}</span>
@@ -232,22 +232,22 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
               ) : loading ? (
                 '…'
               ) : (
-                t('views.wt.noneSize')
+                'None'
               )}
             </Field>
-            <Field label={t('views.info.compared')}>{info ? `${t('views.info.aheadBehind', { ahead: info.ahead, behind: info.behind })}${info.merged ? t('views.info.allMerged') : ''}` : '…'}</Field>
-            <Field label={t('views.info.uncommitted')}>{info ? (info.changed ? t('views.diff.files', { n: info.changed }) : t('views.info.nothing')) : '…'}</Field>
-            <Field label={t('views.info.sizeOnDisk')}>{size !== undefined ? formatBytes(size) : t('views.info.measuring')}</Field>
-            {info?.conductor?.prTitle ? <Field label={t('views.info.pr')}>{info.conductor.prTitle}</Field> : null}
+            <Field label="Compared with base">{info ? `${plural(info.ahead, 'commit')} ahead · ${info.behind} behind${info.merged ? ' · all merged' : ''}` : '…'}</Field>
+            <Field label="Uncommitted">{info ? (info.changed ? plural(info.changed, 'file') : 'Nothing') : '…'}</Field>
+            <Field label="Size on disk">{size !== undefined ? formatBytes(size) : 'Measuring…'}</Field>
+            {info?.conductor?.prTitle ? <Field label="Pull request">{info.conductor.prTitle}</Field> : null}
             {info?.creator ? (
-              <Field label={t('views.wt.colMadeBy')}>
-                {t('views.info.claudeIn', { title: info.creator.title ?? info.creator.sessionId.slice(0, 8) })}{info.creator.at ? `, ${day(info.creator.at)}` : ''}
-                {info.creator.cwd ? t('views.info.ranIn', { cwd: info.creator.cwd }) : ''}
+              <Field label="Made by">
+                Claude Code in “{info.creator.title ?? info.creator.sessionId.slice(0, 8)}”{info.creator.at ? `, ${day(info.creator.at)}` : ''}
+                {info.creator.cwd ? ` (ran in ${info.creator.cwd})` : ''}
               </Field>
             ) : null}
-            <Field label={t('views.info.folder')}>
-              <Tip label={t('views.info.copyPath')}>
-                <button type="button" className={s.path} onClick={() => void navigator.clipboard?.writeText(ws.path).then(() => toast(client, t('views.diff.copiedPath'), 'success'))}>
+            <Field label="Folder">
+              <Tip label="Copy path">
+                <button type="button" className={s.path} onClick={() => void navigator.clipboard?.writeText(ws.path).then(() => toast(client, 'Copied the path', 'success'))}>
                   {ws.path}
                 </button>
               </Tip>
@@ -256,8 +256,8 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
         </section>
 
         <section className={s.section}>
-          <h2 className={s.h2}>{info?.conversations.length ? t('views.info.convosN', { n: info.conversations.length }) : t('views.info.convos')}</h2>
-          {info ? <Conversations ws={ws} info={info} /> : error ? <p className={s.quiet}>{t('views.info.couldntLook', { error })}</p> : <p className={s.quiet}>{t('views.info.looking')}</p>}
+          <h2 className={s.h2}>{info?.conversations.length ? `Claude Code conversations (${info.conversations.length})` : 'Claude Code conversations'}</h2>
+          {info ? <Conversations ws={ws} info={info} /> : error ? <p className={s.quiet}>Couldn’t look: {error}</p> : <p className={s.quiet}>Looking…</p>}
         </section>
       </div>
       {removing ? (
@@ -277,13 +277,12 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
 
 /** Above a conversation shown from a worktree made outside Beluga: what it is, and its info page. */
 export function OtherWorktreeBanner({ ws }: { ws: Workspace }) {
-  const t = useT();
   return (
     <div className={s.banner}>
       <Icon name={iconOf(sourceFromPath(ws.path))} size={13} />
-      <span className={s.bannerText}>{t('views.info.banner')}</span>
+      <span className={s.bannerText}>A worktree made outside Beluga. It becomes one of yours once you send a message here.</span>
       <Button size="small" variant="quiet" onClick={() => setWorktreeFlag('about', ws.id, true)}>
-        {t('views.info.aboutButton')}
+        About This Worktree
       </Button>
     </div>
   );

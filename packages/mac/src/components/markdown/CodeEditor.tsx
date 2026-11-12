@@ -3,7 +3,7 @@ import { cx } from '../ui.js';
 import { useTokens } from './CodeLines.js';
 import { canTidy, tidy } from './tidy.js';
 import c from './code-editor.module.css';
-import { useT } from '../../i18n/index.js';
+import { isImeComposing } from '../../lib/ime.js';
 
 export interface CodeEditorProps {
   readonly value: string;
@@ -28,11 +28,10 @@ export interface CodeEditorProps {
  */
 export function CodeEditor({ value, onChange, onBlur, lang, single = false, minRows = single ? 1 : 3, placeholder, invalid, className, ...rest }: CodeEditorProps) {
   const tokens = useTokens(value, lang);
-  const tr = useT();
   const [failed, setFailed] = useState(false);
   const tidyable = !single && canTidy(lang);
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (single && e.key === 'Enter') return e.preventDefault();
+    if (single && e.key === 'Enter' && !isImeComposing(e)) return e.preventDefault();
     if (e.key !== 'Tab' || e.shiftKey || e.metaKey || e.altKey || e.ctrlKey) return;
     e.preventDefault();
     const el = e.currentTarget;
@@ -89,8 +88,8 @@ export function CodeEditor({ value, onChange, onBlur, lang, single = false, minR
         />
       </div>
       {tidyable && value.trim() ? (
-        <button type="button" className={c.tidy} onClick={lay} title={failed ? tr('common.codeEditor.invalid') : tr('common.codeEditor.tidyHint')}>
-          {failed ? tr('common.codeEditor.cantTidy') : tr('common.codeEditor.tidy')}
+        <button type="button" className={c.tidy} onClick={lay} title={failed ? 'It doesn’t read as valid, so it was left as is' : 'Lay it out on lines, indented'}>
+          {failed ? 'Can’t tidy' : 'Tidy'}
         </button>
       ) : null}
     </div>

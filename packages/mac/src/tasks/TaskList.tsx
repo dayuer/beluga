@@ -8,12 +8,11 @@ import { openSheet } from '../lib/sheets.js';
 import { AssigneeMark, PriorityIcon, StatusIcon, assigneeWords } from './marks.js';
 import { ArchiveDoneButton, IssueMeta, PrivateMark, TuckButton, useIssueMenu } from './parts.js';
 import { AssigneePicker, PriorityPicker, StatusPicker } from './pickers.js';
-import { ago, statusLabel, priorityLabel } from './tasks-model.js';
+import { ago } from './tasks-model.js';
 import { taskDropProps } from './use-task-drop.js';
 import { revealing, setTasksPrefs, tuckOrder, useSelfId, useSolo, useTaskActions, useTasksPrefs, useTucking } from './use-tasks.js';
 import t from './tasks.module.css';
 import { WaitingMark, WorkingMark } from '../team/Team.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * Tasks as a list, grouped by status (each group folds, and its + adds a task there). A row's
@@ -54,25 +53,24 @@ export function TaskList({ issues, statuses, projectId, repo, emptyGroups, archi
   // Sub-tasks just opened out pop in one after another, top to bottom; tucked back, bottom to top.
   let pop = 0;
   const outs = tuckOrder(useTucking(), visible);
-  const tr = useT();
   return (
-    <div ref={list} className={t.list} role="grid" aria-label={tr('tasks.page.tasks')} tabIndex={0} onKeyDown={onKeyDown}>
+    <div ref={list} className={t.list} role="grid" aria-label="Tasks" tabIndex={0} onKeyDown={onKeyDown}>
       {groups.map((g) => {
         const folded = prefs.folded.includes(g.status);
         return (
-          <section key={g.status} className={t.group} aria-label={statusLabel(g.status)}>
+          <section key={g.status} className={t.group} aria-label={STATUS_INFO[g.status].label}>
             <header className={t.groupHead}>
               <button type="button" className={t.groupToggle} onClick={() => fold(g.status)} aria-expanded={!folded}>
                 <Icon name={folded ? 'chevronRight' : 'chevronDown'} size={11} />
                 <StatusIcon status={g.status} />
-                <span className={t.groupName}>{statusLabel(g.status)}</span>
+                <span className={t.groupName}>{STATUS_INFO[g.status].label}</span>
                 <span className={t.groupCount}>{g.items.length}</span>
               </button>
               {g.status === 'done' && !archived ? <ArchiveDoneButton projectId={projectId} /> : null}
-              {archived ? null : <IconButton icon="plus" label={tr('tasks.board.newIn', { status: statusLabel(g.status) })} onClick={() => openSheet({ kind: 'new_task', status: g.status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />}
+              {archived ? null : <IconButton icon="plus" label={`New Task in ${STATUS_INFO[g.status].label}`} onClick={() => openSheet({ kind: 'new_task', status: g.status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />}
             </header>
             {folded ? null : g.items.map((issue) => <Row key={issue.id} issue={issue} {...(revealing(issue.parent) ? { pop: pop++ } : {})} {...(outs?.has(issue.id) ? { out: outs.get(issue.id)! } : {})} cursor={cursor === issue.id} onCursor={() => setCursor(issue.id)} />)}
-            {!folded && !g.items.length ? <div className={t.groupEmpty}>{tr('tasks.view.nothingHere')}</div> : null}
+            {!folded && !g.items.length ? <div className={t.groupEmpty}>Nothing here</div> : null}
           </section>
         );
       })}
@@ -87,7 +85,6 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
   const menu = useIssueMenu();
   const stop = (e: { stopPropagation: () => void }): void => e.stopPropagation();
   const epic = useApp((s) => isEpic(s.board, issue));
-  const tr = useT();
   return (
     <ActionsContext items={() => menu(issue)}>
       <div
@@ -99,11 +96,11 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         style={(out ?? pop) !== undefined ? ({ '--pop': out ?? pop } as CSSProperties) : undefined}
         onClick={() => open(issue)}
         onMouseDown={onCursor}
-        aria-label={`${issue.key} ${issue.title}, ${statusLabel(issue.status)}${issue.private ? tr('tasks.board.privateSuffix') : ''}`}
+        aria-label={`${issue.key} ${issue.title}, ${STATUS_INFO[issue.status].label}${issue.private ? ', private' : ''}`}
       >
         <span className={t.rowCell} onClick={stop}>
           <PriorityPicker issue={issue}>
-            <button type="button" className={t.iconHit} aria-label={tr('tasks.list.priorityAria', { value: priorityLabel(issue.priority) })}>
+            <button type="button" className={t.iconHit} aria-label={`Priority: ${PRIORITY_INFO[issue.priority].label}`}>
               <PriorityIcon priority={issue.priority} />
             </button>
           </PriorityPicker>
@@ -111,13 +108,13 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         <span className={t.key}>{issue.key}</span>
         <span className={t.rowCell} onClick={stop}>
           <StatusPicker issue={issue}>
-            <button type="button" className={t.iconHit} aria-label={tr('tasks.list.statusAria', { value: statusLabel(issue.status) })}>
+            <button type="button" className={t.iconHit} aria-label={`Status: ${STATUS_INFO[issue.status].label}`}>
               <StatusIcon status={issue.status} />
             </button>
           </StatusPicker>
         </span>
         {epic ? (
-          <Tip label={tr('tasks.list.epicTip')}>
+          <Tip label="Epic: a task with sub-tasks">
             <span className={t.epicMark}>
               <Icon name="epic" size={13} />
             </span>
@@ -131,7 +128,7 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         <WorkingMark issueId={issue.id} />
         {solo ? null : <span className={t.rowCell} onClick={stop}>
           <AssigneePicker projectId={issue.projectId} value={issue.assignee} onChange={(a) => void act(() => api.update(issue.id, { assignee: a }))} align="end">
-            <button type="button" className={t.iconHit} aria-label={tr('tasks.board.changeWho', { who: assigneeWords(issue.assignee, selfId) })}>
+            <button type="button" className={t.iconHit} aria-label={`${assigneeWords(issue.assignee, selfId)}. Change who it's for`}>
               <AssigneeMark assignee={issue.assignee} selfId={selfId} changeable />
             </button>
           </AssigneePicker>

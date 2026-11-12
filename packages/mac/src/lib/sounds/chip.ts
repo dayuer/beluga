@@ -1,6 +1,5 @@
 import type { ChipSound } from '../../../../../src/shared/notify-sound.js';
 import { midi, type Note, type SoundSpec } from './synth.js';
-import { t } from '../../i18n/index.js';
 
 /**
  * Beluga's 8-bit sounds: square, pulse, triangle and a little noise, like an old console, but
@@ -75,32 +74,15 @@ const SPECS: Readonly<Record<ChipSound, SoundSpec>> = {
   },
 };
 
-// Read when shown, in the language shown then.
 export const CHIP_LABELS: Readonly<Record<ChipSound, string>> = {
-  get blip() {
-    return t('common.chip.blip');
-  },
-  get coin() {
-    return t('common.chip.coin');
-  },
-  get chime() {
-    return t('common.chip.chime');
-  },
-  get powerUp() {
-    return t('common.chip.powerUp');
-  },
-  get arpUp() {
-    return t('common.chip.arpUp');
-  },
-  get arpDown() {
-    return t('common.chip.arpDown');
-  },
-  get ping() {
-    return t('common.chip.ping');
-  },
-  get done() {
-    return t('common.chip.done');
-  },
+  blip: 'Blip',
+  coin: 'Coin',
+  chime: 'Chime',
+  powerUp: 'Power-up',
+  arpUp: 'Arpeggio up',
+  arpDown: 'Arpeggio down',
+  ping: 'Two-note ping',
+  done: 'Done jingle',
 };
 
 export const chipSpec = (id: ChipSound): SoundSpec => SPECS[id];

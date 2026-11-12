@@ -21,8 +21,7 @@ import c from '../machines/machines.module.css';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { everyWhileShown } from '../lib/window-active.js';
-import { useT } from '../i18n/index.js';
-import { placementWhy } from '../lib/prefs-words.js';
+import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Settings › Your Computers (BLG-780): where new work runs, adding a computer (over SSH, or with
@@ -37,7 +36,6 @@ import { placementWhy } from '../lib/prefs-words.js';
  * plain confirmation of what moves), and Make This Mac Always On to bring it back.
  */
 export function MachinesSettings() {
-  const t = useT();
   const { client } = useBeluga();
   const runOn = useApp((st) => st.prefs.runOn);
   const [machines, setMachines] = useState<readonly MachineView[] | undefined>();
@@ -58,15 +56,15 @@ export function MachinesSettings() {
   const here = upFirst(thisComputer());
   return (
     <>
-      <Group title={t('settings.computers.whereTitle')}>
-        <Row label={t('settings.computers.runOn')} detail={placement ? placementWhy(placement.why) : t('settings.computers.runOnDetail')}>
-          <Select label={t('settings.computers.runOn')} value={runOn} onChange={(v) => void client.api.session.setPrefs({ runOn: v })} options={runOnOptions(here, machines ?? [])} />
+      <Group title="Where new work runs">
+        <Row label="Run New Work On" detail={placement?.why ?? 'Worktrees, runs, plans and sentinels you start from now on.'}>
+          <Select label="Run New Work On" value={runOn} onChange={(v) => void client.api.session.setPrefs({ runOn: v })} options={runOnOptions(here, machines ?? [])} />
         </Row>
       </Group>
       {machines?.length ? <YouOnTheNetwork you={you} here={here} onChange={refresh} /> : null}
-      <Group title={t('settings.computers.yours')}>
+      <Group title="Your computers">
         <AddComputer onAdded={refresh} />
-        {machines === undefined ? <div className={s.note}>{t('settings.computers.looking')}</div> : machines.length === 0 ? <div className={s.note}>{t('settings.computers.none')}</div> : machines.map((mc) => <Computer key={mc.id} machine={mc} moving={Boolean(you?.busy)} onChange={refresh} />)}
+        {machines === undefined ? <div className={s.note}>Looking…</div> : machines.length === 0 ? <div className={s.note}>None yet. A Mac mini, a cloud server or a Linux box: add one, and your work can run there.</div> : machines.map((mc) => <Computer key={mc.id} machine={mc} moving={Boolean(you?.busy)} onChange={refresh} />)}
       </Group>
       <EnvSentAlways />
       {machines?.length ? <YourSettings sync={sync} onClear={() => void client.call('machines.settingsSync.clear').then(refresh, () => undefined)} /> : null}
@@ -76,7 +74,6 @@ export function MachinesSettings() {
 
 /** Projects whose .env files go to your computers without asking (BLG-800): Ask Again takes it back. */
 function EnvSentAlways() {
-  const t = useT();
   const { client } = useBeluga();
   const [always, setAlways] = useState<readonly EnvSendAlways[]>([]);
   useEffect(() => {
@@ -84,11 +81,11 @@ function EnvSentAlways() {
   }, [client]);
   if (!always.length) return null;
   return (
-    <Group title={t('settings.computers.envAlways')}>
+    <Group title="Env files sent without asking">
       {always.map((a) => (
-        <Row key={a.root} label={a.name} detail={t('settings.computers.envAlwaysDetail')}>
+        <Row key={a.root} label={a.name} detail="Its .env files go to your computers when a worktree there lacks them.">
           <Button size="small" variant="quiet" onClick={() => void client.call('machines.env.forget', a.root).then((list) => setAlways(list as readonly EnvSendAlways[]), () => undefined)}>
-            {t('settings.computers.askAgain')}
+            Ask Again
           </Button>
         </Row>
       ))}
@@ -100,24 +97,23 @@ const when = (at: number): string => new Date(at).toLocaleString(undefined, { mo
 
 /** Your settings on every computer (BLG-805): what follows you, what stays, and conflicts said. */
 function YourSettings({ sync, onClear }: { sync: SettingsSyncView | undefined; onClear: () => void }) {
-  const t = useT();
   const conflicts = sync?.conflicts ?? [];
   return (
-    <Group title={t('settings.computers.settings')}>
-      <Row label={t('settings.computers.settingsEvery')} detail={t('settings.computers.settingsEveryDetail')}>
-        <span className={c.kind}>{sync ? t('settings.computers.inSync', { n: sync.synced }) : ''}</span>
+    <Group title="Your settings">
+      <Row label="Your settings on every computer" detail="Models, effort, notifications, Run New Work On and the rest follow you by themselves. Each computer keeps its own paths, shell, service, web access and phones.">
+        <span className={c.kind}>{sync ? `${sync.synced} in sync` : ''}</span>
       </Row>
       {conflicts.length ? (
         <div className={c.add} data-testid="sync-conflicts">
           {conflicts.map((k) => (
             <div key={`${k.key}-${k.at}-${k.kept.at}`} className={c.kind}>
-              <Icon name="alert" size={11} />{' '}
-              {t('settings.computers.conflict', { what: k.secret ? t('settings.computers.yourSecret', { label: k.label }) : k.label, kept: k.kept.name, lost: k.lost.name, keptValue: k.kept.value ?? '', keptAt: when(k.kept.at), lostAt: when(k.lost.at), secret: k.secret ? 1 : 0, ...(k.lost.value !== undefined ? { lostValue: k.lost.value } : {}) })}
+              <Icon name="alert" size={11} /> {k.secret ? `Your secret ${k.label}` : k.label} changed on {k.kept.name} and {k.lost.name} while they were apart: kept {k.kept.name}’s{k.kept.value ? ` (${k.kept.value})` : ''} from {when(k.kept.at)}
+              {k.secret ? '' : `, over ${k.lost.value ?? 'its'} from ${when(k.lost.at)}`}.
             </div>
           ))}
           <div className={c.addRow}>
             <Button size="small" variant="quiet" onClick={onClear}>
-              {t('settings.computers.gotIt')}
+              Got It
             </Button>
           </div>
         </div>
@@ -128,17 +124,16 @@ function YourSettings({ sync, onClear }: { sync: SettingsSyncView | undefined; o
 
 /** Where you are on the network (BLG-796): this Mac, or your Always On, with Make This Mac Always On to bring it back. */
 function YouOnTheNetwork({ you, here, onChange }: { you: AlwaysOnView | undefined; here: string; onChange: () => void }) {
-  const t = useT();
   const { client } = useBeluga();
   const [asking, setAsking] = useState(false);
   const [said, setSaid] = useState<string | undefined>();
   if (!you) return null;
   const back = (): void => {
     setAsking(false);
-    setSaid(t('settings.computers.movingBack', { here }));
+    setSaid(`Moving you back to ${here}…`);
     void client.call('machines.alwaysOn', 'here').then(
       () => {
-        setSaid(t('settings.computers.backAgain', { here }));
+        setSaid(`${here} is you on the network again.`);
         onChange();
       },
       (err: unknown) => setSaid(err instanceof Error ? err.message : String(err)),
@@ -147,32 +142,32 @@ function YouOnTheNetwork({ you, here, onChange }: { you: AlwaysOnView | undefine
   const detail = you.busy
     ? you.busy
     : you.standIn
-      ? t('settings.computers.standIn', { name: you.standIn.name, here })
+      ? `${you.standIn.name}, your Always On, hasn’t answered for a while, so ${here} stands in for it: friends reach you here. It goes back to ${you.standIn.name} by itself, with what came meanwhile, as soon as it answers.`
       : you.here
-      ? t('settings.computers.isYou', { here })
-      : t('settings.computers.isAlwaysOn', { name: you.name ?? '', here }) + (you.pending ? t('settings.computers.finishing', { name: you.name ?? '' }) : '');
+      ? `${here} is you to your friends: their messages and requests come here. Make a computer that never sleeps your Always On (its •••), and you stay reachable while ${here} is closed.`
+      : `${you.name} is your Always On: it receives your friends’ messages and requests, runs them, and ${here} shows everything through your link.${you.pending ? ` Finishing the move as soon as ${you.name} answers.` : ''}`;
   return (
-    <Group title={t('settings.computers.you')}>
-      <Row label={you.here ? here : (you.name ?? t('settings.computers.yourAlwaysOn'))} detail={detail}>
+    <Group title="You on the network">
+      <Row label={you.here ? here : (you.name ?? 'Your Always On')} detail={detail}>
         {you.here || you.busy ? (
           <span className={c.kind} data-testid={you.standIn ? 'standing-in' : undefined}>
-            {you.standIn ? t('settings.computers.standingIn') : you.here ? t('prefs.alwaysOn') : ''}
+            {you.standIn ? 'Standing In' : you.here ? 'Always On' : ''}
           </span>
         ) : (
           <Button size="small" onClick={() => setAsking(true)}>
-            {t('settings.computers.makeHere', { computer: upFirst(thisComputer()) })}
+            Make {upFirst(thisComputer())} Always On…
           </Button>
         )}
       </Row>
       {asking ? (
         <div className={c.add} data-testid="always-on-back">
-          <div className={c.kind}>{t('settings.computers.backAsk', { name: you.name ?? '', here })}</div>
+          <div className={c.kind}>Your identity, friends, trust levels, groups and chats come back from {you.name} to {here} over your end-to-end link. {you.name} stops being you on the network.</div>
           <div className={c.addRow}>
             <Button variant="quiet" onClick={() => setAsking(false)}>
-              {t('settings.computers.notNow')}
+              Not Now
             </Button>
             <Button variant="primary" onClick={back}>
-              {t('settings.computers.moveBack')}
+              Move It Back
             </Button>
           </div>
         </div>
@@ -186,7 +181,6 @@ type How = 'ssh' | 'code';
 
 /** Add a Computer: over SSH (a host from your ssh config, or user@host), or with a link or code. */
 function AddComputer({ onAdded }: { onAdded: () => void }) {
-  const t = useT();
   const { client } = useBeluga();
   const [open, setOpen] = useState(false);
   const [how, setHow] = useState<How>('ssh');
@@ -207,7 +201,7 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
     const what = typed.trim();
     if (!what) return;
     setBusy(true);
-    setSaid(how === 'ssh' ? t('settings.computers.reaching', { what }) : t('settings.computers.lookingFor'));
+    setSaid(how === 'ssh' ? `Reaching ${what} over SSH (Beluga is put on and started there if it needs it)…` : 'Looking for the computer…');
     void client.call(how === 'ssh' ? 'machines.ssh.pair' : 'machines.join.start', what).then(
       (o) => {
         setOffer(o as ComputerOffer);
@@ -222,7 +216,7 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
   const join = (): void => {
     void client.call('machines.join.approve').then(
       (added) => {
-        setSaid(t('settings.computers.added', { name: (added as MachineView).name }));
+        setSaid(`Added ${(added as MachineView).name}.`);
         reset();
         setOpen(false);
         onAdded();
@@ -239,15 +233,15 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
     setSaid(undefined);
   };
   const enter = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') find();
+    if (e.key === 'Enter' && !isImeComposing(e)) find();
   };
   return (
     <>
       <div className={c.head}>
-        <div className={c.headText}>{t('settings.computers.headText')}</div>
+        <div className={c.headText}>Each one joins your devices once, after you check the same four pictures here and there.</div>
         {open ? null : (
           <Button variant="primary" icon="plus" onClick={() => setOpen(true)}>
-            {t('settings.computers.add')}
+            Add a Computer…
           </Button>
         )}
       </div>
@@ -257,24 +251,24 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
           {offer ? (
             <div className={c.offer}>
               <div>
-                {t('settings.computers.wantsJoin', { name: offer.name, platform: offer.platform === 'macos' ? 'Mac' : offer.platform === 'windows' ? 'Windows' : 'Linux', version: offer.version })} {offer.sshChecked ? t('settings.computers.sshPictures') : t('settings.computers.checkPictures')}
+                “{offer.name}” ({offer.platform === 'macos' ? 'Mac' : offer.platform === 'windows' ? 'Windows' : 'Linux'}, Beluga {offer.version}) wants to join your devices. {offer.sshChecked ? 'It printed these same four pictures over SSH:' : 'Check it shows these same four pictures:'}
               </div>
-              <div className={c.pictures} aria-label={t('settings.computers.fingerprint', { fingerprint: offer.fingerprint })}>
+              <div className={c.pictures} aria-label={`Fingerprint ${offer.fingerprint}`}>
                 {offer.fingerprint}
               </div>
               <div className={c.addRow}>
                 <Button variant="quiet" onClick={cancel}>
-                  {t('settings.computers.cancel')}
+                  Cancel
                 </Button>
                 <Button variant="primary" onClick={join}>
-                  {t('settings.computers.join')}
+                  Join
                 </Button>
               </div>
             </div>
           ) : (
             <>
               <Segmented
-                label={t('settings.computers.how')}
+                label="How to add it"
                 radio
                 value={how}
                 onChange={(v) => {
@@ -282,21 +276,21 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
                   setTyped('');
                 }}
                 options={[
-                  { value: 'ssh', label: t('settings.computers.overSsh'), icon: 'terminal' },
-                  { value: 'code', label: t('settings.computers.linkOrCode'), icon: 'link' },
+                  { value: 'ssh', label: 'Over SSH', icon: 'terminal' },
+                  { value: 'code', label: 'Link or Code', icon: 'link' },
                 ]}
               />
               <div className={c.addRow}>
-                {how === 'ssh' && hosts.length ? <Select label={t('settings.computers.sshHost')} value={hosts.includes(typed) ? typed : ''} placeholder={t('settings.computers.yourHosts')} onChange={(v) => setTyped(v)} options={hosts.map((h) => ({ value: h, label: h }))} /> : null}
-                <input className={s.text} aria-label={how === 'ssh' ? 'user@host' : t('settings.computers.linkOrCodeInput')} placeholder={how === 'ssh' ? 'you@host' : 'beluga://computer#… or K7QM-4XPA-R2TD'} value={typed} disabled={busy} onChange={(e) => setTyped(e.target.value)} onKeyDown={enter} autoFocus />
+                {how === 'ssh' && hosts.length ? <Select label="A host from your ssh config" value={hosts.includes(typed) ? typed : ''} placeholder="Your hosts" onChange={(v) => setTyped(v)} options={hosts.map((h) => ({ value: h, label: h }))} /> : null}
+                <input className={s.text} aria-label={how === 'ssh' ? 'user@host' : 'Link or code'} placeholder={how === 'ssh' ? 'you@host' : 'beluga://computer#… or K7QM-4XPA-R2TD'} value={typed} disabled={busy} onChange={(e) => setTyped(e.target.value)} onKeyDown={enter} autoFocus />
                 <Button variant="quiet" onClick={() => (setOpen(false), cancel())}>
-                  {t('settings.computers.close')}
+                  Close
                 </Button>
                 <Button variant="primary" disabled={busy || !typed.trim()} onClick={find}>
-                  {busy ? t('settings.computers.looking') : t('settings.computers.addButton')}
+                  {busy ? 'Looking…' : 'Add'}
                 </Button>
               </div>
-              {how === 'code' ? <div className={c.kind}>{t('settings.computers.pairHint')}</div> : null}
+              {how === 'code' ? <div className={c.kind}>On the computer, run `beluga pair --computer`: it prints a link, a code and a QR.</div> : null}
               {said ? <div className={c.kind}>{said}</div> : null}
             </>
           )}
@@ -308,7 +302,6 @@ function AddComputer({ onAdded }: { onAdded: () => void }) {
 
 /** One computer: icon, name (rename in place), kind, status and load, health with fixes, and •••. */
 function Computer({ machine, moving, onChange }: { machine: MachineView; moving: boolean; onChange: () => void }) {
-  const t = useT();
   const { client } = useBeluga();
   const [naming, setNaming] = useState<string | undefined>();
   const [said, setSaid] = useState<string | undefined>();
@@ -336,16 +329,16 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
   const secrets = (on: boolean): void =>
     void client.call('machines.secrets', machine.id, on).then(() => {
       setAskSecrets(false);
-      setSaid(on ? t('settings.computers.secretsOn', { name: machine.name }) : t('settings.computers.secretsOff', { name: machine.name }));
+      setSaid(on ? `Your secrets now follow you to ${machine.name}.` : `Your secrets no longer go to ${machine.name}; the ones there stay.`);
       onChange();
     }, fail);
   // Make Always On (BLG-796): asked once, here; Run New Work On follows when you leave it on.
   const makeAlwaysOn = (): void => {
     setAskAlwaysOn(false);
-    setSaid(t('settings.computers.movingTo', { name: machine.name }));
+    setSaid(`Moving you to ${machine.name}…`);
     void client.call('machines.alwaysOn', machine.id).then(() => {
       if (runThere) void client.api.session.setPrefs({ runOn: machine.id });
-      setSaid(t('settings.computers.nowAlwaysOn', { name: machine.name }));
+      setSaid(`${machine.name} is your Always On: it’s you on the network now.`);
       onChange();
     }, fail);
   };
@@ -357,21 +350,21 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
   // Its ••• : each row with its icon; Icon ▸ shows each choice as it looks, the one in use ticked at the end.
   const iconNow = machine.icon ?? 'auto';
   const menu: ActionItem[] = [
-    { label: t('settings.computers.rename'), icon: 'pencil', onSelect: () => setNaming(machine.name) },
+    { label: 'Rename…', icon: 'pencil', onSelect: () => setNaming(machine.name) },
     {
-      label: t('settings.computers.icon'),
+      label: 'Icon',
       mark: <MachineMark machine={machine} size={13} />,
       separate: true,
       submenu: ICON_CHOICES.map((choice) =>
         choice.value === 'auto'
-          ? { label: t('settings.computers.itsOwn'), hint: kindLine(machine), mark: <MachineMark machine={{ ...machine, icon: 'auto' }} size={13} />, checked: iconNow === 'auto', onSelect: () => look({ icon: 'auto' }) }
+          ? { label: 'Its Own', hint: kindLine(machine), mark: <MachineMark machine={{ ...machine, icon: 'auto' }} size={13} />, checked: iconNow === 'auto', onSelect: () => look({ icon: 'auto' }) }
           : { label: choice.label, icon: choice.value as IconName, checked: iconNow === choice.value, separate: ICON_CHOICES[1] === choice, onSelect: () => look({ icon: choice.value }) },
       ),
       onSelect: () => undefined,
     },
-    ...(machine.alwaysOn ? [] : [{ label: t('settings.computers.makeAlwaysOn'), icon: 'power' as const, separate: true, disabled: moving, onSelect: () => setAskAlwaysOn(true) }]),
-    { label: machine.secrets ? t('settings.computers.stopSecrets') : t('settings.computers.keepSecrets'), icon: 'lock', ...(machine.alwaysOn ? { separate: true } : {}), onSelect: () => (machine.secrets ? secrets(false) : setAskSecrets(true)) },
-    { label: t('settings.computers.forget', { name: machine.name }), icon: 'trash', danger: true, separate: true, onSelect: forget },
+    ...(machine.alwaysOn ? [] : [{ label: 'Make Always On…', icon: 'power' as const, separate: true, disabled: moving, onSelect: () => setAskAlwaysOn(true) }]),
+    { label: machine.secrets ? 'Stop Syncing My Secrets' : 'Keep My Secrets in Sync…', icon: 'lock', ...(machine.alwaysOn ? { separate: true } : {}), onSelect: () => (machine.secrets ? secrets(false) : setAskSecrets(true)) },
+    { label: `Forget ${machine.name}`, icon: 'trash', danger: true, separate: true, onSelect: forget },
   ];
   const health = healthOf(machine);
   const fixes = health.filter((h) => !h.ok && h.fix);
@@ -382,22 +375,22 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
       <div className={c.main}>
         <div className={c.nameLine}>
           {naming !== undefined ? (
-            <input className={c.nameInput} aria-label={t('settings.computers.name')} value={naming} autoFocus onChange={(e) => setNaming(e.target.value)} onBlur={rename} onKeyDown={(e) => (e.key === 'Enter' ? rename() : e.key === 'Escape' ? setNaming(undefined) : undefined)} maxLength={64} />
+            <input className={c.nameInput} aria-label="Name" value={naming} autoFocus onChange={(e) => setNaming(e.target.value)} onBlur={rename} onKeyDown={(e) => (e.key === 'Enter' && !isImeComposing(e) ? rename() : e.key === 'Escape' ? setNaming(undefined) : undefined)} maxLength={64} />
           ) : (
-            <span className={c.name} title={t('settings.computers.renameTitle')} role="button" tabIndex={0} onClick={() => setNaming(machine.name)} onKeyDown={(e) => (e.key === 'Enter' ? setNaming(machine.name) : undefined)}>
+            <span className={c.name} title="Rename" role="button" tabIndex={0} onClick={() => setNaming(machine.name)} onKeyDown={(e) => (e.key === 'Enter' ? setNaming(machine.name) : undefined)}>
               {machine.name}
             </span>
           )}
           <span className={c.kind}>{kindLine(machine)}</span>
           {machine.alwaysOn ? (
             <span className={c.kind} data-testid="always-on-tag">
-              <Icon name="power" size={11} /> {t('prefs.alwaysOn')}
+              <Icon name="power" size={11} /> Always On
             </span>
           ) : null}
         </div>
         {machine.secrets ? (
           <div className={c.kind}>
-            <Icon name="lock" size={11} /> {t('settings.computers.secretsSync')}
+            <Icon name="lock" size={11} /> Your secrets sync with it
           </div>
         ) : null}
         <div className={c.load}>
@@ -423,7 +416,7 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
               <>
                 : <code>{h.fix!.command}</code>
                 <Button size="small" variant="quiet" icon="copy" onClick={() => void copyText(h.fix!.command!)}>
-                  {t('settings.computers.copy')}
+                  Copy
                 </Button>
               </>
             ) : null}
@@ -433,33 +426,33 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
       <div className={c.side}>
         {machine.update === 'computer' ? (
           <Button size="small" onClick={() => update('ask')}>
-            {t('settings.computers.updateIt')}
+            Update It
           </Button>
         ) : null}
         <ActionsDropdown items={menu}>
-          <IconButton icon="more" label={t('settings.computers.more', { name: machine.name })} />
+          <IconButton icon="more" label={`More for ${machine.name}`} />
         </ActionsDropdown>
       </div>
       {askAlwaysOn ? (
         <div className={c.said} data-testid="always-on-ask">
-          {t('settings.computers.alwaysOnAsk', { name: machine.name, computer: thisComputer() })}{' '}
-          <Switch on={runThere} onChange={setRunThere} label={t('settings.computers.runThereLabel', { name: machine.name })} /> {t('settings.computers.runThere')}{' '}
+          Your identity, friends, their trust levels, your groups and your chats move to {machine.name} over your end-to-end link, and it becomes you on the network: friends see the same you, and it answers them while {thisComputer()} is closed. This is the only time your identity leaves {thisComputer()}.{' '}
+          <Switch on={runThere} onChange={setRunThere} label={`Run new work on ${machine.name} too`} /> Run new work there too.{' '}
           <Button size="small" variant="primary" onClick={makeAlwaysOn}>
-            {t('settings.computers.makeItAlwaysOn')}
+            Make It Always On
           </Button>{' '}
           <Button size="small" variant="quiet" onClick={() => setAskAlwaysOn(false)}>
-            {t('settings.computers.notNow')}
+            Not Now
           </Button>
         </div>
       ) : null}
       {askSecrets ? (
         <div className={c.said}>
-          {t('settings.computers.secretsAsk', { name: machine.name })}{' '}
+          Your own variables (Settings › Environment) go to {machine.name} over your end-to-end link, and every change follows, both ways. Never into a log.{' '}
           <Button size="small" variant="primary" onClick={() => secrets(true)}>
-            {t('settings.computers.keepThem')}
+            Keep Them in Sync
           </Button>{' '}
           <Button size="small" variant="quiet" onClick={() => setAskSecrets(false)}>
-            {t('settings.computers.notNow')}
+            Not Now
           </Button>
         </div>
       ) : null}
@@ -469,10 +462,10 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
           {asked ? (
             <>
               <Button size="small" onClick={() => update('when-idle')}>
-                {t('settings.computers.whenDone')}
+                When They’re Done
               </Button>{' '}
               <Button size="small" variant="quiet" onClick={() => update('now')}>
-                {t('settings.computers.now')}
+                Now
               </Button>
             </>
           ) : null}
@@ -484,7 +477,6 @@ function Computer({ machine, moving, onChange }: { machine: MachineView; moving:
 
 /** What runs on a computer now, each opening its page there (BLG-784): its chat, files, terminal and changes. */
 function Work({ machine }: { machine: MachineView }) {
-  const t = useT();
   const { ui } = useBeluga();
   const actions = useActions();
   const work = (machine.info?.work ?? []).flatMap((w) => {
@@ -499,7 +491,7 @@ function Work({ machine }: { machine: MachineView }) {
   return (
     <div className={c.work}>
       {work.map((w) => (
-        <Button key={w.channel} size="small" variant="quiet" icon="branch" onClick={() => open(w.page)} aria-label={t('settings.computers.openOn', { worktree: w.worktree, name: machine.name })}>
+        <Button key={w.channel} size="small" variant="quiet" icon="branch" onClick={() => open(w.page)} aria-label={`Open ${w.worktree} on ${machine.name}`}>
           {w.worktree} · {w.project}
         </Button>
       ))}

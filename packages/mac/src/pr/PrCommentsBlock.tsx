@@ -1,4 +1,3 @@
-import { t, useT } from '../i18n/index.js';
 import { useMemo } from 'react';
 import { parsePrCommentsRef } from '@beluga/shared/pr-comments-ref.js';
 import { Icon } from '../components/Icon.js';
@@ -20,15 +19,13 @@ export function PrCommentsBlock({ code }: { code: string }) {
   const ref = useMemo(() => parsePrCommentsRef(code), [code]);
   const wsId = useApp((st) => (st.view.kind === 'workspace' ? st.view.id : undefined));
   const pr = useApp((st) => (wsId ? st.prs[wsId] : undefined));
-  useT();
-  if (!wsId || !pr) return <div className={s.chatNote}>{t('pr.block.note')}</div>;
+  if (!wsId || !pr) return <div className={s.chatNote}>The pull request’s comments show in its worktree’s conversation.</div>;
   return <Comments wsId={wsId} show={ref.show} {...(ref.path ? { path: ref.path } : {})} />;
 }
 
 function Comments({ wsId, show, path }: { wsId: string; show: 'open' | 'all'; path?: string }) {
   const pr = useApp((st) => st.prs[wsId])!;
   const { data, error, loading } = usePrConversation(wsId);
-  useT();
   const items = data
     ? timeline(data).filter((i) => {
         if (i.kind !== 'thread') return !path;
@@ -44,20 +41,20 @@ function Comments({ wsId, show, path }: { wsId: string; show: 'open' | 'all'; pa
         <strong>#{pr.number}</strong>
         <span className={s.chatTitle}>{pr.title}</span>
         <span className={s.grow} />
-        <span className={s.when}>{data ? (counts.open ? t('pr.nOpenThreads', { n: counts.open }) : t('issues.model.comments', { n: counts.said })) : loading ? t('pr.reading') : ''}</span>
+        <span className={s.when}>{data ? (counts.open ? `${counts.open} open ${counts.open === 1 ? 'thread' : 'threads'}` : `${counts.said} ${counts.said === 1 ? 'comment' : 'comments'}`) : loading ? 'Reading GitHub…' : ''}</span>
         <Button size="small" icon="chat" onClick={() => openPrPage(wsId)}>
-          {t('pr.block.reply')}
+          Reply on the PR Page
         </Button>
       </figcaption>
       <div className={s.chatItems}>
         {error && !data ? <div className={s.problem}>{error}</div> : null}
-        {data && !items.length ? <div className={s.empty}>{show === 'open' ? t('pr.block.nothingOpen') : t('pr.block.noComments')}</div> : null}
+        {data && !items.length ? <div className={s.empty}>{show === 'open' ? 'Nothing open: every thread is resolved.' : 'Nobody has commented yet.'}</div> : null}
         {items.slice(0, MAX_ITEMS).map((item) => (
           <ItemCard key={item.id} wsId={wsId} item={item} />
         ))}
         {items.length > MAX_ITEMS ? (
           <button type="button" className={s.more} onClick={() => openPrPage(wsId)}>
-            {t('pr.block.more', { n: items.length - MAX_ITEMS })}
+            {items.length - MAX_ITEMS} more on the PR page
           </button>
         ) : null}
       </div>

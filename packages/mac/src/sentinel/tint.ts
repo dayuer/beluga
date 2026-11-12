@@ -1,6 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useProjectIcon } from '../lib/projects.js';
-import { t } from '../i18n/index.js';
 
 /**
  * A project's tint on the board (BLG-300): its tiles carry a soft wash of the project's own colour,
@@ -9,46 +8,14 @@ import { t } from '../i18n/index.js';
  */
 
 export const TINTS = [
-  {
-    id: 'blue',
-    get label() {
-      return t('sentinel.tint.blue');
-    }, color: '#5b8def' },
-  {
-    id: 'teal',
-    get label() {
-      return t('sentinel.tint.teal');
-    }, color: '#3aa3a0' },
-  {
-    id: 'mint',
-    get label() {
-      return t('sentinel.tint.mint');
-    }, color: '#3fae7c' },
-  {
-    id: 'sand',
-    get label() {
-      return t('sentinel.tint.sand');
-    }, color: '#c9a25a' },
-  {
-    id: 'peach',
-    get label() {
-      return t('sentinel.tint.peach');
-    }, color: '#e8915a' },
-  {
-    id: 'rose',
-    get label() {
-      return t('sentinel.tint.rose');
-    }, color: '#df6f86' },
-  {
-    id: 'lilac',
-    get label() {
-      return t('sentinel.tint.lilac');
-    }, color: '#9a7ad8' },
-  {
-    id: 'slate',
-    get label() {
-      return t('sentinel.tint.slate');
-    }, color: '#7a8597' },
+  { id: 'blue', label: 'Blue', color: '#5b8def' },
+  { id: 'teal', label: 'Teal', color: '#3aa3a0' },
+  { id: 'mint', label: 'Mint', color: '#3fae7c' },
+  { id: 'sand', label: 'Sand', color: '#c9a25a' },
+  { id: 'peach', label: 'Peach', color: '#e8915a' },
+  { id: 'rose', label: 'Rose', color: '#df6f86' },
+  { id: 'lilac', label: 'Lilac', color: '#9a7ad8' },
+  { id: 'slate', label: 'Slate', color: '#7a8597' },
 ] as const;
 
 /** 'auto' (from its icon), 'none', or one of TINTS. */

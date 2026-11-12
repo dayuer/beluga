@@ -5,7 +5,6 @@ import { useApp } from '../lib/beluga.js';
 import { StatusIcon } from '../tasks/marks.js';
 import { useTaskActions } from '../tasks/use-tasks.js';
 import { type MentionWorld, tasksIn } from './mentions.js';
-import { useT } from '../i18n/index.js';
 import m from './mention.module.css';
 
 /**
@@ -14,10 +13,9 @@ import m from './mention.module.css';
  */
 export function MentionedTasks({ text, world }: { text: string; world: MentionWorld }) {
   const keys = useMemo(() => tasksIn(text, world), [text, world]);
-  const t = useT();
   if (!keys.length) return null;
   return (
-    <div className={m.taskRow} aria-label={keys.length === 1 ? t('chat.mentioned.one') : t('chat.mentioned.many', { n: keys.length })}>
+    <div className={m.taskRow} aria-label={keys.length === 1 ? 'Task mentioned' : `${keys.length} tasks mentioned`}>
       {keys.map((k) => (
         <MentionedTask key={k} taskKey={k} />
       ))}
@@ -28,10 +26,9 @@ export function MentionedTasks({ text, world }: { text: string; world: MentionWo
 function MentionedTask({ taskKey }: { taskKey: string }) {
   const issue = useApp((st) => findIssue(st.board, taskKey));
   const { open } = useTaskActions();
-  const t = useT();
   if (!issue) return null;
   return (
-    <Tip label={t('chat.mentioned.tip', { key: issue.key, title: issue.title })}>
+    <Tip label={`${issue.key}: ${issue.title}. Click to open`}>
       <button type="button" className={m.taskChip} data-testid="mentioned-task" onClick={() => open(issue)}>
         <StatusIcon status={issue.status} size={11} />
         <span className={m.taskKey}>{issue.key}</span>

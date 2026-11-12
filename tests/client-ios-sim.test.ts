@@ -60,7 +60,8 @@ describe("testflight.sh", () => {
     expect(r.stderr).toContain("请设 BUNDLE_ID");
   });
 
-  it("真实 Bundle ID 能通过占位检查(之后才因缺工具/证书失败)", () => {
+  // PATH="/usr/bin:/bin" has no bash on Windows: the script is for Macs anyway.
+  it.skipIf(process.platform === "win32")("真实 Bundle ID 能通过占位检查(之后才因缺工具/证书失败)", () => {
     const r = run(["check"], { BUNDLE_ID: "com.acme.shop", PATH: "/usr/bin:/bin" });
     expect(r.stderr).not.toContain("占位值");
   });

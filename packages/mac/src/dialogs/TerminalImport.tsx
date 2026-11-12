@@ -8,7 +8,6 @@ import { fontStack, hasFont, looksDark } from '../lib/terminal-look.js';
 import { Group, Row, Select } from './settings-controls.js';
 import t from './terminal-settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * Bringing another terminal's look into Beluga's (BLG-212): Settings › Terminal › Import from…,
@@ -113,7 +112,6 @@ export function TermPreview({ prefs, compact = false }: { readonly prefs: UiPref
 
 /** What a terminal brings, before you apply it: its look drawn, and the list in words. */
 function Pending({ found, onApply, onCancel }: { readonly found: TerminalFound; readonly onApply: () => void; readonly onCancel: () => void }) {
-  const tr = useT();
   const prefs = usePrefs();
   const look = found.look!;
   const words = importSummary(look, hasFont);
@@ -133,10 +131,10 @@ function Pending({ found, onApply, onCancel }: { readonly found: TerminalFound; 
       </div>
       <div className={t.pendingButtons}>
         <Button variant="quiet" onClick={onCancel}>
-          {tr('dialogs.termImport.cancel')}
+          Cancel
         </Button>
         <Button variant="primary" icon="download" onClick={onApply}>
-          {tr('dialogs.termImport.bring')}
+          Bring It In
         </Button>
       </div>
     </div>
@@ -145,7 +143,6 @@ function Pending({ found, onApply, onCancel }: { readonly found: TerminalFound; 
 
 /** Settings › Terminal › Import from…: pick a terminal, see what comes, bring it in (and Undo). */
 export function ImportGroup() {
-  const tr = useT();
   const prefs = usePrefs();
   const { found, again } = useTerminals();
   const choices = importable(found);
@@ -154,23 +151,23 @@ export function ImportGroup() {
   const pick = choices.find((f) => f.app === picked);
   const others = (found ?? []).filter((f) => !hasLook(f));
   return (
-    <Group title={tr('dialogs.termImport.title')}>
+    <Group title="Bring your terminal’s look">
       <Row
-        label={tr('dialogs.termImport.importFrom')}
+        label="Import from"
         detail={
           found === undefined
-            ? tr('dialogs.termImport.looking', { computer: thisComputer() })
+            ? `Looking for other terminals on ${thisComputer()}…`
             : choices.length
-              ? tr('dialogs.termImport.detail')
+              ? 'Colours, font, cursor and the rest, from a terminal you use. You see it before it changes anything.'
               : others.length
-                ? tr('dialogs.termImport.standard', { names: others.map((f) => f.name).join(', ') })
-                : tr('dialogs.termImport.none', { computer: thisComputer() })
+                ? `${others.map((f) => f.name).join(', ')}: on their standard settings, nothing to bring.`
+                : `No other terminal’s settings on ${thisComputer()} (Ghostty, iTerm2, Terminal, Alacritty, kitty, WezTerm, Warp).`
         }
       >
         <Select
-          label={tr('dialogs.termImport.importFrom')}
+          label="Import from"
           value={picked ?? ''}
-          placeholder={found === undefined ? tr('dialogs.termImport.lookingShort') : choices.length ? tr('dialogs.termImport.choose') : tr('dialogs.termImport.noneFound')}
+          placeholder={found === undefined ? 'Looking…' : choices.length ? 'Choose…' : 'None found'}
           disabled={!choices.length}
           onChange={(v) => {
             setPicked(v as TerminalAppId);
@@ -180,7 +177,7 @@ export function ImportGroup() {
             ...choices.map((f) => ({ value: f.app, label: foundLabel(f), icon: 'terminal' as const, ...(f.file ? { description: f.file } : {}) })),
           ]}
         />
-        <IconButton icon="refresh" label={tr('dialogs.termImport.lookAgain')} onClick={again} />
+        <IconButton icon="refresh" label="Look again" onClick={again} />
       </Row>
       {pick ? (
         <Pending
@@ -193,7 +190,7 @@ export function ImportGroup() {
         />
       ) : null}
       {undo ? (
-        <Row label={tr('dialogs.termImport.broughtFrom', { from: undo.from })} detail={tr('dialogs.termImport.changed')}>
+        <Row label={`Brought in from ${undo.from}`} detail="Your terminals changed right away. Undo puts back what you had.">
           <Button
             variant="quiet"
             onClick={() => {
@@ -201,16 +198,16 @@ export function ImportGroup() {
               setUndo(undefined);
             }}
           >
-            {tr('dialogs.termImport.undo')}
+            Undo
           </Button>
         </Row>
       ) : null}
-      <Row label={tr('dialogs.termImport.colours')} detail={prefs.termTheme ? `${prefs.termTheme.name}${prefs.termTheme.from ? tr('dialogs.termImport.fromName', { from: prefs.termTheme.from }) : ''}${prefs.termTheme.light ? tr('dialogs.termImport.lightDark') : ''}.` : tr('dialogs.termImport.belugaOwn')}>
+      <Row label="Colours" detail={prefs.termTheme ? `${prefs.termTheme.name}${prefs.termTheme.from ? `, from ${prefs.termTheme.from}` : ''}${prefs.termTheme.light ? ' (light and dark)' : ''}.` : 'Beluga’s own, following light and dark.'}>
         {prefs.termTheme ? (
           <>
             <Swatches colors={colorsFor(prefs.termTheme, looksDark())!} size={10} />
             <Button variant="quiet" onClick={() => setPrefs({ termTheme: null })}>
-              {tr('dialogs.termImport.useBeluga')}
+              Use Beluga’s
             </Button>
           </>
         ) : null}

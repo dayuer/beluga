@@ -4,7 +4,7 @@ import { dndActive } from '../shared/quiet.js';
 import { isSentinelChat } from './sentinel/model.js';
 import { loudestKind, type SoundChoice, type SoundPrefs, soundFor, volumeOf } from '../shared/notify-sound.js';
 import { type Issue, issueForWorkspace } from './board/model.js';
-import { type Plan, checkerOf, planById, planForHome, planTitle } from './plans/model.js';
+import { type Plan, architectOf, checkerOf, planById, planForHome, planTitle } from './plans/model.js';
 import { type MilestoneView, planView } from './plans/progress.js';
 import { isDecisionQid } from './plans/decisions.js';
 import { ASSISTANT_TITLE, isAssistant } from '../shared/assistant.js';
@@ -139,7 +139,7 @@ export function planOfChannel(state: Pick<DomainState, 'plans' | 'board'>, chann
   const issue = issueForWorkspace(state.board, channel.slice(3));
   const plan = issue?.plan ? planById(state.plans, issue.plan.id) : undefined;
   if (issue?.plan && plan) return { plan, issue, task: issue.plan.task };
-  const home = planForHome(state.plans, channel) ?? checkerOf(state.plans, channel)?.plan;
+  const home = planForHome(state.plans, channel) ?? checkerOf(state.plans, channel)?.plan ?? architectOf(state.plans, channel)?.plan;
   return home ? { plan: home } : undefined;
 }
 
@@ -225,7 +225,7 @@ function planNews(prev: DomainState, next: DomainState): NoticeEvent[] {
     const titleOf = new Map(after.milestones.flatMap((m) => [[m.milestone.id, m.milestone.title] as const, ...m.tasks.map((t) => [t.task.id, t.task.title] as const)]));
     for (const [taskId, w] of Object.entries(plan.watch ?? {})) {
       if (!w.needsYou || old.watch?.[taskId]?.needsYou) continue;
-      out.push({ kind: 'needsYou', tag: 'milestone', title: `${name}: “${titleOf.get(taskId) ?? 'A task'}” stopped twice`, body: `${w.reason}. Resume it, or open its chat`, ...at, need: `plan:${plan.id}:stalled:${taskId}`, key: `plan:${plan.id}:${taskId}:stalled:${w.at}` });
+      out.push({ kind: 'needsYou', tag: 'milestone', title: `${name}: “${titleOf.get(taskId) ?? 'A task'}” ${w.said ? 'waits for you' : 'stopped twice'}`, body: w.said ? `It last said: “${w.said}” If it asks for something, do it, then Resume it` : `${w.reason}. Resume it, or open its chat`, ...at, need: `plan:${plan.id}:stalled:${taskId}`, key: `plan:${plan.id}:${taskId}:stalled:${w.at}` });
     }
     for (const [msId, merge] of Object.entries(plan.merging ?? {})) {
       const c = merge.conflict;

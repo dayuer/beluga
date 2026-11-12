@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { type ClaudeSkill, notOnCodex } from '../../shared/skills.js';
 
@@ -36,9 +36,18 @@ const codexNote = (fields: Readonly<Record<string, string>>): { onCodex?: string
 
 const short = (text: string): string => (text.length > 160 ? `${text.slice(0, 157).trimEnd()}…` : text);
 
+/** A folder's entries, folders ending in "/". A link counts as what it points to (a skill linked in from elsewhere), a broken one as nothing. */
 async function list(dir: string): Promise<string[]> {
   try {
-    return (await readdir(dir, { withFileTypes: true })).filter((e) => !e.name.startsWith('.')).map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
+    const found = (await readdir(dir, { withFileTypes: true })).filter((e) => !e.name.startsWith('.'));
+    const named = await Promise.all(
+      found.map(async (e) => {
+        if (!e.isSymbolicLink()) return e.isDirectory() ? `${e.name}/` : e.name;
+        const target = await stat(path.join(dir, e.name)).catch(() => undefined);
+        return target ? (target.isDirectory() ? `${e.name}/` : e.name) : undefined;
+      }),
+    );
+    return named.filter((n): n is string => n !== undefined);
   } catch {
     return [];
   }

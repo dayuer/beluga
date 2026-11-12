@@ -6,7 +6,6 @@ import { setPrefs, usePrefs } from '../../lib/prefs.js';
 import { ResizeHandle, usePresence } from './ResizeHandle.js';
 import { TerminalPane } from './TerminalPane.js';
 import s from './panel.module.css';
-import { useT } from '../../i18n/index.js';
 
 const SLIDE_MS = 200;
 
@@ -16,7 +15,6 @@ const SLIDE_MS = 200;
  */
 export function TerminalDrawer({ column }: { column: React.RefObject<HTMLElement | null> }) {
   const prefs = usePrefs();
-  const t = useT();
   const view = useApp((st) => st.view);
   const open = prefs.drawer && drawerFits(view);
   const presence = usePresence(open, SLIDE_MS);
@@ -29,7 +27,7 @@ export function TerminalDrawer({ column }: { column: React.RefObject<HTMLElement
     <div className={cx(s.drawer, presence.closing && s.drawerClosing, drag !== undefined && s.dragging)} style={{ height: `${Math.round(size * 1000) / 10}%` }}>
       <ResizeHandle
         axis="y"
-        label={t('layout.terminalDrawer.resize')}
+        label="Resize the terminal drawer"
         className={s.drawerEdge}
         onMove={(y) => {
           const r = column.current?.getBoundingClientRect();

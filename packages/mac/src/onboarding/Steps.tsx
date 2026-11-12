@@ -15,11 +15,9 @@ import { SentinelUses } from './scenes/SentinelUses.js';
 import { Tables } from './scenes/Tables.js';
 import { TOUR_COPY } from './tour-copy.js';
 import s from './onboarding.module.css';
-import { useT } from '../i18n/index.js';
 
 /** The welcome: the mark draws itself, the name and the one-line promise come into focus. */
 export function Hello({ onStart }: { readonly onStart: () => void }) {
-  const t = useT();
   const still = useReducedMotion() ?? false;
   return (
     <div className={s.hello}>
@@ -28,19 +26,19 @@ export function Hello({ onStart }: { readonly onStart: () => void }) {
         Beluga
       </Rise>
       <h1 className={s.heroTitle}>
-        <Words text={t('onboarding.steps.heroTitle')} delay={1.75} />
+        <Words text="Every project. Every agent." delay={1.75} />
         <br />
         {/* One span, not word by word: the line's sheen has to run across all of it. */}
         <motion.span className={s.heroSoft} initial={still ? false : { opacity: 0, y: '0.25em', filter: 'blur(10px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.9, ease: EASE_OUT, delay: 2.05 }}>
-          {t('onboarding.steps.heroSoft')}
+          All at once.
         </motion.span>
       </h1>
       <Rise delay={2.45} className={s.heroBody}>
-        {t('onboarding.steps.heroBody')}
+        Claude Code, Codex, OpenCode, GitHub Copilot or a model of your own, working across all your repositories in parallel. Everything they do, in view. Your friends’ agents, one message away.
       </Rise>
       <Rise delay={2.75}>
         <GlowButton onClick={onStart} autoFocus>
-          {t('onboarding.steps.getStarted')} <Icon name="arrowRight" size={13} />
+          Get Started <Icon name="arrowRight" size={13} />
         </GlowButton>
       </Rise>
     </div>
@@ -71,7 +69,6 @@ const SCENES: Partial<Record<Step, () => ReactNode>> = {
 
 /** One idea of the tour: what it is on the left, the app doing it on the right. */
 export function Tour({ step }: { readonly step: Step }) {
-  useT();
   const copy = TOUR_COPY[step];
   const still = useReducedMotion() ?? false;
   if (!copy) return null;
@@ -130,7 +127,6 @@ function Burst() {
 
 /** The last step: what to do first (add a project, or look around), then into the app. */
 export function Ready({ projects, onAddProject, onOpen }: { readonly projects: number; readonly onAddProject: () => void; readonly onOpen: () => void }) {
-  const t = useT();
   const has = projects > 0;
   return (
     <div className={s.hello}>
@@ -139,29 +135,31 @@ export function Ready({ projects, onAddProject, onOpen }: { readonly projects: n
         <Mark size={92} />
       </div>
       <h1 className={s.heroTitle}>
-        <Words text={t('onboarding.steps.allSet')} delay={0.5} />
+        <Words text="You’re all set." delay={0.5} />
       </h1>
       <Rise delay={0.8} className={s.heroBody}>
-        {has ? t('onboarding.steps.projectsHere', { n: projects }) : t('onboarding.steps.addToBegin')}
+        {has
+          ? `Your ${projects === 1 ? 'project is' : `${projects} projects are`} here. Start a worktree from any of them, and your agent gets to work on its own branch.`
+          : 'Add a project to begin. Beluga finds its branches and worktrees, and every new task gets its own.'}
       </Rise>
       <Rise delay={1.05} className={s.readyButtons}>
         {has ? (
           <GlowButton onClick={onOpen} autoFocus>
-            {t('onboarding.steps.openBeluga')} <Icon name="arrowRight" size={13} />
+            Open Beluga <Icon name="arrowRight" size={13} />
           </GlowButton>
         ) : (
           <>
             <GlowButton onClick={onAddProject} autoFocus>
-              <Icon name="folder" size={13} /> {t('onboarding.steps.addProject')}
+              <Icon name="folder" size={13} /> Add a Project…
             </GlowButton>
             <GlowButton onClick={onOpen} quiet>
-              {t('onboarding.steps.lookAround')}
+              Look Around First
             </GlowButton>
           </>
         )}
       </Rise>
       <Rise delay={1.3} className={s.readyHint}>
-        {t('onboarding.steps.again')}
+        File › Onboard Again shows this again.
       </Rise>
     </div>
   );

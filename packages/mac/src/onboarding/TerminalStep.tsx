@@ -9,7 +9,6 @@ import { hasFont } from '../lib/terminal-look.js';
 import { Rise, SPRING, Words } from './fx.js';
 import s from './onboarding.module.css';
 import { thisComputer } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
 
 const KEEP = 'beluga';
 
@@ -21,7 +20,6 @@ const KEEP = 'beluga';
  */
 export function TerminalStep() {
   const prefs = usePrefs();
-  const t = useT();
   const { found } = useTerminals();
   const choices = importable(found);
   // What the terminal settings were when the step opened: each pick goes over these, and Beluga's puts them back.
@@ -35,18 +33,22 @@ export function TerminalStep() {
     setPrefs(f ? withImport({ ...getPrefs(), ...orig.current }, f) : { ...orig.current, termTheme: null });
   };
   const chosen = choices.find((f) => f.app === picked);
-  const options: Array<{ key: string; label: string; found?: TerminalFound }> = [...choices.map((f) => ({ key: f.app, label: f.name, found: f })), { key: KEEP, label: t('onboarding.terminalStep.own') }];
+  const options: Array<{ key: string; label: string; found?: TerminalFound }> = [...choices.map((f) => ({ key: f.app, label: f.name, found: f })), { key: KEEP, label: 'Beluga’s Own' }];
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text={t('onboarding.terminalStep.title')} />
+        <Words text="Coming from another terminal?" />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        {found === undefined ? t('onboarding.terminalStep.looking', { computer: thisComputer() }) : choices.length ? t('onboarding.terminalStep.bring') : t('onboarding.terminalStep.none')}
+        {found === undefined
+          ? `Looking for the terminals on ${thisComputer()}…`
+          : choices.length
+            ? 'Bring its colours, font and cursor into Beluga’s terminal. It changes as you pick, and Settings › Terminal has it later.'
+            : 'No other terminal here has settings to bring, so Beluga’s terminal keeps its own look. Settings › Terminal › Import from… can bring one in later.'}
       </Rise>
       {choices.length ? (
         <>
-          <div className={cx(s.looks, s.terms)} role="radiogroup" aria-label={t('onboarding.terminalStep.look')}>
+          <div className={cx(s.looks, s.terms)} role="radiogroup" aria-label="Terminal look">
             {options.map((o, i) => {
               const on = picked === o.key;
               return (
@@ -79,7 +81,7 @@ export function TerminalStep() {
             })}
           </div>
           <Rise delay={0.5} className={s.termBrings}>
-            {chosen?.look ? importSummary(chosen.look, hasFont).join(' · ') : t('onboarding.terminalStep.belugaColours')}
+            {chosen?.look ? importSummary(chosen.look, hasFont).join(' · ') : 'Beluga’s colours, following light and dark.'}
           </Rise>
         </>
       ) : null}

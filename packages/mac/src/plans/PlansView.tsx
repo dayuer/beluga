@@ -21,7 +21,6 @@ import { SharedPlansList } from '../team/SharedPlans.js';
 import { isShortcut } from '../lib/shortcuts.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { NoProjects } from '../work/NoProjects.js';
-import { useT } from '../i18n/index.js';
 
 /**
  * Plans: one project's at a time (the one you're in, like Tasks). Each is a row with how far it
@@ -38,7 +37,6 @@ export function PlansView() {
   const project = projectToShow(board, projects, view.kind === 'plans' ? view.projectId : undefined, prefs.project);
   const here = projects.find((x) => x.id === project);
   const plans = plansOf(state, project);
-  const t = useT();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -54,31 +52,31 @@ export function PlansView() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [project]);
 
-  if (!state.enabled) return <Empty icon="flag" title={t('plans.view.needsApp')} detail={t('plans.view.needsAppDetail')} />;
-  if (!here) return <NoProjects icon="flag" detail={t('plans.view.noProjects')} />;
+  if (!state.enabled) return <Empty icon="flag" title="Plans need the Beluga app" detail="Open the Beluga app to plan big work with your agent." />;
+  if (!here) return <NoProjects icon="flag" detail="Plans belong to a project. Add one to plan its work here." />;
   return (
     <div className={p.list}>
       <div className={p.listBar}>
         <span className={v.caption}>
-          {t('plans.view.plansIn')}
+          Plans in
         </span>
-        <PickMenu<string> label={t('plans.sheets.project')} choices={projects.map((x) => ({ value: x.id, label: x.name, mark: <ProjectIcon id={x.id} name={x.name} size={16} /> }))} chosen={[here.id]} onPick={(id) => openList(id)}>
-          <button type="button" className={cx(p.projectSwitch, v.switch)} aria-label={t('plans.view.projectAria', { name: here.name })} title={t('plans.view.switchProject')}>
+        <PickMenu<string> label="Project" choices={projects.map((x) => ({ value: x.id, label: x.name, mark: <ProjectIcon id={x.id} name={x.name} size={16} /> }))} chosen={[here.id]} onPick={(id) => openList(id)}>
+          <button type="button" className={cx(p.projectSwitch, v.switch)} aria-label={`Project: ${here.name}`} title="Switch Project">
             <ProjectIcon id={here.id} name={here.name} size={18} />
             <span>{here.name}</span>
             <Icon name="chevronDown" size={11} />
           </button>
         </PickMenu>
         <span className={p.grow} />
-        <ActionsDropdown items={[{ label: t('plans.page.planningStyle'), onSelect: () => openSheet({ kind: 'plan_style' }) }]}>
-          <IconButton icon="more" label={t('plans.view.options')} />
+        <ActionsDropdown items={[{ label: 'Planning Style…', onSelect: () => openSheet({ kind: 'plan_style' }) }]}>
+          <IconButton icon="more" label="Plans Options" />
         </ActionsDropdown>
-        <Button variant="primary" size="small" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })} title={`${t('plans.sheets.newPlan')}${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
-          {t('plans.sheets.newPlan')}
+        <Button variant="primary" size="small" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })} title={`New Plan${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
+          New Plan
         </Button>
       </div>
       {plans.length ? (
-        <ul className={p.rows} aria-label={t('plans.view.plans')}>
+        <ul className={p.rows} aria-label="Plans">
           {plans.map((plan) => (
             <PlanRow key={plan.id} plan={plan} />
           ))}
@@ -87,12 +85,12 @@ export function PlansView() {
         <Empty
           icon="flag"
           mark={<ProjectIcon id={here.id} name={here.name} size={28} />}
-          title={t('plans.view.noPlans', { name: here.name })}
-          detail={t('plans.view.noPlansDetail')}
+          title={`No plans in ${here.name} yet`}
+          detail="Say what you want built. Your agent reads the code and cuts it into milestones and tasks that run side by side, each with what proves it’s done. You talk it through; nothing reaches the board until you approve."
           action={
             <EmptyActions>
               <Button variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })}>
-                {t('plans.sheets.planIn', { name: here.name })}
+                {`Plan in ${here.name}`}
               </Button>
             </EmptyActions>
           }
@@ -110,13 +108,12 @@ function PlanRow({ plan }: { plan: Plan }) {
   const { open } = usePlanActions();
   const status = planStatus(view);
   const next = nextWords(view.next);
-  const t = useT();
   return (
     <li>
       <button type="button" className={p.row} onClick={() => open(plan.id)} aria-label={`${titleOf(plan)}, ${status.label}`}>
         <span className={p.rowMain}>
           <span className={p.rowTitle}>{titleOf(plan)}</span>
-          <span className={p.rowSub}>{plan.body ? (next.detail ? `${next.title} · ${next.detail}` : next.title) : t('plans.view.draftRow', { ms: view.milestones.length, tasks: view.total })}</span>
+          <span className={p.rowSub}>{plan.body ? (next.detail ? `${next.title} · ${next.detail}` : next.title) : `${view.milestones.length} milestones · ${view.total} tasks · draft`}</span>
         </span>
         {view.milestones.length && plan.body ? <MilestoneBar items={bars(view)} /> : null}
         <TonePill tone={status.tone} live={status.tone === 'claude'}>
@@ -130,9 +127,8 @@ function PlanRow({ plan }: { plan: Plan }) {
 
 /** The plans of the project of this name on your computers, tagged. */
 function RemotePlans({ project }: { project: string }) {
-  const t = useT();
   const sources = useRemoteSources();
   const rows = useMemo(() => remotePlans(sources).filter((t) => t.item.project === project).map((t) => ({ ...t, item: { id: t.item.id, title: t.item.title, sub: t.item.status, page: { kind: 'plan' as const, id: t.item.id } } })), [sources, project]);
-  return <RemoteList title={t('plans.view.onComputers')} rows={rows} />;
+  return <RemoteList title="Plans on your computers" rows={rows} />;
 }
 

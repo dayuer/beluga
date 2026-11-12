@@ -6,7 +6,6 @@ import type { ViewData } from './use-view-data.js';
 import { formatNumber } from './format.js';
 import { useHoverTip } from './HoverTip.js';
 import v from './views.module.css';
-import { useT } from '../../i18n/index.js';
 
 /**
  * A gantt (a timeline): a row per bar from its start to its end, in lanes, on a time axis. Bars
@@ -26,10 +25,9 @@ function when(bar: GanttBar, hours: boolean): string {
 }
 
 export function GanttView({ view, data, full }: { view: View; data: ViewData; full: boolean }) {
-  const t = useT();
   const plan = useMemo(() => planGantt(view, data.rows, data.columns), [view, data.rows, data.columns]);
   const { show, hide, tip } = useHoverTip();
-  if (!plan) return <div className={v.empty}>{data.loading ? t('common.table.loading') : t('common.views.noTimeline')}</div>;
+  if (!plan) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to put on a timeline (it needs a start date)'}</div>;
   const pct = (t: number): string => `${(along(plan, t) * 100).toFixed(3)}%`;
   const bars = plan.lanes.reduce((n, l) => n + l.bars.length, 0);
   return (
@@ -49,7 +47,7 @@ export function GanttView({ view, data, full }: { view: View; data: ViewData; fu
           {plan.ticks.map((t) => (
             <span key={t.t} className={v.ganttLine} style={{ left: pct(t.t) }} />
           ))}
-          {plan.today !== undefined ? <span className={v.ganttToday} style={{ left: pct(plan.today) }} title={t('common.gantt.today')} /> : null}
+          {plan.today !== undefined ? <span className={v.ganttToday} style={{ left: pct(plan.today) }} title="Today" /> : null}
         </div>
         {plan.lanes.map((lane, li) => (
           <div key={`${lane.name}-${li}`} className={v.ganttLane} role="group" aria-label={lane.name || undefined}>
@@ -58,19 +56,19 @@ export function GanttView({ view, data, full }: { view: View; data: ViewData; fu
               const tone = barTone(bar.status);
               const body = (
                 <>
-                  <div className={v.tipHead}>{bar.label || t('more.views.untitled')}</div>
+                  <div className={v.tipHead}>{bar.label || 'Untitled'}</div>
                   <div className={v.tipRow}>
                     <span className={v.tipName}>{when(bar, plan.hours)}</span>
                   </div>
                   {bar.progress !== undefined ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>{t('more.views.progress')}</span>
+                      <span className={v.tipName}>Progress</span>
                       <span className={v.tipValue}>{formatNumber(bar.progress * 100, { decimals: 0 })}%</span>
                     </div>
                   ) : null}
                   {bar.status ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>{t('more.views.status')}</span>
+                      <span className={v.tipName}>Status</span>
                       <span className={v.tipValue}>{bar.status}</span>
                     </div>
                   ) : null}

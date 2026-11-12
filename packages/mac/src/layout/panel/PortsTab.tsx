@@ -8,7 +8,6 @@ import { sameDeep } from '../../lib/stable.js';
 import { openExternal } from '../../lib/system.js';
 import s from './ports.module.css';
 import { everyWhileShown } from '../../lib/window-active.js';
-import { useT } from '../../i18n/index.js';
 
 /**
  * A worktree's servers (BLG-802), above its Background: each port its dev servers listen on, with
@@ -32,7 +31,6 @@ interface Row {
 
 export function PortsTab({ wsId }: { wsId: string }) {
   const { client } = useBeluga();
-  const t = useT();
   const forwarded = useApp((st) => (st.forwards ?? NONE).filter((f) => f.workspaceId === wsId), sameDeep);
   const [here, setHere] = useState<readonly WorktreePort[]>([]);
   const onComputer = useApp((st) => st.onComputers?.[wsId]);
@@ -55,18 +53,18 @@ export function PortsTab({ wsId }: { wsId: string }) {
   ];
   if (!rows.length && !onComputer) return null;
   return (
-    <section className={s.ports} aria-label={t('layout.ports.servers')}>
+    <section className={s.ports} aria-label="Servers">
       {rows.map((r) => (
         <div key={r.key} className={s.row}>
           <Icon name="globe" size={13} className={s.icon} />
           <span className={s.text}>
             <strong>{r.name}</strong>
             <code>localhost:{r.local}</code>
-            {r.where ? <span className={s.detail}>{r.local === r.port ? t('layout.ports.from', { where: r.where }) : t('layout.ports.fromMoved', { where: r.where, port: r.port })}</span> : null}
+            {r.where ? <span className={s.detail}>{r.local === r.port ? `from ${r.where}` : `from ${r.where}’s ${r.port} · ${r.port} is in use on this Mac`}</span> : null}
           </span>
-          <Tip label={t('layout.ports.openTip', { url: `http://localhost:${r.local}` })}>
+          <Tip label={`Open http://localhost:${r.local} in your browser`}>
             <Button size="small" variant="quiet" onClick={() => void openExternal(`http://localhost:${r.local}`)}>
-              {t('layout.ports.open')}
+              Open
             </Button>
           </Tip>
         </div>
@@ -75,12 +73,12 @@ export function PortsTab({ wsId }: { wsId: string }) {
         <div key={`share:${p.port}`} className={s.row}>
           <Icon name="share" size={13} className={s.icon} />
           <span className={s.text}>
-            <strong>{t('layout.ports.thisMac')}</strong>
+            <strong>This Mac</strong>
             <code>localhost:{p.port}</code>
-            <span className={s.detail}>{t('layout.ports.sharedHere')}</span>
+            <span className={s.detail}>shared with this worktree</span>
           </span>
           <Button size="small" variant="quiet" onClick={() => void client.call('machines.unshare', wsId, p.port)}>
-            {t('layout.ports.unshare')}
+            Unshare
           </Button>
         </div>
       ))}
@@ -92,7 +90,6 @@ export function PortsTab({ wsId }: { wsId: string }) {
 /** Share a Port from This Mac: a port, then Share; said plainly when it can't. */
 function ShareRow({ wsId }: { wsId: string }) {
   const { client } = useBeluga();
-  const t = useT();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
   const [said, setSaid] = useState<string | undefined>();
@@ -100,9 +97,9 @@ function ShareRow({ wsId }: { wsId: string }) {
   const valid = Number.isInteger(port) && port > 0 && port < 65536;
   if (!open)
     return (
-      <Tip label={t('layout.ports.shareTip')}>
+      <Tip label="A database or API running on this Mac, reachable from this worktree at the same localhost port">
         <Button size="small" variant="quiet" icon="share" onClick={() => setOpen(true)}>
-          {t('layout.ports.shareButton')}
+          Share a Port from This Mac…
         </Button>
       </Tip>
     );
@@ -120,13 +117,13 @@ function ShareRow({ wsId }: { wsId: string }) {
   return (
     <div className={s.row}>
       <Icon name="share" size={13} className={s.icon} />
-      <input className={s.input} inputMode="numeric" placeholder="5432" aria-label={t('layout.ports.portHere')} autoFocus value={typed} onChange={(e) => setTyped(e.target.value.replace(/\D/g, '').slice(0, 5))} onKeyDown={(e) => (e.key === 'Enter' ? share() : e.key === 'Escape' ? setOpen(false) : undefined)} />
-      <span className={s.hint}>{said ?? t('layout.ports.hint')}</span>
+      <input className={s.input} inputMode="numeric" placeholder="5432" aria-label="Port on this Mac" autoFocus value={typed} onChange={(e) => setTyped(e.target.value.replace(/\D/g, '').slice(0, 5))} onKeyDown={(e) => (e.key === 'Enter' ? share() : e.key === 'Escape' ? setOpen(false) : undefined)} />
+      <span className={s.hint}>{said ?? 'reachable there at the same localhost port'}</span>
       <Button size="small" disabled={!valid} onClick={share}>
-        {t('layout.ports.share')}
+        Share
       </Button>
       <Button size="small" variant="quiet" onClick={() => setOpen(false)}>
-        {t('common.ui.cancel')}
+        Cancel
       </Button>
     </div>
   );

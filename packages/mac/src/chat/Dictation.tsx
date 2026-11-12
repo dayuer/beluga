@@ -6,7 +6,6 @@ import { cancelDictation, dictatingInto, dictationWave, errorIn, finishDictation
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useClock } from '../lib/window-active.js';
-import { useT } from '../i18n/index.js';
 import s from './dictation.module.css';
 
 /**
@@ -26,7 +25,6 @@ const reduced = (): boolean => window.matchMedia('(prefers-reduced-motion: reduc
 
 export function MicButton({ box }: { readonly box: React.RefObject<HTMLTextAreaElement | null> }) {
   const d = useDictation();
-  const t = useT();
   const prefs = usePrefs();
   const here = dictatingInto(box.current);
   const listening = here && d.kind === 'listening';
@@ -49,11 +47,11 @@ export function MicButton({ box }: { readonly box: React.RefObject<HTMLTextAreaE
   }, [listening]);
   const keys = prefs.voiceShortcut ? accelLabel(prefs.voiceShortcut) : undefined;
   return (
-    <Tip label={listening ? t('chat.dictation.writeInTip') : busy ? (d.kind === 'writing' ? t('chat.dictation.writingLast') : t('chat.dictation.gettingReady')) : keys ? t('chat.dictation.speakHold', { keys }) : t('chat.dictation.speak')} {...(listening ? { keys: '↩' } : keys ? { keys } : {})}>
+    <Tip label={listening ? 'Write it in · esc throws it away' : busy ? (d.kind === 'writing' ? 'Writing down the last of it…' : 'Getting ready… click to stop') : `Speak instead of typing${keys ? ` · hold ${keys} to talk` : ''}`} {...(listening ? { keys: '↩' } : keys ? { keys } : {})}>
       <button
         type="button"
         className={cx(s.mic, listening && s.micOn, busy && s.micBusy)}
-        aria-label={listening ? t('chat.dictation.writeIn') : t('chat.dictation.speak')}
+        aria-label={listening ? 'Write it in' : 'Speak instead of typing'}
         aria-pressed={listening}
         disabled={(d.kind === 'writing' && here) || (d.kind !== 'off' && !here)}
         onMouseDown={(e) => e.preventDefault()}
@@ -131,15 +129,14 @@ function Waveform({ live }: { readonly live: boolean }) {
 
 /** The words so far: written phrases arrive word by word; one being written shimmers where it will go. */
 function Transcript({ phrases, listening }: { readonly phrases: readonly Phrase[]; readonly listening: boolean }) {
-  const t = useT();
-  if (!phrases.length) return listening ? <div className={s.transcript}><span className={s.hint}>{t('chat.dictation.sayIt')}</span></div> : null;
+  if (!phrases.length) return listening ? <div className={s.transcript}><span className={s.hint}>Say it the way you’d tell a colleague. Pauses are fine: each one is written down while you go on.</span></div> : null;
   return (
     <div className={s.transcript} aria-live="polite">
       {phrases.map((p) =>
         p.status === 'writing' ? (
-          <span key={p.id} className={s.pending} aria-label={t('chat.dictation.beingWritten')} />
+          <span key={p.id} className={s.pending} aria-label="Being written down" />
         ) : p.status === 'failed' ? (
-          <span key={p.id} className={s.missed} title={t('chat.dictation.missed')}>…</span>
+          <span key={p.id} className={s.missed} title="This part couldn’t be written down">…</span>
         ) : (
           <span key={p.id} className={s.phrase}>
             {(p.text ?? '').split(/(\s+)/).map((w, i) =>
@@ -162,7 +159,6 @@ function Transcript({ phrases, listening }: { readonly phrases: readonly Phrase[
 /** Over the box while it listens, writes, or gets its model ready. */
 export function DictationStrip({ box }: { readonly box: React.RefObject<HTMLTextAreaElement | null> }) {
   const d = useDictation();
-  const t = useT();
   const prefs = usePrefs();
   const here = dictatingInto(box.current);
   const now = useClock(here && d.kind === 'listening', 500);
@@ -187,7 +183,7 @@ export function DictationStrip({ box }: { readonly box: React.RefObject<HTMLText
           <span className={s.text}>{gettingLine(d)}</span>
           <span className={s.flex} />
           <button type="button" className={s.done} onClick={cancelDictation}>
-            {t('chat.items.cancel')}
+            Cancel
           </button>
         </div>
         {d.progress > 0 ? <div className={s.progress} style={{ ['--p' as string]: d.progress }} /> : null}
@@ -206,28 +202,28 @@ export function DictationStrip({ box }: { readonly box: React.RefObject<HTMLText
             {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
           </span>
         ) : (
-          <span className={s.time}>{send ? t('chat.dictation.sendingWhen') : t('chat.dictation.writingLastPlain')}</span>
+          <span className={s.time}>{send ? 'Sending when it’s written down' : 'Writing down the last of it'}</span>
         )}
         <span className={s.keys}>
           {listening ? (
             <>
-              <Kbd>↩</Kbd> {prefs.voiceSend ? t('chat.composer.legendSend') : t('chat.dictation.legendWriteIn')} ·{' '}
+              <Kbd>↩</Kbd> {prefs.voiceSend ? 'send' : 'write it in'} ·{' '}
               {prefs.voiceSend ? null : (
                 <>
-                  <Kbd>{chordLabel('Cmd+Enter')}</Kbd> {t('chat.composer.legendSend')} ·{' '}
+                  <Kbd>{chordLabel('Cmd+Enter')}</Kbd> send ·{' '}
                 </>
               )}
               <Kbd>esc</Kbd>
             </>
           ) : send ? null : (
             <>
-              <Kbd>{chordLabel('Cmd+Enter')}</Kbd> {t('chat.dictation.sendToo')}
+              <Kbd>{chordLabel('Cmd+Enter')}</Kbd> send it too
             </>
           )}
         </span>
         {listening ? (
           <button type="button" className={s.done} onMouseDown={(e) => e.preventDefault()} onClick={() => void finishDictation()}>
-            {t('chat.attention.done')}
+            Done
           </button>
         ) : null}
       </div>

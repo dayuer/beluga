@@ -3,7 +3,6 @@ import { ATTACHMENT_SCHEME } from '@beluga/core/attachment-share.js';
 import type { LinkedImage } from '@beluga/shared/attachment-links.js';
 import type { Location } from '@beluga/core/store.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
-import { t } from '../i18n/index.js';
 import { copyPng } from '../lib/copy.js';
 import { sourceTag } from '../machines/pane-model.js';
 
@@ -191,7 +190,14 @@ export function holdImage(api: Api, image: Loadable, size: ImageSize): { url: Pr
   };
 }
 
-export type ImageState = { readonly status: 'loading' } | { readonly status: 'ready'; readonly url: string } | { readonly status: 'error'; readonly error: string };
+/** Whether a failed read means the file is gone (an agent deleted or moved it since it linked it). */
+export const imageGone = (error: string): boolean => /ENOENT|no such file|is not there|is gone/i.test(error);
+
+/** What a picture that can't show says in its place: never the raw error for one that was deleted. */
+export const unavailableText = (error: string): { text: string; detail: string } =>
+  imageGone(error) ? { text: 'Image no longer here', detail: 'The file was moved or deleted since this was written' } : { text: 'Image unavailable', detail: error };
+
+export type ImageState ={ readonly status: 'loading' } | { readonly status: 'ready'; readonly url: string } | { readonly status: 'error'; readonly error: string };
 
 /** The image while it's on screen (kept that long): `thumb` in a message, `full` in the lightbox. */
 export function useImage(api: Api, image: ChatImage, size: ImageSize = 'thumb'): ImageState {
@@ -246,12 +252,6 @@ let open: Lightbox | undefined;
 const listeners = new Set<() => void>();
 const emit = (): void => listeners.forEach((l) => l());
 
-/** An image's name in the language shown: "image 2" (the words a message links it with), else its own. */
-export function imageLabel(label: string): string {
-  const m = /^image (\d+)$/.exec(label);
-  return m ? t('more.chat.imageN', { n: m[1]! }) : label === 'image' ? t('more.chat.image') : label;
-}
-
 export function openLightbox(images: readonly ChatImage[], index = 0): void {
   open = { images, index: Math.max(0, Math.min(index, images.length - 1)) };
   emit();
@@ -292,9 +292,9 @@ export async function copyImage(url: string): Promise<void> {
             canvas.width = img.naturalWidth;
             canvas.height = img.naturalHeight;
             canvas.getContext('2d')?.drawImage(img, 0, 0);
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('chat.images.convertFailed')))), 'image/png');
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't convert the image"))), 'image/png');
           };
-          img.onerror = () => reject(new Error(t('chat.images.readFailed')));
+          img.onerror = () => reject(new Error("Couldn't read the image"));
           img.src = url;
         });
   await copyPng(png);

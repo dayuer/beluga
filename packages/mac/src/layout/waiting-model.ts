@@ -4,9 +4,9 @@ import type { NeedsYou } from '../../../../src/companion/protocol.js';
 import { allNeeds, needMatches } from '../../../../src/companion/needs-you.js';
 import { macViewFor, needView } from '../../../../src/companion/open-on-mac.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
-import { assistantTitle } from '../lib/brand.js';
+import { ASSISTANT_TITLE } from '../../../../src/shared/assistant.js';
 import { findWorkspace } from '../../../../src/ui/workspace-models.js';
-import { type Key, t } from '../i18n/index.js';
+import { sameDeep } from '../lib/stable.js';
 
 /**
  * The bell's "Waiting for you" (BLG-255): everything that waits on you, from the same list the
@@ -41,11 +41,11 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
   if (!view) return undefined;
   switch (view.kind) {
     case 'room':
-      return t('layout.waiting.room');
+      return 'Room';
     case 'assistant':
-      return assistantTitle();
+      return ASSISTANT_TITLE;
     case 'requests':
-      return t('layout.waiting.requests');
+      return 'Requests';
     case 'workspace': {
       const ws = findWorkspace(state.projects, view.id);
       const project = state.projects.find((p) => p.workspaces.some((w) => w.id === view.id));
@@ -60,29 +60,29 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
         return g ? `#${g.name}` : undefined;
       }
       const f = state.network.friends.find((x) => x.peerId === id);
-      return f ? t('layout.waiting.chatWith', { name: f.name }) : undefined;
+      return f ? `Chat with ${f.name}` : undefined;
     }
     case 'tasks': {
       const name = projectName(state, view.projectId);
-      return name ? t('layout.waiting.tasksOf', { name }) : t('layout.waiting.tasks');
+      return name ? `Tasks · ${name}` : 'Tasks';
     }
     case 'task': {
       const issue = state.board.issues.find((i) => i.id === view.id);
-      return issue ? t('layout.waiting.tasksOf', { name: issue.key }) : t('layout.waiting.tasks');
+      return issue ? `Tasks · ${issue.key}` : 'Tasks';
     }
     case 'plan': {
       const plan = state.plans.plans.find((p) => p.id === view.id);
-      return plan ? t('layout.waiting.planOf', { name: planTitle(plan) }) : t('layout.waiting.plans');
+      return plan ? `Plan · ${planTitle(plan)}` : 'Plans';
     }
     case 'team_plan':
-      return t('layout.waiting.sharedPlan', { name: state.team.plans.find((p) => p.owner === view.owner && p.id === view.id)?.title ?? t('layout.waiting.fromTeammate') });
+      return `Shared plan · ${state.team.plans.find((p) => p.owner === view.owner && p.id === view.id)?.title ?? 'from a teammate'}`;
     case 'sentinel':
-      return t('layout.waiting.sentinel');
+      return 'Sentinel';
     case 'sentinel_page':
-      return state.sentinel.items.find((i) => i.id === view.id)?.name ?? t('layout.waiting.sentinel');
+      return state.sentinel.items.find((i) => i.id === view.id)?.name ?? 'Sentinel';
     case 'sentinel_run': {
       const run = state.sentinel.runs.find((r) => r.id === view.runId);
-      return state.sentinel.items.find((i) => i.id === run?.sentinelId)?.name ?? t('layout.waiting.sentinel');
+      return state.sentinel.items.find((i) => i.id === run?.sentinelId)?.name ?? 'Sentinel';
     }
     case 'project':
       return projectName(state, view.id);
@@ -92,7 +92,7 @@ export function placeOf(state: DomainState, view: View | undefined): string | un
 }
 
 /** Requests with no page of their own still say where they're answered. */
-const PLACE_BY_ID: ReadonlyArray<readonly [RegExp, Key]> = [[/^friend:/, 'layout.waiting.friends']];
+const PLACE_BY_ID: ReadonlyArray<readonly [RegExp, string]> = [[/^friend:/, 'Friends']];
 
 /**
  * One main action and its "no" on the row (Approve · Decline, Team Up · Not Now). A question
@@ -116,13 +116,21 @@ export function waitingList(state: DomainState): readonly Waiting[] {
     .sort((a, b) => at(b) - at(a))
     .map((item) => {
       const view = waitingView(state, item);
-      const byId = PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1];
       // A Synon Studio Gate belongs to a plan a customer confirmed; its card (BLG-75) names it.
       const studioPlan = item.kind === 'studio-start' ? item.gate?.plan : undefined;
-      const place = placeOf(state, view) ?? (studioPlan ? t('layout.waiting.planOf', { name: studioPlan }) : byId ? t(byId) : undefined);
+      const place = placeOf(state, view) ?? (studioPlan ? `Plan: ${studioPlan}` : PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1]);
       return { item, ...(view ? { view } : {}), ...(place ? { place } : {}), ...splitActions(item.actions) };
     });
 }
+
+/**
+ * How deep a waiting list goes, and some: list › row › request › its actions › one › its args › an
+ * answer › its picks. sameDeep's usual six levels stop at an answer and call it changed every time.
+ */
+const WAITING_DEPTH = 16;
+
+/** Two waiting lists say the same (to the bottom of every answer: BLG-905), so the bell redraws only when one changes. */
+export const sameWaiting = (a: readonly Waiting[], b: readonly Waiting[]): boolean => sameDeep(a, b, WAITING_DEPTH);
 
 /** The request a notice is about: its `need`, or the approval or question it names (`ref`). */
 export function noticeNeed(n: Pick<Notice, 'need' | 'ref' | 'tag'>): string | undefined {

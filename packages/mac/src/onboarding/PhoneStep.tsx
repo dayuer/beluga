@@ -11,7 +11,6 @@ import homeDark from '../assets/phone-home-dark.webp';
 import homeLight from '../assets/phone-home-light.webp';
 import { EASE_OUT, Rise, SPRING, Words } from './fx.js';
 import s from './onboarding.module.css';
-import { useT } from '../i18n/index.js';
 
 /**
  * The phone app (docs/companion.md): what it's for, that it's Android only for now, where to get
@@ -20,7 +19,7 @@ import { useT } from '../i18n/index.js';
  */
 
 /** Where the Android app is published: each Mac release carries its APK. */
-export const ANDROID_APP_URL = 'https://github.com/kayraucklnc/beluga/releases/latest';
+export const ANDROID_APP_URL = 'https://github.com/beluga-labs/beluga/releases/latest';
 
 /**
  * The phone app's real Home, from its own demo (a pretend Mac: an approval waiting, a plan and a
@@ -43,7 +42,6 @@ function PhoneShot() {
  */
 function PairHere() {
   const { client } = useBeluga();
-  const t = useT();
   const pairing = useApp((st) => st.companion.pairing, sameDeep);
   const devices = useApp((st) => st.companion.devices.length);
   const now = useClock(true, 30_000);
@@ -67,7 +65,7 @@ function PairHere() {
     <div className={s.accessActions}>
       <motion.button type="button" className={s.solidButton} disabled={busy || devices >= 4} aria-busy={busy || undefined} onClick={start} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}>
         <Icon name={busy ? 'refresh' : 'phone'} size={13} className={busy ? s.spinning : undefined} />
-        {busy ? t('onboarding.phoneStep.opening') : devices ? t('onboarding.phoneStep.pairAnother') : t('onboarding.phoneStep.pair')}
+        {busy ? 'Opening…' : devices ? 'Pair Another Phone…' : 'Pair a Phone…'}
       </motion.button>
       {error ? <span className={s.accessError}>{error}</span> : null}
     </div>
@@ -76,24 +74,23 @@ function PairHere() {
 
 export function PhoneStep() {
   const devices = useApp((st) => st.companion.devices, sameDeep);
-  const t = useT();
   return (
     <div className={s.tour}>
       <div className={s.tourText}>
         <Rise className={s.eyebrow}>
-          <Icon name="phone" size={12} /> {t('onboarding.phoneStep.eyebrow')}
-          <span className={s.eyebrowSoft}>{t('onboarding.phoneStep.androidOnly')}</span>
+          <Icon name="phone" size={12} /> Phone
+          <span className={s.eyebrowSoft}>· Android only for now</span>
         </Rise>
         <h2 className={s.title}>
-          <Words text={t('onboarding.phoneStep.title')} delay={0.05} />
+          <Words text="Your agent in your pocket." delay={0.05} />
         </h2>
         <Rise delay={0.3} className={s.body}>
-          {t('onboarding.phoneStep.body')}
+          The Beluga app on your phone shows what your agent is doing and lets you answer, ask and chat from anywhere. It reads, it never edits. It’s on Android for now; iPhone comes later.
         </Rise>
         {devices.length ? (
           <Rise delay={0.4} className={s.accessStatus}>
             <span className={s.grant} data-grant="granted">
-              <Icon name="check" size={11} /> {devices.length === 1 ? t('onboarding.phoneStep.paired', { name: devices[0]!.name }) : t('onboarding.phoneStep.nPaired', { n: devices.length })}
+              <Icon name="check" size={11} /> {devices.length === 1 ? `${devices[0]!.name} is paired` : `${devices.length} phones paired`}
             </span>
           </Rise>
         ) : null}
@@ -102,7 +99,7 @@ export function PhoneStep() {
         </Rise>
         <Rise delay={0.55}>
           <button type="button" className={s.textLink} onClick={() => void openExternal(ANDROID_APP_URL)}>
-            <Icon name="download" size={11} /> {t('onboarding.phoneStep.getApp')}
+            <Icon name="download" size={11} /> Get the Android app
           </button>
         </Rise>
       </div>

@@ -1,5 +1,4 @@
-import { ASSISTANT_CHANNEL } from '@beluga/shared/assistant.js';
-import { assistantTitle } from '../lib/brand.js';
+import { ASSISTANT_CHANNEL, ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { Icon } from '../components/Icon.js';
 import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
@@ -8,7 +7,6 @@ import { type Signal, signalOf } from './attention-model.js';
 import { SignalMark } from './signal-marks.js';
 import { Row } from './sidebar-parts.js';
 import { yourComputer } from '../lib/os-words.js';
-import { useT } from '../i18n/index.js';
 
 const RANK: Record<Signal['level'], number> = { needs: 3, unread: 2, working: 1, idle: 0 };
 
@@ -19,7 +17,6 @@ const RANK: Record<Signal['level'], number> = { needs: 3, unread: 2, working: 1,
  */
 export function AssistantNav() {
   const actions = useActions();
-  const t = useT();
   // The phone is the Phone tab in this page's panel, not a row of its own (BLG-292); its full-size mirror is still yours.
   const selected = useApp((s) => s.view.kind === 'assistant' || s.view.kind === 'phone');
   const signal = useApp((s) => {
@@ -31,8 +28,8 @@ export function AssistantNav() {
   return (
     <Row
       icon={<Icon name="laptop" size={14} />}
-      label={assistantTitle()}
-      detail={signal.tip || t('layout.assistantNav.detail', { computer: yourComputer() })}
+      label={ASSISTANT_TITLE}
+      detail={signal.tip || `Ask ${yourComputer()} anything: screenshots, what’s running, start a worktree or a task. Several chats as tabs; the open one is on your phone too`}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'assistant' } })}
       trailing={<SignalMark signal={signal} />}
