@@ -226,6 +226,22 @@ call/pointer.module.css:61         long-duration|call/pointer.module.css|transit
 
 `sidebar-calm:12/:25` 单独重跑通过（启动抖动），复跑确认。上述 spec 与 `chat-*`、撤销相关 spec 的复跑结果见 BLG-196 的证据附件。
 
+**BLG-206：第三次复核捕获的 8 个失败，逐个单独重跑（`--workers=1`，走 e2e-lock）**
+
+| spec:行 | 现象 | 裁决 | 改法 | 文件 |
+| --- | --- | --- | --- | --- |
+| `fork-calm-sidebar:68`（沉稳关） | 单跑 2.5s 过，但与 :47 同 worker 连跑必复现：打开 new-hero 的输入框占位符是「Type your own answer…」 | **spec 过期**（不是负载，也不是沉稳门没关干净）：:47 结束时 new-hero 还在等回答，同一 worker 共用一个演示 daemon，:68 看到的是等回答状态。沉稳关的顺序行为本身正常 | :47 结尾点选「Signed cookies」回答它，等 needs 标记消失 | `e2e/fork-calm-sidebar.spec.ts` |
+| `selection-bar:26` | 重跑通过（9.6s），选择条出现，Copy/Ask 可见 | **负载抖动**：当时 load 数百。覆盖层没有关键帧停在 opacity:0 的问题（`.bar` 的 `rise` 只写了 `from`，终态本来可见），无需补规则 | 无 | — |
+| `plans:168` | 逐帧断言 `off` 数组 116 条 | **spec 过期**：沉稳下 CH-06 让里程碑盒子的滑动瞬时，连线与盒子没有中间帧可比，断言测的是上游的滑动。沉稳关单跑复现全绿 | 该条以沉稳关运行（同 cool-window 的做法） | `e2e/plans.spec.ts` |
+| `reader:96`、`:129` | 滚动断言超时 | **负载抖动**：单跑整文件 10/10 通过 | 无 | — |
+| `instant-worktrees:28` | 超时 | **负载抖动**：单跑整文件 3/3 通过 | 无 | — |
+| `project-home:22` | 3ms 启动抖动 | **负载抖动**：单跑整文件 10/10 通过 | 无 | — |
+| `plan-black-box:35` | 90 秒等不到 Unread 里的计划行（连续两次单跑都失败） | **spec 过期**（SH-08 的既定行为）：前面几次点击后指针留在侧栏，沉稳冻结顺序，新 Unread 行不插入。与 BLG-196 的 unread.spec 同因 | 等 Unread 前 `mouse.move(900, 450)` 出侧栏；改后 12.8s 通过 | `e2e/plan-black-box.spec.ts` |
+| `unread`（311 名之后未跑到） | — | 单跑 3/3 通过 | 无 | — |
+| `threads-panel`（同上） | — | 单跑 6/6 通过 | 无 | — |
+
+spec 改动的原因登记在 `docs/fork.md`。`fork-calm-sidebar` 两个变体（:47、:73，原 :68 因加了几行下移）同跑 2/2 通过。
+
 整套 `npm run e2e` 这次没能一次全绿：机器长时间被其它 worktree 打满（load 150–500），e2e 的 fixture 要在 60 秒内等演示 daemon 凑齐假朋友。安静窗口里（load 15–30，2 workers）前 45 个用例零失败。完整一遍需要在空闲的 Mac 上重跑。
 
 ### 4.3 calm-check：36 个场景 × 4 组合

@@ -60,6 +60,8 @@ test('a running plan whose task chats get answers is one Unread row, not one per
   await unfold(page, 'landing');
   await row(page, 'new-hero').click();
 
+  // The pointer rests in the sidebar after those clicks, and calm mode holds its order while it does (SH-08): step out.
+  await page.mouse.move(900, 450);
   // Both answered: the plan is in Unread once, with how many updates; its chats aren't, one by one.
   const listed = unreadSection(page).getByRole('button', { name: new RegExp(`^${PLAN} · .*2 updates`) });
   await expect(listed).toBeVisible({ timeout: 90_000 });

@@ -63,6 +63,11 @@ test('a conversation turning needs-you waits while the pointer is in the sidebar
   // … and only leaving the sidebar brings the new order in.
   await page.mouse.move(900, 450);
   await expect.poll(async () => JSON.stringify(await unreadRows(page)), { timeout: 10_000 }).not.toBe(JSON.stringify(before));
+
+  // Answer it, so the next test starts from a conversation that isn't waiting (one demo daemon per worker).
+  await row(page, 'new-hero').click();
+  await page.getByRole('button', { name: /Signed cookies/ }).click();
+  await expect(row(page, 'new-hero')).not.toHaveAttribute('data-signal-row', 'needs', { timeout: 30_000 });
 });
 
 test('with calm mode off the order changes under the pointer, as upstream does', async ({ page }) => {

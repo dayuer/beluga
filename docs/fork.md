@@ -104,6 +104,9 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/call/PointerMark.tsx` ✓：点击指针标记的 1.16 弹跳在沉稳模式下不做（`calmOn()` 加进 `paintTag` 的守卫；reduced-motion 上游本来就停）。上游 3.2.0 新增，M4 同步跟进（`docs/calm/overlay.md` §12.2）。
 - `packages/mac/e2e/unread.spec.ts`：未读断言从 `font-weight:650` 改为 400 + 计数徽标（沉稳 S2 的配套；fork-only 测试改动，见 `docs/calm/overlay.md` §12）；运行中出现的 Unread 行按 SH-08 等指针离开侧栏后再断言（先 `mouse.move` 出侧栏）。
 - `packages/mac/e2e/cool-window.spec.ts`：KLD-40 的“Working 光带走动”用例以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；沉稳模式故意让当前步骤以外的 live 标记停在静止帧（`docs/calm/hooks.md` §4），这条上游测试测的是上游时钟。
+- `packages/mac/e2e/plans.spec.ts`：「折叠里程碑时连线逐帧跟着」一条以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；它逐帧测上游的滑动，沉稳下这段滑动按 CH-06 是瞬时的，连线与盒子不会有中间帧可比。
+- `packages/mac/e2e/plan-black-box.spec.ts`：等计划行进入 Unread 前先 `mouse.move` 出侧栏（SH-08：指针在侧栏里时沉稳冻结顺序，新行不插入），同 `unread.spec.ts`。
+- `packages/mac/e2e/fork-calm-sidebar.spec.ts`：沉稳开那条结尾回答 new-hero 的提问。同一 worker 共用一个演示 daemon，不回答的话沉稳关那条打开 new-hero 看到的是「等你回答」的输入框，等不到 `new-hero` 占位符。
 - `packages/mac/e2e/send-no-blank.spec.ts`：消息飞行动画的上游用例以沉稳关运行；沉稳模式让消息直接落位、没有飞行（CH-06），这条测的是上游的飞行实现。
 - `packages/mac/e2e/steps.spec.ts`：步骤滑入折叠、消息飞行/飞入队列的上游用例以沉稳关运行；沉稳模式下步骤与 reduced-motion 一样瞬时进折叠（CH-02）、消息直接落位（CH-06），同文件后面的 reduced-motion 用例覆盖了那一档。
 - `packages/mac/e2e/threads-panel.spec.ts`：“threads 关时无标记”与“子线程折在父行下”两条在等新行前把指针移出侧栏（SH-08：指针在侧栏时新出现的行要等它离开）。
