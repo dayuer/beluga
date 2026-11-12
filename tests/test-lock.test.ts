@@ -139,15 +139,20 @@ describe.skipIf(process.platform === 'win32')("vitest's global setup", () => {
 describe.skipIf(process.platform === 'win32')("a worktree's Claude Code runs at lower priority", () => {
   it('nices a run that carries KLAUD_WORKTREE, and what it starts inherits it', async () => {
     // What it starts reads its own niceness (macOS's ps once said -10 for a process niced to 10 on CI).
-    // The run is a node process, not a shell: it waits for the nice (a line on stdin), then starts a node
-    // that prints its priority. (A shell that slept first was sometimes gone before setPriority reached it, ESRCH.)
-    const script = `process.stdin.once('data', () => console.log(require('child_process').execFileSync(process.execPath, ['-e', 'console.log(require("os").getPriority())'], { encoding: 'utf8' }).trim()))`;
-    const child = spawn(process.execPath, ['-e', script], { stdio: ['pipe', 'pipe', 'ignore'] });
-    expect(niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' })).toBe(true);
+    const own = `${JSON.stringify(process.execPath)} -e 'console.log(require("os").getPriority())'`;
+    // In a full run on a busy Mac the shell can be gone before we reach it (setPriority says ESRCH), so a
+    // shell that is already dead is replaced by a fresh one, up to six times, a quarter second apart.
+    let child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
+    for (let attempt = 1; !niced && attempt < 6; attempt++) {
+      await new Promise((r) => setTimeout(r, 250)); // the busy spell passes
+      child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
+      niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
+    }
+    expect(niced).toBe(true);
     expect(os.getPriority(child.pid!)).toBe(10);
     let out = '';
     child.stdout.on('data', (d) => (out += d));
-    child.stdin.end('go\n');
     await new Promise((r) => child.on('exit', r));
     expect(Number(out.trim())).toBe(10);
   });
