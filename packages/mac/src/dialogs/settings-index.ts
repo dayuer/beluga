@@ -320,6 +320,7 @@ const UPSTREAM_SETTINGS: readonly Entry[] = [
     ['Let a browser in', 'A link that works once, for 10 minutes.', 'link browser login'],
   ]),
   ...rows('advanced', 'Agent threads', [['Let your agents start threads', 'Child chats, each with its own agent.', 'threads child sub-agent family orchestrate']]),
+  // Synon Studio's Connect moved to its own dialog (BLG-70): no row in this pane to index.
 
   // Experimental: one group per experiment, its switch the row (made from shared/experiments.ts).
   ...EXPERIMENTS.flatMap((id) => rows('experimental', EXPERIMENT_INFO[id].title, [[EXPERIMENT_INFO[id].title, EXPERIMENT_INFO[id].summary, `${id} experimental early ${EXPERIMENT_INFO[id].keywords}`]])),

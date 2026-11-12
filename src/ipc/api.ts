@@ -12,6 +12,7 @@ import { MAX_RANGE } from '../shared/text-range.js';
 import { type ArgsRuntime, MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH, agentArgsProblem } from '../shared/agent-args.js';
 import { NETWORK_API } from './network-api.js';
 import { STRIPE_API } from './stripe-api.js';
+import { STUDIO_API } from './studio-api.js';
 import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
 import { SUPPORT_API } from './support-api.js';
@@ -517,6 +518,7 @@ export const API = {
 
   // ---- earnings from Stripe, per project (stripe-api.ts)
   ...STRIPE_API,
+  ...STUDIO_API,
   // ---- earnings from RevenueCat, per project, added to Stripe's (revenuecat-api.ts)
   ...REVENUECAT_API,
   // ---- supporting Beluga: the star and coffee asks merges bring (support-api.ts)

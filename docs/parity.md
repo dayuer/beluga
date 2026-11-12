@@ -522,6 +522,13 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `revenuecat.disconnect` | Mac only: the Earnings sheet's RevenueCat section › Disconnect |
 | `revenuecat.refresh` | Mac only: Refresh Now in the Earnings sheet (the daemon also looks again every 10 minutes by itself) |
 | `revenuecat.setApps` | Mac only: the Earnings sheet's RevenueCat section › Choose apps… (Count revenue from) |
+| `studio.link` | Mac only (and `beluga studio link <code>`): a project's ⋯ menu › Connect to Studio…, or Settings › Advanced › Synon Studio: the studio's binding code from its admin page, then Connect |
+| `studio.unlink` | Mac only: the Synon Studio dialog › Disconnect (tells Studio its plans are gone, closes the link, forgets the key) |
+| `studio.status` | Mac only: the Synon Studio dialog (it asks every 2 seconds while open), and `beluga studio status [--json]` |
+| `studio.setProject` | Mac only: the Synon Studio dialog › Share this project, and `beluga studio share &#124; unshare [path]` |
+| `studio.reconnect` | Mac only: the Synon Studio dialog's Reconnect while it is offline, and `beluga studio status` after a hub restart |
+| `studio.answerGate` | ✓ Synon Studio's start card in Needs You (the Mac's bell and the phone): Approve, or Decline with a sentence the customer reads (it binds the answer to the draft they confirmed) |
+| `studio.say` | Mac only: the plan's conversation gets your words as "名字 · Synon Studio" in the customer's turns (the "send to the customer" switch on that box comes later; for now the API is there) |
 | `diagnostics.report` | ✓ Settings › About › Report a Problem: makes the report, shows it in Finder and opens a GitHub issue to attach it to |
 | `diagnostics.windowProblem` | ✓ by itself: a part of the window that stalled or failed to load (a view, the file reader) is noted in the black box, so Report a Problem shows which and when |
 | `diagnostics.windowCrash` | ✓ by itself: a part of the window that threw while drawing (the notification centre, the whole window) shows what went wrong in place of a grey window, and its error and stack are noted in the black box (BLG-905) |
@@ -734,6 +741,29 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `web.tailscale` | ✓ Settings › Advanced › Web access › Reached from › Tailscale (the ts.net address, whose login gets in, a join link under it); `beluga web --tailscale` (with a QR), `beluga web --off`; `beluga status` shows it |
 | `web.public` | ✓ Settings › Advanced › Web access › Reached from › Public link (what it exposes, its current address, refreshed while shown, so a new one after a cloudflared restart appears); `beluga web --public`, `beluga web --off`; `beluga status` shows the current address |
 | `web.download` | ✓ in a browser the web port served: a chat file's Download, Show in Finder / Open on a file, Save on a shared file (docs/web.md) |
+
+## Synon Studio customer actions
+
+The nine things a Synon Studio customer may do (`ACTION_KINDS` in `src/studio/protocol.ts`), where they do
+them in the customer web app (docs/studio.md §6–§8), and what the daemon runs for each. Nothing else is a
+customer action: the whitelist in `src/studio/actions.ts` refuses any other kind, and only a start or a
+change request raises a Gate — `plans.approve` is never reached from here.
+
+| Action | Where the customer does it | What the daemon runs |
+|---|---|---|
+| `plan.create` | 项目 › 新需求 (goal plus platforms) | `plans.create` with the wrapped goal and the operator's defaults (gated, quiet, a restricted first turn); the project comes from the binding, never the request |
+| `chat.send` | 计划页的对话输入框 | `session.submit` with the wrapped words to the plan's own conversation; the agent's reply becomes a turn only after the run ends and the sanitizer |
+| `plan.verify` | 计划页 › 检查这份计划 | `plans.verify(planId)` — never with `thenApprove` (a plan starts only from its Gate) |
+| `plan.requestStart` | 计划页主按钮「确认计划」 | nothing: raises the `start` Gate bound to that `draftRev`, for the operator's Approve/Decline |
+| `decision.answer` | 计划页的决策卡（只有 `audience: customer` 的） | `questions.answer` for the plan decision card `decide:<plan>:<task>` |
+| `milestone.pass` | 计划页验收「通过」 | `plans.pass(planId, milestoneId)` (the milestone must be at its review gate and not already passed) |
+| `milestone.sendBack` | 计划页验收「还不行」加一句原因 | `plans.sendBack(planId, milestoneId, wrapped reason)` — the plan's agent gets the fix work |
+| `draft.apply` | 计划页草稿差异「应用改动」 | nothing: raises the `changes` Gate for the operator; approving it applies the draft through the same one `plans.approve` |
+| `draft.discard` | 计划页草稿差异「放弃改动」 | `plans.discard(planId)` (a plan never approved goes with it) |
+
+The hub checks the same list before it queues an action (`src/net/studio/queue.ts`), and the daemon looks
+again in `StudioInbox` (`callRefusal`): a customer can't reach an internal method by naming it.
+
 ## Sending while the agent works, and images
 
 | What | Core | Mac |

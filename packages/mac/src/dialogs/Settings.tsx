@@ -38,6 +38,7 @@ import { VoiceSettings } from './VoiceSettings.js';
 import { KeyboardSettings } from './KeyboardSettings.js';
 import { ExperimentalSettings } from './ExperimentalSettings.js';
 import { WebAccessSettings } from './WebAccessSettings.js';
+import { StudioSettings } from '../studio/ConnectDialog.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import { LOCALES, type LanguagePref, languagePref, setLanguage } from '../i18n/index.js';
 import { PANES } from './settings-index.js';
@@ -678,6 +679,7 @@ function Advanced() {
   return (
     <>
       <WebAccessSettings />
+      <StudioSettings />
       <AgentThreadsSettings />
     </>
   );

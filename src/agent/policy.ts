@@ -131,6 +131,12 @@ export interface PolicyContext {
   readonly dotenv?: boolean;
   /** A friend's run with the board (BLG-701): its changes ('writes') or every board tool ('all') ask you first. */
   readonly boardAsks?: 'writes' | 'all';
+  /**
+   * A Synon Studio customer's turn (docs/studio-gates.md §5.3): only plan_get / plan_write /
+   * plan_update and reading inside the project. Everything else is denied here, so no approval is
+   * ever raised for it (an 'ask' or 'secret' would become a card that the customer could not answer).
+   */
+  readonly customerTurn?: boolean;
 }
 
 /**
@@ -184,9 +190,31 @@ export function writesCode(toolName: string, input: Record<string, unknown>, cwd
  *  - everything else (Bash, web, other edits, reads outside shares, ask_agent) asks the owner
  */
 export function decideTool(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Decision {
+  // A customer's turn never asks: what isn't on its three tools is denied (no card for anyone).
+  if (ctx.customerTurn) return decideCustomerTurn(toolName, input, ctx);
   const decision = decideToolPlain(toolName, input, ctx);
   if (decision === 'deny' || !ctx.dotenv || !touchesDotenv(toolName, input, ctx)) return decision;
   return 'secret';
+}
+
+/** The three plan tools a customer's turn may use: reading, and changes that stay a draft. */
+const CUSTOMER_PLAN_TOOLS = new Set(['mcp__beluga_plan__plan_get', 'mcp__beluga_plan__plan_write', 'mcp__beluga_plan__plan_update']);
+const CUSTOMER_READS = new Set(['Read', 'Grep', 'Glob']);
+
+/**
+ * A Studio customer's turn (docs/studio-gates.md §5.3): reading inside the project and its
+ * worktrees, plan tools that only touch the draft; never Bash, writes, other MCP tools, secrets or
+ * a question (an 'ask' or 'secret' would put a card in front of the operator that the customer's
+ * words asked for).
+ */
+function decideCustomerTurn(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Decision {
+  if (CUSTOMER_PLAN_TOOLS.has(toolName)) return 'allow';
+  if (!CUSTOMER_READS.has(toolName)) return 'deny';
+  const field = READ_TOOLS[toolName]!;
+  const target = resolveTarget(ctx.cwd, input[field]);
+  const real = realOf(target);
+  if ([target, real, ...namesOf(input)].some((n) => isSecretPath(n) || isDotenvPath(n))) return 'deny';
+  return ctx.roots.some((root) => within(root, target)) ? 'allow' : 'deny';
 }
 
 /** A file tool on a .env file, or a shell command whose only secret is one. */

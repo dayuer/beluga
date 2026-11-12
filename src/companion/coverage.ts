@@ -324,6 +324,18 @@ export const PHONE: Record<Method, Side> = {
   'revenuecat.refresh': 'mac',
   'revenuecat.setApps': 'mac',
 
+  // Synon Studio: publishing plans to customers is a person's choice, at the Mac (docs/studio-daemon.md §7.2).
+  'studio.link': 'mac',
+  'studio.unlink': 'mac',
+  'studio.status': 'mac',
+  'studio.setProject': 'mac',
+  'studio.reconnect': 'mac',
+  // A Gate is a NeedsYou: approving the start of a plan from the phone is the same answer as on the
+  // Mac, bound to the same draftRev (docs/studio-gates.md §3.8).
+  'studio.answerGate': 'phone',
+  // Saying something to a customer is the operator's own words: the phone never writes them for you.
+  'studio.say': 'mac',
+
   // ---- supporting Beluga: the star ask is the Mac's (it opens GitHub there)
   'support.answer': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)

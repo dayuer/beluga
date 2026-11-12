@@ -116,7 +116,9 @@ export function waitingList(state: DomainState): readonly Waiting[] {
     .sort((a, b) => at(b) - at(a))
     .map((item) => {
       const view = waitingView(state, item);
-      const place = placeOf(state, view) ?? PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1];
+      // A Synon Studio Gate belongs to a plan a customer confirmed; its card (BLG-75) names it.
+      const studioPlan = item.kind === 'studio-start' ? item.gate?.plan : undefined;
+      const place = placeOf(state, view) ?? (studioPlan ? `Plan: ${studioPlan}` : PLACE_BY_ID.find(([re]) => re.test(item.id))?.[1]);
       return { item, ...(view ? { view } : {}), ...(place ? { place } : {}), ...splitActions(item.actions) };
     });
 }

@@ -28,10 +28,11 @@ describe('a metric’s history as a file', () => {
 });
 
 describe('what a sentinel keeps', () => {
-  function kept() {
+  function kept(now = T + 3_600_000) {
     const home = mkdtempSync(path.join(os.tmpdir(), 'beluga-kept-'));
     dirs.push(home);
-    const s = setup({ home });
+    // Its own clock, an hour after the run: on the wall clock, 14 days after T swept the documents (files keep 14 days).
+    const s = setup({ home, now: () => now });
     const sn = s.sentinels.create(brief);
     // A run of a minute ago: its files are kept 14 days from it (FILES_KEEP_DAYS), so a fixed date would expire.
     const at = Date.now() - 60_000;
@@ -52,6 +53,12 @@ describe('what a sentinel keeps', () => {
     expect(files.map((f) => [f.name, f.label, f.kind])).toEqual(expect.arrayContaining([['report.md', 'Report', 'report'], ['step-1.txt', k.sn.steps[0]!.name, 'step'], ['files/deploy.html', 'deploy.html', 'document']]));
     expect(files.some((f) => f.name.includes('trigger'))).toBe(false);
     expect(data.keepsDays).toBe(14);
+  });
+
+  it('a run’s documents go once its 14 days are up; its report and steps stay', () => {
+    const k = kept(T + 15 * 24 * 3_600_000);
+    const names = k.sentinels.dataList(k.sn.id).runs[0]!.files.map((f) => f.name);
+    expect(names.sort()).toEqual(['report.md', 'step-1.txt']);
   });
 
   it('reads a run’s file for the viewer: a step’s output redacted, by its step’s name; a document as kept', () => {

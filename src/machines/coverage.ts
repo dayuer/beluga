@@ -319,6 +319,16 @@ export const MACHINE: Record<Method, MachineSide> = {
   'revenuecat.disconnect': 'drive',
   'revenuecat.refresh': 'drive',
   'revenuecat.setApps': 'drive',
+  // ---- Synon Studio: the link and what customers may see stay with the computer itself
+  'studio.link': 'refuse',
+  'studio.unlink': 'refuse',
+  'studio.status': 'drive',
+  'studio.setProject': 'refuse',
+  'studio.reconnect': 'drive',
+  // The answer to a customer's start Gate is the operator's own, not another computer's, and so is
+  // what you say to a customer.
+  'studio.answerGate': 'refuse',
+  'studio.say': 'refuse',
   // ---- support
   'support.answer': 'drive',
   // ---- stats

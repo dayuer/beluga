@@ -209,6 +209,8 @@ export const PhoneCalls = {
   // 1.29 (BLG-392): what a sentinel keeps, its files and histories as refs; a run's file opened on the Mac.
   'sentinel.dataList': entry('sentinel.dataList', DataListView),
   'sentinel.runFileOpen': entry('sentinel.runFileOpen', done),
+  // 1.53 (BLG-74): a Synon Studio start Gate answered from Needs You (the Mac does the same).
+  'studio.answerGate': entry('studio.answerGate', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

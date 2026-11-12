@@ -1,0 +1,1248 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Synon Studio · 手机交互原型（390×844）</title>
+<style>
+  /* Tokens copied from packages/companion/lib/theme.ts (light). No new colors. */
+  :root {
+    --bg: #F6F6F7;
+    --card: #FFFFFF;
+    --bar: #FFFFFF;
+    --sunken: rgba(0,0,0,0.045);
+    --text: #1D1D1F;
+    --text2: #5D5D63;
+    --text3: #737379;
+    --hairline: rgba(0,0,0,0.09);
+    --hairline-strong: rgba(0,0,0,0.16);
+    --press: rgba(0,0,0,0.045);
+    --primary: #1D1D1F;
+    --on-primary: #FFFFFF;
+    --ok: #2E8550;
+    --warn: #94600F;
+    --warn-tint: rgba(176,116,20,0.10);
+    --error: #B3352E;
+    --error-tint: rgba(196,55,48,0.085);
+    --info: #2F64D0;
+    --card-border: rgba(0,0,0,0.06);
+    --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.05);
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Roboto", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { user-select: none; -webkit-user-select: none; }
+  input, textarea, .msg { user-select: text; -webkit-user-select: text; }
+  body {
+    font-family: var(--sans);
+    background: #E9E9EC;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 48px;
+    gap: 20px;
+  }
+
+  /* The desk: controls outside the phone, clearly not part of the product. */
+  .deskbar {
+    width: 100%;
+    max-width: 860px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .deskbar h1 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 0 8px 0 0;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+  .deskbar .grow { flex: 1; }
+  .demo-btn {
+    appearance: none;
+    border: 1px solid var(--hairline);
+    background: var(--card);
+    color: var(--text2);
+    border-radius: 999px;
+    min-height: 44px;
+    padding: 0 16px;
+    font: 500 13.5px/1 var(--sans);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .demo-btn:hover { background: #FAFAFB; }
+  .demo-btn:active { transform: scale(0.98); }
+  .demo-btn[aria-pressed="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-primary);
+  }
+  .demo-btn:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  .demo-btn .led { width: 7px; height: 7px; border-radius: 50%; background: var(--hairline-strong); }
+  .demo-btn[aria-pressed="true"] .led { background: #FFFFFF; }
+
+  .stage { display: flex; justify-content: center; }
+  .phone-scale { transform-origin: top center; }
+
+  .frame {
+    --kb: 0px;
+    --safe-top: 47px;
+    --safe-bottom: 34px;
+    --dock-h: 115px;
+    --composer-h: 0px;
+    position: relative;
+    width: 390px;
+    height: 844px;
+    background: var(--bg);
+    border-radius: 46px;
+    border: 1px solid rgba(0,0,0,0.14);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .frame.keyboard { --dock-h: 77px; }
+
+  /* Status bar: the 47pt safe area every header sits under. */
+  .statusbar {
+    position: absolute; top: 0; left: 0; right: 0; height: var(--safe-top);
+    background: var(--bar);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 24px 6px;
+    font: 600 14px/1 var(--sans);
+    color: var(--text);
+    z-index: 40;
+    pointer-events: none;
+  }
+  .statusbar .icons { display: flex; align-items: center; gap: 6px; color: var(--text); }
+  .statusbar .icons svg { display: block; }
+
+  .screen {
+    position: absolute; top: var(--safe-top); left: 0; right: 0; bottom: 0;
+    display: none;
+  }
+  .screen.active { display: block; }
+
+  .bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 44px;
+    background: var(--bar);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center;
+    padding: 0 12px;
+    z-index: 40;
+  }
+  .bar-title {
+    flex: 1; min-width: 0;
+    font: 600 16px/21px var(--sans);
+    letter-spacing: -0.15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-align: center;
+  }
+  .bar-side { width: 44px; display: flex; align-items: center; justify-content: center; }
+  .icon-btn {
+    appearance: none; border: 0; background: transparent;
+    width: 44px; height: 44px; border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text2); cursor: pointer;
+  }
+  .icon-btn:active { background: var(--press); }
+  .icon-btn:focus-visible { outline: 2px solid var(--info); outline-offset: -2px; }
+  .icon-btn svg { display: block; }
+  .icon-btn.spin svg { animation: spin 600ms linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .icon-btn.spin svg { animation: none; }
+    .demo-btn:active, .icon-btn:active { transform: none; }
+  }
+
+  .content {
+    position: absolute; top: 44px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+    padding: 20px 16px calc(var(--dock-h) + 20px);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+  .content.no-dock { padding-bottom: 24px; }
+  [data-screen="new"] .content { padding-bottom: calc(var(--dock-h) + var(--composer-h) + 20px); }
+
+  .sync-banner {
+    display: none;
+    align-items: center; gap: 8px;
+    min-height: 34px;
+    padding: 7px 16px;
+    background: var(--warn-tint);
+    color: var(--warn);
+    font: 400 12.5px/16px var(--sans);
+  }
+  .sync-banner.show { display: flex; }
+  .sync-banner .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+
+  .eyebrow {
+    font: 600 12px/16px var(--sans); letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--text3); margin: 0 0 8px;
+  }
+  .h1 { font: 700 24px/30px var(--sans); letter-spacing: -0.4px; margin: 0 0 8px; }
+  .h2 { font: 600 16px/21px var(--sans); letter-spacing: -0.15px; margin: 0; }
+  .body { font: 400 15.5px/22px var(--sans); color: var(--text); margin: 0; }
+  .callout { font: 400 14px/19px var(--sans); color: var(--text2); margin: 0; }
+  .caption { font: 400 12.5px/16px var(--sans); color: var(--text3); margin: 0; }
+
+  .section { margin-top: 24px; }
+  .section:first-child { margin-top: 0; }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .project-card {
+    display: flex; flex-direction: column; gap: 6px;
+    text-align: left; width: 100%;
+    appearance: none; color: inherit;
+    margin-bottom: 12px; cursor: pointer;
+    position: relative;
+  }
+  .project-card:active { background: #FBFBFC; }
+  .project-card:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  .project-top { display: flex; align-items: baseline; gap: 8px; }
+  .project-name { font: 600 16px/21px var(--sans); letter-spacing: -0.15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .studio-name { font: 400 12.5px/16px var(--sans); color: var(--text3); white-space: nowrap; }
+  .project-line { font: 400 14px/19px var(--sans); color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-foot { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex: none; }
+  .status-dot.ok { background: var(--ok); }
+  .project-foot .caption { display: inline; }
+  .studio-offline { display: none; align-items: center; gap: 6px; }
+  .studio-offline.show { display: flex; }
+  .project-platforms {
+    display: flex; gap: 6px; margin-top: 4px; min-height: 20px; align-items: center;
+  }
+  .project-platforms:empty { display: none; }
+  .platform-mini {
+    font: 500 11.5px/1 var(--sans); color: var(--text2);
+    background: var(--sunken); border-radius: 999px; padding: 5px 8px;
+  }
+
+  /* Plan rows */
+  .plan-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+    box-shadow: var(--shadow);
+  }
+  .ring { flex: none; }
+  .plan-main { flex: 1; min-width: 0; }
+  .plan-title { font: 600 15.5px/20px var(--sans); letter-spacing: -0.1px; margin: 0 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plan-meta { display: flex; align-items: center; gap: 6px; font: 400 12.5px/16px var(--sans); color: var(--text2); }
+  .plan-meta .who { color: var(--text3); }
+  .plan-meta .waiting { color: var(--warn); font-weight: 500; }
+  .plan-meta .working { color: var(--ok); font-weight: 500; }
+  .plan-progress { font: 400 12.5px/16px var(--sans); color: var(--text3); white-space: nowrap; }
+
+  /* Empty / error states */
+  .state-card { text-align: left; }
+  .state-card .h2 { margin-bottom: 6px; }
+  .state-card .body { color: var(--text2); }
+  .skeleton { border-radius: 14px; background: #EFEFF1; height: 92px; margin-bottom: 12px; }
+  .skeleton.short { height: 64px; }
+
+  /* Dock */
+  .dock {
+    position: absolute; left: 0; right: 0; bottom: var(--kb);
+    background: var(--bg);
+    border-top: 1px solid var(--hairline);
+    padding: 12px 16px calc(16px + var(--safe-bottom));
+    z-index: 35;
+  }
+  .frame.keyboard .dock { padding-bottom: 12px; }
+  .primary {
+    appearance: none; border: 0; width: 100%; min-height: 52px;
+    border-radius: 12px;
+    background: var(--primary); color: var(--on-primary);
+    font: 600 16px/21px var(--sans);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .primary:active:not(:disabled) { opacity: 0.9; transform: scale(0.985); }
+  .primary:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  .primary:disabled { background: #E7E7EA; color: var(--text3); cursor: default; }
+  .primary .spinner {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF;
+    animation: spin 700ms linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .primary .spinner { animation: none; } }
+
+  /* Login */
+  .content-login { display: flex; flex-direction: column; }
+  .login-wrap { padding-top: 8px; display: flex; flex-direction: column; flex: 1; }
+  .login-form { margin-top: auto; padding-top: 24px; }
+  .mark {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+  }
+  .field-label { display: block; font: 500 13.5px/18px var(--sans); color: var(--text2); margin-bottom: 8px; }
+  .text-input {
+    width: 100%; min-height: 52px;
+    border: 1px solid var(--hairline);
+    border-radius: 12px; background: var(--card);
+    padding: 12px 14px;
+    font: 400 16px/22px var(--sans); color: var(--text);
+    outline: none;
+  }
+  .text-input::placeholder { color: var(--text3); }
+  .text-input:focus { border-color: var(--info); }
+  .sent {
+    display: none;
+    margin-top: 16px; padding: 12px 14px;
+    background: var(--sunken); border-radius: 12px;
+    font: 400 14px/20px var(--sans); color: var(--text2);
+  }
+  .sent.show { display: block; }
+  .demo-link {
+    appearance: none; border: 0; background: transparent; padding: 0;
+    margin-top: 8px; min-height: 44px;
+    color: var(--info); font: 500 14px/20px var(--sans);
+    cursor: pointer; text-align: left;
+  }
+  .demo-link:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+  /* New request */
+  .intro { margin-bottom: 16px; }
+  .hint { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--hairline); }
+  .hint-title { font: 500 13.5px/18px var(--sans); color: var(--text2); margin: 0 0 6px; }
+  .hint ul { margin: 0; padding-left: 18px; color: var(--text3); font: 400 13.5px/21px var(--sans); }
+  .composer {
+    position: absolute; left: 0; right: 0;
+    bottom: calc(var(--kb) + var(--dock-h));
+    background: var(--bg);
+    padding: 12px 16px 8px;
+    z-index: 34;
+  }
+  .goal {
+    width: 100%; min-height: 120px; max-height: 337px;
+    resize: none;
+    border: 1px solid var(--hairline);
+    border-radius: 12px; background: var(--card);
+    padding: 12px 14px;
+    font: 400 16px/22px var(--sans); color: var(--text);
+    outline: none;
+    display: block;
+  }
+  .goal::placeholder { color: var(--text3); }
+  .goal:focus { border-color: var(--info); }
+  .goal-meta { display: flex; justify-content: space-between; gap: 12px; min-height: 18px; margin-top: 4px; }
+  .goal-meta .restored { color: var(--text3); }
+  .goal-meta .count { color: var(--text3); white-space: nowrap; }
+  .goal-meta .count.warn { color: var(--warn); }
+
+  .platform-label { margin: 12px 0 8px; }
+  .platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .platform {
+    position: relative;
+    appearance: none; min-height: 52px;
+    border: 1px solid var(--hairline); border-radius: 12px;
+    background: var(--card); color: var(--text2);
+    font: 500 14.5px/20px var(--sans);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer;
+  }
+  .platform[aria-pressed="true"] {
+    border-color: var(--text); color: var(--text);
+    background: var(--sunken); font-weight: 600;
+  }
+  .platform:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  .platform .tick { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0; }
+  .platform[aria-pressed="true"] .tick { opacity: 1; }
+
+  .receipt {
+    display: none; align-items: flex-start; gap: 8px;
+    min-height: 20px; padding: 8px 0 0;
+    font: 400 14px/19px var(--sans); color: var(--text2);
+  }
+  .receipt.show { display: flex; }
+  .receipt .ic { flex: none; margin-top: 1px; }
+  .receipt.warn { color: var(--warn); }
+  .receipt.ok { color: var(--ok); }
+  .receipt.error { color: var(--error); }
+
+  /* Chat drawer (M6 preview) */
+  .chat-handle {
+    position: absolute; left: 16px; right: 16px;
+    bottom: calc(var(--dock-h) + 10px);
+    z-index: 33;
+    display: flex; justify-content: center;
+  }
+  [data-screen="project"] .content { padding-bottom: calc(var(--dock-h) + 76px); }
+  .chat-handle button {
+    appearance: none; border: 1px solid var(--hairline);
+    background: var(--card); color: var(--text2);
+    border-radius: 999px; min-height: 44px; padding: 0 18px;
+    font: 500 14px/20px var(--sans); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow);
+  }
+  .chat-handle button:active { background: #FBFBFC; }
+  .drawer {
+    position: absolute; left: 0; right: 0; bottom: var(--kb);
+    height: 55%; z-index: 60;
+    background: var(--card);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--hairline);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    display: none;
+    flex-direction: column;
+  }
+  .drawer.open { display: flex; }
+  .frame.keyboard .drawer { height: calc(100% - var(--kb) - 110px); }
+  .drawer-scrim {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.25);
+    z-index: 55; display: none;
+  }
+  .drawer-scrim.open { display: block; }
+  .drawer-head { padding: 8px 16px 10px; border-bottom: 1px solid var(--hairline); }
+  .drawer-handle { width: 36px; height: 5px; border-radius: 999px; background: var(--hairline-strong); margin: 0 auto 10px; }
+  .drawer-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .drawer-title { font: 600 16px/21px var(--sans); }
+  .msgs { flex: 1; overflow-y: auto; padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; font: 400 14.5px/20px var(--sans); position: relative; }
+  .msg.ai { align-self: flex-start; background: var(--bg); border: 1px solid var(--card-border); color: var(--text); border-bottom-left-radius: 6px; }
+  .msg.me { align-self: flex-end; background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 6px; }
+  .msg .note { display: block; margin-top: 4px; font: 400 11.5px/14px var(--sans); opacity: 0.72; }
+  .msg .retry {
+    appearance: none; border: 0; background: transparent; padding: 0;
+    min-height: 44px; margin-top: 2px;
+    color: inherit; text-decoration: underline; font: 500 12.5px/16px var(--sans);
+    cursor: pointer;
+  }
+  .typing { align-self: flex-start; color: var(--text3); font: 400 12.5px/16px var(--sans); padding: 2px 4px 6px; display: none; }
+  .typing.show { display: block; }
+  .chat-dock {
+    border-top: 1px solid var(--hairline);
+    padding: 10px 12px;
+    padding-bottom: calc(10px + var(--safe-bottom));
+    background: var(--card);
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  .frame.keyboard .chat-dock { padding-bottom: 10px; }
+  .chat-input {
+    flex: 1; min-height: 44px; max-height: 110px; resize: none;
+    border: 1px solid var(--hairline); border-radius: 12px;
+    background: var(--bg); padding: 10px 12px;
+    font: 400 16px/22px var(--sans); color: var(--text); outline: none;
+  }
+  .chat-input:focus { border-color: var(--info); }
+  .send {
+    appearance: none; border: 0; width: 44px; height: 44px; border-radius: 50%;
+    background: var(--primary); color: var(--on-primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: none; cursor: pointer;
+  }
+  .send:disabled { background: var(--sunken); color: var(--text3); cursor: default; }
+  .send:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+
+  /* Keyboard (demo only): the area the real visualViewport inset stands for. */
+  .kb {
+    position: absolute; left: 0; right: 0; bottom: 0; height: var(--kb);
+    background: #D1D4DA; border-top: 1px solid #BFC3CB;
+    z-index: 20; display: none;
+    padding: 10px 6px 18px;
+    flex-direction: column; gap: 8px;
+  }
+  .frame.keyboard .kb { display: flex; }
+  .kb-row { display: flex; gap: 6px; justify-content: center; flex: 1; }
+  .kb-key {
+    background: #FFFFFF; border-radius: 6px; box-shadow: 0 1px 0 rgba(0,0,0,0.18);
+    flex: 1; max-width: 34px; display: flex; align-items: center; justify-content: center;
+    font: 400 13px/1 var(--sans); color: #4A4A50;
+  }
+  .kb-key.wide { max-width: none; flex: 1.6; }
+  .kb-key.space { max-width: none; flex: 5; }
+  .home-indicator {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 134px; height: 5px; border-radius: 999px;
+    background: rgba(29,29,31,0.28); z-index: 45; pointer-events: none;
+  }
+  .frame.keyboard .home-indicator { display: none; }
+
+  /* Notes under the phone */
+  .notes {
+    max-width: 620px; width: 100%;
+    background: #FFFFFF; border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 14px; padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .notes h2 { font: 600 14px/20px var(--sans); margin: 0 0 8px; color: var(--text); }
+  .notes ul { margin: 0; padding-left: 18px; color: var(--text2); font: 400 13.5px/21px var(--sans); }
+  .notes code { font: 500 12.5px/18px var(--mono); background: var(--sunken); border-radius: 5px; padding: 1px 5px; }
+  .notes .sep { height: 1px; background: var(--hairline); margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<div class="deskbar" role="toolbar" aria-label="原型演示控制">
+  <h1>Synon Studio · 手机交互原型 390×844</h1>
+  <span class="grow"></span>
+  <button class="demo-btn" id="toggle-kb" aria-pressed="false"><span class="led"></span>键盘（inset 344）</button>
+  <button class="demo-btn" id="toggle-user-offline" aria-pressed="false"><span class="led"></span>你已离线</button>
+  <button class="demo-btn" id="toggle-studio-offline" aria-pressed="false"><span class="led"></span>工作室离线</button>
+  <button class="demo-btn" id="reset">重置原型</button>
+</div>
+
+<div class="stage">
+  <div class="phone-scale" id="phone-scale">
+    <div class="frame" id="frame">
+
+      <!-- status bar + 47pt safe area -->
+      <div class="statusbar" aria-hidden="true">
+        <span>9:41</span>
+        <span class="icons">
+          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.5a10 10 0 0 1 14 0"/><path d="M3.6 7.2a6.4 6.4 0 0 1 8.8 0"/><circle cx="8" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><path d="M23 4v4a2.4 2.4 0 0 0 0-4z" fill="currentColor" opacity="0.4"/></svg>
+        </span>
+      </div>
+
+      <!-- LOGIN -->
+      <section class="screen active" data-screen="login" aria-label="登录">
+        <header class="bar">
+          <span class="bar-side"></span>
+          <div class="bar-title">Synon Studio</div>
+          <span class="bar-side"></span>
+        </header>
+        <div class="sync-banner" data-sync-banner><span class="dot"></span><span data-sync-text>你已离线 · 上次同步 12 分钟前</span></div>
+        <div class="content content-login">
+          <div class="login-wrap">
+            <div class="mark" aria-hidden="true">
+              <svg width="34" height="26" viewBox="0 0 34 26" fill="none">
+                <path d="M3 15c0-5 4.6-9 10.3-9 4.8 0 8.7 2.6 9.9 6.2l2.7-2.6c1.2-1.1 3.1-.3 3.1 1.4v3.1c0 4.6-3.9 8.4-8.8 8.4H11C6.6 22.5 3 19.2 3 15z" fill="#F5F5F7"/>
+                <circle cx="12.5" cy="13.5" r="1.15" fill="#1D1D1F"/>
+              </svg>
+            </div>
+            <h1 class="h1">登录</h1>
+            <p class="body" style="color: var(--text2);">用邮箱接收登录链接。只有被邀请过的邮箱可以登录。</p>
+            <div class="login-form">
+              <label class="field-label" for="email">邮箱</label>
+              <input class="text-input" id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" data-testid="email" />
+              <div class="sent" id="login-sent">
+                如果这个邮箱被邀请过，链接已发出。
+                <button class="demo-link" id="demo-enter" data-testid="demo-enter">演示：打开邮箱里的链接 →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dock">
+          <button class="primary" id="login-btn" data-testid="primary">继续</button>
+        </div>
+      </section>
+
+      <!-- PROJECTS -->
+      <section class="screen" data-screen="projects" aria-label="项目">
+        <header class="bar">
+          <span class="bar-side"></span>
+          <div class="bar-title">项目</div>
+          <span class="bar-side">
+            <button class="icon-btn" data-refresh aria-label="刷新" data-testid="refresh">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+            </button>
+          </span>
+        </header>
+        <div class="sync-banner" data-sync-banner><span class="dot"></span><span data-sync-text>你已离线 · 上次同步 12 分钟前</span></div>
+        <div class="content">
+          <div class="section">
+            <p class="eyebrow">进行中</p>
+            <button class="card project-card" data-open-project data-testid="project-card-demo">
+              <span class="project-top">
+                <span class="project-name">饮水打卡</span>
+                <span class="studio-name">青禾工作室</span>
+              </span>
+              <span class="project-line">AI 正在拆登录页的里程碑</span>
+              <span class="project-foot">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="caption">在等你：确认平台</span>
+              </span>
+              <span class="project-foot studio-offline" data-studio-line>
+                <span class="caption">工作室离线 · 上次同步 12 分钟前</span>
+              </span>
+            </button>
+
+            <button class="card project-card" data-open-project data-testid="project-card-demo2">
+              <span class="project-top">
+                <span class="project-name">门店预约</span>
+                <span class="studio-name">山谷工作室</span>
+              </span>
+              <span class="project-line">还没有需求</span>
+              <span class="project-platforms"></span>
+              <span class="project-foot studio-offline show">
+                <span class="caption">工作室离线 · 上次同步 2 小时前</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROJECT HOME -->
+      <section class="screen" data-screen="project" aria-label="项目首页">
+        <header class="bar">
+          <span class="bar-side">
+            <button class="icon-btn" data-back="projects" aria-label="返回" data-testid="back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+            </button>
+          </span>
+          <div class="bar-title" id="project-title">饮水打卡</div>
+          <span class="bar-side">
+            <button class="icon-btn" data-refresh aria-label="刷新" data-testid="refresh">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+            </button>
+          </span>
+        </header>
+        <div class="sync-banner" data-sync-banner><span class="dot"></span><span data-sync-text>你已离线 · 上次同步 12 分钟前</span></div>
+        <div class="content">
+          <div class="section" style="margin-bottom: 20px;">
+            <p class="eyebrow">青禾工作室</p>
+            <p class="caption" id="project-sync" style="margin-top: 6px;">工作室在线 · 刚刚同步</p>
+          </div>
+
+          <div class="plan-row">
+            <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+              <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(0,0,0,0.10)" stroke-width="3"/>
+              <circle cx="22" cy="22" r="18" fill="none" stroke="#1D1D1F" stroke-width="3" stroke-linecap="round" stroke-dasharray="113.1" stroke-dashoffset="70.7" transform="rotate(-90 22 22)"/>
+            </svg>
+            <div class="plan-main">
+              <p class="plan-title">登录与喝水记录</p>
+              <div class="plan-meta"><span class="working">AI 在做</span><span class="who">登录页</span></div>
+            </div>
+            <span class="plan-progress">3 / 8</span>
+          </div>
+
+          <div class="plan-row">
+            <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+              <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(0,0,0,0.10)" stroke-width="3"/>
+              <circle cx="22" cy="22" r="18" fill="none" stroke="#94600F" stroke-width="3" stroke-linecap="round" stroke-dasharray="113.1" stroke-dashoffset="84.8" transform="rotate(-90 22 22)"/>
+            </svg>
+            <div class="plan-main">
+              <p class="plan-title">提醒与统计</p>
+              <div class="plan-meta"><span class="waiting">在等你</span><span class="who">确认计划</span></div>
+            </div>
+            <span class="plan-progress">1 / 4</span>
+          </div>
+        </div>
+
+        <div class="chat-handle" id="chat-handle">
+          <button type="button" id="open-chat" data-testid="open-chat">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H5l-2 2V12A8.5 8.5 0 0 1 11.5 3.5h1A8.5 8.5 0 0 1 21 12z"/></svg>
+            对话 · 3
+          </button>
+        </div>
+        <div class="dock">
+          <button class="primary" id="new-btn" data-testid="primary">新需求</button>
+        </div>
+
+        <div class="drawer-scrim" id="drawer-scrim"></div>
+        <div class="drawer" id="drawer" role="dialog" aria-label="对话">
+          <div class="drawer-head">
+            <div class="drawer-handle" aria-hidden="true"></div>
+            <div class="drawer-row">
+              <span class="drawer-title">对话 <span class="caption">· 饮水打卡</span></span>
+              <button class="icon-btn" id="close-chat" aria-label="关闭对话" data-testid="close-chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="msgs" id="msgs">
+            <div class="msg ai">我已经把「喝水提醒」放进第一个里程碑了。</div>
+            <div class="msg me">提醒时间能不能让我自己设？</div>
+            <div class="msg ai">可以。设置页里会有「每天几点提醒」，也可以按工作日和周末分开。</div>
+            <div class="typing" id="typing">AI 正在写…</div>
+          </div>
+          <div class="chat-dock">
+            <textarea class="chat-input" id="chat-input" rows="1" placeholder="说点什么…" maxlength="4000" data-testid="chat-input"></textarea>
+            <button class="send" id="chat-send" aria-label="发送" disabled data-testid="chat-send">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- NEW REQUEST -->
+      <section class="screen" data-screen="new" aria-label="新需求">
+        <header class="bar">
+          <span class="bar-side">
+            <button class="icon-btn" data-back="project" aria-label="返回" data-testid="back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+            </button>
+          </span>
+          <div class="bar-title">新需求</div>
+          <span class="bar-side"></span>
+        </header>
+        <div class="sync-banner" data-sync-banner><span class="dot"></span><span data-sync-text>你已离线 · 上次同步 12 分钟前</span></div>
+        <div class="content">
+          <div class="intro">
+            <p class="eyebrow">饮水打卡 · 青禾工作室</p>
+            <p class="body" style="color: var(--text2);">描述你想做的，越具体越好。工作室会先拆成里程碑，等你确认。</p>
+            <div class="hint">
+              <p class="hint-title">写得具体一点</p>
+              <ul>
+                <li>给谁用：自己、家人，还是门店的顾客</li>
+                <li>解决什么问题：每天提醒喝水、看统计</li>
+                <li>最重要的一件事：先做好提醒，别的以后再说</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer" id="composer">
+          <label class="field-label" for="goal-input">你想做什么？</label>
+          <textarea class="goal" id="goal-input" placeholder="例如：做一个能记录每天喝水的 App，有提醒和统计。" maxlength="4000" data-testid="goal-input"></textarea>
+          <div class="goal-meta">
+            <span class="caption restored" id="restored"></span>
+            <span class="caption count" id="count"></span>
+          </div>
+          <p class="field-label platform-label">在哪些平台？</p>
+          <div class="platforms" role="group" aria-label="平台">
+            <button class="platform" type="button" aria-pressed="false" data-platform="ios" data-testid="platform-ios">
+              <svg class="tick" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              iOS
+            </button>
+            <button class="platform" type="button" aria-pressed="false" data-platform="android" data-testid="platform-android">
+              <svg class="tick" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              Android
+            </button>
+            <button class="platform" type="button" aria-pressed="false" data-platform="miniprogram" data-testid="platform-miniprogram">
+              <svg class="tick" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              小程序
+            </button>
+            <button class="platform" type="button" aria-pressed="false" data-platform="web" data-testid="platform-web">
+              <svg class="tick" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              Web
+            </button>
+          </div>
+          <div class="receipt" id="receipt" role="status" aria-live="polite">
+            <span class="ic" id="receipt-ic"></span>
+            <span id="receipt-text"></span>
+          </div>
+        </div>
+
+        <div class="dock">
+          <button class="primary" id="start-btn" disabled data-testid="primary">开始规划</button>
+        </div>
+      </section>
+
+      <div class="kb" aria-hidden="true">
+        <div class="kb-row"><span class="kb-key">Q</span><span class="kb-key">W</span><span class="kb-key">E</span><span class="kb-key">R</span><span class="kb-key">T</span><span class="kb-key">Y</span><span class="kb-key">U</span><span class="kb-key">I</span><span class="kb-key">O</span><span class="kb-key">P</span></div>
+        <div class="kb-row"><span class="kb-key">A</span><span class="kb-key">S</span><span class="kb-key">D</span><span class="kb-key">F</span><span class="kb-key">G</span><span class="kb-key">H</span><span class="kb-key">J</span><span class="kb-key">K</span><span class="kb-key">L</span></div>
+        <div class="kb-row"><span class="kb-key">Z</span><span class="kb-key">X</span><span class="kb-key">C</span><span class="kb-key">V</span><span class="kb-key">B</span><span class="kb-key">N</span><span class="kb-key">M</span><span class="kb-key wide">⌫</span></div>
+        <div class="kb-row"><span class="kb-key wide">123</span><span class="kb-key space">空格</span><span class="kb-key wide">换行</span></div>
+      </div>
+      <div class="home-indicator" aria-hidden="true"></div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>怎么点</h2>
+  <ul>
+    <li>登录 → 「演示：打开邮箱里的链接」→ 项目卡片 → 项目首页 → 「新需求」→ 输入、选平台 → 「开始规划」。</li>
+    <li>顶部「键盘」打开后可看到输入区随 <code>visualViewport inset</code> 上移；「你已离线」「工作室离线」切换两种离线文案与提交结果。</li>
+    <li>项目首页的「对话 · 3」是 M6 的底部抽屉预览：发送是乐观显示，断网时气泡带「重试」。</li>
+    <li>草稿存在 <code>localStorage</code>；离开「新需求」再回来、或刷新页面后都还在，且不会自动弹键盘。</li>
+  </ul>
+  <div class="sep"></div>
+  <h2>这张原型要证明的</h2>
+  <ul>
+    <li>可点区域 ≥44pt；每屏只有一个实底主按钮（52pt）。</li>
+    <li>390×844 静止时，主输入框和主按钮都在下半屏（top ≥422）。</li>
+    <li>键盘态下（底部 344 被键盘占据）输入框与主按钮仍完整可见。</li>
+    <li>实色标题栏、无渐变；颜色只用于“在等你”“离线”“已处理”等含义。</li>
+    <li>完整规则与编号可检查项见 <code>docs/studio-mobile-ux.md</code>。</li>
+  </ul>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const frame = document.getElementById('frame');
+  const DRAFT_KEY = 'proto:synon:draft:new:demo';
+  const state = {
+    screen: 'login',
+    kb: 0,
+    youOffline: false,
+    studioOffline: false,
+    drawer: false,
+    phase: 'idle',      // idle | sending | queued | done | failed
+    chatBusy: false,
+  };
+  let draftTimer = null;
+  let restoredTimer = null;
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const fmtLeft = (n) => `还剩 ${n} 字`;
+
+  function screenEl(name) { return $('.screen[data-screen="' + name + '"]'); }
+
+  function show(name) {
+    state.screen = name;
+    try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// */ }
+    $$('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
+    closeDrawer();
+    if (name === 'new') restoreDraft();
+    updateOfflineUI();
+    requestAnimationFrame(measureComposer);
+    const el = screenEl(name);
+    const content = el && $('.content', el);
+    if (content) content.scrollTop = 0;
+  }
+
+  function setKeyboard(on) {
+    state.kb = on ? 344 : 0;
+    frame.style.setProperty('--kb', state.kb + 'px');
+    frame.classList.toggle("keyboard", on);
+    const btn = document.getElementById('toggle-kb');
+    btn.setAttribute('aria-pressed', String(on));
+    if (on) {
+      const target = state.drawer ? $('#chat-input') : (state.screen === 'new' ? $('#goal-input') : null);
+      if (target) {
+        target.focus({ preventScroll: true });
+        setTimeout(() => target.scrollIntoView({ block: 'nearest' }), 60);
+      }
+    } else if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+    requestAnimationFrame(measureComposer);
+  }
+
+  function measureComposer() {
+    const composer = $('#composer');
+    if (!composer) return;
+    const visible = state.screen === 'new';
+    const h = visible ? composer.getBoundingClientRect().height : 0;
+    frame.style.setProperty('--composer-h', Math.round(h) + 'px');
+    const content = $('[data-screen="new"] .content');
+    if (content) content.style.paddingBottom = 'calc(var(--dock-h) + var(--composer-h) + 20px)';
+  }
+
+  /* ---------- offline ---------- */
+  function syncText(base) {
+    const min = 12;
+    return base.replace('x', String(min));
+  }
+
+  function updateOfflineUI() {
+    $$('[data-sync-banner]').forEach((b) => b.classList.toggle('show', state.youOffline));
+    $$('[data-sync-text]').forEach((t) => {
+      t.textContent = state.youOffline ? syncText('你已离线 · 上次同步 x 分钟前') : '';
+    });
+    const line = $('[data-studio-line]', screenEl('projects'));
+    if (line) line.classList.toggle('show', state.studioOffline);
+    const ps = $('#project-sync');
+    if (ps) {
+      ps.textContent = state.studioOffline
+        ? syncText('工作室离线 · 上次同步 x 分钟前')
+        : '工作室在线 · 刚刚同步';
+      ps.style.color = state.studioOffline ? 'var(--warn)' : 'var(--text3)';
+    }
+  }
+
+  /* ---------- login ---------- */
+  document.getElementById('login-btn').addEventListener('click', () => {
+    const email = document.getElementById('email').value.trim();
+    if (!email) {
+      document.getElementById('email').focus();
+      return;
+    }
+    document.getElementById('login-sent').classList.add('show');
+    document.getElementById('login-btn').textContent = '再发一封';
+  });
+  document.getElementById('demo-enter').addEventListener('click', () => show('projects'));
+
+  /* ---------- navigation ---------- */
+  $$('[data-open-project]').forEach((card) => card.addEventListener('click', () => show('project')));
+  document.getElementById('new-btn').addEventListener('click', () => show('new'));
+  $$('[data-back]').forEach((b) => b.addEventListener('click', () => show(b.dataset.back)));
+  $$('[data-refresh]').forEach((b) => {
+    b.addEventListener('click', () => {
+      b.classList.remove('spin');
+      void b.offsetWidth;
+      b.classList.add('spin');
+      setTimeout(() => b.classList.remove('spin'), 650);
+    });
+  });
+
+  /* ---------- new request ---------- */
+  const goal = document.getElementById('goal-input');
+  const startBtn = document.getElementById('start-btn');
+
+  function chosenPlatforms() {
+    return $$('.platform[aria-pressed="true"]').map((p) => p.dataset.platform);
+  }
+
+  function updateStart() {
+    const valid = goal.value.trim().length > 0 && chosenPlatforms().length > 0;
+    if (state.phase === 'sending') {
+      startBtn.disabled = true;
+      startBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>发送中…';
+      return;
+    }
+    if (state.phase === 'queued') {
+      startBtn.disabled = true;
+      startBtn.textContent = '已提交';
+      return;
+    }
+    if (state.phase === 'done') {
+      startBtn.disabled = true;
+      startBtn.textContent = '已处理';
+      return;
+    }
+    if (state.phase === 'failed') {
+      startBtn.disabled = false;
+      startBtn.textContent = '重试';
+      return;
+    }
+    startBtn.textContent = '开始规划';
+    startBtn.disabled = !valid;
+  }
+
+  function updateCount() {
+    const n = goal.value.length;
+    const c = document.getElementById('count');
+    if (n >= 3600) {
+      c.textContent = fmtLeft(4000 - n);
+      c.classList.toggle('warn', n >= 3900);
+    } else {
+      c.textContent = '';
+      c.classList.remove('warn');
+    }
+  }
+
+  function growGoal() {
+    goal.style.height = 'auto';
+    const h = Math.min(Math.max(goal.scrollHeight, 120), 337);
+    goal.style.height = h + 'px';
+    measureComposer();
+  }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        goal: goal.value,
+        platforms: chosenPlatforms(),
+        updatedAt: Date.now(),
+      }));
+    } catch (e) { /* private mode */ }
+  }
+
+  function restoreDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { d = null; }
+    goal.value = d && typeof d.goal === 'string' ? d.goal : '';
+    const picked = d && Array.isArray(d.platforms) ? d.platforms : [];
+    $$('.platform').forEach((p) => p.setAttribute('aria-pressed', String(picked.includes(p.dataset.platform))));
+    growGoal();
+    updateCount();
+    state.phase = 'idle';
+    updateStart();
+    receiptLine('', '');
+    const note = document.getElementById('restored');
+    note.textContent = d && d.goal ? '已恢复草稿 · 刚刚' : '';
+    clearTimeout(restoredTimer);
+    if (d && d.goal) {
+      restoredTimer = setTimeout(() => { note.textContent = ''; }, 3000);
+    }
+  }
+
+  function receiptLine(kind, text) {
+    const r = document.getElementById('receipt');
+    const ic = document.getElementById('receipt-ic');
+    const tx = document.getElementById('receipt-text');
+    r.classList.remove('warn', 'ok', 'error');
+    if (!text) { r.classList.remove('show'); tx.textContent = ''; ic.innerHTML = ''; return; }
+    r.classList.add('show');
+    if (kind) r.classList.add(kind);
+    r.style.color = kind === 'warn' ? 'var(--warn)' : kind === 'ok' ? 'var(--ok)' : kind === 'error' ? 'var(--error)' : 'var(--text2)';
+    tx.textContent = text;
+    ic.innerHTML = iconFor(kind || 'info');
+  }
+
+  function iconFor(kind) {
+    const common = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
+    if (kind === 'ok') return '<svg ' + common + '><path d="M20 6L9 17l-5-5"/></svg>';
+    if (kind === 'error') return '<svg ' + common + '><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r="0.6" fill="currentColor"/></svg>';
+    if (kind === 'warn') return '<svg ' + common + '><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r="0.6" fill="currentColor"/></svg>';
+    return '<svg ' + common + '><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>';
+  }
+
+  goal.addEventListener('input', () => {
+    growGoal();
+    updateCount();
+    updateStart();
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 300);
+  });
+  goal.addEventListener('blur', saveDraft);
+
+  $$('.platform').forEach((p) => {
+    p.addEventListener('click', () => {
+      p.setAttribute('aria-pressed', p.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      updateStart();
+      saveDraft();
+    });
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (state.phase === 'sending' || state.phase === 'queued' || state.phase === 'done') return;
+    if (state.phase === 'failed') {
+      state.phase = 'idle';
+    }
+    if (!goal.value.trim() || chosenPlatforms().length === 0) {
+      updateStart();
+      return;
+    }
+    saveDraft();
+    state.phase = 'sending';
+    updateStart();
+    receiptLine('', '发送中…');
+    setTimeout(() => {
+      if (state.youOffline) {
+        state.phase = 'failed';
+        updateStart();
+        receiptLine('error', '没发出去：你现在没有网络。文字已保留。');
+        return;
+      }
+      state.phase = 'queued';
+      updateStart();
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+      receiptLine('warn', state.studioOffline ? '已排队，工作室上线后处理' : '已提交，等工作室确认');
+      if (state.studioOffline) return;
+      setTimeout(() => {
+        state.phase = 'done';
+        updateStart();
+        receiptLine('ok', '已处理，工作室开始规划了');
+        setTimeout(() => {
+          show('project');
+          state.phase = 'idle';
+          goal.value = '';
+          $$('.platform').forEach((p) => p.setAttribute('aria-pressed', 'false'));
+          growGoal();
+          updateCount();
+          updateStart();
+          receiptLine('', '');
+        }, 1000);
+      }, 1500);
+    }, 900);
+  });
+
+  /* ---------- chat drawer (M6 preview) ---------- */
+  const drawer = document.getElementById('drawer');
+  const scrim = document.getElementById('drawer-scrim');
+  const chatInput = document.getElementById('chat-input');
+  const chatSend = document.getElementById('chat-send');
+  const msgs = document.getElementById('msgs');
+
+  function openDrawer() {
+    state.drawer = true;
+    drawer.classList.add('open');
+    scrim.classList.add('open');
+    document.getElementById('chat-handle').style.display = 'none';
+    $('[data-screen="project"] .dock').style.display = 'none';
+    setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 30);
+  }
+  function closeDrawer() {
+    state.drawer = false;
+    drawer.classList.remove('open');
+    scrim.classList.remove('open');
+    const h = document.getElementById('chat-handle');
+    const d = $('[data-screen="project"] .dock');
+    if (h) h.style.display = '';
+    if (d) d.style.display = '';
+  }
+  document.getElementById('open-chat').addEventListener('click', openDrawer);
+  document.getElementById('close-chat').addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+
+  function addBubble(who, text) {
+    const el = document.createElement('div');
+    el.className = 'msg ' + who;
+    el.textContent = text;
+    msgs.insertBefore(el, document.getElementById('typing'));
+    msgs.scrollTop = msgs.scrollHeight;
+    return el;
+  }
+
+  function setNote(el, text, failed) {
+    let note = el.querySelector('.note');
+    if (!note) {
+      note = document.createElement('span');
+      note.className = 'note';
+      el.appendChild(note);
+    }
+    note.textContent = text || '';
+    let retry = el.querySelector('.retry');
+    if (failed && !retry) {
+      retry = document.createElement('button');
+      retry.className = 'retry';
+      retry.type = 'button';
+      retry.textContent = '没发出去 · 重试';
+      retry.addEventListener('click', () => {
+        if (state.youOffline) return;
+        retry.remove();
+        setNote(el, '发送中…', false);
+        finishBubble(el);
+      });
+      el.appendChild(retry);
+    } else if (!failed && retry) {
+      retry.remove();
+    }
+  }
+
+  function finishBubble(el) {
+    setTimeout(() => {
+      setNote(el, '已排队', false);
+      if (state.studioOffline) {
+        addBubble('ai', '工作室暂时离线，上线后 AI 会回复。');
+        state.chatBusy = false;
+        updateChatSend();
+        return;
+      }
+      setTimeout(() => {
+        const typing = document.getElementById('typing');
+        typing.classList.add('show');
+        msgs.scrollTop = msgs.scrollHeight;
+        setTimeout(() => {
+          typing.classList.remove('show');
+          addBubble('ai', '好的，我记下了。等工作室确认计划后，我会把提醒设置放进第一个里程碑。');
+          state.chatBusy = false;
+          updateChatSend();
+        }, 1100);
+      }, 700);
+    }, 650);
+  }
+
+  function updateChatSend() {
+    chatSend.disabled = chatInput.value.trim().length === 0 || state.chatBusy;
+  }
+
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(Math.max(chatInput.scrollHeight, 44), 110) + 'px';
+    updateChatSend();
+  });
+  chatInput.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      chatSend.click();
+    }
+  });
+  chatSend.addEventListener('click', () => {
+    const text = chatInput.value.trim();
+    if (!text || state.chatBusy) return;
+    state.chatBusy = true;
+    chatInput.value = '';
+    chatInput.style.height = '44px';
+    updateChatSend();
+    const bubble = addBubble('me', text);
+    setNote(bubble, '发送中…', false);
+    if (state.youOffline) {
+      setTimeout(() => {
+        setNote(bubble, '', true);
+        state.chatBusy = false;
+        updateChatSend();
+      }, 600);
+      return;
+    }
+    finishBubble(bubble);
+  });
+
+  /* ---------- demo controls ---------- */
+  document.getElementById('toggle-kb').addEventListener('click', () => setKeyboard(state.kb === 0));
+  document.getElementById('toggle-user-offline').addEventListener('click', (e) => {
+    state.youOffline = !state.youOffline;
+    e.currentTarget.setAttribute('aria-pressed', String(state.youOffline));
+    updateOfflineUI();
+  });
+  document.getElementById('toggle-studio-offline').addEventListener('click', (e) => {
+    state.studioOffline = !state.studioOffline;
+    e.currentTarget.setAttribute('aria-pressed', String(state.studioOffline));
+    updateOfflineUI();
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+    state.youOffline = false;
+    state.studioOffline = false;
+    state.phase = 'idle';
+    state.chatBusy = false;
+    document.getElementById('toggle-kb').setAttribute('aria-pressed', 'false');
+    document.getElementById('toggle-user-offline').setAttribute('aria-pressed', 'false');
+    document.getElementById('toggle-studio-offline').setAttribute('aria-pressed', 'false');
+    setKeyboard(false);
+    document.getElementById('login-sent').classList.remove('show');
+    document.getElementById('login-btn').textContent = '继续';
+    document.getElementById('email').value = '';
+    updateOfflineUI();
+    show('login');
+    restoreDraft();
+  });
+
+  /* ---------- desktop scaling ---------- */
+  function fitScale() {
+    const scale = Math.min(1, (window.innerWidth - 48) / 390, (window.innerHeight - 160) / 844);
+    const s = Math.max(0.5, scale);
+    const wrap = document.getElementById('phone-scale');
+    wrap.style.transform = 'scale(' + s + ')';
+    wrap.style.height = (844 * s) + 'px';
+    wrap.style.width = (390 * s) + 'px';
+  }
+  window.addEventListener('resize', fitScale);
+  fitScale();
+
+  /* ---------- deep links for review: #projects, #project?chat=1, #new?kb=1&user=offline ---------- */
+  function bootFromHash() {
+    const h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+    if (!h) return;
+    const parts = h.split('?');
+    const name = parts[0];
+    const p = new URLSearchParams(parts[1] || '');
+    if (p.get('user') === 'offline') {
+      state.youOffline = true;
+      document.getElementById('toggle-user-offline').setAttribute('aria-pressed', 'true');
+    }
+    if (p.get('studio') === 'offline') {
+      state.studioOffline = true;
+      document.getElementById('toggle-studio-offline').setAttribute('aria-pressed', 'true');
+    }
+    if (['login', 'projects', 'project', 'new'].indexOf(name) !== -1) show(name);
+    if (p.get('chat') === '1') openDrawer();
+    if (p.get('kb') === '1') setKeyboard(true);
+    updateOfflineUI();
+  }
+
+  /* ---------- boot ---------- */
+  updateOfflineUI();
+  updateStart();
+  updateChatSend();
+  restoreDraft();
+  measureComposer();
+  bootFromHash();
+  window.addEventListener('hashchange', bootFromHash);
+})();
+</script>
+</body>
+</html>
