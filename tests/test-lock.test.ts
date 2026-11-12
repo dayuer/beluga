@@ -141,10 +141,11 @@ describe.skipIf(process.platform === 'win32')("a worktree's Claude Code runs at 
     // What it starts reads its own niceness (macOS's ps once said -10 for a process niced to 10 on CI).
     const own = `${JSON.stringify(process.execPath)} -e 'console.log(require("os").getPriority())'`;
     // In a full run on a busy Mac the shell can be gone before we reach it (setPriority says ESRCH), so a
-    // shell that is already dead is replaced by a fresh one, up to three times.
+    // shell that is already dead is replaced by a fresh one, up to six times, a quarter second apart.
     let child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
     let niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
-    for (let attempt = 1; !niced && attempt < 3; attempt++) {
+    for (let attempt = 1; !niced && attempt < 6; attempt++) {
+      await new Promise((r) => setTimeout(r, 250)); // the busy spell passes
       child = spawn('/bin/sh', ['-c', `sleep 0.3; ${own}`], { stdio: ['ignore', 'pipe', 'ignore'] });
       niced = niceForWorktree(child.pid!, { KLAUD_WORKTREE: '/w/kld-49' });
     }
