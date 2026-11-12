@@ -212,6 +212,8 @@ export interface MilestoneAgent {
   readonly at: number;
   /** Plan task ids handed to it so far (more come when a check adds fix tasks). */
   readonly tasks: readonly string[];
+  /** Fork (BLG-199): the agent it started on and why (src/fork/plans/roles.ts workAgentFor); none: your default. */
+  readonly agent?: AgentRef; readonly via?: 'pick' | 'task' | 'fix' | 'plan' | 'auto' | 'default';
 }
 
 /** A task that builds on several unmerged tasks: their branches are being combined into its start. */

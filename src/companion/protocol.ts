@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MilestoneRolesView } from '../fork/companion/plan-roles-view.js';
 
 /**
  * What your phone and your Mac say over the companion link (docs/companion.md). The Mac's side
@@ -9,7 +10,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 54 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 55 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -148,7 +149,7 @@ export const COMPANION_PROTO = { major: 1, minor: 54 } as const;
  * conflicts, a task that stopped twice), changed with `plans.setFixAgent` (SINCE.fixAgent). An older
  * Mac leaves it out (auto route's strongest, else whoever is at it), and an older phone doesn't show it.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, checkAgent: 51, autoAgent: 52, archAgent: 53, fixAgent: 54 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, checkAgent: 51, autoAgent: 52, archAgent: 53, fixAgent: 54, rolesSeen: 55 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -752,6 +753,8 @@ export const PlanView = z.object({
         /** 1.53 (fork): its technical design from the plan's architect (code taken out), and that the architect is writing it now. */
         design: z.string().max(12000).optional(),
         designing: z.boolean().optional(),
+        /** 1.55 (fork): who did each part of it: architecture, coding, audit, hard fixes (src/fork/companion/plan-roles-view.ts). */
+        roles: MilestoneRolesView.optional(),
       }),
     )
     .max(50),

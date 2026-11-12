@@ -10,6 +10,13 @@ import type { AgentRef } from '../src/protocol.js';
 import type { RuntimeChoice } from '../src/shared/agent-runtimes.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 import { waitFor } from './helpers.js';
+import { planView } from '../src/core/plans/progress.js';
+import type { Plan } from '../src/core/plans/model.js';
+import { handoffsIn, milestoneRoles, milestoneOfChannel, taskAgentSeen, workAgentFor } from '../src/fork/plans/roles.js';
+import { PlanFixer } from '../src/fork/plans/fixer.js';
+import type { PilotDeps } from '../src/core/plans/pilot.js';
+import { planPageView } from '../src/companion/views.js';
+import { PlanView as PlanPage } from '../src/companion/protocol.js';
 
 /**
  * Fork (milestone “让角色分工看得见”): each of a plan's four roles lands on the agent it was set to,
@@ -35,7 +42,7 @@ export function setup(opts: { autoRoute?: boolean } = {}) {
   store.dispatch({ type: 'projects', projects: [project('api', 'bob-api', [ws('main', 'api', 'bob-api', 'chat')])] });
   if (opts.autoRoute) {
     store.dispatch({ type: 'runtimes', runtimes: RUNTIMES });
-    store.dispatch({ type: 'prefs', prefs: { autoRoute: { on: true } } } as never);
+    store.dispatch({ type: 'prefs', prefs: { autoRoute: { on: true, build: ['local:deepseek/deepseek-flash[1m]'] } } } as never);
   }
   const listeners: Array<(e: WorktreeEvent) => void> = [];
   const asked: Array<{ prompt: string; channel: string }> = [];
@@ -122,6 +129,20 @@ describe('a plan’s four roles, where each really runs', () => {
     await waitFor(() => t.asked.some((a) => a.channel === w && a.prompt.includes('More tasks for “Safe payments”')));
     expect(t.agentOf(agent.worktree)).toEqual(SONNET);
     expect(t.plans.need(plan.id).activity.some((e) => e.text === 'handed the fix tasks for “Safe payments” to Claude (Sonnet)')).toBe(true);
+
+    // What the plan page shows: each role on its own model, the fix agent's handoff under its milestone.
+    const roles = rolesNow(t, plan.id);
+    expect(roles.arch).toEqual({ state: 'on', agent: OPUS, set: OPUS });
+    expect(roles.work).toEqual({ state: 'on', agent: DEEPSEEK, set: DEEPSEEK });
+    expect(roles.check).toEqual({ state: 'on', agent: GLM, set: GLM });
+    expect(roles.fix).toEqual({ state: 'on', agent: SONNET, set: SONNET, handoffs: [{ at: expect.any(Number), what: 'fix', to: 'Claude (Sonnet)' }] });
+    // The task card: the model of the worktree doing it (Sonnet now: the fix agent has it).
+    const task = planView(t.plans.need(plan.id), t.store.getState().board).milestones[0]!.tasks[0]!;
+    expect(taskAgentSeen(t.plans.need(plan.id), task, t.store.getState())).toEqual({ agent: SONNET, ran: true });
+    // The phone, the same, and it parses.
+    const page = planPageView(t.store.getState(), plan.id)!;
+    expect(PlanPage.safeParse(page).success).toBe(true);
+    expect(page.milestones[0]!.roles).toMatchObject({ arch: { state: 'on', agent: { model: 'opus' } }, work: { agent: { model: DEEPSEEK.model } }, check: { agent: { model: GLM.model } }, fix: { handoffs: [{ what: 'fix', to: 'Claude (Sonnet)' }] } });
   });
 
   it('no architect set: no design chat is made (the role is off, as set)', async () => {
@@ -130,6 +151,10 @@ describe('a plan’s four roles, where each really runs', () => {
     const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
     expect(t.plans.need(plan.id).runs.safe?.architect).toBeUndefined();
     expect(t.agentOf(agent.worktree)).toEqual(DEEPSEEK);
+    const roles = rolesNow(t, plan.id);
+    expect(roles.arch).toEqual({ state: 'off' });
+    expect(roles.check).toEqual({ state: 'waiting', set: GLM });
+    expect(roles.fix).toEqual({ state: 'off', handoffs: [] });
   });
 
   it('no check agent: the work’s agent checks (checkerAgentOf), not your default', async () => {
@@ -142,18 +167,18 @@ describe('a plan’s four roles, where each really runs', () => {
     expect(t.agentOf(checker)).toEqual(DEEPSEEK);
   });
 
-  // BLG-198 found: work on auto route (no agent for the work) starts the milestone's worktree on your
-  // default agent: startShared doesn't route, though Plan Settings says “auto route: an everyday model per task”.
-  it.fails('work on auto route: the milestone’s worktree goes to the build list’s first (DeepSeek), as a task would', async () => {
+  // BLG-198 found, BLG-199 fixed: work on auto route started the milestone's worktree on your default agent.
+  it('work on auto route: the milestone’s worktree goes to the build list’s first (DeepSeek), as a task would', async () => {
     const t = setup({ autoRoute: true });
     const plan = await approved(t, { checkAgent: GLM });
     const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
     expect(t.agentOf(agent.worktree)).toEqual(DEEPSEEK);
+    // Auto route's pick is what's set: no mismatch to mark.
+    expect(rolesNow(t, plan.id).work).toEqual({ state: 'on', agent: DEEPSEEK, auto: true });
   });
 
-  // BLG-198 found: a task's own agent is what the task card says works it (PlanOutline: issue.agent ?? plan.agent),
-  // but a milestone's worktree starts on the plan's agent regardless.
-  it.fails('a task with its own agent: the milestone’s worktree starts on it, as its card says', async () => {
+  // BLG-198 found, BLG-199 fixed: a task's own agent (what its card says) was ignored by its milestone's worktree.
+  it('a task with its own agent: the milestone’s worktree starts on it, as its card says', async () => {
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'gated', agent: DEEPSEEK }, t.claude);
     t.work.forRun('ws:main', 'p-me')!.tools!.write(ONE);
@@ -164,5 +189,66 @@ describe('a plan’s four roles, where each really runs', () => {
     await t.work.startTask(plan.id, 'retries');
     const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
     expect(t.agentOf(agent.worktree)).toEqual(SONNET);
+    expect(rolesNow(t, plan.id).work).toEqual({ state: 'on', agent: SONNET, set: DEEPSEEK, why: 'task' });
+  });
+
+  it('the plan’s setting moved after it started: followed, else marked “changed”; your default when nothing is set', async () => {
+    const t = setup();
+    const plan = await approved(t, { agent: DEEPSEEK });
+    await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    // Agent for Its Work moves an idle worktree: what's set, nothing to mark.
+    t.work.setWorkAgent(plan.id, SONNET);
+    expect(rolesNow(t, plan.id).work).toEqual({ state: 'on', agent: SONNET, set: SONNET });
+    // Set again while it's mid-turn (it keeps its agent): marked.
+    t.plans.setWorkAgent(plan.id, GLM, t.me);
+    expect(rolesNow(t, plan.id).work).toEqual({ state: 'on', agent: SONNET, set: GLM, why: 'changed' });
+    const u = setup();
+    const p2 = await approved(u, {});
+    await waitFor(() => u.plans.need(p2.id).runs.safe?.agent);
+    expect(rolesNow(u, p2.id).work).toEqual({ state: 'on', mine: true });
+    expect(rolesNow(u, p2.id).arch).toEqual({ state: 'off' });
   });
 });
+
+describe('roles, piece by piece', () => {
+  const route = { prefs: { autoRoute: { on: true, build: ['local:deepseek/deepseek-flash[1m]'], hard: ['claude:opus'] } }, runtimes: RUNTIMES };
+  const easy = { labels: [], priority: 'none' };
+
+  it('who a milestone starts on, in order: Start with…, its task’s own, the fix agent, the plan’s, auto route’s, your default', () => {
+    expect(workAgentFor({ agent: DEEPSEEK }, { ...easy, agent: SONNET }, route, OPUS, GLM)).toEqual({ agent: OPUS, via: 'pick' });
+    expect(workAgentFor({ agent: DEEPSEEK }, { ...easy, agent: SONNET }, route, undefined, GLM)).toEqual({ agent: SONNET, via: 'task' });
+    expect(workAgentFor({ agent: DEEPSEEK }, easy, route, undefined, GLM)).toEqual({ agent: GLM, via: 'fix' });
+    expect(workAgentFor({ agent: DEEPSEEK }, easy, route)).toEqual({ agent: DEEPSEEK, via: 'plan' });
+    expect(workAgentFor({}, easy, route)).toEqual({ agent: DEEPSEEK, via: 'auto' });
+    // A hard first task: the strong list, as a task of its own would.
+    expect(workAgentFor({}, { labels: ['hard'], priority: 'none' }, route)).toEqual({ agent: { runtime: 'claude', label: 'Claude', model: 'opus' }, via: 'auto' });
+    expect(workAgentFor({}, easy, { prefs: {}, runtimes: [] })).toEqual({ via: 'default' });
+  });
+
+  it('handoffs: each under its own milestone, by what it was; a conflict is the plan’s', () => {
+    const note = (text: string, at = 1) => ({ id: `e${at}`, at, by: { kind: 'beluga' as const }, kind: 'note' as const, text });
+    const activity = [
+      note('handed the fix tasks for “Safe payments” to Claude (Sonnet)', 1),
+      note('handed a task that stopped twice in “Safe payments” to Claude (Sonnet)', 2),
+      note('handed the conflict to Claude (Sonnet)', 3),
+      note('handed the fix tasks for “Other” to Claude (Sonnet)', 4),
+    ];
+    expect(handoffsIn(activity as never, 'Safe payments')).toEqual([{ at: 1, what: 'fix', to: 'Claude (Sonnet)' }, { at: 2, what: 'stopped', to: 'Claude (Sonnet)' }]);
+  });
+
+  it('a task that stopped twice: the handoff line names its milestone (BLG-198 found it didn’t)', () => {
+    const notes: string[] = [];
+    const store = new Store(initialState('room'));
+    const fixer = new PlanFixer({ store, fixer: () => SONNET, switchAgent: () => undefined, plans: { note: (_id: string, _k: string, text: string) => void notes.push(text) } } as unknown as PilotDeps);
+    const plan = { id: 'p', runs: { safe: { agent: { worktree: 'w9', at: 0, tasks: [] } } }, body: { milestones: [{ id: 'safe', title: 'Safe payments' }] } } as unknown as Plan;
+    expect(milestoneOfChannel(plan, 'ws:w9')).toBe('Safe payments');
+    expect(fixer.escalate(plan, 'ws:w9')).toBe('Claude (Sonnet)');
+    expect(notes).toEqual(['handed a task that stopped twice in “Safe payments” to Claude (Sonnet)']);
+  });
+});
+
+function rolesNow(t: T, id: string) {
+  const plan = t.plans.need(id);
+  const m = planView(plan, t.store.getState().board).milestones[0]!;
+  return milestoneRoles(plan, m, t.store.getState());
+}
