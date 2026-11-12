@@ -101,6 +101,9 @@ const FEED = [
   'handed the conflict to Claude (Opus)',
   'handed a task that stopped twice to Claude (Opus)',
   'handed a stuck conversation to Claude (Opus)',
+  // Naming its milestone (BLG-199, fork/plans/fixer.ts escalate).
+  'handed a task that stopped twice in “Safe payments” to Claude (Opus)',
+  'handed a stuck conversation in “Safe payments” to Claude (Opus)',
   'handed the fix tasks for “Safe payments” to Claude (Opus)',
   // A task that stopped twice (core/plans/watchdog.ts).
   'BOB-4 stopped again: gave it to Claude (Opus), woke it at 14:05',
@@ -123,4 +126,8 @@ describe('plan roles and Plan Settings in Simplified Chinese', () => {
   it.each(TOASTS)('a toast: %s', (en) => expect(leftover(en)).toEqual([]));
   it.each(FEED)('the plan’s feed: %s', (en) => expect(leftover(en)).toEqual([]));
   it.each(GIT)('git’s own words: %s', (en) => expect(leftover(en)).toEqual([]));
+  it('a handoff that names its milestone (BLG-205): the whole sentence, the title kept', () => {
+    expect(lookup(c, 'handed a task that stopped twice in “Safe payments” to Claude (Opus)')).toBe('把“Safe payments”里卡住两次的任务交给了 Claude (Opus)');
+    expect(lookup(c, 'handed a stuck conversation in “Safe payments” to Claude (Opus)')).toBe('把“Safe payments”里卡住的对话交给了 Claude (Opus)');
+  });
 });
