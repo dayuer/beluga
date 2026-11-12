@@ -236,7 +236,7 @@ cd packages/mac && npm run dev                         # vite，同样用隔离 
 node packages/mac/scripts/calm-check.mjs $(tr '\n' ' ' < scenes.txt)
 ```
 
-- 场景数以脚本的场景表为准：**36 个场景 × 4 组合 = 144 次**（设计文档里的 31 是 M3 时的数量，脚本后来加了 5 个）。JSON 留在 `.context/calm/`（gitignore），代表截图拷到 `docs/calm/img/m4-*.png`。
+- 场景数以脚本的场景表为准：**36 个场景 × 4 组合 = 144 次**（设计文档里的 31 是 M3 时的数量，脚本后来加了 5 个）。JSON 留在 `.context/calm/`（gitignore），代表截图拷到 `docs/calm/img/m4-*.png`。下表是凌晨全网格那轮；其中 chatrun 一行在 1bdf6d4dd（测法重写）后单独重测过，用的是 16:34 那轮的数据，其余 35 行没有重跑。
 - 分批跑：第一批 `room` + `onboarding`；其余 34 个第二批。第一轮被演示 daemon 的 origin 挡住（vite 的 `http://localhost:1420` 不在 `APP_ORIGINS` 里），重跑时用 `BELUGA_HOME=/tmp/calm-demo-home`、`BELUGA_ALLOW_ORIGINS=http://localhost:1420` 隔离，顺带避开机器上别的 agent 共用 `~/.beluga/daemon.json` 的 token 冲突。
 - 表格格式：`CLS · CSS 动画数 · JS 动效元素数`；首帧列只对 `calm-on/full`。
 
@@ -246,7 +246,7 @@ node packages/mac/scripts/calm-check.mjs $(tr '\n' ' ' < scenes.txt)
 | chatbtw | 0.005 · 0 · 0 | 0.005 · 0 · 0 | 0.003 · 2 · 0 | 0.005 · 0 · 0 | ✅ |
 | chatdictation | 0.001 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 0 | 0.000 · 0 · 0 | ✅ |
 | chathover | 0.003 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 0 | 0.000 · 0 · 0 | ✅ |
-| chatrun | 0.046 · 0 · 0 | 0.045 · 0 · 0 | 0.053 · 1 · 21 | 0.053 · 0 · 0 | ✅ |
+| chatrun | 0.084 · 0 · 0 | 0.104 · 0 · 0 | 0.078 · 2 · 42 | 0.030 · 0 · 0 | ✅ |
 | chatsteps | 0.095 · 0 · 0 | 0.084 · 0 · 0 | 0.058 · 2 · 42 | 0.080 · 0 · 0 | ✅ |
 | confirmremove | 0.000 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 1 · 0 | 0.006 · 0 · 0 | ✅ |
 | diff | 0.004 · 0 · 0 | 0.000 · 0 · 0 | 0.000 · 2 · 42 | 0.000 · 0 · 0 | ✅ |
@@ -281,11 +281,22 @@ node packages/mac/scripts/calm-check.mjs $(tr '\n' ' ' < scenes.txt)
 
 **与 M3 终值对比**（漂移阈值：CLS ±0.02；on 档的动画数或 JS 动效数上升即信号）。7 处数字不同，逐条判定都不是回归：
 
-- `chatrun` on/full 0.082→0.046、off/full 0.080→0.053、off/reduce 0.030→0.053：CLS 由演示 daemon 在四组合之间继续演化决定（同场景不同批次会变）；on/full 下降，上升的两处都在 calm 关档，与覆盖层无关。
+- `chatrun`：场景在 1bdf6d4dd 重写后单独重测（16:34 那轮），与本表其余 35 行（凌晨全网格那轮）不同批。on/full 0.082→0.084、off/full 0.080→0.078、off/reduce 0.030→0.030 都回到 M3 水平；唯一超出 ±0.02 的是 on/reduce 0.045→0.104：新场景里该组合最后跑，落在前三组合累积的长对话上，长回合的行高变化把位移都算进了这一档——是场景与批次的变化，不是覆盖层（该档动画数、JS 动效数仍为 0）。
 - `sentinel` on/full 0.037→0.000、`sentineldash` on/full 0.142→0.001、off/full 0.129→0.051：M3 的 R3-02（`[data-opening]` 0s）之后这些位移本就不该出现；本次是更干净的终值。
 - `usage` on/full 动画数 0→1：`_titleIn_` 600ms、`iterations: 1`、`playState: finished`，是 Your card（`section[aria-label='Your card']`，§7.4 keep-decor）的一次性标题进场；M3 测量时它已从 `getAnimations()` 丢弃。不是循环，也不在覆盖层应关的范围里。
 
 其余 29 个场景的 on 档与 M3 一致；**全部 calm-on/reduce 组合都是 0 动画、0 JS 动效**；144 个组合里面向沉稳的档位首帧 `data-calm` 全 ✅。
+
+**chatrun 的锚定测量（BLG-166 延后项，1bdf6d4dd 后的 16:34 轮）**。旧测法「上滚后连发三条消息」从没测到锚定：发消息本身会被 `chat/flight.ts` 的 `beluga:chat-bottom` 有意拉回底部（消息就该落在最新处），所以锚点行总在动、提示总读不到。新测法用对话自己产生的新行：等场景开头的回合空闲，补足上翻空间（全新 home 的第一组合历史不足 400px，滚轮被钳在顶端连 scroll 事件都不触发），再起一轮长任务并排队两条消息，然后上滚读数。
+
+| 组合 | 锚点位移 | 「有新内容」提示 | 新行数 |
+| --- | --- | --- | --- |
+| calm-on/full | 0px | 「4 new」 | 4 |
+| calm-on/reduce | 0px（原 −229px） | 「4 new」 | 4 |
+| calm-off/full | 0px | 「Latest」（上游原样） | — |
+| calm-off/reduce | 未捕获 | 未捕获 | — |
+
+沉稳两档锚点不动、提示与计数都在，两个症状（提示缺失、reduce 档 −229px）都消失。calm-off 两档是上游原样——`JumpLabel` 在沉稳关时不做计数（fork/calm/new-below.tsx），提示为「Latest」属预期，不在本项验收范围；calm-off/reduce 那一格这轮没有抓到锚点（上滚时刻列表较短），同样只在沉稳关档，留待下轮网格顺带补测。改测法只动了 `scripts/calm-check.mjs`，产品代码零改动；chat-*.spec 四个文件随后复跑 8/8 通过（单 worker）。
 
 代表截图（沉稳开、motion full）：
 
