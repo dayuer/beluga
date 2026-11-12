@@ -127,6 +127,7 @@ e2e 锁当时被另一个工作树的整套 e2e 占着（`waiting for m7-v5's e2
 - e2e：07:11:47 开跑，load 19.4 / 17.0 / 33.9（1/5/15 分钟）。`npm run e2e -- e2e/fork-ime.spec.ts e2e/plan-chat.spec.ts e2e/plan-settings.spec.ts e2e/plan-roles.spec.ts e2e/plan-roles-walk.spec.ts e2e/plan-zh.spec.ts e2e/issues.spec.ts e2e/network.spec.ts`：28 过、4 跳过、0 失败，用时 2.1 分钟。跳过的 4 个是 `plan-roles-walk.spec.ts`，它只在 `WALK=1` 时跑（截图走查）。BLG-191 里没跑完的 `fork-ime`（新建任务）、`plan-roles`、`plan-zh` 这次都过了。
 - 全量 `npx vitest run`，在本分支（页面写好后的 tree）上跑了两次：07:17:34（load 14.9 / 21.9 / 31.5）和 07:24:13（load 26.5 / 33.6 / 34.9）。两次都是 7762 过、1 失败、16 跳过，失败的都是 `tests/machines/linux-computer.test.ts`：起一个真实的无头 Beluga，在它的终端里打 `echo from-the-$((40+2))-box`，20 秒内没等到回显（`waitFor timed out`，`linux-computer.test.ts:158`）。
 - 对照：同一时段单独跑这一个文件，本分支和 main（`307d1e1b`）都通过。07:31:03（load 38.5）在 main 的临时工作树里跑全量，结果一样：7752 过、1 失败，失败的也是 `linux-computer.test.ts` 的同一步。所以这是早就有的问题：整套并行跑时那个终端回显来得太慢，不是本分支的改动。按要求不改这个测试去迁就。
+- 再跑一次（07:57:45，load 39.1）：7760 过、3 失败（`linux-computer`、`friend-share/fork` 一个、`project-invites` 一个）。08:10–08:17 两边各单独跑这三个文件：fork、project-invites 两边都过；`linux-computer` 两边都失败，停在同一行 `tests/machines/linux-computer.test.ts:158`（远端终端的 `echo` 20 秒没回来）。记录在 `.beluga/scratch/compare-194.txt`。
 - 因此本分支还没有 Tested-on：整套没有一次全过（只差这一个）。开跑时的 load 也没能低于 10，最低是 14.9。
 
 
