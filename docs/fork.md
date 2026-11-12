@@ -173,3 +173,15 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
 - 哨兵保留数据的测试不再用固定日期（过了 14 天保留期就失败，上游也一样；只改一行）：`tests/sentinel-kept-data.test.ts`
 - 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`
+
+### 从其他 fork 移植的修复（2026-11-12）
+
+都是对所有人有用的修复，原样（或按本 fork 调整后）cherry-pick 进来，提交说明里有 `cherry picked from` 原提交。上游合并同样的改动后，这里的差异就消失；上游合并的是改过的版本时，同步时以上游为准。
+
+- 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：`src/agent/policy.ts`、`src/agent/runtime/claude/runner.ts`、`src/net/crypto.ts`、`tests/policy.test.ts`、`tests/identity.test.ts`
+- macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：`src/workspaces/test-procs.ts`、`tests/setup.ts`、`tests/background-tasks.test.ts`、`tests/delete-unpushed.test.ts`、`tests/friend-share/fork.test.ts`、`tests/friend-share/projects.test.ts`、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`
+- Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：`src/agent/runtime/codex/runner.ts`、`tests/codex-parity.test.ts`
+- MCP 服务需要登录时，会话里直接点 Sign in（rstagi/beluga，上游 PR #427 未合并；和本 fork 的 `ownEnv` 合在一起）：`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/mcp-connect.ts`、`src/agent/types.ts`、`src/agent/prompt.ts`、`src/agent/mock.ts`、`src/core/agent-host.ts`、`src/core/store.ts`、`src/protocol.ts`、`src/shared/mcp.ts`、`packages/mac/src/lib/mcp.ts`、`packages/mac/src/views/ChatView.tsx`、`docs/parity.md`、`tests/store.test.ts`
+- Autopilot 不再放过合并失败的里程碑（voshond/beluga `5accb683`）：`src/core/plans/pilot.ts`、`tests/plans.test.ts`
+- 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：`src/core/attachments.ts`、`src/agent/runtime/claude/runner.ts`、`packages/mac/src/chat/use-attachments.tsx`、`packages/mac/src/plans/PlanAsk.tsx`、`packages/mac/src/plans/plan-ask.module.css`、`tests/attachments.test.ts`
+- zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`

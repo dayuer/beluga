@@ -31,10 +31,11 @@ describe('what a sentinel keeps', () => {
   function kept(now = T + 3_600_000) {
     const home = mkdtempSync(path.join(os.tmpdir(), 'beluga-kept-'));
     dirs.push(home);
-    // Its own clock, an hour after the run: on the wall clock, 14 days after T swept the documents (files keep 14 days).
+    // The run is at T and the sentinels' clock is `now` (an hour later by default), never the wall clock:
+    // files keep 14 days, so a test that read Date.now() failed once the real date reached T + 15 days.
     const s = setup({ home, now: () => now });
     const sn = s.sentinels.create(brief);
-    const run = s.sentinels.addHistory(sn.id, { by: 'schedule', trigger: { kind: 'schedule', summary: 'On its schedule' }, state: 'done', startedAt: Date.now() - 60_000, endedAt: Date.now() - 59_000, headline: 'Kept it', steps: sn.steps.map((st) => ({ id: st.id, state: 'done' as const })), tasks: [] }, { outputs: ['token=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 and more'], report: '# Today\n\nAll good.' });
+    const run = s.sentinels.addHistory(sn.id, { by: 'schedule', trigger: { kind: 'schedule', summary: 'On its schedule' }, state: 'done', startedAt: T - 60_000, endedAt: T - 59_000, headline: 'Kept it', steps: sn.steps.map((st) => ({ id: st.id, state: 'done' as const })), tasks: [] }, { outputs: ['token=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 and more'], report: '# Today\n\nAll good.' });
     s.sentinels.demoKeep(sn.id, run.id, [{ name: 'issues', label: 'Open issues', better: 'down', value: 9 }, { name: 'jobs', label: 'Jobs', better: 'none', columns: ['job', 'log'], columnTypes: [{ key: 'log', type: 'html', name: '{{job}}.html' }], rows: [{ job: 'deploy', log: '<p>done</p>' }] }]);
     return { ...s, sn, run, home };
   }
