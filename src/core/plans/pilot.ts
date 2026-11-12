@@ -1038,11 +1038,10 @@ export class PlanPilot {
       // Moved here mid-milestone (BLG-806): from the branch its agent left on the other computer, its work so far.
       const resume = plan.runs[milestoneId]?.resumeFrom;
       const base = resume ?? (first.bases?.length ? plan.branch : first.base);
-      // The agent you started it with (BLG-506), else its fix tasks' (its check failed: the plan's fix agent), else the plan's (BLG-497); none: your default.
-      const fixer = m.run.check?.verdict === 'fail' ? this.deps.fixer?.(plan) : undefined;
-      const agent = pick ?? fixer ?? plan.agent;
+      // Start with… (BLG-506), its task's own, its fix tasks' (failed check), the plan's (BLG-497), auto route's; none: your default (fork roles.ts).
+      const { agent, via } = this.fix.workAgent(plan, m.milestone.title, m.run.check?.verdict === 'fail', first.issue, pick);
       const ws = await this.deps.work.startShared(ids, `${first.issue.key} ${m.milestone.title}`, { quiet: true, ...(base ? { base } : {}), ...(agent ? { agent } : {}) });
-      this.deps.plans.setAgent(plan.id, milestoneId, { worktree: ws.id, ...(ws.branch ? { branch: ws.branch } : {}), at: Date.now(), tasks: ordered.map((t) => t.task.id) });
+      this.deps.plans.setAgent(plan.id, milestoneId, { worktree: ws.id, ...(ws.branch ? { branch: ws.branch } : {}), at: Date.now(), tasks: ordered.map((t) => t.task.id), ...(agent ? { agent } : {}), via });
       const fresh = this.deps.plans.resumed(plan.id, milestoneId);
       const keys = ordered.map((t) => t.issue!.key);
       const said = `started one agent for “${m.milestone.title}” (${keys.join(', ')}) in a new worktree${base ? ` from ${base}` : ''}`;

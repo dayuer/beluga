@@ -2,6 +2,8 @@ import type { AgentRef } from '../../protocol.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Plan } from '../../core/plans/model.js';
 import type { PilotDeps } from '../../core/plans/pilot.js';
+import type { Routable } from '../../shared/auto-route.js';
+import { milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
 
 /**
  * Fork (plan roles, PR #17 and #20): what's hard in a plan goes to its fix agent (PilotDeps.fixer):
@@ -73,13 +75,28 @@ export class PlanFixer {
 
   /** The watchdog's ask (a task stopped again soon after a wake): its conversation goes to the fix agent. → its name, or undefined (no fix agent, or it's on it already). */
   escalate(plan: Plan, channel: string): string | undefined {
-    return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}`);
+    // Which milestone (BLG-199): the plan page shows each handoff under its own.
+    const title = milestoneOfChannel(plan, channel);
+    const where = title ? ` in “${title}”` : '';
+    return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}${where}`);
+  }
+
+  /**
+   * Who a milestone's worktree starts on (roles.ts workAgentFor: Start with…, its first task's own,
+   * the fix agent after a failed check, the plan's, auto route's, your default), and why. Its fix
+   * tasks going straight to the fix agent are a handoff too: a line in the activity.
+   */
+  workAgent(plan: Plan, title: string, failed: boolean, task: Routable & { readonly agent?: AgentRef }, pick?: AgentRef): { readonly agent?: AgentRef; readonly via: WorkVia } {
+    const got = workAgentFor(plan, task, this.deps.store.getState(), pick, failed ? this.deps.fixer?.(plan) : undefined);
+    if (got.via === 'fix' && got.agent) this.deps.plans.note(plan.id, 'note', `handed the fix tasks for “${title}” to ${agentName(got.agent, { model: true })}`, { kind: 'beluga' });
+    return got;
   }
 
   /** The agent a conversation runs on now (its key), as kept on its workspace. */
   private agentOn(channel: string): string | undefined {
     const id = channel.startsWith(WS_PREFIX) ? channel.slice(WS_PREFIX.length) : undefined;
-    const agent = id ? this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)?.agent : undefined;
+    // Its model kept apart on the workspace (the manager's agentFields): put back, so “on it already” compares models too.
+    const agent = id ? workspaceAgent(this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)) : undefined;
     return agent ? agentKey(agent) : undefined;
   }
 }
