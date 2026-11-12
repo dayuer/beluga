@@ -284,13 +284,13 @@ M1 在 `calm-motion.css` 里：
 :root[data-calm] * { animation: none !important; }
 /* 唯一例外：当前步骤行（及其子元素）。M1 在这里填入唯一指示的具体 animation，
    与全局规则同为 !important，靠更高的特异性胜出；M2 只换视觉。 */
-:root[data-calm] [data-current],
-:root[data-calm] [data-current] * {
+:root[data-calm] [data-step][data-current],
+:root[data-calm] [data-step][data-current] * {
   animation: /* M1 填入 */ none !important;
 }
 ```
 
-白名单选择器固定为 `:root[data-calm] [data-current]`。M2 只替换这套动画的视觉（一枚小而安静、不前推布局的进度指示），**位置与锚点不变**。
+白名单选择器固定为 `:root[data-calm] [data-step][data-current]`（不能只写 `[data-current]`：`WaitingRow` 与 `ProjectTree` 也会设它，前者头像环是 2.2s 无限动画）。M2 只替换这套动画的视觉（一枚小而安静、不前推布局的进度指示），**位置与锚点不变**。
 
 ### 7.3 JS 循环的收束
 

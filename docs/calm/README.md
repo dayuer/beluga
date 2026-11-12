@@ -4,18 +4,34 @@
 
 | 节 | 内容 | 状态 |
 | --- | --- | --- |
-| [§1](#1-m0m4-总览) | M0–M4 各页索引与一行结论 | BLG-179 |
+| [§1](#1-m0m4-总览) | M0–M4 各页索引与一行结论 | BLG-207 已完成 |
 | [§2](#2-同步演练模拟上游改动接入点) | 同步演练：种子、冲突与解法、检查报告 | BLG-177 已完成 |
 | [§3](#3-真实同步记录) | 对真实 upstream 的同步记录 | BLG-178 |
 | [§4](#4-全量验证) | 测试、e2e、calm-check 全场景 | BLG-178 |
-| [§5](#5-仍在播放的动画及理由) | 仍在播放的动画清单与理由 | BLG-179 |
-| [§6](#6-上游文件改动清单) | 本计划改了哪些上游文件（文件数、行数） | BLG-179 |
-| [§7](#7-六条规范逐条判定) | 逐条规范判定表与问题表 | BLG-179 |
-| [§8](#8-同步操作手册) | fork.md「同步上游」五步的展开版 | BLG-179 |
+| [§5](#5-仍在播放的动画及理由) | 仍在播放的动画清单与理由 | BLG-207 已完成 |
+| [§6](#6-上游文件改动清单) | 本计划改了哪些上游文件（文件数、行数） | BLG-207 已完成 |
+| [§7](#7-六条规范逐条判定) | 逐条规范判定表与问题表 | BLG-207 已完成 |
+| [§8](#8-同步操作手册) | fork.md「同步上游」五步的展开版 | BLG-207 已完成 |
 
 ## 1. M0–M4 总览
 
-（BLG-179 填：各页报告索引与一行结论。）
+下表一行一份报告。「状态」是 M4 收尾时的状态。
+
+| 文档 | 里程碑 | 内容 | 状态 |
+| --- | --- | --- | --- |
+| [`docs/calm-ui.md`](../calm-ui.md) | M0 | 六条规范、三层分工、唯一循环与白名单（§7）、keep-decor 清单（§7.4）、检查方式 | 定稿；§7.2 的白名单锚点写成 `[data-current]`，实际是 `[data-step][data-current]`（§7 问题表 P-1，已改） |
+| [`baseline.md`](baseline.md) | M0 | 改动前基线：8 场景 × 4 组合的 CLS、动画数 | 定稿，作为 §4.3 漂移对比的起点 |
+| [`overlay.md`](overlay.md) | M1/M3 | 覆盖层规则稿：`calm-motion/overlays/state/tokens.css` 每条规则的为什么、上游位置、失效发现方式；§12 为 M3 补充的 R3-01…07 | 已实施，规则与 `fork/calm/*.css` 一致 |
+| [`hooks.md`](hooks.md) | M2 | 行为挂钩：`hold-order`、`new-below`、`one-toast`、`live-gate`、`settings` 及各接入点的 canary | 已实施；M4 修了 hold-order 的两处释放问题（§4.2） |
+| [`chat.md`](chat.md) | M3 | 对话页逐页验收（CH-01…09） | 问题全部收敛，见 `upstream-prs.md` |
+| [`shell.md`](shell.md) | M3 | 外壳与侧栏（SH-01…10） | 同上 |
+| [`work.md`](work.md) | M3 | 任务板、计划、Sentinel（WK-01…04） | 同上 |
+| [`data.md`](data.md) | M3 | 仪表盘、图表、用量、项目主页（DA-01…05） | 同上 |
+| [`rest.md`](rest.md) | M3 | 通话、引导、设置、对话框（RE-01…04） | 同上；RE-04 是文案 PR 候选，不属沉稳问题 |
+| [`upstream-prs.md`](upstream-prs.md) | M3 | 32 条问题的收敛表、补充规则、上游文件清单与登记行 | 已实施（BLG-174/175） |
+| 本页 §2–§4 | M4 | 同步演练、真实同步、全量验证 | 见各节；e2e 全量一遍待空闲机（BLG-208） |
+
+一句话结论：沉稳开时，144 个场景×组合里相比 M3 终值没有位移回归，工作表面上也没有循环动画（§4.3；对话区 CLS 绝对值 0.08–0.10，沉稳关同量级，见 §7.2 P-5）；沉稳关时与上游原样一致；对真实上游同步一次：8 个「合并时检查」文件、1 个冲突（`layout/EntryRow.tsx`），rerere 直接套用演练记住的解法（§2、§3）。
 
 ## 2. 同步演练：模拟上游改动接入点
 
@@ -334,16 +350,178 @@ node packages/mac/scripts/calm-check.mjs $(tr '\n' ' ' < scenes.txt)
 
 ## 5. 仍在播放的动画及理由
 
-（BLG-179 填：一种循环白名单 + keep-decor 例外。）
+**白名单里只有一种循环**：当前步骤行 `:root[data-calm] [data-step][data-current]`（`fork/calm/calm-motion.css` 的 M2 槽位）。CSS 与 JS 两条路合起来只放它：CSS 关键帧全局关掉，这一行例外；`lib/live-motion.ts` 的时钟由 `fork/calm/live-gate.ts` 在 `wake()` 处只放行 `[data-current]` 内的标记，其余画一帧静止即停。它解释的空间变化是「现在 agent 正在做这一步」。锚点是 `[data-step][data-current]`，不是 `[data-current]` 单独——`WaitingRow` 与 `ProjectTree` 也会设 `data-current`，前者头像环是 2.2s 无限动画，不能进白名单。
+
+**keep-decor 例外**（一次性或不在工作表面，reduce 下仍然全停）：见 §6。§4.3 网格里 calm-on/full 唯一的 CSS 动画数非零项是：
+
+| 场景 | 动画数 | 是什么 | 为什么留 |
+| --- | ---: | --- | --- |
+| `onboarding` | 2 | 欢迎场景（`[data-welcome]` / `_scene_`） | 一次性引导，不在工作表面 |
+| `usage` | 1 | Your card 的 `_titleIn_`，600ms、1 次、`finished` | 用量卡的一次性进场，`section[aria-label='Your card']` 在覆盖层里被排除 |
+
+其余 34 个场景在沉稳开/full 下 CSS 动画数、JS 动效元素数都是 0；`calm-on/reduce` 这 36 组全部为 0 · 0。网格没有单独核对「白名单那一种循环」本身在播；它由 `m3-chatsteps-calm-on-full-running.png` 与 `tests/fork-calm-live-gate.test.ts`（JS 时钟只放行 `[data-current]`）覆盖。
+
+`fork-calm` 的上游报告（`npx vitest run tests/fork-calm.test.ts`）当前 446 条：keyframes 174、long-duration 142、infinite 58、hover-size 28、overscale 15、spring 9、inline-motion 6、element-animate 5、framer-motion 5、live-motion 4。它们是「覆盖层之外上游代码里的动效语句」的盘点，不是正在播放的动画；快照基线已在 BLG-195 收口，新增/消失都会在同步时由 `--after-merge` 打印。
 
 ## 6. 上游文件改动清单
 
-（BLG-179 填：`git diff --numstat upstream/main...HEAD` 里非 fork 新建的文件，文件数与行数。）
+维持原状（keep-decor）的装饰组件。每项写「在覆盖层的哪里被排除」：
+
+| 组件 | 在哪里被排除 | 为什么保留 |
+| --- | --- | --- |
+| `onboarding/**`（含 `scenes`、`Wormhole`、`Glass`） | `calm-motion.css` 的 `[data-welcome]`、`[class*="_scene_"]`、`.glass-surface` 三项；`tests/fork-calm.test.ts` 的 `KEEP_DECOR` 跳过 `onboarding/` | 欢迎/引导的一次性场景 |
+| `components/reactbits/*`（Lanyard、LightTunnel、GlassSurface） | 同上的 `.glass-surface`；它们只在引导里用 | 引导装饰，不进工作表面 |
+| `dialogs/star-scene.module.css` | `[class*="_scene_"]`；`KEEP_DECOR` | 关于/支持页的星空 |
+| `call/call.module.css` 的 `ringIn`、`bloom`、`ripple`（来电与 ask card） | `[class*="_incoming_"]`、`[class*="_ringIcon_"]`、`[class*="_askCard_"]`、`[class*="_askPill_"]` | 必须提示的来电，不是工作表面 |
+| `components/PixelBurst.tsx`、`pixel-burst-model.ts` | `KEEP_DECOR`（JS 粒子，CSS 规则管不到） | 一次性庆祝 |
+| `views/usage/Recap.tsx` | `KEEP_DECOR` | 用户点按才播的一次性回放（BLG-173 批准） |
+| `views/usage/YourCard.tsx` | `section[aria-label='Your card']` | 用量卡进场一次 |
+| `[data-arriving]`、`[data-opening]` | `calm-motion.css` | 外壳首次到场；两处靠 `animationend` 推进状态，关掉会卡住 |
+
+reduced-motion 下这些仍然全停：`calm-on/reduce` 的网格 36 组全是 0 · 0（`:root[data-calm][data-motion='reduce'] *:not([data-opening])` 一条覆盖）。独立窗口（popup、callfloat、overlay）不加载覆盖层，属范围外（`calm-ui.md` §7.5）。
+
+### 6.1 numstat 清点（`git diff --numstat --diff-filter=M upstream/main...HEAD`，只数上游已有、fork 改过的文件）
+
+- 全部：**171 个文件，+1820 / −314**。`node scripts/sync-upstream.mjs --report` 中没有一个标 `!`——每个文件都在 `docs/fork.md` 有登记行。
+- 其中本计划（沉稳界面）改的：**23 个文件，+110 / −30**，对应 `docs/fork.md`「沉稳界面」与「M3 逐页补改」两节：
+
+| 文件 | + | − | 文件 | + | − |
+| --- | ---: | ---: | --- | ---: | ---: |
+| `src/App.tsx` | 4 | 2 | `src/lib/undo-toast.tsx` | 7 | 4 |
+| `src/call/NotesBox.tsx` | 4 | 2 | `src/main.tsx` | 1 | 0 |
+| `src/call/PointerMark.tsx` | 3 | 1 | `src/onboarding/onboarding.module.css` | 8 | 0 |
+| `src/chat/ChatLog.tsx` | 2 | 3 | `src/sentinel/DashboardPage.tsx` | 5 | 3 |
+| `src/chat/flight.ts` | 3 | 2 | `src/tasks/TaskBoard.tsx` | 4 | 1 |
+| `src/chat/steps/AgentSteps.tsx` | 4 | 2 | `tests/mac-settings-search.test.ts` | 10 | 2 |
+| `src/dialogs/Settings.tsx` | 6 | 0 | `e2e/cool-window.spec.ts` | 3 | 0 |
+| `src/layout/EntryRow.tsx` | 7 | 1 | `e2e/plan-black-box.spec.ts` | 2 | 0 |
+| `src/layout/Sidebar.tsx` | 2 | 0 | `e2e/plans.spec.ts` | 2 | 0 |
+| `src/lib/live-motion.ts` | 13 | 6 | `e2e/send-no-blank.spec.ts` | 3 | 0 |
+| `e2e/steps.spec.ts` | 7 | 0 | `e2e/threads-panel.spec.ts` | 4 | 0 |
+| `e2e/unread.spec.ts` | 6 | 1 | | | |
+
+（`packages/mac/` 前缀省略。）这 23 个文件里 11 个是 e2e/单测的沉稳适配，源码只有 12 个，且最长一处 13 行（`live-motion.ts`）。
+
+- 另外 148 个文件（+1710 / −284）是本分支上别的计划的 fork 改动（companion、core/plans、agent 等），不是沉稳界面造成的，它们同样都有 fork.md 登记；数字放在这里只为让「171」与脚本输出对得上。
+- `fork/calm/**`、`docs/calm/**`、`tests/fork-calm*`、`scripts/sync-upstream.*` 全是新建的 fork-only 文件，不算上游改动。
+- 与上游真实同步一次（§3）：8 个双改文件、5 个标 `⚠ 沉稳界面`、1 个冲突（`EntryRow.tsx`），已解。同步之后上游又前进了，现在的 `--report` 显示 30 个双改文件（含 `Sidebar.tsx`、`TaskBoard.tsx` 两个沉稳接入点），下一次同步时处理。
 
 ## 7. 六条规范逐条判定
 
-（BLG-179 填：对照 `docs/calm-ui.md` §1–§7 的判定表与不通过项问题表。）
+### 7.1 逐条判定
+
+证据来自：§4.3 网格（144 次，calm-check 自动测量，存档 `.context/calm/*.json`）、`tests/fork-calm.test.ts`（446 条上游盘点 + 接入点金丝雀）、`packages/mac/e2e/fork-calm-sidebar.spec.ts`、`fork-calm-toast.spec.ts`（§4.2 已重跑通过）、`hold-order` 与 `one-toast` 的单测。
+
+| 规范 | 判定 | 证据 |
+| --- | --- | --- |
+| §1 布局稳定 | **满足，留一条已知项（P-5）** | 沉稳开的 CLS 相比 M3 终值没有超出 ±0.02 的漂移，唯一例外 `chatrun` on/reduce 0.104 是测法批次问题（§4.3）；绝对值上对话区仍有 0.08–0.10（P-5）；上滚时「4 new」提示与 0px 锚点位移（§4.3 锚定表）；悬停时侧栏顺序不动（`fork-calm-sidebar:47`）；tabular-nums 与 hover 不改尺寸在 `calm-tokens.css`/`calm-state.css` |
+| §2 动效克制 | **满足** | 沉稳开 on/full 里除 keep-decor 外 CSS 动画、JS 动效都为 0（§5）；过渡统一 160ms ease-standard（`calm-motion.css` M3）；`fork-calm` 的 spring/overscale/infinite 都落在被盘点的上游语句里，没有进入渲染 |
+| §3 状态安静 | **满足** | 状态点原地切换（`calm-state.css`）；「需要你」是静态琥珀底色 + 左亮边；`fork-calm-sidebar` 与 `unread` spec 通过；忙碌循环只有 `[data-step][data-current]` 一种 |
+| §4 反馈分级 | **满足** | `one-toast` 同时最多一条（含 Undo），`fork-calm-toast:27/:54` 两个方向都测（§4.2）；确认类走对话框（`confirmremove` 场景 0 · 0） |
+| §5 一致可预期 | **满足** | 菜单、对话框同曲线打开（`overlay.md` §3、70ms 截图）；颜色/间距来自 `tokens`（`calm-tokens.css`）；§4.3 `palette`/`settings`/`person` 三场景 on 档全 0 |
+| §6 逐页验收 | **满足** | M3 五份逐页报告 + §4.3 全量网格 + 下面 §7.3 八区×四组合表；reduce 档 36/36 为 0 · 0；新页面进入同一份 calm-check 场景表 |
+
+### 7.2 问题表
+
+| ID | 文件 | 现象 | 改法 | 状态 |
+| --- | --- | --- | --- | --- |
+| P-1 | `docs/calm-ui.md` §7.2 | 白名单锚点写成 `:root[data-calm] [data-current]`，实际覆盖层是 `[data-step][data-current]` | 文档按实际改 | 已改（本任务） |
+| P-2 | `docs/calm/README.md` §4.3 | 沉稳关 reduce 的 chatrun 锚点这轮没抓到 | 只在沉稳关档，下一轮网格补测 | 已知，不影响沉稳开的判定 |
+| P-3 | e2e 全量 | 一遍完整 `npm run e2e` 因机器负载没有一次全绿 | 由 BLG-208 在空闲机上跑 | 待 BLG-208 |
+| P-5 | 对话区场景（chatrun/chatsteps） | 沉稳开 CLS 0.084–0.104，高于其它页（≤0.004） | 来自长回合里新行/新步骤到达，沉稳关同量级（0.058–0.078）；锚定测量里阅读位置位移 0px，不是沉稳引入的回归；上游的流式渲染如要更低需上游改 | 已知，已批准 |
+| P-4 | 沉稳关的 `selection-bar` | 该 spec 没有 calm 开关，只测了默认（沉稳开） | 沉稳关下选择条动画是上游原样，风险低 | 已批准例外 |
+
+没有不通过项；P-3 是验证缺口，不是实现缺陷。
+
+### 7.3 八区 × 四组合走查
+
+**怎么得来的，先说清**：下表由 §4.3 的网格数字按区域汇总（同区多个场景取最大 CLS、动画数与 JS 动效数求和），截图是同一轮 calm-check 的屏幕截图。它是读存档 JSON 和截图得出的结论，**不是人手在窗口里点出来的**；M3 的逐页报告里（`chat.md` 等）有每页的 load → arrival → hover → select → open/close 手动步骤记录，本表不重复。沉稳关两档是上游原样，只作对照，不判定。
+
+| 区域 | 场景 | 组合 | 最大 CLS | CSS 动画 | JS 动效 | 结论 | 依据 |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- |
+| 对话 | chatrun、chatsteps、chathover、chatbtw、chatdictation | calm-on/full | 0.095 | 0 | 0 | 通过：无动画，CLS 是内容到达的位移，沉稳关同量级 | `.context/calm/{chatrun,chatsteps,chathover,chatbtw,chatdictation}.json`；[截图](img/m3-chatsteps-calm-on-full-running.png) |
+| 对话 | chatrun、chatsteps、chathover、chatbtw、chatdictation | calm-on/reduce | 0.104 | 0 | 0 | 通过：无动画，CLS 是内容到达的位移，沉稳关同量级——chatrun 0.104 来自新测法下最后一个组合落在长对话上（§4.3 说明），动画/JS 动效均为 0 | `.context/calm/{chatrun,chatsteps,chathover,chatbtw,chatdictation}.json` |
+| 对话 | chatrun、chatsteps、chathover、chatbtw、chatdictation | calm-off/full | 0.078 | 10 | 84 | 上游原样，作对照 | `.context/calm/{chatrun,chatsteps,chathover,chatbtw,chatdictation}.json`；[截图](img/m3-chatsteps-calm-off-full-running.png) |
+| 对话 | chatrun、chatsteps、chathover、chatbtw、chatdictation | calm-off/reduce | 0.080 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{chatrun,chatsteps,chathover,chatbtw,chatdictation}.json` |
+| 侧栏与外壳 | shellsidebar、shellcollapse、shellpanel、shellnotifications | calm-on/full | 0.004 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{shellsidebar,shellcollapse,shellpanel,shellnotifications}.json`；[截图](img/m3-shellsidebar-calm-on-full-needs-hover.png) |
+| 侧栏与外壳 | shellsidebar、shellcollapse、shellpanel、shellnotifications | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{shellsidebar,shellcollapse,shellpanel,shellnotifications}.json` |
+| 侧栏与外壳 | shellsidebar、shellcollapse、shellpanel、shellnotifications | calm-off/full | 0.000 | 7 | 126 | 上游原样，作对照 | `.context/calm/{shellsidebar,shellcollapse,shellpanel,shellnotifications}.json` |
+| 侧栏与外壳 | shellsidebar、shellcollapse、shellpanel、shellnotifications | calm-off/reduce | 0.000 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{shellsidebar,shellcollapse,shellpanel,shellnotifications}.json` |
+| 任务板 | tasks、taskdetail、tasknew | calm-on/full | 0.003 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{tasks,taskdetail,tasknew}.json`；[截图](img/m4-tasks-calm-on-full-loaded.png) |
+| 任务板 | tasks、taskdetail、tasknew | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{tasks,taskdetail,tasknew}.json` |
+| 任务板 | tasks、taskdetail、tasknew | calm-off/full | 0.000 | 3 | 63 | 上游原样，作对照 | `.context/calm/{tasks,taskdetail,tasknew}.json` |
+| 任务板 | tasks、taskdetail、tasknew | calm-off/reduce | 0.000 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{tasks,taskdetail,tasknew}.json` |
+| 计划 | plan、plancanvas | calm-on/full | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{plan,plancanvas}.json`；[截图](img/m3-plancanvas-calm-on-full-canvas.png) |
+| 计划 | plan、plancanvas | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{plan,plancanvas}.json` |
+| 计划 | plan、plancanvas | calm-off/full | 0.000 | 2 | 42 | 上游原样，作对照 | `.context/calm/{plan,plancanvas}.json` |
+| 计划 | plan、plancanvas | calm-off/reduce | 0.000 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{plan,plancanvas}.json` |
+| Sentinel | sentinel、sentineldash | calm-on/full | 0.001 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{sentinel,sentineldash}.json`；[截图](img/m4-sentinel-calm-on-full-loaded.png) |
+| Sentinel | sentinel、sentineldash | calm-on/reduce | 0.001 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{sentinel,sentineldash}.json` |
+| Sentinel | sentinel、sentineldash | calm-off/full | 0.051 | 2 | 42 | 上游原样，作对照 | `.context/calm/{sentinel,sentineldash}.json`；[截图](img/m3-sentineldash-calm-off-full-dashboard.png) |
+| Sentinel | sentinel、sentineldash | calm-off/reduce | 0.008 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{sentinel,sentineldash}.json` |
+| 设置与对话框 | settings、person、palette、confirmremove | calm-on/full | 0.003 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{settings,person,palette,confirmremove}.json`；[截图](img/m3-settings-calm-on-full-loaded.png) |
+| 设置与对话框 | settings、person、palette、confirmremove | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/{settings,person,palette,confirmremove}.json` |
+| 设置与对话框 | settings、person、palette、confirmremove | calm-off/full | 0.000 | 4 | 21 | 上游原样，作对照 | `.context/calm/{settings,person,palette,confirmremove}.json` |
+| 设置与对话框 | settings、person、palette、confirmremove | calm-off/reduce | 0.006 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/{settings,person,palette,confirmremove}.json` |
+| 通话 | call | calm-on/full | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/call.json`；[截图](img/m4-call-calm-on-full-in-call.png) |
+| 通话 | call | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/call.json` |
+| 通话 | call | calm-off/full | 0.000 | 1 | 0 | 上游原样，作对照 | `.context/calm/call.json` |
+| 通话 | call | calm-off/reduce | 0.000 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/call.json` |
+| 引导 | onboarding | calm-on/full | 0.003 | 2 | 0 | 通过：只剩 keep-decor 欢迎场景——2 个动画是 keep-decor 的欢迎场景（`[data-welcome]`/`_scene_`），一次性；不是工作表面 | `.context/calm/onboarding.json`；[截图](img/m4-onboarding-calm-on-full-loaded.png) |
+| 引导 | onboarding | calm-on/reduce | 0.000 | 0 | 0 | 通过：无动画，无位移 | `.context/calm/onboarding.json` |
+| 引导 | onboarding | calm-off/full | 0.000 | 6 | 42 | 上游原样，作对照 | `.context/calm/onboarding.json` |
+| 引导 | onboarding | calm-off/reduce | 0.000 | 0 | 0 | 上游原样（本区无循环） | `.context/calm/onboarding.json` |
+
+读法：calm-on 两档的「CSS 动画/JS 动效」为 0，或只剩 keep-decor，即判通过。`通话` 场景是通话进行中，不触发来电响铃，所以网格看不到被 keep-decor 排除的 `ringIn`/`bloom`（见 §6）。
 
 ## 8. 同步操作手册
 
-（BLG-179 填：fork.md「同步上游」五步的展开版。）
+对应 `docs/fork.md「同步上游」` 的五步，展开成能照着做的清单。
+
+**0. 先备好**：干净工作区；`upstream` remote 指向真实上游（`git remote -v`）。想先演练就用 `--remote <本地镜像> --ref main`，真实 remote 不动（§2）。
+
+**1. 合并前看风险**
+```bash
+git fetch upstream
+node scripts/sync-upstream.mjs --report
+```
+- 「合并时检查」：fork 改过、上游这次也改了的文件。标 `⚠ 沉稳界面` 的先看 `docs/fork.md` 对应登记行的「为什么」。
+- 末尾「改了上游的文件」清单里**有 `!` 的文件**说明 fork.md 没登记原因（退出码 1）：先补登记再同步。
+
+**2. 合并**
+```bash
+node scripts/sync-upstream.mjs
+```
+- 开 `git rerere`、拉上游、切 `sync/upstream-<版本>-<日期>`、合并；版本号冲突（只改了版本号时）自动取较高值。
+- 冲突解法（演练 §2.4 的模板）：**上游改动留原位，fork 接入点那一行跟上去**；不要把 fork 逻辑搬进上游文件。
+
+**3. 合并后自动检查**
+- 干净合并：脚本自己接着跑。有冲突：解完后
+
+```bash
+git add -A && git commit --no-edit
+node scripts/sync-upstream.mjs --after-merge
+```
+  它依次：① `npx vitest run tests/fork-calm.test.ts`（NEW = 上游新增的动效；退出码非 0 = 某个接入点断了，按 `TOUCHPOINTS` 的 `why` 重接）；② 打印「覆盖层失效的规则」（只报告，不改退出码）；③ 打印 calm-check 命令；④ 满足护栏时 `git commit --amend`，把「沉稳检查」摘要追加到合并提交说明（只对 `Merge upstream…` 双亲提交，重复跑不叠加）。
+
+**4. 逐条处置**
+
+| 输出 | 怎么看 | 怎么办 |
+| --- | --- | --- |
+| NEW（新增动效） | 上游新增了 keyframes / infinite / spring 等 | 在 `fork/calm/*.css` 补一条规则，或写进例外；然后 `CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts` 更新快照 |
+| GONE | 上游删了这些语句 | 确认对应覆盖层规则还有意义；更新快照 |
+| 失效的覆盖层规则 | class/data/aria 锚点在上游被改名 | 改 `fork/calm/*.css` 的锚点（CSS Modules 类名用 `[class*="_name_"]`） |
+| TOUCHPOINTS 红 | 接入点被搬走/删除 | 按 `fork.md` 与 `hooks.md` 的 canary 把一行接回去 |
+
+快照只在逐条裁决后更新，不要为了变绿直接更新。
+
+**5. 验证再开 PR**
+```bash
+npm run dev                                       # 演示 daemon，用隔离 home
+cd packages/mac && npm run dev                    # vite
+node packages/mac/scripts/calm-check.mjs room chatrun chatsteps tasks sentinel usage onboarding call
+npm run typecheck && npx vitest run               # 根目录；mac 的 npm run e2e 走 e2e-lock
+```
+对照 §4.3：on 档动画数/JS 动效数不升、CLS 漂移不超过 ±0.02。e2e 失败先在 `--workers=1` 单跑定性（回归 / spec 过期 / 负载抖动），做法见 §4.2。
+
+**有用的记号**：`fork/calm/` 里每条定点规则都是 `[class*="_name_"]` 或 data/aria 锚点，失效检测就是在上游里找这些名字；已知限度：同名类在别的模块出现会被误判为「活」，所以只报告不卡退出码。
