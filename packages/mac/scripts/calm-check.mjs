@@ -180,22 +180,51 @@ const anchorNow = (page) =>
 
 /**
  * Reading further up while new messages come in (docs/calm/hooks.md §2): the row in sight must not
- * move, and the way back down says how many arrived. Measured after a run, then again after three
- * more prompts (the mock answers each with several rows).
+ * move, and the way back down says how many arrived. New rows come from the conversation itself —
+ * a long run, then two messages queued while it works — not from sending: a message you send takes
+ * you back to the newest on purpose (chat/flight.ts, `beluga:chat-bottom`), which is not this case.
  */
 const measureAnchor = async (page) => {
+  const box = page.locator('textarea:not(.xterm-helper-textarea)');
+  // Whatever the scene sent before this must be over: a message sent while a turn runs is steered
+  // or queued, never a turn of its own, so the long run measured here would never start.
+  const split = page.getByRole('group', { name: 'Claude is working' });
+  for (let t = 0; t < 120000 && (await split.count()); t += 1000) await wait(1000);
+  // Enough read-above for the wheel to leave the newest out of sight: the first combo on a fresh
+  // home starts with almost no history, a 400px wheel clamps at the top, no scroll event fires and
+  // the jump button (what this measures) never comes up. A short turn adds rows until it does.
+  const scrollback = () =>
+    page.evaluate(() => {
+      const first = document.querySelector('[data-index]');
+      const el = first?.parentElement?.parentElement;
+      return el ? el.scrollHeight - el.clientHeight : 0;
+    });
+  for (let fills = 0; (await scrollback()) < 900 && fills < 4; fills++) {
+    await box.fill('How is auth looking?');
+    await box.press('Enter');
+    for (let t = 0; t < 120000 && (await split.count()); t += 1000) await wait(1000);
+  }
+  await box.fill('Take a deep dive into the webhooks');
+  await box.press('Enter');
+  await split.waitFor({ timeout: 20000 }).catch(() => undefined);
+  await wait(1500);
+  for (const text of ['And the tests?', 'Keep it small']) {
+    await box.fill(text);
+    await split.getByRole('button', { name: 'Queue' }).click().catch(() => undefined);
+    await wait(300);
+  }
   await page.mouse.move(700, 400);
   await page.mouse.wheel(0, -400);
   await wait(600);
   const before = await anchorNow(page);
   if (!before) return { offsetPx: null, hint: null, newRows: 0 };
-  for (const text of ['And the tests?', 'Keep it small', 'One more case']) {
-    const box = page.locator('textarea:not(.xterm-helper-textarea)');
-    await box.fill(text);
-    await box.press('Enter');
-    await wait(2500);
+  // The run, then each queued message and its answer.
+  const tray = page.getByRole('region', { name: 'Queued messages' });
+  for (let t = 0; t < 120000; t += 1000) {
+    if (!(await tray.count()) && !(await split.count())) break;
+    await wait(1000);
   }
-  await wait(6000);
+  await wait(3000);
   const after = await page.evaluate(
     pageFn(`(index) => {
       const el = document.querySelector('[data-index="' + index + '"]');
