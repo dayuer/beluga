@@ -1,6 +1,6 @@
 // Brings upstream (beluga-labs/beluga) into this fork with as few conflicts as possible (docs/fork.md).
 //   node scripts/sync-upstream.mjs            → a sync/upstream-<date> branch with upstream merged in
-//   node scripts/sync-upstream.mjs --report   → only the report: which upstream files this fork changes
+//   node scripts/sync-upstream.mjs --report   → only the report: which upstream files this fork changes, by how many lines
 //
 // What it does for a sync:
 //   1. Turns on git rerere here, so a conflict resolved once is resolved the same way next time.
@@ -54,8 +54,46 @@ export const blocking = (names) =>
     .map((f) => f.trim())
     .filter((f) => f && path.basename(f) !== '.DS_Store');
 
+/**
+ * `git diff --numstat` as rows: a file, its lines added and removed (a binary file counts 0), and its
+ * changed lines: the larger of the two (a line changed counts once, as does a line added).
+ */
+export const parseNumstat = (text) =>
+  text
+    .split('\n')
+    .map((l) => l.split('\t'))
+    .filter((c) => c.length >= 3 && c[2])
+    .map(([a, d, file]) => {
+      const add = Number(a) || 0;
+      const del = Number(d) || 0;
+      return { file, add, del, lines: Math.max(add, del) };
+    });
+
+/** The report's lines: each touched file with its +/- and changed lines (`!`: not explained), then the totals. */
+export function reportLines(touched, stats, missing) {
+  const by = new Map(stats.map((r) => [r.file, r]));
+  const rows = touched.map((file) => by.get(file) ?? { file, add: 0, del: 0, lines: 0 });
+  const width = Math.max(0, ...rows.map((r) => `+${r.add}/-${r.del}`.length));
+  const out = rows.map((r) => `  ${missing.includes(r.file) ? '!' : ' '} ${`+${r.add}/-${r.del}`.padEnd(width)}  ${String(r.lines).padStart(3)}  ${r.file}`);
+  const sum = (k) => rows.reduce((n, r) => n + r[k], 0);
+  out.push(`  In all: ${rows.length} files, +${sum('add')}/-${sum('del')}, ${sum('lines')} changed lines; ${rows.filter((r) => r.lines > 3).length} over 3 lines.`);
+  return out;
+}
+
 /** The upstream files a fork changes that `doc` (docs/fork.md) doesn't name in backticks. */
 export const unexplained = (touched, doc) => touched.filter((f) => !doc.includes(`\`${f}\``));
+
+/**
+ * Upstream files `doc`'s list of touch points (from its "## 改了上游的文件" heading on) names in
+ * backticks that the fork no longer changes: the list says more than there is. The version files
+ * don't count (they change only with a release).
+ */
+export const stale = (touched, doc, upstreamFiles) => {
+  const changed = new Set(touched);
+  const list = doc.slice(Math.max(0, doc.indexOf('## 改了上游的文件')));
+  const named = [...list.matchAll(/`([^`\s]+)`/g)].map((m) => m[1]);
+  return [...new Set(named)].filter((f) => upstreamFiles.has(f) && !changed.has(f) && !VERSION_FILES.includes(f));
+};
 
 const git = (args, opts = {}) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', opts.quiet ? 'ignore' : 'inherit'], ...opts }).trim();
 const tryGit = (args) => {
@@ -72,6 +110,12 @@ function touchPoints(ref = 'HEAD') {
   return git(['diff', '--name-only', '--diff-filter=MDR', base, ref]).split('\n').filter(Boolean);
 }
 
+/** How many lines this branch changes in each upstream file (against the same base). */
+function touchStats(ref = 'HEAD') {
+  const base = git(['merge-base', ref, 'upstream/main']);
+  return parseNumstat(git(['diff', '--numstat', '--diff-filter=MDR', base, ref]));
+}
+
 function report(ref = 'HEAD') {
   const touched = touchPoints(ref);
   const doc = existsSync(FORK_DOC) ? readFileSync(FORK_DOC, 'utf8') : '';
@@ -79,8 +123,10 @@ function report(ref = 'HEAD') {
   const ahead = git(['rev-list', '--count', `upstream/main..${ref}`]);
   const behind = git(['rev-list', '--count', `${ref}..upstream/main`]);
   console.log(`\nThis fork: ${ahead} commits ahead of upstream, ${behind} behind.`);
-  console.log(`It changes ${touched.length} upstream files (each one can conflict on a sync):`);
-  for (const f of touched) console.log(`  ${missing.includes(f) ? '!' : ' '} ${f}`);
+  console.log(`It changes ${touched.length} upstream files (each one can conflict on a sync; +added/-removed, then changed lines):`);
+  for (const line of reportLines(touched, touchStats(ref), missing)) console.log(line);
+  const old = stale(touched, doc, new Set(git(['ls-tree', '-r', '--name-only', 'upstream/main']).split('\n')));
+  if (old.length) console.log(`\n${old.length} named in ${FORK_DOC} but no longer changed (take them off the list):\n${old.map((f) => `    ${f}`).join('\n')}`);
   if (missing.length) console.log(`\n! ${missing.length} not explained in ${FORK_DOC} yet: move the change into a fork file, or add a line there saying why it has to stay.`);
   return missing.length;
 }

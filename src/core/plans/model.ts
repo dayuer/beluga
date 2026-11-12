@@ -292,6 +292,8 @@ export interface TaskWatch {
   readonly needsYou?: boolean;
   /** It stalled again soon after a wake and went to the plan's fix agent, woken once more there. */
   readonly escalated?: boolean;
+  /** What it said last when it came to wait for you (often what it needs from you), clipped. */
+  readonly said?: string;
   /** The one line it's shown with: “KLD-36 stopped, woke it at 11:13”. */
   readonly line: string;
   /** Stopped by your usage limit: when it goes on by itself (see shared/run-failure.ts). */

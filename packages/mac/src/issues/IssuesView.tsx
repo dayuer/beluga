@@ -19,7 +19,6 @@ import arr from '../lib/arrive.module.css';
 import { useLateArrival } from '../lib/last-seen.js';
 import { NoProjects } from '../work/NoProjects.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 const STATES: ReadonlyArray<{ readonly value: GhIssueState; readonly label: string; readonly hint: string }> = [
   { value: 'open', label: 'Open', hint: 'Issues still open on GitHub' },
@@ -105,7 +104,7 @@ export function IssuesView() {
               placeholder="Search issues"
               aria-label="Search issues on GitHub"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isImeComposing(e)) setSearch(searchWords(typed));
+                if (e.key === 'Enter') setSearch(searchWords(typed));
                 if (e.key === 'Escape') (setTyped(''), setSearch(''), (e.target as HTMLInputElement).blur());
               }}
             />

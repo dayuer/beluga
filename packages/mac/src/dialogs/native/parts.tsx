@@ -7,7 +7,6 @@ import { Button, cx } from '../../components/ui.js';
 import { tildePath } from '../../lib/brand.js';
 import s from './sharing.module.css';
 import { primaryKey } from '../../lib/shortcuts-model.js';
-import { isImeComposing } from '../../lib/ime.js';
 
 /**
  * The pieces the sharing sheets and popovers are built from: a sheet with a header and a
@@ -39,7 +38,7 @@ export function Sheet({ title, subtitle, icon, badge, close, footer, children, w
           aria-describedby={undefined}
           onKeyDown={(e) => {
             const t = e.target as HTMLElement;
-            if (e.key !== 'Enter' || isImeComposing(e) || !onReturn || primaryKey(e) || e.shiftKey || t.closest('button, textarea, select, input[type="text"], [role="radio"], [role="checkbox"]')) return;
+            if (e.key !== 'Enter' || !onReturn || primaryKey(e) || e.shiftKey || t.closest('button, textarea, select, input[type="text"], [role="radio"], [role="checkbox"]')) return;
             e.preventDefault();
             onReturn();
           }}

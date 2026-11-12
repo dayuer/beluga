@@ -7,7 +7,6 @@ import { useActions } from '../../lib/actions.js';
 import { type Recipient, type UiStore, toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { Field, Sheet } from './parts.js';
 import s from './sharing.module.css';
-import { isImeComposing } from '../../lib/ime.js';
 
 /** A conversation is on screen (where a message, or a command's output, shows up). */
 const chatShown = (v: View): boolean => v.kind === 'room' || ((v.kind === 'workspace' || v.kind === 'shared') && v.tab === 'chat');
@@ -54,7 +53,7 @@ export function RunCommandSheet({ peer, close }: { peer: PeerInfo; close: () => 
       }
     >
       <Field label="Command" htmlFor="peer-command">
-        <input id="peer-command" className={s.input} style={{ fontFamily: 'var(--font-mono)' }} value={cmd} placeholder="npm test" spellCheck={false} autoFocus onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && (e.preventDefault(), run())} />
+        <input id="peer-command" className={s.input} style={{ fontFamily: 'var(--font-mono)' }} value={cmd} placeholder="npm test" spellCheck={false} autoFocus onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), run())} />
         <span className={s.hint}>It runs in the folder {peer.name} shares, as {peer.name}.</span>
       </Field>
     </Sheet>

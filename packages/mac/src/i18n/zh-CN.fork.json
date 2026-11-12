@@ -74,6 +74,8 @@
  "Invite a customer": "邀请客户",
  "Invite a customer…": "邀请客户…",
  "It dropped. Opening a new address. Agents must then sign in again.": "断开了，正在开新地址。之后 Agent 要重新登录。",
+ "It last said: “{0}” If it asks for something, do it (or answer in its chat), then Resume it.": "它最后说：“{0}” 如果它在要什么，做完（或在它的聊天里回复）后点“继续”。",
+ "It last said: “{0}” If it asks for something, do it, then Resume it": "它最后说：“{0}” 如果它在要什么，做完后点“继续”",
  "It reads and sends in your groups, with its name on each message.": "它会在你的群组里读和发消息，每条都署上它的名字。",
  "It reads and sends in your groups.": "它会在你的群组里读和发消息。",
  "It reads and sends yours, with its name on each one.": "它会读和发你的私信，每条都署上它的名字。",
@@ -190,8 +192,13 @@
  "{0} screen.png": "{0} 的屏幕.png",
  "{0} stopped again: gave it to {1}, woke it at {2}": "{0} 又停了：已交给 {1}，并在 {2} 唤醒它",
  "{0} takes over what’s hard in this plan: fix tasks after a failed check, conflicts, a task that stopped twice": "{0} 接手这个计划里的疑难问题：检查没过的修复任务、合并冲突、卡住两次的任务",
+ "{0} waits for you": "{0} 在等你",
+ "{0} works this plan’s milestones and tasks, the {1} already at work included": "{0} 负责这个计划的里程碑和任务，已在工作的 {1} 也一起换过去",
+ "{0} works what starts next and the {1} not running now; the {2} mid-turn keep{3} {4} agent": "{0} 负责接下来开始的工作，以及此刻没在运行的 {1}；正在运行的 {2} 保留{4}智能体",
  "{0} works what starts next; the milestone already at work keeps its agent": "{0} 负责接下来开始的工作；已在工作的里程碑保留它的智能体",
  "{0} works what starts next; the {1} milestones already at work keep their agent": "{0} 负责接下来开始的工作；已在工作的 {1} 个里程碑保留各自的智能体",
+ "{0}. It last said: “{1}” If it asks for something, do it (or answer in its chat), then Resume it.": "{0}。它最后说：“{1}” 如果它在要什么，做完（或在它的聊天里回复）后点“继续”。",
  "“{0}” runs on {1} now. Pick how it runs from here on.": "“{0}”现在按{1}运行。选择从现在起怎么运行。",
+ "“{0}” waits for you": "“{0}”在等你",
  "‹ Back": "‹ 返回"
 }

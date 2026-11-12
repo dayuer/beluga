@@ -26,7 +26,6 @@ import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import n from './numbers.module.css';
 import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * At a glance (docs/sentinel.md §10, BLG-300): the board on Sentinel's page. Anything your
@@ -220,7 +219,7 @@ function RenameTab({ name, done }: { name: string; done: (name: string) => void 
       onChange={(e) => setText(e.target.value)}
       onBlur={() => done(text.trim())}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isImeComposing(e)) done(text.trim());
+        if (e.key === 'Enter') done(text.trim());
         if (e.key === 'Escape') done(name);
       }}
     />
@@ -785,7 +784,7 @@ function TitleInput({ title, done }: { title: string; done: (title: string) => v
       onChange={(e) => setText(e.target.value)}
       onBlur={() => done(text.trim())}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isImeComposing(e)) done(text.trim());
+        if (e.key === 'Enter') done(text.trim());
         if (e.key === 'Escape') done(title);
       }}
     />

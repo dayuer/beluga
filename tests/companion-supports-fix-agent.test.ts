@@ -7,11 +7,16 @@ import { describe, expect, it, vi } from 'vitest';
  * The phone's native pieces are stand-ins; the store itself is the real one.
  */
 
-vi.mock('../packages/companion/node_modules/react-native/index.js', () => ({
+// React Native, as a stand-in: by its bare name when the phone's dependencies aren't installed (only
+// the root's are), and by its file when they are (store.ts then resolves it there). Both, so the test
+// runs either way.
+const reactNative = vi.hoisted(() => ({
   AppState: { currentState: 'active', addEventListener: () => ({ remove: () => undefined }) },
   Linking: { addEventListener: () => ({ remove: () => undefined }), getInitialURL: async () => null },
   Platform: { OS: 'android', select: (o: Record<string, unknown>) => o.android ?? o.default },
 }));
+vi.mock('react-native', () => reactNative);
+vi.mock('../packages/companion/node_modules/react-native/index.js', () => reactNative);
 vi.mock('../packages/companion/lib/kv', () => ({ kv: { get: () => undefined, set: () => undefined, remove: () => undefined } }));
 vi.mock('../packages/companion/lib/secure', () => ({ secure: { get: async () => null, set: async () => undefined, remove: async () => undefined } }));
 vi.mock('../packages/companion/lib/stay', () => ({ notifyNudge: () => undefined, stayOn: () => false, stayService: () => undefined }));

@@ -27,7 +27,6 @@ import { useConversationLoaded } from "./use-plans.js";
 import s from "../chat/composer.module.css";
 import k from "./plan-ask.module.css";
 import p from "./plans.module.css";
-import { isImeComposing } from "../lib/ime.js";
 import { shortcutKeys } from "../lib/shortcuts.js";
 import { chordLabel } from "../lib/shortcuts-model.js";
 
@@ -367,7 +366,7 @@ export function PlanChat({
               onChange={(e) => setText(e.target.value)}
               onPaste={att.onPaste}
               onKeyDown={(e) => {
-                if (isImeComposing(e)) return;
+                if (e.nativeEvent.isComposing) return;
                 if (sug.onKeyDown(e)) return;
                 if (att.onRefKey(e)) return;
                 if (e.key === "Enter" && !e.shiftKey) {

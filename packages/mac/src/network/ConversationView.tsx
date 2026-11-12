@@ -36,7 +36,6 @@ import { agentMark } from '@beluga/shared/agent-marks.js';
 import { PersonButton } from './PersonProfile.js';
 import s from './network.module.css';
 import { computerTitle, thisComputer, yourComputer } from '../lib/os-words.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /** Messages the shared state keeps per conversation; with that many, there may be earlier ones. */
 const KEPT = 200;
@@ -100,7 +99,7 @@ function EditBubble({ m, done }: { m: MessageView; done: () => void }) {
           if (e.key === 'Escape') {
             e.preventDefault();
             done();
-          } else if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) {
+          } else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             save();
           }
