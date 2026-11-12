@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { MilestoneRolesView } from '../fork/companion/plan-roles-view.js';
 
 /**
  * What your phone and your Mac say over the companion link (docs/companion.md). The Mac's side
@@ -421,6 +420,11 @@ export type SubAgentDetailView = z.infer<typeof SubAgentDetailView>;
 /** Which agent it is (src/protocol.ts AgentRef, repeated here: this file is the phone's whole contract). */
 export const AgentRefView = z.object({ runtime: z.string().max(32), model: z.string().max(64).optional(), label: z.string().max(64) });
 export type AgentRefView = z.infer<typeof AgentRefView>;
+/** 1.55 (fork): who did one part of a milestone (src/fork/plans/roles.ts): state off|waiting|skipped|on, the agent that did it (mine: your default), what's set (auto: auto route), why they differ (pick|task|fix|default|changed), now (Coding, after a handoff), and the fix agent's handoffs. */
+export const RoleSeenView = z.object({ state: z.string().max(20), agent: AgentRefView.optional(), mine: z.boolean().optional(), set: AgentRefView.optional(), auto: z.boolean().optional(), why: z.string().max(20).optional(), now: AgentRefView.optional(), handoffs: z.array(z.object({ at: z.number(), what: z.string().max(20), to: z.string().max(80) })).max(20).optional() });
+export const MilestoneRolesView = z.object({ arch: RoleSeenView, work: RoleSeenView, check: RoleSeenView, fix: RoleSeenView });
+export type RoleSeenView = z.infer<typeof RoleSeenView>;
+export type MilestoneRolesView = z.infer<typeof MilestoneRolesView>;
 
 /** 1.41 (BLG-702): one emoji under a message: how many put it there, whether you did, and who (their names, you as "You"). */
 export const ChatReactionView = z.object({
@@ -753,7 +757,7 @@ export const PlanView = z.object({
         /** 1.53 (fork): its technical design from the plan's architect (code taken out), and that the architect is writing it now. */
         design: z.string().max(12000).optional(),
         designing: z.boolean().optional(),
-        /** 1.55 (fork): who did each part of it: architecture, coding, audit, hard fixes (src/fork/companion/plan-roles-view.ts). */
+        /** 1.55 (fork): who did each part of it: architecture, coding, audit, hard fixes (RoleSeenView). */
         roles: MilestoneRolesView.optional(),
       }),
     )

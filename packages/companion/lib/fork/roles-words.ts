@@ -42,7 +42,9 @@ function row(key: RoleRow['key'], r: RoleSeenView): RoleRow {
   if (r.state === 'off') return { ...base, note: 'Not set' };
   if (r.state === 'on') {
     const agent = r.agent;
-    return { ...base, model: nameOf(agent), ...(agent ? { runtime: agent.runtime } : {}), ...(r.why ? { differs: `Set to ${setWords(r)}: ${WHY[r.why] ?? r.why}` } : {}) };
+    // Hard fixes taken over by another than what's set now: who took over, by the last handoff.
+    const model = key === 'fix' && !agent && r.handoffs?.length ? r.handoffs.at(-1)!.to : nameOf(agent);
+    return { ...base, model, ...(agent ? { runtime: agent.runtime } : {}), ...(r.now ? { note: `Handed over, now on ${nameOf(r.now)}` } : {}), ...(r.why ? { differs: `Set to ${setWords(r)}: ${WHY[r.why] ?? r.why}` } : {}) };
   }
   const note = r.state === 'skipped' ? 'Started without a design' : key === 'fix' ? 'Nothing handed over yet' : 'Not started yet';
   return { ...base, model: setWords(r), ...(r.set ? { runtime: r.set.runtime } : {}), note };

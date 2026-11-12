@@ -1,6 +1,7 @@
 import type { AgentRef } from '../../protocol.js';
 import { type AutoRoute, autoAgentFor, autoChecker, autoFixer, autoRouteOn, type Routable } from '../../shared/auto-route.js';
 import type { RuntimeChoice } from '../../shared/agent-runtimes.js';
+import { agentName } from '../../shared/agent-label.js';
 import { checkerAgentOf, type MilestoneAgent, type MilestoneRun, type Plan, type PlanEvent } from '../../core/plans/model.js';
 
 /**
@@ -43,6 +44,8 @@ export interface RoleSeen {
   readonly why?: RoleWhy;
   /** Hard fixes only: each handoff to the fix agent in this milestone, oldest first. */
   readonly handoffs?: readonly Handoff[];
+  /** Coding only: the agent its worktree is on now, when a handoff moved it off the one it started on. */
+  readonly now?: AgentRef;
 }
 
 export type MilestoneRoles = Readonly<Record<RoleKey, RoleSeen>>;
@@ -144,7 +147,9 @@ export function milestoneRoles(
       : via === 'default' ? (plan.agent || auto ? 'default' : undefined)
       : sameAgent(who, plan.agent) || (!plan.agent && auto) ? undefined
       : 'changed';
-    work = { state: 'on', ...ran(who), ...workSet, ...(why ? { why } : {}) };
+    const current = workspaceAgent(there);
+    const moved = handed && there && !sameAgent(current, who);
+    work = { state: 'on', ...ran(who), ...workSet, ...(why ? { why } : {}), ...(moved && current ? { now: current } : {}) };
   }
 
   // Audit: its checker chat's agent; none set: the work's agent, else auto route's review list.
@@ -154,8 +159,11 @@ export function milestoneRoles(
     : { state: 'waiting', ...(checkSet ? { set: checkSet } : {}) };
 
   // Hard fixes: each handoff to the fix agent in this milestone (none: nothing hard came up yet).
+  // The last handoff's agent is who took over (by name: the activity keeps names); not what's set now: marked.
+  const lastTo = handoffs.at(-1)?.to;
+  const fixDiffers = Boolean(lastTo && fixSet && lastTo !== agentName(fixSet, { model: true }));
   const fix: RoleSeen = handoffs.length || agent?.via === 'fix'
-    ? { state: 'on', ...(fixSet ? { set: fixSet, agent: fixSet } : {}), handoffs }
+    ? { state: 'on', ...(fixSet ? { set: fixSet } : {}), ...(fixSet && !fixDiffers ? { agent: fixSet } : {}), ...(fixDiffers ? { why: 'changed' as const } : {}), handoffs }
     : fixSet
       ? { state: 'waiting', set: fixSet, handoffs }
       : { state: 'off', handoffs };

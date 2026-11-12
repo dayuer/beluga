@@ -36,6 +36,10 @@ describe('the phone’s “Who did it”', () => {
     expect(rows[0]).toEqual({ key: 'arch', label: 'Architecture', note: 'Not set', handoffs: [] });
     expect(rows[1]!.differs).toBe('Set to Deepseek flash: its task has an agent of its own');
     expect(roleRows({ ...ROLES, work: { state: 'on', mine: true } }, true)[1]!.model).toBe('Your default agent');
+    // After a handoff: who took over, and that Coding's worktree is on it now.
+    const after = roleRows({ ...ROLES, work: { state: 'on', agent: DEEPSEEK, set: DEEPSEEK, now: SONNET }, fix: { state: 'on', set: OPUS, why: 'changed', handoffs: [{ at: 1, what: 'fix', to: 'Claude (Sonnet)' }] } }, true);
+    expect(after[1]!.note).toBe('Handed over, now on Sonnet');
+    expect(after[3]).toMatchObject({ model: 'Claude (Sonnet)', differs: 'Set to Opus: the plan’s setting changed after it started' });
   });
 
   it('nothing from a Mac before 1.55, or without roles', () => {

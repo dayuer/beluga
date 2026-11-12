@@ -16,6 +16,7 @@ function roleView(r: RoleSeen): RoleSeenView {
     ...(r.set ? { set: agentView(r.set) } : {}),
     ...(r.auto ? { auto: true } : {}),
     ...(r.why ? { why: r.why } : {}),
+    ...(r.now ? { now: agentView(r.now) } : {}),
     ...(r.handoffs?.length ? { handoffs: r.handoffs.slice(-20).map((h) => ({ at: h.at, what: h.what, to: h.to.slice(0, 80) })) } : {}),
   };
 }

@@ -55,8 +55,18 @@ function RoleLine({ role, r }: { role: RoleKey; r: RoleSeen }) {
       <span className={f.roleWho}>
         {r.state === 'off' ? (
           <span className={p.muted}>Not set</span>
+        ) : r.state === 'on' && role === 'fix' && !r.agent && r.handoffs?.length ? (
+          <span className={f.roleModel}>{r.handoffs.at(-1)!.to}</span>
         ) : r.state === 'on' ? (
-          <Model {...(r.agent ? { agent: r.agent } : {})} />
+          <>
+            <Model {...(r.agent ? { agent: r.agent } : {})} />
+            {r.now ? (
+              <span className={f.roleNow}>
+                <span className={p.muted}>Handed over, now on</span>
+                <Model agent={r.now} />
+              </span>
+            ) : null}
+          </>
         ) : (
           <>
             <SetTo r={r} />

@@ -135,7 +135,8 @@ describe('a plan’s four roles, where each really runs', () => {
     // What the plan page shows: each role on its own model, the fix agent's handoff under its milestone.
     const roles = rolesNow(t, plan.id);
     expect(roles.arch).toEqual({ state: 'on', agent: OPUS, set: OPUS });
-    expect(roles.work).toEqual({ state: 'on', agent: DEEPSEEK, set: DEEPSEEK });
+    // Coding: what it started on, and that a handoff moved its worktree to Sonnet (BLG-203's audit).
+    expect(roles.work).toEqual({ state: 'on', agent: DEEPSEEK, set: DEEPSEEK, now: SONNET });
     expect(roles.check).toEqual({ state: 'on', agent: GLM, set: GLM });
     expect(roles.fix).toEqual({ state: 'on', agent: SONNET, set: SONNET, handoffs: [{ at: expect.any(Number), what: 'fix', to: 'Claude (Sonnet)' }] });
     // The task card: the model of the worktree doing it (Sonnet now: the fix agent has it).
@@ -144,6 +145,10 @@ describe('a plan’s four roles, where each really runs', () => {
     // The phone, the same, and it parses.
     const page = planPageView(t.store.getState(), plan.id)!;
     expect(PlanPage.safeParse(page).success).toBe(true);
+    // Hard fixes set to another after the handoff: who took over is the handoff's, and it's marked (BLG-203's audit).
+    t.work.setFixAgent(plan.id, OPUS);
+    const later = rolesNow(t, plan.id).fix;
+    expect(later).toEqual({ state: 'on', set: OPUS, why: 'changed', handoffs: [{ at: expect.any(Number), what: 'fix', to: 'Claude (Sonnet)' }] });
     expect(page.milestones[0]!.roles).toMatchObject({ arch: { state: 'on', agent: { model: 'opus' } }, work: { agent: { model: DEEPSEEK.model } }, check: { agent: { model: GLM.model } }, fix: { handoffs: [{ what: 'fix', to: 'Claude (Sonnet)' }] } });
   });
 

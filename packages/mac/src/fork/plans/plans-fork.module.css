@@ -61,6 +61,11 @@
 .roleModel {
   font-weight: 500;
 }
+.roleNow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .roleDiffers {
   display: inline-flex;
   flex-wrap: wrap;

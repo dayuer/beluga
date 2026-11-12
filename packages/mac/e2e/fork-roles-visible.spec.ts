@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { SocketClient } from '../../../src/ipc/socket-client.js';
 import type { AgentRef } from '../../../src/protocol.js';
@@ -82,6 +83,19 @@ test('the user’s roles on a small plan: each part shows the model that did it,
   const chips = main(page).locator('[data-ran="yes"]');
   await expect(chips.first()).toContainText(handed.length ? 'Sonnet' : 'Deepseek flash');
   await who.screenshot({ path: path.join(SHOTS, 'roles-visible-section-en.png') });
+  // For the audit (BLG-203): what the daemon recorded for each part, next to what the page says.
+  const after = await SocketClient.connect({ url: demo.endpoint.url, token: demo.endpoint.token, kind: 'test', version: 'e2e', timeoutMs: 10_000 });
+  try {
+    const st = after.store.getState() as unknown as { plans: { plans: Array<Plan & { activity: Array<{ kind: string; text: string }> }> }; projects: Array<{ workspaces: Array<{ id: string; name: string; agent?: AgentRef; model?: string }> }> };
+    const now = st.plans.plans.find((p) => p.id === plan.id)!;
+    const run = now.runs[m.id]!;
+    const wsOf = (id?: string) => st.projects.flatMap((p) => p.workspaces).find((w) => w.id === id);
+    const recorded = { architect: wsOf(run.architect), worktree: wsOf(run.agent?.worktree), startedOn: run.agent, checker: wsOf(run.checker), handoffs: now.activity.filter((e) => e.text.startsWith('handed ')).map((e) => e.text) };
+    const shown = Object.fromEntries(await Promise.all(['arch', 'work', 'check', 'fix'].map(async (k) => [k, await line(who, k).innerText()])));
+    writeFileSync(path.join(SHOTS, 'roles-audit.json'), JSON.stringify({ settings: { archAgent: OPUS, agent: DEEPSEEK, checkAgent: GLM, fixAgent: SONNET }, recorded, shown, taskCards: await chips.allInnerTexts() }, null, 2));
+  } finally {
+    after.close();
+  }
   await page.screenshot({ path: path.join(SHOTS, 'roles-visible-en.png') });
 
   // In Chinese: the same, with no English words left in the section (model names aside).

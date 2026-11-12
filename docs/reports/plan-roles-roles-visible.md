@@ -86,3 +86,41 @@
 - 说明文档：`docs/tasks-and-plans.fork.md` 的 “Who did it” 和 “Task titles don't pick models” 两段。任务标题里的【设计】【审计】不会换模型，同一个里程碑的任务都由编码模型做。
 
 截图：`.beluga/scratch/roles-visible-en.png`、`roles-visible-section-zh.png`（BLG-200 的附件里也有）。
+
+## BLG-203 审计（独立核对）
+
+**我跑了什么**
+- 负载偏高（load 约 11），一次就过：`cd packages/mac && npm run e2e -- e2e/fork-roles-visible.spec.ts --reporter=line`，结果 1 passed（37 秒）。日志 `.beluga/scratch/audit-e2e.log`，数据 `.beluga/scratch/roles-audit.json`（副本在 `.beluga/scratch/agents/x5tgvJBSUR/`）。
+- 对照三份数据：设置（settings）、守护进程自己的工作区记录（recorded）、界面文字（shown）；再看三张截图；再读 `src/fork/plans/roles.ts`。
+
+**逐角色对照**
+
+| 角色 | 设置 | 实际记录 | 界面显示 | 结论 |
+|---|---|---|---|---|
+| 架构 | Claude opus | 设计聊天 `chat-4f6525c6`：runtime claude，`model` 字段 opus | Opus | 一致 |
+| 编码 | 本地 deepseek/deepseek-flash[1m] | 里程碑启动时记录 `startedOn.agent` 为 deepseek-flash（via plan）；但该工作树现在是 claude + sonnet（交接后） | Deepseek flash | 一致（显示的是启动时用的模型，交接后由疑难修复接手，Sonnet 在“疑难修复”行体现） |
+| 审计 | 本地 bigmodel/glm-5.3[1m] | 检查聊天还没创建（没有 checker 记录） | Glm 5.3 + “Not started yet” | 一致（未开始，显示的是设置的模型，和设置相符） |
+| 疑难修复 | Claude sonnet | 计划动态里 2 条交接：Groundwork 和 Ship 各一条“a task that stopped twice → Claude (Sonnet)” | Sonnet，并列出“A task that stopped twice → Claude (Sonnet)”一条 | 一致（只显示本里程碑 Groundwork 的那条，Ship 那条属于另一个里程碑，过滤正确） |
+
+**观察到的交接**：“handed a task that stopped twice in “Groundwork” to Claude (Sonnet)”，在“疑难修复”下出现。任务卡：3 张都显示 Sonnet，和工作树当前的 claude + sonnet 一致（卡片跟随工作树现在的模型，而不是启动时的 deepseek）。
+
+**截图**
+- `.beluga/scratch/roles-visible-en.png`
+- `.beluga/scratch/roles-visible-section-en.png`
+- `.beluga/scratch/roles-visible-section-zh.png`
+
+中文截图：标题“谁做的”、四个角色名、“还没开始”、交接行“停了两次的任务 → Claude (Sonnet)”都已翻译，除模型名外没有英文残留。
+
+**发现的问题**
+1. 编码行在交接后仍显示 Deepseek flash，没有提示“现已交给 Sonnet”。只能从下一行“疑难修复”推断。**已修**（审计之后）：交接后编码行会多一句“交接后现在是 Sonnet”（`RoleSeen.now`，Mac 和手机都有）。e2e 复跑时显示为 `Coding / Deepseek flash / Handed over, now on / Sonnet`。审计原来的建议是：交接后在编码行加一句“后来交给疑难修复”。
+2. “疑难修复”行的 `agent` 取的是当前设置（`fixSet`），不是交接记录里真正接手的 agent（`Handoff.to` 只是字符串）。设置在交接之后改过，这一行的模型名会和当时实际接手的不同（交接行文字仍是对的）。**已修**（审计之后）：有交接时，这一行以最后一条交接的 `to` 为准；和当前设置不一样时，标出“开始后计划设置改过”。测试见 `tests/fork-plan-roles-visible.test.ts`（交接后把疑难修复改成 Opus 的那一段）和 `tests/fork-companion-roles.test.ts`。审计原来的建议是：交接时把 agent 以结构化形式写进活动，或界面以最后一条 `to` 为准。
+3. `roles.ts` 的 `ran(seen(...))`：架构/审计的聊天工作区若已被删除，`seen` 返回空，会显示成“你的默认 Agent”，而不是“记录已不在”。遗留，低风险。建议：找不到工作区时单独标出。
+4. 本次 e2e 的审计聊天没创建，所以“审计实际用 GLM”这一项只核对了设置，没有核对实际运行。遗留（e2e 的覆盖缺口）。审计实际用 GLM 已在单元测试里覆盖：`tests/fork-plan-roles-visible.test.ts` 第一个用例里，检查对话的工作区是 GLM，视图也显示 GLM。演示环境没有本地模型运行时，审计对话跑不完，所以 e2e 不等它。
+
+未发现界面显示与记录矛盾的情况。
+
+## 收尾验证（BLG-203）
+
+- 审计之后修了一处：`protocol.ts` 必须只依赖 zod、并且不引用别的文件（手机在 Bare 里加载它，见 `tests/companion-coverage.test.ts`）。所以 `roles` 的 schema 放回 `protocol.ts`，多了 4 行。`src/fork/companion/plan-roles-view.ts` 改成只做转导出。
+- 已通过：`npm run typecheck`、`packages/mac` 的 `tsc --noEmit`、`packages/companion` 的 `npm run typecheck`、本里程碑的 vitest（fork-plan-roles-visible、fork-companion-roles、plan-fix-agent、plan-arch-agent、companion-coverage、parity、i18n、upstream-sync）、e2e `fork-roles-visible.spec.ts`。`sync-upstream.mjs --report` 里没有标 ! 的文件。
+- 全量 `npx vitest run` 跑了三次。第一次失败的是上面的 companion-coverage，已修。第二、三次都是 652 个文件通过，只有 `tests/machines/linux-computer.test.ts:158`（终端那一步的 waitFor 超时）失败，当时机器负载在 12～15。单独跑这个文件能通过。BLG-194 记过同样的情况：它在 main 上的同一行也会这样失败。所以这次没有拿到 `Tested-on` 行，属于**遗留**，和本里程碑的改动无关。
