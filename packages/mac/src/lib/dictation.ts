@@ -9,7 +9,6 @@ import { joinPhrases, PhraseCutter, PHRASE_RATE, promptFrom, Resampler } from '@
 import { cleanWords, DICTATION_MAX_SECONDS, dictationAudio, HOLD_MS, matchesAccel, parseAccel, spoken, wavFromFloats } from './dictation-model.js';
 import { isRecording } from './shortcuts.js';
 import { microphoneSettings, thisComputer } from './os-words.js';
-import { isImeComposing } from './ime.js';
 
 /**
  * Speak instead of typing (BLG-145): the microphone beside Send, and the talk shortcut (Settings ›
@@ -355,7 +354,7 @@ export function useDictationSetup(c: SocketClient): void {
           e.stopPropagation();
           return cancelDictation();
         }
-        if (e.key === 'Enter' && (state.kind === 'listening' || state.kind === 'writing') && !isImeComposing(e)) {
+        if (e.key === 'Enter' && (state.kind === 'listening' || state.kind === 'writing') && !e.isComposing) {
           e.preventDefault();
           e.stopPropagation();
           // ⌘↩ sends it, even while the last phrase is still being written down.

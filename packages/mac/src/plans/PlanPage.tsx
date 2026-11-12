@@ -41,7 +41,6 @@ import { revealLabel } from '../lib/os-words.js';
 import { useActions } from '../lib/actions.js';
 import { onMachine } from '../machines/pane-model.js';
 import { useMoveTo } from './move-to.js';
-import { isImeComposing } from '../lib/ime.js';
 
 const PlanCanvas = lazy(() => import('./PlanCanvas.js'));
 
@@ -566,7 +565,7 @@ function TitleField({ value, onSave }: { value: string; onSave: (title: string) 
       onChange={(e) => ((typed.current = true), setText(e.target.value.replace(/\s*\n\s*/g, ' ')))}
       onBlur={save}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !isImeComposing(e)) {
+        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
           e.preventDefault();
           e.currentTarget.blur();
         }

@@ -10,8 +10,8 @@ import { DataSheet } from '../../sentinel/DataSheet.js';
 import { ShareProjectSheet } from './ShareProjectSheet.js';
 import { SyncSheet } from '../../tasks/SyncSheet.js';
 import { NewPlanSheet, PlanModeSheet, PlanStyleSheet, SendBackSheet } from '../../plans/PlanSheets.js';
-import { PlanSettingsSheet } from '../../plans/PlanSettingsSheet.js';
 import { useState } from 'react';
+import { forkSheet } from '../../fork/sheets.js';
 import { channelOf } from '@beluga/core/store.js';
 import { canRunOn } from '@beluga/core/trust.js';
 import { menuSpec } from '@beluga/ui/menus.js';
@@ -169,6 +169,7 @@ export function NativeSheets() {
   const sheet = useSheet(useMachine());
   if (!sheet) return null;
   const close = closeSheet;
+  const fork = forkSheet(sheet, close); if (fork) return fork;
   switch (sheet.kind) {
     case 'fork':
       return <ForkSheet key={sheet.wsId} wsId={sheet.wsId} close={close} />;
@@ -222,8 +223,6 @@ export function NativeSheets() {
       return <SendBackSheet planId={sheet.planId} milestone={sheet.milestone} close={close} />;
     case 'plan_mode':
       return <PlanModeSheet key={sheet.planId} planId={sheet.planId} close={close} />;
-    case 'plan_settings':
-      return <PlanSettingsSheet key={sheet.planId} planId={sheet.planId} close={close} />;
     case 'git_trouble':
       return <GitTroubleSheet key={`${sheet.wsId}:${sheet.trouble.kind}`} wsId={sheet.wsId} trouble={sheet.trouble} retry={sheet.retry} close={close} />;
     case 'confirm':

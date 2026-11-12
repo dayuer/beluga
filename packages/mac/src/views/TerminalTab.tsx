@@ -5,7 +5,6 @@ import { cx } from '../components/ui.js';
 import { useApi } from '../lib/beluga.js';
 import m from '../components/SpecMenu.module.css';
 import s from './terminal.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 export interface TerminalTabProps {
   readonly termKey: string;
@@ -48,7 +47,7 @@ function NameField({ label, onDone }: { label: string; onDone: (name: string | u
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter' && !isImeComposing(e)) end(text);
+        if (e.key === 'Enter') end(text);
         if (e.key === 'Escape') end(undefined);
       }}
       onBlur={() => end(text)}

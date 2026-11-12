@@ -5,7 +5,6 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import m from '../components/SpecMenu.module.css';
 import t from './tasks.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * A pop-up menu that picks a value: each choice with its own mark (a status ring, priority bars,
@@ -86,7 +85,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
                 onChange={(e) => setQuery(e.target.value)}
                 // Typing goes to the field, not the menu's type-ahead.
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isImeComposing(e) && onCreate && q && !exact) {
+                  if (e.key === 'Enter' && onCreate && q && !exact) {
                     e.preventDefault();
                     onCreate(query.trim());
                     setQuery('');

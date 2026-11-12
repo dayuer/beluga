@@ -5,7 +5,6 @@ import { Select, type SelectOption } from '../components/Select.js';
 import { Tip } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import s from './draft.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /** What a new worktree starts from and is called (empty name: Beluga names it from the task). */
 export interface WorktreeChoice {
@@ -60,7 +59,7 @@ export function WorktreeDraft({ projectId, choice, onChange }: { projectId: stri
           onChange={(e) => onChange({ ...choice, name: e.target.value })}
           onKeyDown={(e) => {
             // Return in the name goes to the task (or creates it when there's no task).
-            if (e.key === 'Enter' && !isImeComposing(e)) {
+            if (e.key === 'Enter') {
               e.preventDefault();
               document.dispatchEvent(new CustomEvent('beluga:focus-composer'));
             }

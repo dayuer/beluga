@@ -28,7 +28,6 @@ import { useNow } from '../chat/Items.js';
 import { useWorkspaceColor } from './row-color-view.js';
 import s from './Sidebar.module.css';
 import o from './other-worktrees.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * What a workspace's right-click menu offers: its toolbar's actions, named and drawn the same
@@ -346,7 +345,7 @@ function WorkspaceNameField({ initial, kind, onDone }: { initial: string; kind: 
       onBlur={() => finish(name.trim() || undefined)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (isImeComposing(e)) return;
+        if (e.nativeEvent.isComposing) return;
         if (e.key === 'Enter') {
           e.preventDefault();
           if (name.trim()) finish(name.trim());

@@ -16,6 +16,13 @@
 4. **通用的修复提回上游。** 对所有人都有用的改动（测试修复、界面小问题）给上游提 PR。上游合并之后，这个差异就消失了。
 5. **改上游文件之前先问自己**：能不能放进新文件？不能的话，就在下面的清单里写一行原因。
 
+### min-conflict 的四条规矩（里程碑 6，见 `docs/reports/plan-roles-min-conflict.md`）
+
+1. **每个上游文件最多 3 行。** 只放接入点：一个 import、一次调用、一个展开或一个导出。改动行 = 增加行与删除行里较多的一边，`--report` 会列出每个文件的行数和超过 3 行的个数。
+2. **一处集中，不处处改。** 同一种判断要加进很多文件时，在一个公共入口拦下（例：输入法组字时的 Enter 由 `packages/mac/src/fork/ime-guard.ts` 在 window 捕获阶段统一拦，各输入框不动）。
+3. **不删上游代码行。** 要换掉上游的一个组件，就在 `fork/` 里放自己的版本，用钩子打开它，上游的版本原样留着（例：`packages/mac/src/fork/sheets.tsx` 的 `forkSheet` 先于上游的 switch 接管“新建计划”和“计划设置”）。上游以后改了被替换的组件，同步时要把改动带进 fork 的版本。
+4. **不往上游测试文件里加用例。** fork 的用例放 fork 自己的文件：`tests/fork-*.test.ts`、`packages/mac/e2e/fork-*.spec.ts`。上游测试只在上游自己也坏了的时候改（并提回上游）。
+
 ## 同步上游
 
 ```bash
@@ -74,6 +81,11 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
+- `packages/mac/src/main.tsx`：一行 `import './fork/boot.js'`（fork 随页面启动的东西，现在是输入法拦截）
+- `packages/mac/src/dialogs/native/WorkSheets.tsx`：两行，`forkSheet`（`packages/mac/src/fork/sheets.tsx`）先接管 fork 的对话框（新建计划、计划设置）
+- `packages/mac/src/plans/PlanSheets.tsx`：末尾一行导出 `AutonomyCards`、`GoalBox`，给 fork 的 `packages/mac/src/fork/plans/NewPlanSheet.tsx` 用（上游的 `NewPlanSheet` 原样留着；上游改它时，把改动带进 fork 版）
+- `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
+- `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
 
 ### 沉稳界面（docs/calm-ui.md）
 
@@ -114,12 +126,14 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 计划按档位分工（架构 / 编码 / 审核 / 疑难修复）：第二阶段要抽出来
 
+已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
+
 - 核心：`src/core/plans/pilot.ts`、`src/core/plans/work.ts`、`src/core/plans/plans.ts`、`src/core/plans/prompt.ts`、`src/core/plans/model.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/progress.ts`、`src/core/plans/owner.ts`、`src/core/plans/move.ts`、`src/core/plans/move-work.ts`、`src/core/notify.ts`、`src/core/board/launch.ts`
 - Agent：`src/agent/plan-tools.ts`、`src/agent/policy.ts`、`src/agent/types.ts`
 - API：`src/ipc/plans-api.ts`、`src/ipc/plans-handlers.ts`、`src/external/domain/tools.ts`、`src/external/adapters/tools/state-rows.ts`
 - 手机：`src/companion/protocol.ts`、`src/companion/views.ts`、`src/companion/calls.ts`、`packages/companion/app/plan/[id].tsx`、`packages/companion/lib/link/calls.ts`、`packages/companion/components/AgentPicker.tsx`
-- Mac：`packages/mac/src/plans/PlanPage.tsx`、`packages/mac/src/plans/PlanSheets.tsx`、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`；计划设置的接入：`packages/mac/src/dialogs/native/WorkSheets.tsx`（一个 case）、`packages/mac/src/lib/sheets.ts`（一行）
-- 文档与测试：`docs/tasks-and-plans.md`、`tests/plans.test.ts`、`tests/agent-change.test.ts`、`tests/mac-plans.test.ts`（计划动态里角色变化的中文行）
+- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
+- 测试：`tests/plans.test.ts`、`tests/agent-change.test.ts`
 
 ### 自动路由（没指定 agent 的任务交给合适的模型）
 
@@ -145,9 +159,11 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 中文输入法组字时 Enter 只选词（BLG-133：留在 fork，不提回上游）
 
-原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown，输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断放在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），每个输入框只加一次调用。
+原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown（keyCode 229，`isComposing` 已是 false），输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），只有一处用它：`packages/mac/src/fork/ime-guard.ts` 在 window 的捕获阶段拦下组字中的 Enter，以及组字时的 Tab、Esc 和方向键（各输入框以前自己的判断也挡这些；字母不拦，快捷键照常）（`stopImmediatePropagation`，从不 `preventDefault`，否则会吃掉上屏的字），终端（`.xterm` 里）放行。各输入框与上游一致。测试：`tests/ime.test.ts`、`tests/ime-guard.test.ts`、`packages/mac/e2e/fork-ime.spec.ts`。
 
-- `packages/mac/e2e/plan-chat.spec.ts`、`packages/mac/src/agent-term/TermPane.tsx`、`packages/mac/src/call/NotesBox.tsx`、`packages/mac/src/chat/BoxSuggestions.tsx`、`packages/mac/src/chat/Composer.tsx`、`packages/mac/src/chat/EditPrompt.tsx`、`packages/mac/src/chat/FindBar.tsx`、`packages/mac/src/chat/WorktreeDraft.tsx`、`packages/mac/src/claude-code/AgentMonitor.tsx`、`packages/mac/src/components/FormSheet.tsx`、`packages/mac/src/components/SelectMenu.tsx`、`packages/mac/src/components/markdown/CodeEditor.tsx`、`packages/mac/src/components/markdown/DocFind.tsx`、`packages/mac/src/dialogs/MachinesSettings.tsx`、`packages/mac/src/dialogs/MenuSheet.tsx`、`packages/mac/src/dialogs/SettingsSearch.tsx`、`packages/mac/src/dialogs/native/PeerSheets.tsx`、`packages/mac/src/dialogs/native/ShareFolderSheet.tsx`、`packages/mac/src/dialogs/native/parts.tsx`、`packages/mac/src/gateway/AccessSettings.tsx`、`packages/mac/src/gateway/RequestsView.tsx`、`packages/mac/src/issues/IssueComposer.tsx`、`packages/mac/src/issues/IssueReply.tsx`、`packages/mac/src/issues/IssuesView.tsx`、`packages/mac/src/layout/ProjectGroups.tsx`、`packages/mac/src/layout/SidebarSearch.tsx`、`packages/mac/src/layout/panel/ContentSearch.tsx`、`packages/mac/src/layout/workspace-row.tsx`、`packages/mac/src/lib/dictation.ts`、`packages/mac/src/network/ConversationView.tsx`、`packages/mac/src/network/EmojiPicker.tsx`、`packages/mac/src/network/GroupInfo.tsx`、`packages/mac/src/network/NetComposer.tsx`、`packages/mac/src/network/NetworkSheets.tsx`、`packages/mac/src/network/NetworkSidebar.tsx`、`packages/mac/src/network/StatusMenu.tsx`、`packages/mac/src/onboarding/Onboarding.tsx`、`packages/mac/src/onboarding/SetupSteps.tsx`、`packages/mac/src/phone/PhoneView.tsx`、`packages/mac/src/pr/PrConversation.tsx`、`packages/mac/src/sentinel/DashboardPage.tsx`、`packages/mac/src/sentinel/SentinelCards.tsx`、`packages/mac/src/sentinel/SentinelHome.tsx`、`packages/mac/src/sentinel/SentinelPage.tsx`、`packages/mac/src/tasks/Activity.tsx`、`packages/mac/src/tasks/Brief.tsx`、`packages/mac/src/tasks/NewTaskSheet.tsx`、`packages/mac/src/tasks/TaskPage.tsx`、`packages/mac/src/tasks/TaskSections.tsx`、`packages/mac/src/team/SharedPlans.tsx`、`packages/mac/src/views/DiffComment.tsx`、`packages/mac/src/views/SearchView.tsx`、`packages/mac/src/views/reader/FileEditor.tsx`
+- 上游文件只有 `packages/mac/src/main.tsx` 一行（见上面“只有一行接入点”）。
+
+以前（PR #20）每个输入框各改两行，共 60 个文件；已全部恢复上游原样（逐文件列表见 `docs/reports/plan-roles-min-conflict.md`）。
 
 ### 适合提回上游的通用修复
 
@@ -155,5 +171,5 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - 路径上不存在的图片显示为“缺失”：`packages/mac/src/chat/images.ts`、`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`tests/mac-chat-images-cache.test.ts`
 - 本地模型在自己的文件夹里运行 Claude Code：`src/agent/runtime/local.ts`、`tests/local-endpoints.test.ts`
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
-- 哨兵保留数据的测试不再用固定日期（过了 14 天保留期就失败，上游也一样）：`tests/sentinel-kept-data.test.ts`
+- 哨兵保留数据的测试不再用固定日期（过了 14 天保留期就失败，上游也一样；只改一行）：`tests/sentinel-kept-data.test.ts`
 - 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`

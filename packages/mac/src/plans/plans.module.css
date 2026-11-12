@@ -251,15 +251,13 @@
 }
 .pageHead {
   display: flex;
-  /* Narrow (BLG-124): the actions go under the name rather than over it. */
-  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 6px 16px;
+  gap: 16px;
   padding: 10px 16px 12px;
   border-bottom: 1px solid var(--hairline);
 }
 .headMain {
-  flex: 1 1 260px;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1015,31 +1013,6 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-3);
-}
-/* A milestone's design (from the plan's architect): folded to its heading until opened. */
-.designFold > summary {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  cursor: default;
-  list-style: none;
-}
-.designFold > summary::-webkit-details-marker {
-  display: none;
-}
-.designFold > summary::before {
-  content: '▸';
-  font-size: 10px;
-  color: var(--text-3);
-}
-.designFold[open] > summary::before {
-  content: '▾';
-}
-.designFold > summary h4 {
-  margin: 0;
-}
-.designFold > summary span {
-  font-size: 12px;
 }
 .checks,
 .plainList {
@@ -2277,3 +2250,6 @@ textarea.goalBox {
     animation: none;
   }
 }
+/* fork (BLG-124): narrow, the actions go under the plan’s name */
+.pageHead { flex-wrap: wrap; gap: 6px 16px; }
+.headMain { flex: 1 1 260px; }

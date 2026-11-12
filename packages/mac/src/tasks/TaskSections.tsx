@@ -16,7 +16,6 @@ import { formatBytes } from '@beluga/shared/format.js';
 import { useBoard, useSelfId, useSolo, useTaskActions } from './use-tasks.js';
 import t from './tasks.module.css';
 import { primaryKey, primaryLabel } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /** A task page's lists: its sub-tasks, what waits on what, the files added for the work, and the proof that it works. */
 
@@ -74,7 +73,7 @@ export function SubTasks({ issue }: { issue: Issue }) {
           maxLength={200}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !isImeComposing(e)) {
+            if (e.key === 'Enter') {
               e.preventDefault();
               void add();
             } else if (e.key === 'Escape') setTitle('');
@@ -216,7 +215,7 @@ export function ProofList({ issue }: { issue: Issue }) {
             aria-label="Link"
             onChange={(e) => setLink(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeComposing(e)) void addLink();
+              if (e.key === 'Enter') void addLink();
               else if (e.key === 'Escape') setLink(undefined);
             }}
             onBlur={() => !link?.trim() && setLink(undefined)}

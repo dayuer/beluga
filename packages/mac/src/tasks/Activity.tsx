@@ -13,7 +13,6 @@ import { useApp } from '../lib/beluga.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import t from './tasks.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * What happened to a task, oldest first: changes as quiet lines ("Beluga moved this to In
@@ -130,7 +129,7 @@ function CommentBox({ issue, people, world }: { issue: Issue; people: ReadonlyAr
           aria-expanded={tags.open}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (isImeComposing(e) || tags.onKey(e)) return;
+            if (e.nativeEvent.isComposing || tags.onKey(e)) return;
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
               void send();

@@ -9,7 +9,6 @@ import menu from '../../components/SpecMenu.module.css';
 import { FILTERS, FILTER_LABELS, type OverviewFilter, type OverviewSort, SORTS, SORT_LABELS } from './overview-model.js';
 import s from './filter-bar.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
-import { isImeComposing } from '../../lib/ime.js';
 
 const FILTER_HINTS: Record<OverviewFilter, string> = {
   all: 'Everything, archived included',
@@ -157,7 +156,7 @@ function SearchField({ search, onSearch, searchRef, onLeave }: { search: string;
             e.stopPropagation();
             if (search) onSearch('');
             else onLeave();
-          } else if (e.key === 'ArrowDown' || e.key === 'Enter' && !isImeComposing(e)) {
+          } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
             e.preventDefault();
             onLeave();
           }
