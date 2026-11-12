@@ -940,3 +940,12 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 | `hooks.md §9.2` 冻结组内容不更新 | 改为「只冻结顺序」（SH-08，fork/calm/hold-order.ts） |
 | `hooks.md §9.6` 菜单启发式 | 扩到 dialog/listbox（SH-09） |
 | `hooks.md §9.6` 被压制的撤销不响应 ⌘Z | 维持 M2 设计；报告 §7 记录，175 迁出问题表 |
+
+### 12.2 M4 同步跟进（上游 3.2.0）
+
+| 编号 | 来源 | 做法 | 目标文件 | 验收 |
+| --- | --- | --- | --- | --- |
+| M4-01 | 同步 3.2.0 新增：`call/PointerMark.tsx` 点击时 `pill.animate([scale(1) → scale(1.16) → scale(1)], 360ms)`（fork-calm 报 `element-animate`/`overscale`） | 把 `calmOn()` 加进 `paintTag` 的守卫：沉稳模式下点击不放大（reduced-motion 上游本来就停）；`POP_MS` 与曲线不动 | `packages/mac/src/call/PointerMark.tsx`（一行接入点） | calm-on/full 点指针标记无数值放大；calm-off/full 仍弹；reduce 两档都不弹 |
+| — | 同步 3.2.0 新增：`components/SelectionBar.module.css` 的 `rise`/`drop`、`call/pointer.module.css` 的 320/420ms 过渡 | 覆盖层已管到：M1 的全局 `animation-name: none` 停关键帧，M3 的过渡 clamp 收到 160ms；无需新规则 | `fork/calm/calm-motion.css`（已有规则） | calm-on/full 下 SelectionBar 无 keyframes、pointer 过渡 0.16s |
+
+快照在逐条裁决后用 `CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts` 接受这 6 条上游新增记录（它们仍是上游的静态事实，只是已确认被覆盖层或挂钩管到）。

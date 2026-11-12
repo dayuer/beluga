@@ -29,13 +29,28 @@ function subscribe(l: () => void): () => void {
   return () => void listeners.delete(l);
 }
 
+/**
+ * A menu, dialog or picker opened from a row: those are portaled to <body>, outside the React
+ * root. A listbox that belongs to the page itself (the Changes tab's file list, in the right
+ * panel) must not keep the order frozen — that bug left the sidebar held for as long as that tab
+ * was open.
+ */
+function popupOpen(): boolean {
+  if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return false;
+  for (const el of document.querySelectorAll('[role="menu"], [role="dialog"], [role="listbox"]')) {
+    if (el.closest('#root')) continue;
+    return true;
+  }
+  return false;
+}
+
 /** Nothing is being used any more: let go unless a menu opened from the sidebar is still up. */
 function release(): void {
   grace = undefined;
   // A menu (or a picker's dialog/listbox) opened from a row is a portal outside the sidebar, so
   // moving into it already ended the pointer hold. Ask the page instead: still open keeps the
   // order for another grace period (M3: dialogs and listboxes too, not only menus).
-  if (typeof document !== 'undefined' && document.querySelector('[role="menu"], [role="dialog"], [role="listbox"]')) {
+  if (popupOpen()) {
     grace = setTimeout(release, HOLD_MS);
     return;
   }
@@ -81,7 +96,12 @@ export function useSidebarHold(ref: RefObject<HTMLElement | null>): void {
     if (!on || !el) return;
     const enter = (): void => holdBegin('pointer');
     const leave = (): void => holdEnd('pointer');
-    const focusIn = (): void => holdBegin('keys');
+    // Only keyboard focus holds: a clicked button keeps focus after the pointer has left, and
+    // counting that froze the order until you clicked somewhere else (M4 e2e, unread.spec).
+    const focusIn = (ev: FocusEvent): void => {
+      const t = ev.target;
+      if (t instanceof Element && t.matches(':focus-visible')) holdBegin('keys');
+    };
     const focusOut = (): void => {
       // The new focus lands after this event: stay held while it is still inside the sidebar.
       requestAnimationFrame(() => {

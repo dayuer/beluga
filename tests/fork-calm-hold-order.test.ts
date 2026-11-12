@@ -6,14 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * packages/mac/e2e/fork-calm-sidebar.spec.ts; here are the timer rules they rely on.
  */
 
-/** A stand-in for the window: the <html> data-calm sets, and the menus the page has open. */
-function windowish(menuOpen = false): { menuOpen: boolean } {
+/**
+ * A stand-in for the window: the <html> data-calm sets, and the popups the page has open.
+ * `inPage` puts the popup inside the React root (a page's own listbox), where it must not hold
+ * the order; a real popup is portaled outside it.
+ */
+function windowish(menuOpen = false, inPage = false): { menuOpen: boolean } {
   const state = { menuOpen };
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined });
   vi.stubGlobal('document', {
     documentElement: { dataset: {} as Record<string, string | undefined> },
     activeElement: null,
-    querySelector: (selector: string) => (selector.includes('[role="menu"]') && state.menuOpen ? {} : null),
+    querySelectorAll: (selector: string) =>
+      selector.includes('[role="menu"]') && state.menuOpen ? [{ closest: (sel: string) => (inPage && sel === '#root' ? {} : null) }] : [],
   });
   return state;
 }
@@ -94,6 +99,15 @@ describe('the sidebar holds its order while it is being used', () => {
     vi.advanceTimersByTime(HOLD_MS);
     expect(holdHeld()).toBe(true); // the menu is still up: the release waits another grace period
     state.menuOpen = false;
+    vi.advanceTimersByTime(HOLD_MS);
+    expect(holdHeld()).toBe(false);
+  });
+
+  it('a listbox that belongs to the page (the Changes file list) does not hold the order', async () => {
+    windowish(true, true); // open, but inside the React root
+    const { holdBegin, holdEnd, holdHeld, HOLD_MS } = await load();
+    holdBegin('pointer');
+    holdEnd('pointer');
     vi.advanceTimersByTime(HOLD_MS);
     expect(holdHeld()).toBe(false);
   });

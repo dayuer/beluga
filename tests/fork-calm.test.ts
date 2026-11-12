@@ -42,6 +42,7 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'packages/mac/src/chat/flight.ts', match: /calmOn\(\)/, why: 'a sent message lands without the flight in calm mode (M3 · CH-06)' },
   { file: 'packages/mac/src/tasks/TaskBoard.tsx', match: /calmOn\(\)|useCalm\(\)/, why: 'cards take their places at once in calm mode (M3 · WK-01)' },
   { file: 'packages/mac/src/sentinel/DashboardPage.tsx', match: /calmOn\(\)/, why: 'dashboard tiles do not glide in calm mode (M3 · DA-02)' },
+  { file: 'packages/mac/src/call/PointerMark.tsx', match: /calmOn\(\)/, why: 'the call pointer mark does not pop (scale 1.16) on click in calm mode (M4 · sync 3.2.0)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
