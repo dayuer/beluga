@@ -66,9 +66,11 @@ test('with calm mode off both toasts show, as upstream does', async ({ page }) =
   await page.goto('/');
   await expect(sidebar(page)).toBeVisible();
 
-  await appToast(page);
+  // The undo toast first (it stays a good while); the app toast fades by itself within seconds, so it
+  // goes second or it is gone before the menu has been used.
   await sidebar(page).getByRole('button', { name: 'bob-api' }).first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Hide Project' }).click();
+  await appToast(page);
 
   // Both together, each where it was: the app toast and the undo toast.
   await expect(toasts(page)).toHaveCount(2);

@@ -454,7 +454,11 @@ function Fold({ side, count, reduce, board, scroller, onMove, children }: { side
     kept.current = { width: w, carry: Math.max(-1, Math.min(1, want - s.scrollLeft)) };
   }, [side, board, scroller]);
   // Opening at once (reduced motion) has no frames: hold the board before it paints.
-  useLayoutEffect(hold, [hold]);
+  // The drag reads the columns again for a moment after one opens (foldMoved): opening at once is that moment too.
+  useLayoutEffect(() => {
+    hold();
+    onMove();
+  }, [hold, onMove]);
   useEffect(() => () => void (side === 'before' && board()?.style.removeProperty('min-width')), [side, board]);
   return (
     <motion.div
