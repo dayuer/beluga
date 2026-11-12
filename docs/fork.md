@@ -22,20 +22,45 @@
 node scripts/sync-upstream.mjs
 ```
 
-这个脚本会：
+脚本按五步走：
 
-- 打开 `git rerere`：同一处冲突解决过一次，以后会自动按同样的方式解决。
-- 拉取上游，从当前分支切出 `sync/upstream-<版本>-<日期>`，用 merge 合进 `upstream/main`。不用 rebase，因为 main 已经公开。
-- 自动处理版本号：`packages/mac/package.json` 和 `packages/mac/src-tauri/tauri.conf.json` 如果冲突，并且 fork 在这两个文件里只改了版本号，就取两边中较高的版本。
-- 列出还没解决的冲突，以及下面这份“改了上游的文件”清单。没写原因的文件会标 `!`。
+1. **合并前先看风险。** 打开 `git rerere`（同一处冲突解决过一次，以后自动按同样方式解决），拉取上游，先打印「合并时检查 (check while merging)」：这个 fork 改过、这次上游也改了的文件。标 `⚠ 沉稳界面` 的，是下面「沉稳界面」与「M3 逐页补改」两节登记过的接入点——它们最可能冲突，也最可能在自动合并后悄悄失效。然后从当前分支切出 `sync/upstream-<版本>-<日期>`，用 merge 合进 `upstream/main`。不用 rebase，因为 main 已经公开。
+2. **版本号自动处理。** `packages/mac/package.json` 和 `packages/mac/src-tauri/tauri.conf.json` 如果冲突，并且 fork 在这两个文件里只改了版本号，就取两边中较高的版本。
+3. **合并后自动跑沉稳检查。** 干净合并时脚本自己接着跑；有冲突时，解完 `git add`、`git commit --no-edit` 之后手动跑同一条命令：
 
-解决完冲突后：`git add`、`git commit --no-edit`，跑 `npm run typecheck` 和 `npx vitest run`，然后从同步分支向 main 开 PR。
+   ```bash
+   node scripts/sync-upstream.mjs --after-merge
+   ```
 
-只想看差异：
+   它做三件事：① 跑 `tests/fork-calm.test.ts`，`NEW` 段就是上游新增的动效；退出码非 0 说明某个接入点被搬走或删掉了（按 `TOUCHPOINTS` 的 `why` 重接）。② 扫描 `fork/calm/*.css` 的定点规则，列出已经失效的类名、data 属性与 aria 字面量。③ 提示重跑 calm-check。结果以 `## 沉稳检查（sync 自动附加）` 追加进合并提交的说明；说明里已有这一段就不再追加。`--after-merge` 可以重复跑，用 `git commit --amend -F -` 核对。
+4. **逐条处置三段输出。** 新增动效 → 补一条覆盖层规则（`fork/calm/*.css`）或记为例外；失效选择器 → 改覆盖层的锚点；接入点断裂 → 按 `TOUCHPOINTS` 的 `why` 重接。快照只在逐条裁决之后更新：`CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts`。
+5. **重跑 calm-check 主场景再开 PR。** 沉稳开与 reduced-motion 各走一遍：
+
+   ```bash
+   npm run dev
+   cd packages/mac && npm run dev
+   node packages/mac/scripts/calm-check.mjs room chatrun chatsteps tasks sentinel usage onboarding call
+   ```
+
+   然后跑 `npm run typecheck` 和 `npx vitest run`，从同步分支向 main 开 PR。
+
+只想看不想合并：
 
 ```bash
 node scripts/sync-upstream.mjs --report
 ```
+
+打印同样的三段：合并时检查、fork-calm 的新增/消失动效、失效的覆盖层规则；再加下面这份「改了上游的文件」清单。没写原因的文件标 `!`（退出码 1）。
+
+演练时用 `--remote` / `--ref` 指向一个本地镜像，真实的上游 remote 全程不动：
+
+```bash
+node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
+```
+
+自动追加提交说明有护栏：只改 HEAD 是双亲合并提交、标题以 `Merge upstream` 开头、且说明里还没有标记行的那一条；人写的说明不会被覆盖。
+
+已知限度：类名失效检测按「这个名字还出现在任何上游 CSS 里吗」判定，抓的是整体改名或消失；同一个类名碰巧在别的模块里出现会被判为仍在。所以它只报告、不卡退出码，在同步 PR 里逐条裁决。
 
 **同步节奏：上游每发一个版本就同步一次。** 攒的提交越少，冲突越小。
 
@@ -49,6 +74,39 @@ node scripts/sync-upstream.mjs --report
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
+
+### 沉稳界面（docs/calm-ui.md）
+
+界面气质（布局稳定、动效克制、状态安静、反馈分级、一致可预期、逐页验收）由 `packages/mac/src/fork/calm/` 的覆盖层实现，规则只在 `:root[data-calm]` 下生效。上游文件只留这几处接入点：
+
+- `packages/mac/src/main.tsx`：在 `tokens.css`、`base.css` 之后加一行 `import './fork/calm/index.js'`；它在首帧前设置 `data-calm`，并引入 `fork/calm/calm.css`。
+- `packages/mac/src/dialogs/Settings.tsx`：Appearance 的 Layout 组、Reduce motion 行后加一行 `<CalmRow />`；开关本体在 `packages/mac/src/fork/calm/settings.tsx`。
+- `tests/mac-settings-search.test.ts`：appearance 的 `PANE_SOURCES` 加 `read('fork/calm/settings.tsx')`，让「索引的标签必须在面板源码里」这条校验读得到 fork 自己的行。
+- `CLAUDE.md`：原来的《The Mac app's look: calm, not lively》一节搬进 `docs/calm-ui.md`，原处只留一行指向；规则本体的改动都在 fork 文件里，不碰上游。
+- `packages/mac/src/layout/Sidebar.tsx`：一行 `useSidebarHold(drop.ref)`——「指针/焦点/拖拽是否在侧栏上」只有 nav 自己知道，探针逻辑在 `fork/calm/hold-order.ts`。操作侧栏时不重排、离开 600ms 后换上新顺序（`docs/calm/hooks.md` §1）。
+- `packages/mac/src/layout/EntryRow.tsx`：`useEntryList` 的返回值经过 `useHeldEntries`——Unread 与 Categories 两种侧栏模式都从这里拿排序结果，改这一处覆盖两种；冻结的取舍与实现见 `docs/calm/hooks.md` §1。M3 起只冻结顺序、内容取最新（「需要你」标记在操作期间也能到达），新增行等释放后出现（`docs/calm/overlay.md` §12 · SH-08）。
+- `packages/mac/src/chat/ChatLog.tsx`：回到底部按钮的 children 换成 `fork/calm/new-below.tsx` 的 `<JumpLabel rows={rows.length} />`——上游不提供「下面来了几条」，计数要跨渲染保存，只能做成组件；按钮本体、`stick` 滚动逻辑一行未动（`docs/calm/hooks.md` §2）。
+- `packages/mac/src/App.tsx`：`Toasts` 里加 `useOneToast('global', toast?.id)`，被后到的 toast 压制时不渲染，外层加 `data-one-toast="global"`——全局 toast 的渲染和 store 定时器都在这里（`docs/calm/hooks.md` §3）。
+- `packages/mac/src/lib/undo-toast.tsx`：`UndoToast` 里加 `useOneToast('undo', toast?.id)`，被压制时不渲染、不响应 ⌘Z（定时器照旧收尾），外层加 `data-one-toast="undo"`——撤销 toast 是模块级状态，两套必须在同一个判据下；样式在 `fork/calm/one-toast.css`（`docs/calm/hooks.md` §3）。
+- `packages/mac/src/lib/live-motion.ts`：`tick`/`wake`/`watch`/`joinLive` 里加 `calmLive` 门（同一文件 5 行）——时钟的 `seen`/`marks` 是模块私有的，外部拿不到，无法在 fork 文件里过滤；沉稳模式下只放行 `[data-current]` 里的标记，其余停在静止帧（`docs/calm/hooks.md` §4）。
+- `packages/mac/src/i18n/zh-CN.fork.json`：fork 自己的 `{0} new` 词条；上游文件不碰。
+
+### M3 逐页补改（docs/calm/overlay.md §12；每处一行接入点）
+
+逐页验收（BLG-170–172）后，覆盖层管不到的行为动效改成接入点；全部是「沉稳开时才改变」，关掉开关与上游一致。每个文件都在 `tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 有 canary（标 ✓）。
+
+- `packages/mac/src/chat/steps/AgentSteps.tsx` ✓：`useStill()` 读 `useCalm()`，沉稳时步骤行的 framer 进场/退场为 0 时长（CH-02）。
+- `packages/mac/src/chat/flight.ts` ✓：`land()`/`launchFlight()` 在沉稳时走「瞬时」分支，消息不再从输入框飞入（CH-06）。
+- `packages/mac/src/tasks/TaskBoard.tsx` ✓：`reduce` 判据加 `calmOn()`，沉稳时卡片重排/落位不做 framer layout 动画（WK-01）。
+- `packages/mac/src/sentinel/DashboardPage.tsx` ✓：`still()` 加 `calmOn()`，沉稳时仪表盘瓦片不做 220/260ms 的 glide（DA-02）。
+- `packages/mac/src/onboarding/onboarding.module.css`：`@media (prefers-reduced-motion: reduce)` 停掉 `heroSoft` 的 sheen 与 `beam`（RE-01，上游缺口；沉稳模式 M5 已停）。
+- `packages/mac/src/call/NotesBox.tsx`：跳到一条发言的高亮 900ms → 160ms，Reduce motion 下不做（overlay §8.1 遗留）。
+- `packages/mac/src/call/PointerMark.tsx` ✓：点击指针标记的 1.16 弹跳在沉稳模式下不做（`calmOn()` 加进 `paintTag` 的守卫；reduced-motion 上游本来就停）。上游 3.2.0 新增，M4 同步跟进（`docs/calm/overlay.md` §12.2）。
+- `packages/mac/e2e/unread.spec.ts`：未读断言从 `font-weight:650` 改为 400 + 计数徽标（沉稳 S2 的配套；fork-only 测试改动，见 `docs/calm/overlay.md` §12）；运行中出现的 Unread 行按 SH-08 等指针离开侧栏后再断言（先 `mouse.move` 出侧栏）。
+- `packages/mac/e2e/cool-window.spec.ts`：KLD-40 的“Working 光带走动”用例以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；沉稳模式故意让当前步骤以外的 live 标记停在静止帧（`docs/calm/hooks.md` §4），这条上游测试测的是上游时钟。
+- `packages/mac/e2e/send-no-blank.spec.ts`：消息飞行动画的上游用例以沉稳关运行；沉稳模式让消息直接落位、没有飞行（CH-06），这条测的是上游的飞行实现。
+- `packages/mac/e2e/steps.spec.ts`：步骤滑入折叠、消息飞行/飞入队列的上游用例以沉稳关运行；沉稳模式下步骤与 reduced-motion 一样瞬时进折叠（CH-02）、消息直接落位（CH-06），同文件后面的 reduced-motion 用例覆盖了那一档。
+- `packages/mac/e2e/threads-panel.spec.ts`：“threads 关时无标记”与“子线程折在父行下”两条在等新行前把指针移出侧栏（SH-08：指针在侧栏时新出现的行要等它离开）。
 
 ### 版本号（脚本自动处理）
 

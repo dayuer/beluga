@@ -1,6 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { blocking, compareVersions, onlyVersionChanged, unexplained, versionOf, withVersion } from '../scripts/sync-upstream.mjs';
+import {
+  blocking,
+  bothChanged,
+  CALM_SUMMARY_MARKER,
+  calmFiles,
+  calmSummary,
+  compareVersions,
+  forkCalmFindings,
+  onlyVersionChanged,
+  parseArgs,
+  selectorsIn,
+  staleSelectors,
+  unexplained,
+  versionOf,
+  withCalmSummary,
+  withVersion,
+} from '../scripts/sync-upstream.mjs';
+import type { SelectorUse } from '../scripts/sync-upstream.mjs';
 import { withForkSettings } from '../packages/mac/src/fork/settings-index.js';
 
 /** Syncing upstream into this fork (docs/fork.md, scripts/sync-upstream.mjs). */
@@ -39,6 +56,156 @@ describe('syncing upstream', () => {
   it('explains every touch point it knows of in docs/fork.md', () => {
     const doc = readFileSync('docs/fork.md', 'utf8');
     for (const f of ['src/companion/coverage.ts', 'packages/mac/src/dialogs/settings-index.ts', 'packages/mac/src/i18n/index.ts', 'tests/parity.test.ts']) expect(doc).toContain(`\`${f}\``);
+  });
+});
+
+/** The merge checks: what both sides changed, what calm mode anchors on (docs/fork.md「同步上游」). */
+describe('checking a merge', () => {
+  it('reads the switches, keeping the real remote when none is given', () => {
+    expect(parseArgs([])).toEqual({ report: false, afterMerge: false, remote: 'upstream', ref: 'main' });
+    expect(parseArgs(['--report'])).toMatchObject({ report: true, afterMerge: false });
+    expect(parseArgs(['--after-merge', '--remote', 'calm-rehearsal', '--ref', 'main'])).toEqual({
+      report: false,
+      afterMerge: true,
+      remote: 'calm-rehearsal',
+      ref: 'main',
+    });
+    expect(parseArgs(['--remote=mirror', '--ref=next'])).toMatchObject({ remote: 'mirror', ref: 'next' });
+  });
+
+  it('lists the files both sides changed, once, in order', () => {
+    expect(bothChanged(['b', 'a', 'b'], ['a', 'b', 'c'])).toEqual(['a', 'b']);
+    expect(bothChanged(['a'], [])).toEqual([]);
+    expect(bothChanged([], ['a'])).toEqual([]);
+  });
+
+  const DOC = [
+    '### 只有一行接入点',
+    '- `packages/mac/src/old.ts`',
+    '### 沉稳界面（docs/calm-ui.md）',
+    '- `packages/mac/src/main.tsx`：一行 `useSidebarHold(drop.ref)`，探针在 `fork/calm/hold-order.ts`，规则只在 `:root[data-calm]` 下生效',
+    '### M3 逐页补改',
+    '- `packages/mac/src/chat/flight.ts`',
+    '### 版本号（脚本自动处理）',
+    '- `packages/mac/package.json`',
+  ].join('\n');
+
+  it('takes the calm sections (hooks and M3 follow-ups) but only paths', () => {
+    const files = calmFiles(DOC);
+    expect(files.has('packages/mac/src/main.tsx')).toBe(true);
+    expect(files.has('packages/mac/src/chat/flight.ts')).toBe(true);
+    expect(files.has('fork/calm/hold-order.ts')).toBe(true);
+    expect(files.has('packages/mac/src/old.ts')).toBe(false);
+    expect(files.has('packages/mac/package.json')).toBe(false);
+    expect(files.has(':root[data-calm]')).toBe(false);
+    expect(files.has('useSidebarHold(drop.ref)')).toBe(false);
+  });
+
+  it('runs to the end of the file when the end heading is gone', () => {
+    expect(calmFiles('### 沉稳界面\n- `a/b.ts`').has('a/b.ts')).toBe(true);
+    expect(calmFiles('no headings at all').size).toBe(0);
+  });
+});
+
+describe('the calm overlay’s anchors', () => {
+  const CSS = [
+    '/* .needsRow explained in a comment is not a selector */',
+    ":root[data-calm] [class*='_needsRow_']::after { display: none }",
+    '.signal .glass-surface:hover { transform: none }',
+    '[data-step][data-current] { margin-top: 0 }',
+    "[aria-label='Your card'] {}",
+    '[aria-label="Side question"] {}',
+    "@import './calm-tokens.css';",
+  ].join('\n');
+
+  it('reads the classes, data attributes and aria literals a rule anchors on', () => {
+    const uses = selectorsIn([{ file: 'fork/calm/a.css', text: CSS }]);
+    const at = (kind: string, name: string) => uses.find((u) => u.kind === kind && u.name === name);
+    expect(at('class', '_needsRow_')?.selector).toBe("[class*='_needsRow_']");
+    expect(at('class', 'glass-surface')?.selector).toBe('.glass-surface');
+    expect(at('class', 'needsRow')).toBeUndefined();
+    expect(at('class', 'css')).toBeUndefined();
+    expect(at('data', 'data-step')).toBeTruthy();
+    expect(at('data', 'data-current')).toBeTruthy();
+    expect(at('aria', 'Your card')?.selector).toBe("[aria-label='Your card']");
+    expect(at('aria', 'Side question')?.selector).toBe('[aria-label="Side question"]');
+  });
+
+  const use = (kind: SelectorUse['kind'], name: string): SelectorUse => ({ kind, name, selector: name, files: ['fork/calm/a.css'] });
+  const stale = (uses: SelectorUse[], sources: { file: string; text: string }[]): string[] =>
+    staleSelectors(uses, sources).map((u) => `${u.kind}|${u.name}`);
+
+  it('keeps a CSS-module class alive while upstream still writes .needsRow', () => {
+    expect(stale([use('class', '_needsRow_')], [{ file: 'layout/signal.module.css', text: '.needsRow { color: amber }' }])).toEqual([]);
+  });
+
+  it('reports a class upstream renamed away', () => {
+    const sources = [{ file: 'layout/signal.module.css', text: '.needsLine { color: amber }' }];
+    expect(stale([use('class', '_needsRow_')], sources)).toEqual(['class|_needsRow_']);
+  });
+
+  it('does not mistake a longer class for the same name', () => {
+    const sources = [{ file: 'layout/signal.module.css', text: '.needsRowBig { color: amber }' }];
+    expect(stale([use('class', '_needsRow_')], sources)).toEqual(['class|_needsRow_']);
+  });
+
+  it('lets a third-party class through', () => {
+    expect(stale([use('class', 'react-flow__node')], [])).toEqual([]);
+  });
+
+  it('keeps a data attribute any source sets, fork included, and never the switch itself', () => {
+    expect(stale([use('data', 'data-dragging')], [{ file: 'fork/calm/hold-order.ts', text: "observe(root, { attributeFilter: ['data-dragging'] })" }])).toEqual([]);
+    expect(stale([use('data', 'data-dragging')], [{ file: 'chat/a.tsx', text: 'nothing' }])).toEqual(['data|data-dragging']);
+    expect(stale([use('data', 'data-calm')], [])).toEqual([]);
+  });
+
+  it('counts an aria literal only in a tsx outside fork/', () => {
+    const sources = [{ file: 'views/usage/YourCard.tsx', text: '<section aria-label="Your card" />' }];
+    expect(stale([use('aria', 'Your card')], sources)).toEqual([]);
+    expect(stale([use('aria', 'Your card')], [{ file: 'fork/calm/x.tsx', text: 'Your card' }])).toEqual(['aria|Your card']);
+    expect(stale([use('aria', 'Your card')], [{ file: 'chat/a.tsx', text: 'nothing' }])).toEqual(['aria|Your card']);
+  });
+});
+
+describe('the calm summary written after a merge', () => {
+  it('starts with the marker and says what to look at', () => {
+    const summary = calmSummary({
+      risk: ['src/a.ts', 'packages/mac/src/chat/flight.ts'],
+      calmRisk: ['packages/mac/src/chat/flight.ts'],
+      newFindings: [{ at: 'sentinel/home.module.css:12', key: 'keyframes|sentinel/home.module.css|pulse' }],
+      goneFindings: ['infinite|chat/x.css|spin'],
+      stale: [{ kind: 'class', name: '_needsRow_', selector: "[class*='_needsRow_']", files: ['fork/calm/calm-state.css'] }],
+    });
+    expect(summary.startsWith(CALM_SUMMARY_MARKER)).toBe(true);
+    expect(summary).toContain('packages/mac/src/chat/flight.ts ⚠ 沉稳界面');
+    expect(summary).toContain('sentinel/home.module.css:12');
+    expect(summary).toContain("[class*='_needsRow_']");
+  });
+
+  it('is appended once, so a rerun does not stack it', () => {
+    const summary = calmSummary({ risk: ['src/a.ts'] });
+    const once = withCalmSummary('Merge upstream 3.2.0', summary);
+    expect(once).toContain(CALM_SUMMARY_MARKER);
+    expect(withCalmSummary(once, summary)).toBe(once);
+  });
+
+  it('says so plainly when there is nothing to fix', () => {
+    expect(calmSummary()).toContain('没有需要补的动效');
+  });
+
+  it('reads the NEW and GONE lists from the fork-calm output', () => {
+    const out = [
+      'fork-calm report: 440 upstream findings (fork/calm/ checked separately)',
+      '  NEW since tests/fork-calm.snapshot.json (1):',
+      '    + sentinel/home.module.css:12  keyframes|sentinel/home.module.css|pulse',
+      '',
+      '  GONE (1):',
+      '    - infinite|chat/x.css|spin',
+    ].join('\n');
+    expect(forkCalmFindings(out)).toEqual({
+      added: [{ at: 'sentinel/home.module.css:12', key: 'keyframes|sentinel/home.module.css|pulse' }],
+      gone: ['infinite|chat/x.css|spin'],
+    });
   });
 });
 

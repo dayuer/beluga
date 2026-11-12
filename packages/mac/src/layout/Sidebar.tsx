@@ -40,6 +40,7 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
+import { useSidebarHold } from '../fork/calm/hold-order.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -94,6 +95,7 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 export function Sidebar() {
   const actions = useActions();
   const drop = useFolderDrop();
+  useSidebarHold(drop.ref);
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
   const { tabs, liveChats, view, badges, categories } = useApp((state) => {
     const news = overviewNews(state);

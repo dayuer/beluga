@@ -27,6 +27,7 @@ import { usePrefs } from './lib/prefs.js';
 import { joinRoom, runMenuItem, useMenuState, useNative, useNotificationTaps, useTrayStatus, useTraySpout, useWindowFocus } from './lib/native.js';
 import { AddProjectSheet } from './dialogs/AddProjectSheet.js';
 import { UndoToast } from './lib/undo-toast.js';
+import { useOneToast } from './fork/calm/one-toast.js';
 import { brandText } from './lib/brand.js';
 import { NativeSheets } from './dialogs/native/WorkSheets.js';
 import { JoinSheet } from './dialogs/JoinSheet.js';
@@ -44,6 +45,7 @@ import { useChunkCare } from './lib/lazy-view.js';
 import { useState } from 'react';
 import { Onboarding, useOnboarding } from './onboarding/Onboarding.js';
 import { Lightbox } from './chat/ChatImages.js';
+import { SelectionBar } from './components/SelectionBar.js';
 import s from './layout/Shell.module.css';
 import { CallLayer } from './call/CallLayer.js';
 
@@ -52,15 +54,16 @@ const TOAST_MS = 3500;
 function Toasts() {
   const { client } = useBeluga();
   const toast = useApp((st) => st.toast);
+  const one = useOneToast('global', toast?.id);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => client.store.dispatch({ type: 'toast_clear', id: toast.id }), TOAST_MS);
     return () => clearTimeout(t);
   }, [toast, client]);
-  if (!toast) return null;
+  if (!toast || !one) return null;
   const icon = toast.level === 'success' ? 'check' : toast.level === 'warn' || toast.level === 'error' ? 'alert' : 'spark';
   return (
-    <div className={s.toasts} role="status" aria-live="polite">
+    <div className={s.toasts} role="status" aria-live="polite" data-one-toast="global">
       <div key={toast.id} className={s.toast} style={{ color: toast.level === 'error' ? 'var(--error)' : toast.level === 'warn' ? 'var(--warn)' : undefined }}>
         <Icon name={icon} size={13} />
         <span className={s.toastText} style={{ color: 'var(--text)' }}>
@@ -257,6 +260,8 @@ export function App() {
       {joining ? <JoinSheet invite={joining} onCancel={() => setJoining(undefined)} onJoin={() => void joinRoom(joining)} /> : null}
       {/* One per window, over whatever opened it (a chat, a sub-agent's activity, a graph). */}
       <Lightbox />
+      {/* Select text you're reading: Copy, Quote, Ask, with no right-click (BLG-917). */}
+      <SelectionBar />
       <Toasts />
       {/* Calls (BLG-706): this window's call engine, who rings you, the ringtone, the floating card. */}
       <CallLayer />

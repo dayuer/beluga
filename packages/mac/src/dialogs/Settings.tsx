@@ -40,6 +40,7 @@ import { ExperimentalSettings } from './ExperimentalSettings.js';
 import { WebAccessSettings } from './WebAccessSettings.js';
 import { StudioSettings } from '../studio/ConnectDialog.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
+import { CalmRow } from '../fork/calm/settings.js';
 import { LOCALES, type LanguagePref, languagePref, setLanguage } from '../i18n/index.js';
 import { PANES } from './settings-index.js';
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './SettingsSearch.js';
@@ -320,6 +321,7 @@ function Appearance() {
         <Row label="Reduce motion" {...(savingNote ? { detail: savingNote } : {})}>
           <Switch label="Reduce motion" on={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
         </Row>
+        <CalmRow />
         {keyPlatform() === 'mac' && !webServed() && (
           <Row label="Reduce transparency" detail={savingNote ?? 'A solid sidebar, with no blur behind the window. Lighter on slower Macs.'}>
             <Switch label="Reduce transparency" on={prefs.reduceTransparency} onChange={(v) => setPrefs({ reduceTransparency: v })} />

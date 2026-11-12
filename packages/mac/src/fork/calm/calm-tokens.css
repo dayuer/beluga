@@ -1,0 +1,52 @@
+/*
+ * Calm mode: tokens (docs/calm-ui.md §2, §5; rules in docs/calm/overlay.md §5).
+ *
+ * Durations move to the three steps the spec allows (120 / 160 / 200 ms) with one curve that does
+ * not overshoot, and the four work colors are desaturated to about 70% at the same hue and
+ * lightness, so accent colour is left to the one main action and key states.
+ *
+ * Upstream tokens.css is not edited. Two things make the override stick:
+ * - the reduce values are written out: upstream `:root[data-motion='reduce']` and our
+ *   `:root[data-calm]` have the same specificity, and the sheets' order is not dependable;
+ * - the colours are scoped to the two built-in themes: tokens.css sets the light values on
+ *   `:root[data-theme='light']`, which ties with a bare `:root[data-calm]`, and in development
+ *   tokens.css is injected after this file. Scoping to the theme wins on specificity instead of
+ *   order, and leaves a user's own palette (data-palette) alone.
+ */
+
+:root[data-calm] {
+  --dur-fast: 120ms;
+  --dur: 160ms;
+  --dur-slow: 200ms;
+  --ease-standard: cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+:root[data-calm][data-theme='light'] {
+  --subagent: #7d6bb3;
+  --worktree: #337873;
+  --plan: #a85d88;
+  --epic: #6e74bb;
+}
+
+:root[data-calm][data-theme='dark'] {
+  --subagent: #b2a1e5;
+  --worktree: #74b8b0;
+  --plan: #db9fc1;
+  --epic: #aeb3ea;
+}
+
+/* Reduced motion, both switches: durations fall to zero. Written out because this file loads after
+   tokens.css and would otherwise overwrite the reduce values of the same specificity. */
+:root[data-calm][data-motion='reduce'] {
+  --dur-fast: 0ms;
+  --dur: 0ms;
+  --dur-slow: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-calm] {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}

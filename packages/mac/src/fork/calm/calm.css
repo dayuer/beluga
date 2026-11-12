@@ -1,0 +1,10 @@
+/*
+ * Calm mode's overlay (docs/calm-ui.md). One import from main.tsx brings this file, which brings
+ * the four parts in order. Every rule inside them is scoped to :root[data-calm]; with calm mode
+ * off none of it matches, so this file can change nothing about the upstream look.
+ */
+@import './calm-tokens.css';
+@import './calm-motion.css';
+@import './calm-overlays.css';
+@import './calm-state.css';
+@import './one-toast.css';
