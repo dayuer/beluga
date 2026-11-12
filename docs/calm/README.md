@@ -260,7 +260,7 @@ call/pointer.module.css:61         long-duration|call/pointer.module.css|transit
 | spec:行 | 现象 | 裁决 | 改法 | 文件 |
 | --- | --- | --- | --- | --- |
 | `fork-calm-sidebar:68`（沉稳关） | 单跑 2.5s 过，但与 :47 同 worker 连跑必复现：打开 new-hero 的输入框占位符是「Type your own answer…」 | **spec 过期**（不是负载，也不是沉稳门没关干净）：:47 结束时 new-hero 还在等回答，同一 worker 共用一个演示 daemon，:68 看到的是等回答状态。沉稳关的顺序行为本身正常 | :47 结尾点选「Signed cookies」回答它，等 needs 标记消失 | `e2e/fork-calm-sidebar.spec.ts` |
-| `selection-bar:26` | 重跑通过（9.6s），选择条出现，Copy/Ask 可见 | **负载抖动**：当时 load 数百。覆盖层没有关键帧停在 opacity:0 的问题（`.bar` 的 `rise` 只写了 `from`，终态本来可见），无需补规则 | 无 | — |
+| `selection-bar:26` | 重跑通过（9.6s），选择条出现，Copy/Ask 可见 | **（当时判负载抖动，后来复现为 spec 时序，见 P-8）**：当时 load 数百。覆盖层没有关键帧停在 opacity:0 的问题（`.bar` 的 `rise` 只写了 `from`，终态本来可见），无需补规则 | 无 | — |
 | `plans:168` | 逐帧断言 `off` 数组 116 条 | **spec 过期**：沉稳下 CH-06 让里程碑盒子的滑动瞬时，连线与盒子没有中间帧可比，断言测的是上游的滑动。沉稳关单跑复现全绿 | 该条以沉稳关运行（同 cool-window 的做法） | `e2e/plans.spec.ts` |
 | `reader:96`、`:129` | 滚动断言超时 | **负载抖动**：单跑整文件 10/10 通过 | 无 | — |
 | `instant-worktrees:28` | 超时 | **负载抖动**：单跑整文件 3/3 通过 | 无 | — |
@@ -444,6 +444,7 @@ reduced-motion 下这些仍然全停：`calm-on/reduce` 的网格 36 组全是 0
 | P-5 | 对话区场景（chatrun/chatsteps） | 沉稳开 CLS 0.084–0.104，高于其它页（≤0.004） | 来自长回合里新行/新步骤到达，沉稳关同量级（0.058–0.078）；锚定测量里阅读位置位移 0px，不是沉稳引入的回归；上游的流式渲染如要更低需上游改 | 已知，已批准 |
 | P-6 | `tests/test-lock.test.ts` nice 用例 | 全量 vitest 里 6 次有 5 次失败（`setPriority` 对刚 spawn 的 shell 报 ESRCH），单跑通过 | 原因未查清；试过重试与改成先 nice 再放行，均无效，已撤回 | **未解决**，挡着 Tested-on |
 | P-7 | `tasks.spec.ts:495` 后半段 | 沉稳开时 Backlog 从左展开后 Ready 列位移 2–3px（断言 < 2），约 50% 波动 | `Fold` 立即展开没有动画帧，`hold` 的滚动补偿留下尾差；补一帧 `hold` 更糟，已撤回 | **未解决** |
+| P-8 | `selection-bar.spec.ts:26` | 沉稳默认下选中文字后 10 秒内没有 `toolbar "Selected text"`（元素不存在） | **真因是 spec 时序，不是沉稳**：打点 `SelectionBar` 的每个 `hide` 来源，失败那轮 `mouseup` 时选区长度为 0（`SELDBG up false 0`）；探针显示被拖的那行 `y = -1421`，在视野之外——回答还在画、日志在跟最新一行（日志上连发 `scroll` 事件），量好的坐标拖到空处。沉稳关下同一时序同样失败（加等待后 3/3 失败）。修法：每次拖选前 `scrollIntoViewIfNeeded` 并立即拖，没选中就重来；改后沉稳开、关各连跑 3 次全过 | 已修（spec） |
 | P-4 | 沉稳关的 `selection-bar` | 该 spec 没有 calm 开关，只测了默认（沉稳开） | 沉稳关下选择条动画是上游原样，风险低 | 已批准例外 |
 
 没有不通过项；P-3 是验证缺口，不是实现缺陷。

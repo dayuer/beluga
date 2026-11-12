@@ -26,6 +26,7 @@ async function dragAcross(page: Page, target: Locator): Promise<void> {
 test('selecting an answer shows Copy and Ask beside it', async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  if (process.env.CALM_OFF) await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
   await page.goto('/');
   const row = sidebar(page).getByRole('button', { name: 'webhook-retries', exact: true });
   if (!(await row.isVisible())) await sidebar(page).getByRole('button', { name: 'bob-api' }).first().click({ position: { x: 60, y: 10 } });
@@ -37,8 +38,15 @@ test('selecting an answer shows Copy and Ask beside it', async ({ page, context 
 
   const line = page.locator('main .selectable p').filter({ hasText: /(\w+ ){5}/ }).last();
   await expect(line).toBeVisible({ timeout: 30_000 });
-  await line.scrollIntoViewIfNeeded();
-  await dragAcross(page, line);
+  // The log can still be following the newest line while the answer finishes drawing, which carries the text
+  // away from where it was measured: a drag on it selects nothing. Bring it into view and drag in the same
+  // breath, and again if nothing was selected.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await line.scrollIntoViewIfNeeded();
+    await dragAcross(page, line);
+    if (((await page.evaluate(() => window.getSelection()?.toString() ?? '')).trim().length) > 2) break;
+    await page.waitForTimeout(500);
+  }
   await expect(bar(page)).toBeVisible();
   await expect(bar(page).getByRole('button', { name: 'Copy' })).toBeVisible();
   await expect(bar(page).getByRole('button', { name: /^Ask / })).toBeVisible();
