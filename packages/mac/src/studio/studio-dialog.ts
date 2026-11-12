@@ -62,7 +62,7 @@ export const useStudioLinked = (): boolean | undefined =>
 /** The project ⋯ menu's entry, next to Connect Earnings…. */
 export function studioMenuItem(projectId: string, isLinked: boolean | undefined): { label: string; onSelect: () => void; separate: boolean } {
   return {
-    label: isLinked ? t('studio.menu.open') : t('studio.menu.connect'),
+    label: isLinked ? t('Synon Studio…') : t('Connect to Studio…'),
     onSelect: () => openStudioDialog(projectId),
     separate: true,
   };

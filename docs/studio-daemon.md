@@ -509,7 +509,7 @@ beluga studio share|unshare [path]     # 默认当前目录所在的项目
 - 对话框：绑定码输入（`XXXX-XXXX`，宽松规范化，复用 `readCode` 的写法）、可展开的 hub 地址、「连接」按钮、
   状态行（在线 / 重连中带倒计时 / 已吊销需重新绑定）、「共享这个项目」开关（`studio.setProject`）和断开。
   打开期间每 2 秒调一次 `studio.status`（关闭对话框就停）。
-- 文案只加到已有的 `packages/mac/src/i18n/en/studio.ts` 与 `zh-CN/studio.ts`；对外名字写 Synon Studio。
+- 文案按 docs/i18n.md：英文直接写在代码里（`t()` 或 DOM 文本），中文加到 `packages/mac/src/i18n/zh-CN.fork.json`；对外名字写 Synon Studio。
 - 截图放 `.beluga/scratch/m3-*.png`。
 
 ## 9. 测试清单
@@ -568,7 +568,7 @@ beluga studio share|unshare [path]     # 默认当前目录所在的项目
 ## 11. 风险
 
 - **分支漂移**：`plan/synon-studio-p1-web` 落后 main 33 个提交（main 已改成"代码里写英文 + zh-CN.json"的
-  i18n 结构）。M3 照计划分支现有的 `i18n/en|zh-CN/studio.ts` 写；计划合回 main 时要统一转换，不是 M3 的事。
+  i18n 结构）。M3 照计划分支当时的 `i18n/en|zh-CN/studio.ts` 写；合回 main 后已转成上游的写法（英文在代码里，中文在 `zh-CN.fork.json`）。
 - **M5 并行**：BLG-68 改 `handler.ts`、`worker.ts`、`protocol.ts`；M5 只碰 `packages/studio-app`。如果 M5 需要
   客户路由，先跟 68 协调 `handler.ts`。
 - **Store 刷新太频繁**：引用检查、去抖、空 diff 三层挡住；构造视图仍是每个范围内的计划一次，计划很多时靠

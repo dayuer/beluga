@@ -4,7 +4,7 @@ import { Alert } from '../components/Alert.js';
 import { Field, FormSheet, TextInput, formStyles as f } from '../components/FormSheet.js';
 import { Button } from '../components/ui.js';
 import { Group, Row, Switch } from '../dialogs/settings-controls.js';
-import { type Key, useT } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import { useApi } from '../lib/beluga.js';
 import { useClock } from '../lib/window-active.js';
 import { closeStudioDialog, openStudioDialog, setStudioLinked, useStudioDialog, useStudioLinked } from './studio-dialog.js';
@@ -37,32 +37,31 @@ export function StudioConnectDialog() {
   return <StudioBody projectId={state.projectId} />;
 }
 
-const ERROR_KEYS: Readonly<Record<string, Key>> = {
-  'bad-code': 'studio.error.badCode',
-  'expired-code': 'studio.error.expiredCode',
-  'bad-hub': 'studio.error.badHub',
-  unreachable: 'studio.error.unreachable',
-  'clock-skew': 'studio.error.clockSkew',
-  'key-taken': 'studio.error.keyTaken',
-  'already-linked': 'studio.error.alreadyLinked',
-  'cannot-save': 'studio.error.cannotSave',
-  'demo-mode': 'studio.error.demoMode',
+const ERROR_KEYS: Readonly<Record<string, string>> = {
+  'bad-code': 'That binding code is not right, or it has expired. Get a fresh one from the admin page.',
+  'expired-code': 'That binding code has expired. Get a fresh one from the admin page.',
+  'bad-hub': 'The studio address must be https, or http on this computer (localhost).',
+  unreachable: 'Could not reach the studio hub. Is it running?',
+  'clock-skew': 'This Mac’s clock is more than five minutes off. Set it and try again.',
+  'key-taken': 'That key is already registered somewhere else. Start over from the admin page.',
+  'already-linked': 'This Mac is already connected. Disconnect first.',
+  'cannot-save': 'Could not save the link to ~/.beluga/studio.json.',
+  'demo-mode': 'Synon Studio is off in a demo.',
 };
 
-const STATE_KEYS: Readonly<Record<string, Key>> = {
-  unlinked: 'studio.state.unlinked',
-  connecting: 'studio.state.connecting',
-  online: 'studio.state.online',
-  offline: 'studio.state.offline',
-  revoked: 'studio.state.revoked',
-  outdated: 'studio.state.outdated',
-  'clock-skew': 'studio.state.clockSkew',
-  'wrong-studio': 'studio.state.wrongStudio',
-  stopped: 'studio.state.stopped',
+const STATE_KEYS: Readonly<Record<string, string>> = {
+  unlinked: 'Not connected',
+  connecting: 'Connecting…',
+  online: 'Online',
+  offline: 'Offline',
+  revoked: 'Revoked: connect again with a new code',
+  outdated: 'This app is older than the studio hub: update Beluga',
+  'clock-skew': 'This Mac’s clock is more than five minutes off',
+  'wrong-studio': 'That link belongs to another studio: connect again',
+  stopped: 'Stopped',
 };
 
 function StudioBody({ projectId }: { projectId?: string }) {
-  const t = useT();
   const api = useApi();
   const [status, setStatus] = useState<StudioStatus>();
   const [code, setCode] = useState('');
@@ -93,7 +92,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
 
   const reason = (error: string): string => {
     const key = ERROR_KEYS[error];
-    return key ? t(key) : t('studio.error.other', { error });
+    return key ? t(key) : t(`The studio said no: ${error}`);
   };
 
   const linked = status?.linked === true;
@@ -111,10 +110,10 @@ function StudioBody({ projectId }: { projectId?: string }) {
     };
     return (
       <FormSheet
-        title={t('studio.connect.title')}
+        title={t('Connect to Studio')}
         icon="people"
-        intro={t('studio.connect.intro')}
-        submitLabel={t('studio.connect.submit')}
+        intro={t('Paste the binding code from the studio’s Synon Studio admin page. This Mac then shows that studio’s customers the plans you share — with no paths, task keys, branches or agent names in them.')}
+        submitLabel={t('Connect')}
         canSubmit={code.trim().length > 0}
         onSubmit={connect}
         onCancel={closeStudioDialog}
@@ -122,16 +121,16 @@ function StudioBody({ projectId }: { projectId?: string }) {
         footer={
           showHub ? null : (
             <button type="button" className={f.linkButton} onClick={() => setShowHub(true)}>
-              {t('studio.connect.otherHub')}
+              {t('Use another studio address')}
             </button>
           )
         }
       >
-        <Field label={t('studio.connect.code')} hint={t('studio.connect.codeHint')} htmlFor="studio-code">
+        <Field label={t('Binding code')} hint={t('Eight letters and digits, like 7K2M-9XQA. The admin page makes a new one.')} htmlFor="studio-code">
           <TextInput id="studio-code" value={code} onChange={setCode} mono placeholder="XXXX-XXXX" data-autofocus />
         </Field>
         {showHub ? (
-          <Field label={t('studio.connect.hub')} hint={t('studio.connect.hubHint')} htmlFor="studio-hub">
+          <Field label={t('Studio address')} hint={t('https anywhere, or http on this computer (localhost). Empty: this computer’s studio hub.')} htmlFor="studio-hub">
             <TextInput id="studio-hub" value={hub} onChange={setHub} mono placeholder="http://localhost:8787" />
           </Field>
         ) : null}
@@ -143,33 +142,33 @@ function StudioBody({ projectId }: { projectId?: string }) {
   if (disconnecting) {
     return (
       <Alert
-        title={t('studio.disconnect.title')}
-        message={status?.state === 'online' ? t('studio.disconnect.message') : `${t('studio.disconnect.message')} ${t('studio.disconnect.offline')}`}
+        title={t('Disconnect from Synon Studio?')}
+        message={status?.state === 'online' ? t('This Mac’s plans stop going to the studio and its customers, the link closes, and the key it made is forgotten. You can connect again with a new code.') : `${t('This Mac’s plans stop going to the studio and its customers, the link closes, and the key it made is forgotten. You can connect again with a new code.')} ${t('The studio hub is offline right now, so it may keep showing the old views until the studio’s operator unbinds this Mac.')}`}
         tone="danger"
         confirm={{
-          label: t('studio.disconnect.confirm'),
+          label: t('Disconnect'),
           destructive: true,
           onClick: () => {
             void api.studio.unlink().then((next) => {
               setStatus(next);
               setStudioLinked(next.linked);
-              setTrouble(next.lastError === 'cannot-remove' ? t('studio.disconnect.cannotRemove') : undefined);
+              setTrouble(next.lastError === 'cannot-remove' ? t('Disconnected, but the key file could not be removed: ~/.beluga/studio.json is still on this Mac.') : undefined);
               setDisconnecting(false);
             });
           },
         }}
         onCancel={() => setDisconnecting(false)}
-        cancel={t('common.ui.cancel')}
+        cancel={t('Cancel')}
       />
     );
   }
 
   return (
     <FormSheet
-      title={t('studio.panel.title')}
+      title={t('Synon Studio')}
       icon="people"
-      intro={t('studio.panel.intro')}
-      submitLabel={t('studio.connect.submit')}
+      intro={t('The link to your Synon Studio: its state, and what this Mac shares with it.')}
+      submitLabel={t('Connect')}
       onSubmit={() => undefined}
       hideSubmit
       onCancel={closeStudioDialog}
@@ -187,26 +186,26 @@ function StudioBody({ projectId }: { projectId?: string }) {
                 })
               }
             >
-              {t('studio.action.reconnect')}
+              {t('Reconnect')}
             </button>
           ) : null}
           <button type="button" className={f.button} onClick={() => setDisconnecting(true)}>
-            {t('studio.action.disconnect')}
+            {t('Disconnect')}
           </button>
         </>
       }
     >
       <div className={f.hint}>
-        <strong>{t(STATE_KEYS[status?.state ?? 'unlinked'] ?? 'studio.state.unlinked')}</strong>
-        {retryIn !== undefined ? ` · ${t('studio.status.retry', { seconds: retryIn })}` : ''}
+        <strong>{t(STATE_KEYS[status?.state ?? 'unlinked'] ?? 'Not connected')}</strong>
+        {retryIn !== undefined ? ` · ${t(`trying again in ${retryIn}s`)}` : ''}
         {status?.lastError ? ` · ${status.lastError}` : ''}
       </div>
-      <div className={f.hint}>{t('studio.panel.hub', { hub: status?.hub ?? '' })}</div>
+      <div className={f.hint}>{t(`Studio: ${status?.hub ?? ''}`)}</div>
       {projectId && shared ? (
-        <Field label={t('studio.share.label')} hint={t('studio.share.detail')}>
+        <Field label={t('Share this project')} hint={t('Its plans go to the studio cleaned of paths, task keys, branches and agent names. A person still maps it on the admin page.')}>
           <Switch
             on={shared.shared}
-            label={t('studio.share.label')}
+            label={t('Share this project')}
             onChange={(on) =>
               void api.studio.setProject(projectId, on).then((next) => {
                 setStatus(next);
@@ -216,7 +215,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
           />
         </Field>
       ) : (
-        <div className={f.hint}>{t('studio.panel.noProject')}</div>
+        <div className={f.hint}>{t('To show a project’s plans to customers, open that project’s ⋯ menu and share it there.')}</div>
       )}
     </FormSheet>
   );
@@ -224,12 +223,11 @@ function StudioBody({ projectId }: { projectId?: string }) {
 
 /** Settings › Advanced: one row that opens the same dialog (no project: share from a project's ⋯ menu). */
 export function StudioSettings() {
-  const t = useT();
   const linked = useStudioLinked();
   return (
-    <Group title={t('studio.settings.title')}>
-      <Row label={t('studio.settings.label')} detail={t('studio.settings.detail')}>
-        <Button onClick={() => openStudioDialog()}>{linked ? t('studio.menu.open') : t('studio.menu.connect')}</Button>
+    <Group title={t('Synon Studio')}>
+      <Row label={t('Connect to Studio')} detail={t('Show a studio’s customers the plans you share — as they are written, without paths, task keys or agent names.')}>
+        <Button onClick={() => openStudioDialog()}>{linked ? t('Synon Studio…') : t('Connect to Studio…')}</Button>
       </Row>
     </Group>
   );
