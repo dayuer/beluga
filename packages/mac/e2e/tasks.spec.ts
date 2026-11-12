@@ -531,7 +531,9 @@ test('the board: a held card opens the columns the scope hides, and drops in one
   const backlog = board.getByRole('listitem', { name: 'Backlog', exact: true });
   await expect(backlog).toHaveCount(1);
   await page.waitForTimeout(500);
-  expect(Math.abs((await readyCol.boundingBox())!.x - before.x)).toBeLessThan(2);
+  // Not pushed along: a few px of rounding at most (calm mode opens it at once, so the last pixel of scroll that
+  // scrollLeft rounds off is never carried to a later frame), against the ~300px a push would be.
+  expect(Math.abs((await readyCol.boundingBox())!.x - before.x)).toBeLessThan(4);
   // Hold at the board's left edge until Backlog has scrolled in.
   await page.mouse.move(before.x - 8, before.y + 120, { steps: 8 });
   await expect.poll(async () => (await backlog.boundingBox())!.x, { timeout: 4000 }).toBeGreaterThan(before.x - 20);

@@ -107,6 +107,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/e2e/plans.spec.ts`：「折叠里程碑时连线逐帧跟着」一条以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；它逐帧测上游的滑动，沉稳下这段滑动按 CH-06 是瞬时的，连线与盒子不会有中间帧可比。
 - `packages/mac/e2e/plan-black-box.spec.ts`：等计划行进入 Unread 前先 `mouse.move` 出侧栏（SH-08：指针在侧栏里时沉稳冻结顺序，新行不插入），同 `unread.spec.ts`。
 - `packages/mac/e2e/fork-calm-sidebar.spec.ts`：沉稳开那条结尾回答 new-hero 的提问。同一 worker 共用一个演示 daemon，不回答的话沉稳关那条打开 new-hero 看到的是「等你回答」的输入框，等不到 `new-hero` 占位符。
+- `packages/mac/e2e/tasks.spec.ts`（BLG-679 那条）：「Backlog 从左展开后 Ready 列没被推走」的容差 2px → 4px。沉稳下展开是立即的，`scrollLeft` 取整丢掉的最后一个像素没有后续帧去补，Ready 列会留 1–2px（沿用的是 `Fold` 的 `hold`，源码里补了展开时的 `onMove()`，见上面 TaskBoard 一行）；推走的话是约 300px，断言意图不变。沉稳开连跑 6 次通过。
 - `packages/mac/e2e/selection-bar.spec.ts`：拖选前把那一行滚进视野并立刻拖，没选中任何字就重来（最多 5 次）；另加 `CALM_OFF=1` 开关用于沉稳关复现。回答还在画时日志仍在跟最新一行，量好的文字会被带走，拖到的是空处（选区长度 0，`mouseup` 后 `readSelection` 为空，工具栏自然不存在）。沉稳开关各连跑 3 次通过。不是沉稳的锚定在改滚动：沉稳关下同一时序也失败。
 - `packages/mac/e2e/steps.spec.ts`：三条以沉稳关运行的用例（折叠、飞入、飞进队列）在设置 `beluga.fork.calm.v1` 之后 `page.reload()`——文件的 `beforeEach` 已经 `goto('/')`，init script 只在下一次加载才跑，之前沉稳其实一直是开的（BLG-196 的改法没生效）。
 - `packages/mac/e2e/fork-calm-toast.spec.ts`（沉稳关那条）：先撤销 toast、后 App toast，并在页面里按帧轮询「两条同时在」。两条 toast 都会自己消失，先后和判定时刻对不上就测不到重叠。
