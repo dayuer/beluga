@@ -121,9 +121,17 @@ e2e 锁当时被另一个工作树的整套 e2e 占着（`waiting for m7-v5's e2
 - BLG-190 给 `scripts/sync-upstream.mjs` 加了 `parseNumstat`、`reportLines`、`stale` 三个导出，`scripts/sync-upstream.d.mts` 没跟上，根目录 `tsc --noEmit` 在 `tests/upstream-sync.test.ts` 报 3 个 TS2305（BLG-188 时说的“typecheck 通过”是在这之前）。补了声明（`NumstatRow` 和三个函数），`.mjs` 没改；根目录 `npm run typecheck` 和 `packages/mac` 的 `tsc --noEmit` 退出码都是 0。
 - 全量 `npx vitest run`（负载 20–37，10 核）：7758 过，5 个超时，都在真实 P2P/进程的长测试里：`friend-share/fork.test.ts`（2 个）、`friend-share/handoff.test.ts`、`friend-share/projects.test.ts`、`machines/linux-computer.test.ts`。单独重跑：handoff、projects 过；fork 的“someone who only follows along can’t fork”（30 秒超时）和 linux-computer（终端里的 `echo` 20 秒没回来）在负载约 30 时仍超时。同样两个文件在 `origin/main` 的临时工作树里也超时（fork.test.ts 还多 2 个），所以是机器忙，不是本分支的改动。等了 10 分钟负载仍在 20–34；之后整套又跑一次（负载约 34），11 个超时，全在 `friend-share/`（fork、handoff、projects）和 `project-invites`，其余全过。所以还没拿到 Tested-on：要在 Mac 空闲时（负载低于 10 左右）再跑整套。
 
+### 低负载下的 e2e 与全量（BLG-194）
+
+- 等负载：03:55 起每 30 秒查一次（`.beluga/scratch/load-wait.txt`），1 分钟 load 先在 12–420 之间，07:10 前后降到 10–17。
+- e2e：07:11:47 开跑，load 19.4 / 17.0 / 33.9（1/5/15 分钟）。`npm run e2e -- e2e/fork-ime.spec.ts e2e/plan-chat.spec.ts e2e/plan-settings.spec.ts e2e/plan-roles.spec.ts e2e/plan-roles-walk.spec.ts e2e/plan-zh.spec.ts e2e/issues.spec.ts e2e/network.spec.ts`：28 过、4 跳过、0 失败，用时 2.1 分钟。跳过的 4 个是 `plan-roles-walk.spec.ts`，它只在 `WALK=1` 时跑（截图走查）。BLG-191 里没跑完的 `fork-ime`（新建任务）、`plan-roles`、`plan-zh` 这次都过了。
+- 全量 `npx vitest run`，在本分支（页面写好后的 tree）上跑了两次：07:17:34（load 14.9 / 21.9 / 31.5）和 07:24:13（load 26.5 / 33.6 / 34.9）。两次都是 7762 过、1 失败、16 跳过，失败的都是 `tests/machines/linux-computer.test.ts`：起一个真实的无头 Beluga，在它的终端里打 `echo from-the-$((40+2))-box`，20 秒内没等到回显（`waitFor timed out`，`linux-computer.test.ts:158`）。
+- 对照：同一时段单独跑这一个文件，本分支和 main（`307d1e1b`）都通过。07:31:03（load 38.5）在 main 的临时工作树里跑全量，结果一样：7752 过、1 失败，失败的也是 `linux-computer.test.ts` 的同一步。所以这是早就有的问题：整套并行跑时那个终端回显来得太慢，不是本分支的改动。按要求不改这个测试去迁就。
+- 因此本分支还没有 Tested-on：整套没有一次全过（只差这一个）。开跑时的 load 也没能低于 10，最低是 14.9。
+
+
 ### 遗留
 
-- Tested-on：Mac 空闲时在本分支跑 `npx vitest run`，通过后用它打印的那行补一个提交（tree 要和 HEAD 一致）。
-- e2e 重跑：`npm run e2e -- e2e/fork-ime.spec.ts e2e/plan-roles.spec.ts e2e/plan-zh.spec.ts`（锁空出来后）。
+- `tests/machines/linux-computer.test.ts` 在整套里超时，main 上也一样：要先在 main 上修好（或给它留出空闲的终端），本分支才能拿到 Tested-on。
 - `packages/mac/e2e/git.spec.ts:126` 在 main 上也失败，不是本里程碑的问题，这里不修。
 - `pilot.ts` 里 PR #17 的建筑师（约 100 行）还在上游文件里，下一步抽到 `src/fork/plans/architect.ts`。
