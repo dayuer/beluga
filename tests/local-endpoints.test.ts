@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -134,6 +134,10 @@ describe('local endpoints: a run', () => {
   it('points Claude Code at the endpoint, every model alias at its model, and keeps your Claude login off it', () => {
     const env = endpointEnv(target);
     expect(env).toMatchObject({ ANTHROPIC_BASE_URL: OLLAMA_URL, ANTHROPIC_AUTH_TOKEN: 'ollama', ANTHROPIC_API_KEY: '', CLAUDE_CODE_OAUTH_TOKEN: '', ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-coder', ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-coder', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' });
+    // No tool search there: its tool_definition blocks are Anthropic-only (DeepSeek answers 422).
+    expect(env.ENABLE_TOOL_SEARCH).toBe('false');
+    // Nor inline tools: an MCP tool arriving mid-run would go as a tool_definition block too.
+    expect(env.CLAUDE_CODE_INLINE_TOOLS).toBe('false');
     expect(endpointEnv({ ...target, key: 'sk-1' }).ANTHROPIC_AUTH_TOKEN).toBe('sk-1');
     // Claude Code runs in its own folder there, where it finds no Claude sign-in to send instead of the key.
     expect(endpointEnv(target, '/tmp/endpoint-claude').CLAUDE_CONFIG_DIR).toBe('/tmp/endpoint-claude');
@@ -148,6 +152,10 @@ describe('local endpoints: a run', () => {
     mkdirSync(path.join(mine, 'skills', 'review'), { recursive: true });
     writeFileSync(path.join(mine, 'settings.json'), '{"hooks":{}}');
     writeFileSync(path.join(mine, '.credentials.json'), '{"claudeAiOauth":{"accessToken":"sk-ant-oat"}}');
+    writeFileSync(path.join(mine, '.claude.json'), '{"primaryApiKey":"sk-ant-api"}');
+    // A link to your .claude.json from before is taken out too.
+    mkdirSync(into, { recursive: true });
+    if (process.platform !== 'win32') symlinkSync(path.join(mine, '.claude.json'), path.join(into, '.claude.json'));
     expect(endpointClaudeHome(mine, into)).toBe(into);
     expect(readdirSync(into).sort()).toEqual(['projects', 'settings.json', 'skills']);
     expect(lstatSync(path.join(into, 'projects')).isSymbolicLink()).toBe(true);
@@ -160,6 +168,11 @@ describe('local endpoints: a run', () => {
     writeFileSync(path.join(into, '.credentials.json'), '{}');
     endpointClaudeHome(mine, into);
     expect(readdirSync(into).sort()).toEqual(['projects', 'settings.json']);
+    // The .claude.json Claude Code writes there is its own, and stays.
+    writeFileSync(path.join(into, '.claude.json'), '{"numStartups":1}');
+    endpointClaudeHome(mine, into);
+    expect(readFileSync(path.join(into, '.claude.json'), 'utf8')).toBe('{"numStartups":1}');
+    rmSync(path.join(into, '.claude.json'));
     // A settings file Claude Code rewrote there (a file of its own now) is linked to yours again.
     rmSync(path.join(into, 'settings.json'));
     writeFileSync(path.join(into, 'settings.json'), '{"stale":true}');

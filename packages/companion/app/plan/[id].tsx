@@ -21,6 +21,7 @@ import type { ConvView, PlanView, Topic } from '../../lib/link/protocol';
 import { color } from '../../lib/theme';
 import { calls } from '../../lib/link/calls';
 import { store } from '../../lib/store';
+import { MilestoneRoles } from '../../components/fork/MilestoneRoles';
 
 /** How a plan runs (src/core/plans/model.ts AUTONOMY_INFO), as the Mac says it. */
 const AUTONOMY = {
@@ -417,6 +418,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                 </View>
               </Press>
             ) : null}
+            <MilestoneRoles {...(m.roles ? { roles: m.roles } : {})} />
             {checker ? (
             // Its checker (a Claude of its own, off the Mac's sidebar): watched live, or read once it said (1.39).
             <Press scaleTo={0.98} onPress={() => router.push(convHref(checker))}>
