@@ -1,0 +1,31 @@
+/* The sidebar's New Task button (new-task.tsx): one solid button, existing tokens only. */
+.newTask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  height: calc(var(--row) + 6px);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 0.5px var(--hairline-strong);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: default;
+  transition: background-color var(--dur-fast);
+}
+.newTask:hover {
+  background: color-mix(in srgb, var(--bg-raised) 92%, var(--text));
+}
+.newTask:active {
+  background: color-mix(in srgb, var(--bg-raised) 86%, var(--text));
+}
+.newTask:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.newTask svg {
+  color: var(--text-2);
+}

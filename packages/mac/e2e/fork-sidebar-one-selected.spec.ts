@@ -44,3 +44,9 @@ test('a conversation opened from Unread is lit once', async ({ page }) => {
   await expect(dup).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   if (process.env.SHOTS_DIR) await sidebar(page).screenshot({ path: path.join(process.env.SHOTS_DIR, 'sidebar-one-selected.png') });
 });
+
+test('New Task under the top entries opens the new task sheet', async ({ page }) => {
+  await page.goto('/');
+  await sidebar(page).getByRole('button', { name: 'New Task…', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'New Task' })).toBeVisible();
+});
