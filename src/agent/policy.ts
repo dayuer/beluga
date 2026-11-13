@@ -483,6 +483,8 @@ function decideCustomerTurn(toolName: string, input: Record<string, unknown>, ct
   const target = resolveTarget(ctx.cwd, input[field]);
   const real = realOf(target);
   if ([target, real, ...namesOf(toolName, input)].some((n) => isSecretPath(n) || isDotenvPath(n))) return 'deny';
+  // A directory search that would still open a credential file (confineSearch couldn't narrow it).
+  if (openedSecrets(toolName, input, ctx)) return 'deny';
   return ctx.roots.some((root) => within(root, target)) ? 'allow' : 'deny';
 }
 

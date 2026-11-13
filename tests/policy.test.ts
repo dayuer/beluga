@@ -269,4 +269,14 @@ describe('a narrowed directory search keeps what was asked', () => {
     // The whole tree, asked for as such, is narrowed as before.
     expect(String(confineSearch('Glob', { pattern: '**', path: dir }, ctx)?.pattern).startsWith('!')).toBe(true);
   });
+  it("a Studio customer's turn never gets a search that would open a credential file", () => {
+    const { dir } = tree();
+    // A name that won't fit in the exclusion glob, so the search can't be narrowed.
+    mkdirSync(path.join(dir, 'keys'));
+    writeFileSync(path.join(dir, 'keys', 'prod,old.pem'), 'x');
+    const customer = { cwd: dir, roots: [dir], autoEdit: false, customerTurn: true };
+    expect(confineSearch('Grep', { pattern: 'BEGIN', path: dir }, customer)).toBeUndefined();
+    expect(decideTool('Grep', { pattern: 'BEGIN', path: dir }, customer)).toBe('deny');
+    expect(decideTool('Read', { file_path: path.join(dir, 'src', 'a.ts') }, customer)).toBe('allow');
+  });
 });
