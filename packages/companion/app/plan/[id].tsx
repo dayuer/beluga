@@ -72,7 +72,7 @@ export default function Plan() {
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  // Who designs each milestone before its work starts (1.57): none, the milestones start right away.
+  // Who designs each milestone before its work starts (1.58): none, the milestones start right away.
   const archWords = p?.archAgent ? agentName(p.archAgent, { model: true }) : 'No architect';
   const setArchAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanArchAgent(id ?? '', agent, label)).then(
@@ -80,7 +80,7 @@ export default function Plan() {
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  // Who takes over what's hard (1.58): fix tasks after a failed check, conflicts, a task that stopped twice. None: auto route's strongest.
+  // Who takes over what's hard (1.59): fix tasks after a failed check, conflicts, a task that stopped twice. None: auto route's strongest.
   const fixWords = p?.fixAgent ? agentName(p.fixAgent, { model: true }) : 'Strongest model';
   const setFixAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanFixAgent(id ?? '', agent, label)).then(
@@ -331,7 +331,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
     if (picked) setOpen(true);
   }, [picked]);
   const [task, setTask] = useState<string | undefined>();
-  // Its design from the plan's architect (1.57), folded until tapped.
+  // Its design from the plan's architect (1.58), folded until tapped.
   const [designOpen, setDesignOpen] = useState(false);
   const n = m.tasks.filter((t) => t.state === 'done').length;
   const agentNow = m.agentNow;

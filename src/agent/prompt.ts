@@ -99,6 +99,8 @@ export function buildScratchAppend(dir: string, cwd?: string): string {
     'api-response.json) and prefer .png/.json/.md/.txt. The owner watches this folder live to follow what',
     'you are doing, so write there as you go instead of only to /tmp. Never put secrets in it.',
     ...(full ? [`Its full path is ${full}/. A picture from it in your answer takes that whole path: ![Login page](${full}/01-login.png).`] : []),
+    `When you name a file or folder in your answer, write its whole path from your working folder (${dir}/pr-12/,`,
+    `not scratch/pr-12/ or pr-12/): the app makes it a link that opens it.`,
   ].join('\n');
 }
 

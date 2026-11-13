@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 60 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 61 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -144,25 +144,27 @@ export const COMPANION_PROTO = { major: 1, minor: 60 } as const;
  * 1.53 (BLG-277): `ConvView.queue[].origin`: a queued message that an agent in another chat sent.
  * 1.54 (BLG-922): usage statistics' level on the phone's Settings (`HomeView.mac.telemetry`, `telemetry.choose`). An older phone
  * shows no such row; an older Mac sends no `telemetry`.
- * 1.55 (fork; was 1.51 before upstream took 1.51–1.54 in 3.3.0): a plan says who checks its milestones and reviews its drafts (`checkAgent`), changed
+ * 1.55 (BLG-940): a worktree of yours shared with someone says how many (`ConvSummary.shared`), for the
+ * Mac sidebar's green dot. An older Mac sends none; an older phone shows none.
+ * 1.56 (fork; was 1.51, then 1.55, before upstream took 1.51–1.54 in 3.3.0 and 1.55 in 3.4.0): a plan says who checks its milestones and reviews its drafts (`checkAgent`), changed
  * with `plans.setCheckAgent`. An older Mac leaves it out (the agent for its work checks).
- * 1.56 (fork, auto route): a task nobody picked an agent for carries the one auto route gives it
+ * 1.57 (fork, auto route; was 1.56): a task nobody picked an agent for carries the one auto route gives it
  * (`TaskPageView.agent`) with `autoAgent`, and the phone says "auto" beside it. An older Mac sends neither.
- * 1.57 (fork): a plan says who designs each milestone before its work starts (`archAgent`), changed
+ * 1.58 (fork; was 1.57): a plan says who designs each milestone before its work starts (`archAgent`), changed
  * with `plans.setArchAgent` (SINCE.archAgent), and a milestone carries its design (`design`, its
  * code taken out) and that it's being designed (`designing`). An older Mac sends none of them, and
  * an older phone shows the milestone without its design.
- * 1.58 (fork): a plan says who takes over what's hard (`fixAgent`: fix tasks after a failed check,
+ * 1.59 (fork; was 1.58): a plan says who takes over what's hard (`fixAgent`: fix tasks after a failed check,
  * conflicts, a task that stopped twice), changed with `plans.setFixAgent` (SINCE.fixAgent). An older
  * Mac leaves it out (auto route's strongest, else whoever is at it), and an older phone doesn't show it.
- * 1.59 (BLG-74): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
+ * 1.60 (BLG-74, fork; was 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
- * 1.60 (fork; was 1.55 before main took 1.55–1.59): who did each part of a plan's milestone
+ * 1.61 (fork; was 1.55 on its branch, then 1.60, as main took 1.55–1.59 and upstream 3.4.0 took 1.55): who did each part of a plan's milestone
  * (`PlanView` milestone `roles`, MilestoneRolesView), read only. An older Mac leaves it out, and
  * the phone shows nothing (`supports('rolesSeen')`).
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, checkAgent: 55, autoAgent: 56, archAgent: 57, fixAgent: 58, rolesSeen: 60 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, checkAgent: 56, autoAgent: 57, archAgent: 58, fixAgent: 59, rolesSeen: 61 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -564,6 +566,8 @@ export const ConvSummary = z.object({
   harness: AgentRefView.optional(),
   /** 1.47: the chat it sits under in Work. Only a live parent in the same project; a kept child has none. */
   parent: Topic.optional(),
+  /** 1.55 (BLG-940): a worktree of yours shared with this many people (friends, or your room), the Mac row's green dot. */
+  shared: z.number().int().min(1).max(1000).optional(),
 });
 export type ConvSummary = z.infer<typeof ConvSummary>;
 
@@ -613,9 +617,10 @@ export type MergeView = z.infer<typeof MergeView>;
  * 1.8: the branch steps the phone can ask the Mac for (companion.branchStep): all of the Mac's
  * (core/branch-state.ts) but Merge into the main folder (its own sheet, companion.merge) and Open
  * PR (the phone's browser). Since BLG-753 also Push (an open PR's commits not pushed yet) and Re-run
- * Failed Checks, added at the end (an older Mac never offers them).
+ * Failed Checks, added at the end (an older Mac never offers them); since BLG-948 Open Your Own PR
+ * (a fork's pull request that can't be pushed to).
  */
-export const PHONE_BRANCH_STEPS = ['merge_pr', 'merge_auto', 'merge_admin', 'cancel_auto', 'update_branch', 'mark_ready', 'resolve_pr', 'fix_checks', 'merge_claude', 'review_claude', 'commit', 'pr', 'pr_claude', 'pr_draft', 'pr_original', 'continue_after_merge', 'archive', 'delete', 'push', 'rerun_checks'] as const;
+export const PHONE_BRANCH_STEPS = ['merge_pr', 'merge_auto', 'merge_admin', 'cancel_auto', 'update_branch', 'mark_ready', 'resolve_pr', 'fix_checks', 'merge_claude', 'review_claude', 'commit', 'pr', 'pr_claude', 'pr_draft', 'pr_original', 'continue_after_merge', 'archive', 'delete', 'push', 'rerun_checks', 'pr_own'] as const;
 export type PhoneBranchStep = (typeof PHONE_BRANCH_STEPS)[number];
 
 /** 1.8: one of a branch's steps (core/branch-state.ts BranchStep). */
@@ -684,6 +689,8 @@ export const AgentPickerView = z.object({
         isDefault: z.boolean(),
         current: z.boolean(),
         models: z.array(z.object({ value: z.string().max(80), label: z.string().max(80), description: z.string().max(200), on: z.boolean() })).max(30),
+        /** BLG-945: how many more models this runtime has on the Mac than `models` holds (the picked one is always in it). */
+        more: z.number().int().min(0).optional(),
       }),
     )
     .max(8),

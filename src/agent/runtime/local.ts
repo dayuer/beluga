@@ -2,7 +2,7 @@ import type { AgentBackend, AgentRunInput, FollowUp, Steer, TerminalSink } from 
 import { CLAUDE_CAPABILITIES, claudeRuntime } from './claude/index.js';
 import { createClaudeBackend } from './claude/runner.js';
 import { askBtw } from './claude/btw.js';
-import { endpointClaudeHome } from './endpoint-home.js';
+import { endpointClaudeHome, prepareEndpointHome, type EndpointHome } from './endpoint-home.js';
 import { tokensPerSecond } from '../../shared/local-endpoints.js';
 import type { AgentRuntime } from './types.js';
 import type { BtwRequest } from '../btw.js';
@@ -42,11 +42,13 @@ export function endpointEnv(t: LocalTarget, configDir: string = endpointClaudeHo
     ANTHROPIC_DEFAULT_HAIKU_MODEL: m,
     ANTHROPIC_SMALL_FAST_MODEL: m,
     CLAUDE_CODE_SUBAGENT_MODEL: m,
-    // Tool search and inline tools send `tool_reference`/`tool_definition` blocks only Anthropic's API
-    // knows: DeepSeek answered 422 "unknown variant `tool_definition`". Inline tools (MCP tools that
-    // arrive mid-run, added as a `tool_addition` message) are on for any model Claude Code doesn't
-    // know, and fall back only on Anthropic's own wording of the refusal. On an endpoint, both are
-    // off: every tool goes up front, in `tools`.
+    // No `tool_reference`/`tool_definition` blocks: only Anthropic's API takes them. DeepSeek answered
+    // 422 "unknown variant `tool_definition`". They come from inline tools: on Claude, MCP tools that
+    // arrive mid-run go as a system message of `tool_addition` blocks, kept in the conversation, so a
+    // run switched to an endpoint and resumed sends them again. Claude Code leaves inline tools on for
+    // a model it doesn't know and falls back only on Anthropic's own wording of the refusal. Tool
+    // search is already off on a non-Anthropic URL unless ENABLE_TOOL_SEARCH is set, and the daemon's
+    // env may set it. On an endpoint, both are off: every tool goes up front, in `tools`.
     ENABLE_TOOL_SEARCH: 'false',
     CLAUDE_CODE_INLINE_TOOLS: 'false',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
@@ -128,8 +130,12 @@ export function usageMeter(now: () => number = Date.now): { begin: () => void; m
   };
 }
 
-/** The run, on the endpoint: its env over yours, its model's own name, no effort (endpoints don't take it), free usage with its speed. */
-export function onEndpoint(input: AgentRunInput, target: LocalTarget, resolve: (value: string | undefined) => LocalTarget | undefined, meter = usageMeter()): AgentRunInput {
+/**
+ * The run, on the endpoint: its env over yours, its model's own name, no effort (endpoints don't take it), free usage with its speed.
+ * What of your Claude Code folder didn't come along (endpoint-home.ts) is said on the run, never left to guess.
+ */
+export function onEndpoint(input: AgentRunInput, target: LocalTarget, resolve: (value: string | undefined) => LocalTarget | undefined, meter = usageMeter(), home: EndpointHome = prepareEndpointHome()): AgentRunInput {
+  if (home.missed.length) input.onEvent('progress', missedWords(home.missed));
   const onEvent = (to: AgentRunInput['onEvent']): AgentRunInput['onEvent'] => (kind, text) => to(kind, kind === 'usage' ? meter.map(text) : text);
   // A model picked mid-run on the same endpoint switches; one elsewhere waits for the next run.
   const mapFollowUp = (f: FollowUp): FollowUp => {
@@ -145,10 +151,15 @@ export function onEndpoint(input: AgentRunInput, target: LocalTarget, resolve: (
     ...rest,
     model: target.model,
     onEvent: onEvent(input.onEvent),
-    env: { ...input.env, ...endpointEnv(target) },
+    env: { ...input.env, ...endpointEnv(target, home.dir) },
     ...(input.onFollowUps ? { onFollowUps: (send) => input.onFollowUps!(send && ((f) => send(mapFollowUp(f)))) } : {}),
     ...(input.onSteer ? { onSteer: (steer) => input.onSteer!(steer && wrapSteer(steer, mapFollowUp)) } : {}),
   };
+}
+
+/** What the run says when part of your Claude Code folder couldn't come along to the endpoint. */
+export function missedWords(missed: readonly string[]): string {
+  return `This local model runs without some of your Claude Code setup (${missed.join(', ')}): it couldn't be brought along.`;
 }
 
 function wrapSteer(steer: Steer, map: (f: FollowUp) => FollowUp): Steer {

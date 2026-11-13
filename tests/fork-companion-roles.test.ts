@@ -4,8 +4,8 @@ import type { MilestoneRolesView } from '../src/fork/companion/plan-roles-view.j
 import { roleRows } from '../packages/companion/lib/fork/roles-words.js';
 
 /**
- * The phone's plan page (fork, 1.60, BLG-201): under each milestone, who did each part, read only,
- * in the Mac's words. A Mac before 1.60 sends no `roles`, and the phone shows nothing
+ * The phone's plan page (fork, 1.61, BLG-201): under each milestone, who did each part, read only,
+ * in the Mac's words. A Mac before 1.61 sends no `roles`, and the phone shows nothing
  * (components/fork/MilestoneRoles.tsx asks store.supports('rolesSeen')).
  */
 
@@ -25,8 +25,8 @@ describe('the phone’s “Who did it”', () => {
   it('the four roles with their models, what hasn’t begun, and each handoff', () => {
     expect(roleRows(ROLES, true)).toEqual([
       { key: 'arch', label: 'Architecture', model: 'Opus', runtime: 'claude', handoffs: [] },
-      { key: 'work', label: 'Coding', model: 'Deepseek flash', runtime: 'local', handoffs: [] },
-      { key: 'check', label: 'Audit', model: 'Glm 5.3', runtime: 'local', note: 'Not started yet', handoffs: [] },
+      { key: 'work', label: 'Coding', model: 'DeepSeek flash', runtime: 'local', handoffs: [] },
+      { key: 'check', label: 'Audit', model: 'GLM 5.3', runtime: 'local', note: 'Not started yet', handoffs: [] },
       { key: 'fix', label: 'Hard fixes', model: 'Sonnet', runtime: 'claude', handoffs: ['A task that stopped twice → Claude (Sonnet)'] },
     ]);
   });
@@ -34,7 +34,7 @@ describe('the phone’s “Who did it”', () => {
   it('not set, and a model that isn’t what’s set, with why', () => {
     const rows = roleRows({ ...ROLES, arch: { state: 'off' }, work: { state: 'on', agent: SONNET, set: DEEPSEEK, why: 'task' } }, true);
     expect(rows[0]).toEqual({ key: 'arch', label: 'Architecture', note: 'Not set', handoffs: [] });
-    expect(rows[1]!.differs).toBe('Set to Deepseek flash: its task has an agent of its own');
+    expect(rows[1]!.differs).toBe('Set to DeepSeek flash: its task has an agent of its own');
     expect(roleRows({ ...ROLES, work: { state: 'on', mine: true } }, true)[1]!.model).toBe('Your default agent');
     // After a handoff: who took over, and that Coding's worktree is on it now.
     const after = roleRows({ ...ROLES, work: { state: 'on', agent: DEEPSEEK, set: DEEPSEEK, now: SONNET }, fix: { state: 'on', set: OPUS, why: 'changed', handoffs: [{ at: 1, what: 'fix', to: 'Claude (Sonnet)' }] } }, true);
@@ -42,9 +42,9 @@ describe('the phone’s “Who did it”', () => {
     expect(after[3]).toMatchObject({ model: 'Claude (Sonnet)', differs: 'Set to Opus: the plan’s setting changed after it started' });
   });
 
-  it('nothing from a Mac before 1.60, or without roles', () => {
-    expect(SINCE.rolesSeen).toBe(60);
-    expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(60);
+  it('nothing from a Mac before 1.61, or without roles', () => {
+    expect(SINCE.rolesSeen).toBe(61);
+    expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(61);
     expect(roleRows(ROLES, false)).toEqual([]);
     expect(roleRows(undefined, true)).toEqual([]);
   });

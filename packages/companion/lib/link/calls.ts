@@ -112,9 +112,9 @@ export const calls = {
   setPlanAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setWorkAgent', [planId, agent], `Plan's agent: ${label}`),
   /** 1.50: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words. Only to a Mac with SINCE.checkAgent. */
   setPlanCheckAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setCheckAgent', [planId, agent], `Plan's checks: ${label}`),
-  /** 1.57 (fork): who designs a plan's milestones before their work starts (null: no architect step) → in words. Only to a Mac with SINCE.archAgent. */
+  /** 1.58 (fork): who designs a plan's milestones before their work starts (null: no architect step) → in words. Only to a Mac with SINCE.archAgent. */
   setPlanArchAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setArchAgent', [planId, agent], `Plan's architecture: ${label}`),
-  /** 1.58 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words. Only to a Mac with SINCE.fixAgent. */
+  /** 1.59 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words. Only to a Mac with SINCE.fixAgent. */
   setPlanFixAgent: (planId: string, agent: { runtime: string; label: string; model?: string } | null, label: string): Call => make('plans.setFixAgent', [planId, agent], `Plan's hard fixes: ${label}`),
   /** A task described in words: Claude's draft first, then it's added. */
   // 1.24 (BLG-322) `several`: only to a Mac that has it (SINCE.severalTasks); an older one drafts one task.
