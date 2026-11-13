@@ -653,6 +653,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         // Claude Code itself failed ("process exited with code 1"): say how, in words.
         else throw new RunFailedError(classifyRun({ error: err instanceof Error ? err.message : String(err), ...(failedResult ? { result: failedResult } : {}), ...ends() }));
       } finally {
+        live.delete(q);
         recorder.finish(failed || abortController.signal.aborted);
         finish();
       }
