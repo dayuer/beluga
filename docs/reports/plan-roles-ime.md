@@ -44,7 +44,7 @@ WorktreeItem、OverviewRows、FilesTab 列表、ci/parts、issues/parts）；Por
 - `packages/mac` 下 `tsc --noEmit` 通过。
 - `npx vitest run tests/ime.test.ts`：3 个通过。
 - e2e（plan-chat、issues、network）按计划在最后一步统一跑。
-- 真实 Mac 应用里用简体中文输入法手测：用户决定接受不做（BLG-148），靠 `tests/ime.test.ts` 和计划对话框的 e2e（keyCode 229）覆盖。
+- 真实 Mac 应用里用简体中文输入法手测：用户决定不做真机手测（BLG-148），以 e2e 模拟 keyCode 229 的用例（`packages/mac/e2e/plan-chat.spec.ts`）为准。
 
 ## 审计（BLG-120）
 
@@ -73,4 +73,4 @@ WorktreeItem、OverviewRows、FilesTab 列表、ci/parts、issues/parts）；Por
 所以手测要由用户在真实 Mac 应用里做：切到简体拼音，在上面四个框里各输入 hello 并按 Enter，应该只上屏、不发送；
 再按一次 Enter 才发送。
 
-**结论（BLG-148）：用户决定接受不做手测**，这一项不再遗留。
+**结论：用户决定不做真机手测（BLG-148），以 e2e 模拟 keyCode 229 的用例（`packages/mac/e2e/plan-chat.spec.ts`）为准。**

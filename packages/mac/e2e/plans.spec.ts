@@ -166,6 +166,8 @@ test('opening a passed milestone opens its box in the same frame: never an open 
 });
 
 test('folding a milestone moves its lines with it, every frame, and no box is stretched past its own gate', async ({ page }, info) => {
+  // The glide is what's measured, and calm mode makes it instant on purpose (CH-06): run it with calm off, as upstream.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
   await page.goto('/');
   await sidebar(page).getByRole('button', { name: 'Card checkout for launch', exact: true }).click();
   await expect(main(page).locator('[data-ready="true"]')).toBeVisible({ timeout: 20_000 });

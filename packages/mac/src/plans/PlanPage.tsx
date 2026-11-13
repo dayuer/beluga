@@ -34,6 +34,7 @@ import { CHAT_DEFAULT, DEFAULT_PLAN_LAYOUT, type Display, PLAN_LAYOUT_KEY, type 
 import { barColumns, changeWords, headline, nextWords, shipAction, titleOf } from './plans-model.js';
 import { useCheckerChat, useConversationLoaded, usePlanActions, usePlanStep, usePlanView, usePlans } from './use-plans.js';
 import p from './plans.module.css';
+import { ClientViewPreview } from '../studio/ClientViewPreview.js';
 import { TeamReviews, usePlanTeamItems } from '../team/SharedPlans.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { revealLabel } from '../lib/os-words.js';
@@ -394,6 +395,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
               {view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
             </Button>
           )}
+          <ClientViewPreview view={view} />
           {/* The orchestrator's chat beside the plan, in and out: always here, whichever way it is. */}
           <Tip label={chat ? 'Hide the orchestrator’s chat' : 'Open the orchestrator’s chat'} keys={shortcutKeys('toggle-inspector')}>
             <Button size="small" variant="quiet" icon="claude" aria-pressed={chat} onClick={() => showChat(!chat)}>

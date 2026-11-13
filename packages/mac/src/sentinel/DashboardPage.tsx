@@ -9,6 +9,7 @@ import { Markdown } from '../chat/Markdown.js';
 import { Icon } from '../components/Icon.js';
 import { type ActionItem, ActionsDropdown } from '../components/SpecMenu.js';
 import { Button, IconButton, Tip } from '../components/ui.js';
+import { calmOn } from '../fork/calm/index.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
 import { openSheet } from '../lib/sheets.js';
@@ -439,7 +440,7 @@ function Grid({ d, state, tiles: only, projects = [] }: { d: Dashboard; state: S
   );
 }
 
-const still = (): boolean => document.documentElement.dataset.motion === 'reduce' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const still = (): boolean => calmOn() || document.documentElement.dataset.motion === 'reduce' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
  * Tiles move like widgets on a phone: when the order or a size changes (a tile lifted, the gap

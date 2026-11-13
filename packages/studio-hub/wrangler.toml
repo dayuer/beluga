@@ -1,0 +1,21 @@
+# Synon Studio's hub (docs/studio-hub.md). BLG-62 chose local `wrangler dev` for P1:
+# no Cloudflare account, no real database_id until a later deploy.
+name = "synon-studio-hub"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+
+# Local D1. The id is a placeholder; `wrangler dev` never contacts Cloudflare for it.
+[[d1_databases]]
+binding = "DB"
+database_name = "synon-studio"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# One Durable Object per studio, addressed by idFromName(studioId).
+[[durable_objects.bindings]]
+name = "STUDIO"
+class_name = "StudioHub"
+
+# SQLite-backed Durable Objects: the only kind the Workers Free plan has (as in packages/mailbox).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioHub"]

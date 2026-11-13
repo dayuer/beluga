@@ -124,6 +124,11 @@ const slid = (page: Page) => page.evaluate(() => (window as unknown as { slid: s
 const foldedCount = async (page: Page): Promise<number> => Number(await lastSteps(page).getByRole('button', { name: /^Show \d+ earlier steps/ }).getAttribute('data-folded-count'));
 
 test('while Claude works, a finished step closes up into the fold, whose count ticks up; the fold opens and closes again', async ({ page }) => {
+  // The fork's calm mode (on by default) folds a finished step at once, like reduced motion below;
+  // this is upstream's sliding-fold test, so it runs with calm off.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
+  await page.reload(); // beforeEach already loaded the page; the init script runs on the next load
+  await expect(sidebar(page)).toBeVisible();
   await openWorkspace(page, 'new-hero', 'landing');
   await send(page, 'deep dive into the webhook code, take your time');
   const steps = lastSteps(page);
@@ -186,6 +191,10 @@ test('with reduced motion, the step Claude is on reads as plain text in light an
 });
 
 test('a sent message flies from the box into the chat and lands in place', async ({ page }) => {
+  // Calm mode lands the message at once, with no flight (CH-06); this is upstream's flight test.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
+  await page.reload(); // beforeEach already loaded the page; the init script runs on the next load
+  await expect(sidebar(page)).toBeVisible();
   await openWorkspace(page, 'new-hero', 'landing');
   // The turn the test before stopped is over first: a message said during one lands above it, in place.
   await expect(page.getByRole('button', { name: 'Stop Claude' })).toHaveCount(0, { timeout: 30_000 });
@@ -213,6 +222,10 @@ test('with reduced motion, a sent message just appears', async ({ page }) => {
 });
 
 test('while Claude works, a sent message flies into the queue above the box', async ({ page }) => {
+  // Calm mode puts a queued message in place at once, with no flight (CH-06).
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
+  await page.reload(); // beforeEach already loaded the page; the init script runs on the next load
+  await expect(sidebar(page)).toBeVisible();
   await openWorkspace(page, 'new-hero', 'landing');
   await send(page, 'deep dive into the webhook code, take your time');
   await expect(page.locator('[data-working]').last()).toBeVisible();
@@ -228,4 +241,32 @@ test('while Claude works, a sent message flies into the queue above the box', as
   await page.getByRole('button', { name: 'Stop Claude' }).first().click();
   await expect(composer(page)).toHaveValue(/then list the riskiest parts/);
   await composer(page).fill('');
+});
+
+test('while Claude works, the newest thing it said stays in sight and the one before folds; its answer folds them all', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openWorkspace(page, 'new-hero', 'landing');
+  const shot = (name: string) => (process.env.STEPS_SHOTS ? page.screenshot({ path: `${process.env.STEPS_SHOTS}/${name}.png` }) : Promise.resolve());
+  await send(page, 'Investigate GitHub issue #48');
+  const steps = lastSteps(page);
+  const now = steps.locator('[data-remark="now"]');
+  await expect(now).toContainText('decodes it a second time', { timeout: 20_000 });
+  await shot('01-working-said');
+  // The next thing it says pops in; the one before goes into the fold with the older steps.
+  await expect(steps.locator('[data-remark="now"]', { hasText: 'That’s the 500' })).toBeVisible({ timeout: 30_000 });
+  await expect(steps.getByText('decodes it a second time')).toHaveCount(0);
+  await expect(steps.getByText(/Looking for where the email/)).toHaveCount(0);
+  await shot('02-working-newer');
+  // The answer lands: the steps fold away, and with them all it said on the way.
+  const card = page.locator('[data-turn="done"]').last();
+  await expect(card).toContainText('Verdict: a real bug', { timeout: 45_000 });
+  await expect(card.locator('[data-remark]')).toHaveCount(0);
+  await shot('03-answered');
+  // Opened again, all of it is there, in the fold.
+  await card.hover();
+  await card.getByRole('button', { name: 'Show Steps' }).click();
+  await card.getByRole('button', { name: /^Show \d+ earlier steps/ }).click();
+  await expect(card.locator('[data-remark]')).toHaveCount(3);
+  await expect(card.locator('[data-remark="now"]')).toHaveCount(0);
+  await shot('04-opened');
 });

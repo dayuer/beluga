@@ -24,6 +24,7 @@ const task = z.object({
   labels: z.array(z.string().max(32)).max(8).optional(),
   touches: z.array(z.string().max(200)).max(20).optional(),
   assignee: z.enum(['claude', 'me']).optional(),
+  audience: z.enum(['customer', 'operator']).optional(),
 });
 const autonomy = z.enum(AUTONOMIES);
 /** The computer a plan moves from or to: its device id (none: the app's own Mac) and name. */

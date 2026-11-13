@@ -24,6 +24,11 @@ export const COMMANDS = {
   pair: { usage: ['beluga pair', 'beluga pair --computer [--json]'], summary: 'pair a phone: scan the QR code or type the code, then confirm (--computer: let your Beluga app add this computer)', options: { computer: { type: 'boolean' }, json: { type: 'boolean' } } },
   computers: { usage: ['beluga computers', 'beluga computers add <link or code>', 'beluga computers forget <name>'], summary: 'your devices: who may drive this computer, the computers you drive; add one, or forget one everywhere', options: {} },
   phones: { usage: ['beluga phones', 'beluga phones remove <name>'], summary: 'list the paired phones, or remove one', options: {} },
+  studio: {
+    usage: ['beluga studio link <code> [--hub <url>] [--name <name>]', 'beluga studio status [--json]', 'beluga studio unlink', 'beluga studio share [path]', 'beluga studio unshare [path]'],
+    summary: 'Synon Studio: connect this Mac with the admin page’s code, see the link, share a project with customers, disconnect',
+    options: { hub: { type: 'string' }, name: { type: 'string' }, json: { type: 'boolean' } },
+  },
   service: { usage: ['beluga service [install | remove]'], summary: 'keep Beluga running, from boot (systemd on Linux, launchd on a Mac)', options: {} },
   web: {
     usage: ['beluga web [--listen host:port] [--allow-host name] [--insecure-http]', 'beluga web --tailscale', 'beluga web --public', 'beluga web --off', 'beluga web link', 'beluga web sessions', 'beluga web revoke <id or name>', 'beluga web stop'],

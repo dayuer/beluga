@@ -1,15 +1,17 @@
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal, flushSync } from 'react-dom';
-import { AnimatePresence, animate, frame as nextFrame, motion, useMotionValue, useReducedMotion, useSpring, useTransform, useVelocity } from 'motion/react';
+import { flushSync } from 'react-dom';
+import { AnimatePresence, animate, frame as nextFrame, motion, useMotionValue, useReducedMotion } from 'motion/react';
 import { ISSUE_STATUSES, type Issue, type IssueStatus, PRIORITY_INFO, STATUS_INFO, byRank, isEpic } from '@beluga/core/board/model.js';
 import { type ActionItem, ActionsContext } from '../components/SpecMenu.js';
+import { Lifted, useLean } from '../components/Lifted.js';
 import { Icon } from '../components/Icon.js';
 import { IconButton, cx } from '../components/ui.js';
+import { useCalm } from '../fork/calm/index.js';
 import { useApp } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { openExternal } from '../lib/system.js';
 import { usePlans } from '../plans/use-plans.js';
-import { type ColumnGeometry, type Slot, type Span, clipBox, closeUp, edgeSpeed, foldedAround, isDrag, leanFor, neighbours, spotIn, withGap } from './board-drag.js';
+import { type ColumnGeometry, type Slot, type Span, clipBox, closeUp, edgeSpeed, foldedAround, isDrag, neighbours, spotIn, withGap } from './board-drag.js';
 import { AssigneeMark, PriorityIcon, StatusIcon, assigneeWords } from './marks.js';
 import { AssigneePicker } from './pickers.js';
 import { ArchiveDoneButton, EpicBar, IssueMeta, OnItLine, PrivateMark, useIssueMenu } from './parts.js';
@@ -87,7 +89,9 @@ const order = (a: Issue, b: Issue): number => byRank(a, b) || PRIORITY_INFO[a.pr
 /** `projectId`: the board shown; `repo`: the one repo you're looking at on a board of several (new tasks run there). */
 export function TaskBoard({ issues, statuses, projectId, repo }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string }) {
   const { api, act } = useTaskActions();
-  const reduce = useReducedMotion() ?? false;
+  // Calm mode treats the board's own layout motion as still: cards take their new places at once.
+  const calm = useCalm();
+  const reduce = (useReducedMotion() ?? false) || calm;
   const [lift, setLift] = useState<Lift>();
   const [over, setOver] = useState<Spot>();
   const [pending, setPending] = useState<Pending>();
@@ -105,7 +109,7 @@ export function TaskBoard({ issues, statuses, projectId, repo }: { issues: reado
   const justDragged = useRef(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const lean = useSpring(useTransform(useVelocity(x), (v) => (reduce ? 0 : leanFor(v))), { stiffness: 260, damping: 22 });
+  const lean = useLean(x);
 
   // Columns as the board says, with a move made here shown where it was dropped until the board catches up.
   // A column whose cards didn't change keeps its list, so it doesn't render again.
@@ -417,11 +421,10 @@ export function TaskBoard({ issues, statuses, projectId, repo }: { issues: reado
       })}
       {fold('after', folded.after)}
       {lift && lifted
-        ? createPortal(
-            <motion.div className={t.cardLifted} style={{ x, y, width: lift.width, rotate: lean }} initial={reduce ? false : { scale: 1 }} animate={{ scale: settling ? 1 : 1.035 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }} aria-hidden="true">
+        ? (
+            <Lifted className={t.cardLifted} x={x} y={y} lean={lean} width={lift.width} down={settling}>
               <CardFace issue={lifted} selfId={selfId} solo={soloIn.split('\n').includes(lifted.projectId)} lifted />
-            </motion.div>,
-            document.body,
+            </Lifted>
           )
         : null}
     </div>
@@ -451,7 +454,11 @@ function Fold({ side, count, reduce, board, scroller, onMove, children }: { side
     kept.current = { width: w, carry: Math.max(-1, Math.min(1, want - s.scrollLeft)) };
   }, [side, board, scroller]);
   // Opening at once (reduced motion) has no frames: hold the board before it paints.
-  useLayoutEffect(hold, [hold]);
+  // The drag reads the columns again for a moment after one opens (foldMoved): opening at once is that moment too.
+  useLayoutEffect(() => {
+    hold();
+    onMove();
+  }, [hold, onMove]);
   useEffect(() => () => void (side === 'before' && board()?.style.removeProperty('min-width')), [side, board]);
   return (
     <motion.div

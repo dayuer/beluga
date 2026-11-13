@@ -1,0 +1,167 @@
+/* The customer's view, drawn about as wide as a phone so it reads the way they'll read it. */
+.phone {
+  width: 100%;
+  max-height: min(68vh, 720px);
+  overflow-y: auto;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.statusCustomer::before {
+  background: var(--warn);
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.headline {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 2px 0 0;
+}
+
+.goal {
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-s);
+  background: var(--bg-raised);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chip {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.chipOpen {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.small {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.tasks {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.taskStatus {
+  flex: none;
+  color: var(--text-3);
+}
+
+.option {
+  font-size: 12px;
+  color: var(--text);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-s);
+  padding: 6px 8px;
+}
+
+.option small {
+  display: block;
+  color: var(--text-3);
+}
