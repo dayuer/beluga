@@ -247,3 +247,25 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
 - Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
 - 以上通用修复已整理成 6 个基于上游 `main` 的分支（`upstream-pr/*`），准备提回上游；上游合并后这里的差异就消失。
+
+### 我的共享（M7 · BLG-217 / BLG-218，2026-11-13）
+
+沉稳模式开时，设置 › 成员与访问里「在房间中」「之前记住的」两组换成一个「我的共享」页（`docs/calm/sharing.md`）：顶部一个对所有圈生效的默认，下面只列与该默认不同的圈（例外），带搜索、筛选、多选批量与虚拟列表。数据仍是 `policy` / `levels` / `remembered`，写仍走已有的 `people.setTrust`、`people.forget` 与 `session.setClaudeSharing`，所以每个圈的实际共享结果与迁移前一致；沉稳关时 `People()` 与上游逐字相同。
+
+上游文件只有一处改动（一行接入点）：
+
+- `packages/mac/src/dialogs/Settings.tsx`：`People()` 里 `calm ? <MySharing /> : (原来的两组)`
+
+fork 自己的新增文件（上游没有）：
+
+- `packages/mac/src/fork/sharing/model.ts`（纯模型：合并三个来源、迁移、搜索、批量计划）
+- `packages/mac/src/fork/sharing/MySharing.tsx`、`sharing.module.css`（页面）
+- `packages/mac/src/fork/sharing/demo.ts`（DEV + `beluga.fork.sharing.demo.v1` 的 200 圈演示源）
+- `packages/mac/src/fork/sharing/quiet.ts`（批量改动期间不显示逐条成功 toast）
+- `packages/mac/src/fork/calm/one-toast.ts`：global 门加 `suppressed`（quiet 窗口里到达的 toast 永不显示）
+
+fork 的其他文件与测试：
+
+- `packages/mac/src/fork/settings-index.ts`：`people` 下加「我的共享」（All circles）的搜索行
+- `packages/mac/src/i18n/zh-CN.fork.json`：中文文案
+- `tests/sharing-defaults.test.ts`、`packages/mac/e2e/sharing-defaults.spec.ts`、`tests/fork-calm.test.ts`（Settings.tsx 的 canary）、`tests/mac-settings-search.test.ts`（people 页的来源加上 `fork/sharing/MySharing.tsx`）、`packages/mac/scripts/calm-check.mjs`（`sharing` 场景，200 圈演示源）

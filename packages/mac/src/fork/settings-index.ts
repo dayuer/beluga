@@ -37,6 +37,14 @@ export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly ent
     after: 'Reduce motion',
     entries: rows('appearance', 'Layout', [['Calm mode', 'A still, predictable window: short motion, and nothing that moves on its own.', 'calm steady quiet still motion 沉稳 沉稳模式 动效 安静']]),
   },
+  {
+    // BLG-218: 「我的共享」——一个默认 + 少数例外，取代沉稳模式下「在房间中」那两组。
+    after: 'In the room',
+    entries: [
+      group('people', 'My sharing', 'One default for every circle; only the ones that differ are listed.', '我的共享 共享 圈 信任 默认 例外 批量 sharing trust default circle'),
+      ...rows('people', 'My sharing', [['All circles', 'The level for every circle that doesn’t have its own.', '默认 所有圈 policy ask trusted blocked full 共享级别']]),
+    ],
+  },
 ];
 
 /** Upstream's list with each fork block after its group's last row (at the end when that group is gone). */

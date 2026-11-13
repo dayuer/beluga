@@ -1,4 +1,5 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react';
+import { muted } from '../sharing/quiet.js';
 import { useCalm } from './index.js';
 
 /**
@@ -14,6 +15,8 @@ export type ToastKind = 'global' | 'undo';
 interface Shown {
   readonly kind: ToastKind;
   readonly id: number;
+  /** It arrived while a quiet change ran (fork/sharing/quiet.ts): it never shows. */
+  readonly suppressed?: boolean;
 }
 
 let latest: Shown | undefined;
@@ -30,7 +33,7 @@ function subscribe(l: () => void): () => void {
 
 /** A toast appeared: it is the one on screen from now on. */
 function register(kind: ToastKind, id: number): Shown {
-  latest = { kind, id };
+  latest = { kind, id, ...(muted() ? { suppressed: true } : {}) };
   notify();
   return latest;
 }
@@ -53,6 +56,7 @@ export function useOneToast(kind: ToastKind, id: number | undefined): boolean {
   }, [kind, id]);
   const shown = (): boolean => {
     if (!on || id === undefined) return true;
+    if (latest?.suppressed) return false;
     return latest !== undefined && latest.kind === kind && latest.id === id;
   };
   return useSyncExternalStore(subscribe, shown);

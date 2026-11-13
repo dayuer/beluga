@@ -158,7 +158,7 @@ const PANE_SOURCES: Record<string, string> = {
   fire: read('dialogs/FireSettings.tsx'),
   menubar: read('dialogs/MenuBarSettings.tsx'),
   environment: read('dialogs/EnvironmentSettings.tsx'),
-  people: [s('People'), read('network/NetworkSettings.tsx'), read('gateway/AccessSettings.tsx')].join('\n'),
+  people: [s('People'), read('network/NetworkSettings.tsx'), read('gateway/AccessSettings.tsx'), read('fork/sharing/MySharing.tsx')].join('\n'),
   phone: read('phone/Phone.tsx'),
   external: read('dialogs/ExternalAgentsSettings.tsx'),
   computers: read('dialogs/MachinesSettings.tsx'),
