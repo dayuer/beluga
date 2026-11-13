@@ -12,6 +12,7 @@
 | [§6](#6-上游文件改动清单) | 本计划改了哪些上游文件（文件数、行数） | BLG-207 已完成 |
 | [§7](#7-六条规范逐条判定) | 逐条规范判定表与问题表 | BLG-207 已完成 |
 | [§8](#8-同步操作手册) | fork.md「同步上游」五步的展开版 | BLG-207 已完成 |
+| [§9](#9-合并前审计m5-2026-11-13)、[§10](#10-开-pr-前修复m6-2026-11-13) | M5 并入与审计、M6 开 PR 前修复（状态菜单、Studio 对话框层级、并入最新 main） | M6 |
 
 ## 1. M0–M4 总览
 
@@ -581,3 +582,29 @@ npm run typecheck && npx vitest run               # 根目录；mac 的 npm run 
 ### 9.3 最终验证
 
 最终树的全量 `npx vitest run` 在提交前对暂存树跑一遍；通过时提交说明末尾记 `Tested-on: macOS …`，其中的 tree 等于 `git write-tree`。之后不再改文件。
+
+## 10. 开 PR 前修复（M6，2026-11-13）
+
+M5 收尾后，用户报了两处问题（侧栏状态菜单的气质、设置里打开「连接到 Studio」被设置窗口盖住），并要求开 PR 前把 main 之后的新提交并进 `plan/mac-fork`、在最终树上重出 `Tested-on`。这一节按任务记下每处的修法与检查。
+
+### 10.1 侧栏底部状态菜单（BLG-216）
+
+用户 11-13 拿 Claude 桌面版左下角的账户菜单和 `network/StatusMenu.tsx` 的 `SelfStatus` → `statusCard` 对比：Beluga 的菜单把同一件事说了五遍（头部头像角标、头部「在线」文字、选项前的 ✓、选项里的彩色圆点、底部按钮的头像角标和「在线」），宽 300 px、越过 248 px 的侧栏右边线压进主区，右侧说明让行宽参差，输入框像嵌在菜单里的表单。沉稳模式下按 Claude 菜单的克制写法收束；沉稳关保持上游原样。
+
+| 问题 | 沉稳开的改法 | 位置 |
+| --- | --- | --- |
+| 名字与状态重复底部按钮 | 隐藏菜单头部；触发按钮上已有名字、状态与头像 | `calm-status.css` 的 `_statusHead_` |
+| 宽 300 px 越过侧栏 | 跟随触发按钮（侧栏行 248 px）再让 16 px，右缘留在侧栏内；`align="start"`、`sideOffset` 6 px 不变 | `_statusCard_` 的 `width: min(300px, calc(var(--radix-popover-trigger-width) - 16px))` |
+| 五处标记 | 当前状态只留 ✓ 一列；菜单里隐藏彩色圆点，颜色只留在底部头像角标 | `_dot_`、`_optionCheck_` |
+| 行高参差、输入框像表单 | 状态行、时长行、备注行统一 32 px；备注输入框变成一行（透明底、6 px 圆角），焦点只留安静的 2 px 环 | `_option_`、`_note_` |
+| 右侧灰字撑宽行 | 说明移进该行的 `title`（悬停可见），行内隐藏 | `StatusMenu.tsx` 一行 `title={calm && hint ? hint : undefined}`；`_optionHint_` |
+
+规则全部在 `fork/calm/calm-status.css`，只在 `:root[data-calm]` 下生效。独立打开的「Set a Status」窗口（`StatusSheet`，同文件里 Dialog.Content 那份）同样套用标记、行高与输入框的规则，视觉语言一致；它下面没有触发按钮，所以保留头部和 300 px 宽度（「不重复按钮」「跟随按钮宽度」两条只锚 popover）。上游文件只有 `StatusMenu.tsx` 一处接入点，已登记 `docs/fork.md`「沉稳界面」，`tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 有 canary。`docs/calm/overlay.md` §12.3 是逐条规则与锚点。
+
+| 沉稳开 | 沉稳关（上游原样） |
+| --- | --- |
+| ![沉稳开的侧栏状态菜单](img/m6-status-calm-on.png) | ![沉稳关的侧栏状态菜单](img/m6-status-calm-off.png) |
+
+与 Claude 菜单并排：Claude 的参照图是用户 11-13 发来的对比截图（未入库，未再向用户索取）；这里按它的气质复刻——不重复触发按钮上的名字与状态、当前状态一种标记、单色、行等高、菜单在侧栏内。沉稳关那张按同一位置与视角截取，用于确认上游外观没有变化。
+
+检查：`packages/mac/e2e/fork-status-menu.spec.ts` 两条用例（沉稳开、沉稳关）断言了头部隐藏/可见、卡片不越过侧栏右缘、圆点隐藏/可见、行高一致、说明变成/不变成 `title`，并在 `CALM_IMG=docs/calm/img` 时写出上面两张图。
