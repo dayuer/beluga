@@ -207,8 +207,9 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
       id: `plan:${plan.id}:stalled:${taskId}`,
       kind: 'decision',
       // What it said last (often what it waits on you for): shown, with what to do if it asks for something.
+      // Claude's own words: no code on the phone, as its answers (stripCode).
       title: clip(w.said ? `“${titles.get(taskId) ?? 'A task'}” waits for you` : `“${titles.get(taskId) ?? 'A task'}” stopped twice: resume it?`, 500),
-      detail: clip(w.said ? `It last said: “${w.said}” If it asks for something, do it (or answer in its chat), then Resume it.` : w.reason, 64_000),
+      detail: clip(w.said ? `It last said: “${plainLine(w.said, 300)}” If it asks for something, do it (or answer in its chat), then Resume it.` : w.reason, 64_000),
       ...at,
       askedAt: w.at,
       actions: [{ label: 'Resume', tone: 'main', method: 'plans.resumeTask', args: [plan.id, taskId] }],
