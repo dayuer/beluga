@@ -138,13 +138,13 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 计划按档位分工（架构 / 编码 / 审核 / 疑难修复）：第二阶段要抽出来
 
-已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
+已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、“谁做的”（BLG-198～201：`src/fork/plans/roles.ts` 算出各角色实际用的模型，里程碑工作树用谁也由它的 `workAgentFor` 决定；手机协议 `src/fork/companion/plan-roles-view.ts`、`plan-roles-views.ts`；Mac `packages/mac/src/fork/plans/MilestoneRoles.tsx`；手机 `packages/companion/components/fork/MilestoneRoles.tsx`、`packages/companion/lib/fork/roles-words.ts`；上游文件各只留接入点：`model.ts` 的 `MilestoneAgent` 两个可选字段，`pilot.ts` 的 `launch()` 两行，`protocol.ts` 的 `roles` 字段和 `SINCE.rolesSeen`，`views.ts` 一行，`PlanDetails.tsx`、`PlanOutline.tsx`、`PlanCanvas.tsx`、`app/plan/[id].tsx` 各一行加一个 import）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
 
 - 核心：`src/core/plans/pilot.ts`、`src/core/plans/work.ts`、`src/core/plans/plans.ts`、`src/core/plans/prompt.ts`、`src/core/plans/model.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/progress.ts`、`src/core/plans/owner.ts`、`src/core/plans/move.ts`、`src/core/plans/move-work.ts`、`src/core/notify.ts`、`src/core/board/launch.ts`
 - Agent：`src/agent/plan-tools.ts`、`src/agent/policy.ts`、`src/agent/types.ts`
 - API：`src/ipc/plans-api.ts`、`src/ipc/plans-handlers.ts`、`src/external/domain/tools.ts`、`src/external/adapters/tools/state-rows.ts`
 - 手机：`src/companion/protocol.ts`、`src/companion/views.ts`、`src/companion/calls.ts`、`packages/companion/app/plan/[id].tsx`、`packages/companion/lib/link/calls.ts`、`packages/companion/components/AgentPicker.tsx`
-- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
+- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/PlanCanvas.tsx`（任务卡上的模型，一行）、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
 - 测试：`tests/plans.test.ts`、`tests/agent-change.test.ts`
 
 ### 自动路由（没指定 agent 的任务交给合适的模型）
