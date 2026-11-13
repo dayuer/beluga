@@ -999,6 +999,8 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     const log = { pushed: [] as string[], ensured: [] as string[], merged: [] as Array<{ into: string; branches: readonly string[] }>, retired: [] as Array<{ ws: string; branch?: string }> };
     const existing = new Set<string>();
     const inMain = new Set<string>();
+    // Branches deleted since (merged and cleared away): no longer there to merge.
+    const gone = new Set<string>();
     let pr: PlanPr | undefined;
     let conflict: ((branches: readonly string[]) => CombineResult | undefined) | undefined;
     let mergeError: string | undefined;
@@ -1014,6 +1016,7 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
         return conflict?.(branches) ?? { ok: true, branch: into };
       },
       inMain: async (_p, b) => inMain.has(b),
+      hasBranch: async (_p, b) => !gone.has(b),
       retire: async (_p, ws, branch) => void log.retired.push({ ws: ws ?? '', ...(branch ? { branch } : {}) }),
       findPr: async () => pr,
       openPr: async (_p, _branch, title) => (pr = { number: 7, url: 'https://github.com/bob/api/pull/7', state: 'OPEN', title, draft: false, checks: 'pending' }),
@@ -1025,7 +1028,7 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
       },
       mergeLocal: async () => ({ ok: true }),
     };
-    return { git, log, existing, inMain, setPr: (p: PlanPr | undefined) => (pr = p), setConflict: (c: typeof conflict) => (conflict = c), failMerge: (why: string | undefined) => (mergeError = why) };
+    return { git, log, existing, inMain, gone, setPr: (p: PlanPr | undefined) => (pr = p), setConflict: (c: typeof conflict) => (conflict = c), failMerge: (why: string | undefined) => (mergeError = why) };
   }
 
   async function running(autonomy: 'gated' | 'autopilot' = 'gated', body: BodyInput = BODY) {
@@ -1093,6 +1096,33 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     expect(t.plans.need(t.plan.id).runs.safe?.passedAt).toBeDefined();
     expect(t.plans.need(t.plan.id).pr).toBeUndefined();
     expect(t.view().milestones[0]!.tasks.map((x) => x.state)).toEqual(['planned', 'planned', 'planned']);
+  });
+
+  it('a task whose branch is gone (merged and cleared away by an earlier milestone) isn’t merged again: the milestone still passes', async () => {
+    const t = await running();
+    // “Auth on payment routes” was done on an earlier milestone's branch, merged and deleted since.
+    t.board.linkWorktree(t.issue('Auth on payment routes').id, 'old14', { branch: 'beluga/old-14' }, t.claude);
+    t.gone.add('beluga/old-14');
+    await t.passSafe();
+    const live = t.issue('Idempotent webhooks').branch;
+    expect(t.log.merged).toEqual([{ into: 'plan/payments', branches: [live] }]);
+    const auth = t.issue('Auth on payment routes');
+    expect(auth.status).toBe('in_plan');
+    expect(auth.activity.map((a) => a.text)).toContain('its branch beluga/old-14 is gone (merged and cleared away earlier): nothing left to merge into plan/payments');
+    expect(t.log.retired.map((r) => r.branch)).toEqual([live]);
+    const plan = t.plans.need(t.plan.id);
+    expect(plan.runs.safe?.mergeFailed).toBeUndefined();
+    expect(plan.runs.safe?.passedAt).toBeDefined();
+  });
+
+  it('a milestone whose every task branch is gone passes without a merge', async () => {
+    const t = await running();
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) t.gone.add(t.issue(title).branch!);
+    await t.passSafe();
+    expect(t.log.merged).toEqual([]);
+    expect(t.log.retired).toEqual([]);
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) expect(t.issue(title).status).toBe('in_plan');
+    expect(t.plans.need(t.plan.id).runs.safe?.passedAt).toBeDefined();
   });
 
   it('a milestone with a task still being worked on isn’t merged: the pass says why, and nothing is retired', async () => {

@@ -670,6 +670,11 @@ export class WorkspaceManager {
     return g.isAncestor(root, branch, await this.baseOf(root));
   }
 
+  /** Whether a local branch is there. */
+  async hasBranch(projectId: string, branch: string): Promise<boolean> {
+    return g.isCommit(this.repoProject(projectId).root, `refs/heads/${branch}`);
+  }
+
   /** Delete a branch whose work is merged into `into` (git refuses one that isn't, or that's checked out). */
   async dropBranch(projectId: string, branch: string, into: string): Promise<void> {
     await g.deleteMergedBranch(this.repoProject(projectId).root, branch, into);

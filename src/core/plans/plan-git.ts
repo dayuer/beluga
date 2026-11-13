@@ -17,6 +17,8 @@ export interface PlanGit {
   mainRef(projectId: string): Promise<string>;
   /** Whether a branch is in main already. */
   inMain(projectId: string, branch: string): Promise<boolean>;
+  /** Whether a local branch is still there (a merged one is deleted when its worktree is cleared away). */
+  hasBranch(projectId: string, branch: string): Promise<boolean>;
   /** A merged task's worktree goes: archived (its conversation kept), its branch deleted only if it's in `into` (git branch -d). */
   retire(projectId: string, workspaceId: string | undefined, branch: string | undefined, into: string): Promise<void>;
   /** The branch's pull request (undefined: none). Throws when GitHub couldn't tell. */
@@ -38,6 +40,7 @@ export function planGitOf(controller: WorkspaceController): PlanGit {
     mergeInto: (projectId, into, branches) => m.mergeIntoPlan(projectId, into, branches),
     mainRef: (projectId) => m.latestBase(projectId),
     inMain: (projectId, branch) => m.inDefaultBranch(projectId, branch),
+    hasBranch: (projectId, branch) => m.hasBranch(projectId, branch),
     retire: async (projectId, workspaceId, branch, into) => {
       const ws = workspaceId ? m.find(workspaceId) : undefined;
       if (ws && !ws.archived) await controller.archive(ws.id, false, { quiet: true });

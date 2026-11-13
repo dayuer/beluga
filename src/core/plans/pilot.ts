@@ -1529,6 +1529,13 @@ export class PlanPilot {
       }
       tasks = left;
     }
+    // A task whose branch is gone: it was merged and cleared away with an earlier milestone (Beluga
+    // only deletes a branch that's merged), then the task moved here. Nothing is left to merge, and
+    // asking git to would fail this milestone's pass every time.
+    const gone: TaskView[] = [];
+    const live: TaskView[] = [];
+    for (const t of tasks) ((await git.hasBranch(plan.projectId, t.issue!.branch!).catch(() => true)) ? live : gone).push(t);
+    tasks = live;
     let res: CombineResult | undefined;
     if (tasks.length) {
       try {
@@ -1569,8 +1576,10 @@ export class PlanPilot {
     this.fixAsked.delete(key);
     this.stuckTried.delete(key);
     for (const t of tasks) this.deps.work.board.planMoved(t.issue!.id, 'in_plan', `merged into ${branch}: “${m.milestone.title}” passed`);
+    for (const t of gone) this.deps.work.board.planMoved(t.issue!.id, 'in_plan', `its branch ${t.issue!.branch} is gone (merged and cleared away earlier): nothing left to merge into ${branch}`);
     this.deps.plans.setMerging(planId, milestoneId, undefined);
     if (tasks.length) this.deps.plans.note(planId, 'passed', `merged ${tasks.map((t) => t.issue!.key).join(', ')} into ${branch}`, beluga);
+    if (gone.length) this.deps.plans.note(planId, 'note', `${gone.map((t) => t.issue!.key).join(', ')}: ${[...new Set(gone.map((t) => t.issue!.branch!))].join(', ')} is gone (merged and cleared away earlier), so nothing was merged for ${gone.length > 1 ? 'them' : 'it'}`, beluga);
     if (!merge.catchUp) this.passed(planId, milestoneId, merge.by);
     // Cleared away in the background: the next merge (another milestone passed) doesn't wait for archiving.
     void this.retireAll(plan, tasks, branch);
