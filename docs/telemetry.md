@@ -44,7 +44,7 @@ You can change the level any time in **Settings › General › Usage statistics
 
 ## What Limited sends
 
-- **Each turn of an agent,** for every runtime (Claude, Codex, OpenCode, Copilot, local models):
+- **Each turn of an agent,** for every runtime (Claude, Codex, OpenCode, Copilot, Antigravity, local models):
   - the runtime and model, the effort;
   - tokens and cache tokens, cost, how long it took, how it ended;
   - the kind of error, never its message;

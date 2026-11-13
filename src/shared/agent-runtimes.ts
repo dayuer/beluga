@@ -39,6 +39,7 @@ export const KNOWN_RUNTIMES: ReadonlyArray<{ readonly id: string; readonly label
   { id: 'codex', label: 'Codex', missing: "Codex isn't set up on this Mac yet" },
   { id: 'opencode', label: 'OpenCode', missing: "OpenCode isn't set up on this Mac yet" },
   { id: 'copilot', label: 'Copilot', missing: "GitHub Copilot CLI isn't set up on this Mac yet" },
+  { id: 'antigravity', label: 'Antigravity', missing: "The Antigravity CLI isn't set up on this Mac yet" },
   { id: 'local', label: 'Local model', missing: 'No local model endpoint is set' },
 ];
 

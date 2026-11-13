@@ -369,7 +369,7 @@ beluga web --off
 
 ## Agent
 
-你的 agent 就是 Claude Code，用你自己的订阅登录。它也可以运行在你自己的模型上（Ollama，或任何兼容 Anthropic 接口的地址）：见[本地模型](../docs/local-models.md)。也可以换成 [OpenCode](../docs/opencode.md)，使用你在里面配置好的模型；或 [GitHub Copilot](../docs/copilot.md)，使用你的 GitHub 账号（Copilot Free 就够）。Codex 即将支持。
+你的 agent 就是 Claude Code，用你自己的订阅登录。它也可以运行在你自己的模型上（Ollama，或任何兼容 Anthropic 接口的地址）：见[本地模型](../docs/local-models.md)。也可以换成 [OpenCode](../docs/opencode.md)，使用你在里面配置好的模型；[GitHub Copilot](../docs/copilot.md)，使用你的 GitHub 账号（Copilot Free 就够）；或 [Antigravity](../docs/antigravity.md)，使用你 Antigravity 订阅里的模型（Gemini、Claude 等）。Codex 即将支持。
 
 ## 工作原理
 
