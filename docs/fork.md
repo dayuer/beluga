@@ -189,3 +189,6 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - Autopilot 不再放过合并失败的里程碑（voshond/beluga `5accb683`）：`src/core/plans/pilot.ts`、`tests/plans.test.ts`
 - 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：`src/core/attachments.ts`、`src/agent/runtime/claude/runner.ts`、`packages/mac/src/chat/use-attachments.tsx`、`packages/mac/src/plans/PlanAsk.tsx`、`packages/mac/src/plans/plan-ask.module.css`、`tests/attachments.test.ts`
 - zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`
+- 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
+- Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
+- 以上通用修复已整理成 6 个基于上游 `main` 的分支（`upstream-pr/*`），准备提回上游；上游合并后这里的差异就消失。
