@@ -180,6 +180,21 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `tests/web-security.test.ts`：浏览器 cookie 做不了 studio 管理
 - `tsconfig.json`：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
 
+### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
+
+原因：「Over SSH」添加电脑时起的 `ssh … beluga pair --computer` 要随 Beluga 退出一起结束，不能等配对在那边过期；停止中的 `sshPairStart` 也要拒绝新配对。这是 fork 的功能，上游没有。
+
+- `src/machines/machines.ts`：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
+- `tests/machines-ssh.test.ts`：对应的用例
+
+### 设置里打开的表单盖在设置窗口之上（BLG-213：留在 fork，不提回上游）
+
+原因：上游的设置窗口是 `z-index` 44/45，`FormSheet`（表单弹窗）是 40/41，所以从设置里打开的表单（Studio 的「连接到 Studio…」、项目的 worktree 环境等）会被设置窗口盖住、无法输入。上游自己的做法是原生 sheet，不受影响；fork 的 Studio 入口在设置里，需要抬高。`FormSheet` 渲染时若页面上有设置窗口（`[data-settings]`），就加 `data-over-settings`，层级 48/49（仍低于 alert 50）。从项目 ⋯ 菜单等处打开时属性不出现，表现不变。
+
+- `packages/mac/src/components/FormSheet.tsx`：渲染时判断设置是否打开，两处加 `data-over-settings`
+- `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
+- `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
+
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
 - `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
