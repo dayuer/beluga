@@ -1,0 +1,69 @@
+/*
+ * The sidebar's look (fork; docs/fork.md, "侧边栏"). Only structure, rhythm and states: every colour
+ * is an existing token from styles/tokens.css or a theme (lib/themes.ts), so themes, accents and
+ * density work as before. Scoped to the nav that useOneSelected marks (data-fork-sidebar); the
+ * `[class*='_name_']` anchors are upstream's CSS-module classes (layout/Sidebar.module.css,
+ * layout/signal.module.css), the same way fork/calm anchors its rules.
+ */
+
+/* One selected row: the others that also call themselves selected are drawn as plain rows. */
+[data-fork-sidebar] [data-fork-dup][data-fork-dup] {
+  background: transparent;
+}
+[data-fork-sidebar] [data-fork-dup][data-fork-dup]:hover {
+  background: var(--bg-hover);
+}
+[data-fork-sidebar] [data-fork-dup] [class*='_rowIcon_'] {
+  color: inherit;
+}
+
+/* Rhythm: a little more air between rows and sections; the top entries a step taller. */
+[data-fork-sidebar] [class*='_row_'] {
+  gap: 9px;
+  border-radius: var(--radius);
+}
+/* Only the top-level entries (no indent: Row's own padding-left is 8px); the plans and sentinels under them keep the base height. */
+[data-fork-sidebar] [class*='_scroll_'] > [class*='_section_']:first-child [class*='_row_'][style*='padding-left: 8px'] {
+  height: calc(var(--row) + 4px);
+}
+[data-fork-sidebar] [class*='_scroll_'] > * + * {
+  margin-top: 14px;
+}
+
+/* Section titles readable: --text-2 instead of --text-3 (about 3:1 on the light sidebar). */
+[data-fork-sidebar] [class*='_sectionTitle_'] {
+  color: var(--text-2);
+}
+
+/*
+ * Needs you: a steady amber dot at the row's end, not a filled, outlined, glowing row. The lit
+ * left edge (signal-marks.tsx's NeedMark, which sits in the row's trailing slot) is drawn as that
+ * dot, in the same 14px slot as the other marks; the amber fill, its outline and the sweep go.
+ * The anchors are checked by tests/fork-sidebar-anchors.test.ts.
+ */
+[data-fork-sidebar] [data-signal='needs'][class*='_edge_'] {
+  position: static;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 3.5px 0 5.5px;
+  border-radius: 50%;
+  box-shadow: none;
+}
+/* A problem (a conflict, failing checks) the same way: its red ! at the row's end, no red row. */
+[data-fork-sidebar] [class*='_needsRow_'],
+[data-fork-sidebar] [class*='_problemRow_'] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+[data-fork-sidebar] [class*='_needsRow_']:hover,
+[data-fork-sidebar] [class*='_problemRow_']:hover {
+  background: var(--bg-hover) !important;
+}
+[data-fork-sidebar] [class*='_needsRow_'][class*='_selected_']:not([data-fork-dup]),
+[data-fork-sidebar] [class*='_problemRow_'][class*='_selected_']:not([data-fork-dup]) {
+  background: var(--bg-selected) !important;
+}
+[data-fork-sidebar] [class*='_needsRow_']::after {
+  display: none !important;
+}
