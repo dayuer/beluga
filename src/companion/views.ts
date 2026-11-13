@@ -504,6 +504,7 @@ function turnOf(state: DomainState, item: LogItem, outputs: readonly OutputView[
     agent: item.agent ?? CLAUDE_AGENT,
     prose: pictures(proseOf(item.text)),
     ts: item.ts,
+    ...(item.origin ? { origin: { ref: clip(item.origin.ref, 400), title: clip(item.origin.title, 200), agent: clip(item.origin.agent.label, 64), prose: proseOf(item.prompt ?? '') } } : {}),
     ...(status ? { status } : {}),
     ...(step ? { step } : {}),
     steps: item.steps.length,
@@ -638,7 +639,7 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
   const assistant = summaryOf(state, openAssistant(state), waiting, ctx);
   const macChats = macChatSummaries(state, waiting, ctx);
   return {
-    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off' },
+    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off', ...(state.telemetry.available ? { telemetry: state.telemetry.level ? { level: state.telemetry.level } : {} } : {}) },
     // 1.5: Your Mac, for Home's "Ask your Mac" (its last line, whether it works).
     ...(assistant ? { assistant } : {}),
     // 1.14: all of Your Mac's chats, for the phone's chat list.
@@ -747,6 +748,7 @@ export function convView(state: DomainState, ctx: ViewContext, topic: Topic): Co
     ...(conv?.project ? { project: clip(conv.project, 200) } : {}),
     turns,
     more,
+    chatLinks: true,
     needsYou: items.slice(0, 20),
     canSend: conv?.mine ?? false,
     working,
@@ -866,13 +868,13 @@ function branchViewOf(state: DomainState, ws: Workspace): BranchView | undefined
   };
 }
 
-/** Your messages waiting for your Claude in a conversation, in run order (the Mac's queue tray, src/ui/compose.ts queueIn). */
+/** What waits for your Claude in a conversation, in run order (the Mac's queue tray, src/ui/compose.ts queueIn): your messages, and messages from your other chats. */
 function queueOf(state: DomainState, channel: string): NonNullable<ConvView['queue']> {
   const me = myId(state);
   return state.log
     .filter((l): l is AgentItem => l.type === 'agent' && l.channel === channel && l.status === 'queued' && l.owner === me && (l.requester !== undefined ? l.requester === me : l.requesterName === l.ownerName))
     .slice(0, 20)
-    .map((l) => ({ id: clip(l.requestId, 200), text: plainLine(l.prompt ?? '', 300) || 'A message', ...(l.slotWait ? { waiting: clip(slotWaitDetail(l.slotWait), 300) } : {}) }));
+    .map((l) => ({ id: clip(l.requestId, 200), text: plainLine(l.prompt ?? '', 300) || 'A message', ...(l.slotWait ? { waiting: clip(slotWaitDetail(l.slotWait), 300) } : {}), ...(l.origin ? { origin: { ref: clip(l.origin.ref, 400), title: clip(l.origin.title, 200), agent: clip(l.origin.agent.label, 64) } } : {}) }));
 }
 
 const planState = (plan: Plan, progress: PlanProgress): string => (plan.status === 'active' && plan.paused ? 'paused' : plan.status === 'active' && progress.next.kind === 'done' ? 'done' : plan.status);
@@ -943,7 +945,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
       ...(m.autonomy !== plan.autonomy ? { autonomy: m.autonomy } : {}),
       ...checkerOfMilestone(state, m.run.checker),
       ...agentNowOf(m),
-      // 1.53 (fork): its design (no code on the phone), and that its architect is writing it.
+      // 1.57 (fork): its design (no code on the phone), and that its architect is writing it.
       ...(m.run.design ? { design: clip(stripCode(m.run.design.text).text.replace(/\[\[code(?::\d+)?\]\]/g, '(code)'), 12000) } : {}),
       ...(designing(plan, m) ? { designing: true } : {}),
     })),
@@ -1082,7 +1084,7 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
 /** Where a task may be moved from the phone (board.move): the open statuses and Done, not where it is. */
 const MOVES = ['todo', 'in_progress', 'in_review', 'done', 'backlog', 'canceled'] as const;
 
-/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.51). */
+/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.56). */
 const autoOf = (state: DomainState, i: Issue): Pick<TaskPageView, 'agent' | 'autoAgent'> => {
   const routed = isStartable(i) ? routedAgent(i, state) : undefined;
   return routed ? { agent: agentRefView(routed), autoAgent: true } : {};

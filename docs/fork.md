@@ -120,6 +120,10 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/e2e/steps.spec.ts`：步骤滑入折叠、消息飞行/飞入队列的上游用例以沉稳关运行；沉稳模式下步骤与 reduced-motion 一样瞬时进折叠（CH-02）、消息直接落位（CH-06），同文件后面的 reduced-motion 用例覆盖了那一档。
 - `packages/mac/e2e/threads-panel.spec.ts`：“threads 关时无标记”与“子线程折在父行下”两条在等新行前把指针移出侧栏（SH-08：指针在侧栏时新出现的行要等它离开）。
 
+### 手机协议的 minor 编号（3.3.0 同步时顺延）
+
+fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59：`checkAgent` 55、`autoAgent` 56、`archAgent` 57、`fixAgent` 58、Synon Studio Gate 59，`COMPANION_PROTO.minor` 为 59。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts` 和 `docs/parity.fork.md` 里的数字。
+
 ### 版本号（脚本自动处理）
 
 - `packages/mac/package.json`、`packages/mac/src-tauri/tauri.conf.json`
@@ -181,7 +185,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：`src/agent/policy.ts`、`src/agent/runtime/claude/runner.ts`、`src/net/crypto.ts`、`tests/policy.test.ts`、`tests/identity.test.ts`
 - macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：`src/workspaces/test-procs.ts`、`tests/setup.ts`、`tests/background-tasks.test.ts`、`tests/delete-unpushed.test.ts`、`tests/friend-share/fork.test.ts`、`tests/friend-share/projects.test.ts`、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`
 - Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：`src/agent/runtime/codex/runner.ts`、`tests/codex-parity.test.ts`
-- MCP 服务需要登录时，会话里直接点 Sign in（rstagi/beluga，上游 PR #427 未合并；和本 fork 的 `ownEnv` 合在一起）：`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/mcp-connect.ts`、`src/agent/types.ts`、`src/agent/prompt.ts`、`src/agent/mock.ts`、`src/core/agent-host.ts`、`src/core/store.ts`、`src/protocol.ts`、`src/shared/mcp.ts`、`packages/mac/src/lib/mcp.ts`、`packages/mac/src/views/ChatView.tsx`、`docs/parity.md`、`tests/store.test.ts`
+- ~~MCP 服务需要登录时，会话里直接点 Sign in~~：上游 3.3.0 合并了 #427 的最终版（agent 调 `mcp__beluga_mcp__mcp_sign_in` 登录，没有会话里的提示条），同步时撤掉了这里移植的早期版本，以上游为准。
 - Autopilot 不再放过合并失败的里程碑（voshond/beluga `5accb683`）：`src/core/plans/pilot.ts`、`tests/plans.test.ts`
 - 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：`src/core/attachments.ts`、`src/agent/runtime/claude/runner.ts`、`packages/mac/src/chat/use-attachments.tsx`、`packages/mac/src/plans/PlanAsk.tsx`、`packages/mac/src/plans/plan-ask.module.css`、`tests/attachments.test.ts`
 - zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`

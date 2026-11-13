@@ -358,7 +358,7 @@ friend's agent's question `gateway.answer`; a milestone sent back `plans.sendBac
 door with your link: `invites.letIn` / `invites.decline`; someone asking to join a channel you
 run: `network.groups.approve` / `decline`. Nothing appears without a way to answer it.
 
-**Synon Studio's start Gate** (1.53, BLG-76): a customer's "confirm the plan" reaches the phone as a
+**Synon Studio's start Gate** (1.59, BLG-76): a customer's "confirm the plan" reaches the phone as a
 `studio-start` card. It says whose plan it is and what is being approved — the plan's title, its
 milestones and estimated points (`NeedsYou.gate`; a change to a running plan shows what it adds) —
 and its Approve / Decline call `studio.answerGate(gateId, {approve:true}` or

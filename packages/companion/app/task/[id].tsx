@@ -30,7 +30,7 @@ import { autoAgentName } from '../../../../src/shared/auto-route';
  * worktree and pull request doing it, and its activity, live. Comment below; start it in a new
  * worktree with Claude, or move it along, from here. Editing the brief stays on the Mac.
  */
-/** Who works it, in a few words: auto route's pick by its model (1.51, fork), else the agent's name. */
+/** Who works it, in a few words: auto route's pick by its model (1.56, fork), else the agent's name. */
 const whoOf = (t: Pick<TaskPageView, 'agent' | 'autoAgent'>): string => (t.agent ? (t.autoAgent ? autoAgentName(t.agent) : agentName(t.agent)) : 'your agent');
 
 export default function Task() {
@@ -66,7 +66,7 @@ export default function Task() {
   // Who works it (BLG-498), shown only (BLG-569): with a worktree on it (conv), what runs there (changed
   // in its conversation); else its own agent, or your default.
   const defaultLabel = t?.agents?.groups.find((g) => g.isDefault)?.label;
-  // Nobody picked one (1.51, fork): the one auto route gives it, said as such.
+  // Nobody picked one (1.56, fork): the one auto route gives it, said as such.
   const agentWords = t?.agent ? (t.autoAgent ? `Auto · ${autoAgentName(t.agent)}` : agentName(t.agent, { model: true })) : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
   const agentRuntime = t?.agent?.runtime ?? t?.agents?.groups.find((g) => g.isDefault)?.runtime;
   // The main Start is its own agent's (else yours); Start with… lists every agent, from ⋯.

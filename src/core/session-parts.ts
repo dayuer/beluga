@@ -110,7 +110,12 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
         onWorktreeCreated: (ws) => workbench?.onWorktreeCreated(ws),
         onWorkspaceGoing: (id) => workbench?.closeTerminals(id),
         onWorktreeRestored: (ws, remake) => workbench?.onWorktreeRestored(ws, remake),
-        env: { newKeysBack: (projectId) => env.newKeysBack(projectId), merge: (projectId, vars) => env.merge(projectId, vars) },
+        env: {
+          newKeysBack: (projectId) => env.newKeysBack(projectId),
+          merge: (projectId, vars) => env.merge(projectId, vars),
+          syncExample: (id, noteOnly) => env.syncWorktreeExample(id, noteOnly),
+          forgetWorktree: (id) => env.forgetWorktree(id),
+        },
       });
     }
     if (workspaces) {
@@ -206,6 +211,7 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
       selfId: () => session.selfId,
       send: (body, o) => session.send(body, o),
       agent: () => session.backend,
+      ...(opts.openPage ? { openPage: opts.openPage } : opts.open ? { openPage: async (url: string) => opts.open?.(url) } : {}),
       agentRef: (channel) => (channel ? workspaces?.agentOf(channel, session.agentRef) : undefined) ?? session.agentRef,
       // A room ask that names one of your agents (BLG-520): the ones your card lists, and whether each runs here.
       agents: () => opts.client.currentProfile.agents ?? [],
@@ -232,7 +238,7 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
       sentinel: (channel, from) => sentinelOf(session)?.forRun(channel, from),
       sentinelChat: (channel, from) => sentinelOf(session)?.chatPlace(channel, from),
       confirmTool: (toolName, input) => sentinelOf(session)?.confirmWords(toolName, input),
-      plans: (channel, from) => plansOf(session)?.forRun(channel, from),
+      plans: (channel, from, chain) => plansOf(session)?.forRun(channel, from, chain),
       threads: (channel) => threadsOf(session)?.forRun(channel),
       // "Your Mac"'s chats, and your own asks in friends' chats (BLG-207): both work in its folder.
       assistant: (channel, from) => assistantOf(session)?.forRun(channel, from) ?? assistantOf(session)?.forChat(channel, from),
