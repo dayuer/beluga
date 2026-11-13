@@ -183,3 +183,18 @@ BLG-218 按本文件实现：
 - 测试：`tests/sharing-defaults.test.ts`（迁移不变性 500 例、搜索/排序、`planBatch` 计数、默认不为 `full`）；`packages/mac/e2e/sharing-defaults.spec.ts`（例外 → 恢复默认 → 原地撤销、批量确认与一条 toast、200 圈打开 < 500ms、第 49/51 行 y 差 0、搜索）；`calm-check.mjs` 加 `sharing` 场景（CLS 0、无循环动画）。
 
 BLG-219 独立实测，把数据填进本文（新增「§7 实测」）：打开到可操作时间、CLS、滚动、搜索、批量改、改单行不跳位，问题表逐条给状态；跑 `sync-upstream --report` 要求 0 个 `!`。
+
+### 6.1 实施记录（BLG-218，2026-11-13）
+
+- 新文件：`packages/mac/src/fork/sharing/{model,demo,quiet}.ts`、`MySharing.tsx`、`sharing.module.css`。
+- 上游接点只有一处：`packages/mac/src/dialogs/Settings.tsx` 的 `People()` 里 `calm ? <MySharing /> : (原两组)`；`docs/fork.md` 已登记。
+- fork 文件：`fork/settings-index.ts` 加「我的共享」搜索行；`fork/calm/one-toast.ts` 加 `suppressed` 门（quiet 窗口里的 toast 永不显示）；`zh-CN.fork.json` 加文案。
+- 同名圈（演示里有一个房间 bob 和一个好友 bob）靠来源标签区分；无障碍名字带上来源（`Trust for bob (Friend)`），测试据此定位。
+- 验证命令：
+  ```bash
+  npx vitest run tests/sharing-defaults.test.ts
+  cd packages/mac && npm run e2e -- e2e/sharing-defaults.spec.ts
+  node scripts/calm-check.mjs sharing          # 需要 demo daemon + vite
+  ```
+- 演示源：`localStorage['beluga.fork.sharing.demo.v1'] = '200'` 后重载（仅开发构建），见 §5。
+- 218 的初步实测（不是 219 的独立审计）：e2e 里 200 圈从点「人与权限」到默认下拉可用、首行可见约 110–140ms；改列表中间一行前后该行 y 差 ≤1px；`calm-check sharing` 在 calm-on/full 与 calm-on/reduce 下 CLS 0.000、动画 0。正式数字由 BLG-219 重测后写进 §7。

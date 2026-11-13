@@ -45,6 +45,7 @@ const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; rea
   { file: 'packages/mac/src/call/PointerMark.tsx', match: /calmOn\(\)/, why: 'the call pointer mark does not pop (scale 1.16) on click in calm mode (M4 · sync 3.2.0)' },
   { file: 'packages/mac/src/components/Lifted.tsx', match: /useCalm\(\)/, why: 'a carried card or chat row does not lean (0°) or scale (1.035) in calm mode (M5 · sync 3.3.0)' },
   { file: 'packages/mac/src/network/StatusMenu.tsx', match: /useCalm\(\)/, why: 'the status menu keeps one marker and even rows: its hints move to the hover title in calm mode (M6 · BLG-216)' },
+  { file: 'packages/mac/src/dialogs/Settings.tsx', match: /<MySharing \/>/, why: '「我的共享」replaces the two trust groups in calm mode (M7 · BLG-218)' },
 ];
 
 /** Names this fork's own overlay must never use (CLAUDE.md's list). */
