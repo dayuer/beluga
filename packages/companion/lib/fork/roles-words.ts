@@ -2,9 +2,9 @@ import type { MilestoneRolesView, RoleSeenView } from '../../../../src/fork/comp
 import { autoAgentName } from '../../../../src/shared/auto-route';
 
 /**
- * Fork (1.61, BLG-201): a milestone's “Who did it” on the phone's plan page, in words, read only:
+ * Fork (1.62, BLG-201): a milestone's “Who did it” on the phone's plan page, in words, read only:
  * the same answer as the Mac's (src/fork/plans/roles.ts, sent as `roles`). English, like the rest
- * of the phone for now. Nothing from a Mac before 1.61 (`supported` false) or with no roles.
+ * of the phone for now. Nothing from a Mac before 1.62 (`supported` false) or with no roles.
  */
 
 export interface RoleRow {

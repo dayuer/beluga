@@ -246,7 +246,7 @@ describe('a plan’s agent for its architecture', () => {
     expect(typeof PLANS_HANDLERS['plans.setArchAgent']).toBe('function');
     expect(PHONE['plans.setArchAgent']).toBe('phone');
     expect(PhoneCalls['plans.setArchAgent'].result.parse('x')).toBe('x');
-    expect(SINCE.archAgent).toBe(58);
+    expect(SINCE.archAgent).toBe(59);
     expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(SINCE.archAgent);
     expect(EXTERNAL_ACCESS['plans.setArchAgent']).toBe('covered');
     expect(STATE_ROWS.find((r) => r.method === 'plans.setArchAgent')?.name).toBe('plan_set_arch_agent');

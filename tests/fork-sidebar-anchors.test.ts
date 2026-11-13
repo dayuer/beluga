@@ -16,7 +16,7 @@ const classes = (css: string): Set<string> => new Set([...css.matchAll(/\.([A-Za
 const anchorsIn = (css: string): string[] => [...new Set([...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\[class\*='_([A-Za-z][\w-]*)_'\]/g)].map((m) => m[1]!))];
 
 describe('the sidebar look’s upstream anchors', () => {
-  const upstream = new Set([...classes(read('layout', 'Sidebar.module.css')), ...classes(read('layout', 'signal.module.css'))]);
+  const upstream = new Set([...classes(read('layout', 'Sidebar.module.css')), ...classes(read('layout', 'signal.module.css')), ...classes(read('layout', 'SidebarSearch.module.css'))]);
 
   it('finds every class the overlay anchors on', () => {
     const look = read('fork', 'sidebar', 'sidebar-look.css');
@@ -31,6 +31,7 @@ describe('the sidebar look’s upstream anchors', () => {
     expect(row).toContain('cx(s.row, selected && s.selected');
     // The indent the overlay and the owner rule read: padding-left 8px plus 14 per level.
     expect(row).toContain('paddingLeft: 8 + indent * 14');
+    expect(row).toContain('<span className={s.rowLabel}>');
     expect(read('layout', 'workspace-row.tsx')).toContain(`'${IN_CHAT_SELECTION}'`);
   });
 

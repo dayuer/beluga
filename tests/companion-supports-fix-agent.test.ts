@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 /**
  * The phone's `store.supports` (packages/companion/lib/store.ts) against the Mac's protocol: the plan
  * page's ⋯ menu hides "Agent for hard fixes" (`hidden: !store.supports('fixAgent')` in
- * app/plan/[id].tsx) on a Mac older than 1.59, since an older Mac has no `plans.setFixAgent`.
+ * app/plan/[id].tsx) on a Mac older than 1.60, since an older Mac has no `plans.setFixAgent`.
  * The phone's native pieces are stand-ins; the store itself is the real one.
  */
 
@@ -42,16 +42,16 @@ const onMac = (major: number, minor: number): boolean => {
 };
 
 describe('the plan page’s “Agent for hard fixes” on old and new Macs', () => {
-  it('shows only on a Mac at 1.59 or later, within the same major', () => {
-    expect(SINCE.fixAgent).toBe(59);
+  it('shows only on a Mac at 1.60 or later, within the same major', () => {
+    expect(SINCE.fixAgent).toBe(60);
     expect(COMPANION_PROTO.major).toBe(1);
-    expect(onMac(1, 58)).toBe(false);
+    expect(onMac(1, 59)).toBe(false);
     expect(onMac(1, 50)).toBe(false);
-    expect(onMac(1, 59)).toBe(true);
-    expect(onMac(1, 61)).toBe(true);
+    expect(onMac(1, 60)).toBe(true);
+    expect(onMac(1, 62)).toBe(true);
     expect(onMac(2, 0)).toBe(true);
     // the roles before it keep their own minors
-    (store as unknown as { state: { proto: { major: number; minor: number } } }).state.proto = { major: 1, minor: 58 };
+    (store as unknown as { state: { proto: { major: number; minor: number } } }).state.proto = { major: 1, minor: 59 };
     expect(store.supports('archAgent')).toBe(true);
     expect(store.supports('checkAgent')).toBe(true);
   });

@@ -4,8 +4,8 @@ import type { MilestoneRolesView } from '../src/fork/companion/plan-roles-view.j
 import { roleRows } from '../packages/companion/lib/fork/roles-words.js';
 
 /**
- * The phone's plan page (fork, 1.61, BLG-201): under each milestone, who did each part, read only,
- * in the Mac's words. A Mac before 1.61 sends no `roles`, and the phone shows nothing
+ * The phone's plan page (fork, 1.62, BLG-201): under each milestone, who did each part, read only,
+ * in the Mac's words. A Mac before 1.62 sends no `roles`, and the phone shows nothing
  * (components/fork/MilestoneRoles.tsx asks store.supports('rolesSeen')).
  */
 
@@ -42,9 +42,9 @@ describe('the phone’s “Who did it”', () => {
     expect(after[3]).toMatchObject({ model: 'Claude (Sonnet)', differs: 'Set to Opus: the plan’s setting changed after it started' });
   });
 
-  it('nothing from a Mac before 1.61, or without roles', () => {
-    expect(SINCE.rolesSeen).toBe(61);
-    expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(61);
+  it('nothing from a Mac before 1.62, or without roles', () => {
+    expect(SINCE.rolesSeen).toBe(62);
+    expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(62);
     expect(roleRows(ROLES, false)).toEqual([]);
     expect(roleRows(undefined, true)).toEqual([]);
   });
