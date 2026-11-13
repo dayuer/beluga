@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 61 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 62 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -146,25 +146,27 @@ export const COMPANION_PROTO = { major: 1, minor: 61 } as const;
  * shows no such row; an older Mac sends no `telemetry`.
  * 1.55 (BLG-940): a worktree of yours shared with someone says how many (`ConvSummary.shared`), for the
  * Mac sidebar's green dot. An older Mac sends none; an older phone shows none.
- * 1.56 (fork; was 1.51, then 1.55, before upstream took 1.51–1.54 in 3.3.0 and 1.55 in 3.4.0): a plan says who checks its milestones and reviews its drafts (`checkAgent`), changed
+ * 1.56 (BLG-952): a task held for its checks says so (`TaskSummary.needsChecks`): how many criteria are
+ * neither ticked nor explained, and whether its work already merged. An older Mac sends none; an older phone shows none.
+ * 1.57 (fork; was 1.56, before that 1.51, then 1.55, before upstream took 1.51–1.54 in 3.3.0 and 1.55 in 3.4.0): a plan says who checks its milestones and reviews its drafts (`checkAgent`), changed
  * with `plans.setCheckAgent`. An older Mac leaves it out (the agent for its work checks).
- * 1.57 (fork, auto route; was 1.56): a task nobody picked an agent for carries the one auto route gives it
+ * 1.58 (fork, auto route; was 1.57, before that 1.56): a task nobody picked an agent for carries the one auto route gives it
  * (`TaskPageView.agent`) with `autoAgent`, and the phone says "auto" beside it. An older Mac sends neither.
- * 1.58 (fork; was 1.57): a plan says who designs each milestone before its work starts (`archAgent`), changed
+ * 1.59 (fork; was 1.58, before that 1.57): a plan says who designs each milestone before its work starts (`archAgent`), changed
  * with `plans.setArchAgent` (SINCE.archAgent), and a milestone carries its design (`design`, its
  * code taken out) and that it's being designed (`designing`). An older Mac sends none of them, and
  * an older phone shows the milestone without its design.
- * 1.59 (fork; was 1.58): a plan says who takes over what's hard (`fixAgent`: fix tasks after a failed check,
+ * 1.60 (fork; was 1.59, before that 1.58): a plan says who takes over what's hard (`fixAgent`: fix tasks after a failed check,
  * conflicts, a task that stopped twice), changed with `plans.setFixAgent` (SINCE.fixAgent). An older
  * Mac leaves it out (auto route's strongest, else whoever is at it), and an older phone doesn't show it.
- * 1.60 (BLG-74, fork; was 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
+ * 1.61 (BLG-74, fork; was 1.60, before that 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
- * 1.61 (fork; was 1.55 on its branch, then 1.60, as main took 1.55–1.59 and upstream 3.4.0 took 1.55): who did each part of a plan's milestone
+ * 1.62 (fork; was 1.61, before that 1.55 on its branch, then 1.60, as main took 1.55–1.59 and upstream 3.4.0 took 1.55): who did each part of a plan's milestone
  * (`PlanView` milestone `roles`, MilestoneRolesView), read only. An older Mac leaves it out, and
  * the phone shows nothing (`supports('rolesSeen')`).
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, checkAgent: 56, autoAgent: 57, archAgent: 58, fixAgent: 59, rolesSeen: 61 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, checkAgent: 57, autoAgent: 58, archAgent: 59, fixAgent: 60, rolesSeen: 62 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -888,6 +890,11 @@ export const TaskSummary = z.object({
   onBoard: z.string().max(200).optional(),
   /** Only you see it (BLG-501): it never reaches teammates or Linear. */
   private: z.literal(true).optional(),
+  /**
+   * 1.56 (BLG-952): held for its checks, as the Mac's "Needs its checks": `open` criteria are neither
+   * ticked nor explained, so it stays out of review; `merged`: its work merged, so it stays out of Done.
+   */
+  needsChecks: z.object({ open: z.number().int().min(1), merged: z.literal(true).optional() }).optional(),
   updatedAt: ts,
 });
 export type TaskSummary = z.infer<typeof TaskSummary>;

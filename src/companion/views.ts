@@ -970,7 +970,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
       ...(m.autonomy !== plan.autonomy ? { autonomy: m.autonomy } : {}),
       ...checkerOfMilestone(state, m.run.checker),
       ...agentNowOf(m),
-      // 1.58 (fork): its design (no code on the phone), and that its architect is writing it.
+      // 1.59 (fork): its design (no code on the phone), and that its architect is writing it.
       ...(m.run.design ? { design: clip(stripCode(m.run.design.text).text.replace(/\[\[code(?::\d+)?\]\]/g, '(code)'), 12000) } : {}),
       ...(designing(plan, m) ? { designing: true } : {}),
       ...rolesOfMilestone(plan, m, state),
@@ -1037,6 +1037,8 @@ function taskSummary(state: DomainState, i: Issue, listedOn?: string): TaskSumma
   const topic = taskTopic(i.id);
   if (!topic) return undefined;
   const t = tally(i.brief.acceptance);
+  // Held for its checks, shown as the Mac does (TaskPage's ChecksBanner): only while open, with one open.
+  const held = i.needsChecks && STATUS_INFO[i.status].open && t.open ? { open: t.open, ...(i.mergedHeld ? { merged: true as const } : {}) } : undefined;
   const conv = taskConv(state, i);
   const who = assigneeWords(state, i);
   const working = workingWords(workingOn(state.team, i.id).map((p) => p.name));
@@ -1063,6 +1065,7 @@ function taskSummary(state: DomainState, i: Issue, listedOn?: string): TaskSumma
     ...(repo && !onBoard ? { repo: clip(repo, 200) } : {}),
     ...(onBoard ? { onBoard: clip(onBoard, 200) } : {}),
     ...(i.private ? { private: true as const } : {}),
+    ...(held ? { needsChecks: held } : {}),
     updatedAt: Math.round(i.updatedAt),
   };
 }
@@ -1110,7 +1113,7 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
 /** Where a task may be moved from the phone (board.move): the open statuses and Done, not where it is. */
 const MOVES = ['todo', 'in_progress', 'in_review', 'done', 'backlog', 'canceled'] as const;
 
-/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.57). */
+/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.58). */
 const autoOf = (state: DomainState, i: Issue): Pick<TaskPageView, 'agent' | 'autoAgent'> => {
   const routed = isStartable(i) ? routedAgent(i, state) : undefined;
   return routed ? { agent: agentRefView(routed), autoAgent: true } : {};

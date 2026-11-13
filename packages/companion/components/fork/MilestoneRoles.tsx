@@ -7,8 +7,8 @@ import { AgentMarkIcon, runtimeMark } from '../AgentMark';
 import { T, toneBg, toneInk } from '../ui';
 
 /**
- * Fork (1.61, BLG-201): who did each part of a milestone, read only, under its criteria: the
- * Mac's “Who did it” (lib/fork/roles-words.ts). Hidden on a Mac before 1.61 (store.supports).
+ * Fork (1.62, BLG-201): who did each part of a milestone, read only, under its criteria: the
+ * Mac's “Who did it” (lib/fork/roles-words.ts). Hidden on a Mac before 1.62 (store.supports).
  */
 export function MilestoneRoles({ roles }: { roles?: MilestoneRolesView }) {
   const rows = roleRows(roles, store.supports('rolesSeen'));

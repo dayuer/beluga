@@ -4,7 +4,7 @@ import { query, type Options, type Query } from '@anthropic-ai/claude-agent-sdk'
 import { MAX_ATTACHMENT_BYTES, linkedImages, mediaTypeOf, withImagePaths } from '../../../core/attachments.js';
 import { buildPrompt, summarizeTool } from '../../prompt.js';
 import { runInstructions } from '../../run-instructions.js';
-import { SECRET_DECLINED, confineSearch, decideTool, denyReason } from '../../policy.js';
+import { SECRET_DECLINED, confineSearch, decideTool, denyReason, isYourRun } from '../../policy.js';
 import { baseEnv } from '../../../core/peer-run.js';
 import { gateTool } from '../../tool-gate.js';
 import { syncProbes } from '../../sync-main.js';
@@ -15,7 +15,7 @@ import { type RecorderMessage, StepRecorder } from '../../step-recorder.js';
 import { type TrackedMessage, McpAppTracker } from '../../../mcp-apps/tracker.js';
 import { type ContextMessage, ContextReport, breakdownReader, isCompactCommand } from '../../context-report.js';
 import { compactEnv } from '../../../shared/context-usage.js';
-import { zshCompatEnv } from './zsh-compat.js';
+import { claudeShellSetup, zshCompatEnv } from './zsh-compat.js';
 import { progressCount } from '../../../shared/progress-count.js';
 import { resultText } from '../../../shared/steps.js';
 import { BackgroundAgents, type PromptContent, PromptQueue, TurnRouter, startedPrompt } from './live-run.js';
@@ -90,6 +90,16 @@ export function claudeLaunchEnv(input: Pick<AgentRunInput, 'guest' | 'ownerMcp' 
     return undefined;
   }
   return { ...baseEnv(env), ...claudeConfigEnv(env), ...SCRUBBED_SHELL, ...compact, ...safeRunEnv(input.env) };
+}
+
+/**
+ * The launch environment with zsh-compat.sh's CLAUDE_ENV_FILE in (zsh-compat.ts): on top of the
+ * scrubbed one a friend's run gets, or of the daemon's own when the run inherits it. Nothing to add
+ * (Windows, or your own CLAUDE_ENV_FILE): the launch environment as it was.
+ */
+export function withZshCompat(launchEnv: Readonly<Record<string, string>> | undefined, compat: Readonly<Record<string, string>>, env: NodeJS.ProcessEnv = process.env): Record<string, string> | undefined {
+  if (!Object.keys(compat).length) return launchEnv;
+  return { ...(launchEnv ?? env), ...compat } as Record<string, string>;
 }
 
 /**
@@ -285,7 +295,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const syncMain = askOnly ? place?.syncMain : undefined;
       // A hidden worktree to fix a conflict in (a plan's head Claude, in its main-folder conversation).
       const fixup = place?.fixup;
-      const policy = { cwd, roots: [cwd, ...extraDirs, ...(fixup ? [fixup] : [])], autoEdit, scope: input.scope, guest: input.guest, boardAsks: input.boardAsks, dotenv: Boolean(input.canUseSecret) && !input.guest, askOnly: Boolean(askOnly), ...(syncMain ? { syncMain: syncProbes(cwd, syncMain) } : {}), ...(fixup ? { fixup } : {}), ...(place?.alsoEdit?.length ? { alsoEdit: place.alsoEdit } : {}), ...(input.customerTurn ? { customerTurn: true } : {}) };
+      const policy = { cwd, roots: [cwd, ...extraDirs, ...(fixup ? [fixup] : [])], autoEdit, scope: input.scope, guest: input.guest, boardAsks: input.boardAsks, dotenv: Boolean(input.canUseSecret) && !input.guest, yourRun: isYourRun(input), askOnly: Boolean(askOnly), ...(syncMain ? { syncMain: syncProbes(cwd, syncMain) } : {}), ...(fixup ? { fixup } : {}), ...(place?.alsoEdit?.length ? { alsoEdit: place.alsoEdit } : {}), ...(input.customerTurn ? { customerTurn: true } : {}) };
       // How the run ends, when it fails: Claude Code's stderr, a limit that said no, an API error.
       const stderr: string[] = [];
       const keepStderr = (data: string): void => keepLines(stderr, data, STDERR_KEEP);
@@ -319,7 +329,10 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const chrome = chromeGate(input.chrome);
       // Set, this replaces Claude Code's whole environment. A friend or a guest gets a scrubbed one
       // (never the daemon's tokens); your own run inherits unless it already passes variables.
-      const launchEnv = claudeLaunchEnv(input);
+      // zsh-compat.sh makes Claude Code's zsh take the bash it writes (zsh-compat.ts); the prompt says what's left.
+      const baseLaunchEnv = claudeLaunchEnv(input);
+      const compat = zshCompatEnv(baseLaunchEnv ?? process.env);
+      const launchEnv = withZshCompat(baseLaunchEnv, compat);
       const failure = (end: RunEnd): RunFailedError => new RunFailedError(withSignInHint(classifyRun(end), launchEnv, inheritsDaemonEnv(input)));
       const options: Options = {
         cwd,
@@ -359,7 +372,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
                   const scratched = scratchRoot ? withAgentScratch(hookInput.tool_name, judged, hookInput.tool_use_id, scratchRoot) : undefined;
                   // In a worktree, what's kept on purpose is made to outlive the turn (see workspaces/test-procs.ts).
                   const keptLog = path.join(cwd, SCRATCH_DIR, `kept-${hookInput.tool_use_id.slice(-8)}.log`);
-                  const kept = input.env?.KLAUD_WORKTREE ? keptBashInput(hookInput.tool_name, scratched ?? judged, keptLog) : undefined;
+                  const kept = input.env?.KLAUD_WORKTREE ? keptBashInput(hookInput.tool_name, scratched ?? judged, keptLog, compat.CLAUDE_ENV_FILE) : undefined;
                   const patched = kept ?? scratched ?? confined;
                   const allow = (reason: string) => (patched ? { hookSpecificOutput: { ...verdict('allow', reason).hookSpecificOutput, updatedInput: patched } } : verdict('allow', reason));
                   if (decision === 'allow' && !input.asksFirst?.(hookInput.tool_name)) return patched ? allow('Allowed by Beluga.') : {};
@@ -381,14 +394,13 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
             },
           ],
         },
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: runInstructions(input, opts.bridge.selfName(), opts.agentOf?.(input) ?? input.place?.agent) },
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: runInstructions(input, opts.bridge.selfName(), opts.agentOf?.(input) ?? input.place?.agent, claudeShellSetup(baseLaunchEnv ?? process.env, compat)) },
         ...ownerSettings(input),
         ...skills,
         ...((input.model ?? opts.model) ? { model: input.model ?? opts.model } : {}),
         ...(input.effort ? { effort: input.effort } : {}),
-        // Claude Code's own auto-compact follows Beluga's threshold (see shared/context-usage.ts).
-        // zsh-compat.sh makes a zsh login shell take the bash Claude writes (zsh-compat.ts).
-        env: { ...(launchEnv ?? process.env), ...zshCompatEnv({ ...process.env, ...input.env }) } as Record<string, string>,
+        // Claude Code's own auto-compact follows Beluga's threshold (see shared/context-usage.ts), and zsh-compat.sh.
+        ...(launchEnv ? { env: launchEnv } : {}),
         ...claudeExecutable(opts.claudePath),
         // Its last words, so a crash says why (see shared/run-failure.ts): read by our own spawn when there is one.
         ...(tracked ? { spawnClaudeCodeProcess: tracked.spawn } : { stderr: keepStderr }),

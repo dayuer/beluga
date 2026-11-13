@@ -148,7 +148,7 @@ describe('a plan’s agent for its checks', () => {
     expect(typeof PLANS_HANDLERS['plans.setCheckAgent']).toBe('function');
     expect(PHONE['plans.setCheckAgent']).toBe('phone');
     expect(PhoneCalls['plans.setCheckAgent'].result.parse('x')).toBe('x');
-    expect(SINCE.checkAgent).toBe(56);
+    expect(SINCE.checkAgent).toBe(57);
     expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(SINCE.checkAgent);
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
