@@ -57,14 +57,18 @@ export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel,
     }
   };
   // Opened from Settings (its window is open): over that window, not behind it (BLG-213).
-  const overSettings = document.querySelector('[data-settings]') ? '' : undefined;
+  // Settings opened from the welcome sits over the welcome too, so the sheet goes above both.
+  const settingsWindow = document.querySelector('[data-settings]');
+  const overSettings = settingsWindow ? '' : undefined;
+  const overWelcome = settingsWindow?.hasAttribute('data-over-welcome') ? '' : undefined;
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>
       <Dialog.Portal>
-        <Dialog.Overlay className={s.overlay} data-over-settings={overSettings} />
+        <Dialog.Overlay className={s.overlay} data-over-settings={overSettings} data-over-welcome={overWelcome} />
         <Dialog.Content
           className={cx(s.sheet, tall && s.tall)}
           data-over-settings={overSettings}
+          data-over-welcome={overWelcome}
           style={{ width: `min(${width}px, calc(100vw - 48px))` }}
           aria-describedby={undefined}
           // Escape in a field with its suggestions open (New Task's "@") closes them, not the sheet.

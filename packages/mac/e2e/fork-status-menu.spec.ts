@@ -71,6 +71,7 @@ test('calm on: the menu is the button written once, one marker, equal rows, insi
   expect(box.x + box.width).toBeLessThanOrEqual(nav.x + nav.width + 0.5);
 
   // One marker: the check column. The coloured dots are gone from the menu.
+  await expect(dots(page)).not.toHaveCount(0); // upstream dots exist, so the hidden check below means something
   await expect(dots(page).first()).toBeHidden();
   await expect(card(page).getByRole('radio', { name: /^Online/ })).toHaveAttribute('aria-checked', 'true');
 
