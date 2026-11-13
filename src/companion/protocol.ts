@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 59 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 60 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -158,8 +158,11 @@ export const COMPANION_PROTO = { major: 1, minor: 59 } as const;
  * 1.59 (BLG-74): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
+ * 1.60 (fork; was 1.55 before main took 1.55–1.59): who did each part of a plan's milestone
+ * (`PlanView` milestone `roles`, MilestoneRolesView), read only. An older Mac leaves it out, and
+ * the phone shows nothing (`supports('rolesSeen')`).
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, checkAgent: 55, autoAgent: 56, archAgent: 57, fixAgent: 58 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, checkAgent: 55, autoAgent: 56, archAgent: 57, fixAgent: 58, rolesSeen: 60 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -449,6 +452,11 @@ export type SubAgentDetailView = z.infer<typeof SubAgentDetailView>;
 /** Which agent it is (src/protocol.ts AgentRef, repeated here: this file is the phone's whole contract). */
 export const AgentRefView = z.object({ runtime: z.string().max(32), model: z.string().max(64).optional(), label: z.string().max(64) });
 export type AgentRefView = z.infer<typeof AgentRefView>;
+/** 1.60 (fork): who did one part of a milestone (src/fork/plans/roles.ts): state off|waiting|skipped|on, the agent that did it (mine: your default), what's set (auto: auto route), why they differ (pick|task|fix|default|changed), now (Coding, after a handoff), and the fix agent's handoffs. */
+export const RoleSeenView = z.object({ state: z.string().max(20), agent: AgentRefView.optional(), mine: z.boolean().optional(), set: AgentRefView.optional(), auto: z.boolean().optional(), why: z.string().max(20).optional(), now: AgentRefView.optional(), handoffs: z.array(z.object({ at: z.number(), what: z.string().max(20), to: z.string().max(80) })).max(20).optional() });
+export const MilestoneRolesView = z.object({ arch: RoleSeenView, work: RoleSeenView, check: RoleSeenView, fix: RoleSeenView });
+export type RoleSeenView = z.infer<typeof RoleSeenView>;
+export type MilestoneRolesView = z.infer<typeof MilestoneRolesView>;
 
 /** 1.41 (BLG-702): one emoji under a message: how many put it there, whether you did, and who (their names, you as "You"). */
 export const ChatReactionView = z.object({
@@ -800,6 +808,8 @@ export const PlanView = z.object({
         /** 1.53 (fork): its technical design from the plan's architect (code taken out), and that the architect is writing it now. */
         design: z.string().max(12000).optional(),
         designing: z.boolean().optional(),
+        /** 1.60 (fork): who did each part of it: architecture, coding, audit, hard fixes (RoleSeenView). */
+        roles: MilestoneRolesView.optional(),
       }),
     )
     .max(50),

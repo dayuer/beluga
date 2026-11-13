@@ -7,6 +7,7 @@ import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
 import { routedAgent } from '../shared/auto-route.js';
+import { rolesOfMilestone } from '../fork/companion/plan-roles-views.js';
 import { waitingNote } from '../core/friend-share-people.js';
 import { criteria, tally } from '../core/board/criteria.js';
 import { OFFER_DETAIL, offerWords, waitingOn, waitingWords, workingOn, workingWords } from '../core/team/model.js';
@@ -948,6 +949,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
       // 1.57 (fork): its design (no code on the phone), and that its architect is writing it.
       ...(m.run.design ? { design: clip(stripCode(m.run.design.text).text.replace(/\[\[code(?::\d+)?\]\]/g, '(code)'), 12000) } : {}),
       ...(designing(plan, m) ? { designing: true } : {}),
+      ...rolesOfMilestone(plan, m, state),
     })),
     autonomy: plan.autonomy,
     ...(plan.paused ? { paused: true } : {}),
