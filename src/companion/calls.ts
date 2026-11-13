@@ -16,6 +16,9 @@ const done = z.unknown();
 export const AskResult = z.object({ topic: z.string() });
 export const AskPersonResult = z.object({ topic: z.string(), task: z.string() });
 export const OlderResult = z.union([z.object({ turns: z.array(TurnView), more: z.boolean() }), z.object({ messages: z.array(ChatMessageView), more: z.boolean() })]);
+/** What a chat's address is now (src/core/chat-links/resolve.ts); null for a malformed ref, or from a Mac of 3.3.0 or older with chat links off. Where it opens stays the Mac's: the phone opens /conv/<channel>. */
+export const ChatResolveResult = z.object({ title: z.string().optional(), kind: z.string(), state: z.enum(['idle', 'working', 'archived', 'removed', 'loading']), ownership: z.enum(['own', 'shared', 'unknown']) }).passthrough().nullable();
+export type ChatResolveResult = z.infer<typeof ChatResolveResult>;
 /** Open on your Mac: it came to the front, or why not. */
 export const OpenOnMacResult = z.object({ opened: z.boolean(), why: z.string().optional() });
 /** A project's small icon (PNG, or a small SVG), by checksum. */
@@ -150,11 +153,14 @@ export const PhoneCalls = {
   'companion.signOut': entry('companion.signOut', z.object({ signedOut: z.literal(true) })),
   // 1.13: whether the Mac stays awake for the phone (BLG-127).
   'companion.keepAwake': entry('companion.keepAwake', done),
+  // 1.54: usage statistics' level, from the phone's Settings (BLG-922).
+  'telemetry.choose': entry('telemetry.choose', done),
   // 1.32: one of your providers becomes the default agent (BLG-459).
   'companion.defaultAgent': entry('companion.defaultAgent', done),
   // 1.14: Your Mac's chats: a new one (its id comes back), or one deleted for good.
   'assistant.newChat': entry('assistant.newChat', z.string()),
   'assistant.deleteChat': entry('assistant.deleteChat', done),
+  'chats.resolve': entry('chats.resolve', ChatResolveResult),
   'companion.openOnMac': entry('companion.openOnMac', OpenOnMacResult),
   'companion.icon': entry('companion.icon', IconResult),
   'companion.mergeCheck': entry('companion.mergeCheck', MergeCheckView),
@@ -171,9 +177,9 @@ export const PhoneCalls = {
   'plans.setWorkAgent': entry('plans.setWorkAgent', z.string()),
   // 1.50: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words.
   'plans.setCheckAgent': entry('plans.setCheckAgent', z.string()),
-  // 1.53 (fork): who designs each milestone before its work starts (null: no architect step) → in words.
+  // 1.57 (fork): who designs each milestone before its work starts (null: no architect step) → in words.
   'plans.setArchAgent': entry('plans.setArchAgent', z.string()),
-  // 1.54 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words.
+  // 1.58 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words.
   'plans.setFixAgent': entry('plans.setFixAgent', z.string()),
   // 1.7: a worktree's files (read-only) and terminals (shared with the Mac).
   'companion.files.list': entry('companion.files.list', FolderView),
@@ -209,6 +215,8 @@ export const PhoneCalls = {
   // 1.29 (BLG-392): what a sentinel keeps, its files and histories as refs; a run's file opened on the Mac.
   'sentinel.dataList': entry('sentinel.dataList', DataListView),
   'sentinel.runFileOpen': entry('sentinel.runFileOpen', done),
+  // 1.59 (BLG-74): a Synon Studio start Gate answered from Needs You (the Mac does the same).
+  'studio.answerGate': entry('studio.answerGate', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

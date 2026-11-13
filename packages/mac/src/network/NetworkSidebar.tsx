@@ -22,7 +22,6 @@ import { channelName, isMain } from './chat-model.js';
 import { openMain } from './ChatTabs.js';
 import side from '../layout/Sidebar.module.css';
 import s from './network.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * The sidebar's Friends and Groups: who's around (with their status), the groups you're in,
@@ -211,7 +210,7 @@ function RenameField({ g, done }: { g: GroupView; done: () => void }) {
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter' && !isImeComposing(e)) save();
+        if (e.key === 'Enter') save();
         if (e.key === 'Escape') done();
       }}
     />

@@ -16,7 +16,6 @@ import { Glass } from './Glass.js';
 import s from './onboarding.module.css';
 import { cmdReturn, notificationSettings, returnName, systemSettingsName } from '../lib/os-words.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 type Appearance = UiPrefs['appearance'];
 
@@ -332,7 +331,7 @@ export function Setup() {
       </Rise>
       <Glass radius={16} width="100%" className={s.rows}>
         <SetupRow index={0} label="Your name" detail="What friends see when you work together.">
-          <input className={s.input} aria-label="Your name" value={name} placeholder="Your name" maxLength={64} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && saveName()} />
+          <input className={s.input} aria-label="Your name" value={name} placeholder="Your name" maxLength={64} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === 'Enter' && saveName()} />
         </SetupRow>
         <SetupRow index={1} label="When a friend asks your agent" detail={policy === 'ask' ? 'Recommended: you see and approve every request.' : policy === 'auto' ? 'Requests from friends run without asking.' : 'Only you can use your agent.'}>
           <Choice

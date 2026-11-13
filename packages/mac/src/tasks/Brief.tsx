@@ -9,7 +9,6 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { ago, checklist, toggleCheck } from './tasks-model.js';
 import { useSelfId, useTaskActions } from './use-tasks.js';
 import t from './tasks.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * A task's brief: what later agents and people rely on, in sections. Click a section to edit it
@@ -154,7 +153,7 @@ function Section({ issue, section, startEditing, onDone }: { issue: Issue; secti
             aria-label={info.label}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeComposing(e) && (e.metaKey || e.ctrlKey)) {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 void save();
               } else if (e.key === 'Escape') {

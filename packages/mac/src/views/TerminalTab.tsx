@@ -1,11 +1,11 @@
 import * as Context from '@radix-ui/react-context-menu';
 import { type ReactNode, useRef, useState } from 'react';
+import { ContextRoot } from '../components/ContextRoot.js';
 import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { useApi } from '../lib/beluga.js';
 import m from '../components/SpecMenu.module.css';
 import s from './terminal.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 export interface TerminalTabProps {
   readonly termKey: string;
@@ -48,7 +48,7 @@ function NameField({ label, onDone }: { label: string; onDone: (name: string | u
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter' && !isImeComposing(e)) end(text);
+        if (e.key === 'Enter') end(text);
         if (e.key === 'Escape') end(undefined);
       }}
       onBlur={() => end(text)}
@@ -91,7 +91,7 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
   );
   if (!renamable && !onClose) return tab;
   return (
-    <Context.Root>
+    <ContextRoot>
       <Context.Trigger asChild>{tab}</Context.Trigger>
       <Context.Portal>
         {/* Focus stays with the name field Rename… opens, instead of going back to the tab. */}
@@ -108,6 +108,6 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
           ) : null}
         </Context.Content>
       </Context.Portal>
-    </Context.Root>
+    </ContextRoot>
   );
 }

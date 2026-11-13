@@ -553,3 +553,31 @@ npm run typecheck && npx vitest run               # 根目录；mac 的 npm run 
 对照 §4.3：on 档动画数/JS 动效数不升、CLS 漂移不超过 ±0.02。e2e 失败先在 `--workers=1` 单跑定性（回归 / spec 过期 / 负载抖动），做法见 §4.2。
 
 **有用的记号**：`fork/calm/` 里每条定点规则都是 `[class*="_name_"]` 或 data/aria 锚点，失效检测就是在上游里找这些名字；已知限度：同名类在别的模块出现会被误判为「活」，所以只报告不卡退出码。
+
+## 9. 合并前审计（M5，2026-11-13）
+
+提交到 main 之前，把当时最新的 main（已含上游 3.3.0 与后续中文同步，`be26e0abf`）并进计划分支 `plan/mac-fork`，在合并后的树上重跑检查。这个 fork 比上游多 282 个提交、落后 0 个。
+
+### 9.1 结果
+
+| 检查 | 结果 |
+| --- | --- |
+| `git merge main`（`plan/mac-fork` → 本分支） | 无冲突；自动合好的两处：`docs/fork.md`、`packages/mac/src/tasks/TaskBoard.tsx` |
+| `cd packages/mac && npm run typecheck` | 通过 |
+| `npx vitest run tests/fork-calm.test.ts tests/fork-calm-hold-order.test.ts tests/upstream-sync.test.ts` | 35/35 通过 |
+| `node scripts/sync-upstream.mjs --report` | 0 个 `!`、0 条「no longer changed」；覆盖层失效规则 0（退出码 0） |
+| fork-calm 报告（合并后） | 451 条上游发现（合并前同在 main 上一样）；新增/消失动效 0 |
+
+`--report` 在 main 上原本就有 28 个 `!`：那些是 fork 自己的 Synon Studio、`packages/ui-plan` 共用组件、以及几处通用修复留在上游文件里的接入点，一直没在 `docs/fork.md` 登记。这次按「沉稳的进沉稳节、其余进对应功能节」逐条补了原因（`docs/fork.md` 的「计划图与大纲共用」「Synon Studio」「适合提回上游」等节），并从清单删掉两条早已失效的登记（`CLAUDE.md`、`tests/sentinel-kept-data.test.ts` 现在与上游一致）。
+
+### 9.2 回归：Lifted 的沉稳判断
+
+上游 3.3.0 把「拖起的东西（任务板卡片、侧栏对话行）轻抬并随方向倾斜」抽成了 `packages/mac/src/components/Lifted.tsx`（`useLean` + `Lifted`），由 `tasks/TaskBoard.tsx` 和新的 `layout/chat-drag.tsx` 共用。重构时 `reduce` 只剩 `useReducedMotion()`：原来 `TaskBoard` 里 `reduce` 是 `reduced-motion || calm`，这一半丢了。
+
+后果（沉稳开时）：拖起的卡片会按手指速度弹簧倾斜（`LEAN_SPRING`），并以弹簧放大到 `LIFT_SCALE` = 1.035——正是沉稳界面要避免的。
+
+修法：`useLean` 与 `Lifted` 都读 `useCalm()`；沉稳时倾斜目标恒为 0 且直接返回该值（不经过 spring），`scale` 恒为 1、过渡时长为 0。沉稳关时表达式与上游逐行相同。`tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 加了这一处 canary，`docs/fork.md`「沉稳界面」一节登记了原因。
+
+### 9.3 最终验证
+
+最终树的全量 `npx vitest run` 在提交前对暂存树跑一遍；通过时提交说明末尾记 `Tested-on: macOS …`，其中的 tree 等于 `git write-tree`。之后不再改文件。

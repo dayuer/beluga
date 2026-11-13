@@ -4,7 +4,6 @@ import { Icon } from '../components/Icon.js';
 import { IconButton } from '../components/ui.js';
 import s from './find.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /** The words of one conversation item that Find looks through. */
 function searchable(item: LogItem): string {
@@ -137,7 +136,7 @@ export function FindBar({ items, logRef, onGo }: { items: readonly LogItem[]; lo
           if (e.key === 'Escape') {
             e.preventDefault();
             close();
-          } else if (e.key === 'Enter' && !isImeComposing(e)) {
+          } else if (e.key === 'Enter') {
             e.preventDefault();
             step(e.shiftKey ? -1 : 1);
           }

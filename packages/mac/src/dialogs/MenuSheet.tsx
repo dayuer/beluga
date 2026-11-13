@@ -9,7 +9,6 @@ import { useActions } from '../lib/actions.js';
 import { useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { guiHint, paragraphs } from '../lib/gui-copy.js';
 import s from './sheet.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Every choice the shared menus ask (settings sections, a person, a pull request, invites,
@@ -53,7 +52,7 @@ export function MenuSheet() {
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && options.length) {
               e.preventDefault();
               setSelected((n) => (n + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length);
-            } else if (e.key === 'Enter' && !isImeComposing(e)) {
+            } else if (e.key === 'Enter') {
               e.preventDefault();
               pick(selected);
             }

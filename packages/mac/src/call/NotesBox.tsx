@@ -9,7 +9,6 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { namesOf } from './CallStrip.js';
 import { clockOf, findTurns, lengthOf, marks, minuteMarks, timeline, turns, wordCount } from './notes-model.js';
 import c from './notes.module.css';
-import { isImeComposing } from '../lib/ime.js';
 import { reducedMotion } from '../lib/reduced-motion.js';
 
 /* ---------- Which notes are open (one reader at a time, over its conversation) ---------- */
@@ -244,7 +243,7 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
               if (first !== undefined) goTo(first, false);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeComposing(e)) step(e.shiftKey ? -1 : 1);
+              if (e.key === 'Enter') step(e.shiftKey ? -1 : 1);
               if (e.key === 'Escape') {
                 setQuery('');
                 search.current?.blur();

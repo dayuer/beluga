@@ -13,7 +13,6 @@ import side from './Sidebar.module.css';
 import s from './project-groups.module.css';
 import { isShortcut } from '../lib/shortcuts.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /** The project menu's group options, done the Mac way: these spec options become "Move to Group ▸". */
 export const isGroupOption = (id: string): boolean => id.startsWith('p-group:') || id === 'p-newgroup' || id === 'p-ungroup';
@@ -80,7 +79,7 @@ function NameField({ initial, onDone, label }: { initial: string; onDone: (name:
       onChange={(e) => setName(e.target.value)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Enter' && !isImeComposing(e)) finish(name);
+        if (e.key === 'Enter') finish(name);
         else if (e.key === 'Escape') finish(undefined);
       }}
       onBlur={() => finish(name)}

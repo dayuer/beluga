@@ -233,6 +233,12 @@ export const MACHINE: Record<Method, MachineSide> = {
   'env.testDatabase': 'drive',
   'env.importDotenv': 'drive',
   'env.newKeysBack': 'drive',
+  'env.worktree': 'drive',
+  'env.setWorktree': 'drive',
+  'env.carryWorktree': 'drive',
+  'env.overview': 'drive',
+  'env.addToExample': 'drive',
+  'env.exampleSync': 'drive',
   'env.endpoints': 'drive',
   'env.saveEndpoint': 'drive',
   'env.removeEndpoint': 'drive',
@@ -319,8 +325,23 @@ export const MACHINE: Record<Method, MachineSide> = {
   'revenuecat.disconnect': 'drive',
   'revenuecat.refresh': 'drive',
   'revenuecat.setApps': 'drive',
+  // ---- Synon Studio: the link and what customers may see stay with the computer itself
+  'studio.link': 'refuse',
+  'studio.unlink': 'refuse',
+  'studio.status': 'drive',
+  'studio.setProject': 'refuse',
+  'studio.reconnect': 'drive',
+  // The answer to a customer's start Gate is the operator's own, not another computer's, and so is
+  // what you say to a customer.
+  'studio.answerGate': 'refuse',
+  'studio.say': 'refuse',
   // ---- support
   'support.answer': 'drive',
+  // ---- usage statistics
+  'telemetry.choose': 'drive',
+  'telemetry.answer': 'drive',
+  'telemetry.exclude': 'drive',
+  'telemetry.mark': 'drive',
   // ---- stats
   'stats.get': 'drive',
   'stats.leaderboard': 'drive',
@@ -672,6 +693,9 @@ export const MACHINE: Record<Method, MachineSide> = {
   'web.public': 'refuse',
   'web.tailscale': 'refuse',
   'web.stop': 'refuse',
+  // ---- chats (chat links: a chat's chip, a chat's copy)
+  'chats.resolve': 'drive',
+  'chats.snapshot': 'drive',
   // ---- external agents: letting one in stays with the computer itself.
   'external.activity': 'drive',
   'external.agents': 'drive',

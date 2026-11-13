@@ -31,7 +31,6 @@ export function useChannelTasks(people: ReadonlyArray<{ readonly peerId: string;
 }
 import c from '../chat/composer.module.css';
 import s from './network.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /** What you were writing in each conversation (kept while the app runs, like Messages). */
 const drafts = new Map<string, string>();
@@ -238,7 +237,7 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
               void addBlobs(client, id, files);
             }}
             onKeyDown={(e) => {
-              if (isImeComposing(e)) return;
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
               if (sug.onKeyDown(e)) return;
               if (e.key === 'Escape' && ask) {
                 e.preventDefault();
