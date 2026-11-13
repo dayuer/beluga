@@ -418,7 +418,7 @@ describe('a customer turn in every runtime (BLG-110)', () => {
   });
 
   it('every runner puts customerTurn into its policy', () => {
-    for (const runtime of ['claude', 'codex', 'copilot', 'opencode']) {
+    for (const runtime of ['claude', 'codex', 'copilot', 'opencode', 'antigravity']) {
       const src = readFileSync(join(process.cwd(), 'src/agent/runtime', runtime, 'runner.ts'), 'utf8');
       expect(src, runtime).toContain('customerTurn: true');
     }

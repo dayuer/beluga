@@ -478,7 +478,7 @@ approve 被拒”的半成功状态。运营方自己的 Mac/手机/`machines` �
 
 - 实现：`PlanWork.forRun(channel, from)` 发现 `customerTurns.active(channel)` 时只给 `plan_get` /
   `plan_write` / `plan_update`（照 checker 的 `only: [...]` 写法）；运行时把 `customerTurn: true` 放进
-  `PolicyContext`，`decideTool` 按上表判。**四个运行时都一样**：Claude、Codex、Copilot、OpenCode 的 runner
+  `PolicyContext`，`decideTool` 按上表判。**五个运行时都一样**：Claude、Codex、Copilot、OpenCode、Antigravity 的 runner
   都把 `input.customerTurn` 放进 policy，由同一个 `tool-gate.ts` 判；客户回合在任何一个运行时上都不会弹出
   权限请求（BLG-110）。
 - **三条入口都受限**，不只是聊天：客户消息（chat）、`milestone.sendBack` 的原因、客户对决策的自由回答，都在
