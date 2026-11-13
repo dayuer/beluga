@@ -94,13 +94,13 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/main.tsx`：在 `tokens.css`、`base.css` 之后加一行 `import './fork/calm/index.js'`；它在首帧前设置 `data-calm`，并引入 `fork/calm/calm.css`。
 - `packages/mac/src/dialogs/Settings.tsx`：Appearance 的 Layout 组、Reduce motion 行后加一行 `<CalmRow />`；开关本体在 `packages/mac/src/fork/calm/settings.tsx`。
 - `tests/mac-settings-search.test.ts`：appearance 的 `PANE_SOURCES` 加 `read('fork/calm/settings.tsx')`，让「索引的标签必须在面板源码里」这条校验读得到 fork 自己的行。
-- `CLAUDE.md`：原来的《The Mac app's look: calm, not lively》一节搬进 `docs/calm-ui.md`，原处只留一行指向；规则本体的改动都在 fork 文件里，不碰上游。
 - `packages/mac/src/layout/Sidebar.tsx`：一行 `useSidebarHold(drop.ref)`——「指针/焦点/拖拽是否在侧栏上」只有 nav 自己知道，探针逻辑在 `fork/calm/hold-order.ts`。操作侧栏时不重排、离开 600ms 后换上新顺序（`docs/calm/hooks.md` §1）。
 - `packages/mac/src/layout/EntryRow.tsx`：`useEntryList` 的返回值经过 `useHeldEntries`——Unread 与 Categories 两种侧栏模式都从这里拿排序结果，改这一处覆盖两种；冻结的取舍与实现见 `docs/calm/hooks.md` §1。M3 起只冻结顺序、内容取最新（「需要你」标记在操作期间也能到达），新增行等释放后出现（`docs/calm/overlay.md` §12 · SH-08）。
 - `packages/mac/src/chat/ChatLog.tsx`：回到底部按钮的 children 换成 `fork/calm/new-below.tsx` 的 `<JumpLabel rows={rows.length} />`——上游不提供「下面来了几条」，计数要跨渲染保存，只能做成组件；按钮本体、`stick` 滚动逻辑一行未动（`docs/calm/hooks.md` §2）。
 - `packages/mac/src/App.tsx`：`Toasts` 里加 `useOneToast('global', toast?.id)`，被后到的 toast 压制时不渲染，外层加 `data-one-toast="global"`——全局 toast 的渲染和 store 定时器都在这里（`docs/calm/hooks.md` §3）。
 - `packages/mac/src/lib/undo-toast.tsx`：`UndoToast` 里加 `useOneToast('undo', toast?.id)`，被压制时不渲染、不响应 ⌘Z（定时器照旧收尾），外层加 `data-one-toast="undo"`——撤销 toast 是模块级状态，两套必须在同一个判据下；样式在 `fork/calm/one-toast.css`（`docs/calm/hooks.md` §3）。
 - `packages/mac/src/lib/live-motion.ts`：`tick`/`wake`/`watch`/`joinLive` 里加 `calmLive` 门（同一文件 5 行）——时钟的 `seen`/`marks` 是模块私有的，外部拿不到，无法在 fork 文件里过滤；沉稳模式下只放行 `[data-current]` 里的标记，其余停在静止帧（`docs/calm/hooks.md` §4）。
+- `packages/mac/src/components/Lifted.tsx`：`useLean` 与 `Lifted` 的 `reduce` 判据加 `useCalm()`（M5 · 同步 3.3.0）。上游把任务板卡片和侧栏对话行的「拖起」抽成这个文件后，只看 `useReducedMotion`——原来 `TaskBoard` 的 `reduce` 含沉稳，这次重构丢了，沉稳开时拖起的东西会弹簧倾斜并放大到 `LIFT_SCALE` 1.035。沉稳时 `lean` 恒为 0、`scale` 恒为 1、不挂 spring；沉稳关与上游逐行一致。
 - `packages/mac/src/i18n/zh-CN.fork.json`：fork 自己的 `{0} new` 词条；上游文件不碰。
 
 ### M3 逐页补改（docs/calm/overlay.md §12；每处一行接入点）
@@ -152,6 +152,33 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `src/core/board/work.ts`、`src/core/store.ts`、`src/shared/settings-schema.ts`、`src/ipc/api.ts`、`src/machines/sync.ts`
 - `packages/mac/src/tasks/use-task-start.ts`、`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`、`packages/companion/app/task/[id].tsx`
 
+### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
+
+计划图与大綱抽成 `packages/ui-plan`，Mac、客户 web 应用和手机读同一份；上游文件里只有「换成共用组件」的接入点。
+
+- `packages/companion/components/PlanParts.tsx`：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
+- `packages/companion/metro.config.js`、`packages/companion/tsconfig.json`：把 `packages/ui-plan` 加进手机端的共享路径
+
+### Synon Studio（客户写需求、看计划；开工前由你确认）
+
+客户 web 应用（`packages/studio-app`）、中台（`packages/studio-hub`）与 daemon 的 `src/studio/` 都是 fork 自己的文件；下面这些上游文件里只有接入点。
+
+- `src/cli/args.ts`、`src/cli/main.ts`：`beluga studio link/status/unlink/share/unshare` 命令
+- `src/core/agent-host.ts`：`plans` 的返回值把 `customerTurn` 透传给 agent
+- `src/core/plans/edit.ts`：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
+- `src/daemon/core.ts`：起停 `launchStudio`（没连接时什么都不做）
+- `src/daemon/server.ts`：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
+- `src/ipc/handlers.ts`：展开 `STUDIO_HANDLERS`
+- `src/agent/runtime/copilot/runner.ts`、`src/agent/runtime/opencode/runner.ts`：客户回合的 policy 带 `customerTurn`
+- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、`packages/mac/src/layout/waiting-model.ts`：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
+- `packages/companion/app/need/[id].tsx`、`packages/companion/components/Needs.tsx`：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
+- `docs/companion.md`、`docs/how-it-works.md`：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
+- `tests/boundaries.test.ts`：`src/studio` 算核心（不含 UI）
+- `tests/browser-safe.test.ts`：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
+- `tests/machine-coverage.test.ts`：studio 的管理与 Gate 方法不从「你的电脑」放行
+- `tests/web-security.test.ts`：浏览器 cookie 做不了 studio 管理
+- `tsconfig.json`：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
+
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
 - `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
@@ -167,7 +194,7 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 原因：中文系统下 git 的提示是中文，Beluga 按英文原话判断 git 的结果（冲突、没有改动、分支不存在等）会判断错，全量测试也因此拿不到 Tested-on（见 `docs/reports/plan-roles-git-locale.md`）。每处只加一行 `LC_MESSAGES=C LANGUAGE=C`。
 
-- `src/workspaces/git.ts`、`src/workspaces/pr.ts`、`src/machines/ready.ts`、`tests/machines-ready.test.ts`
+- `src/workspaces/git.ts`、`src/workspaces/pr.ts`、`src/machines/ready.ts`、`tests/machines-ready.test.ts`、`tests/git-env.test.ts`（BLG-144：`gitEnv` 固定 `LC_MESSAGES=C` 并保留 `LC_CTYPE`）
 
 ### 中文输入法组字时 Enter 只选词（BLG-133：留在 fork，不提回上游）
 
@@ -183,7 +210,9 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - 路径上不存在的图片显示为“缺失”：`packages/mac/src/chat/images.ts`、`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`tests/mac-chat-images-cache.test.ts`
 - 本地模型在自己的文件夹里运行 Claude Code：`src/agent/runtime/local.ts`、`tests/local-endpoints.test.ts`
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
-- 哨兵保留数据的测试不再用固定日期（过了 14 天保留期就失败，上游也一样；只改一行）：`tests/sentinel-kept-data.test.ts`
+- 用量时间轴的「Now」线不挡悬停（`pointer-events: none`，标记不是点击目标）：`packages/mac/src/views/usage/stats.module.css`
+- e2e 夹具：预热太久的 demo daemon 不复用（它的时钟已经走过 demo 的定时事件），超过 45 秒就另起一个：`packages/mac/e2e/fixtures.ts`
+- Linux 机器测试先探测 UDP/TCP/子进程，被沙箱挡住就跳过并说明原因，而不是等配对超时：`tests/machines/linux-computer.test.ts`
 - 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`
 
 ### 从其他 fork 移植的修复（2026-11-12）
