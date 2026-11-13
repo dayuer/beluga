@@ -42,6 +42,9 @@ export function endpointEnv(t: LocalTarget, configDir: string = endpointClaudeHo
     ANTHROPIC_DEFAULT_HAIKU_MODEL: m,
     ANTHROPIC_SMALL_FAST_MODEL: m,
     CLAUDE_CODE_SUBAGENT_MODEL: m,
+    // Tool search sends `tool_reference`/`tool_definition` blocks only Anthropic's API knows: DeepSeek
+    // answered 422 "unknown variant `tool_definition`". On an endpoint, every tool goes up front.
+    ENABLE_TOOL_SEARCH: 'false',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     DISABLE_TELEMETRY: '1',
     DISABLE_ERROR_REPORTING: '1',
