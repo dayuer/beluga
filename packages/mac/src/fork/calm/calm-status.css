@@ -1,0 +1,60 @@
+/*
+ * Calm mode: the status panel (BLG-216; docs/calm-ui.md §3, §5). It is the popover above the
+ * sidebar's bottom row and the standalone Set a Status… dialog (`StatusSheet`), both rendering the
+ * same `statusCard` class.
+ *
+ * In the popover the trigger row already says the name and the status, with a coloured dot: the
+ * card says neither again, one marker (the check) tells the current status, no second colour is in
+ * the menu, every row is the same height, and the card is no wider than the row it comes from —
+ * 300 px crossed the 248 px sidebar's right edge into the main area. The dialog has no trigger
+ * underneath, so it keeps its header; the rows and the note still follow the same quiet rules.
+ *
+ * Rules are in docs/calm/overlay.md §12.3.
+ */
+
+/* The popover's header repeated the button underneath: avatar, name, "Online". */
+:root[data-calm] [data-radix-popper-content-wrapper] [class*='_statusHead_'] {
+  display: none;
+}
+
+/* The card follows its trigger (the sidebar row) and stays inside the sidebar: 16 px narrower
+   than the 248 px row, which leaves the 10 px Radix keeps from the window edge plus a 6 px gap on
+   the right. A dialog is not inside a popover wrapper, so it keeps upstream's 300 px. */
+:root[data-calm] [data-radix-popper-content-wrapper] [class*='_statusCard_'] {
+  width: min(300px, calc(var(--radix-popover-trigger-width) - 16px));
+}
+
+/* One marker for the current status: the check column. The dot's colour stays on the avatar. */
+:root[data-calm] [class*='_statusCard_'] [class*='_option_'] [class*='_dot_'] {
+  display: none;
+}
+
+/* The check sits in a 16 px left column, like a menu's icons, whether or not the row carries one. */
+:root[data-calm] [class*='_statusCard_'] [class*='_optionCheck_'] {
+  width: 16px;
+}
+
+/* The note is one more row, not a form in the middle of a menu (upstream: 30 px, inset field). */
+:root[data-calm] [class*='_statusCard_'] [class*='_note_'] {
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+/* Focus still shows, as a quiet ring rather than the filled field's stronger one. */
+:root[data-calm] [class*='_statusCard_'] [class*='_note_']:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* Every row is the same height (upstream options are 28 px). */
+:root[data-calm] [class*='_statusCard_'] [class*='_option_'] {
+  height: 32px;
+}
+
+/* The hints ("Silences notifications", "Still get messages") made the rows ragged. In calm mode
+   they are the row's hover title instead (StatusMenu.tsx). */
+:root[data-calm] [class*='_statusCard_'] [class*='_optionHint_'] {
+  display: none;
+}

@@ -101,6 +101,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/lib/undo-toast.tsx`：`UndoToast` 里加 `useOneToast('undo', toast?.id)`，被压制时不渲染、不响应 ⌘Z（定时器照旧收尾），外层加 `data-one-toast="undo"`——撤销 toast 是模块级状态，两套必须在同一个判据下；样式在 `fork/calm/one-toast.css`（`docs/calm/hooks.md` §3）。
 - `packages/mac/src/lib/live-motion.ts`：`tick`/`wake`/`watch`/`joinLive` 里加 `calmLive` 门（同一文件 5 行）——时钟的 `seen`/`marks` 是模块私有的，外部拿不到，无法在 fork 文件里过滤；沉稳模式下只放行 `[data-current]` 里的标记，其余停在静止帧（`docs/calm/hooks.md` §4）。
 - `packages/mac/src/components/Lifted.tsx`：`useLean` 与 `Lifted` 的 `reduce` 判据加 `useCalm()`（M5 · 同步 3.3.0）。上游把任务板卡片和侧栏对话行的「拖起」抽成这个文件后，只看 `useReducedMotion`——原来 `TaskBoard` 的 `reduce` 含沉稳，这次重构丢了，沉稳开时拖起的东西会弹簧倾斜并放大到 `LIFT_SCALE` 1.035。沉稳时 `lean` 恒为 0、`scale` 恒为 1、不挂 spring；沉稳关与上游逐行一致。
+- `packages/mac/src/network/StatusMenu.tsx`：`StatusPanel` 读 `useCalm()`，沉稳开时把状态行右侧的说明（「Silences notifications」等）放进 `title`，说明由 `fork/calm/calm-status.css` 隐藏，行才等高；沉稳关时 `title` 为 `undefined`，与上游逐行一致。菜单的头部、宽度、圆点、行高、备注输入框全在 `calm-status.css`（BLG-216）。
 - `packages/mac/src/i18n/zh-CN.fork.json`：fork 自己的 `{0} new` 词条；上游文件不碰。
 
 ### M3 逐页补改（docs/calm/overlay.md §12；每处一行接入点）
@@ -130,7 +131,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 手机协议的 minor 编号（3.3.0 同步时顺延）
 
-fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59：`checkAgent` 55、`autoAgent` 56、`archAgent` 57、`fixAgent` 58、Synon Studio Gate 59，`COMPANION_PROTO.minor` 为 59。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts` 和 `docs/parity.fork.md` 里的数字。
+fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59：`checkAgent` 55、`autoAgent` 56、`archAgent` 57、`fixAgent` 58、Synon Studio Gate 59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时 1.55–1.59 已被上面几条占用，顺延为 1.60，`COMPANION_PROTO.minor` 为 60。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts` 和 `docs/parity.fork.md` 里的数字。
 
 ### 版本号（脚本自动处理）
 
@@ -193,6 +194,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `packages/mac/src/components/FormSheet.tsx`：渲染时判断设置是否打开，两处加 `data-over-settings`
 - `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
 - `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
+
+已知限制：设置叠在引导页上时（`[data-over-welcome]`，`settings.module.css` 的 86/87），48/49 仍不够，从设置里打开的 FormSheet 会被盖住；BLG-213 没有加更高的 `'welcome'` 档。这条窄路径（引导页上开设置再进 Studio）留着将来一起处理。
 
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 

@@ -12,6 +12,7 @@
 | [§6](#6-上游文件改动清单) | 本计划改了哪些上游文件（文件数、行数） | BLG-207 已完成 |
 | [§7](#7-六条规范逐条判定) | 逐条规范判定表与问题表 | BLG-207 已完成 |
 | [§8](#8-同步操作手册) | fork.md「同步上游」五步的展开版 | BLG-207 已完成 |
+| [§9](#9-合并前审计m5-2026-11-13)、[§10](#10-开-pr-前修复m6-2026-11-13) | M5 并入与审计、M6 开 PR 前修复（状态菜单、Studio 对话框层级、并入最新 main） | M6 |
 
 ## 1. M0–M4 总览
 
@@ -579,5 +580,72 @@ npm run typecheck && npx vitest run               # 根目录；mac 的 npm run 
 修法：`useLean` 与 `Lifted` 都读 `useCalm()`；沉稳时倾斜目标恒为 0 且直接返回该值（不经过 spring），`scale` 恒为 1、过渡时长为 0。沉稳关时表达式与上游逐行相同。`tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 加了这一处 canary，`docs/fork.md`「沉稳界面」一节登记了原因。
 
 ### 9.3 最终验证
+
+最终树的全量 `npx vitest run` 在提交前对暂存树跑一遍；通过时提交说明末尾记 `Tested-on: macOS …`，其中的 tree 等于 `git write-tree`。之后不再改文件。
+
+## 10. 开 PR 前修复（M6，2026-11-13）
+
+M5 收尾后，用户报了两处问题（侧栏状态菜单的气质、设置里打开「连接到 Studio」被设置窗口盖住），并要求开 PR 前把 main 之后的新提交并进 `plan/mac-fork`、在最终树上重出 `Tested-on`。这一节按任务记下每处的修法与检查。
+
+### 10.1 侧栏底部状态菜单（BLG-216）
+
+用户 11-13 拿 Claude 桌面版左下角的账户菜单和 `network/StatusMenu.tsx` 的 `SelfStatus` → `statusCard` 对比：Beluga 的菜单把同一件事说了五遍（头部头像角标、头部「在线」文字、选项前的 ✓、选项里的彩色圆点、底部按钮的头像角标和「在线」），宽 300 px、越过 248 px 的侧栏右边线压进主区，右侧说明让行宽参差，输入框像嵌在菜单里的表单。沉稳模式下按 Claude 菜单的克制写法收束；沉稳关保持上游原样。
+
+| 问题 | 沉稳开的改法 | 位置 |
+| --- | --- | --- |
+| 名字与状态重复底部按钮 | 隐藏菜单头部；触发按钮上已有名字、状态与头像 | `calm-status.css` 的 `_statusHead_` |
+| 宽 300 px 越过侧栏 | 跟随触发按钮（侧栏行 248 px）再让 16 px，右缘留在侧栏内；`align="start"`、`sideOffset` 6 px 不变 | `_statusCard_` 的 `width: min(300px, calc(var(--radix-popover-trigger-width) - 16px))` |
+| 五处标记 | 当前状态只留 ✓ 一列；菜单里隐藏彩色圆点，颜色只留在底部头像角标 | `_dot_`、`_optionCheck_` |
+| 行高参差、输入框像表单 | 状态行、时长行、备注行统一 32 px；备注输入框变成一行（透明底、6 px 圆角），焦点只留安静的 2 px 环 | `_option_`、`_note_` |
+| 右侧灰字撑宽行 | 说明移进该行的 `title`（悬停可见），行内隐藏 | `StatusMenu.tsx` 一行 `title={calm && hint ? hint : undefined}`；`_optionHint_` |
+
+规则全部在 `fork/calm/calm-status.css`，只在 `:root[data-calm]` 下生效。独立打开的「Set a Status」窗口（`StatusSheet`，同文件里 Dialog.Content 那份）同样套用标记、行高与输入框的规则，视觉语言一致；它下面没有触发按钮，所以保留头部和 300 px 宽度（「不重复按钮」「跟随按钮宽度」两条只锚 popover）。上游文件只有 `StatusMenu.tsx` 一处接入点，已登记 `docs/fork.md`「沉稳界面」，`tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 有 canary。`docs/calm/overlay.md` §12.3 是逐条规则与锚点。
+
+| 沉稳开 | 沉稳关（上游原样） |
+| --- | --- |
+| ![沉稳开的侧栏状态菜单](img/m6-status-calm-on.png) | ![沉稳关的侧栏状态菜单](img/m6-status-calm-off.png) |
+
+与 Claude 菜单并排：Claude 的参照图是用户 11-13 发来的对比截图（未入库，未再向用户索取）；这里按它的气质复刻——不重复触发按钮上的名字与状态、当前状态一种标记、单色、行等高、菜单在侧栏内。沉稳关那张按同一位置与视角截取，用于确认上游外观没有变化。
+
+检查：`packages/mac/e2e/fork-status-menu.spec.ts` 两条用例（沉稳开、沉稳关）断言了头部隐藏/可见、卡片不越过侧栏右缘、圆点隐藏/可见、行高一致、说明变成/不变成 `title`，并在 `CALM_IMG=docs/calm/img` 时写出上面两张图。
+
+### 10.2 设置里打开的表单盖在设置窗口之上（BLG-213）
+
+现象：设置 › 高级 › 连接到 Studio…，绑定码对话框出现在设置窗口后面，输入框被挡住。
+
+原因：`dialogs/sheet.module.css` 的 FormSheet 是背板 40、内容 41（`components/form.module.css` 通过 `composes` 继承），`dialogs/settings.module.css` 的设置窗口是 44/45，所以从设置里打开的 FormSheet 永远在它下面。设置叠在引导页上时（`[data-over-welcome]`）是 86/87。
+
+修法（`beluga/blg-213-studio` 的 ef7169fb7）：FormSheet 渲染时看页面上有没有设置窗口（`[data-settings]`），有就给背板和内容都加 `data-over-settings`；`sheet.module.css` 把它抬到 48/49——高于设置 44/45，低于 alert 与 palette 的 50，表单里弹出的确认框仍在上面。`Settings.tsx` 的 `Dialog.Content` 加一行 `data-settings=""`。设置没开（从项目 ⋯ 菜单打开）时属性不出现，仍是上游的 40/41。三个上游文件已登记 `docs/fork.md`，`sync-upstream --report` 的 0 个 `!` 覆盖了它们。
+
+| 入口 | 组件 | 结论 |
+| --- | --- | --- |
+| 设置 › 高级 › 连接到 Studio… | `studio/ConnectDialog.tsx` → `components/FormSheet.tsx` | 已修，实测可输入、Esc 关闭后回到设置 |
+| 设置 › 环境 › 项目行 | `dialogs/EnvironmentSettings.tsx` → `openSheet({kind:'project_env'})` → `dialogs/EnvironmentSheet.tsx`（FormSheet） | 同一机制覆盖；批次里没有单独截图 |
+| 设置 › 环境 › worktree 行 | `dialogs/EnvWorktreeGroups.tsx` → `openSheet({kind:'worktree_env'})` → `EnvironmentSheet.tsx` 的 `WorktreeEnvSheet`（FormSheet） | 同一机制覆盖 |
+| 设置 › 收益 / 支持 / 遥测 / 添加项目 | `EarningsSettings`、`SupportSheets`、`TelemetrySheets`、`AddProjectSheet` | 已排查：设置页里没有打开这些表单的入口（收益表从别处打开，支持/遥测表单不在设置里触发），不受影响 |
+| 项目 ⋯ 菜单 | 同上 `ConnectDialog` | 设置没开，没有 `data-over-settings`，与上游一致（截图见下） |
+
+| 沉稳开：从设置打开 | 沉稳关：从设置打开 | 从项目 ⋯ 菜单打开（设置没开） |
+| --- | --- | --- |
+| ![沉稳开的 Studio 对话框在设置之上](img/m6-studio-over-settings-calm-on.png) | ![沉稳关的 Studio 对话框在设置之上](img/m6-studio-over-settings-calm-off.png) | ![从项目菜单打开的 Studio 对话框](img/m6-studio-from-project-menu.png) |
+
+已知限制：设置叠在引导页上（`data-over-welcome`，86/87）时，这个 48/49 的档位不够，从设置里打开的 FormSheet 仍会被盖住；引导页上打开设置再进 Studio 是窄路径，BLG-213 未做这个 `'welcome'` 档，`docs/fork.md` 如实记着。
+
+### 10.3 并入最新 main 与检查结果（BLG-214）
+
+| 合并 | 内容 |
+| --- | --- |
+| `origin/main`（`877a6d8ad`…`e9fbdb4b6`，20 个提交） | main 在 M5 之后前进的两次合并（上游 3.3.0、Synon 角色、fix/fork-audit #31）。以 `plan/mac-fork` 的 `b1a159f33` 为基，无冲突 |
+| `beluga/blg-213-studio`（`ef7169fb7`） | 设置里的 FormSheet 层级修复（§10.2），无冲突 |
+| `fix/roles-seen-1-60`（`fc788f84d`） | main 上 `SINCE.rolesSeen` 从 1.55 顺延到 1.60 后，`tests/fork-companion-roles.test.ts` 与文档还写着 55 的那处不一致；并入后全量 vitest 才干净 |
+
+`git diff --check` 与 `grep '^<<<<<<<\|^>>>>>>>'` 均无残留。
+
+| 检查 | 结果 |
+| --- | --- |
+| `node scripts/sync-upstream.mjs --report` | 0 个 `!`、0 条「no longer changed」、覆盖层失效规则 0；fork 改动的上游文件 179 个 |
+| `npx vitest run tests/fork-calm.test.ts tests/fork-calm-hold-order.test.ts tests/upstream-sync.test.ts` | 35/35 通过 |
+| `cd packages/mac && npm run typecheck` | 通过 |
+| `packages/mac/e2e/fork-status-menu.spec.ts` | 2/2 通过（§10.1 的两张截图由它重出） |
 
 最终树的全量 `npx vitest run` 在提交前对暂存树跑一遍；通过时提交说明末尾记 `Tested-on: macOS …`，其中的 tree 等于 `git write-tree`。之后不再改文件。
