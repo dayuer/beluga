@@ -42,9 +42,13 @@ export function endpointEnv(t: LocalTarget, configDir: string = endpointClaudeHo
     ANTHROPIC_DEFAULT_HAIKU_MODEL: m,
     ANTHROPIC_SMALL_FAST_MODEL: m,
     CLAUDE_CODE_SUBAGENT_MODEL: m,
-    // Tool search sends `tool_reference`/`tool_definition` blocks only Anthropic's API knows: DeepSeek
-    // answered 422 "unknown variant `tool_definition`". On an endpoint, every tool goes up front.
+    // Tool search and inline tools send `tool_reference`/`tool_definition` blocks only Anthropic's API
+    // knows: DeepSeek answered 422 "unknown variant `tool_definition`". Inline tools (MCP tools that
+    // arrive mid-run, added as a `tool_addition` message) are on for any model Claude Code doesn't
+    // know, and fall back only on Anthropic's own wording of the refusal. On an endpoint, both are
+    // off: every tool goes up front, in `tools`.
     ENABLE_TOOL_SEARCH: 'false',
+    CLAUDE_CODE_INLINE_TOOLS: 'false',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     DISABLE_TELEMETRY: '1',
     DISABLE_ERROR_REPORTING: '1',
