@@ -213,6 +213,12 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'env.testDatabase': 'gated',
   'env.importDotenv': 'gated',
   'env.newKeysBack': 'gated',
+  'env.worktree': { refused: SECRET_VALUES },
+  'env.setWorktree': { refused: ENV_LIST },
+  'env.carryWorktree': 'gated',
+  'env.overview': 'gated',
+  'env.addToExample': 'gated',
+  'env.exampleSync': 'gated',
   'env.endpoints': 'gated',
   'env.saveEndpoint': { refused: SECRET_VALUES },
   'env.removeEndpoint': 'gated',
@@ -282,6 +288,11 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stripe.disconnect': 'gated',
   'stripe.refresh': 'gated',
   'support.answer': 'gated',
+  // Consent to usage statistics is the person's own, made at a screen: never an agent's.
+  'telemetry.choose': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.answer': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.exclude': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.mark': { refused: 'Only Beluga\'s own screens report these.' },
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',
   'claudeCode.findAgent': 'gated',
@@ -646,6 +657,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.moveReceive': { refused: COMPUTERS },
   'workspaces.moveUndo': { refused: COMPUTERS },
   'workspaces.ports': { refused: NO_TOOL },
+  'chats.resolve': { refused: NO_TOOL },
+  'chats.snapshot': { refused: NO_TOOL },
   // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
   ...EXTERNAL_FORK,
 };

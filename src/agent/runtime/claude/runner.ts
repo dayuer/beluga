@@ -23,11 +23,12 @@ import { claudeComplete } from './complete.js';
 import { askBtw } from './btw.js';
 import { claudeTerminal } from './terminal.js';
 import { claudeLaunch } from './launch-args.js';
+import { chromeGate, isChromeTool } from '../../chrome.js';
 import { ViewShelf } from '../../view-tools.js';
 import { runToolSuites } from '../../run-tools.js';
 import { sdkServers } from './sdk-mount.js';
 import { ownerMcpServers } from './owner-mcp.js';
-import { McpConnect, claudeMcpSession, needsAuthServers } from './mcp-connect.js';
+import { McpConnect, claudeMcpSession } from './mcp-connect.js';
 import type { AgentBackend, AgentRunInput, FollowUp, LiveStatus, RoomBridge, RunProcess, Steer } from '../../types.js';
 import { keepLines, trackedSpawn } from './claude-process.js';
 import { keptBashInput } from '../../../workspaces/test-procs.js';
@@ -59,6 +60,20 @@ const SECRET_ENV = /PASSWORD|PASSWD|SECRET|PRIVATE_KEY|SERVICE_ROLE_KEY|API_KEY|
 /** What a friend's shell is given, on top of baseEnv (see core/peer-run.ts). */
 const SCRUBBED_SHELL = { CI: '1', GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', TERM: 'dumb', PAGER: 'cat', GIT_PAGER: 'cat' };
 
+/**
+ * Claude Code's own settings the owner may keep in the environment: where its config lives, which
+ * endpoint or cloud it talks to, how it gets through a proxy. None is a credential, so a friend's run
+ * keeps them and can still start. A proxy address with a password in it (user:pass@host) stays out,
+ * and so do the keys and tokens (ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN): a friend's run signs in
+ * the way Claude Code does without them.
+ */
+const CLAUDE_CONFIG_ENV = ['CLAUDE_CONFIG_DIR', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_MODEL', 'ANTHROPIC_SMALL_FAST_MODEL', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'ANTHROPIC_VERTEX_PROJECT_ID', 'CLOUD_ML_REGION', 'AWS_REGION', 'CLAUDE_CODE_GIT_BASH_PATH', 'NODE_EXTRA_CA_CERTS', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
+const claudeConfigEnv = (env: NodeJS.ProcessEnv): Record<string, string> =>
+  Object.fromEntries(CLAUDE_CONFIG_ENV.flatMap((name) => {
+    const value = env[name];
+    return value && !/:\/\/[^/\s]*@/.test(value) ? [[name, value]] : [];
+  }));
+
 const safeRunEnv = (extra: Readonly<Record<string, string>> | undefined): Record<string, string> =>
   Object.fromEntries(Object.entries(extra ?? {}).filter(([name]) => name && !SECRET_ENV.test(name)));
 
@@ -73,7 +88,7 @@ export function claudeLaunchEnv(input: Pick<AgentRunInput, 'guest' | 'ownerMcp' 
     if ((input.env && Object.keys(input.env).length) || input.autoCompactAt) return { ...env, ...input.env, ...compact } as Record<string, string>;
     return undefined;
   }
-  return { ...baseEnv(env), ...SCRUBBED_SHELL, ...compact, ...safeRunEnv(input.env) };
+  return { ...baseEnv(env), ...claudeConfigEnv(env), ...SCRUBBED_SHELL, ...compact, ...safeRunEnv(input.env) };
 }
 
 /**
@@ -112,10 +127,10 @@ export interface ClaudeBackendOptions {
   readonly claudePath?: string;
   /** Who the agent is told it is, when not the place's agent (a local model: its own name). */
   readonly agentOf?: (input: AgentRunInput) => AgentRef | undefined;
-  /** Your saved variables for Settings' MCP check in a folder (RuntimeOptions.ownEnv). */
-  readonly ownEnv?: (cwd: string) => Readonly<Record<string, string>>;
   /** Your MCP servers' sign-in (a fake one in tests); by default Claude Code's own. */
   readonly mcp?: McpConnect;
+  /** Your saved variables for Settings' MCP check in a folder (RuntimeOptions.ownEnv). */
+  readonly ownEnv?: (cwd: string) => Readonly<Record<string, string>>;
 }
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
@@ -211,12 +226,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
   let sessionId: string | undefined;
   // Settings' MCP list reads your saved variables as your runs do (#442).
   const mcp = opts.mcp ?? new McpConnect(claudeMcpSession(opts.claudePath), opts.ownEnv ? { ownEnv: opts.ownEnv } : {});
-  // Servers already reported as needing a sign-in, once per conversation and server.
-  const reported = new Set<string>();
-  // Every Claude Code query running now: a sign-in that connects reaches each of them.
+  // Every Claude Code query running now with your servers: a sign-in that connects reaches each of them.
   const live = new Set<Query>();
   mcp.onSignedIn((name) => {
-    for (const key of reported) if (key.endsWith(`\0${name}`)) reported.delete(key);
     for (const q of live) reconnect(q, name);
   });
 
@@ -276,7 +288,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         return own && mayBeCommand(msg.prompt) ? expandCommand(msg.prompt, cwd, home).then(build) : build(msg.prompt);
       };
       // Your `claude` flags (Settings › Agents): how it asks, in the SDK's words; the rest as they are.
-      const launch = claudeLaunch(input.launchArgs?.claude ?? [], { plan: Boolean(input.plan), autoEdit });
+      const launch = claudeLaunch(input.launchArgs?.claude ?? [], { plan: Boolean(input.plan), autoEdit, chrome: Boolean(input.chrome) });
+      // Claude in Chrome: as usual on a run you typed; any other asks you once before it first uses it (agent/chrome.ts).
+      const chrome = chromeGate(input.chrome);
       // Set, this replaces Claude Code's whole environment. A friend or a guest gets a scrubbed one
       // (never the daemon's tokens); your own run inherits unless it already passes variables.
       const launchEnv = claudeLaunchEnv(input);
@@ -304,6 +318,11 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
                   const toolInput = (hookInput.tool_input ?? {}) as Record<string, unknown>;
                   const veto = input.vetTool?.(hookInput.tool_name, toolInput);
                   if (veto) return verdict('deny', veto);
+                  if (isChromeTool(hookInput.tool_name)) {
+                    const said = await chrome(hookInput.tool_name, toolInput);
+                    if (said.kind === 'deny') return verdict('deny', said.reason);
+                    if (said.kind === 'allow') return verdict('allow', 'Approved by the machine owner.');
+                  }
                   // A directory search is narrowed so it never opens a credential file, then judged on that.
                   const confined = confineSearch(hookInput.tool_name, toolInput, policy);
                   const judged = confined ?? toolInput;
@@ -533,7 +552,8 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
 
       const ends = () => ({ stderr, ...(rejectedUntil !== undefined ? { rejectedUntil } : {}), ...(apiError ? { apiError } : {}) });
       const q = query({ prompt: prompts, options });
-      live.add(q);
+      // Only runs that have your MCP servers (never a friend's or a guest's) reload one you signed in to.
+      if (input.ownerMcp && !input.guest) live.add(q);
       showThinking(q);
       let failed = true;
       try {
@@ -541,13 +561,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
           lastEventAt = Date.now();
           background.observe(msg as Parameters<BackgroundAgents['observe']>[0]);
           watchQuiet();
-          if (msg.type === 'system' && msg.subtype === 'init') {
-            remember(msg.session_id);
-            // Servers that need a sign-in: said once per conversation, so the screens offer it (the run goes on without them).
-            const fresh = needsAuthServers(msg.mcp_servers).filter((s) => !reported.has(`${input.channel ?? ''}\0${s.name}`));
-            for (const s of fresh) reported.add(`${input.channel ?? ''}\0${s.name}`);
-            if (fresh.length) input.onMcpNeedsAuth?.(fresh);
-          }
+          if (msg.type === 'system' && msg.subtype === 'init') remember(msg.session_id);
           // Claude Code retrying the API (busy, a limit, no network): said on the working line, not a silent "Starting" (BLG-403).
           if (msg.type === 'system' && msg.subtype === 'api_retry') input.onEvent('progress', retryWords(msg.error_status, msg.attempt, msg.max_retries, Boolean(msg.no_response)));
           if (msg.type === 'rate_limit_event') {
@@ -670,6 +684,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
     mcpServers: (projects) => mcp.list([opts.cwd, ...projects]),
     mcpSignIn: (projects, name) => mcp.signIn([opts.cwd, ...projects], name),
     mcpSignedIn: (name) => mcp.signedIn(name),
+    mcpSigningIn: (name) => mcp.signingIn(name),
 
     /** Ask Claude Code which models it offers (no prompt is sent). */
     async listModels() {
