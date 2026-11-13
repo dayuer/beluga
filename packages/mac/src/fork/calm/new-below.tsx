@@ -26,7 +26,8 @@ export function JumpLabel({ rows }: { rows: number }) {
     <>
       <Icon name="chevronDown" size={12} />
       {/* Its own element: one-toast.css gives the count a quiet look, data-new says how many. */}
-      <span data-new={added}>{added} new</span>
+      {/* "new below", not "new": upstream's "{0} new" counts a plan's new milestones, and the two read differently in Chinese. */}
+      <span data-new={added}>{added} new below</span>
     </>
   );
 }
