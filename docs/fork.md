@@ -195,6 +195,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
 - `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
 
+已知限制：设置叠在引导页上时（`[data-over-welcome]`，`settings.module.css` 的 86/87），48/49 仍不够，从设置里打开的 FormSheet 会被盖住；BLG-213 没有加更高的 `'welcome'` 档。这条窄路径（引导页上开设置再进 Studio）留着将来一起处理。
+
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
 - `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
