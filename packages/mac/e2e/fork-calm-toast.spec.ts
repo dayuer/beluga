@@ -66,15 +66,23 @@ test('with calm mode off both toasts show, as upstream does', async ({ page }) =
   await page.goto('/');
   await expect(sidebar(page)).toBeVisible();
 
-  await appToast(page);
+  // The undo toast first (it stays a good while); the app toast fades by itself within seconds, so it
+  // goes second or it is gone before the menu has been used.
   await sidebar(page).getByRole('button', { name: 'bob-api' }).first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Hide Project' }).click();
-
-  // Both together, each where it was: the app toast and the undo toast.
-  await expect(toasts(page)).toHaveCount(2);
-  await expect(page.locator('[data-one-toast="global"]')).toBeVisible();
+  await page.keyboard.press('Meta+.');
+  // Both together, each where it was: the app toast and the undo toast. Looked for every frame: both
+  // fade by themselves, and a slow moment must not be what keeps them apart.
+  await page.waitForFunction(
+    () => {
+      const app = document.querySelector('[data-one-toast="global"]');
+      const undo = document.querySelector('[data-one-toast="undo"]');
+      return Boolean(app?.textContent?.includes('Open a conversation') && undo?.textContent?.includes('Hidden bob-api'));
+    },
+    undefined,
+    { polling: 'raf', timeout: 10_000 },
+  );
   const undo = page.locator('[data-one-toast="undo"]').filter({ hasText: 'Hidden bob-api' });
-  await expect(undo).toBeVisible();
 
   // And its Undo still works.
   await undo.getByRole('button', { name: 'Undo' }).click();
