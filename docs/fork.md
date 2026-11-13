@@ -130,7 +130,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 手机协议的 minor 编号（3.3.0 同步时顺延）
 
-fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59：`checkAgent` 55、`autoAgent` 56、`archAgent` 57、`fixAgent` 58、Synon Studio Gate 59，`COMPANION_PROTO.minor` 为 59。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts` 和 `docs/parity.fork.md` 里的数字。
+fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59：`checkAgent` 55、`autoAgent` 56、`archAgent` 57、`fixAgent` 58、Synon Studio Gate 59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时 1.55–1.59 已被上面几条占用，顺延为 1.60，`COMPANION_PROTO.minor` 为 60。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts` 和 `docs/parity.fork.md` 里的数字。
 
 ### 版本号（脚本自动处理）
 
