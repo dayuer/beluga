@@ -3,7 +3,6 @@ import { cx } from '../ui.js';
 import { useTokens } from './CodeLines.js';
 import { canTidy, tidy } from './tidy.js';
 import c from './code-editor.module.css';
-import { isImeComposing } from '../../lib/ime.js';
 
 export interface CodeEditorProps {
   readonly value: string;
@@ -31,7 +30,7 @@ export function CodeEditor({ value, onChange, onBlur, lang, single = false, minR
   const [failed, setFailed] = useState(false);
   const tidyable = !single && canTidy(lang);
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (single && e.key === 'Enter' && !isImeComposing(e)) return e.preventDefault();
+    if (single && e.key === 'Enter') return e.preventDefault();
     if (e.key !== 'Tab' || e.shiftKey || e.metaKey || e.altKey || e.ctrlKey) return;
     e.preventDefault();
     const el = e.currentTarget;

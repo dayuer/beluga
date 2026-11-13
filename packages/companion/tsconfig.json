@@ -14,6 +14,18 @@
       ],
       "zod/*": [
         "./node_modules/zod/*"
+      ],
+      "react": [
+        "./node_modules/@types/react/index.d.ts"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ],
+      "react-native": [
+        "./node_modules/react-native/types_generated/index.d.ts"
+      ],
+      "lucide-react-native": [
+        "./node_modules/lucide-react-native/dist/types/lucide-react-native.d.ts"
       ]
     }
   },
@@ -21,9 +33,11 @@
     "app",
     "lib",
     "components",
+    "../ui-plan",
     "../../src/companion/protocol.ts",
     "../../src/shared/view-spec.ts",
-    "../../src/net/hyperdht.d.ts"
+    "../../src/net/hyperdht.d.ts",
+    "../../src/net/mesh/modules.d.ts"
   ],
   "exclude": [
     "node_modules",

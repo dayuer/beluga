@@ -32,6 +32,12 @@ const TASK = z.object({
   labels: z.array(z.string().max(32)).max(6).optional().describe(`From the board's set only: ${DEFAULT_LABELS.map((l) => l.name).join(', ')}, and any the project added`),
   touches: z.array(z.string().max(200)).max(20).optional().describe('Files or folders it changes (parallel tasks shouldn’t share them)'),
   assignee: z.enum(['claude', 'me']).optional().describe('claude (default), or me: only the user can do it'),
+  audience: z
+    .enum(['customer', 'operator'])
+    .optional()
+    .describe(
+      'For a decision: who answers it. Leave it out (operator) for accounts, keys, payments, store consoles, domains — anything only the operator can answer. "customer" only when the customer should answer it in Synon Studio: never put a secret, an account or a payment there — such a decision stays with the operator anyway',
+    ),
   decision: z
     .object({
       question: z.string().min(1).max(1000).describe('What the user decides, as a question'),
@@ -100,6 +106,7 @@ export function taskInput(t: Partial<Task>): Partial<TaskInput> & { readonly iss
     ...(t.labels ? { labels: t.labels } : {}),
     ...(t.touches ? { touches: t.touches } : {}),
     ...(t.assignee ? { assignee: t.assignee } : {}),
+    ...(t.audience ? { audience: t.audience } : {}),
     ...(t.decision ? { decision: { question: t.decision.question, options: t.decision.options, ...(t.decision.multi ? { multi: true } : {}) } } : {}),
     ...(t.issue ? { issue: t.issue } : {}),
   };

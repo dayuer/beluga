@@ -41,3 +41,13 @@ export function staleSelectors(uses: readonly SelectorUse[], sources: readonly {
 export function calmSummary(input?: CalmSummaryInput): string;
 export function withCalmSummary(message: string, summary: string): string;
 export function forkCalmFindings(text: string): { added: { at: string; key: string }[]; gone: string[] };
+/** One row of `git diff --numstat`: lines added and removed, and its changed lines (the larger of the two). */
+export interface NumstatRow {
+  readonly file: string;
+  readonly add: number;
+  readonly del: number;
+  readonly lines: number;
+}
+export function parseNumstat(text: string): NumstatRow[];
+export function reportLines(touched: readonly string[], stats: readonly NumstatRow[], missing: readonly string[]): string[];
+export function stale(touched: readonly string[], doc: string, upstreamFiles: ReadonlySet<string>): string[];

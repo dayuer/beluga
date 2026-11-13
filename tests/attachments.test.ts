@@ -14,6 +14,7 @@ import {
   mediaTypeOf,
   publishForRoom,
   registerAttachment,
+  withImagePaths,
 } from '../src/core/attachments.js';
 import { imageContent } from '../src/agent/runtime/claude/runner.js';
 
@@ -73,6 +74,13 @@ describe('images for Claude', () => {
     expect(mediaTypeOf('a.JPG')).toBe('image/jpeg');
   });
 
+  it('points linked images at their files for an answer Claude reads as text', () => {
+    const answer = 'like this [📎 image 1 (png, 1K)](klaud-attachment:me/a.png), not [x](klaud-attachment:me/missing.png)';
+    expect(withImagePaths(answer, dir)).toBe(`like this [📎 image 1 (png, 1K)](${path.join(dir, 'a.png')}), not [x](klaud-attachment:me/missing.png)`);
+    expect(withImagePaths('[y](klaud-attachment:me/b.jpg)', dir)).toBe(`[y](${path.join(dir, 'room', 'b.jpg')})`);
+    expect(withImagePaths('klaud-attachment:me/../secret.png', dir)).toBe('klaud-attachment:me/../secret.png');
+  });
+
   it('sends images as content blocks next to the text', async () => {
     expect(imageContent('hi', [])).toBe('hi');
     const content = imageContent('hi', [path.join(dir, 'a.png')]) as Array<{ type: string; source?: { data: string; media_type: string } }>;
@@ -86,5 +94,14 @@ describe('images for Claude', () => {
     const a = registerAttachment(copy, png.length);
     const name = publishForRoom(a, path.join(dir, 'out'));
     expect(readFileSync(path.join(dir, 'out', name))).toEqual(png);
+  });
+});
+
+describe('an image linked into an answer', () => {
+  it("is in a folder the agent may read (not one of Beluga's secret files)", async () => {
+    const { attachmentsDir } = await import('../src/core/attachments.js');
+    const { isSecretPath } = await import('../src/core/shares.js');
+    expect(isSecretPath(path.join(attachmentsDir(), 'shot.png'))).toBe(false);
+    expect(isSecretPath(path.join(attachmentsDir(), '..', 'identity.json'))).toBe(true);
   });
 });

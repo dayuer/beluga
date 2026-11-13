@@ -9,7 +9,6 @@ import { Select, type SelectEntry } from './Select.js';
 import { cx } from './ui.js';
 import s from './form.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
-import { isImeComposing } from '../lib/ime.js';
 
 export { Checkbox } from './Alert.js';
 
@@ -30,6 +29,8 @@ export interface FormSheetProps {
   /** Left of the buttons: a link-like button, a note… */
   readonly footer?: ReactNode;
   readonly width?: number;
+  /** Most of the window's height, its content filling it (a document's preview). */
+  readonly tall?: boolean;
   /** No default button at all, only Done (a sheet that acts as you click inside it). */
   readonly cancelLabel?: string;
   readonly hideSubmit?: boolean;
@@ -40,7 +41,7 @@ export interface FormSheetProps {
  * A Mac sheet with a form: the title, a short intro, labelled fields, then Cancel and the default
  * button on the right. Return in a field (⌘Return in a text area) presses the default button.
  */
-export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel, canSubmit = true, destructive, footer, width = 520, cancelLabel = 'Cancel', hideSubmit, children }: FormSheetProps) {
+export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel, canSubmit = true, destructive, footer, width = 520, tall, cancelLabel = 'Cancel', hideSubmit, children }: FormSheetProps) {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const submit = async (): Promise<void> => {
@@ -60,7 +61,7 @@ export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel,
       <Dialog.Portal>
         <Dialog.Overlay className={s.overlay} />
         <Dialog.Content
-          className={s.sheet}
+          className={cx(s.sheet, tall && s.tall)}
           style={{ width: `min(${width}px, calc(100vw - 48px))` }}
           aria-describedby={undefined}
           // Escape in a field with its suggestions open (New Task's "@") closes them, not the sheet.
@@ -85,7 +86,7 @@ export function FormSheet({ title, intro, icon, submitLabel, onSubmit, onCancel,
               if (!hideSubmit) void submit();
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isImeComposing(e) && primaryKey(e) && !hideSubmit) {
+              if (e.key === 'Enter' && primaryKey(e) && !hideSubmit) {
                 e.preventDefault();
                 void submit();
               }

@@ -286,7 +286,7 @@ describe('a plan’s agent for hard fixes', () => {
     expect(typeof PLANS_HANDLERS['plans.setFixAgent']).toBe('function');
     expect(PHONE['plans.setFixAgent']).toBe('phone');
     expect(PhoneCalls['plans.setFixAgent'].result.parse('x')).toBe('x');
-    expect(SINCE.fixAgent).toBe(54);
+    expect(SINCE.fixAgent).toBe(58);
     expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(SINCE.fixAgent);
     expect(EXTERNAL_ACCESS['plans.setFixAgent']).toBe('covered');
     expect(STATE_ROWS.find((r) => r.method === 'plans.setFixAgent')?.name).toBe('plan_set_fix_agent');

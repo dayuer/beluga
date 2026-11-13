@@ -3,9 +3,9 @@ import type { ContentResults, LineMatch, NameResults } from '@beluga/core/worksp
 import { Icon } from '../../components/Icon.js';
 import { cx } from '../../components/ui.js';
 import { useBeluga } from '../../lib/beluga.js';
+import { scrollWithin } from '../../lib/scroll-within.js';
 import s from './panel.module.css';
 import k from './content-search.module.css';
-import { isImeComposing } from '../../lib/ime.js';
 
 /**
  * The Files tab searching what's in the files (not their names): as you type, a moment after you
@@ -141,7 +141,7 @@ export function ContentResultsList({ state, query, listRef, onOpen, onEscape }: 
   const picks = useMemo(() => files.flatMap((f) => (folded.has(f.path) ? [{ path: f.path, line: 0 }] : [{ path: f.path, line: 0 }, ...f.matches.map((m) => ({ path: f.path, line: m.line }))])), [files, folded]);
   const same = (a: Pick | undefined, b: Pick): boolean => a?.path === b.path && a.line === b.line;
   useEffect(() => {
-    listRef.current?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' });
+    scrollWithin(listRef.current?.querySelector('[data-cursor="true"]'));
   }, [cursor]);
 
   const fold = (p: string, to?: boolean): void => {
@@ -157,7 +157,7 @@ export function ContentResultsList({ state, query, listRef, onOpen, onEscape }: 
     else if (e.key === 'ArrowUp') (e.preventDefault(), move(i < 0 ? 0 : i - 1));
     else if (e.key === 'ArrowLeft' && cursor) (e.preventDefault(), fold(cursor.path, true), setCursor({ path: cursor.path, line: 0 }));
     else if (e.key === 'ArrowRight' && cursor && !cursor.line) (e.preventDefault(), fold(cursor.path, false));
-    else if (e.key === 'Enter' && !isImeComposing(e) && cursor) {
+    else if (e.key === 'Enter' && cursor) {
       e.preventDefault();
       if (cursor.line) onOpen(cursor.path, cursor.line);
       else fold(cursor.path);

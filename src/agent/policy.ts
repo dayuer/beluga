@@ -1,3 +1,4 @@
+import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { isDotenvPath, isReceivedTaskFile, isSecretPath, realOf } from '../core/shares.js';
 import { expandHome } from '../core/home-path.js';
@@ -39,7 +40,8 @@ const ALWAYS_OK = new Set([
   ...['who_can', 'wait_for', 'check', 'cancel', 'answer_question'].map((n) => `mcp__beluga__${n}`),
   // The task board: your own runs, and a friend's you trust (BLG-701: only its repo's board, and a
   // Trusted friend's changes ask you, see boardAsks); each change is in the task's activity.
-  ...['task_define', 'task_get', 'task_list', 'task_create', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`),
+  // task_start refuses a friend's run (core/board/work.ts): it starts a worktree on this Mac.
+  ...['task_define', 'task_get', 'task_list', 'task_create', 'task_start', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`),
   // Sentinels (core/sentinel): only your own runs have them; a new one starts paused until you turn it on,
   // and a change to what one can do pauses it. sentinel_remove and sentinel_delete_runs aren't here: deleting asks you.
   // sentinel_test and sentinel_try_source only read: a database read-only, a file, an address without your
@@ -49,6 +51,9 @@ const ALWAYS_OK = new Set([
   // dashboards' tiles and read the numbers (a tile removed takes nothing kept with it).
   // dashboard_remove isn't here: deleting a dashboard asks you.
   ...['sentinel_measure', 'dashboard_list', 'dashboard_create', 'dashboard_update', 'dashboard_add_tile', 'dashboard_update_tile', 'dashboard_move_tile', 'dashboard_remove_tile', 'metric_list', 'metric_read'].map((n) => `mcp__beluga_dashboard__${n}`),
+  // Other chats (core/chat-links): only your own runs have them. core/chat-links/access.ts decides each read and send,
+  // and guard.ts limits sends. A message approves nothing in the chat that reads it.
+  ...['list_chats', 'read_chat', 'send_to_chat', 'wait_for_chat'].map((n) => `mcp__beluga_chats__${n}`),
   // A plan's tools: only its home conversation has them (core/plans); changes to an approved plan wait for you.
   ...['plan_get', 'plan_write', 'plan_update', 'plan_gate', 'plan_review', 'plan_design', 'plan_start_task', 'plan_message_task', 'plan_stop_task', 'plan_pause'].map((n) => `mcp__beluga_plan__${n}`),
   // Child threads (core/threads): only your own runs have them, with the flag on. They start and follow your own chats, under limits; no tool archives or deletes one.
@@ -62,6 +67,8 @@ const ALWAYS_OK = new Set([
   // Your phone (BLG-150): looking at it never asks (like the Mac's screenshot). Acting on it falls
   // to 'ask', then the owner-approval gate honours the phone's own setting (Off · Ask · Use · Full).
   ...['phone_status', 'phone_screenshot', 'phone_screen', 'phone_apps', 'phone_info', 'phone_pull', 'phone_notifications', 'phone_macro_list'].map((n) => `mcp__beluga_phone__${n}`),
+  // Your MCP servers: only your own runs have these. A sign-in only opens its page in your browser: you finish it there.
+  ...['mcp_servers', 'mcp_sign_in'].map((n) => `mcp__beluga_mcp__${n}`),
 ]);
 
 /** The board tools that only look. */
@@ -131,6 +138,12 @@ export interface PolicyContext {
   readonly dotenv?: boolean;
   /** A friend's run with the board (BLG-701): its changes ('writes') or every board tool ('all') ask you first. */
   readonly boardAsks?: 'writes' | 'all';
+  /**
+   * A Synon Studio customer's turn (docs/studio-gates.md §5.3): only plan_get / plan_write /
+   * plan_update and reading inside the project. Everything else is denied here, so no approval is
+   * ever raised for it (an 'ask' or 'secret' would become a card that the customer could not answer).
+   */
+  readonly customerTurn?: boolean;
 }
 
 /**
@@ -173,44 +186,331 @@ export function writesCode(toolName: string, input: Record<string, unknown>, cwd
   return typeof raw === 'string' && raw !== '' && (runsCodeAt(raw) || runsCode(path.resolve(cwd, raw)));
 }
 
+/** Directory searches: they read files they find, not only the path the arguments name. */
+const SEARCH_TOOLS = new Set(['Grep', 'Glob', 'LS']);
+/** How many entries a directory search is walked before it stops (node_modules and .git are skipped). */
+const MAX_SEARCH_SCAN = 20_000;
+/**
+ * Names a broad directory search must leave out, the same files Codex denies (codex/sandbox.ts).
+ * One ripgrep glob: a basename anywhere, or a directory and everything in it.
+ */
+const SEARCH_SECRET_GLOBS = [
+  '.env*',
+  '*.pem',
+  '*.key',
+  '*.p12',
+  '*.pfx',
+  '*.keystore',
+  '*.jks',
+  'id_rsa*',
+  'id_ed25519*',
+  'id_ecdsa*',
+  'id_dsa*',
+  '.npmrc',
+  '.netrc',
+  '.pypirc',
+  '.git-credentials',
+  '.pgpass',
+  'credentials',
+  'credentials.json',
+  '.credentials',
+  '.credentials.json',
+  '.zsh_history',
+  '.zshhistory',
+  '.bash_history',
+  '.bashhistory',
+  '.sh_history',
+  '.shhistory',
+  '.python_history',
+  '.pythonhistory',
+  '.node_repl_history',
+  '.psql_history',
+  '.mysql_history',
+  '.lesshst_history',
+  '.lesshsthistory',
+  '.ssh',
+  '.ssh/**',
+  '.aws',
+  '.aws/**',
+  '.gnupg',
+  '.gnupg/**',
+  '.kube',
+  '.kube/**',
+  '.docker',
+  '.docker/**',
+  '.azure',
+  '.azure/**',
+  '.gcloud',
+  '.gcloud/**',
+  '.config/gh',
+  '.config/gh/**',
+  '.config/hub',
+  '.config/hub/**',
+  '.config/gcloud',
+  '.config/gcloud/**',
+  '.config/op',
+  '.config/op/**',
+  '.config/1password',
+  '.config/1password/**',
+  '.config/doctl',
+  '.config/doctl/**',
+  'library/keychains',
+  'library/keychains/**',
+  '.claude/.credentials',
+  '.claude/.credentials*',
+];
+/** Sample names those globs match, so a narrow search (only TypeScript files) is left as it is. */
+const SEARCH_SECRET_SAMPLES = ['.env', '.env.local', 'credentials.json', 'id_ed25519', 'k.pem', 'k.key', '.npmrc', '.ssh'];
+
+interface SearchHit {
+  readonly rel: string;
+  readonly kind: 'hard' | 'dotenv';
+}
+
+const secretKindAt = (p: string): SearchHit['kind'] | undefined => {
+  if (!isSecretPath(p)) return undefined;
+  return isDotenvPath(p) ? 'dotenv' : 'hard';
+};
+
+/** A file's own name, or where a link really points (a harmless name for a key is still the key). */
+function hitKind(abs: string, link: boolean): SearchHit['kind'] | undefined {
+  const named = secretKindAt(abs);
+  if (named === 'hard' || !link) return named;
+  const real = realOf(abs);
+  if (real === abs) return named;
+  const linked = secretKindAt(real);
+  if (linked === 'hard') return 'hard';
+  return linked ?? named;
+}
+
+/**
+ * Credential files under a directory a search would walk. Stops after {@link MAX_SEARCH_SCAN}
+ * entries (a whole checkout still searches; named secrets are excluded either way). Symlink
+ * directories are not descended: ripgrep doesn't follow them unless asked.
+ */
+function scanSearch(root: string): { hits: SearchHit[]; truncated: boolean } | undefined {
+  try {
+    if (!statSync(root).isDirectory()) return undefined;
+  } catch {
+    return undefined;
+  }
+  const hits: SearchHit[] = [];
+  const seen = new Set<string>();
+  const stack = [root];
+  let n = 0;
+  while (stack.length) {
+    const dir = stack.pop()!;
+    const realDir = realOf(dir);
+    if (seen.has(realDir)) continue;
+    seen.add(realDir);
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (ent.name === 'node_modules' || ent.name === '.git') continue;
+      if (++n > MAX_SEARCH_SCAN) return { hits, truncated: true };
+      const abs = path.join(dir, ent.name);
+      const rel = path.relative(root, abs).split(path.sep).join('/');
+      const kind = hitKind(abs, ent.isSymbolicLink());
+      if (kind) {
+        hits.push({ rel, kind });
+        continue;
+      }
+      if (!ent.isSymbolicLink() && ent.isDirectory()) stack.push(abs);
+    }
+  }
+  return { hits, truncated: false };
+}
+
+/** Ripgrep brace expansion, one level deep, so one exclusion of several names is one glob per name. */
+function braceExpand(pattern: string): string[] {
+  const start = pattern.indexOf('{');
+  const end = start < 0 ? -1 : pattern.indexOf('}', start);
+  if (start < 0 || end < 0) return [pattern];
+  const prefix = pattern.slice(0, start);
+  const suffix = pattern.slice(end + 1);
+  return pattern
+    .slice(start + 1, end)
+    .split(',')
+    .flatMap((part) => braceExpand(prefix + part + suffix));
+}
+
+/** A character copied from a glob into a regex has to be literal. */
+const REGEX_LITERAL = new Set(['.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
+
+/** One ripgrep glob (no braces) against a relative path. No slash: the file's name. Two stars cross directories. */
+function globMatches(glob: string, rel: string): boolean {
+  const g = glob.split('\\').join('/');
+  const target = g.includes('/') ? rel : (rel.split('/').pop() ?? rel);
+  let re = '^';
+  let i = 0;
+  while (i < g.length) {
+    if (g.startsWith('**' + '/', i)) {
+      re += '(?:' + '.*' + '/)?';
+      i += 3;
+      continue;
+    }
+    if (g.startsWith('**', i)) {
+      re += '.*';
+      i += 2;
+      continue;
+    }
+    const c = g[i]!;
+    if (c === '*') re += '[^/]*';
+    else if (c === '?') re += '[^/]';
+    else re += REGEX_LITERAL.has(c) ? '\\' + c : c;
+    i += 1;
+  }
+  return new RegExp(re + '$', 'i').test(target);
+}
+
+/** Whether this one glob (an exclusion when it starts with `!`) keeps `rel` in the search. */
+function globSelects(spec: string, rel: string): boolean {
+  const negated = spec.startsWith('!');
+  const matched = braceExpand(negated ? spec.slice(1) : spec).some((alt) => globMatches(alt, rel));
+  return negated ? !matched : matched;
+}
+
+/** The glob that chooses files: Grep's `glob`, Glob's `pattern`. LS has none. */
+function searchSpec(toolName: string, input: Record<string, unknown>): string | undefined {
+  const raw = toolName === 'Grep' ? input.glob : toolName === 'Glob' ? input.pattern : undefined;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+/** A directory search reads `rel` when it has no glob, or a glob that matches every file. */
+function searchSelects(toolName: string, input: Record<string, unknown>, rel: string): boolean {
+  if (toolName === 'LS') return true;
+  const spec = searchSpec(toolName, input);
+  if (!spec) return true;
+  return globSelects(spec, rel);
+}
+
+/** Credential files this directory search would actually open. */
+function openedSecrets(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): { hard: boolean; dotenv: boolean } | undefined {
+  if (!SEARCH_TOOLS.has(toolName)) return undefined;
+  const field = READ_TOOLS[toolName];
+  if (!field) return undefined;
+  const scan = scanSearch(resolveTarget(ctx.cwd, input[field]));
+  if (!scan) return undefined;
+  let hard = false;
+  let dotenv = false;
+  for (const hit of scan.hits) {
+    if (!searchSelects(toolName, input, hit.rel)) continue;
+    if (hit.kind === 'hard') hard = true;
+    else dotenv = true;
+  }
+  return hard || dotenv ? { hard, dotenv } : undefined;
+}
+
+/** Glob patterns that already list the whole tree, so the exclusion glob can stand in for them. */
+const WHOLE_TREE_PATTERNS = new Set(['**', '**/*']);
+
+/** A relative path that cannot be put inside one `{a,b}` glob. */
+const UNSAFE_GLOB_CHAR = new Set(['*', '?', '[', ']', '{', '}', ',', '!', '\\', '\n']);
+const unsafeGlob = (rel: string): boolean => [...rel].some((c) => UNSAFE_GLOB_CHAR.has(c));
+
+/**
+ * One negated ripgrep glob that leaves every credential file out and still returns the rest.
+ * Undefined when a discovered name won't fit in that glob.
+ */
+function exclusionGlob(extra: readonly string[]): string | undefined {
+  if (extra.some(unsafeGlob)) return undefined;
+  const alts = [...new Set([...SEARCH_SECRET_GLOBS, ...extra])];
+  const glob = `!**/{${alts.join(',')}}`;
+  return glob.length > 30_000 ? undefined : glob;
+}
+
+/**
+ * The same Grep or Glob with credential files left out, so the search can run and not open them.
+ * Undefined when the search already skips them, when it isn't a directory, or when it can't be
+ * said safely (LS, a name that breaks the glob): decideTool then denies.
+ */
+export function confineSearch(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Record<string, unknown> | undefined {
+  if (toolName !== 'Grep' && toolName !== 'Glob') return undefined;
+  const field = READ_TOOLS[toolName];
+  if (!field) return undefined;
+  const scan = scanSearch(resolveTarget(ctx.cwd, input[field]));
+  if (!scan) return undefined;
+  const opened = scan.hits.filter((hit) => searchSelects(toolName, input, hit.rel));
+  const broad = !searchSpec(toolName, input) || SEARCH_SECRET_SAMPLES.some((name) => searchSelects(toolName, input, name));
+  if (!opened.length && !(scan.truncated && broad)) return undefined;
+  // The exclusion takes the place of Grep's glob or Glob's pattern: a caller's own one would be lost
+  // and the search widened, so that search isn't narrowed (decideTool then turns it down).
+  if (toolName === 'Grep' ? typeof input.glob === 'string' && input.glob.trim() !== '' : !WHOLE_TREE_PATTERNS.has(String(input.pattern ?? '').trim())) return undefined;
+  const glob = exclusionGlob(opened.map((hit) => hit.rel));
+  if (!glob) return undefined;
+  if (toolName === 'Grep') return input.glob === glob ? undefined : { ...input, glob };
+  return input.pattern === glob ? undefined : { ...input, pattern: glob };
+}
+
 /**
  * Decide whether a tool call can run without asking the machine owner.
  * This runs as a PreToolUse hook, so it applies even to tools Claude Code would
  * auto-approve on its own (e.g. "read-only" shell commands).
  *  - credential files (by path or in a shell command) are always denied
+ *  - a directory search that would open one is too, including a link whose name hides it
  *  - except a .env file for your own Claude: that asks you ('secret'), and is never sent anywhere
  *  - read-only tools inside the shared folders are allowed; outside them the owner is asked
  *  - edits inside a :rw share are allowed
  *  - everything else (Bash, web, other edits, reads outside shares, ask_agent) asks the owner
  */
 export function decideTool(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Decision {
-  const decision = decideToolPlain(toolName, input, ctx);
-  if (decision === 'deny' || !ctx.dotenv || !touchesDotenv(toolName, input, ctx)) return decision;
+  // A customer's turn never asks: what isn't on its three tools is denied (no card for anyone).
+  if (ctx.customerTurn) return decideCustomerTurn(toolName, input, ctx);
+  const opened = openedSecrets(toolName, input, ctx);
+  const decision = decideToolPlain(toolName, input, ctx, opened);
+  if (decision === 'deny' || !ctx.dotenv || !touchesDotenv(toolName, input, ctx, opened)) return decision;
   return 'secret';
 }
 
-/** A file tool on a .env file, or a shell command whose only secret is one. */
-function touchesDotenv(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): boolean {
+/** The three plan tools a customer's turn may use: reading, and changes that stay a draft. */
+const CUSTOMER_PLAN_TOOLS = new Set(['mcp__beluga_plan__plan_get', 'mcp__beluga_plan__plan_write', 'mcp__beluga_plan__plan_update']);
+const CUSTOMER_READS = new Set(['Read', 'Grep', 'Glob']);
+
+/**
+ * A Studio customer's turn (docs/studio-gates.md §5.3): reading inside the project and its
+ * worktrees, plan tools that only touch the draft; never Bash, writes, other MCP tools, secrets or
+ * a question (an 'ask' or 'secret' would put a card in front of the operator that the customer's
+ * words asked for).
+ */
+function decideCustomerTurn(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Decision {
+  if (CUSTOMER_PLAN_TOOLS.has(toolName)) return 'allow';
+  if (!CUSTOMER_READS.has(toolName)) return 'deny';
+  const field = READ_TOOLS[toolName]!;
+  const target = resolveTarget(ctx.cwd, input[field]);
+  const real = realOf(target);
+  if ([target, real, ...namesOf(toolName, input)].some((n) => isSecretPath(n) || isDotenvPath(n))) return 'deny';
+  // A directory search that would still open a credential file (confineSearch couldn't narrow it).
+  if (openedSecrets(toolName, input, ctx)) return 'deny';
+  return ctx.roots.some((root) => within(root, target)) ? 'allow' : 'deny';
+}
+
+/** A file tool on a .env file, a shell command whose only secret is one, or a directory search that would open one and nothing harder. */
+function touchesDotenv(toolName: string, input: Record<string, unknown>, ctx: PolicyContext, opened: { hard: boolean; dotenv: boolean } | undefined): boolean {
   if (toolName === 'Bash') return typeof input.command === 'string' && mentionsOnlyDotenv(input.command);
   const field = READ_TOOLS[toolName] ?? WRITE_TOOLS[toolName];
-  if (field === undefined) return false;
-  if (isDotenvPath(resolveTarget(ctx.cwd, input[field]))) return true;
-  return READ_TOOLS[toolName] !== undefined && namesOf(input).some(isDotenvPath);
+  if (field !== undefined && isDotenvPath(resolveTarget(ctx.cwd, input[field]))) return true;
+  if (READ_TOOLS[toolName] !== undefined && namesOf(toolName, input).some(isDotenvPath)) return true;
+  return Boolean(opened?.dotenv && !opened.hard);
 }
 
 /**
  * The file names a search is limited to (Glob's pattern, Grep's glob), each alternative of a
  * `{a,b}` on its own and with its wildcards out, so `.env*` names .env and `*.pem` a key.
+ * A glob that is only an exclusion (`!…`) names nothing to read: it leaves those files out.
  */
-const namesOf = (input: Record<string, unknown>): string[] =>
-  [input.pattern, input.glob]
+const namesOf = (toolName: string, input: Record<string, unknown>): string[] =>
+  [toolName === 'Glob' && typeof input.pattern === 'string' && input.pattern.trim().startsWith('!') ? undefined : input.pattern, typeof input.glob === 'string' && input.glob.trim().startsWith('!') ? undefined : input.glob]
     .filter((v): v is string => typeof v === 'string')
     .flatMap((g) => [g, ...g.split(/[{},]/).map((part) => part.split(/[\\/]/).at(-1)?.replace(/[*?[\]!]/g, '') ?? '')])
     .filter(Boolean);
 
-function decideToolPlain(toolName: string, input: Record<string, unknown>, ctx: PolicyContext): Decision {
+function decideToolPlain(toolName: string, input: Record<string, unknown>, ctx: PolicyContext, opened: { hard: boolean; dotenv: boolean } | undefined): Decision {
   // Your own Claude's .env: judged as any file there, then it asks you (decideTool).
-  const dotenv = ctx.dotenv === true && touchesDotenv(toolName, input, ctx);
+  const dotenv = ctx.dotenv === true && touchesDotenv(toolName, input, ctx, opened);
   if (ctx.askOnly && changesMain(toolName, input, ctx)) return 'deny';
   if (ctx.guest && toolName.startsWith('mcp__beluga__')) return 'deny';
   if (ctx.boardAsks && asksForBoard(toolName, ctx.boardAsks)) return 'ask';
@@ -233,10 +533,12 @@ function decideToolPlain(toolName: string, input: Record<string, unknown>, ctx: 
   if (readField) {
     const target = resolveTarget(ctx.cwd, input[readField]);
     // A secret a friend approved sending you (BLG-209) is your user's file now: your own Claude may read it, once you say so.
-    if (ctx.dotenv && isReceivedTaskFile(target) && !namesOf(input).some(isSecretPath)) return 'ask';
+    if (ctx.dotenv && isReceivedTaskFile(target) && !namesOf(toolName, input).some(isSecretPath)) return 'ask';
     const real = realOf(target);
-    if (!dotenv && (isSecretPath(target) || isSecretPath(real) || namesOf(input).some(isSecretPath))) return 'deny';
-    if ([target, real, ...namesOf(input)].some((n) => isSecretPath(n) && !isDotenvPath(n))) return 'deny';
+    if (!dotenv && (isSecretPath(target) || isSecretPath(real) || namesOf(toolName, input).some(isSecretPath))) return 'deny';
+    if ([target, real, ...namesOf(toolName, input)].some((n) => isSecretPath(n) && !isDotenvPath(n))) return 'deny';
+    // A directory Grep, Glob or LS opens credential files it finds, not only the path it was given.
+    if (opened?.hard || (opened?.dotenv && !ctx.dotenv)) return 'deny';
     if (ctx.roots.some((r) => within(r, target))) return 'allow';
     // Outside the shared folders the owner decides (or it just runs, with full trust).
     return ctx.scope === 'full' ? 'allow' : 'ask';

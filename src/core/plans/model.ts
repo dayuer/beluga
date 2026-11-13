@@ -57,6 +57,11 @@ export interface PlanTask {
   readonly assignee?: 'claude' | 'me';
   /** Yours (assignee "me"): what you're asked when it's ready, in the plan's conversation (see decisions.ts). */
   readonly decision?: PlanDecision;
+  /**
+   * Who may answer this task's decision: the customer (Synon Studio) or you. Left out: yours. Accounts,
+   * keys, payments and the like stay yours even when marked customer (src/studio/decisions.ts).
+   */
+  readonly audience?: 'customer' | 'operator';
   /** Its task on the board, once the plan is approved. */
   readonly issueId?: string;
 }

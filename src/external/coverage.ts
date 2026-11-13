@@ -33,6 +33,9 @@ const PREVIEW = 'A live preview is built for a window\'s frame and drawn there: 
 const SAVE_PANEL = 'It writes a file where a person chose in the Save panel.';
 const COMPUTERS = 'It manages your other computers, or moves work between them: a person does that from the app.';
 const NO_TOOL = 'No tool reaches it yet: a tool for it comes with its own decision.';
+const STUDIO_PUBLISH = 'A person links Studio with the admin page’s code and chooses what customers see: no agent publishes a plan.';
+const STUDIO_GATE = 'Starting a customer’s plan is the operator’s own answer: no agent approves a start Gate.';
+const STUDIO_SAY = 'Talking to a customer is the operator’s own words: no agent speaks for them.';
 
 export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.submit': 'covered',
@@ -210,6 +213,12 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'env.testDatabase': 'gated',
   'env.importDotenv': 'gated',
   'env.newKeysBack': 'gated',
+  'env.worktree': { refused: SECRET_VALUES },
+  'env.setWorktree': { refused: ENV_LIST },
+  'env.carryWorktree': 'gated',
+  'env.overview': 'gated',
+  'env.addToExample': 'gated',
+  'env.exampleSync': 'gated',
   'env.endpoints': 'gated',
   'env.saveEndpoint': { refused: SECRET_VALUES },
   'env.removeEndpoint': 'gated',
@@ -279,6 +288,11 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stripe.disconnect': 'gated',
   'stripe.refresh': 'gated',
   'support.answer': 'gated',
+  // Consent to usage statistics is the person's own, made at a screen: never an agent's.
+  'telemetry.choose': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.answer': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.exclude': { refused: 'Usage statistics are your own choice, made in Beluga itself.' },
+  'telemetry.mark': { refused: 'Only Beluga\'s own screens report these.' },
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',
   'claudeCode.findAgent': 'gated',
@@ -564,6 +578,13 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stats.leaderboard': { refused: STATS },
   'stats.note': { refused: STATS },
   'stats.saveImage': { refused: SAVE_PANEL },
+  'studio.link': { refused: STUDIO_PUBLISH },
+  'studio.unlink': { refused: STUDIO_PUBLISH },
+  'studio.status': 'ui_only',
+  'studio.setProject': { refused: STUDIO_PUBLISH },
+  'studio.reconnect': 'ui_only',
+  'studio.answerGate': { refused: STUDIO_GATE },
+  'studio.say': { refused: STUDIO_SAY },
   'preview.open': { refused: PREVIEW },
   'preview.snapshot': { refused: PREVIEW },
   'files.readRange': { refused: NO_TOOL },
@@ -636,6 +657,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.moveReceive': { refused: COMPUTERS },
   'workspaces.moveUndo': { refused: COMPUTERS },
   'workspaces.ports': { refused: NO_TOOL },
+  'chats.resolve': { refused: NO_TOOL },
+  'chats.snapshot': { refused: NO_TOOL },
   // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
   ...EXTERNAL_FORK,
 };

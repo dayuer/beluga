@@ -10,7 +10,10 @@ import {
   forkCalmFindings,
   onlyVersionChanged,
   parseArgs,
+  parseNumstat,
+  reportLines,
   selectorsIn,
+  stale,
   staleSelectors,
   unexplained,
   versionOf,
@@ -222,5 +225,30 @@ describe('the fork’s settings rows', () => {
   it('go at the end when that group is gone upstream', () => {
     const out = withForkSettings([e('claude', 'B')], [{ after: 'Gone', entries: [e('claude', 'Mine')] }]);
     expect(out.map((x) => x.label)).toEqual(['B', 'Mine']);
+  });
+});
+
+/** The report counts how much of each upstream file the fork changes (min-conflict, BLG-190). */
+describe('the touch-point report', () => {
+  it('reads git’s numstat: a changed line counts once, a binary file 0', () => {
+    expect(parseNumstat('1\t1\tsrc/workspaces/git.ts\n3\t0\tpackages/mac/src/main.tsx\n-\t-\tlogo.png\n')).toEqual([
+      { file: 'src/workspaces/git.ts', add: 1, del: 1, lines: 1 },
+      { file: 'packages/mac/src/main.tsx', add: 3, del: 0, lines: 3 },
+      { file: 'logo.png', add: 0, del: 0, lines: 0 },
+    ]);
+  });
+
+  it('lists each file with its +/- and changed lines, marks the unexplained, and adds them up', () => {
+    const stats = parseNumstat('1\t1\ta.ts\n12\t5\tb.ts\n');
+    const lines = reportLines(['a.ts', 'b.ts'], stats, ['b.ts']);
+    expect(lines[0]).toMatch(/^ {4}\+1\/-1 +1 {2}a\.ts$/);
+    expect(lines[1]).toMatch(/^ {2}! \+12\/-5 +12 {2}b\.ts$/);
+    expect(lines[2]).toBe('  In all: 2 files, +13/-6, 13 changed lines; 1 over 3 lines.');
+  });
+
+  it('names the files docs/fork.md still lists but the fork no longer changes', () => {
+    const doc = '`README.md` stays upstream’s.\n## 改了上游的文件\n- `a.ts`, `b.ts`, `packages/mac/package.json`, `fork/own.ts`';
+    const upstream = new Set(['README.md', 'a.ts', 'b.ts', 'packages/mac/package.json']);
+    expect(stale(['a.ts'], doc, upstream)).toEqual(['b.ts']);
   });
 });

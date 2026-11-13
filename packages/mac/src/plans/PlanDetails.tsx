@@ -20,6 +20,7 @@ import { useMyAgent } from '../lib/agent-words.js';
 import type { AgentRef } from '@beluga/protocol.js';
 import { WaitingLine } from './WaitingLine.js';
 import p from './plans.module.css';
+import f from '../fork/plans/plans-fork.module.css';
 import { revealLabel } from '../lib/os-words.js';
 
 /** The details pane shows what the plan did when this is picked. */
@@ -422,7 +423,7 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
       </section>
       {m.run.design ? (
         <section className={p.detailsSection} aria-label={'Design'}>
-          <details className={p.designFold}>
+          <details className={f.designFold}>
             <summary>
               <h4>{'Design'}</h4>
               <span className={p.muted}>{'From the plan’s architect: its agent follows it, its checker checks against it'}</span>

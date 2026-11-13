@@ -50,7 +50,6 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
 import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { useOpenFolderLabel } from '../lib/remote-open.js';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * A sentinel's page: the editor and its history in one. The name is renamed in place, When and
@@ -150,7 +149,7 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
           onChange={(e) => name.change(e.target.value)}
           onBlur={name.flush}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !isImeComposing(e)) (e.target as HTMLInputElement).blur();
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
         />
         <span className={s.subtitle}>{scheduleSentence(item.trigger, (id) => items.find((x) => x.id === id)?.name)}</span>
@@ -214,7 +213,7 @@ function AskBox({ item }: { item: Sentinel }) {
           spellCheck
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !isImeComposing(e) && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               send();
             }
@@ -324,7 +323,7 @@ function History({ item }: { item: Sentinel }) {
                   data-run={r.id}
                   onClick={() => a.openRun(r.id)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isImeComposing(e) && primaryKey(e)) {
+                    if (e.key === 'Enter' && primaryKey(e)) {
                       e.preventDefault();
                       const channel = r.channel ?? r.steps.find((x) => x.channel)?.channel;
                       if (chatPlaceOf(channel)) a.openChannel(channel);

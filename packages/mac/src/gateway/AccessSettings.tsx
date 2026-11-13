@@ -7,7 +7,6 @@ import { canPickFolders, inApp } from '../lib/boot.js';
 import { pickFolders } from '../lib/projects.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import s from './access.module.css';
-import { isImeComposing } from '../lib/ime.js';
 
 /**
  * Settings › People & access, for tasks between Claudes: what friends' Claudes may do here, per
@@ -60,7 +59,7 @@ function Folders() {
         </div>
       ))}
       <div className={s.folderAdd}>
-        {canPickFolders() ? null : <input className={s.input} aria-label="Folder path" placeholder="/Users/you/Shared" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && void add()} />}
+        {canPickFolders() ? null : <input className={s.input} aria-label="Folder path" placeholder="/Users/you/Shared" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void add()} />}
         <Button size="small" onClick={() => void add()} disabled={!canPickFolders() && !typed.trim()}>
           Add Folder…
         </Button>
@@ -82,7 +81,7 @@ function AskMeFor() {
     <div className={s.folders}>
       <div className={s.capName}>Ask me for…</div>
       <div className={s.capDetail}>A short note friends’ agents see when they look for who can help.</div>
-      <input className={s.input} aria-label="Ask me for" placeholder="the API, design reviews…" value={text ?? saved} maxLength={280} onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && !isImeComposing(e) && save()} />
+      <input className={s.input} aria-label="Ask me for" placeholder="the API, design reviews…" value={text ?? saved} maxLength={280} onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && save()} />
     </div>
   );
 }
