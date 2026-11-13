@@ -83,7 +83,7 @@ describe('who works it', () => {
 
   it('a card says the model', () => {
     expect(autoAgentName({ runtime: 'local', label: 'Local model', model: 'anthropic/claude-opus-5-5' })).toBe('Opus 5.5');
-    expect(autoAgentName({ runtime: 'local', label: 'Local model', model: 'bigmodel/glm-5.3[1m]' })).toBe('Glm 5.3');
+    expect(autoAgentName({ runtime: 'local', label: 'Local model', model: 'bigmodel/glm-5.3[1m]' })).toBe('GLM 5.3');
     expect(autoAgentName({ runtime: 'claude', label: 'Claude', model: 'haiku' })).toBe('Haiku');
   });
 });

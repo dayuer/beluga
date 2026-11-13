@@ -3,6 +3,8 @@ import type { AgentRef } from '../../protocol.js';
 import { actingVia } from '../acting-agent.js';
 import { autoAutonomy, autoChecker, autoFixer } from '../../shared/auto-route.js';
 import { agentName } from '../../shared/agent-label.js';
+import type { RuntimeChoice } from '../../shared/agent-runtimes.js';
+import type { Workspace } from '../../workspaces/types.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
 import type { BoardWork } from '../board/work.js';
 import type { CombineResult } from '../../workspaces/git.js';
@@ -74,6 +76,22 @@ export interface PlansWorkDeps {
 }
 
 const WS = 'ws:';
+
+/**
+ * Whether a conversation already runs on `pick` (undefined: your default): its runtime, and its
+ * model when the pick names one. A pick naming no model leaves the conversation's own model alone,
+ * unless that model is what the plan's last pick (`was`) put there.
+ */
+export function chatRunsOn(chat: Pick<Workspace, 'agent' | 'model'>, pick: AgentRef | undefined, was: AgentRef | undefined): boolean {
+  if (chat.agent?.runtime !== pick?.runtime) return false;
+  if (pick?.model) return chat.model === pick.model;
+  return !(chat.model && was?.runtime === pick?.runtime && was?.model === chat.model);
+}
+
+/** Whether this Mac runs `agent`'s runtime, as the agent pickers know it (none listed yet: assumed). */
+function runsHere(runtimes: readonly RuntimeChoice[], agent: AgentRef): boolean {
+  return !runtimes.length || Boolean(runtimes.find((r) => r.id === agent.runtime)?.available);
+}
 
 export class PlansWork {
   readonly plans: Plans;
@@ -208,8 +226,10 @@ export class PlansWork {
     const roles: PlanRoles = { ...(input.agent ? { agent: input.agent } : {}), ...(input.checkAgent ? { checkAgent: input.checkAgent } : {}), ...(input.archAgent ? { archAgent: input.archAgent } : {}), ...(input.fixAgent ? { fixAgent: input.fixAgent } : {}) };
     const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...roles }, this.me());
     // Its conversation plans on its architect, else the agent picked for its work (a new conversation: nothing to hand off).
+    // One this Mac can't run would fail the first turn, so your default plans it and the plan keeps the pick.
     const planner = homeAgentOf(plan);
-    if (planner) controller.manager.setAgent(chat.id, planner);
+    if (planner && runsHere(this.deps.store.getState().runtimes, planner)) controller.manager.setAgent(chat.id, planner);
+    else if (planner) this.deps.store.dispatch({ type: 'system', channel: home, text: `${agentName(planner)} isn’t set up on this Mac, so your default agent plans this.`, level: 'warn' });
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
     // A Studio customer's first turn is limited too (docs/studio-gates.md §5.3): the marker is up
     // before the run starts, and down again if no run could start.
@@ -410,9 +430,11 @@ export class PlansWork {
    * to it too. → in words.
    */
   setWorkAgent(id: string, agent: AgentRef | null): string {
+    const was = this.plans.need(id).agent;
     const plan = this.plans.setWorkAgent(id, agent ?? undefined, this.me());
     // The plan's own conversation follows it (unless it has an architect, who plans), so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
-    this.followHome(plan);
+    // One already on it isn't moved: a move clears the conversation's own effort and model.
+    this.followHome(plan, was);
     const who = agent ? agentName(agent, { model: true }) : 'your default agent';
     // Milestones at work between turns (a usage limit, stopped) go to it now; one mid-turn keeps its agent.
     const { moved, kept } = plan.status === 'done' ? { moved: 0, kept: 0 } : this.pilot.followWork(id, agent ?? undefined);
@@ -452,9 +474,20 @@ export class PlansWork {
     return agent ? `${agentName(agent, { model: true })} takes over what’s hard in this plan: fix tasks after a failed check, conflicts, a task that stopped twice` : 'What’s hard in this plan goes to auto route’s strongest model, else stays with whoever is at it';
   }
 
-  /** The plan's own conversation onto the agent it plans on (its architect, else its work agent), while it's under way. */
-  private followHome(plan: Plan): void {
-    if (plan.status !== 'done' && plan.home.startsWith(WS)) this.deps.followAgent?.(plan.home, homeAgentOf(plan));
+  /**
+   * The plan's own conversation onto the agent it plans on (its architect, else its work agent), while
+   * it's under way. One already on it isn't moved (chatRunsOn; `was`: the plan's last work agent).
+   */
+  private followHome(plan: Plan, was?: AgentRef): void {
+    if (plan.status === 'done' || !plan.home.startsWith(WS)) return;
+    const agent = homeAgentOf(plan);
+    // A controller that can't look a conversation up (none here): it follows, as before.
+    const manager = this.deps.controller?.manager;
+    if (typeof manager?.find === 'function') {
+      const chat = manager.find(plan.home.slice(WS.length));
+      if (!chat || chatRunsOn(chat, agent, was)) return;
+    }
+    this.deps.followAgent?.(plan.home, agent);
   }
 
   pass(id: string, milestone: string): Plan {

@@ -33,7 +33,7 @@ const HANDED: Record<HandoffWhat, string> = {
   conflict: 'The conflict',
 };
 
-/** One model: its runtime's mark and its short name (Opus, Deepseek flash), or your default agent. */
+/** One model: its runtime's mark and its short name (Opus, DeepSeek flash), or your default agent. */
 function Model({ agent }: { agent?: AgentRef }) {
   return (
     <span className={f.roleModel} data-model={agent?.model ?? ''}>

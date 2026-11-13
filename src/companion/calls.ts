@@ -177,9 +177,9 @@ export const PhoneCalls = {
   'plans.setWorkAgent': entry('plans.setWorkAgent', z.string()),
   // 1.50: who checks a plan's milestones and reviews its drafts (null: the agent for its work) → in words.
   'plans.setCheckAgent': entry('plans.setCheckAgent', z.string()),
-  // 1.57 (fork): who designs each milestone before its work starts (null: no architect step) → in words.
+  // 1.58 (fork): who designs each milestone before its work starts (null: no architect step) → in words.
   'plans.setArchAgent': entry('plans.setArchAgent', z.string()),
-  // 1.58 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words.
+  // 1.59 (fork): who takes over what's hard in a plan (null: auto route's strongest) → in words.
   'plans.setFixAgent': entry('plans.setFixAgent', z.string()),
   // 1.7: a worktree's files (read-only) and terminals (shared with the Mac).
   'companion.files.list': entry('companion.files.list', FolderView),
@@ -215,7 +215,7 @@ export const PhoneCalls = {
   // 1.29 (BLG-392): what a sentinel keeps, its files and histories as refs; a run's file opened on the Mac.
   'sentinel.dataList': entry('sentinel.dataList', DataListView),
   'sentinel.runFileOpen': entry('sentinel.runFileOpen', done),
-  // 1.59 (BLG-74): a Synon Studio start Gate answered from Needs You (the Mac does the same).
+  // 1.60 (BLG-74): a Synon Studio start Gate answered from Needs You (the Mac does the same).
   'studio.answerGate': entry('studio.answerGate', done),
 } as const;
 
