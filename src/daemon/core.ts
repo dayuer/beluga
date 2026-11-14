@@ -38,6 +38,7 @@ import { launchEarnings } from '../core/stripe-launch.js';
 import { launchStudio } from '../studio/service.js';
 import { launchRevenueCat } from '../core/revenuecat-launch.js';
 import { launchSupport } from '../core/merge-counter.js';
+import { launchAttachmentSweep } from '../core/attachment-sweep.js';
 import { launchTelemetry } from '../telemetry/launch.js';
 import { launchStats } from '../core/stats/counter.js';
 import { launchLeaderboard } from '../core/leaderboard/launch.js';
@@ -399,6 +400,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
   let stopEarnings = (): void => undefined;
   let stopRevenueCat = (): void => undefined;
   let stopSupport = (): void => undefined;
+  let stopAttachmentSweep = (): void => undefined;
   let stopTelemetry = async (): Promise<void> => undefined;
   let stopStats = (): void => undefined;
   let stopLeaderboard = (): void => undefined;
@@ -475,6 +477,15 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     if (opts.network) stopExternal = launchExternal({ session, log: (line) => console.warn(line) });
     // Synon Studio (docs/studio-daemon.md): the outbound link and the customer view of shared plans; nothing until linked.
     if (opts.network) stopStudio = launchStudio({ session, store, demo: Boolean(demo) });
+    // Pasted images no conversation links any more (its worktree or chat deleted) are cleaned up (core/attachment-sweep).
+    // Never in the demo: its pretend chats link images of their own.
+    if (!demo) {
+      const controller = session.workspaces;
+      stopAttachmentSweep = launchAttachmentSweep({
+        ...(controller ? { onRemoved: (listener: () => void) => controller.onWorktree((e) => e.kind === 'removed' && listener()) } : {}),
+        log: (line) => console.warn(line),
+      });
+    }
     if (config.mode === 'host' && config.inviteNow) void publish(config, room, session, () => closing);
     if (!demo) return;
     // A pretend friend and a fake invite so every part of the UI has something to show.
@@ -527,6 +538,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     stopEarnings();
     stopRevenueCat();
     stopSupport();
+    stopAttachmentSweep();
     await stopTelemetry();
     stopLeaderboard();
     stopStats();

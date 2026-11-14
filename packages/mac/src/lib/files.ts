@@ -98,6 +98,13 @@ export async function shareFiles(paths: readonly string[], at?: Element | null):
   return invoke<boolean>('share_files', { paths, x: box.left, y: box.top, width: box.width, height: box.height }).catch(() => false);
 }
 
+/** Open a folder of yours in a Finder window (in a served page or on a computer's page: as Show in Finder there). */
+export async function openFolderInFinder(client: SocketClient, path: string): Promise<void> {
+  if (webServed()) return downloadOrSay(client, path);
+  if (await openThere(client, path, 'reveal')) return;
+  await client.api.local.openFolder(path);
+}
+
 /** Open a file of yours the way Finder would (its default app, usually your editor). One that runs something shows in Finder instead. */
 export async function openWithDefaultApp(client: SocketClient, path: string): Promise<void> {
   if (webServed()) return downloadOrSay(client, path);

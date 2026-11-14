@@ -10,6 +10,7 @@ import { namesOf } from './CallStrip.js';
 import { clockOf, findTurns, lengthOf, marks, minuteMarks, timeline, turns, wordCount } from './notes-model.js';
 import c from './notes.module.css';
 import { reducedMotion } from '../lib/reduced-motion.js';
+import { thisComputer } from '../lib/os-words.js';
 
 /* ---------- Which notes are open (one reader at a time, over its conversation) ---------- */
 
@@ -86,7 +87,7 @@ export function CallNotesChip({ id }: { id: string }) {
   });
   if (!found) {
     return (
-      <span className={cx(c.inlineChip, c.inlineGone)} title="These notes aren’t on this Mac">
+      <span className={cx(c.inlineChip, c.inlineGone)} title={`These notes aren’t on ${thisComputer()}`}>
         <Icon name="book" size={11} />
         Call notes
       </span>

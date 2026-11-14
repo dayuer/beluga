@@ -218,6 +218,9 @@
   outline: none;
   box-shadow: 0 0 0 0.5px var(--control-edge), var(--focus-ring);
 }
+.checkOff .box {
+  opacity: 0.55;
+}
 .checkText {
   display: flex;
   flex-direction: column;
