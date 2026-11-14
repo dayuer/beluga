@@ -123,7 +123,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 打字跳转：`lib/list-typeahead.ts`（新文件），接在 `layout/panel/FilesTab.tsx`、`ChangesTab.tsx`、`ScratchTab.tsx` 的 `onKey`。
   - 原生表单 sheet：`src-tauri/src/native_sheet.rs`（通用的 NSPanel 表单：多行文本带 @ 补全与高亮、文本框、弹出按钮、分段控件、展开三角、底部复选框），`lib/native-sheet.ts`（`useNativeSheet`，React 仍是状态来源）。第一个用它的是 `tasks/NewTaskSheet.tsx`（提交逻辑抽成 `create`，网页版不变）。
   - 也用原生 sheet 的：`fork/plans/NewPlanSheet.tsx`（新建计划，提交逻辑抽成 `create`）、`dialogs/native/WorkSheets.tsx` 的 Fork 与在朋友电脑上运行命令。弹出按钮的选项支持说明行、分组和禁用（`choicesOf` 把 `Select` 的选项原样转过去），另有行内复选框。新建标签（带删除按钮的标签列表）仍是网页。
-  - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSettingsSheet.tsx`（`plans/PlanSheets.tsx` 导出 `AUTONOMY_ICON`）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
+  - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSettingsSheet.tsx`（`plans/PlanSheets.tsx` 导出 `AUTONOMY_ICON`）、`plans/PlanSheets.tsx` 的 `PlanModeSheet`（如何运行：三张卡片，下面是改变了什么的提示框）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
   - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
 

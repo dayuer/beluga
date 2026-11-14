@@ -16,7 +16,7 @@ export function ClientViewPreview({ view }: { view: PlanView }) {
   return (
     <>
       <Tip label={t('What a Synon Studio customer sees of this plan: no paths, branches, agents or task keys')}>
-        <Button size="small" variant="quiet" icon="eye" aria-pressed={open} onClick={() => setOpen(true)}>
+        <Button variant="quiet" icon="eye" aria-pressed={open} onClick={() => setOpen(true)}>
           {t('Customer view')}
         </Button>
       </Tip>

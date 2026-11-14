@@ -132,7 +132,7 @@
 :root {
   /* The three sizes of docs/mac-controls.md: one height, text size and corner each. */
   --control-h-large: 28px;
-  --control-h: 22px;
+  --control-h: 24px;
   --control-h-small: 20px;
   --control-text-large: 13px;
   --control-text: 13px;

@@ -13,12 +13,14 @@ pop-up and a button on one row line up without adjusting anything.
 | Size | Height | Text | Corner | Icon | Padding (button) | Checkbox | Switch |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Large** | 28px | 13px | 7px | 16px | 0 16px | 14px | 32 × 19 |
-| **Regular** (default) | 22px | 13px | 5px | 14px | 0 12px | 14px | 32 × 19 |
+| **Regular** (default) | 24px | 13px | 5px | 14px | 0 12px | 14px | 32 × 19 |
 | **Small** | 20px | 12px | 4px | 12px | 0 8px | 12px | 26 × 15 |
 
 - AppKit's mini size (16px, 9pt) is left out: Chinese and Japanese text don't read at that size.
 - Small uses 12px text, a point above AppKit's 11pt, for the same reason.
 - The heights are the whole control, its bezel included.
+- They are what AppKit measures on macOS 26 and later (`fittingSize` of a push button, pop-up and
+  segmented control): small 20, regular 24, large 28. Regular was 22 before macOS 26.
 
 | Token | Large | Regular | Small |
 | --- | --- | --- | --- |
@@ -35,6 +37,8 @@ pop-up and a button on one row line up without adjusting anything.
 - Settings: every row's control (pop-up, field, segmented control, button).
 - Forms anywhere: in the inspector, in a popover, on a project's page.
 - The segmented control that switches a sheet's or a page's tabs.
+- A page's own header and tool rows (a plan's header and its Canvas / List row), and the actions
+  of the panel beside them. These are what you work the page with, not dense content.
 
 **Small** is for controls that sit inside dense content, beside text that is itself small.
 
@@ -60,7 +64,7 @@ Never more than one large button in a view outside the toolbar. One row never mi
 - **Push button** (`Button`, a sheet's or an alert's buttons): plain, primary (the accent, for the
   default action), danger, merge. Height, padding and text by size; at least 76px wide in a sheet's
   or an alert's button row.
-- **Icon button** (`IconButton`): square at its size (28 × 28, 22 × 22, 20 × 20), the icon
+- **Icon button** (`IconButton`): square at its size (28 × 28, 24 × 24, 20 × 20), the icon
   16, 14 or 13px and centred, no bezel until hovered or pressed. One without a `size` keeps the
   28 × 26 it had until its screen moves onto the scale (steps 3 and 4).
 - **Split button** (a button and its ▾, `SplitButton`, the toolbar's branch button): both halves

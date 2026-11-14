@@ -59,10 +59,10 @@ export function PullsView() {
           </PickMenu>
         </div>
         <div className={cx(t.barGroup, t.barActions)}>
-          <IconButton size="small" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
+          <IconButton size="regular" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
           {repo ? (
             <Tip label={`${repo.url}/pulls`}>
-              <Button size="small" icon="external" onClick={() => onGitHub(`${repo.url}/pulls`)}>
+              <Button icon="external" onClick={() => onGitHub(`${repo.url}/pulls`)}>
                 GitHub
               </Button>
             </Tip>

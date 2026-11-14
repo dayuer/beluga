@@ -256,7 +256,7 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
       onCancel={close}
       footer={
         editing && own ? (
-          <Button variant="quiet" size="small" onClick={() => deleteBoard(boardId)}>
+          <Button variant="quiet" onClick={() => deleteBoard(boardId)}>
             Delete Board…
           </Button>
         ) : null

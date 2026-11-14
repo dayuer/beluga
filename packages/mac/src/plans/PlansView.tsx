@@ -69,9 +69,9 @@ export function PlansView() {
         </PickMenu>
         <span className={p.grow} />
         <ActionsDropdown items={[{ label: 'Planning Style…', onSelect: () => openSheet({ kind: 'plan_style' }) }]}>
-          <IconButton size="small" icon="more" label="Plans Options" />
+          <IconButton size="regular" icon="more" label="Plans Options" />
         </ActionsDropdown>
-        <Button variant="primary" size="small" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })} title={`New Plan${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
+        <Button variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })} title={`New Plan${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
           New Plan
         </Button>
       </div>

@@ -3,7 +3,7 @@ import type { PlanPr } from '@beluga/core/plans/model.js';
 import type { TaskState } from '@beluga/core/plans/progress.js';
 import { useRef } from 'react';
 import { Icon } from '../components/Icon.js';
-import { Avatar, Button, cx } from '../components/ui.js';
+import { Avatar, Button, cx, type ControlSize } from '../components/ui.js';
 import { openExternal } from '../lib/system.js';
 import { useApp } from '../lib/beluga.js';
 import { agentName, useMyAgent } from '../lib/agent-words.js';
@@ -188,9 +188,9 @@ export function TaskChatMark({ worktree }: { worktree?: string }) {
 }
 
 /** The plan's pull request, one click from GitHub, with what stands in its way (the page's header, and above its conversation). */
-export function PlanPrChip({ pr }: { pr: PlanPr }) {
+export function PlanPrChip({ pr, size = 'small' }: { pr: PlanPr; size?: ControlSize }) {
   return (
-    <Button size="small" variant="quiet" icon="pr" title={`#${pr.number} ${pr.title}: ${prWords(pr)}. Open on GitHub`} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
+    <Button size={size} variant="quiet" icon="pr" title={`#${pr.number} ${pr.title}: ${prWords(pr)}. Open on GitHub`} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
       #{pr.number} · {pr.state === 'OPEN' ? prWords(pr) : pr.state === 'MERGED' ? 'Merged' : 'Closed'}
     </Button>
   );

@@ -100,11 +100,11 @@ function PictureRow() {
       <span className={s.pictureRow}>
         {me ? <Avatar name={me.name || fallbackName} id={me.peerId} size={32} /> : null}
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
-        <Button size="small" icon="image" disabled={!on || busy} onClick={() => input.current?.click()}>
+        <Button icon="image" disabled={!on || busy} onClick={() => input.current?.click()}>
           {me?.avatar ? 'Change…' : 'Choose…'}
         </Button>
         {me?.avatar ? (
-          <Button size="small" variant="quiet" disabled={busy} onClick={() => run(null)}>
+          <Button variant="quiet" disabled={busy} onClick={() => run(null)}>
             Remove
           </Button>
         ) : null}
@@ -371,7 +371,7 @@ function AgentsGroup({ mine }: { mine: string }) {
             <Dot tone={row.state ? TONE[row.state] : 'muted'} />
             {row.words}
             {row.fix ? (
-              <Button size="small" onClick={() => act(row)}>
+              <Button onClick={() => act(row)}>
                 {fixLabel(row)}
               </Button>
             ) : null}
@@ -668,10 +668,10 @@ function About() {
           {client.clients}
         </Row>
         <Row label="Log" detail="~/.beluga/logs/daemon.log">
-          <Button size="small" onClick={() => void client.api.local.openFolder(logPath)}>
+          <Button onClick={() => void client.api.local.openFolder(logPath)}>
             Open in Console
           </Button>
-          <Button size="small" variant="quiet" onClick={() => void revealInFinder(client, logPath)}>
+          <Button variant="quiet" onClick={() => void revealInFinder(client, logPath)}>
             {revealLabel()}
           </Button>
         </Row>
@@ -683,7 +683,7 @@ function About() {
               Built and maintained by <MaintainerChip />. Stars are how other developers find it.
             </>
           }>
-          <Button size="small" icon="star" onClick={() => void openExternal(GITHUB_URL)}>
+          <Button icon="star" onClick={() => void openExternal(GITHUB_URL)}>
             Star on GitHub
           </Button>
         </Row>

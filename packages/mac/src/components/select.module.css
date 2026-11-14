@@ -84,7 +84,7 @@
   place-items: center;
   color: var(--text-2);
 }
-/* The arrows' box: 16px in a 22px button (14 in a small one), the accent unless the window isn't key. */
+/* The arrows' box: 16px in a 24px button (14 in a small one), the accent unless the window isn't key. */
 .chevrons {
   flex: none;
   box-sizing: content-box;

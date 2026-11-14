@@ -92,7 +92,7 @@ export function IssuesView() {
               <Icon name="chevronDown" size={11} />
             </button>
           </PickMenu>
-          <Segmented<GhIssueState> size="small" label="Show" value={prefs.state} onChange={(state) => setIssuesPrefs({ state })} options={STATES} />
+          <Segmented<GhIssueState> label="Show" value={prefs.state} onChange={(state) => setIssuesPrefs({ state })} options={STATES} />
         </div>
         <div className={cx(t.barGroup, t.barActions)}>
           <label className={cx(t.find, s.find)}>
@@ -114,10 +114,10 @@ export function IssuesView() {
               </button>
             ) : null}
           </label>
-          <IconButton size="small" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
+          <IconButton size="regular" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} disabled={!repo} />
           {repo ? (
             <Tip label={`${repo.url}/issues`}>
-              <Button size="small" icon="external" onClick={() => openOnGitHub(`${repo.url}/issues`)}>
+              <Button icon="external" onClick={() => openOnGitHub(`${repo.url}/issues`)}>
                 GitHub
               </Button>
             </Tip>

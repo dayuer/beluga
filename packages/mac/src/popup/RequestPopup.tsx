@@ -38,10 +38,10 @@ function NeedCard({ r, open, later }: { r: PopupNeed; open: () => void; later: (
         </div>
       </header>
       <footer className={s.buttons}>
-        <Button size="small" variant="plain" onClick={later}>
+        <Button variant="plain" onClick={later}>
           Later
         </Button>
-        <Button size="small" variant="primary" onClick={open}>
+        <Button variant="primary" onClick={open}>
           {r.tag === 'approval' ? 'Review in Beluga' : r.tag === 'milestone' ? 'Open the Plan' : 'Answer in Beluga'}
         </Button>
       </footer>
@@ -105,7 +105,7 @@ function Card({ r, act }: { r: PopupRequest; act: (action: RequestAction, r: Pop
       ) : null}
       <footer className={s.buttons}>
         {popupButtons(r).map((b) => (
-          <Button key={b.action} size="small" variant={b.action === 'approve' ? 'primary' : 'plain'} disabled={busy} onClick={() => press(b.action)}>
+          <Button key={b.action} variant={b.action === 'approve' ? 'primary' : 'plain'} disabled={busy} onClick={() => press(b.action)}>
             {b.label}
           </Button>
         ))}

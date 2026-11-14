@@ -8,6 +8,7 @@ import { agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { autoRouteOn, planRoleDefaults } from '@beluga/shared/auto-route.js';
 import { FormSheet, Popup } from '../components/FormSheet.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
+import { t } from '../i18n/index.js';
 import { RunsOnLabel } from '../chat/RunsOn.js';
 import { modeChange } from './plans-model.js';
 import { type PlanRole, roleChanges, rolesFromPlan, PLAN_ROLES, ROLE_INFO } from './plan-roles-model.js';
@@ -87,7 +88,7 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
         },
         // What changes, before Save confirms it, in the tinted box (.modeConfirm).
         ...(change ? [{ kind: 'callout' as const, text: change.from, ...(change.now ? { detail: change.now } : {}) }] : []),
-        { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt ?? 'milestone', options: TESTS_AT.map((t) => ({ value: t, label: TESTS_AT_INFO[t].label })), hint: testsAt ? `${TESTS_AT_INFO[testsAt].hint}.` : '' },
+        { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt ?? 'milestone', options: TESTS_AT.map((t) => ({ value: t, label: TESTS_AT_INFO[t].label })), hint: testsAt ? `${t(TESTS_AT_INFO[testsAt].hint)}.` : '' },
         ...PLAN_ROLES.map((role) => ({ kind: 'popup' as const, id: `role:${role}`, label: ROLE_INFO[role].label, value: picks?.[role] ?? '', options: choicesOf(roleEntries(role, tiers, agents)) })),
         { kind: 'note', text: 'The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it.' },
       ],

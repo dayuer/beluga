@@ -136,7 +136,6 @@ export function MenuBarSettings() {
             <Dial label="Speed" low="Slow" high="Quick" value={look.speed} colors={WATER} onChange={(speed) => set({ speed })} />
             <Row label="Try it" detail={`The whale ${keyPlatform() === 'mac' ? 'up in your menu bar' : `in your ${trayName().toLowerCase()}`} spouts once.`}>
               <Button
-                size="small"
                 disabled={prefs.reduceMotion}
                 onClick={() => {
                   setKick((k) => k + 1);

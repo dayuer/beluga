@@ -83,7 +83,7 @@ export function ActionsView() {
                 <Icon name="chevronDown" size={11} />
               </button>
             </PickMenu>
-            <Segmented<Page> size="small" label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
+            <Segmented<Page> label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
             {page === 'runs' && known.length + (workflow ? 1 : 0) > 1 ? (
               <PickMenu<string>
                 label="Workflow"
@@ -106,10 +106,10 @@ export function ActionsView() {
                 Live
               </span>
             ) : null}
-            <IconButton size="small" icon="refresh" label={loading || flows.loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
+            <IconButton size="regular" icon="refresh" label={loading || flows.loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
             {repo ? (
               <Tip label={`${repo.url}/actions`}>
-                <Button size="small" icon="external" onClick={() => openOnGitHub(`${repo.url}/actions`)}>
+                <Button icon="external" onClick={() => openOnGitHub(`${repo.url}/actions`)}>
                   GitHub
                 </Button>
               </Tip>
