@@ -175,6 +175,90 @@ describe('a plan’s agent for hard fixes', () => {
     expect(t.made).toHaveLength(1);
   });
 
+  it('its fix tasks done, the milestone’s worktree goes back to the work’s agent: the fix agent doesn’t keep the coding', async () => {
+    const t = setup({ workers: 'milestone' });
+    const plan = await approved(t, ONE);
+    const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    const w = `ws:${agent.worktree}`;
+    t.run(w, 'started', 'm-1');
+    t.board.update(t.issue('Idempotent webhooks').id, { status: 'in_review' }, t.claude);
+    t.run(w, 'done', 'm-1');
+    const head = t.work.forRun('ws:main', 'p-me')!.tools!;
+    await waitFor(() => t.plans.need(plan.id).runs.safe?.checkAsked !== undefined);
+    head.gate('safe', 'fail', 'a replay charges twice');
+    head.update([{ op: 'add_task', milestone: 'safe', task: { id: 'fix', title: 'Charge once on replay' } }]);
+    await waitFor(() => t.switched.some((x) => x.channel === w && x.agent?.model === STRONG.model));
+    // Still at its fix: it stays on the fix agent.
+    t.work.pilot.tick();
+    expect(t.switched.filter((x) => x.channel === w).map((x) => x.agent)).toEqual([STRONG]);
+    t.run(w, 'started', 'm-2');
+    t.board.update(t.issue('Charge once on replay').id, { status: 'in_review' }, t.claude);
+    t.run(w, 'done', 'm-2');
+    t.work.pilot.tick();
+    await waitFor(() => t.switched.filter((x) => x.channel === w).length === 2);
+    expect(t.switched.filter((x) => x.channel === w).map((x) => x.agent)).toEqual([STRONG, CHEAP]);
+    expect(t.plans.need(plan.id).activity.some((e) => e.text.startsWith('what was hard in “Safe payments” is done: its work is back on'))).toBe(true);
+    // Once back, it stays back.
+    t.work.pilot.tick();
+    expect(t.switched.filter((x) => x.channel === w)).toHaveLength(2);
+  });
+
+  it('a task that stopped twice, done: the milestone’s next tasks go on with the work’s agent, not the fix agent', async () => {
+    let now = Date.now();
+    const t = setup({ workers: 'milestone', now: () => now });
+    const TWO: BodyInput = {
+      title: 'Payments',
+      goal: 'Take card payments safely.',
+      milestones: [{ id: 'safe', title: 'Safe payments', criteria: ['A replayed webhook charges once'], tasks: [{ id: 'retries', title: 'Idempotent webhooks' }, { id: 'refunds', title: 'Refunds', blockedBy: ['retries'] }] }],
+    };
+    const plan = await approved(t, TWO, { autonomy: 'gated' });
+    const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    const channel = `ws:${agent.worktree}`;
+    const wakes = () => t.asked.filter((a) => a.channel === channel && a.prompt.startsWith('You stopped before handing off'));
+    const stop = async (id: string, wakesBefore: number) => {
+      now += MIN;
+      t.run(channel, 'started', id, now);
+      t.run(channel, 'done', id, now);
+      now += 1000;
+      t.work.pilot.tick();
+      return waitFor(() => (wakes().length > wakesBefore ? true : t.plans.need(plan.id).watch?.retries?.needsYou));
+    };
+    await stop('r1', 0);
+    await stop('r2', 1);
+    expect(t.switched).toEqual([{ channel, agent: STRONG, at: expect.any(Number) }]);
+    // The task that stopped twice gets done: the next one runs on the work's agent.
+    t.run(channel, 'started', 'r3', now);
+    t.board.update(t.issue('Idempotent webhooks').id, { status: 'in_review' }, t.claude);
+    t.run(channel, 'done', 'r3', now);
+    t.work.pilot.tick();
+    await waitFor(() => t.switched.length === 2);
+    expect(t.switched.map((x) => x.agent)).toEqual([STRONG, CHEAP]);
+  });
+
+  it('after a restart, a milestone its activity says was handed over goes back once nothing hard is left', async () => {
+    const t = setup({ workers: 'milestone' });
+    const plan = await approved(t, ONE);
+    const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    const w = `ws:${agent.worktree}`;
+    // As a restart leaves it: its worktree on the fix agent, the handoff only in the activity (the task
+    // that stopped twice is done since, its watch gone), nothing of it in memory.
+    t.plans.note(plan.id, 'note', 'handed a task that stopped twice in “Safe payments” to Claude (Opus)', { kind: 'beluga' });
+    t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((x) => (x.id === agent.worktree ? ({ ...x, agent: { runtime: 'claude', label: 'Claude' }, model: 'opus' } as unknown as Workspace) : x)) })) });
+    t.work.pilot.tick();
+    await waitFor(() => t.switched.some((x) => x.channel === w));
+    expect(t.switched.filter((x) => x.channel === w).map((x) => x.agent)).toEqual([CHEAP]);
+  });
+
+  it('put on the fix agent’s model by you (no handoff): it stays there', async () => {
+    const t = setup({ workers: 'milestone' });
+    const plan = await approved(t, ONE);
+    const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((x) => (x.id === agent.worktree ? ({ ...x, agent: { runtime: 'claude', label: 'Claude' }, model: 'opus' } as unknown as Workspace) : x)) })) });
+    t.work.pilot.tick();
+    t.work.pilot.tick();
+    expect(t.switched).toEqual([]);
+  });
+
   it('without a fix agent (and auto route off), the milestone keeps its agent, as before', async () => {
     const t = setup({ workers: 'milestone' });
     const plan = await approved(t, ONE, { fix: null });

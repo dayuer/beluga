@@ -179,6 +179,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 计划按档位分工（架构 / 编码 / 审核 / 疑难修复）：第二阶段要抽出来
 
+疑难修复做完要交还：修复智能体只接手难事（检查失败后的修复任务、停了两次的任务），这些任务做完、工作树空闲时，里程碑的工作交还给编码角色（`fixer.ts` 的 `settle`；重启后凭活动记录里的交接行和 `watch.escalated` 认出来；你自己换的模型不动）。上游文件的接入点：`pilot.ts` 每轮一行调用 `settle`、`hand()` 和 `escalate` 多传任务 id，`watchdog.ts` 的 `escalate` 多一个任务 id 参数。
+
 已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、“谁做的”（BLG-198～201：`src/fork/plans/roles.ts` 算出各角色实际用的模型，里程碑工作树用谁也由它的 `workAgentFor` 决定；手机协议 `src/fork/companion/plan-roles-view.ts`、`plan-roles-views.ts`；Mac `packages/mac/src/fork/plans/MilestoneRoles.tsx`；手机 `packages/companion/components/fork/MilestoneRoles.tsx`、`packages/companion/lib/fork/roles-words.ts`；上游文件各只留接入点：`model.ts` 的 `MilestoneAgent` 两个可选字段，`pilot.ts` 的 `launch()` 两行，`protocol.ts` 的 `roles` 字段和 `SINCE.rolesSeen`，`views.ts` 一行，`PlanDetails.tsx`、`PlanOutline.tsx`、`PlanCanvas.tsx`、`app/plan/[id].tsx` 各一行加一个 import）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
 
 - 核心：`src/core/plans/pilot.ts`、`src/core/plans/work.ts`、`src/core/plans/plans.ts`、`src/core/plans/prompt.ts`、`src/core/plans/model.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/progress.ts`、`src/core/plans/owner.ts`、`src/core/plans/move.ts`、`src/core/plans/move-work.ts`、`src/core/notify.ts`、`src/core/board/launch.ts`
