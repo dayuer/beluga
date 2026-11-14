@@ -99,8 +99,14 @@ export class PlanFixer {
     // Handed over this session, or (after a restart) on the fix agent with what says it was handed: its
     // handoff in the plan's activity (fix tasks, a task that stopped twice), a task of it that stopped
     // twice, or a round started on it for fix tasks. Put there by you: yours.
-    const said = handoffsIn(plan.activity, m.milestone.title).some((h) => h.what === 'fix' || h.what === 'stopped');
-    const handed = this.onFixer.has(channel) || (on === agentKey(fixer) && (said || at.via === 'fix' || m.tasks.some((t) => stoppedTwice.has(t.task.id))));
+    // Only what came after its last hand-back counts: once back, a model you put on yourself is yours.
+    const back = `what was hard in “${m.milestone.title}” is done:`;
+    const lastBack = plan.activity.reduce((t, e) => (e.kind === 'note' && e.text.startsWith(back) ? Math.max(t, e.at) : t), -Infinity);
+    const said = handoffsIn(plan.activity, m.milestone.title).some((h) => (h.what === 'fix' || h.what === 'stopped') && h.at > lastBack);
+    const startedOnFixer = at.via === 'fix' && lastBack === -Infinity;
+    // On the fix agent now, and put there by a handoff (this session, or one the activity or a
+    // stopped-twice mark says): switched to another model by you since, it's left where you put it.
+    const handed = on === agentKey(fixer) && (this.onFixer.has(channel) || said || startedOnFixer || m.tasks.some((t) => stoppedTwice.has(t.task.id)));
     if (!handed) return;
     const left = m.tasks.filter((t) => (known ?? stoppedTwice).has(t.task.id) && !FINISHED.has(t.state));
     if (left.length || (!known && m.run.check?.verdict === 'fail') || !idle(channel)) return;

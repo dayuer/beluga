@@ -56,6 +56,9 @@ pub enum SheetRow {
         mentions: Vec<Mention>,
         #[serde(default)]
         focus: bool,
+        /// At most this many characters (cut as you type).
+        #[serde(default, rename = "maxLength")]
+        max_length: Option<usize>,
     },
     #[serde(rename = "text")]
     Text {
@@ -69,6 +72,13 @@ pub enum SheetRow {
         hint: Option<String>,
         #[serde(default)]
         focus: bool,
+        /// As you type: at most this many characters, in capitals, only these characters.
+        #[serde(default, rename = "maxLength")]
+        max_length: Option<usize>,
+        #[serde(default)]
+        upper: bool,
+        #[serde(default)]
+        keep: Option<String>,
     },
     #[serde(rename = "note")]
     Note { text: String },
@@ -82,15 +92,6 @@ pub enum SheetRow {
         options: Vec<SheetOption>,
         #[serde(default)]
         hint: Option<String>,
-    },
-    /// A radio group, one option to a line: its icon and name, the option's line under it
-    /// (`hint`), as AppKit's radio groups with descriptions (and the app's option cards) show them.
-    #[serde(rename = "radio")]
-    Radio {
-        id: String,
-        label: String,
-        value: String,
-        options: Vec<SheetOption>,
     },
     /// Option cards side by side, as the app's own (plans.module.css's .modeCards): each its icon,
     /// its name and its line, the chosen one outlined in the accent, a word in a card's corner.
@@ -128,6 +129,9 @@ pub enum SheetRow {
         checked: bool,
         #[serde(default)]
         hint: Option<String>,
+        /// Shown, not changed (a board's own repo).
+        #[serde(default)]
+        disabled: bool,
     },
     #[serde(rename = "segmented")]
     Segmented {
@@ -154,7 +158,6 @@ impl SheetRow {
             SheetRow::Segmented { id, options, .. } => format!("segmented:{id}:{}", options.len()),
             SheetRow::Checkbox { id, label, .. } => format!("checkbox:{id}:{}", label.is_some()),
             SheetRow::Button { id, label, .. } => format!("button:{id}:{}", label.is_some()),
-            SheetRow::Radio { id, options, .. } => format!("radio:{id}:{}", options.len()),
             SheetRow::Cards { id, options, .. } => format!("cards:{id}:{}", options.len()),
             SheetRow::Callout { detail, .. } => format!("callout:{}", detail.is_some()),
         }
@@ -213,6 +216,15 @@ pub enum SheetEvent {
     Cancel,
 }
 
+/// What a field takes as you type (`max_length`, `upper`, `keep`): the text as it should stand.
+pub fn filtered(text: &str, max_length: Option<usize>, upper: bool, keep: Option<&str>) -> String {
+    let mut out: String = text.chars().map(|c| if upper { c.to_uppercase().next().unwrap_or(c) } else { c }).filter(|c| keep.is_none_or(|k| k.contains(*c))).collect();
+    if let Some(max) = max_length {
+        out = out.chars().take(max).collect();
+    }
+    out
+}
+
 #[cfg(target_os = "macos")]
 mod mac {
     use super::{SheetEvent, SheetOption, SheetRow, SheetSpec};
@@ -241,7 +253,6 @@ mod mac {
         Segmented { control: Retained<NSSegmentedControl>, values: Vec<String> },
         Checkbox { button: Retained<NSButton> },
         Button { button: Retained<NSButton> },
-        Radio { buttons: Vec<Retained<NSButton>>, lines: Vec<Option<Retained<NSTextField>>>, values: Vec<String> },
         Cards { cards: Vec<Card>, values: Vec<String> },
         Callout { boxed: Retained<NSBox>, text: Retained<NSTextField>, detail: Option<Retained<NSTextField>> },
     }
@@ -266,6 +277,8 @@ mod mac {
     }
 
     struct Sheet {
+        /// Which sheet this is: an update or close for another (an earlier one, still on its way) is dropped.
+        id: u64,
         parent: Retained<NSWindow>,
         panel: Retained<NSPanel>,
         root: Retained<Flipped>,
@@ -286,11 +299,19 @@ mod mac {
 
     thread_local! {
         static SHEET: RefCell<Option<Sheet>> = const { RefCell::new(None) };
+        static NEXT_ID: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    }
+
+    /// The sheet as it is, for a callback: none while it's being updated (`update` holds it, and
+    /// AppKit can call back in the middle: an input method committing its text as a field goes).
+    /// A panic in an Objective-C callback would take the whole app down, so a busy cell is skipped.
+    fn peek<R>(f: impl FnOnce(&Sheet) -> Option<R>) -> Option<R> {
+        SHEET.with(|s| s.try_borrow().ok().and_then(|b| b.as_ref().and_then(f)))
     }
 
     fn emit(event: SheetEvent) {
         // Read the callback out first: the page's answer comes back later, never inside this call.
-        let call = SHEET.with(|s| s.borrow().as_ref().map(|s| s.emit.as_ref() as *const dyn Fn(SheetEvent)));
+        let call = peek(|s| Some(s.emit.as_ref() as *const dyn Fn(SheetEvent)));
         if let Some(call) = call {
             // SAFETY: the sheet (and its callback) lives until close(), which runs on this thread later.
             unsafe { (*call)(event) };
@@ -368,7 +389,7 @@ mod mac {
 
             #[unsafe(method(submit:))]
             fn submit(&self, _sender: &AnyObject) {
-                let ok = SHEET.with(|s| s.borrow().as_ref().is_some_and(|s| s.spec.can_submit && !s.spec.busy));
+                let ok = peek(|s| Some(s.spec.can_submit && !s.spec.busy)).unwrap_or(false);
                 if ok {
                     emit(SheetEvent::Submit);
                 }
@@ -386,15 +407,29 @@ mod mac {
             #[unsafe(method(controlTextDidChange:))]
             fn control_text_did_change(&self, note: &NSNotification) {
                 let Some(object) = note.object() else { return };
-                let id = SHEET.with(|s| {
-                    s.borrow().as_ref().and_then(|s| {
-                        s.rows.iter().find_map(|r| match &r.control {
-                            Control::Text { field } if std::ptr::eq(Retained::as_ptr(field) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => Some((r.id.clone(), field.stringValue().to_string())),
-                            _ => None,
-                        })
+                let id = peek(|s| {
+                    s.rows.iter().find_map(|r| match &r.control {
+                        Control::Text { field } if std::ptr::eq(Retained::as_ptr(field) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => {
+                            let rule = s.spec.rows.iter().find_map(|row| match row {
+                                SheetRow::Text { id, max_length, upper, keep, .. } if *id == r.id => Some((*max_length, *upper, keep.clone())),
+                                _ => None,
+                            });
+                            Some((r.id.clone(), field.clone(), rule))
+                        }
+                        _ => None,
                     })
                 });
-                if let Some((id, value)) = id {
+                if let Some((id, field, rule)) = id {
+                    // What the field takes, in the field itself as you type (the page's own checks
+                    // can't put it back while you type: an update leaves a field being typed in).
+                    let typed = field.stringValue().to_string();
+                    let value = match rule {
+                        Some((max, upper, keep)) => super::filtered(&typed, max, upper, keep.as_deref()),
+                        None => typed.clone(),
+                    };
+                    if value != typed {
+                        field.setStringValue(&NSString::from_str(&value));
+                    }
                     emit(SheetEvent::Change { id, value });
                 }
             }
@@ -406,17 +441,25 @@ mod mac {
             #[unsafe(method(textDidChange:))]
             fn text_did_change(&self, note: &NSNotification) {
                 let Some(object) = note.object() else { return };
-                let found = SHEET.with(|s| {
-                    s.borrow().as_ref().and_then(|s| {
-                        s.rows.iter().find_map(|r| match &r.control {
-                            Control::TextArea { view, handles, .. } if std::ptr::eq(Retained::as_ptr(view) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => {
-                                Some((r.id.clone(), view.clone(), handles.clone()))
-                            }
-                            _ => None,
-                        })
+                let found = peek(|s| {
+                    s.rows.iter().find_map(|r| match &r.control {
+                        Control::TextArea { view, handles, .. } if std::ptr::eq(Retained::as_ptr(view) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => {
+                            Some((r.id.clone(), view.clone(), handles.clone()))
+                        }
+                        _ => None,
                     })
                 });
                 let Some((id, view, handles)) = found else { return };
+                let max = peek(|s| s.spec.rows.iter().find_map(|row| match row {
+                    SheetRow::TextArea { id: rid, max_length, .. } if *rid == id => *max_length,
+                    _ => None,
+                }));
+                if let Some(max) = max {
+                    let text = view.string().to_string();
+                    if text.chars().count() > max {
+                        view.setString(&NSString::from_str(&text.chars().take(max).collect::<String>()));
+                    }
+                }
                 paint_mentions(&view, &handles);
                 // Typing after "@": the system's completion list, of the handles that fit.
                 if !handles.is_empty() && mention_before_caret(&view).is_some() {
@@ -433,13 +476,11 @@ mod mac {
             fn completions(&self, view: &NSTextView, _words: &NSArray<NSString>, range: NSRange, index: *mut isize) -> Retained<NSArray<NSString>> {
                 let text = view.string();
                 let typed = text.substringWithRange(range).to_string().to_lowercase();
-                let handles = SHEET.with(|s| {
-                    s.borrow().as_ref().map(|s| {
-                        s.rows.iter().flat_map(|r| match &r.control {
-                            Control::TextArea { handles, .. } => handles.clone(),
-                            _ => vec![],
-                        }).collect::<Vec<_>>()
-                    })
+                let handles = peek(|s| {
+                    Some(s.rows.iter().flat_map(|r| match &r.control {
+                        Control::TextArea { handles, .. } => handles.clone(),
+                        _ => vec![],
+                    }).collect::<Vec<_>>())
                 }).unwrap_or_default();
                 let fits: Vec<Retained<NSString>> = handles.iter().filter(|h| typed.starts_with('@') && h.to_lowercase().starts_with(&typed)).map(|h| NSString::from_str(&format!("{h} "))).collect();
                 if !index.is_null() {
@@ -499,13 +540,13 @@ mod mac {
     fn change_of(sender: &NSControl) -> Option<SheetEvent> {
         let tag = sender.tag();
         SHEET.with(|s| {
-            let s = s.borrow();
+            let s = s.try_borrow().ok()?;
             let s = s.as_ref()?;
             if tag >= RADIO_TAG {
                 let (row, option) = ((tag - RADIO_TAG) / RADIO_ROW, (tag - RADIO_TAG) % RADIO_ROW);
                 let built = s.rows.get(row as usize)?;
                 let values = match &built.control {
-                    Control::Radio { values, .. } | Control::Cards { values, .. } => values,
+                    Control::Cards { values, .. } => values,
                     _ => return None,
                 };
                 return Some(SheetEvent::Change { id: built.id.clone(), value: values.get(option as usize)?.clone() });
@@ -536,7 +577,7 @@ mod mac {
 
     const FOOTER_TAG: isize = 10_000;
     const ASIDE_TAG: isize = 10_001;
-    /// A radio button's tag: RADIO_TAG + its row × RADIO_ROW + its option.
+    /// An option card's tag: RADIO_TAG + its row × RADIO_ROW + its option (a card set has a few).
     const RADIO_TAG: isize = 20_000;
     const RADIO_ROW: isize = 64;
 
@@ -827,42 +868,16 @@ mod mac {
                     root.addSubview(&boxed);
                     Row { id: String::new(), label: None, control: Control::Callout { boxed, text: words, detail: more }, line: None }
                 }
-                SheetRow::Radio { id, label: text, value, options } => {
-                    let mut buttons = Vec::new();
-                    let mut lines = Vec::new();
-                    for (o, option) in options.iter().enumerate() {
-                        let button = unsafe { NSButton::radioButtonWithTitle_target_action(&NSString::from_str(&option.label), Some(controller), Some(sel!(changed:)), mtm) };
-                        button.setTag(RADIO_TAG + tag * RADIO_ROW + o as isize);
-                        button.setState(if option.value == *value { NSControlStateValueOn } else { NSControlStateValueOff });
-                        if let Some(png) = option.icon.as_deref() {
-                            button.setImage(image(png, option.template.unwrap_or(true)).as_deref());
-                            button.setImagePosition(objc2_app_kit::NSCellImagePosition::ImageLeading);
-                        }
-                        root.addSubview(&button);
-                        let line = option.hint.as_deref().filter(|h| !h.is_empty()).map(|h| {
-                            let l = wrapping(h, 11.0, true, mtm);
-                            root.addSubview(&l);
-                            l
-                        });
-                        buttons.push(button);
-                        lines.push(line);
-                    }
-                    Row {
-                        id: id.clone(),
-                        label: Some(label(text, mtm)),
-                        control: Control::Radio { buttons, lines, values: options.iter().map(|o| o.value.clone()).collect() },
-                        line: None,
-                    }
-                }
                 SheetRow::Button { id, label: text, text: title, hint } => {
                     let button = unsafe { NSButton::buttonWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
                     button.setTag(tag);
                     root.addSubview(&button);
                     Row { id: id.clone(), label: text.as_deref().map(|t| label(t, mtm)), control: Control::Button { button }, line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)) }
                 }
-                SheetRow::Checkbox { id, label: text, text: title, checked, hint } => {
+                SheetRow::Checkbox { id, label: text, text: title, checked, hint, disabled } => {
                     let button = unsafe { NSButton::checkboxWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
                     button.setTag(tag);
+                    button.setEnabled(!*disabled);
                     button.setState(if *checked { NSControlStateValueOn } else { NSControlStateValueOff });
                     root.addSubview(&button);
                     Row { id: id.clone(), label: text.as_deref().map(|t| label(t, mtm)), control: Control::Checkbox { button }, line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)) }
@@ -1001,24 +1016,6 @@ mod mac {
                     y += h;
                     (MARGIN, inner)
                 }
-                Control::Radio { buttons, lines, .. } => {
-                    if let Some(l) = &row.label {
-                        l.setFrame(NSRect::new(NSPoint::new(MARGIN, y + 1.0), NSSize::new(label_w, 17.0)));
-                    }
-                    for (button, line) in buttons.iter().zip(lines) {
-                        let size = button.fittingSize();
-                        button.setFrame(NSRect::new(NSPoint::new(control_x, y), NSSize::new(size.width.min(control_w), size.height)));
-                        y += size.height;
-                        if let Some(line) = line {
-                            let h = fit_height(line, control_w - 20.0);
-                            line.setFrame(NSRect::new(NSPoint::new(control_x + 20.0, y + 1.0), NSSize::new(control_w - 20.0, h)));
-                            y += h + 1.0;
-                        }
-                        y += 6.0;
-                    }
-                    y -= 6.0;
-                    (control_x, control_w)
-                }
                 Control::Button { button } => {
                     let size = button.fittingSize();
                     let x = if row.label.is_some() { control_x } else { MARGIN };
@@ -1097,6 +1094,8 @@ mod mac {
 
     /// Puts the spec's values on the controls that are there (the form's shape is the same).
     fn update_in_place(sheet: &mut Sheet, spec: &SheetSpec, mtm: MainThreadMarker) {
+        // What has the focus now: a field being typed in keeps its own text (see below).
+        let focused = sheet.panel.firstResponder().map(|r| Retained::as_ptr(&r) as *const AnyObject);
         for (row, (built, old)) in spec.rows.iter().zip(sheet.rows.iter_mut().zip(sheet.spec.rows.iter())) {
             if row == old {
                 continue;
@@ -1104,13 +1103,17 @@ mod mac {
             match (row, &mut built.control) {
                 (SheetRow::TextArea { value, mentions, .. }, Control::TextArea { view, handles, .. }) => {
                     *handles = mentions.iter().map(|m| m.handle.clone()).collect();
-                    if view.string().to_string() != *value {
+                    // Being typed in: what the page sends back is what it typed a moment ago, so
+                    // setting it would drop what came since (and cut an input method's text).
+                    let typing = focused == Some(Retained::as_ptr(view) as *const AnyObject);
+                    if !typing && view.string().to_string() != *value {
                         view.setString(&NSString::from_str(value));
                     }
                     paint_mentions(view, handles);
                 }
                 (SheetRow::Text { value, hint, .. }, Control::Text { field }) => {
-                    if field.stringValue().to_string() != *value {
+                    // Being typed in (its field editor has the focus): as the text view above.
+                    if field.currentEditor().is_none() && field.stringValue().to_string() != *value {
                         field.setStringValue(&NSString::from_str(value));
                     }
                     if let (Some(h), Some(line)) = (hint, &built.line) {
@@ -1165,24 +1168,15 @@ mod mac {
                         d.setStringValue(&NSString::from_str(m));
                     }
                 }
-                (SheetRow::Radio { value, options, .. }, Control::Radio { buttons, lines, values }) => {
-                    for (o, (button, option)) in buttons.iter().zip(options).enumerate() {
-                        button.setTitle(&NSString::from_str(&option.label));
-                        button.setState(if option.value == *value { NSControlStateValueOn } else { NSControlStateValueOff });
-                        if let (Some(Some(line)), Some(h)) = (lines.get(o), option.hint.as_deref()) {
-                            line.setStringValue(&NSString::from_str(h));
-                        }
-                    }
-                    *values = options.iter().map(|o| o.value.clone()).collect();
-                }
                 (SheetRow::Button { text, hint, .. }, Control::Button { button }) => {
                     button.setTitle(&NSString::from_str(text));
                     if let (Some(h), Some(line)) = (hint, &built.line) {
                         line.setStringValue(&NSString::from_str(h));
                     }
                 }
-                (SheetRow::Checkbox { text, checked, hint, .. }, Control::Checkbox { button }) => {
+                (SheetRow::Checkbox { text, checked, hint, disabled, .. }, Control::Checkbox { button }) => {
                     button.setTitle(&NSString::from_str(text));
+                    button.setEnabled(!*disabled);
                     button.setState(if *checked { NSControlStateValueOn } else { NSControlStateValueOff });
                     if let (Some(h), Some(line)) = (hint, &built.line) {
                         line.setStringValue(&NSString::from_str(h));
@@ -1231,11 +1225,12 @@ mod mac {
         }
     }
 
-    pub fn open(parent: *mut std::ffi::c_void, spec: SheetSpec, emit: Box<dyn Fn(SheetEvent)>) -> bool {
-        let Some(mtm) = MainThreadMarker::new() else { return false };
-        close();
-        // SAFETY: the app's own window, alive while it's open.
-        let Some(parent) = (unsafe { parent.cast::<NSWindow>().as_ref() }) else { return false };
+    /// Opens the sheet on `parent`: its id, which its updates and close carry, or none.
+    pub fn open(parent: *mut std::ffi::c_void, spec: SheetSpec, emit: Box<dyn Fn(SheetEvent)>) -> Option<u64> {
+        let mtm = MainThreadMarker::new()?;
+        close(None);
+        // SAFETY: the app's own window, read on this thread just now; alive while it's open.
+        let parent = unsafe { parent.cast::<NSWindow>().as_ref() }?;
         let parent: Retained<NSWindow> = unsafe { Retained::retain(parent as *const NSWindow as *mut NSWindow) }.expect("window");
         let width = spec.width.unwrap_or(520.0);
         let panel = {
@@ -1288,20 +1283,24 @@ mod mac {
         });
         let rows = build_rows(&spec, &root, &controller, mtm);
         let shape = spec.rows.iter().map(SheetRow::shape).collect();
-        let sheet = Sheet { parent: parent.clone(), panel: panel.clone(), root, controller, spec, shape, title, intro, rows, footer, aside, error, cancel, submit, submit_cmd, emit };
+        let id = NEXT_ID.with(|n| {
+            n.set(n.get() + 1);
+            n.get()
+        });
+        let sheet = Sheet { id, parent: parent.clone(), panel: panel.clone(), root, controller, spec, shape, title, intro, rows, footer, aside, error, cancel, submit, submit_cmd, emit };
         apply_chrome(&sheet);
         layout(&sheet);
         focus_first(&sheet);
         SHEET.with(|s| *s.borrow_mut() = Some(sheet));
         parent.beginSheet_completionHandler(&panel, None);
-        true
+        Some(id)
     }
 
-    pub fn update(spec: SheetSpec) {
+    pub fn update(id: u64, spec: SheetSpec) {
         let Some(mtm) = MainThreadMarker::new() else { return };
         SHEET.with(|s| {
-            let mut s = s.borrow_mut();
-            let Some(sheet) = s.as_mut() else { return };
+            let Ok(mut s) = s.try_borrow_mut() else { return };
+            let Some(sheet) = s.as_mut().filter(|sheet| sheet.id == id) else { return };
             let shape: Vec<String> = spec.rows.iter().map(SheetRow::shape).collect();
             let rebuilt = shape != sheet.shape;
             if rebuilt {
@@ -1329,14 +1328,6 @@ mod mac {
                             }
                         }
                         Control::Callout { boxed, .. } => boxed.removeFromSuperview(),
-                        Control::Radio { buttons, lines, .. } => {
-                            for b in buttons {
-                                b.removeFromSuperview();
-                            }
-                            for l in lines.into_iter().flatten() {
-                                l.removeFromSuperview();
-                            }
-                        }
                         Control::Note => {}
                     }
                 }
@@ -1354,8 +1345,15 @@ mod mac {
         });
     }
 
-    pub fn close() {
-        let sheet = SHEET.with(|s| s.borrow_mut().take());
+    /// Closes the sheet `id` (none: whichever is open).
+    pub fn close(id: Option<u64>) {
+        let sheet = SHEET.with(|s| {
+            let mut s = s.try_borrow_mut().ok()?;
+            if id.is_some_and(|id| s.as_ref().is_some_and(|sheet| sheet.id != id)) {
+                return None;
+            }
+            s.take()
+        });
         if let Some(sheet) = sheet {
             sheet.parent.endSheet(&sheet.panel);
             sheet.panel.orderOut(None);
@@ -1365,19 +1363,21 @@ mod mac {
 
 /// Opens the form as a sheet on the window; its changes come back as `native-sheet` events.
 #[tauri::command]
-pub async fn native_sheet_open(window: tauri::Window, spec: SheetSpec) -> Result<bool, String> {
+pub async fn native_sheet_open(window: tauri::Window, spec: SheetSpec) -> Result<Option<u64>, String> {
     #[cfg(target_os = "macos")]
     {
         use tauri::Emitter;
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let ns = window.ns_window().map_err(|e| e.to_string())? as usize;
         let to = window.clone();
+        let on = window.clone();
         window
             .run_on_main_thread(move || {
                 let emit: Box<dyn Fn(SheetEvent)> = Box::new(move |event| {
                     let _ = to.emit("native-sheet", event);
                 });
-                let _ = tx.send(mac::open(ns as *mut std::ffi::c_void, spec, emit));
+                // The window's own pointer, read here on the main thread, where it's used.
+                let opened = on.ns_window().ok().and_then(|ns| mac::open(ns, spec, emit));
+                let _ = tx.send(opened);
             })
             .map_err(|e| e.to_string())?;
         rx.await.map_err(|e| e.to_string())
@@ -1385,27 +1385,27 @@ pub async fn native_sheet_open(window: tauri::Window, spec: SheetSpec) -> Result
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (window, spec);
-        Ok(false)
+        Ok(None)
     }
 }
 
 /// The form again, as it is now (the page's state changed).
 #[tauri::command]
-pub async fn native_sheet_update(window: tauri::Window, spec: SheetSpec) -> Result<(), String> {
+pub async fn native_sheet_update(window: tauri::Window, id: u64, spec: SheetSpec) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    window.run_on_main_thread(move || mac::update(spec)).map_err(|e| e.to_string())?;
+    window.run_on_main_thread(move || mac::update(id, spec)).map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
-    let _ = (window, spec);
+    let _ = (window, id, spec);
     Ok(())
 }
 
 /// Closes the sheet (submitted, cancelled, or the page gave up on it).
 #[tauri::command]
-pub async fn native_sheet_close(window: tauri::Window) -> Result<(), String> {
+pub async fn native_sheet_close(window: tauri::Window, id: u64) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    window.run_on_main_thread(mac::close).map_err(|e| e.to_string())?;
+    window.run_on_main_thread(move || mac::close(Some(id))).map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
-    let _ = window;
+    let _ = (window, id);
     Ok(())
 }
 
@@ -1448,6 +1448,24 @@ mod tests {
         assert_eq!(match_at("Ask @Mi", 4, "@mia"), None);
         // A letter whose lower case is longer (İ → i̇): the end is still the text's own.
         assert_eq!(match_at("@İa x", 0, "@i̇a"), Some(4));
+    }
+
+    #[test]
+    fn reads_a_field_s_rules_as_the_page_writes_them() {
+        let row: SheetRow = serde_json::from_str(r#"{ "kind": "text", "id": "prefix", "value": "", "maxLength": 6, "upper": true, "keep": "AB" }"#).unwrap();
+        assert!(matches!(row, SheetRow::Text { max_length: Some(6), upper: true, ref keep, .. } if keep.as_deref() == Some("AB")));
+        let area: SheetRow = serde_json::from_str(r#"{ "kind": "textarea", "id": "goal", "value": "", "maxLength": 8000 }"#).unwrap();
+        assert!(matches!(area, SheetRow::TextArea { max_length: Some(8000), .. }));
+        let check: SheetRow = serde_json::from_str(r#"{ "kind": "checkbox", "id": "repo:a", "text": "a", "checked": true, "disabled": true }"#).unwrap();
+        assert!(matches!(check, SheetRow::Checkbox { disabled: true, .. }));
+    }
+
+    #[test]
+    fn a_field_takes_what_its_rules_allow_as_you_type() {
+        assert_eq!(filtered("ln-x", Some(6), true, Some("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")), "LNX");
+        assert_eq!(filtered("ABCDEFGH", Some(6), true, None), "ABCDEF");
+        assert_eq!(filtered("名字很长的工作树", Some(4), false, None), "名字很长");
+        assert_eq!(filtered("as is", None, false, None), "as is");
     }
 
     #[test]

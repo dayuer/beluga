@@ -75,7 +75,12 @@ function setup(opts: { workers?: 'milestone' | 'task'; combine?: PlansWorkDeps['
     askClaude: (prompt, channel) => `ask-${asked.push({ prompt, channel })}`,
     intend: () => undefined,
     delayMs: 0,
-    followAgent: (channel, agent) => void switched.push({ channel, agent, at: asked.length }),
+    // As the app's switch does: the worktree is on that agent from then on (its model kept apart).
+    followAgent: (channel, agent) => {
+      switched.push({ channel, agent, at: asked.length });
+      const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
+      store.dispatch({ type: 'projects', projects: store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((x) => (x.id === id ? ({ ...x, agent: agent ? { runtime: agent.runtime, label: agent.label } : undefined, model: agent?.model } as unknown as Workspace) : x)) })) });
+    },
     rescueMs: Number.POSITIVE_INFINITY,
     ...(opts.workers ? { workers: opts.workers } : {}),
     ...(opts.combine ? { combine: opts.combine } : {}),
@@ -247,6 +252,25 @@ describe('a plan’s agent for hard fixes', () => {
     t.work.pilot.tick();
     await waitFor(() => t.switched.some((x) => x.channel === w));
     expect(t.switched.filter((x) => x.channel === w).map((x) => x.agent)).toEqual([CHEAP]);
+  });
+
+  it('handed back once, then put on the fix agent’s model by you: it stays there', async () => {
+    const t = setup({ workers: 'milestone' });
+    const plan = await approved(t, ONE);
+    const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
+    const w = `ws:${agent.worktree}`;
+    const onOpus = (): void => t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((x) => (x.id === agent.worktree ? ({ ...x, agent: { runtime: 'claude', label: 'Claude' }, model: 'opus' } as unknown as Workspace) : x)) })) });
+    t.plans.note(plan.id, 'note', 'handed a task that stopped twice in “Safe payments” to Claude (Opus)', { kind: 'beluga' });
+    onOpus();
+    t.work.pilot.tick();
+    await waitFor(() => t.switched.some((x) => x.channel === w));
+    // Back on the work's agent; then you pick Opus for it yourself.
+    t.store.dispatch({ type: 'projects', projects: t.store.getState().projects.map((p) => ({ ...p, workspaces: p.workspaces.map((x) => (x.id === agent.worktree ? ({ ...x, agent: CHEAP, model: CHEAP.model } as unknown as Workspace) : x)) })) });
+    onOpus();
+    t.work.pilot.tick();
+    t.work.pilot.tick();
+    expect(t.switched.filter((x) => x.channel === w).map((x) => x.agent)).toEqual([CHEAP]);
+    expect(t.plans.need(plan.id).activity.filter((e) => e.text.startsWith('what was hard in “Safe payments” is done:'))).toHaveLength(1);
   });
 
   it('put on the fix agent’s model by you (no handoff): it stays there', async () => {

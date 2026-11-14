@@ -89,6 +89,10 @@ mod mac {
     /// Drags the files out of the window, as Finder does: the drag the page's press began, now the
     /// Mac's, with each file's own icon under the pointer.
     pub fn drag(view: *mut std::ffi::c_void, paths: &[String]) -> bool {
+        // No items: AppKit raises, and an Objective-C exception through Rust aborts the app.
+        if paths.is_empty() {
+            return false;
+        }
         let Some(mtm) = MainThreadMarker::new() else { return false };
         // SAFETY: the window's own content view, alive while its window is.
         let Some(view) = (unsafe { view.cast::<NSView>().as_ref() }) else { return false };
@@ -166,10 +170,11 @@ pub async fn share_files(window: tauri::Window, paths: Vec<String>, x: f64, y: f
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let view = window.ns_view().map_err(|e| e.to_string())? as usize;
+        let on = window.clone();
         window
             .run_on_main_thread(move || {
-                let _ = tx.send(mac::share(view as *mut std::ffi::c_void, &paths, (x, y, width, height)));
+                // The view's pointer, read here on the main thread, where it's used.
+                let _ = tx.send(on.ns_view().is_ok_and(|view| mac::share(view, &paths, (x, y, width, height))));
             })
             .map_err(|e| e.to_string())?;
         rx.await.map_err(|e| e.to_string())
@@ -187,10 +192,10 @@ pub async fn drag_files(window: tauri::Window, paths: Vec<String>) -> Result<boo
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let view = window.ns_view().map_err(|e| e.to_string())? as usize;
+        let on = window.clone();
         window
             .run_on_main_thread(move || {
-                let _ = tx.send(mac::drag(view as *mut std::ffi::c_void, &paths));
+                let _ = tx.send(on.ns_view().is_ok_and(|view| mac::drag(view, &paths)));
             })
             .map_err(|e| e.to_string())?;
         rx.await.map_err(|e| e.to_string())

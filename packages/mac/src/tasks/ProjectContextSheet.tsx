@@ -33,6 +33,7 @@ export function ProjectContextSheet({ projectId, close }: { projectId: string; c
   };
   // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts).
   const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
   const native = useNativeSheet(
     nativeSheets(),
     {
@@ -40,19 +41,23 @@ export function ProjectContextSheet({ projectId, close }: { projectId: string; c
       intro: 'Your agent reads this whenever it writes a task here, so tasks use the project’s own words and point at the right part of the app.',
       width: 600,
       rows: [
-        { kind: 'textarea', id: 'context', value: text, lines: 12, placeholder: PLACEHOLDER, focus: true },
+        { kind: 'textarea', id: 'context', value: text, lines: 12, placeholder: PLACEHOLDER, focus: true, maxLength: MAX_PROJECT_CONTEXT },
         { kind: 'note', text: `${shared}${saved?.text ? ` Last edited by ${saved.by}, ${ago(saved.at)}.` : ''}` },
       ],
       submit: 'Save',
       canSubmit: changed,
       busy,
+      ...(problem ? { error: problem } : {}),
     },
     {
       change: (_id, value) => setText(value.slice(0, MAX_PROJECT_CONTEXT)),
       submit: () => {
         if (!changed || busy) return;
         setBusy(true);
-        save().finally(() => setBusy(false));
+        setProblem(undefined);
+        save()
+          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
+          .finally(() => setBusy(false));
       },
       cancel: close,
     },

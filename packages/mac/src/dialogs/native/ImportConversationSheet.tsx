@@ -89,7 +89,8 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
   // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the conversations in a pop-up,
   // each with where it ran and when on the line under it (the pop-up's type-ahead finds one by name).
   const native = useNativeSheet(
-    nativeSheets() && Boolean(project),
+    // On a computer's page its folder browser is the page's own, which a native sheet would cover: the web sheet there.
+    nativeSheets() && Boolean(project) && !machine,
     {
       title: 'Import from Claude Code',
       intro: `Pick a conversation from Terminal or another app. Your agent goes on with it in a new worktree of ${project?.name ?? ''}.`,
@@ -112,7 +113,7 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
                   hint: parts(c.wsId && 'Brought in already', whereIn(found.dir, c.cwd, home), agoText(c.lastModified), formatBytes(c.bytes)),
                 })),
               },
-        ...(chosen && !opening ? [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}${t(', from the commit that folder is on. Its uncommitted changes stay there.')}` } : {}) }] : []),
+        ...(chosen && !opening ? [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, maxLength: 120, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}${t(', from the commit that folder is on. Its uncommitted changes stay there.')}` } : {}) }] : []),
       ],
       submit: opening ? 'Open Its Worktree' : 'Continue in a Worktree',
       canSubmit: Boolean(chosen) && (opening || Boolean(slug(name))),

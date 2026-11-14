@@ -125,6 +125,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 也用原生 sheet 的：`fork/plans/NewPlanSheet.tsx`（新建计划，提交逻辑抽成 `create`）、`dialogs/native/WorkSheets.tsx` 的 Fork 与在朋友电脑上运行命令。弹出按钮的选项支持说明行、分组和禁用（`choicesOf` 把 `Select` 的选项原样转过去），另有行内复选框。新建标签（带删除按钮的标签列表）仍是网页。
   - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSettingsSheet.tsx`（`plans/PlanSheets.tsx` 导出 `AUTONOMY_ICON`）、`plans/PlanSheets.tsx` 的 `PlanModeSheet`（如何运行：三张卡片，下面是改变了什么的提示框）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
   - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
+  - 审计（2026-11-15，PR 39 / 41 / 44）后的修正：原生 sheet 的回调在更新中被系统回调时不再 panic（`peek`/`try_borrow`），正在输入的文本框不被页面回传覆盖，每个 sheet 有编号（更新、关闭只作用于自己），输入规则（`maxLength`/`upper`/`keep`）在原生框里即时生效，复选框可禁用，单选行去掉（已由卡片取代）；原生菜单的标题、分隔线 tag 为 -1；窗口指针改在主线程里取；空路径不拖；警告框随页面卸载收起、内容变了重新弹出；`useNativeSheet` 卸载后不再打开或更新，每次改动后重发让控件显示页面认可的值。修复智能体只在仍在它身上、且最近一次交还之后又有交接时才交还。对比度规则压过自定义配色；几处图标按钮补成常规尺寸。留着的：Quick Look 没按面板控制者协议接入（能用，会打警告）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
 
 ### 沉稳界面（docs/calm-ui.md）

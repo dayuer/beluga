@@ -68,7 +68,7 @@ export function ContinueSheet({ wsId, close }: { wsId: string; close: () => void
         { kind: 'note', text: `Empty: your agent goes ahead with what you discussed. ${cmdReturn()} continues.` },
         { kind: 'popup', id: 'base', label: 'Based on', value: chosen, options, hint: 'Origin branches are fetched first, so it starts from the latest.' },
         { kind: 'popup', id: 'agent', label: 'Agent', value: agent, options: choicesOf(agents), hint: fresh ? `${agentName(picked)} can’t pick up this conversation, so it starts fresh there, handed the conversation so far.` : 'Who goes on there. It keeps the conversation.' },
-        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'from the task', hint: 'Empty: named after the task.' },
+        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'from the task', hint: 'Empty: named after the task.', maxLength: 60 },
       ],
       submit: 'Continue',
       canSubmit: true,

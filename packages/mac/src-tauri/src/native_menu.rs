@@ -99,7 +99,13 @@ mod mac {
         let headers = responds(NSMenuItem::class().as_ref(), sel!(sectionHeaderWithTitle:));
         for item in items {
             match item.kind.as_deref() {
-                Some("separator") => menu.addItem(&NSMenuItem::separatorItem(mtm)),
+                Some("separator") => {
+                    let line = NSMenuItem::separatorItem(mtm);
+                    // Only the rows that do something carry an id (0 up): the rest -1, so
+                    // itemWithTag never finds a header or a line for the chosen row.
+                    line.setTag(-1);
+                    menu.addItem(&line);
+                }
                 Some("header") => {
                     let title = NSString::from_str(&item.text);
                     let row = if headers {
@@ -110,6 +116,7 @@ mod mac {
                         row.setEnabled(false);
                         row
                     };
+                    row.setTag(-1);
                     menu.addItem(&row);
                 }
                 _ => menu.addItem(&row(item, target, mtm)),
@@ -120,6 +127,7 @@ mod mac {
 
     fn row(item: &NativeItem, target: &Target, mtm: MainThreadMarker) -> Retained<NSMenuItem> {
         let row = NSMenuItem::new(mtm);
+        row.setTag(-1);
         row.setTitle(&NSString::from_str(&item.text));
         row.setEnabled(item.enabled.unwrap_or(true));
         if item.checked == Some(true) {
@@ -202,11 +210,12 @@ pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Optio
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let view = window.ns_view().map_err(|e| e.to_string())? as usize;
         let at = x.zip(y);
+        let on = window.clone();
         window
             .run_on_main_thread(move || {
-                let picked = mac::show(view as *mut std::ffi::c_void, &items, at, selected);
+                // The view's pointer, read here on the main thread, where it's used.
+                let picked = on.ns_view().ok().and_then(|view| mac::show(view, &items, at, selected));
                 let _ = tx.send(picked);
             })
             .map_err(|e| e.to_string())?;
