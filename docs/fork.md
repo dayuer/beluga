@@ -99,6 +99,9 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/components/`：`ui.tsx`（`ControlSize`，`Button`/`IconButton`/`Segmented` 的 `size`）、`Select.tsx`、`SelectMenu.tsx`，以及 `ui`、`alert`、`form`、`select` 四个 CSS module。
 - 标题栏与面板（大号 / 小号）：`layout/Toolbar.tsx`、`Toolbar.module.css`、`BranchControl.tsx`、`BranchControl.module.css`、`Sidebar.tsx`、`SidebarSearch.module.css`、`AppMenu.tsx`、`NotificationCenter.tsx`、`RightPanel.tsx`、`panel/*Tab.tsx`、`panel/TerminalPane.tsx`、`panel/panel.module.css`、`agent-term/ConvoSwitch.tsx`。
 - sheet（常规）：`dialogs/settings.module.css`、`dialogs/sheet.module.css`、`dialogs/env-settings.module.css`、`dialogs/add-project.module.css`、`dialogs/native/sharing.module.css`、`dialogs/native/menus.module.css`、`tasks/NewTaskSheet.module.css`，以及 `EnvironmentSettings.tsx`、`AddProjectSheet.tsx`、`native/MergeReview.tsx`、`native/WorkConfirm.tsx`、`native/ShareFolderSheet.tsx` 里按钮的 `size`。
+- 列表、卡片、对话（小号，规范第 4 步）：约 105 个上游文件里的 `Button`、`IconButton`、`Select`、`Segmented` 加了 `size="small"`（空的 Work 页主按钮是 `size="large"`），目录是 `views/`、`sentinel/`、`tasks/`、`components/`（graph、views、preview、code、markdown）、`plans/`、`network/`、`layout/`（行内操作、面板外的列表）、`issues/`、`chat/`、`claude-code/`、`ci/`、`work/`、`team/`、`pr/`、`gateway/`、`agent-term/`。每处只是给已有的标签加一个属性；同步时冲突就按上游的新标签重新加 `size`，取哪一档看 `docs/mac-controls.md` 的“Which size where”。另有自带样式的几处：`views/overview/filter-bar.module.css`、`views/overview.module.css`（行尾 ▾）、`sentinel/home.module.css`、`sentinel/numbers.module.css`、`sentinel/sentinel.module.css`。
+- 修正（审查 PR #39）：`layout/BranchControl.module.css`、`layout/Toolbar.module.css` 的出错/已合并按钮整个边框、按下、焦点都用自己的颜色；按下的样子一律是渐变，不再从透明淡入；窗口不在前台时 ui 的主按钮和 sheet 的默认按钮一样画成普通按钮。
+- fork 自己的侧栏样式 `fork/sidebar/sidebar-look.css` 的搜索框也跟着用大号 `--control-h-large`（原来写死 30px），由 `tests/fork-sidebar-anchors.test.ts` 检查。
 - 用例：`tests/mac-controls.test.ts`（上游的新测试文件，随 PR 一起提回）。
 
 ### 沉稳界面（docs/calm-ui.md）

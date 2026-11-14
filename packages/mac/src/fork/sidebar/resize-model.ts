@@ -22,6 +22,15 @@ export function widthAtPointer(pointerX: number, sidebarLeft: number): number {
   return clampSidebarWidth(pointerX - sidebarLeft);
 }
 
+/**
+ * The widest the sidebar may get in this window: the conversation between it and the right panel
+ * keeps upstream's minimum (`CENTER_MIN`, lib/panel-model.ts). `panelWidth` is what the panel
+ * takes beside it (0 when it's closed). Never under the minimum sidebar.
+ */
+export function widestSidebar(windowWidth: number, panelWidth: number, centerMin: number): number {
+  return Math.max(SIDEBAR_MIN, Math.floor(windowWidth - panelWidth - centerMin));
+}
+
 /** An arrow key: → widens (dir 1), ← narrows (dir -1). */
 export function stepSidebarWidth(width: number, dir: 1 | -1): number {
   return clampSidebarWidth(clampSidebarWidth(width) + dir * SIDEBAR_STEP);

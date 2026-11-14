@@ -35,6 +35,13 @@ describe('the sidebar look’s upstream anchors', () => {
     expect(read('layout', 'workspace-row.tsx')).toContain(`'${IN_CHAT_SELECTION}'`);
   });
 
+  it('keeps the search field on the controls’ scale (docs/mac-controls.md: Large in the title row)', () => {
+    const look = read('fork', 'sidebar', 'sidebar-look.css');
+    const field = /\[data-fork-sidebar\] \[class\*='_field_'\] \{([^}]*)\}/.exec(look)?.[1] ?? '';
+    expect(field).toContain('height: var(--control-h-large)');
+    expect(field).not.toMatch(/height:\s*\d+px/);
+  });
+
   it('finds the needs-you edge the overlay draws as a dot', () => {
     const marks = read('layout', 'signal-marks.tsx');
     expect(marks).toContain('<span className={m.edge} data-signal="needs"');

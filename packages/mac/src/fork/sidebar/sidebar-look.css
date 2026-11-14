@@ -59,7 +59,9 @@
 
 /* Search: a soft well at the top, not a raised field. */
 [data-fork-sidebar] [class*='_field_'] {
-  height: 30px;
+  /* The title row's Large (docs/mac-controls.md), as upstream's SidebarSearch.module.css. */
+  height: var(--control-h-large);
+  border-radius: var(--control-radius-large);
   background: var(--bg-hover);
   box-shadow: none;
 }

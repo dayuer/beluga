@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_STEP, clampSidebarWidth, stepSidebarWidth, widthAtPointer } from '../packages/mac/src/fork/sidebar/resize-model.js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SIDEBAR_STEP, clampSidebarWidth, stepSidebarWidth, widestSidebar, widthAtPointer } from '../packages/mac/src/fork/sidebar/resize-model.js';
+import { CENTER_MIN } from '../packages/mac/src/lib/panel-model.js';
 import { DEFAULT_PREFS } from '../packages/mac/src/lib/prefs.js';
 
 /** The sidebar's draggable edge (packages/mac/src/fork/sidebar/resize.tsx, resize-model.ts). */
@@ -29,6 +32,20 @@ describe('sidebar width', () => {
     expect(stepSidebarWidth(SIDEBAR_MIN, -1)).toBe(SIDEBAR_MIN);
     // A width saved out of bounds (an older version, a hand edit) steps from within them.
     expect(stepSidebarWidth(999, -1)).toBe(SIDEBAR_MAX - SIDEBAR_STEP);
+  });
+
+  it('leaves the conversation its minimum beside the right panel', () => {
+    // A 1280-point window with a 360-point panel: 1280 - 360 - CENTER_MIN for the sidebar at most.
+    expect(widestSidebar(1280, 360, CENTER_MIN)).toBe(1280 - 360 - CENTER_MIN);
+    // A narrow window: still the minimum sidebar (the panel gives way, as upstream's clamp does).
+    expect(widestSidebar(900, 360, CENTER_MIN)).toBe(SIDEBAR_MIN);
+    // No panel: the whole window but the conversation.
+    expect(widestSidebar(1440, 0, CENTER_MIN)).toBe(1440 - CENTER_MIN);
+  });
+
+  it('is grabbed outside the border only, leaving the sidebar’s scrollbar free', () => {
+    const css = readFileSync(path.join('packages', 'mac', 'src', 'fork', 'sidebar', 'resize.module.css'), 'utf8');
+    expect(css).toMatch(/\.edge > \[role='separator'\]::before \{\s*inset: 0 -7px 0 0;/);
   });
 });
 

@@ -1,7 +1,15 @@
 import { useRef } from 'react';
 import { ResizeHandle } from '../../layout/panel/ResizeHandle.js';
+import { CENTER_MIN, clampPanelWidth } from '../../lib/panel-model.js';
 import { getPrefs, setPrefs } from '../../lib/prefs.js';
-import { SIDEBAR_DEFAULT, clampSidebarWidth, stepSidebarWidth, widthAtPointer } from './resize-model.js';
+import { SIDEBAR_DEFAULT, clampSidebarWidth, stepSidebarWidth, widestSidebar, widthAtPointer } from './resize-model.js';
+
+/** A width this window can give the sidebar: the conversation beside it keeps its minimum. */
+function fit(width: number): number {
+  const prefs = getPrefs();
+  const panel = prefs.inspector ? clampPanelWidth(prefs.panelWidth, window.innerWidth, width) : 0;
+  return Math.min(width, widestSidebar(window.innerWidth, panel, CENTER_MIN));
+}
 import s from './resize.module.css';
 
 /**
@@ -24,7 +32,7 @@ export function SidebarEdge() {
         onMove={(x) => {
           const nav = edge.current?.closest('nav');
           if (!nav) return;
-          drag.current = widthAtPointer(x, nav.getBoundingClientRect().left);
+          drag.current = fit(widthAtPointer(x, nav.getBoundingClientRect().left));
           document.documentElement.style.setProperty('--sidebar-w', `${drag.current}px`);
         }}
         onEnd={() => {
@@ -33,7 +41,7 @@ export function SidebarEdge() {
         }}
         onReset={() => save(SIDEBAR_DEFAULT)}
         // The handle's +1 is "toward the left" (it was made for the right panel): for the sidebar, narrower.
-        onStep={(dir) => save(stepSidebarWidth(getPrefs().sidebarWidth, dir === 1 ? -1 : 1))}
+        onStep={(dir) => save(fit(stepSidebarWidth(getPrefs().sidebarWidth, dir === 1 ? -1 : 1)))}
       />
     </span>
   );

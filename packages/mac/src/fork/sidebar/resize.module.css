@@ -20,6 +20,11 @@
   z-index: 5;
   display: flex;
 }
+/* The line stays on the sidebar's border, but the place to grab reaches outward only: the
+   sidebar's own scrollbar sits just inside that border and stays draggable. */
+.edge > [role='separator']::before {
+  inset: 0 -7px 0 0;
+}
 /* It sits among the scroll's children: sidebar-look.css spaces those apart (`* + *`), not this. */
 .edge.edge[data-fork-sidebar-edge] {
   margin: 0;
