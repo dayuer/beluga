@@ -119,6 +119,8 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 警告框：`components/Alert.tsx`、`dialogs/native/parts.tsx` 的 `Alert` 在 Mac app 里是 NSAlert（`src-tauri/src/native_alert.rs`、`lib/native-alert.ts`）；带表格或复选框的仍是网页。
   - 跟随系统辅助显示：`src-tauri/src/native_menu.rs` 的 `display_options`，`lib/prefs.ts`（`data-glass`、`data-contrast`），`styles/base.css`（关掉窗口内模糊），`styles/tokens.css`（增强对比度）。
   - 文件：`src-tauri/src/native_files.rs`（Quick Look、系统分享菜单），`lib/files.ts`（`quickLook`、`shareFiles`），`layout/panel/FilesTab.tsx`（右键菜单 + 空格键）、`chat/PathLink.tsx`（右键菜单）。
+  - 拖出文件：`src-tauri/src/native_files.rs` 的 `drag_files`（NSDraggingSession），`layout/panel/FilesTab.tsx` 的行 `draggable` + `onDragStart`。
+  - 打字跳转：`lib/list-typeahead.ts`（新文件），接在 `layout/panel/FilesTab.tsx`、`ChangesTab.tsx`、`ScratchTab.tsx` 的 `onKey`。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
 
 ### 沉稳界面（docs/calm-ui.md）
