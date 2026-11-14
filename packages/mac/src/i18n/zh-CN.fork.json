@@ -473,5 +473,6 @@
  "{0} circles now follow the default.": "{0} 个圈改为跟随默认。",
  "{0} circles: {1}. {2}": "{0} 个圈：{1}。{2}",
  "{0} following the default · {1} exceptions": "{0} 个跟随默认 · {1} 个例外",
- "{0} selected": "已选 {0} 个"
+ "{0} selected": "已选 {0} 个",
+ "Work": "计划"
 }
