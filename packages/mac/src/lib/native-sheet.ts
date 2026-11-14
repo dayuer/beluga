@@ -23,6 +23,8 @@ export interface SheetChoice {
   /** Its section in a pop-up: a new one starts with a line and its title. */
   readonly section?: string;
   readonly disabled?: boolean;
+  /** A word in a card's corner ("Now"). */
+  readonly badge?: string;
 }
 
 /** A pop-up button's options (components/Select.tsx's entries: sections, descriptions, icons) as the sheet's. */
@@ -45,6 +47,10 @@ export type SheetRowSpec =
   | { readonly kind: 'note'; readonly text: string }
   | { readonly kind: 'disclosure'; readonly id: string; readonly label: string; readonly open: boolean }
   | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string }
+  /** Option cards side by side (the app's own, plans.module.css's .modeCards): icon, name, line; the label a heading above. */
+  | { readonly kind: 'cards'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[] }
+  /** A tinted box of words (.modeConfirm): what changes, its second line dimmer. */
+  | { readonly kind: 'callout'; readonly text: string; readonly detail?: string }
   /** One option to a line, each with its icon and its line under it (the app's option cards, as AppKit draws them). */
   | { readonly kind: 'radio'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[] }
   /** A push button ("Choose Another Folder…"): pressing it is a change to "press". */
@@ -98,6 +104,7 @@ async function choices(options: readonly SheetChoice[]): Promise<unknown[]> {
         ...(o.hint ? { hint: t(o.hint) } : {}),
         ...(o.section !== undefined ? { section: t(o.section) } : {}),
         ...(o.disabled ? { disabled: true } : {}),
+        ...(o.badge ? { badge: t(o.badge) } : {}),
       };
     }),
   );
@@ -122,6 +129,10 @@ async function wire(spec: SheetSpec): Promise<unknown> {
           return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
         case 'radio':
           return { ...row, label: colon(row.label), options: await choices(row.options) };
+        case 'cards':
+          return { ...row, label: t(row.label), options: await choices(row.options) };
+        case 'callout':
+          return { kind: 'callout', text: t(row.text), ...(row.detail ? { detail: t(row.detail) } : {}) };
         case 'popup':
         case 'segmented':
           return { ...row, label: colon(row.label), options: await choices(row.options), ...(row.hint ? { hint: t(row.hint) } : {}) };

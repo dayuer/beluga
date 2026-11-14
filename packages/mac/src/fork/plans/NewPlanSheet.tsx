@@ -112,7 +112,8 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
                   },
                 ]
               : []),
-            { kind: 'radio', id: 'autonomy', label: 'How it runs', value: autonomy, options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: AUTONOMY_INFO[a].summary })) },
+            // The three cards, as plans/PlanSheets.tsx's AutonomyCards draws them.
+            { kind: 'cards', id: 'autonomy', label: 'How it runs', value: autonomy, options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: AUTONOMY_INFO[a].summary })) },
             { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt, hint: `${TESTS_AT_INFO[testsAt].hint}.`, options: TESTS_AT.map((x) => ({ value: x, label: TESTS_AT_INFO[x].label })) },
             { kind: 'disclosure', id: 'more', label: 'More options', open: more },
             ...(more

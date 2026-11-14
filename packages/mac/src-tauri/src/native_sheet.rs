@@ -29,6 +29,9 @@ pub struct SheetOption {
     pub section: Option<String>,
     #[serde(default)]
     pub disabled: bool,
+    /// A word in a card's corner ("Now").
+    #[serde(default)]
+    pub badge: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -89,6 +92,23 @@ pub enum SheetRow {
         value: String,
         options: Vec<SheetOption>,
     },
+    /// Option cards side by side, as the app's own (plans.module.css's .modeCards): each its icon,
+    /// its name and its line, the chosen one outlined in the accent, a word in a card's corner.
+    /// Its label is a heading above them, across the sheet.
+    #[serde(rename = "cards")]
+    Cards {
+        id: String,
+        label: String,
+        value: String,
+        options: Vec<SheetOption>,
+    },
+    /// A tinted box of words (what changes, before Save confirms it: .modeConfirm), its second line dimmer.
+    #[serde(rename = "callout")]
+    Callout {
+        text: String,
+        #[serde(default)]
+        detail: Option<String>,
+    },
     /// A push button in the control column ("Choose Another Folder…"): pressing it says "press".
     #[serde(rename = "button")]
     Button {
@@ -135,6 +155,8 @@ impl SheetRow {
             SheetRow::Checkbox { id, label, .. } => format!("checkbox:{id}:{}", label.is_some()),
             SheetRow::Button { id, label, .. } => format!("button:{id}:{}", label.is_some()),
             SheetRow::Radio { id, options, .. } => format!("radio:{id}:{}", options.len()),
+            SheetRow::Cards { id, options, .. } => format!("cards:{id}:{}", options.len()),
+            SheetRow::Callout { detail, .. } => format!("callout:{}", detail.is_some()),
         }
     }
 }
@@ -198,7 +220,7 @@ mod mac {
     use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol, ProtocolObject, Sel};
     use objc2::{define_class, msg_send, sel, AllocAnyThread, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
-        NSBackingStoreType, NSBezelStyle, NSBorderType, NSButton, NSButtonType, NSColor, NSControl, NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSFont,
+        NSBackingStoreType, NSBezelStyle, NSBox, NSBoxType, NSImageView, NSTitlePosition, NSBorderType, NSButton, NSButtonType, NSColor, NSControl, NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSFont,
         NSForegroundColorAttributeName, NSImage, NSMenuItem, NSPanel, NSPopUpButton, NSScrollView, NSSegmentSwitchTracking, NSSegmentedControl, NSTextAlignment, NSTextDelegate, NSTextField,
         NSTextFieldDelegate, NSTextView, NSTextViewDelegate, NSView, NSWindow, NSWindowStyleMask,
     };
@@ -220,6 +242,19 @@ mod mac {
         Checkbox { button: Retained<NSButton> },
         Button { button: Retained<NSButton> },
         Radio { buttons: Vec<Retained<NSButton>>, lines: Vec<Option<Retained<NSTextField>>>, values: Vec<String> },
+        Cards { cards: Vec<Card>, values: Vec<String> },
+        Callout { boxed: Retained<NSBox>, text: Retained<NSTextField>, detail: Option<Retained<NSTextField>> },
+    }
+
+    /// One option card: its box, what's in it, and the button over it that picks it.
+    struct Card {
+        boxed: Retained<NSBox>,
+        content: Retained<Flipped>,
+        icon: Option<Retained<NSImageView>>,
+        name: Retained<NSTextField>,
+        line: Option<Retained<NSTextField>>,
+        badge: Option<Retained<NSTextField>>,
+        hit: Retained<NSButton>,
     }
 
     struct Row {
@@ -469,7 +504,10 @@ mod mac {
             if tag >= RADIO_TAG {
                 let (row, option) = ((tag - RADIO_TAG) / RADIO_ROW, (tag - RADIO_TAG) % RADIO_ROW);
                 let built = s.rows.get(row as usize)?;
-                let Control::Radio { values, .. } = &built.control else { return None };
+                let values = match &built.control {
+                    Control::Radio { values, .. } | Control::Cards { values, .. } => values,
+                    _ => return None,
+                };
                 return Some(SheetEvent::Change { id: built.id.clone(), value: values.get(option as usize)?.clone() });
             }
             if tag == ASIDE_TAG {
@@ -600,6 +638,97 @@ mod mac {
         control.sizeToFit();
     }
 
+    /// The accent mixed into the window's background, as color-mix(in srgb, var(--accent) N%, var(--bg)).
+    fn tint(fraction: f64) -> Retained<NSColor> {
+        NSColor::textBackgroundColor().blendedColorWithFraction_ofColor(fraction, &NSColor::controlAccentColor()).unwrap_or_else(NSColor::textBackgroundColor)
+    }
+
+    fn custom_box(mtm: MainThreadMarker) -> Retained<NSBox> {
+        let b = NSBox::new(mtm);
+        b.setBoxType(NSBoxType::Custom);
+        b.setTitlePosition(NSTitlePosition::NoTitle);
+        b.setContentViewMargins(NSSize::new(0.0, 0.0));
+        b.setCornerRadius(8.0);
+        b
+    }
+
+    /// A card as chosen or not: the accent's 1.5 outline and an 8% tint, or a hairline on the background.
+    fn style_card(card: &Card, on: bool) {
+        if on {
+            card.boxed.setBorderWidth(1.5);
+            card.boxed.setBorderColor(&NSColor::controlAccentColor());
+            card.boxed.setFillColor(&tint(0.08));
+        } else {
+            card.boxed.setBorderWidth(0.5);
+            card.boxed.setBorderColor(&NSColor::separatorColor());
+            card.boxed.setFillColor(&NSColor::textBackgroundColor());
+        }
+        if let Some(icon) = &card.icon {
+            let tint = if on { NSColor::controlAccentColor() } else { NSColor::tertiaryLabelColor() };
+            icon.setContentTintColor(Some(&tint));
+        }
+    }
+
+    fn build_card(option: &SheetOption, on: bool, tag: isize, root: &Flipped, controller: &Controller, mtm: MainThreadMarker) -> Card {
+        let boxed = custom_box(mtm);
+        let content: Retained<Flipped> = unsafe { msg_send![Flipped::alloc(mtm), initWithFrame: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(100.0, 60.0))] };
+        boxed.setContentView(Some(&content));
+        let icon = option.icon.as_deref().and_then(|png| image(png, true)).map(|img| {
+            img.setSize(NSSize::new(16.0, 16.0));
+            let view = NSImageView::imageViewWithImage(&img, mtm);
+            content.addSubview(&view);
+            view
+        });
+        let name = label(&option.label, mtm);
+        name.setFont(Some(&NSFont::boldSystemFontOfSize(13.0)));
+        content.addSubview(&name);
+        let line = option.hint.as_deref().filter(|h| !h.is_empty()).map(|h| {
+            let l = wrapping(h, 11.5, true, mtm);
+            content.addSubview(&l);
+            l
+        });
+        let badge = option.badge.as_deref().map(|b| {
+            let l = label(b, mtm);
+            l.setFont(Some(&NSFont::boldSystemFontOfSize(10.5)));
+            l.setTextColor(Some(&NSColor::tertiaryLabelColor()));
+            content.addSubview(&l);
+            l
+        });
+        root.addSubview(&boxed);
+        // Over the card, the whole of it picks it.
+        let hit = unsafe { NSButton::buttonWithTitle_target_action(&NSString::from_str(""), Some(controller), Some(sel!(changed:)), mtm) };
+        hit.setTransparent(true);
+        hit.setTag(tag);
+        root.addSubview(&hit);
+        let card = Card { boxed, content, icon, name, line, badge, hit };
+        style_card(&card, on);
+        card
+    }
+
+    /// Lays a card's insides out at `width`; its height.
+    fn layout_card(card: &Card, width: f64) -> f64 {
+        let (pad_x, pad_top, pad_bottom) = (12.0, 10.0, 11.0);
+        let inner = width - 2.0 * pad_x;
+        let mut y = pad_top;
+        if let Some(icon) = &card.icon {
+            icon.setFrame(NSRect::new(NSPoint::new(pad_x, y), NSSize::new(16.0, 16.0)));
+            y += 16.0 + 6.0;
+        }
+        let h = card.name.fittingSize().height;
+        card.name.setFrame(NSRect::new(NSPoint::new(pad_x, y), NSSize::new(inner, h)));
+        y += h;
+        if let Some(line) = &card.line {
+            let lh = fit_height(line, inner);
+            line.setFrame(NSRect::new(NSPoint::new(pad_x, y + 3.0), NSSize::new(inner, lh)));
+            y += lh + 3.0;
+        }
+        if let Some(badge) = &card.badge {
+            let size = badge.fittingSize();
+            badge.setFrame(NSRect::new(NSPoint::new(width - 10.0 - size.width, 9.0), size));
+        }
+        y + pad_bottom
+    }
+
     /// Makes the rows' controls (the form's shape changed, or it's new).
     fn build_rows(spec: &SheetSpec, root: &Flipped, controller: &Controller, mtm: MainThreadMarker) -> Vec<Row> {
         let mut rows = Vec::new();
@@ -675,6 +804,28 @@ mod mac {
                         control: Control::Popup { button, values: options.iter().map(|o| o.value.clone()).collect(), options: options.clone() },
                         line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)),
                     }
+                }
+                SheetRow::Cards { id, label: text, value, options } => {
+                    let cards = options.iter().enumerate().map(|(o, option)| build_card(option, option.value == *value, RADIO_TAG + tag * RADIO_ROW + o as isize, root, controller, mtm)).collect();
+                    let heading = label(text, mtm);
+                    Row { id: id.clone(), label: Some(heading), control: Control::Cards { cards, values: options.iter().map(|o| o.value.clone()).collect() }, line: None }
+                }
+                SheetRow::Callout { text, detail } => {
+                    let boxed = custom_box(mtm);
+                    boxed.setBorderWidth(0.5);
+                    boxed.setBorderColor(&NSColor::controlAccentColor().colorWithAlphaComponent(0.4));
+                    boxed.setFillColor(&tint(0.07));
+                    let inside: Retained<Flipped> = unsafe { msg_send![Flipped::alloc(mtm), initWithFrame: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(100.0, 40.0))] };
+                    boxed.setContentView(Some(&inside));
+                    let words = wrapping(text, 13.0, false, mtm);
+                    inside.addSubview(&words);
+                    let more = detail.as_deref().filter(|d| !d.is_empty()).map(|d| {
+                        let l = wrapping(d, 13.0, true, mtm);
+                        inside.addSubview(&l);
+                        l
+                    });
+                    root.addSubview(&boxed);
+                    Row { id: String::new(), label: None, control: Control::Callout { boxed, text: words, detail: more }, line: None }
                 }
                 SheetRow::Radio { id, label: text, value, options } => {
                     let mut buttons = Vec::new();
@@ -752,7 +903,7 @@ mod mac {
     fn layout(sheet: &Sheet) {
         let width = sheet.spec.width.unwrap_or(520.0);
         let inner = width - 2.0 * MARGIN;
-        let label_w = sheet.rows.iter().filter_map(|r| r.label.as_ref()).map(|l| l.fittingSize().width).fold(0.0f64, f64::max).ceil();
+        let label_w = sheet.rows.iter().filter(|r| !matches!(r.control, Control::Cards { .. })).filter_map(|r| r.label.as_ref()).map(|l| l.fittingSize().width).fold(0.0f64, f64::max).ceil();
         let control_x = MARGIN + label_w + LABEL_GAP;
         let control_w = width - MARGIN - control_x;
         let mut y = MARGIN;
@@ -810,6 +961,45 @@ mod mac {
                     button.setFrame(NSRect::new(NSPoint::new(control_x - 3.0, y - 1.0), NSSize::new(size.width.clamp(140.0, control_w + 6.0), size.height)));
                     y += size.height - 2.0;
                     (control_x, control_w)
+                }
+                Control::Cards { cards, .. } => {
+                    if let Some(l) = &row.label {
+                        l.setAlignment(NSTextAlignment::Left);
+                        let h = l.fittingSize().height;
+                        l.setFrame(NSRect::new(NSPoint::new(MARGIN, y), NSSize::new(inner, h)));
+                        y += h + 6.0;
+                    }
+                    let n = cards.len().max(1) as f64;
+                    let w = ((inner - 8.0 * (n - 1.0)) / n).floor();
+                    let tallest = cards.iter().map(|c| layout_card(c, w)).fold(0.0f64, f64::max);
+                    for (i, card) in cards.iter().enumerate() {
+                        let frame = NSRect::new(NSPoint::new(MARGIN + i as f64 * (w + 8.0), y), NSSize::new(w, tallest));
+                        card.boxed.setFrame(frame);
+                        card.content.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, tallest)));
+                        card.hit.setFrame(frame);
+                    }
+                    y += tallest;
+                    (MARGIN, inner)
+                }
+                Control::Callout { boxed, text, detail } => {
+                    let (pad_x, pad_y) = (12.0, 10.0);
+                    let w = inner - 2.0 * pad_x;
+                    let mut h = pad_y;
+                    let th = fit_height(text, w);
+                    text.setFrame(NSRect::new(NSPoint::new(pad_x, h), NSSize::new(w, th)));
+                    h += th;
+                    if let Some(d) = detail {
+                        let dh = fit_height(d, w);
+                        d.setFrame(NSRect::new(NSPoint::new(pad_x, h + 4.0), NSSize::new(w, dh)));
+                        h += dh + 4.0;
+                    }
+                    h += pad_y;
+                    boxed.setFrame(NSRect::new(NSPoint::new(MARGIN, y), NSSize::new(inner, h)));
+                    if let Some(inside) = boxed.contentView() {
+                        inside.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(inner, h)));
+                    }
+                    y += h;
+                    (MARGIN, inner)
                 }
                 Control::Radio { buttons, lines, .. } => {
                     if let Some(l) = &row.label {
@@ -957,6 +1147,22 @@ mod mac {
                     control.setEnabled(!*disabled);
                     if let (Some(h), Some(line)) = (hint, &built.line) {
                         line.setStringValue(&NSString::from_str(h));
+                    }
+                }
+                (SheetRow::Cards { value, options, .. }, Control::Cards { cards, values }) => {
+                    for (card, option) in cards.iter().zip(options) {
+                        card.name.setStringValue(&NSString::from_str(&option.label));
+                        if let (Some(line), Some(h)) = (&card.line, option.hint.as_deref()) {
+                            line.setStringValue(&NSString::from_str(h));
+                        }
+                        style_card(card, option.value == *value);
+                    }
+                    *values = options.iter().map(|o| o.value.clone()).collect();
+                }
+                (SheetRow::Callout { text: words, detail: more }, Control::Callout { text, detail, .. }) => {
+                    text.setStringValue(&NSString::from_str(words));
+                    if let (Some(d), Some(m)) = (detail, more) {
+                        d.setStringValue(&NSString::from_str(m));
                     }
                 }
                 (SheetRow::Radio { value, options, .. }, Control::Radio { buttons, lines, values }) => {
@@ -1116,6 +1322,13 @@ mod mac {
                         Control::Popup { button, .. } => button.removeFromSuperview(),
                         Control::Segmented { control, .. } => control.removeFromSuperview(),
                         Control::Checkbox { button } | Control::Button { button } => button.removeFromSuperview(),
+                        Control::Cards { cards, .. } => {
+                            for c in cards {
+                                c.boxed.removeFromSuperview();
+                                c.hit.removeFromSuperview();
+                            }
+                        }
+                        Control::Callout { boxed, .. } => boxed.removeFromSuperview(),
                         Control::Radio { buttons, lines, .. } => {
                             for b in buttons {
                                 b.removeFromSuperview();
