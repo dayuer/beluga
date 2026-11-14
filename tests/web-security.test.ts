@@ -73,7 +73,7 @@ describe('a browser can use Beluga but not decide who gets in', () => {
     const { send, frames, ws } = await browserIn();
     for (const [i, method] of [...WEB_STUDIO].entries()) send({ t: 'call', id: `studio${i}`, method, args: method === 'studio.setProject' ? ['p1', true] : method === 'studio.link' ? ['ABCD-EFGH'] : [] });
     await expect.poll(() => frames.filter((f) => f.t === 'result').length).toBe(WEB_STUDIO.size);
-    for (let i = 0; i < WEB_STUDIO.size; i++) expect(resultOf(frames, `studio${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Mac app or `beluga studio`/) });
+    for (let i = 0; i < WEB_STUDIO.size; i++) expect(resultOf(frames, `studio${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Beluga app or `beluga studio`/) });
     ws.close();
   });
 

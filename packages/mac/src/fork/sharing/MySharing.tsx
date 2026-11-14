@@ -380,6 +380,7 @@ export function MySharing() {
           />
         </Row>
       </Group>
+      {/* computer-wording: mac (fork feature, worded for the Mac app for now) */}
       <p className={s.note}>{t('“Full trust” can only be given to one circle at a time: it lets their agent work on this Mac without asking.')}</p>
 
       {empty ? (

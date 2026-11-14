@@ -42,8 +42,10 @@ const ERROR_KEYS: Readonly<Record<string, string>> = {
   'expired-code': 'That binding code has expired. Get a fresh one from the admin page.',
   'bad-hub': 'The studio address must be https, or http on this computer (localhost).',
   unreachable: 'Could not reach the studio hub. Is it running?',
+  // computer-wording: mac (fork feature, worded for the Mac app for now)
   'clock-skew': 'This Mac’s clock is more than five minutes off. Set it and try again.',
   'key-taken': 'That key is already registered somewhere else. Start over from the admin page.',
+  // computer-wording: mac (fork feature, worded for the Mac app for now)
   'already-linked': 'This Mac is already connected. Disconnect first.',
   'cannot-save': 'Could not save the link to ~/.beluga/studio.json.',
   'demo-mode': 'Synon Studio is off in a demo.',
@@ -56,6 +58,7 @@ const STATE_KEYS: Readonly<Record<string, string>> = {
   offline: 'Offline',
   revoked: 'Revoked: connect again with a new code',
   outdated: 'This app is older than the studio hub: update Beluga',
+  // computer-wording: mac (fork feature, worded for the Mac app for now)
   'clock-skew': 'This Mac’s clock is more than five minutes off',
   'wrong-studio': 'That link belongs to another studio: connect again',
   stopped: 'Stopped',
@@ -112,6 +115,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
       <FormSheet
         title={t('Connect to Studio')}
         icon="people"
+        /* computer-wording: mac (fork feature, worded for the Mac app for now) */
         intro={t('Paste the binding code from the studio’s Synon Studio admin page. This Mac then shows that studio’s customers the plans you share — with no paths, task keys, branches or agent names in them.')}
         submitLabel={t('Connect')}
         canSubmit={code.trim().length > 0}
@@ -143,6 +147,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
     return (
       <Alert
         title={t('Disconnect from Synon Studio?')}
+        /* computer-wording: mac (fork feature, worded for the Mac app for now) */
         message={status?.state === 'online' ? t('This Mac’s plans stop going to the studio and its customers, the link closes, and the key it made is forgotten. You can connect again with a new code.') : `${t('This Mac’s plans stop going to the studio and its customers, the link closes, and the key it made is forgotten. You can connect again with a new code.')} ${t('The studio hub is offline right now, so it may keep showing the old views until the studio’s operator unbinds this Mac.')}`}
         tone="danger"
         confirm={{
@@ -152,6 +157,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
             void api.studio.unlink().then((next) => {
               setStatus(next);
               setStudioLinked(next.linked);
+              // computer-wording: mac (fork feature, worded for the Mac app for now)
               setTrouble(next.lastError === 'cannot-remove' ? t('Disconnected, but the key file could not be removed: ~/.beluga/studio.json is still on this Mac.') : undefined);
               setDisconnecting(false);
             });
@@ -167,6 +173,7 @@ function StudioBody({ projectId }: { projectId?: string }) {
     <FormSheet
       title={t('Synon Studio')}
       icon="people"
+      /* computer-wording: mac (fork feature, worded for the Mac app for now) */
       intro={t('The link to your Synon Studio: its state, and what this Mac shares with it.')}
       submitLabel={t('Connect')}
       onSubmit={() => undefined}
