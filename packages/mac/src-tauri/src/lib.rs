@@ -303,6 +303,7 @@ pub fn run() {
             native_alert::native_alert,
             native_files::quick_look,
             native_files::share_files,
+            native_files::drag_files,
             daemon_endpoint,
             restart_daemon,
             set_menu_state,
