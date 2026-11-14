@@ -112,7 +112,8 @@ describe('the control tokens', () => {
     for (const file of ['chat/Attention.tsx', 'tasks/TaskPage.tsx', 'sentinel/SentinelCards.tsx', 'views/Overview.tsx']) {
       const tags = [...read(...file.split('/')).matchAll(/<(?:Button|IconButton)\b[^>]*/g)].map((m) => m[0]);
       expect(tags.length, file).toBeGreaterThan(0);
-      for (const tag of tags) expect(tag, file).toMatch(/\bsize="(?:small|large)"/);
+      // Each says its size; an empty state's are Large and Regular (docs/mac-controls.md, "Large").
+      for (const tag of tags) expect(tag, file).toMatch(/\bsize="(?:small|regular|large)"/);
     }
   });
 

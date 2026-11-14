@@ -118,7 +118,7 @@ export function ActionsView() {
         </div>
         <div className={t.body}>
           {error && !list ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
           ) : !list ? (
             <Empty icon="pulse" title="Asking GitHub…" detail={`For ${here.name}’s workflow runs`} />
           ) : list.kind === 'none' ? (
@@ -130,14 +130,14 @@ export function ActionsView() {
               detail={`Beluga reads ${repoSlug(list.repo)}’s Actions with GitHub’s command-line tool, signed in as you. Set it up once, then check again.`}
               action={
                 <EmptyActions>
-                  <Button size="small" variant="primary" onClick={() => setConnect(true)}>
+                  <Button size="large" variant="primary" onClick={() => setConnect(true)}>
                     Connect GitHub…
                   </Button>
                 </EmptyActions>
               }
             />
           ) : list.kind === 'error' ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
           ) : page === 'workflows' ? (
             <Workflows projectId={projectId} flows={flows} runs={runs} />
           ) : !runs.length ? (

@@ -89,7 +89,7 @@ export function PlansView() {
           detail="Say what you want built. Your agent reads the code and cuts it into milestones and tasks that run side by side, each with what proves it’s done. You talk it through; nothing reaches the board until you approve."
           action={
             <EmptyActions>
-              <Button size="small" variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })}>
+              <Button size="large" variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_plan', projectId: here.id })}>
                 {`Plan in ${here.name}`}
               </Button>
             </EmptyActions>

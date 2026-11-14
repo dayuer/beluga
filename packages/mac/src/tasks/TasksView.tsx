@@ -265,7 +265,7 @@ export function TasksView() {
             detail={several ? `Tasks here run in ${repos.map((r) => repoName(r)).join(', ')}: each in the repo you pick. Write down what needs doing.` : 'Every new worktree opens a task here, and its pull request moves it along. Or write down what needs doing.'}
             action={
               <EmptyActions>
-                <Button size="small" variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_task', ...newTask })}>
+                <Button size="large" variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_task', ...newTask })}>
                   New Task
                 </Button>
               </EmptyActions>

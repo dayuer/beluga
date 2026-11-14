@@ -42,8 +42,8 @@ export function RunPage({ projectId, runId }: { projectId: string; runId: number
           detail={error}
           action={
             <EmptyActions>
-              <Button size="small" onClick={refresh}>Try Again</Button>
-              <Button size="small" variant="quiet" onClick={() => actions.run({ type: 'view', view: runWayBack(projectId) })}>
+              <Button onClick={refresh}>Try Again</Button>
+              <Button variant="quiet" onClick={() => actions.run({ type: 'view', view: runWayBack(projectId) })}>
                 Back
               </Button>
             </EmptyActions>
