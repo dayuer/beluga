@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Location } from '@beluga/core/store.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
 import { activeAssistantChannel, assistantChannel } from '@beluga/shared/assistant.js';
@@ -283,6 +284,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
     setClosed(false);
     setPicked(path);
   };
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const i = rows.findIndex((f) => f.path === shown);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -293,6 +295,10 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
       e.preventDefault();
       e.stopPropagation();
       setClosed(true);
+    } else {
+      // Typing a name goes to it.
+      const to = typeAhead(e, rows.map((f) => f.path.split('/').pop() ?? f.path), i);
+      if (to >= 0) pick(rows[to]!.path);
     }
   };
 
