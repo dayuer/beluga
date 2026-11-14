@@ -54,7 +54,7 @@
   padding: 0;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   border-radius: 999px;
 }
 .pillButton:hover .pill {

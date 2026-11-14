@@ -64,7 +64,7 @@
   padding: 6px 0;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .segment > span {
   display: block;
@@ -110,7 +110,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 8vw 6vh;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   user-select: none;
 }
 .slide {
