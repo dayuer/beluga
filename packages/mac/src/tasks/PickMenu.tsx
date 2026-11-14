@@ -69,7 +69,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
         if (!next) setQuery('');
       }}
     >
-      <Dropdown.Trigger asChild {...(searchable || multiple ? {} : nativeDropdown(rows))}>
+      <Dropdown.Trigger asChild {...(searchable || multiple ? {} : nativeDropdown(rows, undefined, () => setOpen(true)))}>
         {children}
       </Dropdown.Trigger>
       <Dropdown.Portal>

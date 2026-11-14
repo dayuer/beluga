@@ -55,7 +55,14 @@ export async function picture(p: Picture): Promise<Made | undefined> {
   if (!p) return undefined;
   if ('mark' in p) {
     if (!isValidElement(p.mark)) return undefined;
-    const markup = renderToStaticMarkup(p.mark as ReactElement).trim();
+    // A mark that reads the app's context (a project's icon: useBeluga) can't be drawn outside the app's
+    // tree: it throws here, and one such row must not take the whole menu with it. No picture then.
+    let markup: string;
+    try {
+      markup = renderToStaticMarkup(p.mark as ReactElement).trim();
+    } catch {
+      return undefined;
+    }
     if (!markup.startsWith('<svg')) return undefined;
     const kept = pictures.get(markup);
     if (kept) return kept;
@@ -127,7 +134,8 @@ export async function popUpNative(rows: readonly NativeRow[], at?: PopUpAt): Pro
     const picked = await invoke<number | null>('native_menu', { items, x: at?.x ?? null, y: at?.y ?? null, selected });
     if (picked != null) picks[picked]?.();
     return true;
-  } catch {
+  } catch (e) {
+    console.warn('native menu failed:', e);
     return false;
   } finally {
     showing = false;
@@ -152,12 +160,15 @@ export function nativeContext(rows: () => readonly NativeRow[]) {
  * edge just under the button, or with the chosen row over it for a pop-up button (`selected`).
  * Spread onto the trigger, ahead of the web menu's own handlers.
  */
-export function nativeDropdown(rows: () => readonly NativeRow[], selected?: () => number | undefined) {
+export function nativeDropdown(rows: () => readonly NativeRow[], selected?: () => number | undefined, fallback?: () => void) {
   const open = (e: MouseEvent | KeyboardEvent): void => {
     e.preventDefault();
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const at = selected?.();
-    void popUpNative(rows(), at === undefined || at < 0 ? { x: box.left, y: box.bottom + 4 } : { x: box.left, y: box.top, selected: at });
+    // When the Mac's menu couldn't be shown, the web menu opens instead: a press never does nothing.
+    void popUpNative(rows(), at === undefined || at < 0 ? { x: box.left, y: box.bottom + 4 } : { x: box.left, y: box.top, selected: at }).then((shown) => {
+      if (!shown) fallback?.();
+    });
   };
   return {
     onPointerDown: (e: PointerEvent): void => {
