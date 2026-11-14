@@ -112,7 +112,14 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/lib/native-menu.ts`、`native-menu-model.ts`（新文件）：一次调用建好整个菜单，文字过 `t()`，快捷键、勾选、子菜单、分组，图标和色点按菜单文字颜色画成图片。
 - `packages/mac/src/components/Icon.tsx`：导出 `iconShape`，给原生菜单画图标用。
 - 按下指针：`styles/base.css` 的 `--press-cursor`（app 里是箭头，浏览器里是手形）；约 45 个 CSS 文件里控件上的 `cursor: pointer` 换成 `var(--press-cursor)`，链接保留手形。fork 自己的 `fork/sharing/sharing.module.css` 的 `.nameButton` 也一样。
-- 用例：`tests/mac-native-menu.test.ts`（快捷键转换、哪些菜单走原生、控件上不再有手形）。
+- 用例：`tests/mac-native-menu.test.ts`（快捷键转换、原生菜单的行怎么建、控件上不再有手形）。
+- 第二轮（`fork/native-2`）：
+  - 菜单改由 `src-tauri/src/native_menu.rs` 自己建 NSMenu（不再走 Tauri 的菜单 API）：说明行（subtitle）、分组标题、模板图标、弹出按钮把选中项盖在按钮上。不再有退回网页菜单的情况。
+  - 新接入原生菜单的上游文件：`components/Select.tsx`（短列表；带搜索的长列表仍是网页）、`tasks/PickMenu.tsx`（单选、无搜索）、`chat/RunsOn.tsx`、`views/overview/FilterBar.tsx`、`views/TerminalTab.tsx`、`dialogs/native/PersonMenu.tsx`（菜单项抽成 `usePersonMenu`，网页和原生共用）、`dialogs/native/PersonCards.tsx`。
+  - 警告框：`components/Alert.tsx`、`dialogs/native/parts.tsx` 的 `Alert` 在 Mac app 里是 NSAlert（`src-tauri/src/native_alert.rs`、`lib/native-alert.ts`）；带表格或复选框的仍是网页。
+  - 跟随系统辅助显示：`src-tauri/src/native_menu.rs` 的 `display_options`，`lib/prefs.ts`（`data-glass`、`data-contrast`），`styles/base.css`（关掉窗口内模糊），`styles/tokens.css`（增强对比度）。
+  - 文件：`src-tauri/src/native_files.rs`（Quick Look、系统分享菜单），`lib/files.ts`（`quickLook`、`shareFiles`），`layout/panel/FilesTab.tsx`（右键菜单 + 空格键）、`chat/PathLink.tsx`（右键菜单）。
+  - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
 
 ### 沉稳界面（docs/calm-ui.md）
 

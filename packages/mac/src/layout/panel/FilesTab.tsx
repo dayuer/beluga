@@ -10,7 +10,7 @@ import { IconButton, Segmented, cx } from '../../components/ui.js';
 import { useApi, useApp, useBeluga, useScopedKey } from '../../lib/beluga.js';
 import { scrollWithin } from '../../lib/scroll-within.js';
 import { ViewBoundary } from '../../lib/lazy-view.js';
-import { localPathOf, openWithDefaultApp } from '../../lib/files.js';
+import { localPathOf, nativeFiles, openWithDefaultApp, quickLook, shareFiles } from '../../lib/files.js';
 import { focusFor, openFocus, showChange, usePanelRuntime } from '../../lib/panel.js';
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN, clampShare } from '../../lib/panel-model.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
@@ -263,6 +263,12 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
       ...(canShowChange(row.path) ? [{ label: 'Show Changes', icon: 'diff' as const, onSelect: () => void showChange(client.store.getState(), row.path) }] : []),
       { label: 'Open in Full', icon: 'expand', keys: chordLabel('Cmd+Enter'), onSelect: () => void api.files.open(at(row.path)).then(() => openFocus('file', wsId)) },
       ...(local ? [{ label: 'Open With Its App', icon: 'external' as const, onSelect: () => void openWithDefaultApp(client, local) }] : []),
+      ...(local && nativeFiles()
+        ? [
+            { label: 'Quick Look', icon: 'eye' as const, keys: 'Space', onSelect: () => void quickLook([local]) },
+            { label: 'Share…', icon: 'share' as const, onSelect: () => void shareFiles([local]) },
+          ]
+        : []),
       ...base.slice(1),
     ];
   };
@@ -292,6 +298,10 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
         const parent = ancestorsOf(row.path).pop();
         if (parent !== undefined) setCursor(parent);
       }
+    } else if (e.key === ' ' && row && !row.dir && nativeFiles() && localOf(row.path)) {
+      // Space: Quick Look, as in Finder.
+      e.preventDefault();
+      void quickLook([localOf(row.path)!]);
     } else if (e.key === 'Enter' && row) {
       e.preventDefault();
       if ((e.metaKey || e.ctrlKey) && !row.dir) void api.files.open(at(row.path)).then(() => openFocus('file', wsId));

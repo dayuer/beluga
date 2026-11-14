@@ -10,7 +10,7 @@ import { ActionsContext, type ActionItem } from '../components/SpecMenu.js';
 import { useActions } from '../lib/actions.js';
 import { useBeluga } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
-import { localPathOf, revealInFinder } from '../lib/files.js';
+import { localPathOf, nativeFiles, quickLook, revealInFinder, shareFiles } from '../lib/files.js';
 import { goToCode } from '../lib/go-to-code.js';
 import { revealLabel, thisComputer } from '../lib/os-words.js';
 import s from './chat.module.css';
@@ -97,6 +97,12 @@ export function PathLink({ pathRef: ref, children }: { pathRef: PathRef; childre
   const items = (): readonly ActionItem[] => [
     { label: looksLikeFolder ? 'Open Folder' : 'Open', icon: looksLikeFolder ? 'folder' : 'file', onSelect: () => void open() },
     { label: looksLikeFolder ? revealFolder : revealFile, onSelect: () => void lookUp(client, ref).then((found) => (found ? revealInFinder(client, found.path) : missing())) },
+    ...(nativeFiles() && !looksLikeFolder
+      ? [
+          { label: 'Quick Look', icon: 'eye' as const, onSelect: () => void lookUp(client, ref).then((found) => (found?.kind === 'file' ? void quickLook([found.path]) : missing())) },
+          { label: 'Share…', icon: 'share' as const, onSelect: () => void lookUp(client, ref).then((found) => (found?.kind === 'file' ? void shareFiles([found.path]) : missing())) },
+        ]
+      : []),
     {
       label: 'Copy Path',
       icon: 'copy',
