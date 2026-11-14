@@ -4,7 +4,7 @@ import type { AgentRef } from '../../protocol.js';
 import { milestoneRoles, ROLE_KEYS, type RoleSeen, type RolesState } from '../plans/roles.js';
 import type { MilestoneRolesView, RoleSeenView } from './plan-roles-view.js';
 
-/** Fork (1.60, BLG-199): a milestone's roles for the phone's plan page (see plan-roles-view.ts). */
+/** Fork (1.62, BLG-199): a milestone's roles for the phone's plan page (see plan-roles-view.ts). */
 
 const agentView = (a: AgentRef) => ({ runtime: a.runtime.slice(0, 32), label: a.label.slice(0, 64), ...(a.model ? { model: a.model.slice(0, 64) } : {}) });
 

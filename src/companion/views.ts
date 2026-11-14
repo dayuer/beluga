@@ -3,6 +3,7 @@ import { STILLS_DIR, STILL_SCHEME } from '../shared/preview/ref.js';
 import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
 import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
+import { phoneModels } from '../shared/model-search.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
@@ -20,6 +21,7 @@ import { type Plan, planForHome, planTitle, reviewState } from '../core/plans/mo
 import { verifyProgress } from '../core/plans/verify-progress.js';
 import { planOwnerOf } from '../core/plans/owner.js';
 import { branchState, notOnPr } from '../core/branch-state.js';
+import { worktreeSharedWith } from '../ui/worktree-share.js';
 import { type RunSummary, type Sentinel, type SentinelState, activeSentinelChat, firstLine, isLive, isSentinelChat, lastRunOf, pausedWords, runsOf, scheduleSentence, sentinelById, sentinelChatTitle } from '../core/sentinel/model.js';
 import { type Dashboard, type Tile, metricOf, outputLook, tileColumns, tileCompare, tileMetrics, tileOutput, tileStateIn, tileTitle } from '../core/sentinel/dashboard-model.js';
 import { documentMime, isDocumentKind, storageName, storageSources } from '../core/sentinel/columns.js';
@@ -75,7 +77,7 @@ import {
   VIEW_TURNS,
   type WorkView,
 } from './protocol.js';
-import { HIDDEN_STEP, humanizeDoing, humanizeStep, plainLine, stepWords, stripCode } from './strip.js';
+import { HIDDEN_STEP, humanizeDoing, humanizeStep, plainLine, stepWords, stripCode, summaryWords } from './strip.js';
 import { withMath } from './math-svg.js';
 import { agentRefView, chatTopic, clip, convTopic, dashboardTopic, myId, nameOf, needsYou, planTopic, progressOf, sentinelTopic, taskTopic } from './needs-you.js';
 import { familyOf, threadFamilyOf, threadRowOf } from './thread-family.js';
@@ -86,6 +88,7 @@ import { ASSISTANT_CHANNEL, ASSISTANT_TITLE, activeAssistantChannel, assistantCh
 import { STEERED_IN, TAKEN_BACK, type SteeredMessage, asSent, steeredMessages, steerWaiting } from '../shared/claude-notices.js';
 import { slotWaitDetail } from '../shared/run-slots.js';
 import type { DocKey } from './files.js';
+import { mayHaveApps } from '../shared/mcp-apps.js';
 
 /** Words for a turn: code taken out (strip.ts), math typeset (math-svg.ts). */
 const proseOf = (markdown: string) => withMath(stripCode(markdown));
@@ -151,6 +154,8 @@ export interface ViewContext {
   readonly icons?: (projectId: string) => string | undefined;
   /** Where a merge started from the phone stands, per worktree (merge.ts). */
   readonly merges?: (workspaceId: string) => MergeView | undefined;
+  /** MCP Apps: the lines of a Claude card's steps whose tool has an app (drawn on the Mac only). */
+  readonly appSteps?: (channel: string, itemId: string) => ReadonlySet<string>;
 }
 
 // ---- small helpers
@@ -326,12 +331,12 @@ function turnStatus(item: AgentItem): TurnView['status'] {
 }
 
 /** Steps in words with their tools' kinds, newest last (what the Mac's chat hides stays hidden). */
-const trailOf = (steps: readonly string[], max: number): StepView[] =>
+const trailOf = (steps: readonly string[], max: number, apps?: ReadonlySet<string>): StepView[] =>
   steps
     .filter((s) => !HIDDEN_STEP.test(s))
     .slice(-max)
     .map((s) => {
-      const w = stepWords(s);
+      const w = summaryWords({ title: s, hasApp: Boolean(apps?.has(s)) });
       return { tool: w.tool, text: w.did };
     });
 
@@ -451,14 +456,14 @@ function editOf(state: DomainState, channel: string, text: string, prose: ProseV
   return ws && !ws.archived && (ws.kind === 'worktree' || ws.kind === 'chat') ? { ws: clip(id, 200), kind: ws.kind } : undefined;
 }
 
-function turnOf(state: DomainState, item: LogItem, outputs: readonly OutputView[], cc: ReadonlyMap<string, CcAgent> = new Map(), steer?: SteeredMessage, pictures: (prose: ProseView) => ProseView = (p) => p): TurnView | undefined {
+function turnOf(state: DomainState, item: LogItem, outputs: readonly OutputView[], cc: ReadonlyMap<string, CcAgent> = new Map(), steer?: SteeredMessage, pictures: (prose: ProseView) => ProseView = (p) => p, appSteps?: ViewContext['appSteps']): TurnView | undefined {
   const me = myId(state);
   if (item.type === 'chat') {
     const who = item.byAgent ? 'claude' : item.from === me ? 'you' : 'friend';
     const prose = who === 'claude' ? pictures(proseOf(item.text)) : proseOf(item.text);
-    const edit = who === 'you' && !steer && !item.via ? editOf(state, item.channel, item.text, prose) : undefined;
+    const edit = who === 'you' && !steer && !item.via && !item.fromApp ? editOf(state, item.channel, item.text, prose) : undefined;
     const reactions = reactableChannel(item.channel) ? chipsView(state, chatReactions(item), me) : undefined;
-    return { id: item.id, who, name: clip(who === 'you' ? myName(state) : item.name, 100), ...(who === 'claude' ? { agent: item.agent ?? CLAUDE_AGENT } : {}), ...(item.via ? { via: clip(item.via.name, 80) } : {}), prose, ts: item.ts, ...(steer && who === 'you' ? { steer: { request: clip(steer.request, 200), waiting: steer.waiting } } : {}), ...(edit ? { edit } : {}), ...(reactableChannel(item.channel) ? { reactable: true } : {}), ...(reactions ? { reactions } : {}) };
+    return { id: item.id, who, name: clip(who === 'you' ? myName(state) : item.name, 100), ...(who === 'claude' ? { agent: item.agent ?? CLAUDE_AGENT } : {}), ...(item.via ? { via: clip(item.via.name, 80) } : item.fromApp ? { via: clip(`the ${item.fromApp} app`, 80) } : {}), prose, ts: item.ts, ...(steer && who === 'you' ? { steer: { request: clip(steer.request, 200), waiting: steer.waiting } } : {}), ...(edit ? { edit } : {}), ...(reactableChannel(item.channel) ? { reactable: true } : {}), ...(reactions ? { reactions } : {}) };
   }
   if (item.type === 'system') {
     // Earlier lines of a shared workspace's conversation ("bob: …") read as that person's turn.
@@ -497,7 +502,9 @@ function turnOf(state: DomainState, item: LogItem, outputs: readonly OutputView[
   const theirs = new Set([...known, ...extra.map((a) => a.toolUseId ?? a.id)]);
   const mineOut = outputs.filter((o) => o.ts !== undefined && o.ts >= item.ts && o.ts <= end && !(o.by && theirs.has(o.by)));
   const agents = [...subs.map((s) => subView(s, outputs, cc.get(s.id))), ...extra.map((a) => ccSubView(a, outputs.filter((o) => o.by === (a.toolUseId ?? a.id))))].slice(-40);
-  const trail = trailOf(item.steps, 40);
+  // Only a card with an MCP step can have an app: the others never ask.
+  const apps = appSteps && mayHaveApps(item.steps) ? appSteps(item.channel, item.id) : undefined;
+  const trail = trailOf(item.steps, 40, apps);
   return {
     id: item.id,
     who: 'claude',
@@ -600,7 +607,16 @@ function summaryOf(state: DomainState, conv: Conversation, waiting: ReadonlySet<
     ...(conv.projectId && conv.projectId !== 'asked' ? { projectId: clip(conv.projectId, 200), ...iconOf(ctx, conv.projectId) } : {}),
     ...(fresh ? { fresh } : {}),
     ...notOnPrOf(state, conv.channel),
+    ...sharedOf(state, conv.channel),
   };
+}
+
+/** How many people a worktree of yours is shared with (BLG-940), the Mac row's green dot. */
+function sharedOf(state: DomainState, channel: string): Pick<ConvSummary, 'shared'> {
+  const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
+  const ws = id ? state.projects.flatMap((p) => p.workspaces).find((w) => w.id === id) : undefined;
+  const count = ws && ws.kind !== 'main' && !ws.archived ? worktreeSharedWith(state, ws.id).length : 0;
+  return count ? { shared: Math.min(count, 1000) } : {};
 }
 
 /** A worktree's commits its open PR doesn't have (BLG-840), as the Mac's row chip counts them. */
@@ -709,7 +725,7 @@ export function convTurns(state: DomainState, ctx: ViewContext, named: string, o
   const outputs = task ? [] : outputsOf(ctx, conv);
   const cc = ccAgents(state, channel);
   const pictures = (p: ProseView) => withPictures(p, ctx.refs, 'cwd' in conv ? conv.cwd : undefined);
-  const turned = task ? taskTurns(state, ctx, task) : withLateOutputs(withSteers(state, itemsOf(state, channel)).flatMap(({ item, steer }) => (turnOf(state, item, outputs, cc, steer, pictures) ?? [])), outputs);
+  const turned = task ? taskTurns(state, ctx, task) : withLateOutputs(withSteers(state, itemsOf(state, channel)).flatMap(({ item, steer }) => (turnOf(state, item, outputs, cc, steer, pictures, ctx.appSteps) ?? [])), outputs);
   // A run stopped by your usage limit: when it continues on its own (1.42).
   const resume = task ? undefined : resumeOf(state, channel, Date.now());
   const all = resume ? turned.map((t) => (t.id === resume.id ? { ...t, resumesAt: resume.at } : t)) : turned;
@@ -797,19 +813,27 @@ function workPicker(state: DomainState, ref: AgentRef | undefined): AgentPickerV
   return ref ? p : { ...p, groups: p.groups.map((g) => ({ ...g, models: g.models.map((m) => ({ ...m, on: false })) })) };
 }
 
+/** The models a picker group sends the phone (the protocol's most). */
+const PHONE_MODELS = 30;
+
 function pickerView(p: ReturnType<typeof agentPicker>): AgentPickerView {
   return {
     runtime: clip(p.runtime, 32),
     label: clip(p.label, 120),
-    groups: p.groups.slice(0, 8).map((g) => ({
-      runtime: clip(g.runtime, 32),
-      label: clip(g.label, 64),
-      available: g.available,
-      ...(g.why ? { why: clip(g.why, 200) } : {}),
-      isDefault: g.isDefault,
-      current: g.current,
-      models: g.models.slice(0, 30).map((m) => ({ value: clip(m.value, 80), label: clip(m.label, 80), description: clip(m.description, 200), on: m.on })),
-    })),
+    groups: p.groups.slice(0, 8).map((g) => {
+      // A long list (OpenCode's every provider, BLG-945): its first ones, the picked one kept, and how many more.
+      const { models, more } = phoneModels(g.models, PHONE_MODELS);
+      return {
+        runtime: clip(g.runtime, 32),
+        label: clip(g.label, 64),
+        available: g.available,
+        ...(g.why ? { why: clip(g.why, 200) } : {}),
+        isDefault: g.isDefault,
+        current: g.current,
+        models: models.map((m) => ({ value: clip(m.value, 80), label: clip(m.label, 80), description: clip(m.description, 200), on: m.on })),
+        ...(more ? { more } : {}),
+      };
+    }),
   };
 }
 
@@ -946,7 +970,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
       ...(m.autonomy !== plan.autonomy ? { autonomy: m.autonomy } : {}),
       ...checkerOfMilestone(state, m.run.checker),
       ...agentNowOf(m),
-      // 1.57 (fork): its design (no code on the phone), and that its architect is writing it.
+      // 1.59 (fork): its design (no code on the phone), and that its architect is writing it.
       ...(m.run.design ? { design: clip(stripCode(m.run.design.text).text.replace(/\[\[code(?::\d+)?\]\]/g, '(code)'), 12000) } : {}),
       ...(designing(plan, m) ? { designing: true } : {}),
       ...rolesOfMilestone(plan, m, state),
@@ -1013,6 +1037,8 @@ function taskSummary(state: DomainState, i: Issue, listedOn?: string): TaskSumma
   const topic = taskTopic(i.id);
   if (!topic) return undefined;
   const t = tally(i.brief.acceptance);
+  // Held for its checks, shown as the Mac does (TaskPage's ChecksBanner): only while open, with one open.
+  const held = i.needsChecks && STATUS_INFO[i.status].open && t.open ? { open: t.open, ...(i.mergedHeld ? { merged: true as const } : {}) } : undefined;
   const conv = taskConv(state, i);
   const who = assigneeWords(state, i);
   const working = workingWords(workingOn(state.team, i.id).map((p) => p.name));
@@ -1039,6 +1065,7 @@ function taskSummary(state: DomainState, i: Issue, listedOn?: string): TaskSumma
     ...(repo && !onBoard ? { repo: clip(repo, 200) } : {}),
     ...(onBoard ? { onBoard: clip(onBoard, 200) } : {}),
     ...(i.private ? { private: true as const } : {}),
+    ...(held ? { needsChecks: held } : {}),
     updatedAt: Math.round(i.updatedAt),
   };
 }
@@ -1086,7 +1113,7 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
 /** Where a task may be moved from the phone (board.move): the open statuses and Done, not where it is. */
 const MOVES = ['todo', 'in_progress', 'in_review', 'done', 'backlog', 'canceled'] as const;
 
-/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.56). */
+/** Nobody picked its agent: the one auto route gives it (fork), marked as such (1.58). */
 const autoOf = (state: DomainState, i: Issue): Pick<TaskPageView, 'agent' | 'autoAgent'> => {
   const routed = isStartable(i) ? routedAgent(i, state) : undefined;
   return routed ? { agent: agentRefView(routed), autoAgent: true } : {};

@@ -178,7 +178,7 @@ export function routedAgent(task: Routable & { readonly projectId: string; reado
   return autoAgentFor(task, st.prefs.autoRoute, st.runtimes, planAgent ?? (project ? st.prefs.projectAgents?.[project] : undefined));
 }
 
-/** A routed agent's short name for a task card: its model ("Opus 5.5", "Glm 5.3"), else its runtime. */
+/** A routed agent's short name for a task card: its model ("Opus 5.5", "GLM 5.3"), else its runtime. */
 export function autoAgentName(ref: AgentRef): string {
   return ref.model ? modelName(ref.model).replace(/\[1m\]/gi, '').trim() : ref.label;
 }

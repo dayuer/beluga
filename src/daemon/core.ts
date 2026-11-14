@@ -9,9 +9,12 @@ import { createCodexRuntime } from '../agent/runtime/codex/index.js';
 import { ScriptedCodex } from '../agent/runtime/codex/scripted.js';
 import { createOpenCodeRuntime } from '../agent/runtime/opencode/index.js';
 import { ScriptedOpenCode } from '../agent/runtime/opencode/scripted.js';
+import { DEMO_PROVIDER_MODELS, demoDescription } from '../agent/runtime/opencode/demo-models.js';
 import { createCopilotRuntime } from '../agent/runtime/copilot/index.js';
 import { ScriptedCopilot } from '../agent/runtime/copilot/scripted.js';
 import { AUTO_MODEL } from '../agent/runtime/copilot/status.js';
+import { createAntigravityRuntime } from '../agent/runtime/antigravity/index.js';
+import { ScriptedAgy } from '../agent/runtime/antigravity/scripted.js';
 import { findConversation } from '../agent/runtime/claude/claude-sessions.js';
 import { otherTools } from '../agent/other-tools.js';
 import { copyNative, pasteText } from '../core/clipboard.js';
@@ -83,10 +86,12 @@ interface Room {
 
 const roomInvite = (room: Room): string | undefined => (room.reach ? encodeInvite({ ...room.reach, secret: room.secret }) : undefined);
 
-/** The demo's OpenCode: ready, with the scripted one's models. */
+/** The demo's OpenCode: ready, with the scripted one's models, and DeepSeek's, Kimi's and OpenRouter's (BLG-945). */
 function demoOpenCode(): AgentRuntime {
   const scripted = new ScriptedOpenCode({ stepMs: 600 });
-  const models = scripted.models.map((m) => ({ value: m.value, label: m.name.split('/').at(-1) ?? m.name, description: m.value.split('/')[0] ?? '', ...(m.efforts.length ? { efforts: m.efforts } : {}) }));
+  scripted.models = [...scripted.models, ...DEMO_PROVIDER_MODELS.map((m) => ({ value: m.value, name: m.name, efforts: [...m.efforts] }))];
+  const context = new Map(DEMO_PROVIDER_MODELS.map((m) => [m.value, m.context]));
+  const models = scripted.models.map((m) => ({ value: m.value, label: m.name.split('/').at(-1) ?? m.name, description: demoDescription({ value: m.value, ...(context.has(m.value) ? { context: context.get(m.value) } : {}) }), ...(m.efforts.length ? { efforts: m.efforts } : {}) }));
   return createOpenCodeRuntime({ connect: scripted.connect, resolve: async () => undefined, status: async () => ({ state: 'ready', models }) });
 }
 
@@ -97,6 +102,16 @@ function demoCopilot(): AgentRuntime {
   const names: Readonly<Record<string, string>> = { 'claude-sonnet-4.5': 'Claude Sonnet 4.5', 'gpt-5.3-codex': 'GPT-5.3-Codex' };
   const models = [AUTO_MODEL, ...offered.map((value) => ({ value, label: names[value] ?? value, description: '' }))];
   return createCopilotRuntime({ connect: scripted.connect, status: async () => ({ state: 'ready', models }) });
+}
+
+/** The demo's Antigravity: ready, on a plan with Gemini (its thinking levels) and a Claude model. */
+function demoAntigravity(): AgentRuntime {
+  const scripted = new ScriptedAgy({ stepMs: 600, models: ['gemini-3.8-flash', 'claude-sonnet-4-6'] });
+  const models = [
+    { value: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: '', efforts: ['low', 'medium', 'high'] },
+    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)', description: '' },
+  ];
+  return createAntigravityRuntime({ connect: scripted.connect, status: async () => ({ state: 'ready', models }) });
 }
 
 let claudeWithStatus: AgentRuntime | undefined;
@@ -344,9 +359,9 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     createAgent: demo
       ? (bridge) => createMockBackend(bridge, Number(belugaEnv('DEMO_PACE')) || 2.6) // unhurried, so you can watch workspaces run side by side
       : undefined,
-    // The demo's Codex, OpenCode and Copilot: the real runtimes over a scripted app-server, a
-    // scripted `opencode acp` and a scripted `copilot --acp`, so a worktree can run on any (BLG-462, BLG-686, BLG-873).
-    ...(demo ? { alsoRuntimes: [createCodexRuntime({ connect: new ScriptedCodex({ stepMs: 600 }).connect }), demoOpenCode(), demoCopilot()] } : {}),
+    // The demo's Codex, OpenCode, Copilot and Antigravity: the real runtimes over a scripted app-server, a
+    // scripted `opencode acp`, a scripted `copilot --acp` and a scripted `agy acp`, so a worktree can run on any (BLG-462, BLG-686, BLG-873).
+    ...(demo ? { alsoRuntimes: [createCodexRuntime({ connect: new ScriptedCodex({ stepMs: 600 }).connect }), demoOpenCode(), demoCopilot(), demoAntigravity()] } : {}),
     // Your agent through the runtime seam (agent/runtime): Claude, the only one registered yet.
     ...(!demo && config.agent
       ? {

@@ -13,6 +13,7 @@ import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController, WorktreeEvent } from '../src/core/workspace-controller.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 import { planOf } from '../src/core/plans/owner.js';
+import { needsYou } from '../src/companion/needs-you.js';
 import { PLAN_TOOL_NAMES, createPlanToolDefs, milestoneInput, toOps } from '../src/agent/plan-tools.js';
 import { decideTool } from '../src/agent/policy.js';
 import { PlanBodySchema } from '../src/core/team/protocol.js';
@@ -998,6 +999,8 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     const log = { pushed: [] as string[], ensured: [] as string[], merged: [] as Array<{ into: string; branches: readonly string[] }>, retired: [] as Array<{ ws: string; branch?: string }> };
     const existing = new Set<string>();
     const inMain = new Set<string>();
+    // Branches deleted since (merged and cleared away): no longer there to merge.
+    const gone = new Set<string>();
     let pr: PlanPr | undefined;
     let conflict: ((branches: readonly string[]) => CombineResult | undefined) | undefined;
     let mergeError: string | undefined;
@@ -1013,6 +1016,7 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
         return conflict?.(branches) ?? { ok: true, branch: into };
       },
       inMain: async (_p, b) => inMain.has(b),
+      hasBranch: async (_p, b) => !gone.has(b),
       retire: async (_p, ws, branch) => void log.retired.push({ ws: ws ?? '', ...(branch ? { branch } : {}) }),
       findPr: async () => pr,
       openPr: async (_p, _branch, title) => (pr = { number: 7, url: 'https://github.com/bob/api/pull/7', state: 'OPEN', title, draft: false, checks: 'pending' }),
@@ -1024,7 +1028,7 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
       },
       mergeLocal: async () => ({ ok: true }),
     };
-    return { git, log, existing, inMain, setPr: (p: PlanPr | undefined) => (pr = p), setConflict: (c: typeof conflict) => (conflict = c), failMerge: (why: string | undefined) => (mergeError = why) };
+    return { git, log, existing, inMain, gone, setPr: (p: PlanPr | undefined) => (pr = p), setConflict: (c: typeof conflict) => (conflict = c), failMerge: (why: string | undefined) => (mergeError = why) };
   }
 
   async function running(autonomy: 'gated' | 'autopilot' = 'gated', body: BodyInput = BODY) {
@@ -1092,6 +1096,33 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     expect(t.plans.need(t.plan.id).runs.safe?.passedAt).toBeDefined();
     expect(t.plans.need(t.plan.id).pr).toBeUndefined();
     expect(t.view().milestones[0]!.tasks.map((x) => x.state)).toEqual(['planned', 'planned', 'planned']);
+  });
+
+  it('a task whose branch is gone (merged and cleared away by an earlier milestone) isn’t merged again: the milestone still passes', async () => {
+    const t = await running();
+    // “Auth on payment routes” was done on an earlier milestone's branch, merged and deleted since.
+    t.board.linkWorktree(t.issue('Auth on payment routes').id, 'old14', { branch: 'beluga/old-14' }, t.claude);
+    t.gone.add('beluga/old-14');
+    await t.passSafe();
+    const live = t.issue('Idempotent webhooks').branch;
+    expect(t.log.merged).toEqual([{ into: 'plan/payments', branches: [live] }]);
+    const auth = t.issue('Auth on payment routes');
+    expect(auth.status).toBe('in_plan');
+    expect(auth.activity.map((a) => a.text)).toContain('its branch beluga/old-14 is gone (merged and cleared away earlier): nothing left to merge into plan/payments');
+    expect(t.log.retired.map((r) => r.branch)).toEqual([live]);
+    const plan = t.plans.need(t.plan.id);
+    expect(plan.runs.safe?.mergeFailed).toBeUndefined();
+    expect(plan.runs.safe?.passedAt).toBeDefined();
+  });
+
+  it('a milestone whose every task branch is gone passes without a merge', async () => {
+    const t = await running();
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) t.gone.add(t.issue(title).branch!);
+    await t.passSafe();
+    expect(t.log.merged).toEqual([]);
+    expect(t.log.retired).toEqual([]);
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) expect(t.issue(title).status).toBe('in_plan');
+    expect(t.plans.need(t.plan.id).runs.safe?.passedAt).toBeDefined();
   });
 
   it('a milestone with a task still being worked on isn’t merged: the pass says why, and nothing is retired', async () => {
@@ -1248,6 +1279,49 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     t.work.pass(t.plan.id, 'safe');
     await t.settle();
     expect(run()?.passedAt).toBeDefined();
+  });
+
+  /** On Autopilot: the first milestone finished, checked and passed by Autopilot, and its merge failed. */
+  async function failedOnAutopilot() {
+    const t = await running('autopilot');
+    let tries = 0;
+    t.setConflict(() => {
+      tries++;
+      throw new Error('fatal: plan/payments is checked out with uncommitted changes');
+    });
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks']) t.board.update(t.issue(title).id, { status: 'in_review' }, t.claude);
+    await tick(10);
+    t.board.update(t.issue('Receipts once').id, { status: 'in_review' }, t.claude);
+    await tick(10);
+    t.work.forRun('ws:main', 'p-me')!.tools!.gate('safe', 'pass', 'ok');
+    await t.settle();
+    await tick(50);
+    return { ...t, tries: () => tries, run: () => t.plans.need(t.plan.id).runs['safe'] };
+  }
+
+  it('on autopilot a failed merge is yours to pass again: the plan says so, and Needs You (the phone too) asks', async () => {
+    const t = await failedOnAutopilot();
+    expect(t.run()?.mergeFailed).toBeDefined();
+    expect(t.view().next).toMatchObject({ kind: 'pass', milestone: { milestone: { id: 'safe' } } });
+    const card = needsYou(t.store.getState()).find((n) => n.id === `plan:${t.plan.id}:pass:safe`);
+    expect(card?.title).toBe('“Safe payments” couldn’t merge: pass it again?');
+    expect(card?.detail).toBe('fatal: plan/payments is checked out with uncommitted changes');
+    expect(card?.actions.map((a) => a.method)).toEqual(['plans.pass', 'plans.recheck']);
+  });
+
+  it('on autopilot a new round (Check Again) forgets the failed merge, and a passing check passes it again', async () => {
+    const t = await failedOnAutopilot();
+    expect(t.tries()).toBe(1);
+    t.setConflict(undefined);
+    t.work.recheck(t.plan.id, 'safe');
+    expect(t.run()?.mergeFailed).toBeUndefined();
+    expect(t.run()?.passedAt).toBeUndefined();
+    await tick(20);
+    t.work.forRun('ws:main', 'p-me')!.tools!.gate('safe', 'pass', 'ok again');
+    await t.settle();
+    await tick(50);
+    expect(t.run()?.passedAt).toBeDefined();
+    expect(t.log.merged.length).toBe(2);
   });
 
   it('Merge on GitHub pushes the branch first, asks GitHub again, and says GitHub’s no in plain words', async () => {

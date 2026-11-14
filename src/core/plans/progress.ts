@@ -377,10 +377,11 @@ export function planView(plan: Plan, board: BoardState, live: Live = NOBODY_LIVE
 /**
  * A milestone that can be passed now: it's at its gate, and there is something to go on — Claude's
  * check came back, or there is nothing to check. A milestone whose check hasn't run yet isn't
- * passable, by the operator or a Studio customer (docs/studio-gates.md §5).
+ * passable, by the operator or a Studio customer (docs/studio-gates.md §5). On Autopilot only once its
+ * merge failed: Autopilot won't pass it again, so Pass Again is yours.
  */
 export const passable = (m: MilestoneView): boolean =>
-  m.state === 'gate' && (Boolean(m.run.check) || !m.milestone.criteria.length) && !(m.autonomy === 'autopilot' && m.milestone.criteria.length);
+  m.state === 'gate' && (Boolean(m.run.check) || !m.milestone.criteria.length) && (Boolean(m.run.mergeFailed) || !(m.autonomy === 'autopilot' && m.milestone.criteria.length));
 
 function nextStep(plan: Plan, v: Omit<PlanView, 'next'>): NextStep {
   if (plan.status === 'done') {

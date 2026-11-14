@@ -368,7 +368,7 @@ Signing Claude in on a server, the service, updating and removing, and what each
 
 ## Agents
 
-Your agent is Claude Code, signed in with your own subscription. It can also run on your own models (Ollama, or any Anthropic-compatible address): see [local models](docs/local-models.md). Or make it [OpenCode](docs/opencode.md), on the models you've set up in it, or [GitHub Copilot](docs/copilot.md), with your GitHub account (Copilot Free is enough). Codex is on the way.
+Your agent is Claude Code, signed in with your own subscription. It can also run on your own models (Ollama, or any Anthropic-compatible address): see [local models](docs/local-models.md). Or make it [OpenCode](docs/opencode.md), on the models you've set up in it, [GitHub Copilot](docs/copilot.md), with your GitHub account (Copilot Free is enough), or [Antigravity](docs/antigravity.md), on the models of your Antigravity plan (Gemini, Claude and more). Codex is on the way.
 
 ## How it works
 

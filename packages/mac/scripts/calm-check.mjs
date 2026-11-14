@@ -108,8 +108,12 @@ mkdirSync(imgOut, { recursive: true });
 
 const side = (page, name) => page.locator('nav [role="button"]').filter({ hasText: name }).first();
 
+/** A worktree's row, its project unfolded first: the row opens the project's page, its icon's button shows what's in it (as e2e/fork-calm-sidebar.spec.ts). */
 const openWs = async (page, name = 'add-auth') => {
-  if (!(await side(page, name).isVisible().catch(() => false))) await side(page, 'bob-api').click();
+  if (!(await side(page, name).isVisible().catch(() => false))) {
+    const show = page.locator('nav').getByRole('button', { name: "Show what's in bob-api" }).first();
+    await ((await show.isVisible().catch(() => false)) ? show : side(page, 'bob-api')).click();
+  }
   await wait(300);
   await side(page, name).click();
   await wait(700);

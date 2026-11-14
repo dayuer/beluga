@@ -272,6 +272,9 @@ covering several), a task on a board of several says which repo it runs in (`Tas
 1.32 (BLG-446) gives the phone the composer's agent picker: a conversation's ••• › Agent opens runtimes as
 groups with their models (`ConvView.agent`), your default agent first, one your Mac doesn't run greyed with
 what's missing. A model of the same runtime is `workbench.setModel`; another runtime, `workbench.setAgent`.
+A runtime with more than 30 models (OpenCode with every provider, BLG-945) sends its first 30 with the
+picked one always among them, and `more` says how many the Mac has besides; the phone filters what it
+has, and says the rest are on the Mac. An older Mac sends no `more`.
 1.41 (BLG-702) brings emoji reactions to the phone's chats (`SINCE.reactions`): each message's
 `reactions` (emoji, count, whether one is yours, who) as chips under it (a tap adds yours or takes it
 back, a long-press says who), and long-press on a message opens its sheet with your quick row
@@ -358,7 +361,7 @@ friend's agent's question `gateway.answer`; a milestone sent back `plans.sendBac
 door with your link: `invites.letIn` / `invites.decline`; someone asking to join a channel you
 run: `network.groups.approve` / `decline`. Nothing appears without a way to answer it.
 
-**Synon Studio's start Gate** (1.59, BLG-76): a customer's "confirm the plan" reaches the phone as a
+**Synon Studio's start Gate** (1.61, BLG-76): a customer's "confirm the plan" reaches the phone as a
 `studio-start` card. It says whose plan it is and what is being approved — the plan's title, its
 milestones and estimated points (`NeedsYou.gate`; a change to a running plan shows what it adds) —
 and its Approve / Decline call `studio.answerGate(gateId, {approve:true}` or

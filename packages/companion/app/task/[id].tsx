@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowRightLeft, Check, CircleSlash, GitBranch, Clock, GitPullRequest, MessageSquare, Monitor, Play, User } from 'lucide-react-native';
+import { ArrowRightLeft, Check, CircleSlash, GitBranch, Clock, GitPullRequest, MessageSquare, Monitor, Play, TriangleAlert, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -24,13 +24,14 @@ import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
 import { agentName } from '../../../../src/shared/agent-label';
 import { autoAgentName } from '../../../../src/shared/auto-route';
+import { checksWords } from '../../../../src/shared/task-checks';
 
 /**
  * One task (BLG-48): its goal (code folded), the acceptance criteria with their ticks, the
  * worktree and pull request doing it, and its activity, live. Comment below; start it in a new
  * worktree with Claude, or move it along, from here. Editing the brief stays on the Mac.
  */
-/** Who works it, in a few words: auto route's pick by its model (1.56, fork), else the agent's name. */
+/** Who works it, in a few words: auto route's pick by its model (1.58, fork), else the agent's name. */
 const whoOf = (t: Pick<TaskPageView, 'agent' | 'autoAgent'>): string => (t.agent ? (t.autoAgent ? autoAgentName(t.agent) : agentName(t.agent)) : 'your agent');
 
 export default function Task() {
@@ -66,7 +67,7 @@ export default function Task() {
   // Who works it (BLG-498), shown only (BLG-569): with a worktree on it (conv), what runs there (changed
   // in its conversation); else its own agent, or your default.
   const defaultLabel = t?.agents?.groups.find((g) => g.isDefault)?.label;
-  // Nobody picked one (1.56, fork): the one auto route gives it, said as such.
+  // Nobody picked one (1.58, fork): the one auto route gives it, said as such.
   const agentWords = t?.agent ? (t.autoAgent ? `Auto · ${autoAgentName(t.agent)}` : agentName(t.agent, { model: true })) : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
   const agentRuntime = t?.agent?.runtime ?? t?.agents?.groups.find((g) => g.isDefault)?.runtime;
   // The main Start is its own agent's (else yours); Start with… lists every agent, from ⋯.
@@ -102,6 +103,19 @@ export default function Task() {
                 {t.waiting ? <Pill label={t.waiting} Icon={Clock} tone="butter" /> : null}
                 {t.checks ? <Pill label={`${t.checks.done} of ${t.checks.total} checked`} Icon={Check} tone={t.checks.done === t.checks.total ? 'mint' : 'plain'} /> : null}
               </View>
+
+              {/* Held for its checks (BLG-952), in the Mac's words: out of review, or out of Done once merged. */}
+              {t.needsChecks ? (
+                <Card tone="butter" style={{ padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                  <TriangleAlert color={toneInk('butter')} size={18} style={{ marginTop: 1 }} />
+                  <T v="callout" c={toneInk('butter')} style={{ flex: 1 }}>
+                    <T v="callout" c={toneInk('butter')} style={{ fontWeight: '600' }}>
+                      Needs its checks.
+                    </T>{' '}
+                    {checksWords(t.needsChecks.open, t.needsChecks.merged === true)}
+                  </T>
+                </Card>
+              ) : null}
 
               {canStart ? <Button label={starting ? 'Starting…' : startLabel} Icon={Play} disabled={starting} onPress={() => void start()} /> : null}
               {t.conv ? <Button label="Open its conversation" Icon={MessageSquare} quiet onPress={() => router.push(convHref(t.conv!))} /> : null}

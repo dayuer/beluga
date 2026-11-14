@@ -63,7 +63,7 @@ export interface TurnFacts {
   readonly text?: { readonly prompt: string; readonly answer: string };
 }
 
-const PROVIDERS: Readonly<Record<string, string>> = { claude: 'anthropic', local: 'local', codex: 'openai', copilot: 'github', opencode: 'opencode' };
+const PROVIDERS: Readonly<Record<string, string>> = { claude: 'anthropic', local: 'local', codex: 'openai', copilot: 'github', antigravity: 'google', opencode: 'opencode' };
 
 /** Ratel's words for how a call ended. */
 const finish = (f: TurnFacts, last: boolean): string => (f.outcome === 'error' ? 'error' : f.outcome === 'stopped' ? 'stop' : !last ? 'tool_call' : 'stop');

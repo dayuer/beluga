@@ -20,6 +20,7 @@ import { dropFolderSessions, dropSession, pathVariants, sessionFoldersUnder } fr
 import { dropCodexSessions } from '../agent/runtime/codex/codex-sessions.js';
 import { dropOpenCodeFolder, dropOpenCodeSession } from '../agent/runtime/opencode/sessions.js';
 import { dropCopilotFolder, dropCopilotSession } from '../agent/runtime/copilot/sessions.js';
+import { dropAgyFolder, dropAgySession } from '../agent/runtime/antigravity/sessions.js';
 import { addDay, dayKey } from './usage-days.js';
 import type { AgentRef } from '../protocol.js';
 import type { DeletePlan, MergeWait, Project, ProjectGroup, PullHead, ProjectSync, ProjectsConfig, RenameResult, Workspace, WorkspaceRecord, WorkspaceUsage } from './types.js';
@@ -134,6 +135,8 @@ export class WorkspaceManager {
   private forks = new Map<string, ForkOf>();
   /** A remote's default branch learned while fetching, for repos without origin/HEAD (by root). */
   private remoteDefaults = new Map<string, string>();
+  /** Worktree branches (root and branch) already checked for a fork pull request's head to follow: git asked once each. */
+  private readonly pullHeadsChecked = new Set<string>();
 
   /** What new branches start with (Settings › Workspaces; the session points this at your choice). */
   branchPrefix: () => string = () => BRANCH_PREFIX;
@@ -559,6 +562,7 @@ export class WorkspaceManager {
         if (rec.kind === 'chat') workspaces.push({ ...rec, projectId: id, external: false, ...(real(rec.path) === real(root) || rec.thread?.readOnly ? { askOnly: true } : {}) });
         else if (rec.archived && rec.kind === 'worktree') workspaces.push({ ...rec, projectId: id, external: false });
       }
+      await this.followPullHeads(root, workspaces);
       const withStatus = await Promise.all(
         workspaces.map(async (w) => (w.archived || w.kind === 'chat' ? w : { ...w, status: await g.status(w.path, w.kind === 'main' ? undefined : w.base, shippedOf(w)).catch(() => undefined) })),
       );
@@ -664,6 +668,11 @@ export class WorkspaceManager {
   async inDefaultBranch(projectId: string, branch: string): Promise<boolean> {
     const { root } = this.repoProject(projectId);
     return g.isAncestor(root, branch, await this.baseOf(root));
+  }
+
+  /** Whether a local branch is there. */
+  async hasBranch(projectId: string, branch: string): Promise<boolean> {
+    return g.isCommit(this.repoProject(projectId).root, `refs/heads/${branch}`);
   }
 
   /** Delete a branch whose work is merged into `into` (git refuses one that isn't, or that's checked out). */
@@ -888,6 +897,9 @@ export class WorkspaceManager {
       // `git pull` there brings the pull request's new commits.
       await g.git(root, ['config', `branch.${branch}.remote`, 'origin']);
       await g.git(root, ['config', `branch.${branch}.merge`, `refs/pull/${pull.number}/head`]);
+      // And keeps its head here current (BLG-948): what git pull brings is never "not on the PR".
+      await g.followPullHead(root, branch).catch(() => undefined);
+      this.pullHeadsChecked.add(`${root}\0${branch}`);
     }
     await g.excludeProjectDir(dir);
     await copyEnvFiles(root, dir);
@@ -896,6 +908,18 @@ export class WorkspaceManager {
     this.saveRecord(record);
     const status = await g.status(dir, base).catch(() => undefined);
     return this.adopt(project, { ...record, projectId: project.id, external: false, ...(status ? { status } : {}) });
+  }
+
+  /**
+   * Fork pull requests' worktrees made before their heads were followed (BLG-948) get the fetch
+   * refspec that keeps them current: once per branch while the daemon runs, never in a refresh's way.
+   */
+  private async followPullHeads(root: string, workspaces: readonly Workspace[]): Promise<void> {
+    const fresh = workspaces.filter((w) => w.kind === 'worktree' && !w.archived && w.branch && !this.pullHeadsChecked.has(`${root}\0${w.branch}`));
+    for (const w of fresh) {
+      this.pullHeadsChecked.add(`${root}\0${w.branch}`);
+      await g.followPullHead(root, w.branch!).catch(() => undefined);
+    }
   }
 
   /**
@@ -1226,7 +1250,7 @@ export class WorkspaceManager {
     // A chat in a folder that stays (yours, or a worktree it was forked in): only what you sent it goes.
     else if (ws.kind === 'chat' && existsSync(ws.path)) await dropSent(ws.path, sentFolder(`ws:${ws.id}`, false)).catch(() => undefined);
     if (ours) {
-      // Claude Code's (your own Claude and local models alike), Codex's, OpenCode's and Copilot's, whichever agent ran there.
+      // Claude Code's (your own Claude and local models alike), Codex's, OpenCode's, Copilot's and Antigravity's, whichever agent ran there.
       for (const dir of new Set([sessionsDir, path.resolve(ws.path)])) await dropFolderSessions(dir).catch(() => 0);
       await dropCodexSessions({ dir: sessionsDir }).catch(() => 0);
       if (ws.sessionRuntime === 'opencode') {
@@ -1234,10 +1258,15 @@ export class WorkspaceManager {
         await dropOpenCodeFolder(sessionsDir, ws.kind === 'worktree' ? ws.projectRoot : sessionsDir).catch(() => 0);
       }
       if (ws.sessionRuntime === 'copilot') await dropCopilotFolder(sessionsDir).catch(() => 0);
+      if (ws.sessionRuntime === 'antigravity') {
+        if (ws.sessionId) await dropAgySession(ws.sessionId).catch(() => false);
+        await dropAgyFolder(sessionsDir).catch(() => 0);
+      }
     } else if (ws.kind === 'chat' && this.ownSession(ws)) {
       if (ws.sessionRuntime === 'codex') await dropCodexSessions({ threadId: ws.sessionId! }).catch(() => 0);
       else if (ws.sessionRuntime === 'opencode') await dropOpenCodeSession(ws.sessionId!).catch(() => false);
       else if (ws.sessionRuntime === 'copilot') await dropCopilotSession(ws.sessionId!).catch(() => false);
+      else if (ws.sessionRuntime === 'antigravity') await dropAgySession(ws.sessionId!).catch(() => false);
       else await dropSession(sessionsDir, ws.sessionId!).catch(() => undefined);
     }
     this.records = this.records.filter((r) => r.id !== id);
@@ -1534,6 +1563,26 @@ export class WorkspaceManager {
     this.patchRecord(id, { name: s, nameSetByUser: true, ...(branch ? { branch } : {}) });
     await this.refresh();
     return { name: s, ...(branch ? { branch } : {}), ...(kept ? { branchKept: kept } : {}) };
+  }
+
+  /**
+   * Make a fork pull request's worktree a branch of your own (BLG-948), for a pull request of its
+   * own when the fork can't be pushed to: it gets a name nothing here or on a remote has (beluga/<its
+   * name>, so the fork's branch name never finds the fork's PR), and stops following the fork's
+   * pull request. Its commits, the fork's and yours, all stay. → the branch's name now.
+   */
+  async leavePull(id: string): Promise<string> {
+    const ws = this.require(id);
+    if (ws.kind !== 'worktree' || !ws.branch) throw new WorkspaceError('Only a worktree’s branch can have a pull request of its own');
+    if (!(await g.followsPull(ws.path, ws.branch))) return ws.branch;
+    const wanted = `${this.branchPrefix()}${slug(ws.name) || 'pull-request'}`;
+    let branch = wanted;
+    for (let i = 2; (await g.isCommit(ws.path, `refs/heads/${branch}`)) || (await this.onRemote(ws.path, branch)); i++) branch = `${wanted}-${i}`;
+    await g.git(ws.path, ['branch', '-m', ws.branch, branch]);
+    await g.stopFollowingPull(ws.path, branch);
+    this.patchRecord(id, { branch });
+    await this.refresh();
+    return branch;
   }
 
   /** Is this branch on a remote already (a remote branch of the same name)? Its upstream alone says nothing: a new worktree's is origin/main. */
