@@ -45,6 +45,8 @@ export type SheetRowSpec =
   | { readonly kind: 'note'; readonly text: string }
   | { readonly kind: 'disclosure'; readonly id: string; readonly label: string; readonly open: boolean }
   | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string }
+  /** A push button ("Choose Another Folder…"): pressing it is a change to "press". */
+  | { readonly kind: 'button'; readonly id: string; readonly label?: string; readonly text: string; readonly hint?: string }
   | { readonly kind: 'popup'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[]; readonly hint?: string }
   | { readonly kind: 'segmented'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[]; readonly hint?: string; readonly disabled?: boolean };
 
@@ -54,6 +56,8 @@ export interface SheetSpec {
   readonly rows: readonly SheetRowSpec[];
   /** A checkbox left of the buttons ("Start with your agent"). */
   readonly footer?: { readonly id: string; readonly label: string; readonly detail?: string; readonly checked: boolean };
+  /** A button on the left of the buttons' row ("Delete Board…"): pressing it is a change to "press". */
+  readonly aside?: { readonly id: string; readonly label: string };
   readonly cancel?: string;
   readonly submit: string;
   readonly canSubmit: boolean;
@@ -102,6 +106,8 @@ async function wire(spec: SheetSpec): Promise<unknown> {
           return { ...row, text: t(row.text) };
         case 'disclosure':
           return { ...row, label: t(row.label) };
+        case 'button':
+          return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
         case 'checkbox':
           return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
         case 'popup':
@@ -115,6 +121,7 @@ async function wire(spec: SheetSpec): Promise<unknown> {
     ...(spec.intro ? { intro: t(spec.intro) } : {}),
     rows,
     ...(spec.footer ? { footer: { ...spec.footer, label: t(spec.footer.label), ...(spec.footer.detail ? { detail: t(spec.footer.detail) } : {}) } } : {}),
+    ...(spec.aside ? { aside: { ...spec.aside, label: t(spec.aside.label) } } : {}),
     cancel: t(spec.cancel ?? 'Cancel'),
     submit: t(spec.submit),
     canSubmit: spec.canSubmit,
