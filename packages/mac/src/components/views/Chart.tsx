@@ -125,7 +125,7 @@ function Cartesian({ plan, kind, view, colorOf, off, onPoint, fit }: { plan: Cha
         barGap={2}
         {...(onPoint
           ? {
-              style: { cursor: 'pointer' },
+              style: { cursor: 'var(--press-cursor)' },
               onClick: (state: { activeTooltipIndex?: number | string | null; activeIndex?: number | string | null; activeLabel?: unknown }) => {
                 const at = Number(state?.activeTooltipIndex ?? state?.activeIndex);
                 const row = Number.isInteger(at) ? plan.rows[at] : state?.activeLabel !== undefined ? plan.rows.find((r) => r[plan.x] === state.activeLabel) : undefined;

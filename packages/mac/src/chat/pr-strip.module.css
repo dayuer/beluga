@@ -27,7 +27,7 @@
   font: inherit;
   color: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .main:hover {
   background: var(--bg-hover);
@@ -64,7 +64,7 @@
   font-variant-numeric: tabular-nums;
 }
 .toggle {
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .toggle:disabled {
   cursor: default;

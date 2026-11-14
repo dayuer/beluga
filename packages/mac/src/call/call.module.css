@@ -336,7 +336,7 @@
 }
 .missedBack {
   all: unset;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   color: var(--call-ink);
   font-weight: 600;
 }
