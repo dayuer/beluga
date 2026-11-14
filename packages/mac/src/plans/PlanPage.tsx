@@ -371,7 +371,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
       <header className={p.pageHead}>
         <div className={p.headMain}>
           <div className={p.titleRow}>
-            <IconButton size="small" icon="back" label="All Plans" className={p.back} onClick={() => openList(plan.projectId)} />
+            <IconButton size="regular" icon="back" label="All Plans" className={p.back} onClick={() => openList(plan.projectId)} />
             <TitleField value={titleOf(plan)} onSave={(title) => void act(() => api.edit(plan.id, [{ op: 'retitle', title }]))} />
           </div>
           {drafting ? null : (

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { IconName } from '../components/Icon.js';
 import type { SelectEntry } from '../components/select-parts.js';
 import { isSection } from '../components/select-model.js';
@@ -42,11 +42,12 @@ export function choicesOf(entries: readonly SelectEntry<string>[]): SheetChoice[
 }
 
 export type SheetRowSpec =
-  | { readonly kind: 'textarea'; readonly id: string; readonly value: string; readonly placeholder?: string; readonly lines?: number; readonly mentions?: readonly string[]; readonly focus?: boolean }
-  | { readonly kind: 'text'; readonly id: string; readonly label?: string; readonly value: string; readonly placeholder?: string; readonly hint?: string; readonly focus?: boolean }
+  | { readonly kind: 'textarea'; readonly id: string; readonly value: string; readonly placeholder?: string; readonly lines?: number; readonly mentions?: readonly string[]; readonly focus?: boolean; readonly maxLength?: number }
+  /** `maxLength`, `upper` and `keep` (the only characters it takes) apply as you type, in the field itself. */
+  | { readonly kind: 'text'; readonly id: string; readonly label?: string; readonly value: string; readonly placeholder?: string; readonly hint?: string; readonly focus?: boolean; readonly maxLength?: number; readonly upper?: boolean; readonly keep?: string }
   | { readonly kind: 'note'; readonly text: string }
   | { readonly kind: 'disclosure'; readonly id: string; readonly label: string; readonly open: boolean }
-  | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string }
+  | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string; readonly disabled?: boolean }
   /** Option cards side by side (the app's own, plans.module.css's .modeCards): icon, name, line; the label a heading above. */
   | { readonly kind: 'cards'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[] }
   /** A tinted box of words (.modeConfirm): what changes, its second line dimmer. */
@@ -161,33 +162,46 @@ async function wire(spec: SheetSpec): Promise<unknown> {
 export function useNativeSheet(on: boolean, spec: SheetSpec, handlers: SheetHandlers): boolean {
   const latest = useRef(handlers);
   latest.current = handlers;
-  const opened = useRef<Promise<boolean> | undefined>(undefined);
+  // The sheet once it's open: its id, which its updates and close carry (null: it couldn't open).
+  const opened = useRef<Promise<number | null> | undefined>(undefined);
   // The form as it was last sent (its JSON), so a render that changed nothing sends nothing.
   const sent = useRef('');
   // Each send's turn: a slower one (pictures still drawing) never lands after a newer one.
   const turn = useRef(0);
+  // This mount's life: bumped when it ends, so a send still on its way when the sheet went (Esc,
+  // another sheet) opens nothing, updates nothing and cancels nothing.
+  const life = useRef(0);
+  // A change the page didn't take as typed (clamped, refused, a checkbox that can't change) has
+  // to go back to the control: each change sends the form again.
+  const [, poke] = useState(0);
   const key = JSON.stringify(spec, (_k, v: unknown) => (typeof v === 'object' && v !== null && '$$typeof' in v ? `mark:${String((v as { key?: unknown }).key ?? '')}` : v));
 
   useEffect(() => {
     if (!on) return;
+    const mine = life.current;
     let unlisten: (() => void) | undefined;
-    let gone = false;
     void (async () => {
       const { listen } = await import('@tauri-apps/api/event');
       const off = await listen<{ kind: 'change'; id: string; value: string } | { kind: 'submit' } | { kind: 'cancel' }>('native-sheet', ({ payload }) => {
-        if (payload.kind === 'change') latest.current.change(payload.id, payload.value);
-        else if (payload.kind === 'submit') latest.current.submit();
+        if (mine !== life.current) return;
+        if (payload.kind === 'change') {
+          latest.current.change(payload.id, payload.value);
+          sent.current = '';
+          poke((n) => n + 1);
+        } else if (payload.kind === 'submit') latest.current.submit();
         else latest.current.cancel();
       });
-      if (gone) return off();
+      if (mine !== life.current) return off();
       unlisten = off;
     })();
     return () => {
-      gone = true;
+      life.current++;
       unlisten?.();
+      const was = opened.current;
       opened.current = undefined;
       sent.current = '';
-      void import('@tauri-apps/api/core').then(({ invoke }) => invoke('native_sheet_close')).catch(() => undefined);
+      // Closed by its id once it's open: one still opening is closed as soon as it is.
+      void was?.then((id) => (id === null ? undefined : import('@tauri-apps/api/core').then(({ invoke }) => invoke('native_sheet_close', { id })))).catch(() => undefined);
     };
   }, [on]);
 
@@ -195,16 +209,18 @@ export function useNativeSheet(on: boolean, spec: SheetSpec, handlers: SheetHand
     if (!on || key === sent.current) return;
     sent.current = key;
     const mine = ++turn.current;
+    const alive = life.current;
     void (async () => {
       const { invoke } = await import('@tauri-apps/api/core');
       const wired = await wire(spec);
-      if (mine !== turn.current && opened.current) return;
+      if (alive !== life.current || (mine !== turn.current && opened.current)) return;
       if (!opened.current) {
-        opened.current = invoke<boolean>('native_sheet_open', { spec: wired }).catch(() => false);
-        if (!(await opened.current)) latest.current.cancel();
+        opened.current = invoke<number | null>('native_sheet_open', { spec: wired }).catch(() => null);
+        if ((await opened.current) === null && alive === life.current) latest.current.cancel();
       } else {
-        await opened.current;
-        await invoke('native_sheet_update', { spec: wired }).catch(() => undefined);
+        const id = await opened.current;
+        if (id === null || alive !== life.current) return;
+        await invoke('native_sheet_update', { id, spec: wired }).catch(() => undefined);
       }
     })();
   });

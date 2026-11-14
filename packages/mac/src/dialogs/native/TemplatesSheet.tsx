@@ -121,7 +121,7 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
       intro: 'A way to start a task you do often. It shows up when you start a worktree or a chat.',
       width: 560,
       rows: [
-        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'Fix a flaky test', focus: true, ...(builtIn ? { hint: 'A built-in template has this name. Pick another one.' } : taken ? { hint: 'You have a template with this name: saving replaces it.' } : {}) },
+        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'Fix a flaky test', focus: true, maxLength: 60, ...(builtIn ? { hint: 'A built-in template has this name. Pick another one.' } : taken ? { hint: 'You have a template with this name: saving replaces it.' } : {}) },
         { kind: 'textarea', id: 'prompt', value: prompt, lines: 5, placeholder: 'Find out why this test fails now and then, make it reliable, and run it 20 times to be sure.' },
         { kind: 'note', text: 'What your agent should do. Leave two spaces where the details go: the cursor starts there.' },
         { kind: 'checkbox', id: 'plan', text: 'Plan first', checked: plan, hint: 'Your agent shows you a plan and waits for your OK before changing anything' },

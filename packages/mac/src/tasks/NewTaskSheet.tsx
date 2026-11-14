@@ -126,7 +126,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
           rows: [
             ...(mine
               ? [
-                  { kind: 'text' as const, id: 'title', label: 'Title', value: title, placeholder: 'Rate-limit the login endpoint', focus: true },
+                  { kind: 'text' as const, id: 'title', label: 'Title', value: title, placeholder: 'Rate-limit the login endpoint', focus: true, maxLength: 200 },
                   { kind: 'textarea' as const, id: 'goal', value: goal, lines: 4, placeholder: '10 tries a minute per IP, then 429. Logins from the app keep working.' },
                   { kind: 'note' as const, text: `What it’s for and what done looks like. Markdown; ${chordLabel('Cmd+Enter')} creates it.` },
                 ]
@@ -136,6 +136,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
                     id: 'describe',
                     value: describe,
                     lines: 4,
+                    maxLength: 8000,
                     focus: true,
                     mentions: tagged.people.map((p) => friendMention(p.name)),
                     placeholder: solo ? 'Say what you want done: one task, or a few. Your agent writes them.' : 'Say what you want done: one task, or a few and who each is for. Your agent writes them.',

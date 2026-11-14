@@ -154,7 +154,10 @@ export function Select<T extends string>(props: SelectProps<T>) {
     if (!box) return;
     const { rows, chosen } = nativeSelectRows(options, value, choose);
     // The menu's rows start past its checkmark column: back by it, so the names line up.
-    void popUpNative(rows, chosen >= 0 ? { x: box.left - 12, y: box.top - 1, selected: chosen } : { x: box.left, y: box.bottom + 4 });
+    // It couldn't open (an older shell, a failed call): the web menu instead, so the press still opens one.
+    void popUpNative(rows, chosen >= 0 ? { x: box.left - 12, y: box.top - 1, selected: chosen } : { x: box.left, y: box.bottom + 4 }).then((shown) => {
+      if (!shown) show(true);
+    });
   };
 
   // Lists of a few options size the button to the longest, so it doesn't jump when the value changes.

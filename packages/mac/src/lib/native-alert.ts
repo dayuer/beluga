@@ -50,32 +50,42 @@ export function textOf(node: ReactNode): string {
  * the caller draws its own. Returns `on`, so the caller can draw nothing while it's shown.
  */
 export function useNativeAlert(on: boolean, spec: NativeAlertSpec): boolean {
-  const shown = useRef(false);
   const latest = useRef(spec);
   latest.current = spec;
+  // What it says: an alert that stays mounted with other words (one confirm after another) is shown again.
+  const words = on ? `${spec.title}\u0000${textOf(spec.message)}` : '';
   useEffect(() => {
-    if (!on || shown.current) return;
-    shown.current = true;
+    if (!on) return;
+    let live = true;
+    const token = Math.floor(Math.random() * 2 ** 48);
     const s = latest.current;
     const buttons = [s.confirm, ...(s.cancel ? [s.cancel] : []), ...(s.alternative ? [s.alternative] : [])];
     void (async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         const at = await invoke<number>('native_alert', {
+          token,
           title: t(s.title),
           message: t(textOf(s.message)),
           style: s.tone === 'info' ? 'info' : 'warning',
           buttons: buttons.map((b) => ({ label: t(b.label), destructive: 'destructive' in b && Boolean(b.destructive), cancel: b === s.cancel })),
         });
+        // Its page went meanwhile (taken down below): what it would have run is stale.
+        if (!live) return;
         const pressed = buttons[at];
         if (pressed) pressed.run();
         else s.cancel?.run();
       } catch {
         // Couldn't show it: Esc's way out, so nothing happens behind your back.
-        s.cancel?.run();
+        if (live) s.cancel?.run();
       }
     })();
-  }, [on]);
+    return () => {
+      live = false;
+      // The page that asked is gone (Esc, another sheet, the project removed): so is its alert.
+      void import('@tauri-apps/api/core').then(({ invoke }) => invoke('native_alert_close', { token })).catch(() => undefined);
+    };
+  }, [on, words]);
   return on;
 }
 

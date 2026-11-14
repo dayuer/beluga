@@ -22,12 +22,27 @@ mod mac {
     use block2::RcBlock;
     use objc2::runtime::AnyObject;
     use objc2::{msg_send, sel, MainThreadMarker};
+    use objc2::rc::Retained;
     use objc2_app_kit::{NSAlert, NSAlertFirstButtonReturn, NSAlertStyle, NSModalResponse, NSWindow};
     use objc2_foundation::NSString;
+    use std::cell::RefCell;
     use std::sync::Mutex;
 
+    thread_local! {
+        /// The alert up now: its token (the page's), the alert and the window it's a sheet on.
+        static SHOWN: RefCell<Option<(u64, Retained<NSAlert>, Retained<NSWindow>)>> = const { RefCell::new(None) };
+    }
+
+    /// Takes the alert `token` down (its page went: Esc, another sheet), as if cancelled.
+    pub fn close(token: u64) {
+        let shown = SHOWN.with(|s| s.try_borrow_mut().ok().and_then(|mut s| if s.as_ref().is_some_and(|(t, ..)| *t == token) { s.take() } else { None }));
+        if let Some((_, alert, window)) = shown {
+            window.endSheet(&alert.window());
+        }
+    }
+
     /// Shows the alert as a sheet on `window` and calls `done` with the index of the button pressed.
-    pub fn show(window: *mut std::ffi::c_void, title: &str, message: &str, style: &str, buttons: &[AlertButton], done: Box<dyn FnOnce(i64) + Send>) {
+    pub fn show(window: *mut std::ffi::c_void, token: u64, title: &str, message: &str, style: &str, buttons: &[AlertButton], done: Box<dyn FnOnce(i64) + Send>) {
         let Some(mtm) = MainThreadMarker::new() else { return done(-1) };
         // SAFETY: the app's own window, alive while it's open.
         let Some(window) = (unsafe { window.cast::<NSWindow>().as_ref() }) else { return done(-1) };
@@ -50,8 +65,22 @@ mod mac {
         }
         let done = Mutex::new(Some(done));
         let handler = RcBlock::new(move |response: NSModalResponse| {
+            SHOWN.with(|s| {
+                if let Ok(mut s) = s.try_borrow_mut() {
+                    if s.as_ref().is_some_and(|(t, ..)| *t == token) {
+                        s.take();
+                    }
+                }
+            });
             if let Some(done) = done.lock().ok().and_then(|mut d| d.take()) {
                 done((response - NSAlertFirstButtonReturn) as i64);
+            }
+        });
+        // SAFETY: the window is alive (it was just read on this thread); kept with the alert so close can end it.
+        let kept: Retained<NSWindow> = unsafe { Retained::retain(window as *const NSWindow as *mut NSWindow) }.expect("window");
+        SHOWN.with(|s| {
+            if let Ok(mut s) = s.try_borrow_mut() {
+                *s = Some((token, alert.clone(), kept));
             }
         });
         alert.beginSheetModalForWindow_completionHandler(window, Some(&handler));
@@ -60,14 +89,16 @@ mod mac {
 
 /// Shows an alert and returns the index of the button pressed (in the order given).
 #[tauri::command]
-pub async fn native_alert(window: tauri::Window, title: String, message: String, style: String, buttons: Vec<AlertButton>) -> Result<i64, String> {
+pub async fn native_alert(window: tauri::Window, token: u64, title: String, message: String, style: String, buttons: Vec<AlertButton>) -> Result<i64, String> {
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let ns = window.ns_window().map_err(|e| e.to_string())? as usize;
+        let on = window.clone();
         window
             .run_on_main_thread(move || {
-                mac::show(ns as *mut std::ffi::c_void, &title, &message, &style, &buttons, Box::new(move |i| {
+                // The window's pointer, read here on the main thread, where it's used.
+                let ns = on.ns_window().unwrap_or(std::ptr::null_mut());
+                mac::show(ns, token, &title, &message, &style, &buttons, Box::new(move |i| {
                     let _ = tx.send(i);
                 }));
             })
@@ -76,7 +107,17 @@ pub async fn native_alert(window: tauri::Window, title: String, message: String,
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (window, title, message, style, buttons);
+        let _ = (window, token, title, message, style, buttons);
         Err("native alerts are the Mac's".into())
     }
+}
+
+/// Takes the alert `token` down: the page that asked is gone.
+#[tauri::command]
+pub async fn native_alert_close(window: tauri::Window, token: u64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    window.run_on_main_thread(move || mac::close(token)).map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = (window, token);
+    Ok(())
 }
