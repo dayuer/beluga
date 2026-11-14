@@ -16,7 +16,8 @@ import p from './plans.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
 
-const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
+/** Each way a plan runs, by its card's icon (New Plan and Plan Settings' native sheets use them too). */
+export const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
 
 /**
  * A new plan: what it's for (Claude plans from it, reading the code) and how far it runs on its

@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
-
-/** The three ways a plan runs, as its cards draw them (plans/PlanSheets.tsx). */
-const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { planRoleDefaults } from '@beluga/shared/auto-route.js';
 import { useDefaultAutonomy } from '../../plans/use-default-autonomy.js';
 import { PLAN_ROLES, type PlanRole, roleStart, rolesInput } from '../../plans/plan-roles-model.js';
 import { PlanRoles } from '../../plans/PlanRoles.js';
-import { AutonomyCards, GoalBox } from '../../plans/PlanSheets.js';
+import { AUTONOMY_ICON, AutonomyCards, GoalBox } from '../../plans/PlanSheets.js';
 import { FormSheet, Popup } from '../../components/FormSheet.js';
 import { Icon } from '../../components/Icon.js';
 import { useApp } from '../../lib/beluga.js';
@@ -28,7 +25,6 @@ import { useRunsOn } from '../../chat/RunsOn.js';
 import { HERE, type RunsOn, runsOnRows } from '../../machines/runs-on-model.js';
 import { MachineMark } from '../../machines/MachineMark.js';
 import { thisComputer, upFirst } from '../../lib/os-words.js';
-import type { IconName } from '../../components/Icon.js';
 
 // Fork (plan roles, PR #17 and #20): New Plan with a pop-up per role, in place of upstream's one
 // Agent pop-up (plans/PlanSheets.tsx's NewPlanSheet, kept as it is upstream). fork/sheets.tsx opens
