@@ -10,7 +10,7 @@ import { IconButton, Segmented, cx } from '../../components/ui.js';
 import { useApi, useApp, useBeluga, useScopedKey } from '../../lib/beluga.js';
 import { scrollWithin } from '../../lib/scroll-within.js';
 import { ViewBoundary } from '../../lib/lazy-view.js';
-import { localPathOf, nativeFiles, openWithDefaultApp, quickLook, shareFiles } from '../../lib/files.js';
+import { dragFiles, localPathOf, nativeFiles, openWithDefaultApp, quickLook, shareFiles } from '../../lib/files.js';
 import { focusFor, openFocus, showChange, usePanelRuntime } from '../../lib/panel.js';
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN, clampShare } from '../../lib/panel-model.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
@@ -379,6 +379,14 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
                     style={{ paddingLeft: 6 + row.depth * 14 }}
                     title={row.path}
                     {...aheadOnHover(api, () => (row.dir ? undefined : at(row.path)))}
+                    // Dragged out of the window, as from Finder: the file (or folder) itself, the Mac's drag.
+                    draggable={nativeFiles() && Boolean(localOf(row.path))}
+                    onDragStart={(e) => {
+                      const p = localOf(row.path);
+                      if (!p || !nativeFiles()) return;
+                      e.preventDefault();
+                      void dragFiles([p]);
+                    }}
                     onClick={() => activate(row)}
                     onDoubleClick={() => {
                       const p = localOf(row.path);

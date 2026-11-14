@@ -1,12 +1,12 @@
 //! A file of yours the Mac's way (packages/mac/src/lib/files.ts): Quick Look (Space, as in
-//! Finder) and the Share menu (Messages, Mail, AirDrop…), both macOS's own panels.
+//! Finder), the Share menu (Messages, Mail, AirDrop…), and dragging it out of the window.
 
 #[cfg(target_os = "macos")]
 mod mac {
     use objc2::rc::Retained;
-    use objc2::runtime::{AnyClass, AnyObject, NSObject};
+    use objc2::runtime::{AnyClass, AnyObject, NSObject, NSObjectProtocol, ProtocolObject};
     use objc2::{define_class, msg_send, AllocAnyThread, DefinedClass, MainThreadMarker, MainThreadOnly};
-    use objc2_app_kit::{NSSharingServicePicker, NSView};
+    use objc2_app_kit::{NSApplication, NSDragOperation, NSDraggingContext, NSDraggingItem, NSDraggingSession, NSDraggingSource, NSEventType, NSSharingServicePicker, NSView, NSWorkspace};
     use objc2_foundation::{NSArray, NSPoint, NSRect, NSRectEdge, NSSize, NSString, NSURL};
     use std::cell::RefCell;
 
@@ -65,6 +65,64 @@ mod mac {
         true
     }
 
+    define_class!(
+        /// The source of a drag out of the window: files are copied where they land (Finder, Mail…).
+        #[unsafe(super(NSObject))]
+        #[thread_kind = MainThreadOnly]
+        #[name = "BelugaFileDragSource"]
+        struct DragSource;
+
+        unsafe impl NSObjectProtocol for DragSource {}
+
+        unsafe impl NSDraggingSource for DragSource {
+            #[unsafe(method(draggingSession:sourceOperationMaskForDraggingContext:))]
+            fn operation(&self, _session: &NSDraggingSession, _context: NSDraggingContext) -> NSDragOperation {
+                NSDragOperation::Copy
+            }
+        }
+    );
+
+    thread_local! {
+        static DRAG_SOURCE: RefCell<Option<Retained<DragSource>>> = const { RefCell::new(None) };
+    }
+
+    /// Drags the files out of the window, as Finder does: the drag the page's press began, now the
+    /// Mac's, with each file's own icon under the pointer.
+    pub fn drag(view: *mut std::ffi::c_void, paths: &[String]) -> bool {
+        let Some(mtm) = MainThreadMarker::new() else { return false };
+        // SAFETY: the window's own content view, alive while its window is.
+        let Some(view) = (unsafe { view.cast::<NSView>().as_ref() }) else { return false };
+        let app = NSApplication::sharedApplication(mtm);
+        // The press that's dragging: the event the page's dragstart came from.
+        let Some(event) = app.currentEvent().filter(|e| matches!(e.r#type(), NSEventType::LeftMouseDragged | NSEventType::LeftMouseDown)) else { return false };
+        let workspace = NSWorkspace::sharedWorkspace();
+        let at = view.convertPoint_fromView(event.locationInWindow(), None);
+        let items: Vec<Retained<NSDraggingItem>> = paths
+            .iter()
+            .enumerate()
+            .map(|(i, path)| {
+                let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+                let item = NSDraggingItem::initWithPasteboardWriter(NSDraggingItem::alloc(), ProtocolObject::from_ref(&*url));
+                let icon = workspace.iconForFile(&NSString::from_str(path));
+                let offset = i as f64 * 6.0;
+                let frame = NSRect::new(NSPoint::new(at.x - 16.0 + offset, at.y - 16.0 - offset), NSSize::new(32.0, 32.0));
+                unsafe { item.setDraggingFrame_contents(frame, Some(&icon)) };
+                item
+            })
+            .collect();
+        let array = NSArray::from_retained_slice(&items);
+        let source = DragSource::new(mtm);
+        view.beginDraggingSessionWithItems_event_source(&array, &event, ProtocolObject::from_ref(&*source));
+        DRAG_SOURCE.with(|s| *s.borrow_mut() = Some(source));
+        true
+    }
+
+    impl DragSource {
+        fn new(mtm: MainThreadMarker) -> Retained<Self> {
+            unsafe { msg_send![Self::alloc(mtm), init] }
+        }
+    }
+
     /// The Share menu for the files, beside `rect` (the window's points from its top-left).
     pub fn share(view: *mut std::ffi::c_void, paths: &[String], rect: (f64, f64, f64, f64)) -> bool {
         let Some(_mtm) = MainThreadMarker::new() else { return false };
@@ -119,6 +177,27 @@ pub async fn share_files(window: tauri::Window, paths: Vec<String>, x: f64, y: f
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (window, paths, x, y, width, height);
+        Ok(false)
+    }
+}
+
+/// Drags files of yours out of the window (to Finder, Mail, another app), started from the page's dragstart.
+#[tauri::command]
+pub async fn drag_files(window: tauri::Window, paths: Vec<String>) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let view = window.ns_view().map_err(|e| e.to_string())? as usize;
+        window
+            .run_on_main_thread(move || {
+                let _ = tx.send(mac::drag(view as *mut std::ffi::c_void, &paths));
+            })
+            .map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (window, paths);
         Ok(false)
     }
 }

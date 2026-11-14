@@ -90,6 +90,13 @@ export async function quickLook(paths: readonly string[]): Promise<boolean> {
   return invoke<boolean>('quick_look', { paths }).catch(() => false);
 }
 
+/** Drags files of yours out of the window (Finder, Mail, another app), from a dragstart: the Mac's own drag. */
+export async function dragFiles(paths: readonly string[]): Promise<boolean> {
+  if (!nativeFiles() || !paths.length) return false;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<boolean>('drag_files', { paths }).catch(() => false);
+}
+
 /** The Share menu (Messages, Mail, AirDrop…) for files of yours, beside `at` (an element) or where you last pressed. */
 export async function shareFiles(paths: readonly string[], at?: Element | null): Promise<boolean> {
   if (!nativeFiles() || !paths.length) return false;
