@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { calmMs } from '../fork/calm/calm-state.js';
 import type { EnvVar } from '@beluga/shared/env-vars.js';
 import { findKeys, maskKey, mayHoldKey, withKeyRefs } from '@beluga/shared/key-detect.js';
 import { Icon } from '../components/Icon.js';
@@ -290,7 +291,7 @@ function holdHeight(el: HTMLTextAreaElement | null, ms: number): void {
   setTimeout(() => {
     el.style.minHeight = '';
     const to = el.offsetHeight;
-    if (to < now) el.animate([{ minHeight: `${now}px` }, { minHeight: `${to}px` }], { duration: 300, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+    if (to < now) el.animate([{ minHeight: `${now}px` }, { minHeight: `${to}px` }], { duration: calmMs(300), easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
   }, ms);
 }
 
@@ -314,7 +315,7 @@ function Fold({ folding, onGone, children }: { folding: boolean; onGone: () => v
       const before = last.current;
       last.current = now;
       if (before === undefined || before === now || folding) return;
-      wrap.animate([{ height: `${before}px` }, { height: `${now}px` }], { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+      wrap.animate([{ height: `${before}px` }, { height: `${now}px` }], { duration: calmMs(380), easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
     });
     observer.observe(el);
     return () => observer.disconnect();
