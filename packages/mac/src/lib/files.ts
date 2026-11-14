@@ -72,7 +72,7 @@ export const nativeFiles = (): boolean => inApp() && isMac() && !webServed();
 
 /** Where the pointer last pressed (a right-click's menu, a button): where the Share menu opens from. */
 let lastPress = { x: 0, y: 0 };
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   for (const type of ['pointerdown', 'contextmenu'] as const) window.addEventListener(type, (e) => (lastPress = { x: e.clientX, y: e.clientY }), true);
 }
 

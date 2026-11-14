@@ -374,7 +374,7 @@ async function readSystemDisplay(): Promise<void> {
 
 // (Not in tests, which load the pure parts of what imports this without a window.)
 if (typeof window !== 'undefined') window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => apply());
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   void readSystemDisplay();
   window.addEventListener('focus', () => void readSystemDisplay());
 }
