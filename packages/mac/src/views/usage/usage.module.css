@@ -491,7 +491,7 @@
   color: var(--text);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .earnRow:hover {
   background: var(--bg-hover);
@@ -646,7 +646,7 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: filter var(--dur-fast);
 }
 .segment:hover,
@@ -673,7 +673,7 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .legendItem:hover {
   background: var(--bg-hover);

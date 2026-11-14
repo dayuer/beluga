@@ -111,7 +111,7 @@
   font: inherit;
   font-size: 0.86rem;
   font-weight: 560;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background var(--dur-fast), transform 160ms var(--ease-out);
 }
 .chip :global(svg) {

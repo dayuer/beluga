@@ -104,6 +104,16 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - fork 自己的侧栏样式 `fork/sidebar/sidebar-look.css` 的搜索框也跟着用大号 `--control-h-large`（原来写死 30px），由 `tests/fork-sidebar-anchors.test.ts` 检查。
 - 用例：`tests/mac-controls.test.ts`（上游的新测试文件，随 PR 一起提回）。
 
+### 原生菜单与按下指针（待提回上游）
+
+同样直接改在上游文件里、准备提回上游：分支 `upstream-pr/native-menus`（基于 `upstream/main`，未推送），在 fork 里是 cherry-pick 过来的。
+
+- `packages/mac/src/components/SpecMenu.tsx`：右键菜单和 ⋯ 下拉（`ActionsContext`、`ActionsDropdown`、`SpecContext`、`SpecDropdown`）在 Mac 的 app 里先交给 `lib/native-menu.ts` 弹 NSMenu；选项下有说明文字或自带标记的菜单仍用网页菜单（和 fork 的 `FitContent` 摆放一起用）。
+- `packages/mac/src/lib/native-menu.ts`、`native-menu-model.ts`（新文件）：一次调用建好整个菜单，文字过 `t()`，快捷键、勾选、子菜单、分组，图标和色点按菜单文字颜色画成图片。
+- `packages/mac/src/components/Icon.tsx`：导出 `iconShape`，给原生菜单画图标用。
+- 按下指针：`styles/base.css` 的 `--press-cursor`（app 里是箭头，浏览器里是手形）；约 45 个 CSS 文件里控件上的 `cursor: pointer` 换成 `var(--press-cursor)`，链接保留手形。fork 自己的 `fork/sharing/sharing.module.css` 的 `.nameButton` 也一样。
+- 用例：`tests/mac-native-menu.test.ts`（快捷键转换、哪些菜单走原生、控件上不再有手形）。
+
 ### 沉稳界面（docs/calm-ui.md）
 
 界面气质（布局稳定、动效克制、状态安静、反馈分级、一致可预期、逐页验收）由 `packages/mac/src/fork/calm/` 的覆盖层实现，规则只在 `:root[data-calm]` 下生效。上游文件只留这几处接入点：

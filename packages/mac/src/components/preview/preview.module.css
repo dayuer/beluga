@@ -40,7 +40,7 @@
   white-space: nowrap;
 }
 button.title {
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 button.title:hover {
   text-decoration: underline;
@@ -361,7 +361,7 @@ textarea.field {
   color: var(--text-2);
   font: inherit;
   font-size: 11.5px;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition:
     background var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
@@ -383,7 +383,7 @@ textarea.field {
   border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 16%, transparent);
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background var(--dur-fast) var(--ease-out);
 }
 .switch::after {
@@ -420,7 +420,7 @@ textarea.field {
   border: 0;
   border-radius: var(--radius-s);
   background: none;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .pictureField img {
   flex: none;
@@ -442,7 +442,7 @@ textarea.field {
   color: var(--text-3);
   font: inherit;
   font-size: 11.5px;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .setIt {
   color: var(--accent);
@@ -469,7 +469,7 @@ textarea.field {
   color: var(--text-3);
   font: inherit;
   font-size: 11px;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .mini:hover,
 .iconMini:hover {
@@ -640,7 +640,7 @@ button.title {
   font: inherit;
   font-size: 12px;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .issue:hover {
   background: var(--bg-hover);

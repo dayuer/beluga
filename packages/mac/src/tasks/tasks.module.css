@@ -144,7 +144,7 @@
   border-radius: 50%;
   background: none;
   color: var(--text-3);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .labelRemove:hover {
   background: var(--bg-hover);
@@ -357,7 +357,7 @@
   border-radius: 50%;
   background: var(--bg-press);
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .body {
   flex: 1;
@@ -426,7 +426,7 @@
   font: inherit;
   color: var(--text-3);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .groupToggle:hover {
   background: var(--bg-hover);
@@ -475,7 +475,7 @@
   border-radius: 5px;
   background: none;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .iconHit:hover {
   background: var(--bg-press);
@@ -927,7 +927,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .tuck:hover {
   color: var(--epic);
@@ -1155,7 +1155,7 @@
   background: none;
   font: inherit;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .crumb:hover {
   background: var(--bg-hover);
@@ -1493,7 +1493,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .addSection:hover {
   background: var(--bg-hover);
@@ -1528,7 +1528,7 @@
   background: var(--bg);
   box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
   color: white;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .checkBox:hover {
@@ -1682,7 +1682,7 @@
   font: inherit;
   text-align: left;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .lineMain .key {
   min-width: 48px;
@@ -1839,7 +1839,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .activityList {
   position: relative;
@@ -2018,7 +2018,7 @@
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .propValue:hover {
   background: var(--bg-hover);
@@ -2075,7 +2075,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
   font-variant-numeric: tabular-nums;
 }
 .estimate:hover {
@@ -2138,7 +2138,7 @@
   font: inherit;
   color: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .stripMain:hover {
   background: var(--bg-hover);
@@ -2307,7 +2307,7 @@
   background: none;
   font: inherit;
   color: var(--text);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .projectSwitch:hover,
 .projectSwitch[data-state='open'] {
@@ -2346,7 +2346,7 @@
   background: none;
   border: 0;
   padding: 0 2px;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   font-variant-numeric: tabular-nums;
 }
 .columnPr:hover {
@@ -2393,7 +2393,7 @@
   font: inherit;
   font-size: 12px;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .syncPill:hover {
   background: var(--bg-hover);
@@ -2545,7 +2545,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
   white-space: nowrap;
 }
 .repoFilter:hover,
@@ -2588,7 +2588,7 @@
   background: color-mix(in srgb, var(--text) 6%, transparent);
   font: inherit;
   font-size: 11.5px;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .onBoardChip:hover {
   background: color-mix(in srgb, var(--text) 11%, transparent);
@@ -2625,7 +2625,7 @@
   font-size: 13px;
   color: var(--text-2);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .repoRow:hover:not(:disabled) {
   background: var(--bg-hover);
