@@ -91,6 +91,10 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 - `packages/mac/src/layout/Sidebar.tsx`：三行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、一行 `useOneSelected(drop.ref)`、顶部入口后一行 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，侧栏唯一的主按钮，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它）。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。
 
+### 原生控件
+
+上游文件零改动：`packages/mac/src/fork/boot.ts` 引入 `fork/native/index.ts`，它在首帧前给 `<html>` 打上 `data-native`，并引入 `fork/native/native-controls.css`。公共控件按 AppKit 常规尺寸重画：FormSheet 的文本框（22px、5px 圆角、细边框，等宽字段用 SF Mono 小一号）、表单标签用主文字色、sheet/alert 的按钮与 ui 的 `Button`（自上而下的轻渐变、细边与投影，默认按钮是强调色渐变）、弹出按钮（Select）右侧的强调色双箭头方块、复选框（未选为凸起的白/灰面，选中是强调色渐变）、`Segmented` 的 NSSegmentedControl 外观（凹槽、选中段凸起、未选段之间的竖线），键盘焦点一律是外扩 3px 的强调色光环。颜色只用 `styles/tokens.css` 的 token（亮暗差异集中在文件开头的 `--nc-*`），主题、强调色照旧；不加任何动效。锚点是上游 `components/` 下 `form`、`alert`、`ui`、`select` 四个 CSS module 的类名，各自用相邻结构收窄（如 `[class*='_controlRow_'] > input[class*='_input_']`），由 `tests/fork-native-anchors.test.ts` 检查；同步后它失败就按报出的名字重接。
+
 ### 沉稳界面（docs/calm-ui.md）
 
 界面气质（布局稳定、动效克制、状态安静、反馈分级、一致可预期、逐页验收）由 `packages/mac/src/fork/calm/` 的覆盖层实现，规则只在 `:root[data-calm]` 下生效。上游文件只留这几处接入点：
