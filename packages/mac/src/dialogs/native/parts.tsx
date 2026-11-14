@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { nativeAlerts, useNativeAlert } from '../../lib/native-alert.js';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AppState } from '@beluga/core/store.js';
 import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
@@ -143,6 +144,8 @@ export function Choice<T extends string>({ value, options, onChange, label, tone
 
 /** "Are you sure?" the Mac way: what happens, Cancel, and the button that does it. */
 export function Alert({ title, message, confirm, onConfirm, onCancel }: { title: string; message: string; confirm: string; onConfirm: () => void; onCancel: () => void }) {
+  // The Mac's own alert in the app on a Mac (lib/native-alert.ts).
+  if (useNativeAlert(nativeAlerts(), { title, message, confirm: { label: confirm, destructive: true, run: onConfirm }, cancel: { label: 'Cancel', run: onCancel } })) return null;
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>
       <Dialog.Portal>

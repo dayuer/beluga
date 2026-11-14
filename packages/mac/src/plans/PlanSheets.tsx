@@ -6,6 +6,8 @@ import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
+import { t } from '../i18n/index.js';
+import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
 import { RunsOnRow } from '../chat/RunsOn.js';
 import { myRuntime } from '../chat/ModelPicker.js';
 import { sendToComputer, useStartDeps } from '../machines/start-there.js';
@@ -16,7 +18,8 @@ import p from './plans.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
 
-const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
+/** Each way a plan runs, by its card's icon (New Plan and Plan Settings' native sheets use them too). */
+export const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
 
 /**
  * A new plan: what it's for (Claude plans from it, reading the code) and how far it runs on its
@@ -181,9 +184,43 @@ export function PlanModeSheet({ planId, close }: { planId: string; close: () => 
   const view = usePlanView(plan);
   const { api, act } = usePlanActions();
   const [mode, setMode] = useState<Autonomy>(plan?.autonomy ?? DEFAULT_AUTONOMY);
+  const mixed = plan?.body?.milestones.some((m) => m.autonomy && m.autonomy !== plan.autonomy);
+  const change = plan && view && (mode !== plan.autonomy || mixed) ? modeChange(view, mode) : undefined;
+  const switchMode = async (): Promise<void> => {
+    if (!plan) return;
+    close();
+    await act(() => api.setAutonomy(plan.id, mode), `Runs on ${AUTONOMY_INFO[mode].label} now`);
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the three cards, what changes under them.
+  const native = useNativeSheet(
+    nativeSheets() && Boolean(plan && view),
+    {
+      title: 'How It Runs',
+      intro: plan ? `“${plan.body?.title ?? plan.draft?.title ?? 'This plan'}” runs on ${AUTONOMY_INFO[plan.autonomy].label} now. Pick how it runs from here on.` : '',
+      width: 600,
+      rows: [
+        {
+          kind: 'cards',
+          id: 'mode',
+          label: 'How it runs',
+          value: mode,
+          options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: AUTONOMY_INFO[a].summary, ...(a === plan?.autonomy ? { badge: 'Now' } : {}) })),
+        },
+        change ? { kind: 'callout', text: change.from, ...(change.now ? { detail: change.now } : {}) } : { kind: 'note', text: `${plan ? t(AUTONOMY_INFO[plan.autonomy].hint) : ''}.` },
+      ],
+      submit: change?.title ?? 'Switch',
+      canSubmit: Boolean(change),
+    },
+    {
+      change: (id, value) => {
+        if (id === 'mode') setMode(value as Autonomy);
+      },
+      submit: () => void (change && switchMode()),
+      cancel: close,
+    },
+  );
+  if (native) return null;
   if (!plan || !view) return <FormSheet title="How It Runs" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
-  const mixed = plan.body?.milestones.some((m) => m.autonomy && m.autonomy !== plan.autonomy);
-  const change = mode !== plan.autonomy || mixed ? modeChange(view, mode) : undefined;
   return (
     <FormSheet
       title="How It Runs"
@@ -193,10 +230,7 @@ export function PlanModeSheet({ planId, close }: { planId: string; close: () => 
       canSubmit={Boolean(change)}
       width={600}
       onCancel={close}
-      onSubmit={async () => {
-        close();
-        await act(() => api.setAutonomy(plan.id, mode), `Runs on ${AUTONOMY_INFO[mode].label} now`);
-      }}
+      onSubmit={switchMode}
     >
       <div className={p.newPlan}>
         <div className={p.newPlanLabel} id="plan-runs">

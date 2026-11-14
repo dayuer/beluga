@@ -251,7 +251,7 @@
   border-radius: 6px;
   overflow: hidden;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   pointer-events: auto !important;
   color: var(--chip-fg, var(--text));
   background: color-mix(in srgb, var(--chip-accent, #a99ad9) 16%, var(--chip-bg, var(--term-bg, var(--bg))));

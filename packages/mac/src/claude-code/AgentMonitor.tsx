@@ -79,7 +79,7 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
           }}
         />
         <Tip label={`The main agent in ${lead} gets it and passes it on with SendMessage`} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
-          <Button size="small" variant={text.trim() ? 'primary' : 'plain'} icon="send" disabled={!text.trim()} onClick={send}>
+          <Button variant={text.trim() ? 'primary' : 'plain'} icon="send" disabled={!text.trim()} onClick={send}>
             Send to Main Agent
           </Button>
         </Tip>
@@ -170,24 +170,24 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
         </div>
         <div className={m.headActions}>
           {parent ? (
-            <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
+            <Button icon="chat" onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
               Open Main Chat
             </Button>
           ) : null}
           {worktree ? (
-            <Button size="small" icon="folder" onClick={() => void showWorktreeFolder(client, worktree.id)}>
+            <Button icon="folder" onClick={() => void showWorktreeFolder(client, worktree.id)}>
               {revealWords}
             </Button>
           ) : null}
           {worktree && !live ? (
-            <Button size="small" variant="danger" icon="archive" onClick={() => setRemoving(true)}>
+            <Button variant="danger" icon="archive" onClick={() => setRemoving(true)}>
               Remove Worktree…
             </Button>
           ) : null}
         </div>
       </header>
       <div className={o.tabs}>
-        <Segmented size="small"
+        <Segmented
           label="Show"
           value={view}
           onChange={setView}

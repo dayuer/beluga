@@ -50,13 +50,13 @@ describe('the control tokens', () => {
   it('come in the three sizes of docs/mac-controls.md, each one height, text and corner', () => {
     const base = block(':root', '--control-h-large');
     const px = (name: string): number => Number(new RegExp(`${name}:\\s*(\\d+)px`).exec(base)?.[1]);
-    expect([px('--control-h-small'), px('--control-h'), px('--control-h-large')]).toEqual([20, 22, 28]);
+    expect([px('--control-h-small'), px('--control-h'), px('--control-h-large')]).toEqual([20, 24, 28]);
     expect([px('--control-text-small'), px('--control-text'), px('--control-text-large')]).toEqual([12, 13, 13]);
     expect([px('--control-radius-small'), px('--control-radius'), px('--control-radius-large')]).toEqual([4, 5, 7]);
     // No text under 12px (Chinese doesn't read there), so no mini size.
     expect(tokens).not.toContain('--control-h-mini');
     const doc = readFileSync(path.join('docs', 'mac-controls.md'), 'utf8');
-    for (const row of ['| **Large** | 28px | 13px | 7px', '| **Regular** (default) | 22px | 13px | 5px', '| **Small** | 20px | 12px | 4px']) expect(doc).toContain(row);
+    for (const row of ['| **Large** | 28px | 13px | 7px', '| **Regular** (default) | 24px | 13px | 5px', '| **Small** | 20px | 12px | 4px']) expect(doc).toContain(row);
   });
 
   it('give each size a class to the shared controls that take one', () => {
@@ -112,7 +112,8 @@ describe('the control tokens', () => {
     for (const file of ['chat/Attention.tsx', 'tasks/TaskPage.tsx', 'sentinel/SentinelCards.tsx', 'views/Overview.tsx']) {
       const tags = [...read(...file.split('/')).matchAll(/<(?:Button|IconButton)\b[^>]*/g)].map((m) => m[0]);
       expect(tags.length, file).toBeGreaterThan(0);
-      for (const tag of tags) expect(tag, file).toMatch(/\bsize="(?:small|large)"/);
+      // Each says its size; an empty state's are Large and Regular (docs/mac-controls.md, "Large").
+      for (const tag of tags) expect(tag, file).toMatch(/\bsize="(?:small|regular|large)"/);
     }
   });
 

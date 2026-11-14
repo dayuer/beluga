@@ -43,10 +43,10 @@ export function AutoRouteSettings() {
           return (
             <Row key={`${tier}-${i}`} label={`Choice ${(i + 1)}`} detail={detail}>
               <Select label={`Choice ${(i + 1)}`} value={value} options={entries} placeholder={readable(value)} onChange={(v) => setList(tier, list.map((x, j) => (j === i ? v : x)))} />
-              <Button size="small" disabled={i === 0} aria-label={'Move up'} onClick={() => setList(tier, list.map((x, j) => (j === i - 1 ? value : j === i ? list[i - 1]! : x)))}>
+              <Button disabled={i === 0} aria-label={'Move up'} onClick={() => setList(tier, list.map((x, j) => (j === i - 1 ? value : j === i ? list[i - 1]! : x)))}>
                 ↑
               </Button>
-              <Button size="small" disabled={list.length <= 1} aria-label={'Remove'} onClick={() => setList(tier, list.filter((_, j) => j !== i))}>
+              <Button disabled={list.length <= 1} aria-label={'Remove'} onClick={() => setList(tier, list.filter((_, j) => j !== i))}>
                 ✕
               </Button>
             </Row>
@@ -54,12 +54,12 @@ export function AutoRouteSettings() {
         })}
         <Row label={tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? (tier === 'hard' ? 'Its tasks, and plans’ design and hard fixes, start on the one marked Used now' : 'Its tasks start on the one marked Used now') : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
           {list.length < MAX_CANDIDATES ? (
-            <Button size="small" onClick={() => setList(tier, [...list, 'claude:'])}>
+            <Button onClick={() => setList(tier, [...list, 'claude:'])}>
               {'Add'}
             </Button>
           ) : null}
           {custom ? (
-            <Button size="small" onClick={() => save({ [tier]: undefined })}>
+            <Button onClick={() => save({ [tier]: undefined })}>
               {'Back to Default'}
             </Button>
           ) : null}

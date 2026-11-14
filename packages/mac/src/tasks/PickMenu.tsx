@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { type NativeRow, nativeDropdown } from '../lib/native-menu.js';
 import { FitContent } from '../components/SpecMenu.js';
 import { type ReactNode, useMemo, useState } from 'react';
 import { Icon, type IconName } from '../components/Icon.js';
@@ -46,6 +47,19 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
   const q = query.trim().toLowerCase();
   const shown = useMemo(() => (q ? choices.filter((c) => c.label.toLowerCase().includes(q) || c.hint?.toLowerCase().includes(q)) : choices), [choices, q]);
   const exact = choices.some((c) => c.label.toLowerCase() === q);
+  // A plain pick (no field, one choice) is the Mac's own menu in the app (lib/native-menu.ts); one
+  // with a field or several ticks keeps this menu, which stays open as you type or tick.
+  const rows = (): NativeRow[] => [
+    ...choices.map((c, i): NativeRow => ({
+      label: c.label,
+      ...(c.hint ? { hint: c.hint } : {}),
+      ...(c.mark ? { mark: c.mark } : {}),
+      ...(chosen.includes(c.value) ? { checked: true } : {}),
+      ...(c.section && c.section !== choices[i - 1]?.section ? { header: c.section } : {}),
+      onSelect: () => onPick(c.value),
+    })),
+    ...(actions ?? []).map((a, i): NativeRow => ({ label: a.label, icon: a.icon, ...(i === 0 ? { separate: true } : {}), onSelect: a.onSelect })),
+  ];
   return (
     <Dropdown.Root
       modal={false}
@@ -55,7 +69,7 @@ export function PickMenu<T extends string>({ label, choices, chosen, onPick, chi
         if (!next) setQuery('');
       }}
     >
-      <Dropdown.Trigger asChild>
+      <Dropdown.Trigger asChild {...(searchable || multiple ? {} : nativeDropdown(rows))}>
         {children}
       </Dropdown.Trigger>
       <Dropdown.Portal>

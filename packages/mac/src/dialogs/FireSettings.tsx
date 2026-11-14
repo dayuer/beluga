@@ -189,7 +189,7 @@ export function FireSettings() {
       </Group>
       {(['preset', 'show', 'where', 'typing', 'popDelete', 'catchAfter', 'outAfter'] as const).some((k) => look[k] !== DEFAULT_FIRE[k]) ? (
         <div className={f.reset}>
-          <Button size="small" onClick={() => setPrefs({ maxFire: { ...DEFAULT_FIRE, palettes: look.palettes } })}>
+          <Button onClick={() => setPrefs({ maxFire: { ...DEFAULT_FIRE, palettes: look.palettes } })}>
             Back to the Default
           </Button>
         </div>
@@ -308,14 +308,14 @@ function Maker({ palette, isNew, onSave, onCancel, onDelete }: { palette: FirePa
       <input className={cx(s.text, f.name)} placeholder="Name them, like Dragon’s Breath" aria-label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
       <span className={f.makerButtons}>
         {isNew ? null : (
-          <Button size="small" variant="quiet" onClick={onDelete}>
+          <Button variant="quiet" onClick={onDelete}>
             Delete
           </Button>
         )}
-        <Button size="small" variant="quiet" onClick={onCancel}>
+        <Button variant="quiet" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="small" variant="primary" type="submit">
+        <Button variant="primary" type="submit">
           {isNew ? 'Add' : 'Save'}
         </Button>
       </span>

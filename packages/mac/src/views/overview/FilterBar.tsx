@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { type NativeRow, nativeDropdown } from '../../lib/native-menu.js';
 import { type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import type { Project } from '@beluga/workspaces/types.js';
 import { Icon } from '../../components/Icon.js';
@@ -114,9 +115,14 @@ function ProjectPopup({ projects, project, onProject }: Pick<FilterBarProps, 'pr
   );
   const name = (p: Project): string => (p.root ? p.name : 'Chats');
   const iconOf = (p: Project, size: number) => (p.root ? <ProjectIcon id={p.id} name={p.name} size={size} /> : <Icon name="chat" size={size - 2} />);
+  // The Mac's own menu in the app (lib/native-menu.ts), each project by its icon.
+  const nativeRows = (): NativeRow[] => [
+    { label: 'All Projects', icon: 'grid', ...(!project ? { checked: true } : {}), onSelect: () => onProject(undefined) },
+    ...projects.map((p, i): NativeRow => ({ label: name(p), mark: iconOf(p, 16), ...(project?.id === p.id ? { checked: true } : {}), ...(i === 0 ? { separate: true } : {}), onSelect: () => onProject(p.id) })),
+  ];
   return (
     <Dropdown.Root modal={false}>
-      <Dropdown.Trigger asChild>
+      <Dropdown.Trigger asChild {...nativeDropdown(nativeRows)}>
         <button type="button" className={s.popup} aria-label={`Project: ${project ? name(project) : 'All Projects'}`}>
           {project ? iconOf(project, 14) : <Icon name="grid" size={12} />}
           <span className={s.popupText}>{project ? name(project) : 'All Projects'}</span>

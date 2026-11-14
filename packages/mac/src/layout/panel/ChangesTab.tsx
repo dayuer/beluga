@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Review } from '@beluga/workspaces/git.js';
 import { parseDiff } from '@beluga/shared/diff-lines.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
@@ -327,6 +328,7 @@ export function ChangesTab({ wsId }: { wsId: string }) {
     const i = files.findIndex((f) => f.path === asked);
     if (i >= 0) show(i);
   }, [data, reviewLoading]);
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const i = at < 0 ? -1 : at;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -346,6 +348,10 @@ export function ChangesTab({ wsId }: { wsId: string }) {
       e.preventDefault();
       e.stopPropagation();
       setOpen(undefined);
+    } else {
+      // Typing a file's name goes to it.
+      const to = typeAhead(e, order.map((k) => files[k]?.path.split('/').pop() ?? ''), order.indexOf(i));
+      if (to >= 0) show(order[to]!);
     }
   };
 

@@ -3,7 +3,8 @@ import { agentName } from '../../shared/agent-label.js';
 import type { Plan } from '../../core/plans/model.js';
 import type { PilotDeps } from '../../core/plans/pilot.js';
 import type { Routable } from '../../shared/auto-route.js';
-import { milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
+import { FINISHED, type MilestoneView } from '../../core/plans/progress.js';
+import { handoffsIn, milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
 
 /**
  * Fork (plan roles, PR #17 and #20): what's hard in a plan goes to its fix agent (PilotDeps.fixer):
@@ -20,6 +21,8 @@ const agentKey = (a: AgentRef): string => `${a.runtime}:${a.model ?? ''}`;
 export class PlanFixer {
   /** Conversations put on the plan's fix agent this session (by channel: the agent's key), so each is switched once. */
   private readonly onFixer = new Map<string, string>();
+  /** What the fix agent took each milestone's conversation over for (by channel: task ids), so it goes back once they're done. */
+  private readonly hard = new Map<string, Set<string>>();
   /** Conflicts the plan's conversation is fixing (by plan: their folders), so one gone doesn't hand it back while another is still there. */
   private readonly fixing = new Map<string, Set<string>>();
 
@@ -27,10 +30,13 @@ export class PlanFixer {
 
   /**
    * What's hard goes to the plan's fix agent (see PilotDeps.fixer): `channel` is put on it from its
-   * next message on, once (it stays there). → the fixer's name when it was switched now.
+   * next message on, once, for `tasks` (the fix tasks, the task that stopped twice): it stays there
+   * until they're done, then the milestone's work goes back to its own agent (settle).
+   * → the fixer's name when it was switched now.
    */
-  toFixer(plan: Plan, channel: string, what: string): string | undefined {
+  toFixer(plan: Plan, channel: string, what: string, tasks: readonly string[] = []): string | undefined {
     const fixer = this.deps.fixer?.(plan);
+    if (fixer && tasks.length) this.hard.set(channel, new Set([...(this.hard.get(channel) ?? []), ...tasks]));
     if (!fixer || !this.deps.switchAgent || this.onFixer.get(channel) === agentKey(fixer)) return undefined;
     this.onFixer.set(channel, agentKey(fixer));
     // Already on it (it was switched before the daemon restarted): nothing to hand over.
@@ -71,14 +77,49 @@ export class PlanFixer {
   /** The conversation was put on another agent by you (Agent for Its Work): no longer on the fix agent. */
   forget(channel: string): void {
     this.onFixer.delete(channel);
+    this.hard.delete(channel);
+  }
+
+  /**
+   * A milestone's worktree on the fix agent goes back to the agent its work runs on once what was
+   * hard is done: the fix tasks it was given, the task that stopped twice. Coding stays the coding
+   * agent's (the plan's Coding, a task's own, auto route's): the fix agent doesn't keep the rest of
+   * the milestone. After a daemon restart (what it was given isn't known): the tasks marked as having
+   * stopped twice, and while its round's check failed, the fix tasks of that round. Only between
+   * turns (`idle`): switching mid-turn would cut it.
+   */
+  settle(plan: Plan, m: MilestoneView, idle: (channel: string) => boolean): void {
+    const at = m.agent;
+    const fixer = this.deps.fixer?.(plan);
+    if (!at || !fixer || !this.deps.switchAgent) return;
+    const channel = `${WS_PREFIX}${at.worktree}`;
+    const on = this.agentOn(channel);
+    const known = this.hard.get(channel);
+    const stoppedTwice = new Set(Object.entries(plan.watch ?? {}).flatMap(([id, w]) => (w?.escalated ? [id] : [])));
+    // Handed over this session, or (after a restart) on the fix agent with what says it was handed: its
+    // handoff in the plan's activity (fix tasks, a task that stopped twice), a task of it that stopped
+    // twice, or a round started on it for fix tasks. Put there by you: yours.
+    const said = handoffsIn(plan.activity, m.milestone.title).some((h) => h.what === 'fix' || h.what === 'stopped');
+    const handed = this.onFixer.has(channel) || (on === agentKey(fixer) && (said || at.via === 'fix' || m.tasks.some((t) => stoppedTwice.has(t.task.id))));
+    if (!handed) return;
+    const left = m.tasks.filter((t) => (known ?? stoppedTwice).has(t.task.id) && !FINISHED.has(t.state));
+    if (left.length || (!known && m.run.check?.verdict === 'fail') || !idle(channel)) return;
+    const next = m.tasks.find((t) => t.issue && !FINISHED.has(t.state));
+    const { agent: work } = workAgentFor(plan, next?.issue ?? { labels: [], priority: 'none' }, this.deps.store.getState());
+    this.hard.delete(channel);
+    this.onFixer.delete(channel);
+    if (on === (work ? agentKey(work) : undefined)) return;
+    this.deps.switchAgent(channel, work);
+    const name = work ? agentName(work, { model: true }) : 'your default agent';
+    this.deps.plans.note(plan.id, 'note', `what was hard in “${m.milestone.title}” is done: its work is back on ${name}`, { kind: 'beluga' });
   }
 
   /** The watchdog's ask (a task stopped again soon after a wake): its conversation goes to the fix agent. → its name, or undefined (no fix agent, or it's on it already). */
-  escalate(plan: Plan, channel: string): string | undefined {
+  escalate(plan: Plan, channel: string, task?: string): string | undefined {
     // Which milestone (BLG-199): the plan page shows each handoff under its own.
     const title = milestoneOfChannel(plan, channel);
     const where = title ? ` in “${title}”` : '';
-    return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}${where}`);
+    return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}${where}`, task ? [task] : []);
   }
 
   /**

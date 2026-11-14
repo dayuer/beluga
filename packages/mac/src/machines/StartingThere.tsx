@@ -18,7 +18,7 @@ export function StartingThere({ start }: { start: Starting }) {
         title={`Couldn’t start ${start.what} on ${where}`}
         {...(start.error ? { detail: start.error } : {})}
         action={
-          <Button size="small" onClick={dismissStarting}>
+          <Button onClick={dismissStarting}>
             Back
           </Button>
         }

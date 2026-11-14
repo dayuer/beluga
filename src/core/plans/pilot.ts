@@ -317,7 +317,7 @@ export class PlanPilot {
       ...(deps.takeOver ? { takeOver: deps.takeOver } : {}),
       ...(deps.promote ? { promote: deps.promote } : {}),
       ...(deps.now ? { now: deps.now } : {}),
-      escalate: (plan, channel) => this.fix.escalate(plan, channel),
+      escalate: (plan, channel, task) => this.fix.escalate(plan, channel, task),
     });
     this.off = deps.store.onAction((a: Action) => {
       if (a.type === 'agent_event') this.onRunEvent(a.channel);
@@ -574,6 +574,9 @@ export class PlanPilot {
     }
     this.tellYou(plan, view);
     for (const m of view.open) this.stepMilestone(plan, view, m);
+    // What was hard is done: a milestone's work goes back from the fix agent to its own (fork, fixer.ts).
+    const live = liveFrom(this.deps.store.getState());
+    for (const m of view.open) this.fix.settle(plan, m, (channel) => !live.busy(channel) && !live.asking(channel) && !this.deps.alive?.(channel));
     this.rescue(plan.id);
   }
 
@@ -1000,7 +1003,7 @@ export class PlanPilot {
     const agent = m.agent;
     if (!agent) return;
     // Its check failed: these are the fix tasks, and the plan's fix agent takes the milestone's worktree over for them.
-    if (tasks.length && m.run.check?.verdict === 'fail') this.fix.toFixer(plan, `${WS_PREFIX}${agent.worktree}`, `the fix tasks for “${m.milestone.title}”`);
+    if (tasks.length && m.run.check?.verdict === 'fail') this.fix.toFixer(plan, `${WS_PREFIX}${agent.worktree}`, `the fix tasks for “${m.milestone.title}”`, tasks.map((t) => t.task.id));
     const ws = this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === agent.worktree);
     for (const t of tasks) if (t.issue) this.deps.work.linkShared(t.issue.id, { id: agent.worktree, ...(agent.branch ? { branch: agent.branch } : {}), name: ws?.name ?? agent.worktree });
     const ids = [...new Set([...agent.tasks, ...tasks.map((t) => t.task.id)])];

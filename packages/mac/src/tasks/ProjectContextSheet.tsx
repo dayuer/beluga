@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
 import { MAX_PROJECT_CONTEXT } from '@beluga/core/board/model.js';
 import { Field, FormSheet, TextArea } from '../components/FormSheet.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
@@ -25,6 +26,38 @@ export function ProjectContextSheet({ projectId, close }: { projectId: string; c
   const [text, setText] = useState(saved?.text ?? '');
   const changed = text.trim() !== (saved?.text ?? '');
   const shared = mates.length ? `Shared with ${mates.join(', ')}: an edit here reaches them too.` : 'Teammates on this project get it too.';
+  const save = async (): Promise<void> => {
+    await api.setContext(projectId, text);
+    close();
+    toast(client, text.trim() ? 'Your agent knows about this project now' : 'The project’s context is cleared', 'success');
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts).
+  const [busy, setBusy] = useState(false);
+  const native = useNativeSheet(
+    nativeSheets(),
+    {
+      title: 'About This Project',
+      intro: 'Your agent reads this whenever it writes a task here, so tasks use the project’s own words and point at the right part of the app.',
+      width: 600,
+      rows: [
+        { kind: 'textarea', id: 'context', value: text, lines: 12, placeholder: PLACEHOLDER, focus: true },
+        { kind: 'note', text: `${shared}${saved?.text ? ` Last edited by ${saved.by}, ${ago(saved.at)}.` : ''}` },
+      ],
+      submit: 'Save',
+      canSubmit: changed,
+      busy,
+    },
+    {
+      change: (_id, value) => setText(value.slice(0, MAX_PROJECT_CONTEXT)),
+      submit: () => {
+        if (!changed || busy) return;
+        setBusy(true);
+        save().finally(() => setBusy(false));
+      },
+      cancel: close,
+    },
+  );
+  if (native) return null;
   return (
     <FormSheet
       title="About This Project"
@@ -34,11 +67,7 @@ export function ProjectContextSheet({ projectId, close }: { projectId: string; c
       width={600}
       canSubmit={changed}
       onCancel={close}
-      onSubmit={async () => {
-        await api.setContext(projectId, text);
-        close();
-        toast(client, text.trim() ? 'Your agent knows about this project now' : 'The project’s context is cleared', 'success');
-      }}
+      onSubmit={save}
     >
       <Field label="Context" htmlFor="project-context" hint={`${shared}${saved?.text ? ` Last edited by ${saved.by}, ${ago(saved.at)}.` : ''}`}>
         <TextArea id="project-context" autoFocus rows={12} value={text} placeholder={PLACEHOLDER} maxLength={MAX_PROJECT_CONTEXT} onChange={setText} />

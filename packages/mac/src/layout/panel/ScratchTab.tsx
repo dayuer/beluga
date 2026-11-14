@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Location } from '@beluga/core/store.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
 import { activeAssistantChannel, assistantChannel } from '@beluga/shared/assistant.js';
@@ -9,7 +10,7 @@ import { Icon, type IconName } from '../../components/Icon.js';
 import { Empty, IconButton, Segmented, cx } from '../../components/ui.js';
 import { ActionsDropdown } from '../../components/SpecMenu.js';
 import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
-import { openWithDefaultApp, revealInFinder } from '../../lib/files.js';
+import { dragFiles, nativeFiles, openWithDefaultApp, revealInFinder } from '../../lib/files.js';
 import { openFocus } from '../../lib/panel.js';
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN, clampShare } from '../../lib/panel-model.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
@@ -283,6 +284,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
     setClosed(false);
     setPicked(path);
   };
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const i = rows.findIndex((f) => f.path === shown);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -293,6 +295,10 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
       e.preventDefault();
       e.stopPropagation();
       setClosed(true);
+    } else {
+      // Typing a name goes to it.
+      const to = typeAhead(e, rows.map((f) => f.path.split('/').pop() ?? f.path), i);
+      if (to >= 0) pick(rows[to]!.path);
     }
   };
 
@@ -355,6 +361,13 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
                 aria-selected={sel}
                 className={cx(s.row, sel && s.rowOn, fresh && k.arrived)}
                 title={f.path}
+                // Yours: dragged out of the window, as from Finder (the Mac's own drag).
+                draggable={!owner && nativeFiles()}
+                onDragStart={(e) => {
+                  if (owner || !nativeFiles()) return;
+                  e.preventDefault();
+                  void dragFiles([joinPath(list.root, f.path)]);
+                }}
                 onClick={() => pick(f.path)}
               >
                 <Icon name={ICONS[fileKind(f.path)]} size={13} className={s.fileIcon} />

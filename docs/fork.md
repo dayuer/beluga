@@ -104,6 +104,29 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - fork 自己的侧栏样式 `fork/sidebar/sidebar-look.css` 的搜索框也跟着用大号 `--control-h-large`（原来写死 30px），由 `tests/fork-sidebar-anchors.test.ts` 检查。
 - 用例：`tests/mac-controls.test.ts`（上游的新测试文件，随 PR 一起提回）。
 
+### 原生菜单与按下指针（待提回上游）
+
+同样直接改在上游文件里、准备提回上游：分支 `upstream-pr/native-menus`（基于 `upstream/main`，未推送），在 fork 里是 cherry-pick 过来的。
+
+- `packages/mac/src/components/SpecMenu.tsx`：右键菜单和 ⋯ 下拉（`ActionsContext`、`ActionsDropdown`、`SpecContext`、`SpecDropdown`）在 Mac 的 app 里先交给 `lib/native-menu.ts` 弹 NSMenu；选项下有说明文字或自带标记的菜单仍用网页菜单（和 fork 的 `FitContent` 摆放一起用）。
+- `packages/mac/src/lib/native-menu.ts`、`native-menu-model.ts`（新文件）：一次调用建好整个菜单，文字过 `t()`，快捷键、勾选、子菜单、分组，图标和色点按菜单文字颜色画成图片。
+- `packages/mac/src/components/Icon.tsx`：导出 `iconShape`，给原生菜单画图标用。
+- 按下指针：`styles/base.css` 的 `--press-cursor`（app 里是箭头，浏览器里是手形）；约 45 个 CSS 文件里控件上的 `cursor: pointer` 换成 `var(--press-cursor)`，链接保留手形。fork 自己的 `fork/sharing/sharing.module.css` 的 `.nameButton` 也一样。
+- 用例：`tests/mac-native-menu.test.ts`（快捷键转换、原生菜单的行怎么建、控件上不再有手形）。
+- 第二轮（`fork/native-2`）：
+  - 菜单改由 `src-tauri/src/native_menu.rs` 自己建 NSMenu（不再走 Tauri 的菜单 API）：说明行（subtitle）、分组标题、模板图标、弹出按钮把选中项盖在按钮上。不再有退回网页菜单的情况。
+  - 新接入原生菜单的上游文件：`components/Select.tsx`（短列表；带搜索的长列表仍是网页）、`tasks/PickMenu.tsx`（单选、无搜索）、`chat/RunsOn.tsx`、`views/overview/FilterBar.tsx`、`views/TerminalTab.tsx`、`dialogs/native/PersonMenu.tsx`（菜单项抽成 `usePersonMenu`，网页和原生共用）、`dialogs/native/PersonCards.tsx`。
+  - 警告框：`components/Alert.tsx`、`dialogs/native/parts.tsx` 的 `Alert` 在 Mac app 里是 NSAlert（`src-tauri/src/native_alert.rs`、`lib/native-alert.ts`）；带表格或复选框的仍是网页。
+  - 跟随系统辅助显示：`src-tauri/src/native_menu.rs` 的 `display_options`，`lib/prefs.ts`（`data-glass`、`data-contrast`），`styles/base.css`（关掉窗口内模糊），`styles/tokens.css`（增强对比度）。
+  - 文件：`src-tauri/src/native_files.rs`（Quick Look、系统分享菜单），`lib/files.ts`（`quickLook`、`shareFiles`），`layout/panel/FilesTab.tsx`（右键菜单 + 空格键）、`chat/PathLink.tsx`（右键菜单）。
+  - 拖出文件：`src-tauri/src/native_files.rs` 的 `drag_files`（NSDraggingSession），`layout/panel/FilesTab.tsx` 的行 `draggable` + `onDragStart`。
+  - 打字跳转：`lib/list-typeahead.ts`（新文件），接在 `layout/panel/FilesTab.tsx`、`ChangesTab.tsx`、`ScratchTab.tsx` 的 `onKey`。
+  - 原生表单 sheet：`src-tauri/src/native_sheet.rs`（通用的 NSPanel 表单：多行文本带 @ 补全与高亮、文本框、弹出按钮、分段控件、展开三角、底部复选框），`lib/native-sheet.ts`（`useNativeSheet`，React 仍是状态来源）。第一个用它的是 `tasks/NewTaskSheet.tsx`（提交逻辑抽成 `create`，网页版不变）。
+  - 也用原生 sheet 的：`fork/plans/NewPlanSheet.tsx`（新建计划，提交逻辑抽成 `create`）、`dialogs/native/WorkSheets.tsx` 的 Fork 与在朋友电脑上运行命令。弹出按钮的选项支持说明行、分组和禁用（`choicesOf` 把 `Select` 的选项原样转过去），另有行内复选框。新建标签（带删除按钮的标签列表）仍是网页。
+  - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSettingsSheet.tsx`（`plans/PlanSheets.tsx` 导出 `AUTONOMY_ICON`）、`plans/PlanSheets.tsx` 的 `PlanModeSheet`（如何运行：三张卡片，下面是改变了什么的提示框）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
+  - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
+  - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
+
 ### 沉稳界面（docs/calm-ui.md）
 
 界面气质（布局稳定、动效克制、状态安静、反馈分级、一致可预期、逐页验收）由 `packages/mac/src/fork/calm/` 的覆盖层实现，规则只在 `:root[data-calm]` 下生效。上游文件只留这几处接入点：
@@ -155,6 +178,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `packages/mac/package.json`、`packages/mac/src-tauri/tauri.conf.json`
 
 ### 计划按档位分工（架构 / 编码 / 审核 / 疑难修复）：第二阶段要抽出来
+
+疑难修复做完要交还：修复智能体只接手难事（检查失败后的修复任务、停了两次的任务），这些任务做完、工作树空闲时，里程碑的工作交还给编码角色（`fixer.ts` 的 `settle`；重启后凭活动记录里的交接行和 `watch.escalated` 认出来；你自己换的模型不动）。上游文件的接入点：`pilot.ts` 每轮一行调用 `settle`、`hand()` 和 `escalate` 多传任务 id，`watchdog.ts` 的 `escalate` 多一个任务 id 参数。
 
 已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、“谁做的”（BLG-198～201：`src/fork/plans/roles.ts` 算出各角色实际用的模型，里程碑工作树用谁也由它的 `workAgentFor` 决定；手机协议 `src/fork/companion/plan-roles-view.ts`、`plan-roles-views.ts`；Mac `packages/mac/src/fork/plans/MilestoneRoles.tsx`；手机 `packages/companion/components/fork/MilestoneRoles.tsx`、`packages/companion/lib/fork/roles-words.ts`；上游文件各只留接入点：`model.ts` 的 `MilestoneAgent` 两个可选字段，`pilot.ts` 的 `launch()` 两行，`protocol.ts` 的 `roles` 字段和 `SINCE.rolesSeen`，`views.ts` 一行，`PlanDetails.tsx`、`PlanOutline.tsx`、`PlanCanvas.tsx`、`app/plan/[id].tsx` 各一行加一个 import）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
 

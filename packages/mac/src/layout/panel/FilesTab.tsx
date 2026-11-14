@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Location, ViewerState } from '@beluga/core/store.js';
 import type { FsEntry } from '@beluga/protocol.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
@@ -10,7 +11,7 @@ import { IconButton, Segmented, cx } from '../../components/ui.js';
 import { useApi, useApp, useBeluga, useScopedKey } from '../../lib/beluga.js';
 import { scrollWithin } from '../../lib/scroll-within.js';
 import { ViewBoundary } from '../../lib/lazy-view.js';
-import { localPathOf, openWithDefaultApp } from '../../lib/files.js';
+import { dragFiles, localPathOf, nativeFiles, openWithDefaultApp, quickLook, shareFiles } from '../../lib/files.js';
 import { focusFor, openFocus, showChange, usePanelRuntime } from '../../lib/panel.js';
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN, clampShare } from '../../lib/panel-model.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
@@ -263,10 +264,17 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
       ...(canShowChange(row.path) ? [{ label: 'Show Changes', icon: 'diff' as const, onSelect: () => void showChange(client.store.getState(), row.path) }] : []),
       { label: 'Open in Full', icon: 'expand', keys: chordLabel('Cmd+Enter'), onSelect: () => void api.files.open(at(row.path)).then(() => openFocus('file', wsId)) },
       ...(local ? [{ label: 'Open With Its App', icon: 'external' as const, onSelect: () => void openWithDefaultApp(client, local) }] : []),
+      ...(local && nativeFiles()
+        ? [
+            { label: 'Quick Look', icon: 'eye' as const, keys: 'Space', onSelect: () => void quickLook([local]) },
+            { label: 'Share…', icon: 'share' as const, onSelect: () => void shareFiles([local]) },
+          ]
+        : []),
       ...base.slice(1),
     ];
   };
 
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const nav = rows.filter((r) => r.kind === 'entry');
     const i = nav.findIndex((r) => r.path === cursor);
@@ -292,6 +300,10 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
         const parent = ancestorsOf(row.path).pop();
         if (parent !== undefined) setCursor(parent);
       }
+    } else if (e.key === ' ' && row && !row.dir && nativeFiles() && localOf(row.path)) {
+      // Space: Quick Look, as in Finder.
+      e.preventDefault();
+      void quickLook([localOf(row.path)!]);
     } else if (e.key === 'Enter' && row) {
       e.preventDefault();
       if ((e.metaKey || e.ctrlKey) && !row.dir) void api.files.open(at(row.path)).then(() => openFocus('file', wsId));
@@ -300,6 +312,10 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
       e.preventDefault();
       e.stopPropagation();
       void api.files.closeViewer();
+    } else {
+      // Typing a name goes to it.
+      const to = typeAhead(e, nav.map((r) => r.name), i);
+      if (to >= 0) move(to);
     }
   };
 
@@ -369,6 +385,14 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
                     style={{ paddingLeft: 6 + row.depth * 14 }}
                     title={row.path}
                     {...aheadOnHover(api, () => (row.dir ? undefined : at(row.path)))}
+                    // Dragged out of the window, as from Finder: the file (or folder) itself, the Mac's drag.
+                    draggable={nativeFiles() && Boolean(localOf(row.path))}
+                    onDragStart={(e) => {
+                      const p = localOf(row.path);
+                      if (!p || !nativeFiles()) return;
+                      e.preventDefault();
+                      void dragFiles([p]);
+                    }}
                     onClick={() => activate(row)}
                     onDoubleClick={() => {
                       const p = localOf(row.path);

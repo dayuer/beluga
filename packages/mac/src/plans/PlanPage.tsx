@@ -387,10 +387,10 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
           <RunsOnLabel tip="It runs on the computer it was made on until you move it." />
           {/* The plan's pull request, always one click from GitHub, with what stands in its way. */}
-          {pr ? <PlanPrChip pr={pr} /> : null}
+          {pr ? <PlanPrChip pr={pr} size="regular" /> : null}
           {/* How it runs: nothing to run while Claude writes it. A real decision: its sheet says what changes. */}
           {drafting ? null : (
-            <Button size="small" variant="quiet" icon="gauge" title={AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
+            <Button variant="quiet" icon="gauge" title={AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
               Runs on {AUTONOMY_INFO[plan.autonomy].label}
               {view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
             </Button>
@@ -398,21 +398,21 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           <ClientViewPreview view={view} />
           {/* The orchestrator's chat beside the plan, in and out: always here, whichever way it is. */}
           <Tip label={chat ? 'Hide the orchestrator’s chat' : 'Open the orchestrator’s chat'} keys={shortcutKeys('toggle-inspector')}>
-            <Button size="small" variant="quiet" icon="claude" aria-pressed={chat} onClick={() => showChat(!chat)}>
+            <Button variant="quiet" icon="claude" aria-pressed={chat} onClick={() => showChat(!chat)}>
               {chat ? 'Hide Orchestrator' : 'Open Orchestrator'}
             </Button>
           </Tip>
           <ActionsDropdown items={more}>
-            <IconButton size="small" icon="more" label="Plan Options" />
+            <IconButton size="regular" icon="more" label="Plan Options" />
           </ActionsDropdown>
           {primary?.with && !primary.busy ? (
-            <SplitButton label={primary.with.label} items={primary.with.items}>
-              <Button variant="primary" size="small" {...(primary.icon ? { icon: primary.icon } : {})} onClick={primary.run}>
+            <SplitButton size="regular" label={primary.with.label} items={primary.with.items}>
+              <Button variant="primary" {...(primary.icon ? { icon: primary.icon } : {})} onClick={primary.run}>
                 {primary.label}
               </Button>
             </SplitButton>
           ) : primary ? (
-            <Button variant="primary" size="small" {...(primary.icon && !primary.busy ? { icon: primary.icon } : {})} disabled={primary.busy} aria-busy={primary.busy || undefined} className={primary.busy ? p.busyButton : undefined} onClick={primary.run}>
+            <Button variant="primary" {...(primary.icon && !primary.busy ? { icon: primary.icon } : {})} disabled={primary.busy} aria-busy={primary.busy || undefined} className={primary.busy ? p.busyButton : undefined} onClick={primary.run}>
               {primary.busy ? <Working /> : null}
               {primary.label}
             </Button>
@@ -460,7 +460,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
         <div className={p.stage}>
           <div className={p.stageTools}>
             {drafting ? null : (
-              <Segmented<Display> size="small"
+              <Segmented<Display>
                 label="Show"
                 value={prefs.display}
                 onChange={(display) => setPrefs((l) => ({ ...l, display }))}
@@ -471,19 +471,19 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
               />
             )}
             {drafting ? null : (
-              <Button size="small" variant="quiet" icon="clock" onClick={() => setPicked(picked === FEED ? undefined : FEED)} aria-pressed={picked === FEED}>
+              <Button variant="quiet" icon="clock" onClick={() => setPicked(picked === FEED ? undefined : FEED)} aria-pressed={picked === FEED}>
                 What Happened
               </Button>
             )}
             {/* What the plan has decided (BLG-772): there once it decided something. */}
             {body?.decisions?.length ? (
-              <Button size="small" variant="quiet" icon="bulb" onClick={() => setPicked(picked === DECISIONS ? undefined : DECISIONS)} aria-pressed={picked === DECISIONS}>
+              <Button variant="quiet" icon="bulb" onClick={() => setPicked(picked === DECISIONS ? undefined : DECISIONS)} aria-pressed={picked === DECISIONS}>
                 Decisions
               </Button>
             ) : null}
             {/* Where the work goes: each milestone into the plan's branch, the branch into main as one PR. */}
             {plan.body && !plan.draft ? (
-              <Button size="small" variant="quiet" icon="branch" onClick={() => setPicked(picked === BRANCH ? undefined : BRANCH)} aria-pressed={picked === BRANCH} title={`Where the plan’s work goes, step by step${plan.branch ? ` (${plan.branch})` : ''}`} className={p.branchButton}>
+              <Button variant="quiet" icon="branch" onClick={() => setPicked(picked === BRANCH ? undefined : BRANCH)} aria-pressed={picked === BRANCH} title={`Where the plan’s work goes, step by step${plan.branch ? ` (${plan.branch})` : ''}`} className={p.branchButton}>
                 {plan.branch ?? 'Branch'}
               </Button>
             ) : null}

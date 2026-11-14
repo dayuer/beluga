@@ -462,7 +462,7 @@ function MilestoneAgentSection({ m }: { m: MilestoneView }) {
         </span>
       </p>
       <div className={p.detailsActions}>
-        <Button size="small" icon="chat" variant={words?.tone === 'warn' ? 'primary' : 'plain'} onClick={() => openWorktree(m.agent!.worktree)}>
+        <Button icon="chat" variant={words?.tone === 'warn' ? 'primary' : 'plain'} onClick={() => openWorktree(m.agent!.worktree)}>
           {words?.tone === 'warn' ? 'Answer' : 'Open Agent’s Chat'}
           <TaskChatMark worktree={m.agent.worktree} />
         </Button>

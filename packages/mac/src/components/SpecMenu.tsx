@@ -7,6 +7,7 @@ import { useBeluga } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
 import { guiHint } from '../lib/gui-copy.js';
 import { ContextRoot } from './ContextRoot.js';
+import { type NativeRow, nativeContext, nativeDropdown } from '../lib/native-menu.js';
 import s from './SpecMenu.module.css';
 
 /**
@@ -35,6 +36,23 @@ const stayInMenu = (e: MouseEvent): void => e.stopPropagation();
 const isKeys = (hint: string | undefined): hint is string => !!hint && (/^[⌘⌥⇧⌃↩⌫]+.{0,3}$/.test(hint) || /^((Ctrl|Alt|Shift|Win|Super)\+)+.{1,5}$/.test(hint));
 
 const isDanger = (id: string): boolean => /delete|remove|leave|revoke|stop|hide/.test(id);
+
+/** A spec menu's rows as the web menu groups them: its own, this window's extras, the dangerous ones last. */
+function useSpecRows(menu: MenuKind, extra: readonly ActionItem[] = [], hide?: (id: string) => boolean): () => readonly NativeRow[] {
+  const actions = useActions();
+  const { client } = useBeluga();
+  return () => {
+    const spec = menuSpec(client.store.getState(), menu);
+    const items = (spec?.options ?? []).map((o, index) => ({ ...o, index })).filter((o) => o.id !== 'close' && !hide?.(o.id));
+    const row = (o: (typeof items)[number]): NativeRow => {
+      const hint = guiHint(o.hint);
+      // A hint that isn't a shortcut is the web menu's tooltip: a native menu has none, so it goes.
+      return { label: o.label, ...(isKeys(hint) ? { keys: hint } : {}), danger: isDanger(o.id), onSelect: () => actions.pick(menu, o.index) };
+    };
+    const groups = [items.filter((o) => !isDanger(o.id)).map(row), extra, items.filter((o) => isDanger(o.id)).map(row)].filter((g) => g.length);
+    return groups.flatMap((g, gi) => g.map((r, i) => (gi > 0 && i === 0 ? { ...r, separate: true } : r)));
+  };
+}
 
 function Items({ menu, Item, Separator, extra = [], hide, kit }: { menu: MenuKind; Item: typeof Dropdown.Item; Separator: typeof Dropdown.Separator; extra?: readonly ActionItem[]; hide?: (id: string) => boolean; kit: SubKit }) {
   const actions = useActions();
@@ -108,9 +126,10 @@ export function FitContent({ children, ...props }: ComponentPropsWithoutRef<type
 
 /** A dropdown from a button (the ⋯ on a project). Built when opened, so it's always current. */
 export function SpecDropdown({ menu, children, align = 'start', extra, hide }: { menu: MenuKind; children: ReactNode; align?: 'start' | 'end'; extra?: readonly ActionItem[]; hide?: (id: string) => boolean }) {
+  const rows = useSpecRows(menu, extra, hide);
   return (
     <Dropdown.Root modal={false}>
-      <Dropdown.Trigger asChild>{children}</Dropdown.Trigger>
+      <Dropdown.Trigger asChild {...nativeDropdown(rows)}>{children}</Dropdown.Trigger>
       <Dropdown.Portal>
         <FitContent className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} align={align}>
           <Items menu={menu} Item={Dropdown.Item} Separator={Dropdown.Separator} kit={DROPDOWN_SUB} {...(extra ? { extra } : {})} {...(hide ? { hide } : {})} />
@@ -123,9 +142,14 @@ export function SpecDropdown({ menu, children, align = 'start', extra, hide }: {
 /** A right-click menu on anything (a project row, a person). */
 export function SpecContext({ menu, children, extra, hide }: { menu: MenuKind | undefined; children: ReactNode; extra?: readonly ActionItem[]; hide?: (id: string) => boolean }) {
   if (!menu) return <>{children}</>;
+  return <SpecContextOf menu={menu} {...(extra ? { extra } : {})} {...(hide ? { hide } : {})}>{children}</SpecContextOf>;
+}
+
+function SpecContextOf({ menu, children, extra, hide }: { menu: MenuKind; children: ReactNode; extra?: readonly ActionItem[]; hide?: (id: string) => boolean }) {
+  const rows = useSpecRows(menu, extra, hide);
   return (
     <ContextRoot>
-      <Context.Trigger asChild>{children}</Context.Trigger>
+      <Context.Trigger asChild onContextMenu={nativeContext(rows)}>{children}</Context.Trigger>
       <Context.Portal>
         <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGE} sticky="always">
           <Items menu={menu} Item={Context.Item as unknown as typeof Dropdown.Item} Separator={Context.Separator as unknown as typeof Dropdown.Separator} kit={CONTEXT_SUB} {...(extra ? { extra } : {})} {...(hide ? { hide } : {})} />
@@ -220,7 +244,7 @@ function ActionRows({ items, Item, Separator, kit = DROPDOWN_SUB }: { items: rea
 export function ActionsContext({ items, children }: { items: readonly ActionItem[] | (() => readonly ActionItem[]); children: ReactNode }) {
   return (
     <ContextRoot>
-      <Context.Trigger asChild>{children}</Context.Trigger>
+      <Context.Trigger asChild onContextMenu={nativeContext(() => (typeof items === 'function' ? items() : items))}>{children}</Context.Trigger>
       <Context.Portal>
         <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGE} sticky="always">
           <LazyRows items={items} />
@@ -239,7 +263,7 @@ function LazyRows({ items }: { items: readonly ActionItem[] | (() => readonly Ac
 export function ActionsDropdown({ items, children, align = 'end' }: { items: readonly ActionItem[]; children: ReactNode; align?: 'start' | 'end' }) {
   return (
     <Dropdown.Root modal={false}>
-      <Dropdown.Trigger asChild>{children}</Dropdown.Trigger>
+      <Dropdown.Trigger asChild {...nativeDropdown(() => items)}>{children}</Dropdown.Trigger>
       <Dropdown.Portal>
         <FitContent className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} align={align}>
           <ActionRows items={items} Item={Dropdown.Item} Separator={Dropdown.Separator} />

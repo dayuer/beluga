@@ -91,7 +91,7 @@ function EnvSentAlways() {
     <Group title="Env files sent without asking">
       {always.map((a) => (
         <Row key={a.root} label={a.name} detail="Its .env files go to your computers when a worktree there lacks them.">
-          <Button size="small" variant="quiet" onClick={() => void client.call('machines.env.forget', a.root).then((list) => setAlways(list as readonly EnvSendAlways[]), () => undefined)}>
+          <Button variant="quiet" onClick={() => void client.call('machines.env.forget', a.root).then((list) => setAlways(list as readonly EnvSendAlways[]), () => undefined)}>
             Ask Again
           </Button>
         </Row>
@@ -161,7 +161,7 @@ function YouOnTheNetwork({ you, here, onChange }: { you: AlwaysOnView | undefine
             {you.standIn ? 'Standing In' : you.here ? 'Always On' : ''}
           </span>
         ) : (
-          <Button size="small" onClick={() => setAsking(true)}>
+          <Button onClick={() => setAsking(true)}>
             Make {upFirst(thisComputer())} Always On…
           </Button>
         )}

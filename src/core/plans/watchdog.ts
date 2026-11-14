@@ -303,7 +303,7 @@ export interface WatchdogDeps {
    * plan's fix agent (a stronger model) and be woken once more there. → that agent's name, or
    * undefined (no fix agent, or it's on it already).
    */
-  readonly escalate?: (plan: Plan, channel: string) => string | undefined;
+  readonly escalate?: (plan: Plan, channel: string, task?: string) => string | undefined;
   readonly now?: () => number;
 }
 
@@ -442,7 +442,7 @@ export class TaskWatchdog {
       const key = t.issue.key;
       if (w?.wokeAt !== undefined && now - w.wokeAt < REPEAT_MS) {
         // Hard for whoever is at it: the plan's fix agent gets one go before it waits for you.
-        const to = w.escalated ? undefined : this.deps.escalate?.(plan, channel);
+        const to = w.escalated ? undefined : this.deps.escalate?.(plan, channel, t.task.id);
         if (to) {
           this.wake(plan, t, t.issue, channel, stall, run, `${key} stopped again: gave it to ${to}, woke it at ${hhmm(now)}`, { escalated: true });
           continue;

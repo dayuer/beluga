@@ -43,7 +43,7 @@
   background: transparent;
   color: var(--text-2);
   font-size: 0.82rem;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .levelOn {
   background: var(--bg);
@@ -251,7 +251,7 @@
   background: transparent;
   color: var(--text);
   font-size: 0.84rem;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .macroRun:disabled {
   color: var(--text-3);
@@ -263,7 +263,7 @@
   border-left: 0.5px solid var(--hairline);
   background: transparent;
   color: var(--text-3);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .macroX:hover {
   color: var(--text);

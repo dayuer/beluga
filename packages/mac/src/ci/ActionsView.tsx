@@ -83,7 +83,7 @@ export function ActionsView() {
                 <Icon name="chevronDown" size={11} />
               </button>
             </PickMenu>
-            <Segmented<Page> size="small" label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
+            <Segmented<Page> label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
             {page === 'runs' && known.length + (workflow ? 1 : 0) > 1 ? (
               <PickMenu<string>
                 label="Workflow"
@@ -106,10 +106,10 @@ export function ActionsView() {
                 Live
               </span>
             ) : null}
-            <IconButton size="small" icon="refresh" label={loading || flows.loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
+            <IconButton size="regular" icon="refresh" label={loading || flows.loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx((loading || flows.loading) && s.spinning)} onClick={() => (refresh(), flows.refresh())} disabled={!repo} />
             {repo ? (
               <Tip label={`${repo.url}/actions`}>
-                <Button size="small" icon="external" onClick={() => openOnGitHub(`${repo.url}/actions`)}>
+                <Button icon="external" onClick={() => openOnGitHub(`${repo.url}/actions`)}>
                   GitHub
                 </Button>
               </Tip>
@@ -118,7 +118,7 @@ export function ActionsView() {
         </div>
         <div className={t.body}>
           {error && !list ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
           ) : !list ? (
             <Empty icon="pulse" title="Asking GitHub…" detail={`For ${here.name}’s workflow runs`} />
           ) : list.kind === 'none' ? (
@@ -130,14 +130,14 @@ export function ActionsView() {
               detail={`Beluga reads ${repoSlug(list.repo)}’s Actions with GitHub’s command-line tool, signed in as you. Set it up once, then check again.`}
               action={
                 <EmptyActions>
-                  <Button size="small" variant="primary" onClick={() => setConnect(true)}>
+                  <Button size="large" variant="primary" onClick={() => setConnect(true)}>
                     Connect GitHub…
                   </Button>
                 </EmptyActions>
               }
             />
           ) : list.kind === 'error' ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
           ) : page === 'workflows' ? (
             <Workflows projectId={projectId} flows={flows} runs={runs} />
           ) : !runs.length ? (
