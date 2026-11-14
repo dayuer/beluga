@@ -19,6 +19,7 @@ import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { Alert } from '../../components/Alert.js';
 import { Field, FormSheet, Popup, TextInput } from '../../components/FormSheet.js';
 import { useActions } from '../../lib/actions.js';
+import { nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
 import { useApi, useApp, useBeluga, useMachine } from '../../lib/beluga.js';
 import { type NativeSheet, closeSheet, useSheet } from '../../lib/sheets.js';
 import { RemoteWorktreeForm } from './RemoteWorktreeSheet.js';
@@ -45,8 +46,26 @@ function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
   const ws = useApp((st) => findWorkspace(st.projects, wsId));
   const siblings = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === wsId))?.workspaces);
   const [name, setName] = useState(ws ? `${ws.name}-2` : '');
-  if (!ws) return null;
   const taken = siblings?.some((w) => w.name === slug(name));
+  const fork = (): void => {
+    if (!ws || !slug(name) || taken) return;
+    void api.workspaces.fork(ws.id, name.trim());
+    close();
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts).
+  const native = useNativeSheet(
+    nativeSheets() && Boolean(ws),
+    {
+      title: `Fork “${ws?.name ?? ''}”`,
+      intro: 'A new worktree that starts exactly where this one is: its commits, uncommitted changes, Scratch and conversation, so you can try another direction. This one stays as it is.',
+      width: 500,
+      rows: [{ kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(taken ? { hint: 'A workspace in this project has this name.' } : slug(name) ? { hint: `Branch beluga/${slug(name)}` } : {}) }],
+      submit: 'Fork',
+      canSubmit: Boolean(slug(name)) && !taken,
+    },
+    { change: (_id, value) => setName(value), submit: fork, cancel: close },
+  );
+  if (!ws || native) return null;
   return (
     <FormSheet
       title={`Fork “${ws.name}”`}
@@ -79,6 +98,27 @@ function PeerRunSheet({ peerId, close }: { peerId?: string; close: () => void })
   const [command, setCommand] = useState('');
   const peer = peers.find((p) => p.peerId === who);
   const full = granted[who]?.level === 'full';
+  const run = (): void => {
+    if (!peer || !command.trim()) return;
+    void api.session.runOnPeerByHand(peer.name, command.trim(), channelOf(view));
+    close();
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts); nobody to run on is the alert below.
+  const native = useNativeSheet(
+    nativeSheets() && Boolean(able.length || peer),
+    {
+      title: peer ? `Run a Command on ${peer.name}’s Computer` : 'Run a Command on a Friend’s Computer',
+      intro: peer ? (full ? 'It runs right away. The output shows in this chat.' : `${peer.name} approves it first. The output shows in this chat.`) : 'The output shows in this chat.',
+      rows: [
+        ...(peerId ? [] : [{ kind: 'popup' as const, id: 'who', label: 'On', value: who, options: able.map((p) => ({ value: p.peerId, label: `${p.name}’s computer` })) }]),
+        { kind: 'text', id: 'command', label: 'Command', value: command, placeholder: 'npm test', focus: true },
+      ],
+      submit: 'Run',
+      canSubmit: Boolean(peer && command.trim()),
+    },
+    { change: (id, value) => (id === 'who' ? setWho(value) : setCommand(value)), submit: run, cancel: close },
+  );
+  if (native) return null;
   if (!able.length && !peer) {
     return (
       <Alert

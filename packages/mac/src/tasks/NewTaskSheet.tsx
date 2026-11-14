@@ -17,8 +17,7 @@ import { useBoard, usePeople, useSelf, useSolo, useTaskActions, useTasksPrefs } 
 import n from './NewTaskSheet.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
-import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
-import { flatOptions } from '../components/select-model.js';
+import { choicesOf, nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
 import { friendMention } from '@beluga/ui/suggest.js';
 
 /** The priority scale, left to right: its keys are 0 to 4. */
@@ -179,9 +178,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
               label: 'Agent',
               value: agent,
               hint: 'Who works on it when it starts: its worktree runs this agent and model.',
-              options: flatOptions(agents)
-                .filter((o) => !o.disabled)
-                .map((o) => ({ value: o.value, label: o.label, ...(typeof o.icon === 'string' ? { icon: o.icon } : o.icon ? { mark: o.icon } : {}) })),
+              options: choicesOf(agents),
             },
           ],
           footer: { id: 'start', label: 'Start with your agent', detail: 'A new worktree, with your agent working on it', checked: start },
