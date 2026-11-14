@@ -51,7 +51,7 @@ async function fromSvg(markup: string): Promise<Made | undefined> {
 }
 
 /** A row's picture as a PNG: the app's icon (a template), a colour dot, or a mark that's an SVG. */
-async function picture(p: Picture): Promise<Made | undefined> {
+export async function picture(p: Picture): Promise<Made | undefined> {
   if (!p) return undefined;
   if ('mark' in p) {
     if (!isValidElement(p.mark)) return undefined;

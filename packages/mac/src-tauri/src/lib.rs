@@ -13,6 +13,7 @@ mod menu;
 mod native_alert;
 mod native_files;
 mod native_menu;
+mod native_sheet;
 mod call_float;
 mod call_overlay;
 mod shared_window;
@@ -304,6 +305,9 @@ pub fn run() {
             native_files::quick_look,
             native_files::share_files,
             native_files::drag_files,
+            native_sheet::native_sheet_open,
+            native_sheet::native_sheet_update,
+            native_sheet::native_sheet_close,
             daemon_endpoint,
             restart_daemon,
             set_menu_state,

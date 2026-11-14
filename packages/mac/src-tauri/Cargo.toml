@@ -39,8 +39,8 @@ libc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSAlert", "NSApplication", "NSButton", "NSCell", "NSControl", "NSEvent", "NSImage", "NSMenu", "NSMenuItem", "NSResponder", "NSView", "NSWindow", "NSWorkspace", "NSAccessibility", "NSSharingService", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSPasteboard"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSGeometry", "NSString", "NSURL"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSAlert", "NSApplication", "NSButton", "NSCell", "NSControl", "NSEvent", "NSImage", "NSMenu", "NSMenuItem", "NSResponder", "NSView", "NSWindow", "NSWorkspace", "NSAccessibility", "NSSharingService", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSPasteboard", "NSPanel", "NSTextField", "NSTextView", "NSText", "NSScrollView", "NSClipView", "NSPopUpButton", "NSSegmentedControl", "NSFont", "NSColor", "NSTextStorage", "NSAttributedString", "NSButtonCell", "NSActionCell", "NSLayoutConstraint", "NSTextContainer", "NSTextInputClient", "NSUserInterfaceValidation", "NSUserInterfaceItemIdentification", "NSGraphics"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSGeometry", "NSString", "NSURL", "NSNotification", "NSRange", "NSAttributedString", "NSObject", "NSRunLoop"] }
 objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNUserNotificationCenter", "UNNotificationSettings"] }
 
 [profile.release]
