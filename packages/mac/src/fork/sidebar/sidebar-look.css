@@ -23,6 +23,21 @@
 }
 
 /*
+ * The selection is a neutral grey, as in a Mac source list, a step stronger while the sidebar has
+ * the focus (a row or the search field) and softer once you click elsewhere. The icon keeps the accent.
+ */
+[data-fork-sidebar] {
+  --sb-selected: color-mix(in srgb, var(--text) 5.5%, transparent);
+}
+[data-fork-sidebar]:focus-within {
+  --sb-selected: color-mix(in srgb, var(--text) 10%, transparent);
+}
+[data-fork-sidebar] [class*='_selected_']:not([data-fork-dup]),
+[data-fork-sidebar] [class*='_selected_']:not([data-fork-dup]):hover {
+  background: var(--sb-selected);
+}
+
+/*
  * Rhythm (the reviewed design): icon and name side by side with room between them; list rows a
  * little taller than upstream's, the top-level entries a step taller again with larger icons; a
  * child row's icon starts under its parent's name. Heights follow --row, so Compact still works.
@@ -69,12 +84,9 @@
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
-/* Section titles readable (--text-2 instead of --text-3, about 3:1 on the light sidebar); their + always there. */
+/* Section titles readable (--text-2 instead of --text-3, about 3:1 on the light sidebar); their + and fold arrow appear on hover, as upstream's do. */
 [data-fork-sidebar] [class*='_sectionTitle_'] {
   color: var(--text-2);
-}
-[data-fork-sidebar] [class*='_sectionAction_'] {
-  opacity: 1;
 }
 [data-fork-sidebar] [class*='_sectionAction_'] button {
   color: var(--text-3);
@@ -107,7 +119,7 @@
 }
 [data-fork-sidebar] [class*='_needsRow_'][class*='_selected_']:not([data-fork-dup]),
 [data-fork-sidebar] [class*='_problemRow_'][class*='_selected_']:not([data-fork-dup]) {
-  background: var(--bg-selected) !important;
+  background: var(--sb-selected) !important;
 }
 [data-fork-sidebar] [class*='_needsRow_']::after {
   display: none !important;

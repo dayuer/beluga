@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { IN_CHAT_SELECTION, SELECTED_CLASS } from '../packages/mac/src/fork/sidebar/one-selected.js';
+import { FOLD, ROW } from '../packages/mac/src/fork/sidebar/keys.js';
 
 /**
  * The fork's sidebar look (packages/mac/src/fork/sidebar/) hangs on upstream's class names and
@@ -45,5 +46,10 @@ describe('the sidebar look’s upstream anchors', () => {
   it('finds the needs-you edge the overlay draws as a dot', () => {
     const marks = read('layout', 'signal-marks.tsx');
     expect(marks).toContain('<span className={m.edge} data-signal="needs"');
+  });
+
+  it('finds the scroll area and the fold button the arrow keys (keys.ts) go by', () => {
+    expect(anchorsIn(`${ROW} ${FOLD}`.replace('button[', '[')).filter((name) => !upstream.has(name) && !classes(read('layout', 'project-groups.module.css')).has(name))).toEqual([]);
+    expect(read('layout', 'ProjectTree.tsx')).toContain('aria-expanded={foldable ? !fold.folded : undefined}');
   });
 });
