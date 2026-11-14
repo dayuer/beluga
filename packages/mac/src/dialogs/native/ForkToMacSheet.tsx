@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
+import { labelled, nativeSheets, parts, useNativeSheet } from '../../lib/native-sheet.js';
+import { t } from '../../i18n/index.js';
 import type { SharedFork } from '@beluga/core/friend-share-store.js';
 import { trustOf } from '@beluga/core/trust.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -60,10 +61,14 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
       intro: `A worktree of your own that starts where ${ownerName}’s is now, with your agent. ${ownerName}’s goes on as it is.`,
       width: 540,
       rows: [
-        { kind: 'note', text: 'Comes with it: its commits and uncommitted changes (uncommitted work stays uncommitted, as it was), its Scratch (screenshots, notes and logs the agent saved), and the conversation (your agent remembers it and carries on).' },
-        { kind: 'note', text: 'Stays behind: node_modules, build output and anything else git ignores, made again by the setup here. Never a .env file or a key.' },
+        // The web sheet's own rows, each in its language.
+        { kind: 'note', text: labelled('Comes with it', '') },
+        { kind: 'note', text: parts('Its commits and uncommitted changes', 'Uncommitted work stays uncommitted, as it was') },
+        { kind: 'note', text: parts('Its Scratch', 'Screenshots, notes and logs the agent saved') },
+        { kind: 'note', text: parts('The conversation', 'Your agent remembers it and carries on') },
+        { kind: 'note', text: labelled('Stays behind', t('node_modules, build output and anything else git ignores, made again by the setup here. Never a .env file or a key.')) },
         ...(full ? [] : [{ kind: 'note' as const, text: `It’s ${ownerName}’s code: the setup waits until you’ve looked it over, and your .env files aren’t copied in.` }]),
-        { kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(slug(name) ? { hint: `Your branch beluga/${slug(name)}` } : {}) },
+        { kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}` } : {}) },
       ],
       submit: 'Fork',
       canSubmit: Boolean(slug(name)),

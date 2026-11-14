@@ -80,6 +80,15 @@ pub enum SheetRow {
         #[serde(default)]
         hint: Option<String>,
     },
+    /// A radio group, one option to a line: its icon and name, the option's line under it
+    /// (`hint`), as AppKit's radio groups with descriptions (and the app's option cards) show them.
+    #[serde(rename = "radio")]
+    Radio {
+        id: String,
+        label: String,
+        value: String,
+        options: Vec<SheetOption>,
+    },
     /// A push button in the control column ("Choose Another Folder…"): pressing it says "press".
     #[serde(rename = "button")]
     Button {
@@ -125,6 +134,7 @@ impl SheetRow {
             SheetRow::Segmented { id, options, .. } => format!("segmented:{id}:{}", options.len()),
             SheetRow::Checkbox { id, label, .. } => format!("checkbox:{id}:{}", label.is_some()),
             SheetRow::Button { id, label, .. } => format!("button:{id}:{}", label.is_some()),
+            SheetRow::Radio { id, options, .. } => format!("radio:{id}:{}", options.len()),
         }
     }
 }
@@ -209,6 +219,7 @@ mod mac {
         Segmented { control: Retained<NSSegmentedControl>, values: Vec<String> },
         Checkbox { button: Retained<NSButton> },
         Button { button: Retained<NSButton> },
+        Radio { buttons: Vec<Retained<NSButton>>, lines: Vec<Option<Retained<NSTextField>>>, values: Vec<String> },
     }
 
     struct Row {
@@ -455,6 +466,12 @@ mod mac {
         SHEET.with(|s| {
             let s = s.borrow();
             let s = s.as_ref()?;
+            if tag >= RADIO_TAG {
+                let (row, option) = ((tag - RADIO_TAG) / RADIO_ROW, (tag - RADIO_TAG) % RADIO_ROW);
+                let built = s.rows.get(row as usize)?;
+                let Control::Radio { values, .. } = &built.control else { return None };
+                return Some(SheetEvent::Change { id: built.id.clone(), value: values.get(option as usize)?.clone() });
+            }
             if tag == ASIDE_TAG {
                 return Some(SheetEvent::Change { id: s.spec.aside.as_ref()?.id.clone(), value: "press".into() });
             }
@@ -481,6 +498,9 @@ mod mac {
 
     const FOOTER_TAG: isize = 10_000;
     const ASIDE_TAG: isize = 10_001;
+    /// A radio button's tag: RADIO_TAG + its row × RADIO_ROW + its option.
+    const RADIO_TAG: isize = 20_000;
+    const RADIO_ROW: isize = 64;
 
     fn label(text: &str, mtm: MainThreadMarker) -> Retained<NSTextField> {
         NSTextField::labelWithString(&NSString::from_str(text), mtm)
@@ -656,6 +676,33 @@ mod mac {
                         line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)),
                     }
                 }
+                SheetRow::Radio { id, label: text, value, options } => {
+                    let mut buttons = Vec::new();
+                    let mut lines = Vec::new();
+                    for (o, option) in options.iter().enumerate() {
+                        let button = unsafe { NSButton::radioButtonWithTitle_target_action(&NSString::from_str(&option.label), Some(controller), Some(sel!(changed:)), mtm) };
+                        button.setTag(RADIO_TAG + tag * RADIO_ROW + o as isize);
+                        button.setState(if option.value == *value { NSControlStateValueOn } else { NSControlStateValueOff });
+                        if let Some(png) = option.icon.as_deref() {
+                            button.setImage(image(png, option.template.unwrap_or(true)).as_deref());
+                            button.setImagePosition(objc2_app_kit::NSCellImagePosition::ImageLeading);
+                        }
+                        root.addSubview(&button);
+                        let line = option.hint.as_deref().filter(|h| !h.is_empty()).map(|h| {
+                            let l = wrapping(h, 11.0, true, mtm);
+                            root.addSubview(&l);
+                            l
+                        });
+                        buttons.push(button);
+                        lines.push(line);
+                    }
+                    Row {
+                        id: id.clone(),
+                        label: Some(label(text, mtm)),
+                        control: Control::Radio { buttons, lines, values: options.iter().map(|o| o.value.clone()).collect() },
+                        line: None,
+                    }
+                }
                 SheetRow::Button { id, label: text, text: title, hint } => {
                     let button = unsafe { NSButton::buttonWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
                     button.setTag(tag);
@@ -762,6 +809,24 @@ mod mac {
                     }
                     button.setFrame(NSRect::new(NSPoint::new(control_x - 3.0, y - 1.0), NSSize::new(size.width.clamp(140.0, control_w + 6.0), size.height)));
                     y += size.height - 2.0;
+                    (control_x, control_w)
+                }
+                Control::Radio { buttons, lines, .. } => {
+                    if let Some(l) = &row.label {
+                        l.setFrame(NSRect::new(NSPoint::new(MARGIN, y + 1.0), NSSize::new(label_w, 17.0)));
+                    }
+                    for (button, line) in buttons.iter().zip(lines) {
+                        let size = button.fittingSize();
+                        button.setFrame(NSRect::new(NSPoint::new(control_x, y), NSSize::new(size.width.min(control_w), size.height)));
+                        y += size.height;
+                        if let Some(line) = line {
+                            let h = fit_height(line, control_w - 20.0);
+                            line.setFrame(NSRect::new(NSPoint::new(control_x + 20.0, y + 1.0), NSSize::new(control_w - 20.0, h)));
+                            y += h + 1.0;
+                        }
+                        y += 6.0;
+                    }
+                    y -= 6.0;
                     (control_x, control_w)
                 }
                 Control::Button { button } => {
@@ -893,6 +958,16 @@ mod mac {
                     if let (Some(h), Some(line)) = (hint, &built.line) {
                         line.setStringValue(&NSString::from_str(h));
                     }
+                }
+                (SheetRow::Radio { value, options, .. }, Control::Radio { buttons, lines, values }) => {
+                    for (o, (button, option)) in buttons.iter().zip(options).enumerate() {
+                        button.setTitle(&NSString::from_str(&option.label));
+                        button.setState(if option.value == *value { NSControlStateValueOn } else { NSControlStateValueOff });
+                        if let (Some(Some(line)), Some(h)) = (lines.get(o), option.hint.as_deref()) {
+                            line.setStringValue(&NSString::from_str(h));
+                        }
+                    }
+                    *values = options.iter().map(|o| o.value.clone()).collect();
                 }
                 (SheetRow::Button { text, hint, .. }, Control::Button { button }) => {
                     button.setTitle(&NSString::from_str(text));
@@ -1041,6 +1116,14 @@ mod mac {
                         Control::Popup { button, .. } => button.removeFromSuperview(),
                         Control::Segmented { control, .. } => control.removeFromSuperview(),
                         Control::Checkbox { button } | Control::Button { button } => button.removeFromSuperview(),
+                        Control::Radio { buttons, lines, .. } => {
+                            for b in buttons {
+                                b.removeFromSuperview();
+                            }
+                            for l in lines.into_iter().flatten() {
+                                l.removeFromSuperview();
+                            }
+                        }
                         Control::Note => {}
                     }
                 }

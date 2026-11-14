@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
+import { t } from '../i18n/index.js';
 import { type IssueStatus, PRIORITY_INFO, type Priority, STATUS_INFO, asksPrivate, boardOf, issueById, reposOf } from '@beluga/core/board/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
@@ -17,7 +18,7 @@ import { useBoard, usePeople, useSelf, useSolo, useTaskActions, useTasksPrefs } 
 import n from './NewTaskSheet.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
-import { choicesOf, nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { choicesOf, nativeSheets, parts, useNativeSheet } from '../lib/native-sheet.js';
 import { friendMention } from '@beluga/ui/suggest.js';
 
 /** The priority scale, left to right: its keys are 0 to 4. */
@@ -119,7 +120,8 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
       ? { title: 'New Task', intro: 'Tasks belong to a project: a folder with your code. Add one first.', rows: [], submit: 'Add a Project…', canSubmit: true }
       : {
           title: parentIssue ? `New Sub-task of ${parentIssue.key}` : 'New Task',
-          intro: parentIssue ? `Under “${parentIssue.title}” · ${where}` : where,
+          // The board's name stays; the column's label in its language.
+          intro: ((at: string) => (parentIssue ? t(`Under “${parentIssue.title}” · ${at}`) : at))(parts(pickBoard ? undefined : boards.find((b) => b.id === onBoard)?.name, STATUS_INFO[start ? 'todo' : column].label)),
           width: 560,
           rows: [
             ...(mine

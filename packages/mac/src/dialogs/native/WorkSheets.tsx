@@ -20,6 +20,7 @@ import { Alert } from '../../components/Alert.js';
 import { Field, FormSheet, Popup, TextInput } from '../../components/FormSheet.js';
 import { useActions } from '../../lib/actions.js';
 import { nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
+import { t } from '../../i18n/index.js';
 import { useApi, useApp, useBeluga, useMachine } from '../../lib/beluga.js';
 import { type NativeSheet, closeSheet, useSheet } from '../../lib/sheets.js';
 import { RemoteWorktreeForm } from './RemoteWorktreeSheet.js';
@@ -59,7 +60,7 @@ function ForkSheet({ wsId, close }: { wsId: string; close: () => void }) {
       title: `Fork “${ws?.name ?? ''}”`,
       intro: 'A new worktree that starts exactly where this one is: its commits, uncommitted changes, Scratch and conversation, so you can try another direction. This one stays as it is.',
       width: 500,
-      rows: [{ kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(taken ? { hint: 'A workspace in this project has this name.' } : slug(name) ? { hint: `Branch beluga/${slug(name)}` } : {}) }],
+      rows: [{ kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(taken ? { hint: 'A workspace in this project has this name.' } : slug(name) ? { hint: `${t('Branch')} beluga/${slug(name)}` } : {}) }],
       submit: 'Fork',
       canSubmit: Boolean(slug(name)) && !taken,
     },

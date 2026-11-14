@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { choicesOf, nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { choicesOf, labelled, nativeSheets, parts, useNativeSheet } from '../lib/native-sheet.js';
+import { t } from '../i18n/index.js';
 import { useAgentEntries } from '../components/agent-options.js';
 import { roleEntries } from './PlanRoles.js';
 import { AUTONOMY_ICON } from './PlanSheets.js';
@@ -76,15 +77,17 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
       intro: `How “${plan?.body?.title ?? plan?.draft?.title ?? 'this plan'}” runs and who does each part. Changes apply from now on; work already running keeps its agent.`,
       width: 600,
       rows: [
-        { kind: 'note', text: `Project: ${projectName ?? plan?.projectId ?? ''}` },
+        { kind: 'note', text: labelled('Project', projectName ?? plan?.projectId ?? '') },
+        // The cards' radio group: each way's line under it, the one it runs now marked Now (as its card is).
         {
-          kind: 'segmented',
+          kind: 'radio',
           id: 'mode',
           label: 'How it runs',
           value: mode ?? 'step',
-          options: AUTONOMIES.map((a) => ({ value: a, label: a === plan?.autonomy ? `${AUTONOMY_INFO[a].label} (now)` : AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a] })),
-          hint: change ? [change.from, change.now].filter(Boolean).join(' ') : mode ? AUTONOMY_INFO[mode].summary : '',
+          options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: a === plan?.autonomy ? parts(AUTONOMY_INFO[a].summary, 'Now') : AUTONOMY_INFO[a].summary })),
         },
+        // What changes, before Save confirms it: each sentence in its language.
+        ...(change ? [{ kind: 'note' as const, text: [t(change.from), change.now ? t(change.now) : ''].filter(Boolean).join(' ') }] : []),
         { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt ?? 'milestone', options: TESTS_AT.map((t) => ({ value: t, label: TESTS_AT_INFO[t].label })), hint: testsAt ? `${TESTS_AT_INFO[testsAt].hint}.` : '' },
         ...PLAN_ROLES.map((role) => ({ kind: 'popup' as const, id: `role:${role}`, label: ROLE_INFO[role].label, value: picks?.[role] ?? '', options: choicesOf(roleEntries(role, tiers, agents)) })),
         { kind: 'note', text: 'The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it.' },

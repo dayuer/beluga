@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { t } from '../../i18n/index.js';
 import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { planRoleDefaults } from '@beluga/shared/auto-route.js';
@@ -91,7 +92,8 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
           width: 600,
           rows: [
             { kind: 'textarea', id: 'goal', value: goal, lines: 6, focus: true },
-            { kind: 'note', text: `What it’s for and what done looks like. ${chordLabel('Cmd+Enter')} starts planning.` },
+            // As the web sheet's line, whose shortcut splits it in two.
+            { kind: 'note', text: `${t('What it’s for and what done looks like.')} ${chordLabel('Cmd+Enter')} ${t('starts planning.')}` },
             ...(known ? [] : [{ kind: 'popup' as const, id: 'project', label: 'Project', value: project, options: projects.map((x) => ({ value: x.id, label: x.name })) }]),
             ...(runs.machines.length
               ? [
@@ -110,14 +112,7 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
                   },
                 ]
               : []),
-            {
-              kind: 'segmented',
-              id: 'autonomy',
-              label: 'How it runs',
-              value: autonomy,
-              hint: AUTONOMY_INFO[autonomy].summary,
-              options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a] })),
-            },
+            { kind: 'radio', id: 'autonomy', label: 'How it runs', value: autonomy, options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: AUTONOMY_INFO[a].summary })) },
             { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt, hint: `${TESTS_AT_INFO[testsAt].hint}.`, options: TESTS_AT.map((x) => ({ value: x, label: TESTS_AT_INFO[x].label })) },
             { kind: 'disclosure', id: 'more', label: 'More options', open: more },
             ...(more

@@ -34,6 +34,14 @@ export function textOf(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   const markup = isValidElement(node) || Array.isArray(node) ? renderToStaticMarkup(node as never) : String(node);
   const doc = new DOMParser().parseFromString(`<body>${markup}</body>`, 'text/html');
+  // Each piece of text in its language, as the web view's own pieces are (a name in bold, a sentence around it).
+  const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  for (let node = walk.nextNode(); node; node = walk.nextNode()) {
+    const text = node.textContent ?? '';
+    const lead = /^\s*/.exec(text)![0];
+    const tail = /\s*$/.exec(text)![0];
+    if (text.trim()) node.textContent = `${lead}${t(text.trim())}${tail}`;
+  }
   return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
