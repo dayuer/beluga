@@ -121,6 +121,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 文件：`src-tauri/src/native_files.rs`（Quick Look、系统分享菜单），`lib/files.ts`（`quickLook`、`shareFiles`），`layout/panel/FilesTab.tsx`（右键菜单 + 空格键）、`chat/PathLink.tsx`（右键菜单）。
   - 拖出文件：`src-tauri/src/native_files.rs` 的 `drag_files`（NSDraggingSession），`layout/panel/FilesTab.tsx` 的行 `draggable` + `onDragStart`。
   - 打字跳转：`lib/list-typeahead.ts`（新文件），接在 `layout/panel/FilesTab.tsx`、`ChangesTab.tsx`、`ScratchTab.tsx` 的 `onKey`。
+  - 原生表单 sheet：`src-tauri/src/native_sheet.rs`（通用的 NSPanel 表单：多行文本带 @ 补全与高亮、文本框、弹出按钮、分段控件、展开三角、底部复选框），`lib/native-sheet.ts`（`useNativeSheet`，React 仍是状态来源）。第一个用它的是 `tasks/NewTaskSheet.tsx`（提交逻辑抽成 `create`，网页版不变）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
 
 ### 沉稳界面（docs/calm-ui.md）

@@ -17,6 +17,9 @@ import { useBoard, usePeople, useSelf, useSolo, useTaskActions, useTasksPrefs } 
 import n from './NewTaskSheet.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
+import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { flatOptions } from '../components/select-model.js';
+import { friendMention } from '@beluga/ui/suggest.js';
 
 /** The priority scale, left to right: its keys are 0 to 4. */
 const SCALE: readonly Priority[] = ['none', 'low', 'medium', 'high', 'urgent'];
@@ -77,49 +80,159 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
   const tagged = useTaggable(project, self.id, projects.find((p) => p.id === project)?.name);
   const box = useRef<HTMLTextAreaElement>(null);
   const tags = useBoxSuggestions({ text: describe, setText: setDescribe, people: tagged.people, className: n.suggestions });
-  if (!projects.length) {
-    // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
-    const addProject = (): void => {
-      close();
-      actions.run({ type: 'add_project' });
-    };
-    return <FormSheet title="New Task" intro="Tasks belong to a project: a folder with your code. Add one first." submitLabel="Add a Project…" onSubmit={addProject} onCancel={close} />;
-  }
   // Where it goes, quietly: the board (unless you pick it below) and the column; the repo when the board has several.
   const pickBoard = !known(boardId) && !parentIssue && boards.length > 1;
   const pickRepo = repos.length > 1;
   const where = [pickBoard ? '' : boards.find((b) => b.id === onBoard)?.name, STATUS_INFO[start ? 'todo' : column].label].filter(Boolean).join(' · ');
+  const canSubmit = Boolean((mine ? title.trim() : describe.trim()) && project);
+  const create = async (): Promise<void> => {
+    const who = choices.find((c) => c.key === assignee)?.assignee;
+    const created = await api.create({
+      projectId: project,
+      board: onBoard,
+      ...(mine ? { title: title.trim(), ...(goal.trim() ? { goal: goal.trim() } : {}) } : { describe: describe.trim() }),
+      status: start ? 'todo' : column,
+      priority,
+      ...(who ? { assignee: who } : {}),
+      ...(parentIssue ? { parent: parentIssue.id } : {}),
+      ...(agent !== YOUR_AGENT ? { agent: agentForChoice(agent, runtimes) } : {}),
+      private: isPrivate,
+    });
+    close();
+    // (The sheet is gone: a problem starting shows as a toast, and the task is there to start again.)
+    if (start) await act(() => api.start(created.id, { claude: true }));
+    else {
+      toast(client, `Created ${created.key}${created.private ? ', private' : ''}`, 'success');
+      if (parentIssue) open(parentIssue);
+    }
+  };
+
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the same state, its controls the system's.
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const addProject = (): void => {
+    close();
+    actions.run({ type: 'add_project' });
+  };
+  const native = useNativeSheet(
+    nativeSheets(),
+    !projects.length
+      ? { title: 'New Task', intro: 'Tasks belong to a project: a folder with your code. Add one first.', rows: [], submit: 'Add a Project…', canSubmit: true }
+      : {
+          title: parentIssue ? `New Sub-task of ${parentIssue.key}` : 'New Task',
+          intro: parentIssue ? `Under “${parentIssue.title}” · ${where}` : where,
+          width: 560,
+          rows: [
+            ...(mine
+              ? [
+                  { kind: 'text' as const, id: 'title', label: 'Title', value: title, placeholder: 'Rate-limit the login endpoint', focus: true },
+                  { kind: 'textarea' as const, id: 'goal', value: goal, lines: 4, placeholder: '10 tries a minute per IP, then 429. Logins from the app keep working.' },
+                  { kind: 'note' as const, text: `What it’s for and what done looks like. Markdown; ${chordLabel('Cmd+Enter')} creates it.` },
+                ]
+              : [
+                  {
+                    kind: 'textarea' as const,
+                    id: 'describe',
+                    value: describe,
+                    lines: 4,
+                    focus: true,
+                    mentions: tagged.people.map((p) => friendMention(p.name)),
+                    placeholder: solo ? 'Say what you want done: one task, or a few. Your agent writes them.' : 'Say what you want done: one task, or a few and who each is for. Your agent writes them.',
+                  },
+                  {
+                    kind: 'note' as const,
+                    text: solo
+                      ? `Ask for several tasks, or an epic with its parts, and Create makes them all. @ names a friend. ${chordLabel('Cmd+Enter')} creates it.`
+                      : `Ask for several tasks, or an epic with its parts, and name who each is for (@ picks them): Create makes and assigns them all. ${chordLabel('Cmd+Enter')} creates it.`,
+                  },
+                ]),
+            { kind: 'disclosure' as const, id: 'mine', label: mine ? 'Let your agent write the title and goal' : 'Write title and goal myself', open: mine },
+            ...(pickBoard ? [{ kind: 'popup' as const, id: 'board', label: 'Board', value: onBoard, options: boards.map((b) => ({ value: b.id, label: b.name })) }] : []),
+            ...(pickRepo ? [{ kind: 'popup' as const, id: 'repo', label: 'Repo', value: project, options: repos.map((r) => ({ value: r, label: projects.find((p) => p.id === r)?.name ?? r })) }] : []),
+            {
+              kind: 'segmented' as const,
+              id: 'priority',
+              label: 'Priority',
+              value: priority,
+              options: SCALE.map((p) => ({ value: p, label: p === 'none' ? 'None' : PRIORITY_INFO[p].label, mark: <PriorityIcon priority={p} size={12} /> })),
+            },
+            ...(sharedWith || forced
+              ? [
+                  {
+                    kind: 'segmented' as const,
+                    id: 'who',
+                    label: 'Who Sees It',
+                    value: isPrivate ? 'only' : 'team',
+                    disabled: forced,
+                    options: [
+                      { value: 'team', label: 'Your Team', icon: 'people' as const },
+                      { value: 'only', label: 'Only You', icon: 'lock' as const },
+                    ],
+                    ...(forced ? { hint: 'Its parent is private, so it is too' } : isPrivate ? (only === undefined ? { hint: 'Your words asked to keep it to yourself' } : {}) : sharedWith ? { hint: `Everyone on the team: ${sharedWith}, and whoever they team up with` } : {}),
+                  },
+                ]
+              : []),
+            ...(solo ? [] : [{ kind: 'popup' as const, id: 'assignee', label: 'Assignee', value: assignee, options: [{ value: '', label: 'No one' }, ...choices.map((c) => ({ value: c.key, label: c.label }))] }]),
+            {
+              kind: 'popup' as const,
+              id: 'agent',
+              label: 'Agent',
+              value: agent,
+              hint: 'Who works on it when it starts: its worktree runs this agent and model.',
+              options: flatOptions(agents)
+                .filter((o) => !o.disabled)
+                .map((o) => ({ value: o.value, label: o.label, ...(typeof o.icon === 'string' ? { icon: o.icon } : o.icon ? { mark: o.icon } : {}) })),
+            },
+          ],
+          footer: { id: 'start', label: 'Start with your agent', detail: 'A new worktree, with your agent working on it', checked: start },
+          submit: start ? 'Create and Start' : 'Create Task',
+          canSubmit,
+          busy,
+          ...(problem ? { error: problem } : {}),
+        },
+    {
+      change: (id, value) => {
+        if (id === 'describe') setDescribe(value);
+        else if (id === 'title') setTitle(value);
+        else if (id === 'goal') setGoal(value);
+        else if (id === 'mine') setMine(value === 'true');
+        else if (id === 'board') setOnBoard(value);
+        else if (id === 'repo') setProject(value);
+        else if (id === 'priority') setPriority(value as Priority);
+        else if (id === 'who') setOnly(value === 'only');
+        else if (id === 'assignee') setAssignee(value);
+        else if (id === 'agent') setAgent(value);
+        else if (id === 'start') setStart(value === 'true');
+      },
+      submit: () => {
+        if (!projects.length) return addProject();
+        if (!canSubmit || busy) return;
+        setBusy(true);
+        setProblem(undefined);
+        create().catch((err: unknown) => {
+          setProblem(err instanceof Error ? err.message : String(err));
+          setBusy(false);
+        });
+      },
+      cancel: close,
+    },
+  );
+  if (native) return null;
+  if (!projects.length) {
+    // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
+    return <FormSheet title="New Task" intro="Tasks belong to a project: a folder with your code. Add one first." submitLabel="Add a Project…" onSubmit={addProject} onCancel={close} />;
+  }
   return (
     <FormSheet
       title={parentIssue ? `New Sub-task of ${parentIssue.key}` : 'New Task'}
       icon="task"
       intro={parentIssue ? `Under “${parentIssue.title}” · ${where}` : where}
       submitLabel={start ? 'Create and Start' : 'Create Task'}
-      canSubmit={Boolean((mine ? title.trim() : describe.trim()) && project)}
+      canSubmit={canSubmit}
       width={560}
       onCancel={close}
       footer={<Checkbox checked={start} onChange={setStart} label="Start with your agent" detail="A new worktree, with your agent working on it" />}
-      onSubmit={async () => {
-        const who = choices.find((c) => c.key === assignee)?.assignee;
-        const created = await api.create({
-          projectId: project,
-          board: onBoard,
-          ...(mine ? { title: title.trim(), ...(goal.trim() ? { goal: goal.trim() } : {}) } : { describe: describe.trim() }),
-          status: start ? 'todo' : column,
-          priority,
-          ...(who ? { assignee: who } : {}),
-          ...(parentIssue ? { parent: parentIssue.id } : {}),
-          ...(agent !== YOUR_AGENT ? { agent: agentForChoice(agent, runtimes) } : {}),
-          private: isPrivate,
-        });
-        close();
-        // (The sheet is gone: a problem starting shows as a toast, and the task is there to start again.)
-        if (start) await act(() => api.start(created.id, { claude: true }));
-        else {
-          toast(client, `Created ${created.key}${created.private ? ', private' : ''}`, 'success');
-          if (parentIssue) open(parentIssue);
-        }
-      }}
+      onSubmit={create}
     >
       {mine ? (
         <>
