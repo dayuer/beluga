@@ -143,7 +143,6 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
         label="From"
         aside={
           <Button
-            size="small"
             variant="quiet"
             icon="folder"
             onClick={another}

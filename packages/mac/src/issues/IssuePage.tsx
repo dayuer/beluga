@@ -95,7 +95,7 @@ function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: s
       <div className={t.page}>
         <div className={t.pageMain}>
           <nav className={t.crumbs} aria-label="Where this issue is">
-            <IconButton size="small" icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
+            <IconButton size="regular" icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
             <button type="button" className={t.crumb} onClick={() => a.openList(projectId)}>
               Issues
             </button>
@@ -103,9 +103,9 @@ function Page({ projectId, repo, issue, loading, refresh, late }: { projectId: s
             <span className={t.crumbPlain}>{project?.name ?? repoSlug(repo)}</span>
             <span className={t.grow} />
             <span className={t.pageKey}>#{issue.number}</span>
-            <IconButton size="small" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
+            <IconButton size="regular" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
             <ActionsDropdown items={[...post, ...menu(issue, stage, { open: false })]}>
-              <IconButton size="small" icon="more" label="More" />
+              <IconButton size="regular" icon="more" label="More" />
             </ActionsDropdown>
           </nav>
           <header className={t.pageHead}>

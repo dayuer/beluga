@@ -164,7 +164,7 @@ export function TasksView() {
             </button>
           </PickMenu>
         ) : null}
-        <Segmented<Scope> size="small"
+        <Segmented<Scope>
           label="Show"
           value={prefs.scope}
           onChange={(scope) => setTasksPrefs({ scope })}
@@ -174,7 +174,6 @@ export function TasksView() {
         {people.length > 1 || (people.length === 1 && people[0]!.key !== `person:${selfId}` && people[0]!.key !== `claude:${selfId}`) ? (
           <Select
             label="Whose tasks"
-            size="small"
             value={who}
             onChange={(w) => setTasksPrefs({ who: w })}
             options={[{ value: '', label: 'Everyone' }, ...people.map((p) => ({ value: p.key, label: p.label })), { value: 'nobody', label: 'No one yet' }, ...(hasPrivate ? [{ value: 'private', label: 'Private (only you see them)' }] : [])]}
@@ -206,7 +205,6 @@ export function TasksView() {
         {archive ? (
           counts.archived ? (
             <Button
-              size="small"
               variant="quiet"
               onClick={() =>
                 openSheet({
@@ -223,7 +221,7 @@ export function TasksView() {
             </Button>
           ) : null
         ) : (
-          <Segmented<Display> size="small"
+          <Segmented<Display>
             label="Display"
             iconOnly
             value={prefs.display}
@@ -248,9 +246,9 @@ export function TasksView() {
             ...(here.own ? [{ label: 'Delete Board…', icon: 'trash' as const, separate: true, danger: true, onSelect: () => deleteBoard(here.id) }] : []),
           ]}
         >
-          <IconButton size="small" icon="more" label="Tasks Options" />
+          <IconButton size="regular" icon="more" label="Tasks Options" />
         </ActionsDropdown>
-        <Button variant="primary" size="small" icon="plus" className={t.newTask} aria-label="New Task" onClick={() => openSheet({ kind: 'new_task', ...newTask })} title={`New Task${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
+        <Button variant="primary" icon="plus" className={t.newTask} aria-label="New Task" onClick={() => openSheet({ kind: 'new_task', ...newTask })} title={`New Task${shortcutKeys('page-new') ? ` (${shortcutKeys('page-new')})` : ''}`}>
           New Task
         </Button>
         </div>

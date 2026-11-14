@@ -218,17 +218,17 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
         </label>
         <span className={s.grow} />
         <ActionsDropdown items={more}>
-          <IconButton size="small" icon="more" label="More for Sentinel" />
+          <IconButton icon="more" label="More for Sentinel" />
         </ActionsDropdown>
         {asking ? null : (
           <Tip label="Say what you want watched; your agent sets it up beside this page">
-            <Button size="small" icon="claude" onClick={() => ask()}>
+            <Button icon="claude" onClick={() => ask()}>
               Ask Your Agent
             </Button>
           </Tip>
         )}
         <Tip label="Describe one, start from a recipe, or build it step by step" keys={shortcutKeys('page-new')}>
-          <Button variant="primary" size="small" icon="plus" onClick={() => openSheet({ kind: 'new_sentinel', ...(scoped ? { projectId: scoped } : {}) })}>
+          <Button variant="primary" icon="plus" onClick={() => openSheet({ kind: 'new_sentinel', ...(scoped ? { projectId: scoped } : {}) })}>
             New Sentinel
           </Button>
         </Tip>

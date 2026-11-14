@@ -97,14 +97,14 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: var(--control-h-small);
+  height: var(--control-h);
   padding: 0 8px;
   border: 0;
-  border-radius: var(--control-radius-small);
+  border-radius: var(--control-radius);
   background: linear-gradient(var(--control-top), var(--control));
   box-shadow: var(--control-bezel);
   font: inherit;
-  font-size: var(--control-text-small);
+  font-size: var(--control-text);
   color: var(--text);
   cursor: default;
 }
@@ -121,7 +121,7 @@
   align-items: center;
   gap: 6px;
   width: 210px;
-  height: 26px;
+  height: var(--control-h);
   padding: 0 9px;
   border: 1px solid var(--hairline);
   border-radius: 7px;

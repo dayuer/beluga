@@ -27,14 +27,14 @@ export function UsageLimitSettings() {
       </Row>
       {skipping ? (
         <Row label="Skipped this session" detail={`Nothing continues on its own until ${resetWords(p.autoContinueSkip, now)}.`}>
-          <Button size="small" onClick={() => set({ autoContinueSkip: 0 })}>
+          <Button onClick={() => set({ autoContinueSkip: 0 })}>
             Turn Back On
           </Button>
         </Row>
       ) : null}
       {p.autoContinue && chats > 0 ? (
         <Row label="Chats it’s off in" detail={`${chats} ${chats === 1 ? 'chat waits' : 'chats wait'} for you to press Continue.`}>
-          <Button size="small" onClick={() => set({ autoContinueOff: [] })}>
+          <Button onClick={() => set({ autoContinueOff: [] })}>
             Turn On in All
           </Button>
         </Row>

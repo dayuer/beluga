@@ -5,6 +5,8 @@ import { Checkbox } from '../components/Alert.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
+import { t } from '../i18n/index.js';
+import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
 import { RunsOnRow } from '../chat/RunsOn.js';
 import { myRuntime } from '../chat/ModelPicker.js';
 import { useMyAgent } from '../lib/agent-words.js';
@@ -184,12 +186,52 @@ export function PlanModeSheet({ planId, close }: { planId: string; close: () => 
   const { api, act } = usePlanActions();
   const [mode, setMode] = useState<Autonomy>(plan?.autonomy ?? DEFAULT_AUTONOMY);
   const [full, setFull] = useState(Boolean(plan?.fullAuto));
-  if (!plan || !view) return <FormSheet title="How It Runs" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
-  const mixed = plan.body?.milestones.some((m) => m.autonomy && m.autonomy !== plan.autonomy);
+  const mixed = plan?.body?.milestones.some((m) => m.autonomy && m.autonomy !== plan.autonomy);
   const fullNow = mode === 'autopilot' && full;
-  const fullChange = fullNow !== Boolean(plan.fullAuto) && mode === plan.autonomy && !mixed ? fullAutoChange(fullNow) : undefined;
-  const change = fullChange ?? (mode !== plan.autonomy || mixed ? modeChange(view, mode) : undefined);
-  const nowLabel = plan.fullAuto ? FULL_AUTOPILOT_INFO.label : AUTONOMY_INFO[plan.autonomy].label;
+  const fullChange = plan && fullNow !== Boolean(plan.fullAuto) && mode === plan.autonomy && !mixed ? fullAutoChange(fullNow) : undefined;
+  const change = plan && view ? (fullChange ?? (mode !== plan.autonomy || mixed ? modeChange(view, mode) : undefined)) : undefined;
+  const nowLabel = plan?.fullAuto ? FULL_AUTOPILOT_INFO.label : plan ? AUTONOMY_INFO[plan.autonomy].label : '';
+  const switchMode = async (): Promise<void> => {
+    if (!plan) return;
+    close();
+    if (fullNow) await act(() => api.setFullAuto(plan.id, true), `Runs on ${FULL_AUTOPILOT_INFO.label} now`);
+    else if (plan.fullAuto && mode === 'autopilot') await act(() => api.setFullAuto(plan.id, false), 'Runs on Autopilot now: questions wait for you again');
+    else await act(() => api.setAutonomy(plan.id, mode), `Runs on ${AUTONOMY_INFO[mode].label} now`);
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the three cards, Never wait for me under Autopilot (BLG-981), what changes under them.
+  const native = useNativeSheet(
+    nativeSheets() && Boolean(plan && view),
+    {
+      title: 'How It Runs',
+      intro: plan ? `“${plan.body?.title ?? plan.draft?.title ?? 'This plan'}” runs on ${nowLabel} now. Pick how it runs from here on.` : '',
+      width: 600,
+      rows: [
+        {
+          kind: 'cards',
+          id: 'mode',
+          label: 'How it runs',
+          value: mode,
+          options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a], hint: AUTONOMY_INFO[a].summary, ...(a === plan?.autonomy ? { badge: 'Now' } : {}) })),
+        },
+        ...(mode === 'autopilot'
+          ? [{ kind: 'checkbox' as const, id: 'full', text: 'Never wait for me', checked: full, hint: 'A stand-in agent answers what the plan’s agents would ask you, so it keeps going. A secret, a friend’s request or a task only you can do still waits for you.' }]
+          : []),
+        change ? { kind: 'callout', text: change.from, ...(change.now ? { detail: change.now } : {}) } : { kind: 'note', text: `${plan ? t(AUTONOMY_INFO[plan.autonomy].hint) : ''}.` },
+      ],
+      submit: change?.title ?? 'Switch',
+      canSubmit: Boolean(change),
+    },
+    {
+      change: (id, value) => {
+        if (id === 'mode') setMode(value as Autonomy);
+        else if (id === 'full') setFull(value === 'true');
+      },
+      submit: () => void (change && switchMode()),
+      cancel: close,
+    },
+  );
+  if (native) return null;
+  if (!plan || !view) return <FormSheet title="How It Runs" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
   return (
     <FormSheet
       title="How It Runs"
@@ -199,12 +241,7 @@ export function PlanModeSheet({ planId, close }: { planId: string; close: () => 
       canSubmit={Boolean(change)}
       width={600}
       onCancel={close}
-      onSubmit={async () => {
-        close();
-        if (fullNow) await act(() => api.setFullAuto(plan.id, true), `Runs on ${FULL_AUTOPILOT_INFO.label} now`);
-        else if (plan.fullAuto && mode === 'autopilot') await act(() => api.setFullAuto(plan.id, false), 'Runs on Autopilot now: questions wait for you again');
-        else await act(() => api.setAutonomy(plan.id, mode), `Runs on ${AUTONOMY_INFO[mode].label} now`);
-      }}
+      onSubmit={switchMode}
     >
       <div className={p.newPlan}>
         <div className={p.newPlanLabel} id="plan-runs">
