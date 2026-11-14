@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { IconName } from '../components/Icon.js';
+import type { SelectEntry } from '../components/select-parts.js';
+import { isSection } from '../components/select-model.js';
 import { locale, t } from '../i18n/index.js';
 import { nativeMenus, picture } from './native-menu.js';
 
@@ -16,6 +18,25 @@ export interface SheetChoice {
   readonly icon?: IconName;
   /** A mark of its own (an agent's logo, a priority's bars): drawn when it's an SVG. */
   readonly mark?: unknown;
+  /** A line under it in the open menu (a pop-up's option). */
+  readonly hint?: string;
+  /** Its section in a pop-up: a new one starts with a line and its title. */
+  readonly section?: string;
+  readonly disabled?: boolean;
+}
+
+/** A pop-up button's options (components/Select.tsx's entries: sections, descriptions, icons) as the sheet's. */
+export function choicesOf(entries: readonly SelectEntry<string>[]): SheetChoice[] {
+  return entries.flatMap((e) =>
+    (isSection(e) ? e.options.map((o) => [o, e.section] as const) : [[e, undefined] as const]).map(([o, section]) => ({
+      value: o.value,
+      label: o.label,
+      ...(typeof o.icon === 'string' ? { icon: o.icon } : o.icon ? { mark: o.icon } : {}),
+      ...(typeof o.description === 'string' && o.description ? { hint: o.description } : {}),
+      ...(section !== undefined ? { section } : {}),
+      ...(o.disabled ? { disabled: true } : {}),
+    })),
+  );
 }
 
 export type SheetRowSpec =
@@ -23,6 +44,7 @@ export type SheetRowSpec =
   | { readonly kind: 'text'; readonly id: string; readonly label?: string; readonly value: string; readonly placeholder?: string; readonly hint?: string; readonly focus?: boolean }
   | { readonly kind: 'note'; readonly text: string }
   | { readonly kind: 'disclosure'; readonly id: string; readonly label: string; readonly open: boolean }
+  | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string }
   | { readonly kind: 'popup'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[]; readonly hint?: string }
   | { readonly kind: 'segmented'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[]; readonly hint?: string; readonly disabled?: boolean };
 
@@ -55,7 +77,14 @@ async function choices(options: readonly SheetChoice[]): Promise<unknown[]> {
   return Promise.all(
     options.map(async (o) => {
       const made = await picture(o.icon ? { icon: o.icon } : o.mark != null ? { mark: o.mark } : undefined);
-      return { value: o.value, label: t(o.label), ...(made ? { icon: made.png, template: made.template } : {}) };
+      return {
+        value: o.value,
+        label: t(o.label),
+        ...(made ? { icon: made.png, template: made.template } : {}),
+        ...(o.hint ? { hint: t(o.hint) } : {}),
+        ...(o.section !== undefined ? { section: t(o.section) } : {}),
+        ...(o.disabled ? { disabled: true } : {}),
+      };
     }),
   );
 }
@@ -73,6 +102,8 @@ async function wire(spec: SheetSpec): Promise<unknown> {
           return { ...row, text: t(row.text) };
         case 'disclosure':
           return { ...row, label: t(row.label) };
+        case 'checkbox':
+          return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
         case 'popup':
         case 'segmented':
           return { ...row, label: colon(row.label), options: await choices(row.options), ...(row.hint ? { hint: t(row.hint) } : {}) };

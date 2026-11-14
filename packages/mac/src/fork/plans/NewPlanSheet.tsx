@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import { type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
+import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, TESTS_AT, TESTS_AT_INFO, type TestsAt } from '@beluga/core/plans/model.js';
+
+/** The three ways a plan runs, as its cards draw them (plans/PlanSheets.tsx). */
+const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
 import { agentForChoice } from '@beluga/ui/agent-choice.js';
 import { planRoleDefaults } from '@beluga/shared/auto-route.js';
 import { useDefaultAutonomy } from '../../plans/use-default-autonomy.js';
@@ -17,6 +20,15 @@ import { usePlanActions } from '../../plans/use-plans.js';
 import p from '../../plans/plans.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
 import { useActions } from '../../lib/actions.js';
+import { choicesOf, nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
+import { useAgentEntries } from '../../components/agent-options.js';
+import { ROLE_INFO } from '../../plans/plan-roles-model.js';
+import { roleEntries } from '../../plans/PlanRoles.js';
+import { useRunsOn } from '../../chat/RunsOn.js';
+import { HERE, type RunsOn, runsOnRows } from '../../machines/runs-on-model.js';
+import { MachineMark } from '../../machines/MachineMark.js';
+import { thisComputer, upFirst } from '../../lib/os-words.js';
+import type { IconName } from '../../components/Icon.js';
 
 // Fork (plan roles, PR #17 and #20): New Plan with a pop-up per role, in place of upstream's one
 // Agent pop-up (plans/PlanSheets.tsx's NewPlanSheet, kept as it is upstream). fork/sheets.tsx opens
@@ -49,12 +61,105 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
   const [picked, setPicked] = useState<Partial<Record<PlanRole, string>>>({});
   const picks = Object.fromEntries(PLAN_ROLES.map((r) => [r, picked[r] ?? roleStart(r, tiers)])) as Record<PlanRole, string>;
   const [more, setMore] = useState(false);
+  // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
+  const addProject = (): void => {
+    close();
+    actions.run({ type: 'add_project' });
+  };
+  const create = async (): Promise<void> => {
+    const roles = rolesInput(picks, tiers, (v) => agentForChoice(v, runtimes));
+    const input = { goal: goal.trim(), autonomy, testsAt, ...roles };
+    // Runs on one of your computers (BLG-788): the plan is made there and opens at once; held, the sheet stays.
+    const sent = sendToComputer(startDeps, project, roles.agent?.runtime ?? myRuntime(prefsNow()), { kind: 'plan', input });
+    if (sent === 'held') return;
+    close();
+    if (sent === 'sent') return;
+    await act(() => api.create({ projectId: project, ...input }));
+  };
+
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the same state, the system's controls.
+  const agents = useAgentEntries();
+  const runs = useRunsOn(project);
+  const runtime = useApp((s) => myRuntime(s.prefs));
+  const here = upFirst(thisComputer());
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const planIn = projects.find((x) => x.id === project)?.name;
+  const native = useNativeSheet(
+    nativeSheets(),
+    !projects.length
+      ? { title: 'New Plan', intro: 'Plans belong to a project: a folder with your code. Add one first.', rows: [], submit: 'Add a Project…', canSubmit: true }
+      : {
+          title: planIn ? `Plan in ${planIn}` : 'New Plan',
+          intro: 'Say what you want built. Your agent reads the code and cuts it into milestones and tasks; you talk it through, and nothing reaches the board until you approve.',
+          width: 600,
+          rows: [
+            { kind: 'textarea', id: 'goal', value: goal, lines: 6, focus: true },
+            { kind: 'note', text: `What it’s for and what done looks like. ${chordLabel('Cmd+Enter')} starts planning.` },
+            ...(known ? [] : [{ kind: 'popup' as const, id: 'project', label: 'Project', value: project, options: projects.map((x) => ({ value: x.id, label: x.name })) }]),
+            ...(runs.machines.length
+              ? [
+                  {
+                    kind: 'popup' as const,
+                    id: 'runs',
+                    label: 'Runs on',
+                    value: runs.value,
+                    options: runsOnRows(runs.machines, runtime, here).map((row) => ({
+                      value: row.value,
+                      label: row.label,
+                      hint: row.line,
+                      ...(row.machine ? { mark: <MachineMark machine={row.machine} size={13} /> } : { icon: row.value === HERE ? ('laptop' as const) : ('gauge' as const) }),
+                      ...(row.disabled ? { disabled: true } : {}),
+                    })),
+                  },
+                ]
+              : []),
+            {
+              kind: 'segmented',
+              id: 'autonomy',
+              label: 'How it runs',
+              value: autonomy,
+              hint: AUTONOMY_INFO[autonomy].summary,
+              options: AUTONOMIES.map((a) => ({ value: a, label: AUTONOMY_INFO[a].label, icon: AUTONOMY_ICON[a] })),
+            },
+            { kind: 'popup', id: 'tests', label: 'When to run tests', value: testsAt, hint: `${TESTS_AT_INFO[testsAt].hint}.`, options: TESTS_AT.map((x) => ({ value: x, label: TESTS_AT_INFO[x].label })) },
+            { kind: 'disclosure', id: 'more', label: 'More options', open: more },
+            ...(more
+              ? [
+                  ...PLAN_ROLES.map((role) => ({ kind: 'popup' as const, id: `role:${role}`, label: ROLE_INFO[role].label, value: picks[role], options: choicesOf(roleEntries(role, tiers, agents)) })),
+                  { kind: 'note' as const, text: 'The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in Plan Settings.' },
+                ]
+              : []),
+          ],
+          submit: 'Plan with Your Agent',
+          canSubmit: Boolean(goal.trim() && project),
+          busy,
+          ...(problem ? { error: problem } : {}),
+        },
+    {
+      change: (id, value) => {
+        if (id === 'goal') setGoal(value);
+        else if (id === 'project') setProject(value);
+        else if (id === 'runs') runs.set(value as RunsOn);
+        else if (id === 'autonomy') setAutonomy(value as Autonomy);
+        else if (id === 'tests') setTestsAt(value as TestsAt);
+        else if (id === 'more') setMore(value === 'true');
+        else if (id.startsWith('role:')) setPicked((was) => ({ ...was, [id.slice(5)]: value }));
+      },
+      submit: () => {
+        if (!projects.length) return addProject();
+        if (!goal.trim() || !project || busy) return;
+        setBusy(true);
+        setProblem(undefined);
+        create()
+          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
+          .finally(() => setBusy(false));
+      },
+      cancel: close,
+    },
+  );
+  if (native) return null;
   if (!projects.length) {
-    // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
-    const addProject = (): void => {
-      close();
-      actions.run({ type: 'add_project' });
-    };
     return <FormSheet title="New Plan" intro="Plans belong to a project: a folder with your code. Add one first." submitLabel="Add a Project…" onSubmit={addProject} onCancel={close} />;
   }
   const name = projects.find((p) => p.id === project)?.name;
@@ -67,16 +172,7 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
       width={600}
       canSubmit={Boolean(goal.trim() && project)}
       onCancel={close}
-      onSubmit={async () => {
-        const roles = rolesInput(picks, tiers, (v) => agentForChoice(v, runtimes));
-        const input = { goal: goal.trim(), autonomy, testsAt, ...roles };
-        // Runs on one of your computers (BLG-788): the plan is made there and opens at once; held, the sheet stays.
-        const sent = sendToComputer(startDeps, project, roles.agent?.runtime ?? myRuntime(prefsNow()), { kind: 'plan', input });
-        if (sent === 'held') return;
-        close();
-        if (sent === 'sent') return;
-        await act(() => api.create({ projectId: project, ...input }));
-      }}
+      onSubmit={create}
     >
       <div className={p.newPlan}>
         <label className={p.newPlanLabel} htmlFor="plan-goal">

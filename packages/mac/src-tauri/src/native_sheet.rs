@@ -21,6 +21,14 @@ pub struct SheetOption {
     pub icon: Option<Vec<u8>>,
     #[serde(default)]
     pub template: Option<bool>,
+    /// A line under it in the open menu (macOS 14.4's subtitle; a tooltip before).
+    #[serde(default)]
+    pub hint: Option<String>,
+    /// The section it's in: a new one starts with a line and its title.
+    #[serde(default)]
+    pub section: Option<String>,
+    #[serde(default)]
+    pub disabled: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -72,6 +80,16 @@ pub enum SheetRow {
         #[serde(default)]
         hint: Option<String>,
     },
+    #[serde(rename = "checkbox")]
+    Checkbox {
+        id: String,
+        #[serde(default)]
+        label: Option<String>,
+        text: String,
+        checked: bool,
+        #[serde(default)]
+        hint: Option<String>,
+    },
     #[serde(rename = "segmented")]
     Segmented {
         id: String,
@@ -95,6 +113,7 @@ impl SheetRow {
             SheetRow::Disclosure { id, .. } => format!("disclosure:{id}"),
             SheetRow::Popup { id, .. } => format!("popup:{id}"),
             SheetRow::Segmented { id, options, .. } => format!("segmented:{id}:{}", options.len()),
+            SheetRow::Checkbox { id, label, .. } => format!("checkbox:{id}:{}", label.is_some()),
         }
     }
 }
@@ -146,10 +165,10 @@ mod mac {
     use super::{SheetEvent, SheetOption, SheetRow, SheetSpec};
     use objc2::rc::Retained;
     use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol, ProtocolObject, Sel};
-    use objc2::{define_class, msg_send, sel, AllocAnyThread, MainThreadMarker, MainThreadOnly};
+    use objc2::{define_class, msg_send, sel, AllocAnyThread, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
         NSBackingStoreType, NSBezelStyle, NSBorderType, NSButton, NSButtonType, NSColor, NSControl, NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSFont,
-        NSForegroundColorAttributeName, NSImage, NSPanel, NSPopUpButton, NSScrollView, NSSegmentSwitchTracking, NSSegmentedControl, NSTextAlignment, NSTextDelegate, NSTextField,
+        NSForegroundColorAttributeName, NSImage, NSMenuItem, NSPanel, NSPopUpButton, NSScrollView, NSSegmentSwitchTracking, NSSegmentedControl, NSTextAlignment, NSTextDelegate, NSTextField,
         NSTextFieldDelegate, NSTextView, NSTextViewDelegate, NSView, NSWindow, NSWindowStyleMask,
     };
     use objc2_foundation::{NSArray, NSData, NSNotification, NSPoint, NSRange, NSRect, NSSize, NSString};
@@ -167,6 +186,7 @@ mod mac {
         Disclosure { triangle: Retained<NSButton>, title: Retained<NSButton> },
         Popup { button: Retained<NSPopUpButton>, values: Vec<String>, options: Vec<SheetOption> },
         Segmented { control: Retained<NSSegmentedControl>, values: Vec<String> },
+        Checkbox { button: Retained<NSButton> },
     }
 
     struct Row {
@@ -419,7 +439,8 @@ mod mac {
             }
             let row = s.rows.get(tag as usize)?;
             let value = match &row.control {
-                Control::Popup { button, values, .. } => values.get(button.indexOfSelectedItem() as usize)?.clone(),
+                Control::Popup { button, values, .. } => values.get(usize::try_from(button.selectedTag()).ok()?)?.clone(),
+                Control::Checkbox { button } => (button.state() == NSControlStateValueOn).to_string(),
                 Control::Segmented { control, values } => values.get(control.selectedSegment() as usize)?.clone(),
                 Control::Disclosure { .. } => {
                     let open = s.spec.rows.get(tag as usize).is_some_and(|r| matches!(r, SheetRow::Disclosure { open: true, .. }));
@@ -463,18 +484,59 @@ mod mac {
         control.setTag(tag);
     }
 
-    fn fill_popup(button: &NSPopUpButton, options: &[SheetOption], value: &str) {
+    /// The pop-up's menu: each option an item tagged with its index (so two with the same name stay
+    /// two, which addItemWithTitle wouldn't), a section's title before its first, the chosen one picked.
+    fn fill_popup(button: &NSPopUpButton, options: &[SheetOption], value: &str, mtm: MainThreadMarker) {
         button.removeAllItems();
-        for option in options {
-            button.addItemWithTitle(&NSString::from_str(&option.label));
-            if let (Some(png), Some(item)) = (option.icon.as_deref(), button.lastItem()) {
+        let Some(menu) = button.menu() else { return };
+        menu.setAutoenablesItems(false);
+        let headers = responds(NSMenuItem::class().as_ref(), sel!(sectionHeaderWithTitle:));
+        let mut section: Option<&str> = None;
+        for (i, option) in options.iter().enumerate() {
+            if option.section.as_deref() != section {
+                section = option.section.as_deref();
+                if i > 0 {
+                    menu.addItem(&NSMenuItem::separatorItem(mtm));
+                }
+                if let Some(title) = section.filter(|t| !t.is_empty()) {
+                    let title = NSString::from_str(title);
+                    let head = if headers {
+                        NSMenuItem::sectionHeaderWithTitle(&title, mtm)
+                    } else {
+                        let head = NSMenuItem::new(mtm);
+                        head.setTitle(&title);
+                        head.setEnabled(false);
+                        head
+                    };
+                    head.setTag(-1);
+                    menu.addItem(&head);
+                }
+            }
+            let item = NSMenuItem::new(mtm);
+            item.setTitle(&NSString::from_str(&option.label));
+            item.setTag(i as isize);
+            item.setEnabled(!option.disabled);
+            if let Some(png) = option.icon.as_deref() {
                 item.setImage(image(png, option.template.unwrap_or(true)).as_deref());
             }
+            if let Some(hint) = option.hint.as_deref().filter(|h| !h.is_empty()) {
+                let text = NSString::from_str(hint);
+                if responds(item.as_ref(), sel!(setSubtitle:)) {
+                    item.setSubtitle(Some(&text));
+                } else {
+                    item.setToolTip(Some(&text));
+                }
+            }
+            menu.addItem(&item);
         }
         if let Some(at) = options.iter().position(|o| o.value == value) {
-            button.selectItemAtIndex(at as isize);
+            button.selectItemWithTag(at as isize);
         }
         button.sizeToFit();
+    }
+
+    fn responds(obj: &AnyObject, selector: Sel) -> bool {
+        unsafe { msg_send![obj, respondsToSelector: selector] }
     }
 
     fn fill_segments(control: &NSSegmentedControl, options: &[SheetOption], value: &str) {
@@ -556,7 +618,7 @@ mod mac {
                 }
                 SheetRow::Popup { id, label: text, value, options, hint } => {
                     let button = NSPopUpButton::initWithFrame_pullsDown(NSPopUpButton::alloc(mtm), NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(160.0, 24.0)), false);
-                    fill_popup(&button, options, value);
+                    fill_popup(&button, options, value, mtm);
                     unsafe { target(&button, controller, sel!(changed:), tag) };
                     root.addSubview(&button);
                     Row {
@@ -565,6 +627,13 @@ mod mac {
                         control: Control::Popup { button, values: options.iter().map(|o| o.value.clone()).collect(), options: options.clone() },
                         line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)),
                     }
+                }
+                SheetRow::Checkbox { id, label: text, text: title, checked, hint } => {
+                    let button = unsafe { NSButton::checkboxWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
+                    button.setTag(tag);
+                    button.setState(if *checked { NSControlStateValueOn } else { NSControlStateValueOff });
+                    root.addSubview(&button);
+                    Row { id: id.clone(), label: text.as_deref().map(|t| label(t, mtm)), control: Control::Checkbox { button }, line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)) }
                 }
                 SheetRow::Segmented { id, label: text, value, options, hint, disabled } => {
                     let control = NSSegmentedControl::new(mtm);
@@ -661,6 +730,16 @@ mod mac {
                     y += size.height - 2.0;
                     (control_x, control_w)
                 }
+                Control::Checkbox { button } => {
+                    let size = button.fittingSize();
+                    let (x, w) = if row.label.is_some() { (control_x, control_w) } else { (MARGIN, inner) };
+                    if let Some(l) = &row.label {
+                        l.setFrame(NSRect::new(NSPoint::new(MARGIN, y + 1.0), NSSize::new(label_w, 17.0)));
+                    }
+                    button.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(size.width.min(w), size.height)));
+                    y += size.height;
+                    (x + 18.0, w - 18.0)
+                }
                 Control::Segmented { control, .. } => {
                     let size = control.fittingSize();
                     if let Some(l) = &row.label {
@@ -713,7 +792,7 @@ mod mac {
     }
 
     /// Puts the spec's values on the controls that are there (the form's shape is the same).
-    fn update_in_place(sheet: &mut Sheet, spec: &SheetSpec) {
+    fn update_in_place(sheet: &mut Sheet, spec: &SheetSpec, mtm: MainThreadMarker) {
         for (row, (built, old)) in spec.rows.iter().zip(sheet.rows.iter_mut().zip(sheet.spec.rows.iter())) {
             if row == old {
                 continue;
@@ -745,11 +824,11 @@ mod mac {
                 }
                 (SheetRow::Popup { value, options, label, hint, .. }, Control::Popup { button, values, options: had }) => {
                     if options != had {
-                        fill_popup(button, options, value);
+                        fill_popup(button, options, value, mtm);
                         *values = options.iter().map(|o| o.value.clone()).collect();
                         *had = options.clone();
                     } else if let Some(at) = values.iter().position(|v| v == value) {
-                        button.selectItemAtIndex(at as isize);
+                        button.selectItemWithTag(at as isize);
                     }
                     if let Some(l) = &built.label {
                         l.setStringValue(&NSString::from_str(label));
@@ -762,6 +841,13 @@ mod mac {
                     fill_segments(control, options, value);
                     *values = options.iter().map(|o| o.value.clone()).collect();
                     control.setEnabled(!*disabled);
+                    if let (Some(h), Some(line)) = (hint, &built.line) {
+                        line.setStringValue(&NSString::from_str(h));
+                    }
+                }
+                (SheetRow::Checkbox { text, checked, hint, .. }, Control::Checkbox { button }) => {
+                    button.setTitle(&NSString::from_str(text));
+                    button.setState(if *checked { NSControlStateValueOn } else { NSControlStateValueOff });
                     if let (Some(h), Some(line)) = (hint, &built.line) {
                         line.setStringValue(&NSString::from_str(h));
                     }
@@ -889,13 +975,14 @@ mod mac {
                         }
                         Control::Popup { button, .. } => button.removeFromSuperview(),
                         Control::Segmented { control, .. } => control.removeFromSuperview(),
+                        Control::Checkbox { button } => button.removeFromSuperview(),
                         Control::Note => {}
                     }
                 }
                 sheet.rows = build_rows(&spec, &sheet.root, &sheet.controller, mtm);
                 sheet.shape = shape;
             } else {
-                update_in_place(sheet, &spec);
+                update_in_place(sheet, &spec, mtm);
             }
             sheet.spec = spec;
             apply_chrome(sheet);
