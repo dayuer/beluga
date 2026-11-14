@@ -42,7 +42,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
 import { useSidebarHold } from '../fork/calm/hold-order.js';
-import { NewTaskButton, useOneSelected } from '../fork/sidebar/index.js';
+import { NewTaskButton, SidebarEdge, useOneSelected } from '../fork/sidebar/index.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -165,7 +165,7 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
-        <NewTaskButton />
+        <NewTaskButton /><SidebarEdge />
 
         {categories ? (
           <CategorySections />

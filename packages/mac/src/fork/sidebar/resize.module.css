@@ -1,0 +1,36 @@
+/*
+ * The sidebar's draggable right edge (fork; resize.tsx). The sidebar's own hairline border is the
+ * line; the handle (layout/panel/panel.module.css `.handle`) sits on it, 1 point wide with 4 more
+ * on each side to grab, and only lights up while hovered, dragged or focused.
+ */
+:global(nav:has([data-fork-sidebar-edge])) {
+  position: relative;
+  /*
+   * Calm mode gives every element's transitions 160 ms (fork/calm/calm-motion.css, M3) and the
+   * browser's default property is `all`: the width would glide behind the pointer and after each
+   * arrow key. The sidebar keeps its colour fades and never animates its width.
+   */
+  transition-property: background-color, border-color, color, opacity, box-shadow;
+}
+.edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+}
+/* It sits among the scroll's children: sidebar-look.css spaces those apart (`* + *`), not this. */
+.edge.edge[data-fork-sidebar-edge] {
+  margin: 0;
+}
+/* Nothing animates under Reduce Motion or calm mode: the highlight is there at once, or not. */
+:global(:root[data-motion='reduce']) .edge > *,
+:global(:root[data-calm]) .edge > * {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge > * {
+    transition: none;
+  }
+}
