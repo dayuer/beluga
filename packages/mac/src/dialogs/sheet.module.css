@@ -12,6 +12,13 @@
 .sheet[data-over-settings] {
   z-index: 49;
 }
+/* Settings opened from the welcome (its window is 86/87, the welcome 85): over both, under pop-ups (90). */
+.overlay[data-over-welcome] {
+  z-index: 88;
+}
+.sheet[data-over-welcome] {
+  z-index: 89;
+}
 :global([data-theme='dark']) .overlay {
   background: rgba(0, 0, 0, 0.35);
 }

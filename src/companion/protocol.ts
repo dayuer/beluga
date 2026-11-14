@@ -822,7 +822,7 @@ export const PlanView = z.object({
   /** 1.35 (BLG-498): who works its milestones and tasks from here on (none: your default), and the list to change it from (`plans.setWorkAgent`). */
   agent: AgentRefView.optional(),
   agents: AgentPickerView.optional(),
-  /** 1.51 (fork): who checks its milestones and reviews its drafts (none: the agent for its work); changed with `plans.setCheckAgent` from the same list. */
+  /** 1.55 (fork): who checks its milestones and reviews its drafts (none: the agent for its work); changed with `plans.setCheckAgent` from the same list. */
   checkAgent: AgentRefView.optional(),
   /** 1.53 (fork): who writes each milestone's design before its work starts (none: no architect step); changed with `plans.setArchAgent` from the same list. */
   archAgent: AgentRefView.optional(),
