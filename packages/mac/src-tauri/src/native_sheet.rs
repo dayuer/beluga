@@ -80,6 +80,16 @@ pub enum SheetRow {
         #[serde(default)]
         hint: Option<String>,
     },
+    /// A push button in the control column ("Choose Another Folder…"): pressing it says "press".
+    #[serde(rename = "button")]
+    Button {
+        id: String,
+        #[serde(default)]
+        label: Option<String>,
+        text: String,
+        #[serde(default)]
+        hint: Option<String>,
+    },
     #[serde(rename = "checkbox")]
     Checkbox {
         id: String,
@@ -114,6 +124,7 @@ impl SheetRow {
             SheetRow::Popup { id, .. } => format!("popup:{id}"),
             SheetRow::Segmented { id, options, .. } => format!("segmented:{id}:{}", options.len()),
             SheetRow::Checkbox { id, label, .. } => format!("checkbox:{id}:{}", label.is_some()),
+            SheetRow::Button { id, label, .. } => format!("button:{id}:{}", label.is_some()),
         }
     }
 }
@@ -130,6 +141,13 @@ pub struct FooterCheck {
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct AsideButton {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct SheetSpec {
     pub title: String,
     #[serde(default)]
@@ -137,6 +155,9 @@ pub struct SheetSpec {
     pub rows: Vec<SheetRow>,
     #[serde(default)]
     pub footer: Option<FooterCheck>,
+    /// A button on the left of the buttons' row ("Delete Board…"): pressing it says "press".
+    #[serde(default)]
+    pub aside: Option<AsideButton>,
     pub cancel: String,
     pub submit: String,
     pub can_submit: bool,
@@ -187,6 +208,7 @@ mod mac {
         Popup { button: Retained<NSPopUpButton>, values: Vec<String>, options: Vec<SheetOption> },
         Segmented { control: Retained<NSSegmentedControl>, values: Vec<String> },
         Checkbox { button: Retained<NSButton> },
+        Button { button: Retained<NSButton> },
     }
 
     struct Row {
@@ -208,6 +230,7 @@ mod mac {
         intro: Retained<NSTextField>,
         rows: Vec<Row>,
         footer: Option<(Retained<NSButton>, Option<Retained<NSTextField>>)>,
+        aside: Option<Retained<NSButton>>,
         error: Retained<NSTextField>,
         cancel: Retained<NSButton>,
         submit: Retained<NSButton>,
@@ -432,6 +455,9 @@ mod mac {
         SHEET.with(|s| {
             let s = s.borrow();
             let s = s.as_ref()?;
+            if tag == ASIDE_TAG {
+                return Some(SheetEvent::Change { id: s.spec.aside.as_ref()?.id.clone(), value: "press".into() });
+            }
             if tag == FOOTER_TAG {
                 let (check, _) = s.footer.as_ref()?;
                 let id = s.spec.footer.as_ref()?.id.clone();
@@ -441,6 +467,7 @@ mod mac {
             let value = match &row.control {
                 Control::Popup { button, values, .. } => values.get(usize::try_from(button.selectedTag()).ok()?)?.clone(),
                 Control::Checkbox { button } => (button.state() == NSControlStateValueOn).to_string(),
+                Control::Button { .. } => "press".into(),
                 Control::Segmented { control, values } => values.get(control.selectedSegment() as usize)?.clone(),
                 Control::Disclosure { .. } => {
                     let open = s.spec.rows.get(tag as usize).is_some_and(|r| matches!(r, SheetRow::Disclosure { open: true, .. }));
@@ -453,6 +480,7 @@ mod mac {
     }
 
     const FOOTER_TAG: isize = 10_000;
+    const ASIDE_TAG: isize = 10_001;
 
     fn label(text: &str, mtm: MainThreadMarker) -> Retained<NSTextField> {
         NSTextField::labelWithString(&NSString::from_str(text), mtm)
@@ -628,6 +656,12 @@ mod mac {
                         line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)),
                     }
                 }
+                SheetRow::Button { id, label: text, text: title, hint } => {
+                    let button = unsafe { NSButton::buttonWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
+                    button.setTag(tag);
+                    root.addSubview(&button);
+                    Row { id: id.clone(), label: text.as_deref().map(|t| label(t, mtm)), control: Control::Button { button }, line: hint.as_deref().map(|h| wrapping(h, 11.0, true, mtm)) }
+                }
                 SheetRow::Checkbox { id, label: text, text: title, checked, hint } => {
                     let button = unsafe { NSButton::checkboxWithTitle_target_action(&NSString::from_str(title), Some(controller), Some(sel!(changed:)), mtm) };
                     button.setTag(tag);
@@ -730,6 +764,16 @@ mod mac {
                     y += size.height - 2.0;
                     (control_x, control_w)
                 }
+                Control::Button { button } => {
+                    let size = button.fittingSize();
+                    let x = if row.label.is_some() { control_x } else { MARGIN };
+                    if let Some(l) = &row.label {
+                        l.setFrame(NSRect::new(NSPoint::new(MARGIN, y + 4.0), NSSize::new(label_w, 17.0)));
+                    }
+                    button.setFrame(NSRect::new(NSPoint::new(x - 6.0, y - 1.0), size));
+                    y += size.height - 2.0;
+                    (x, if row.label.is_some() { control_w } else { inner })
+                }
                 Control::Checkbox { button } => {
                     let size = button.fittingSize();
                     let (x, w) = if row.label.is_some() { (control_x, control_w) } else { (MARGIN, inner) };
@@ -785,6 +829,11 @@ mod mac {
                 detail.setFrame(NSRect::new(NSPoint::new(MARGIN + 18.0, y + 2.0 + size.height), NSSize::new(room - 18.0, h)));
                 bottom = bottom.max(y + 2.0 + size.height + h);
             }
+        }
+        if let Some(aside) = &sheet.aside {
+            aside.sizeToFit();
+            let size = aside.frame().size;
+            aside.setFrame(NSRect::new(NSPoint::new(MARGIN - 6.0, y), NSSize::new(size.width.max(82.0), size.height)));
         }
         let height = bottom + MARGIN;
         sheet.root.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, height)));
@@ -845,6 +894,12 @@ mod mac {
                         line.setStringValue(&NSString::from_str(h));
                     }
                 }
+                (SheetRow::Button { text, hint, .. }, Control::Button { button }) => {
+                    button.setTitle(&NSString::from_str(text));
+                    if let (Some(h), Some(line)) = (hint, &built.line) {
+                        line.setStringValue(&NSString::from_str(h));
+                    }
+                }
                 (SheetRow::Checkbox { text, checked, hint, .. }, Control::Checkbox { button }) => {
                     button.setTitle(&NSString::from_str(text));
                     button.setState(if *checked { NSControlStateValueOn } else { NSControlStateValueOff });
@@ -866,6 +921,10 @@ mod mac {
         sheet.submit.setEnabled(spec.can_submit && !spec.busy);
         sheet.submit_cmd.setEnabled(spec.can_submit && !spec.busy);
         sheet.cancel.setEnabled(!spec.busy);
+        if let (Some(button), Some(a)) = (&sheet.aside, &spec.aside) {
+            button.setTitle(&NSString::from_str(&a.label));
+            button.setEnabled(!spec.busy);
+        }
         if let (Some((check, detail)), Some(footer)) = (&sheet.footer, &spec.footer) {
             check.setTitle(&NSString::from_str(&footer.label));
             check.setState(if footer.checked { NSControlStateValueOn } else { NSControlStateValueOff });
@@ -940,9 +999,15 @@ mod mac {
             (check, detail)
         });
 
+        let aside = spec.aside.as_ref().map(|a| {
+            let button = unsafe { NSButton::buttonWithTitle_target_action(&NSString::from_str(&a.label), Some(&controller), Some(sel!(changed:)), mtm) };
+            button.setTag(ASIDE_TAG);
+            root.addSubview(&button);
+            button
+        });
         let rows = build_rows(&spec, &root, &controller, mtm);
         let shape = spec.rows.iter().map(SheetRow::shape).collect();
-        let sheet = Sheet { parent: parent.clone(), panel: panel.clone(), root, controller, spec, shape, title, intro, rows, footer, error, cancel, submit, submit_cmd, emit };
+        let sheet = Sheet { parent: parent.clone(), panel: panel.clone(), root, controller, spec, shape, title, intro, rows, footer, aside, error, cancel, submit, submit_cmd, emit };
         apply_chrome(&sheet);
         layout(&sheet);
         focus_first(&sheet);
@@ -975,7 +1040,7 @@ mod mac {
                         }
                         Control::Popup { button, .. } => button.removeFromSuperview(),
                         Control::Segmented { control, .. } => control.removeFromSuperview(),
-                        Control::Checkbox { button } => button.removeFromSuperview(),
+                        Control::Checkbox { button } | Control::Button { button } => button.removeFromSuperview(),
                         Control::Note => {}
                     }
                 }
