@@ -155,6 +155,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/onboarding/onboarding.module.css`：`@media (prefers-reduced-motion: reduce)` 停掉 `heroSoft` 的 sheen 与 `beam`（RE-01，上游缺口；沉稳模式 M5 已停）。
 - `packages/mac/src/call/NotesBox.tsx`：跳到一条发言的高亮 900ms → 160ms，Reduce motion 下不做（overlay §8.1 遗留）。
 - `packages/mac/src/call/PointerMark.tsx` ✓：点击指针标记的 1.16 弹跳在沉稳模式下不做（`calmOn()` 加进 `paintTag` 的守卫；reduced-motion 上游本来就停）。上游 3.2.0 新增，M4 同步跟进（`docs/calm/overlay.md` §12.2）。
+- `packages/mac/src/chat/KeyPasteCard.tsx` ✓：粘贴 API key 的卡片（上游 3.5.0）用 `element.animate()` 做的两处高度缓动（300/380ms，为了让上面的聊天不跳），沉稳模式下走 `calmMs()`（`fork/calm/calm-state.ts`：最多 160ms，减弱动效时为 0）；它的 CSS 动画由 `calm-motion.css` 的总规则关掉。
 - `packages/mac/e2e/unread.spec.ts`：未读断言从 `font-weight:650` 改为 400 + 计数徽标（沉稳 S2 的配套；fork-only 测试改动，见 `docs/calm/overlay.md` §12）；运行中出现的 Unread 行按 SH-08 等指针离开侧栏后再断言（先 `mouse.move` 出侧栏）。
 - `packages/mac/e2e/cool-window.spec.ts`：KLD-40 的“Working 光带走动”用例以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；沉稳模式故意让当前步骤以外的 live 标记停在静止帧（`docs/calm/hooks.md` §4），这条上游测试测的是上游时钟。
 - `packages/mac/e2e/plans.spec.ts`：「折叠里程碑时连线逐帧跟着」一条以沉稳关运行（`beluga.fork.calm.v1 = { calm: false }`）；它逐帧测上游的滑动，沉稳下这段滑动按 CH-06 是瞬时的，连线与盒子不会有中间帧可比。
@@ -224,6 +225,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
 
+上游 3.5.0 起 `src/machines/machines.ts`、`tests/machines-ssh.test.ts` 与上游一致（上游有了同样的结束处理），这里的差异已经没有了。
+
 原因：「Over SSH」添加电脑时起的 `ssh … beluga pair --computer` 要随 Beluga 退出一起结束，不能等配对在那边过期；停止中的 `sshPairStart` 也要拒绝新配对。这是 fork 的功能，上游没有。
 
 - `src/machines/machines.ts`：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
@@ -288,7 +291,7 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`
 - 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
 - Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
-- 以上通用修复已整理成 6 个基于上游 `main` 的分支（`upstream-pr/*`），准备提回上游；上游合并后这里的差异就消失。
+- 以上通用修复提回上游的 6 个 PR（beluga-labs/beluga #490–#495）已于 2026-11-13 全部合并，3.4.0 / 3.5.0 起这些文件与上游一致（`src/agent/policy.ts` 里 Studio 客户回合那部分是 fork 自己的，仍留着），同步 3.5.0 时从「改了上游的文件」清单里消失。
 
 ### 我的共享（M7 · BLG-217 / BLG-218，2026-11-13）
 
