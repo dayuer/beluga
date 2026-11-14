@@ -1,5 +1,6 @@
 import { type ReactNode, createContext, useContext, useMemo, useState } from 'react';
 import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { t as tr } from '../i18n/index.js';
 import { boardName, boardOf, isOwnBoard, isVisiting, reposOf } from '@beluga/core/board/model.js';
 import { Field, FormSheet, TextInput } from '../components/FormSheet.js';
 import { Icon } from '../components/Icon.js';
@@ -208,7 +209,7 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
             kind: 'checkbox' as const,
             id: `repo:${p.id}`,
             ...(i === 0 ? { label: 'Repos' } : {}),
-            text: self ? `${p.name} (its own)` : p.name,
+            text: self ? `${p.name} · ${tr('Its own')}` : p.name,
             checked: self || repos.includes(p.id),
             ...(i === projects.length - 1 ? { hint: own ? 'Tick the repos its tasks run in.' : 'Other repos whose tasks go on this board too.' } : {}),
           };

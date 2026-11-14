@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { nativeSheets, parts, useNativeSheet } from '../lib/native-sheet.js';
 import { useRunsOn } from '../chat/RunsOn.js';
 import { myRuntime } from '../chat/ModelPicker.js';
 import { HERE, type RunsOn, runsOnRows } from '../machines/runs-on-model.js';
@@ -149,7 +149,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
                     id: 'recipe',
                     label: 'Recipe',
                     value: chosenRecipe?.id ?? '',
-                    options: recipes.map((r) => ({ value: r.id, label: r.name, icon: iconOf(r.icon), hint: `${recipeWhen(r)} · ${r.line}`, section: r.group === 'numbers' ? 'Keep the numbers' : 'Recipes' })),
+                    options: recipes.map((r) => ({ value: r.id, label: r.name, icon: iconOf(r.icon), hint: parts(recipeWhen(r), r.line), section: r.group === 'numbers' ? 'Keep the numbers' : 'Recipes' })),
                     hint: chosenRecipe?.group === 'numbers' ? 'Numbers: they show on the sentinel’s page and your Dashboard' : '',
                   },
                 ]

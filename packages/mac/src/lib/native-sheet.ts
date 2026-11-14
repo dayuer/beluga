@@ -45,6 +45,8 @@ export type SheetRowSpec =
   | { readonly kind: 'note'; readonly text: string }
   | { readonly kind: 'disclosure'; readonly id: string; readonly label: string; readonly open: boolean }
   | { readonly kind: 'checkbox'; readonly id: string; readonly label?: string; readonly text: string; readonly checked: boolean; readonly hint?: string }
+  /** One option to a line, each with its icon and its line under it (the app's option cards, as AppKit draws them). */
+  | { readonly kind: 'radio'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[] }
   /** A push button ("Choose Another Folder…"): pressing it is a change to "press". */
   | { readonly kind: 'button'; readonly id: string; readonly label?: string; readonly text: string; readonly hint?: string }
   | { readonly kind: 'popup'; readonly id: string; readonly label: string; readonly value: string; readonly options: readonly SheetChoice[]; readonly hint?: string }
@@ -76,6 +78,14 @@ export interface SheetHandlers {
 export const nativeSheets = nativeMenus;
 
 const colon = (label: string): string => `${t(label)}${locale() === 'zh-CN' ? '：' : ':'}`;
+
+/**
+ * Words made of parts, each translated on its own (as the web sheet's pieces are), joined:
+ * the whole would be a sentence the catalog doesn't have. A part that's a name stays as it is.
+ */
+export const parts = (...pieces: ReadonlyArray<string | false | undefined>): string => pieces.filter((p): p is string => Boolean(p)).map((p) => t(p)).join(' · ');
+/** "Label: value" with the label translated and the language's own colon. */
+export const labelled = (label: string, value: string): string => `${colon(label)} ${value}`;
 
 async function choices(options: readonly SheetChoice[]): Promise<unknown[]> {
   return Promise.all(
@@ -110,6 +120,8 @@ async function wire(spec: SheetSpec): Promise<unknown> {
           return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
         case 'checkbox':
           return { ...row, ...(row.label ? { label: colon(row.label) } : {}), text: t(row.text), ...(row.hint ? { hint: t(row.hint) } : {}) };
+        case 'radio':
+          return { ...row, label: colon(row.label), options: await choices(row.options) };
         case 'popup':
         case 'segmented':
           return { ...row, label: colon(row.label), options: await choices(row.options), ...(row.hint ? { hint: t(row.hint) } : {}) };

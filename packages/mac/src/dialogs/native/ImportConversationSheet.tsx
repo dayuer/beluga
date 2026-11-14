@@ -1,5 +1,6 @@
 import { underPart } from '@beluga/shared/path-inside.js';
-import { nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
+import { nativeSheets, parts, useNativeSheet } from '../../lib/native-sheet.js';
+import { t } from '../../i18n/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import type { OutsideConversation } from '@beluga/core/workspace-controller.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -94,7 +95,7 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
       intro: `Pick a conversation from Terminal or another app. Your agent goes on with it in a new worktree of ${project?.name ?? ''}.`,
       width: 580,
       rows: [
-        { kind: 'button', id: 'folder', label: 'From', text: 'Choose Another Folder…', hint: `${tildePath(home, looking)}: this folder and the folders inside it` },
+        { kind: 'button', id: 'folder', label: 'From', text: 'Choose Another Folder…', hint: parts(tildePath(home, looking), 'This folder and the folders inside it') },
         !found
           ? { kind: 'note', text: 'Looking for conversations…' }
           : !found.conversations.length
@@ -108,10 +109,10 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
                   value: c.sessionId,
                   label: c.title,
                   icon: c.wsId ? ('branch' as const) : ('chat' as const),
-                  hint: [c.wsId ? 'Brought in already' : '', whereIn(found.dir, c.cwd, home), agoText(c.lastModified), formatBytes(c.bytes)].filter(Boolean).join(' · '),
+                  hint: parts(c.wsId && 'Brought in already', whereIn(found.dir, c.cwd, home), agoText(c.lastModified), formatBytes(c.bytes)),
                 })),
               },
-        ...(chosen && !opening ? [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, ...(slug(name) ? { hint: `Your branch beluga/${slug(name)}, from the commit that folder is on. Its uncommitted changes stay there.` } : {}) }] : []),
+        ...(chosen && !opening ? [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}${t(', from the commit that folder is on. Its uncommitted changes stay there.')}` } : {}) }] : []),
       ],
       submit: opening ? 'Open Its Worktree' : 'Continue in a Worktree',
       canSubmit: Boolean(chosen) && (opening || Boolean(slug(name))),
