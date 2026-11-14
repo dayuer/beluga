@@ -42,7 +42,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
 import { useSidebarHold } from '../fork/calm/hold-order.js';
-import { NewTaskButton, useOneSelected } from '../fork/sidebar/index.js';
+import { NewTaskButton, SidebarEdge, useOneSelected } from '../fork/sidebar/index.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -136,7 +136,7 @@ export function Sidebar() {
           </span>
         )}
         <UsageButton />
-        <IconButton icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
+        <IconButton size="large" icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
       </div>
       <SidebarSearch>
       <div className={s.scroll}>
@@ -165,7 +165,7 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
-        <NewTaskButton />
+        <NewTaskButton /><SidebarEdge />
 
         {categories ? (
           <CategorySections />
@@ -235,7 +235,7 @@ function UsageButton() {
   const selected = useApp((st) => st.view.kind === 'usage');
   return (
     <span className={s.usage} data-level={week === undefined ? undefined : week >= 90 ? 'high' : week >= 70 ? 'mid' : 'low'}>
-      <IconButton icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
+      <IconButton size="large" icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
     </span>
   );
 }
