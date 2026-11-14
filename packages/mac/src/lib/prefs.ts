@@ -325,6 +325,19 @@ function vibrancy(on: boolean): void {
   void import('@tauri-apps/api/core').then(({ invoke }) => invoke('set_vibrancy', { on })).catch(() => undefined);
 }
 
+let themeShown: UiPrefs['appearance'] | undefined;
+/**
+ * The app's own Appearance for what macOS draws: the menus, sheets and alerts that are AppKit's
+ * (lib/native-menu.ts, native-sheet.ts, native-alert.ts), Quick Look, the Share menu and the
+ * window's own blur follow NSApp's appearance, not the page's CSS. Match the System gives it back
+ * to macOS.
+ */
+function nativeTheme(mode: UiPrefs['appearance']): void {
+  if (themeShown === mode || !('__TAURI_INTERNALS__' in globalThis)) return;
+  themeShown = mode;
+  void import('@tauri-apps/api/app').then(({ setTheme }) => setTheme(mode === 'system' ? null : mode)).catch(() => undefined);
+}
+
 /** Put the preferences on the document (CSS variables and data attributes do the rest). */
 export function apply(p: UiPrefs = shown): void {
   const root = document.documentElement;
@@ -343,6 +356,7 @@ export function apply(p: UiPrefs = shown): void {
   const blur = !reduce && keyPlatform() === 'mac' && !isSolid(theme);
   root.dataset.os = keyPlatform();
   root.dataset.transparency = blur ? 'full' : 'reduce';
+  nativeTheme(p.appearance);
   root.dataset.glass = reduce ? 'off' : 'on';
   root.dataset.contrast = systemDisplay.increaseContrast ? 'more' : 'normal';
   vibrancy(blur);
