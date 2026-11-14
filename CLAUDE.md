@@ -90,3 +90,18 @@ a Mac it ends with a `Tested-on: macOS <tree>` line. Put that line, as it is, at
 commit message, and commit every file it tested (nothing changed since the run). CI then skips its
 macOS run for that commit (`scripts/local-pass.mjs`), and Linux and Windows still run there. No line
 (a failure, part of the suite, a file changed during the run) means don't add one.
+
+## Working in this fork (dayuer/beluga)
+
+This section is the fork's own; keep it last so upstream syncs merge cleanly.
+
+- **One session writes in the main checkout at a time.** Parallel work goes in its own worktree,
+  and every worktree ends merged into `main` or removed. Never leave uncommitted changes behind in
+  the main checkout for another session to build on.
+- **Build only from `main`.** Merge what the build should carry first, then `npm run app:build` from
+  a clean `main`. One build number per distinct code: don't build the same tree twice.
+- **One PR per piece of work.** Fold small fixes into the open PR instead of opening another; the
+  build-number change goes in the same PR as the code it ships.
+- **Merges and pushes follow the owner's word.** When the request already says to merge or push
+  (for example "测好就合并"), do it without stopping; otherwise finish the PR and ask once.
+- Nothing goes to upstream (`beluga-labs/beluga`) unless the owner asks for it in this session.
