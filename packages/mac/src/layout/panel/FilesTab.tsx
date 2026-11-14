@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Location, ViewerState } from '@beluga/core/store.js';
 import type { FsEntry } from '@beluga/protocol.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
@@ -273,6 +274,7 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
     ];
   };
 
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const nav = rows.filter((r) => r.kind === 'entry');
     const i = nav.findIndex((r) => r.path === cursor);
@@ -310,6 +312,10 @@ export function FilesTab({ wsId, project = false }: { wsId: string; project?: bo
       e.preventDefault();
       e.stopPropagation();
       void api.files.closeViewer();
+    } else {
+      // Typing a name goes to it.
+      const to = typeAhead(e, nav.map((r) => r.name), i);
+      if (to >= 0) move(to);
     }
   };
 
