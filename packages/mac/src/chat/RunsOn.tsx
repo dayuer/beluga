@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { type NativeRow, nativeDropdown } from '../lib/native-menu.js';
 import { useSyncExternalStore } from 'react';
 import type { MachineView } from '@beluga/machines/machines.js';
 import { Icon } from '../components/Icon.js';
@@ -88,9 +89,22 @@ export function RunsOnPicker({ project, runtime, folder, bare = false }: { proje
   // The computer it names can't take it now, or the folder is this Mac's: said on the chip, and sending waits (BLG-841).
   const picked = machines.find((x) => x.id === value);
   const why = picked ? (rows.find((row) => row.value === value)?.disabled ? rows.find((row) => row.value === value)!.line : folder ? `this folder is on ${here}` : undefined) : undefined;
+  // The Mac's own menu in the app (lib/native-menu.ts): "Runs on" as its section, each computer's
+  // mark, and what it can do now as the line under it.
+  const nativeRows = (): NativeRow[] =>
+    rows.map((row, i) => ({
+      label: row.label,
+      hint: row.line,
+      mark: row.machine ? <MachineMark machine={row.machine} size={13} /> : undefined,
+      ...(row.machine ? {} : { icon: row.value === HERE ? ('laptop' as const) : ('gauge' as const) }),
+      ...(row.disabled ? { disabled: true } : {}),
+      ...(row.value === value ? { checked: true } : {}),
+      ...(i === 0 ? { header: 'Runs on' } : {}),
+      onSelect: () => set(row.value),
+    }));
   return (
     <Dropdown.Root modal={false}>
-      <Dropdown.Trigger asChild>
+      <Dropdown.Trigger asChild {...nativeDropdown(nativeRows)}>
         <button type="button" className={cx(s.chip, r.chip, bare && r.bare, why && r.held)} aria-label={`Runs on ${name}${why ? `: ${why}` : ''}`} title={why ? `Nothing starts until it can: ${why}` : undefined} data-runs-on={value}>
           {bare ? null : <span className={r.words} data-runs-on-words>Runs on</span>}
           <Mark value={value} machines={machines} />

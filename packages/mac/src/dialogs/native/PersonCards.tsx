@@ -1,4 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { nativeDropdown } from '../../lib/native-menu.js';
 import { type ReactNode, useState } from 'react';
 import type { Guest } from '@beluga/core/collab-store.js';
 import { TRUST_INFO, canRunOn, trustOf } from '@beluga/core/trust.js';
@@ -269,7 +270,13 @@ export function GuestCard({ peer, guest, close, confirm }: CardProps & { guest: 
           {guest.room ? <Tag tone="accent">Everything</Tag> : guest.projects.map((id) => <Tag key={id}>{name(id)}</Tag>)}
           {!guest.room && more.length ? (
             <Dropdown.Root modal={false}>
-              <Dropdown.Trigger asChild>
+              <Dropdown.Trigger
+                asChild
+                {...nativeDropdown(() => [
+                  ...more.map((x) => ({ label: x.name, onSelect: () => void api.invites.change(peer.peerId, { addProject: x.id }) })),
+                  { label: 'Everything', hint: 'the room chat and what you share', separate: true, onSelect: () => void api.invites.change(peer.peerId, { room: true }) },
+                ])}
+              >
                 <button type="button" className={p.addChip} aria-label="Add to a project">
                   <Icon name="plus" size={10} /> Add
                 </button>
