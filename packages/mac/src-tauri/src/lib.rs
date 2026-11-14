@@ -10,6 +10,7 @@ mod export;
 mod focus;
 mod i18n;
 mod menu;
+mod native_alert;
 mod native_menu;
 mod call_float;
 mod call_overlay;
@@ -297,6 +298,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             native_menu::native_menu,
+            native_menu::display_options,
+            native_alert::native_alert,
             daemon_endpoint,
             restart_daemon,
             set_menu_state,

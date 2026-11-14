@@ -198,6 +198,33 @@
 }
 
 /* Before the prefs are applied (lib/prefs.ts accentCss): a web view without AccentColor (Chromium) gets macOS blue. */
+/*
+ * Increase contrast (macOS Accessibility › Display, read by lib/prefs.ts; prefers-contrast where the
+ * web view has it): firmer lines and secondary text, as AppKit's own controls draw then.
+ */
+:root[data-theme='light'][data-contrast='more'] {
+  --hairline: rgba(0, 0, 0, 0.24);
+  --hairline-strong: rgba(0, 0, 0, 0.4);
+  --text-2: #3a3a40;
+}
+:root[data-theme='dark'][data-contrast='more'] {
+  --hairline: rgba(255, 255, 255, 0.22);
+  --hairline-strong: rgba(255, 255, 255, 0.38);
+  --text-2: #cfcfd5;
+}
+@media (prefers-contrast: more) {
+  :root[data-theme='light'] {
+    --hairline: rgba(0, 0, 0, 0.24);
+    --hairline-strong: rgba(0, 0, 0, 0.4);
+    --text-2: #3a3a40;
+  }
+  :root[data-theme='dark'] {
+    --hairline: rgba(255, 255, 255, 0.22);
+    --hairline-strong: rgba(255, 255, 255, 0.38);
+    --text-2: #cfcfd5;
+  }
+}
+
 @supports not (color: AccentColor) {
   :root {
     --accent: #007aff;
