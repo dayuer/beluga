@@ -1,5 +1,5 @@
-import type { Policy } from '@beluga/core/store.js';
-import { defaultTrust, type TrustLevel } from '@beluga/core/trust.js';
+import type { Policy } from '../../../../../src/core/store.js';
+import { defaultTrust, type TrustLevel } from '../../../../../src/core/trust.js';
 
 /**
  * 「我的共享」的纯模型（BLG-217 / BLG-218，docs/calm/sharing.md）：「一个默认 + 少数例外」。

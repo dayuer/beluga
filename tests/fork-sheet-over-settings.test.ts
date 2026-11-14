@@ -22,7 +22,7 @@ describe('a sheet opened from Settings', () => {
     const sheet = read('components/FormSheet.tsx');
     expect(sheet).toContain(`document.querySelector('[data-settings]')`);
     expect(sheet).toMatch(/<Dialog\.Overlay className=\{s\.overlay\} data-over-settings=\{overSettings\}/);
-    expect(sheet).toMatch(/className=\{cx\(s\.sheet, tall && s\.tall\)\}\s+data-over-settings=\{overSettings\}/);
+    expect(sheet).toMatch(/className=\{cx\(s\.sheet, tall && s\.tall(, scrolls && s\.scrolls)?\)\}\s+data-over-settings=\{overSettings\}/);
   });
 
   it('layers above Settings and below alerts and the palette', () => {
