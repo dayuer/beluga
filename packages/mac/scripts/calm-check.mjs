@@ -288,6 +288,18 @@ function stepsFor(page, shot) {
     },
     // The row reads "Files" now (its old name, "Shared files", is the view's kind).
     shared: async () => side(page, 'Files').click(),
+    // M7 (BLG-218): 「我的共享」with 200 circles from its own demo source: CLS 0, nothing loops.
+    sharing: async () => {
+      await page.keyboard.press('Meta+,');
+      await page.waitForTimeout(800);
+      await page.getByRole('button', { name: 'People & access' }).click();
+      await page.waitForTimeout(1200);
+      // Calm on: the new page. Calm off: upstream's two groups (the comparison).
+      const view = page.locator('[data-sharing]');
+      if (await view.count()) await view.getByText('My sharing', { exact: true }).scrollIntoViewIfNeeded();
+      else await page.getByText('In the room', { exact: true }).first().scrollIntoViewIfNeeded();
+      await wait(800);
+    },
     palette: async () => page.keyboard.press('Meta+K'),
     settings: async () => page.keyboard.press('Meta+,'),
     person: async () => page.getByRole('button', { name: 'bob', exact: true }).click(),
@@ -694,9 +706,12 @@ try {
       // Before the app draws: the two switches, past the welcome, layout shifts from the first frame,
       // and whether data-calm was on before the first frame.
       await page.addInitScript(
-        pageFn(`({ calm, reduce, onboarding, theme }) => {
+        pageFn(`({ calm, reduce, onboarding, theme, demo }) => {
           const selectorOf = ${selectorFn};
           localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm }));
+          // M7's own demo source: 200 circles for the sharing scene (production never reads it).
+          if (demo) localStorage.setItem('beluga.fork.sharing.demo.v1', String(demo));
+          else localStorage.removeItem('beluga.fork.sharing.demo.v1');
           const prefs = {};
           if (reduce) prefs.reduceMotion = true;
           if (theme) prefs.appearance = theme;
@@ -723,7 +738,7 @@ try {
             });
           });
         }`),
-        { calm: combo.calm, reduce: combo.reduce, onboarding: scene === 'onboarding', theme },
+        { calm: combo.calm, reduce: combo.reduce, onboarding: scene === 'onboarding', theme, demo: scene === 'sharing' ? 200 : 0 },
       );
       if (combo.reduce) await page.emulateMedia({ reducedMotion: 'reduce' });
 

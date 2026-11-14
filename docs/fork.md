@@ -105,6 +105,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/lib/undo-toast.tsx`：`UndoToast` 里加 `useOneToast('undo', toast?.id)`，被压制时不渲染、不响应 ⌘Z（定时器照旧收尾），外层加 `data-one-toast="undo"`——撤销 toast 是模块级状态，两套必须在同一个判据下；样式在 `fork/calm/one-toast.css`（`docs/calm/hooks.md` §3）。
 - `packages/mac/src/lib/live-motion.ts`：`tick`/`wake`/`watch`/`joinLive` 里加 `calmLive` 门（同一文件 5 行）——时钟的 `seen`/`marks` 是模块私有的，外部拿不到，无法在 fork 文件里过滤；沉稳模式下只放行 `[data-current]` 里的标记，其余停在静止帧（`docs/calm/hooks.md` §4）。
 - `packages/mac/src/components/Lifted.tsx`：`useLean` 与 `Lifted` 的 `reduce` 判据加 `useCalm()`（M5 · 同步 3.3.0）。上游把任务板卡片和侧栏对话行的「拖起」抽成这个文件后，只看 `useReducedMotion`——原来 `TaskBoard` 的 `reduce` 含沉稳，这次重构丢了，沉稳开时拖起的东西会弹簧倾斜并放大到 `LIFT_SCALE` 1.035。沉稳时 `lean` 恒为 0、`scale` 恒为 1、不挂 spring；沉稳关与上游逐行一致。
+- `packages/mac/src/network/StatusMenu.tsx`：`StatusPanel` 读 `useCalm()`，沉稳开时把状态行右侧的说明（「Silences notifications」等）放进 `title`，说明由 `fork/calm/calm-status.css` 隐藏，行才等高；沉稳关时 `title` 为 `undefined`，与上游逐行一致。菜单的头部、宽度、圆点、行高、备注输入框全在 `calm-status.css`（BLG-216）。
 - `packages/mac/src/i18n/zh-CN.fork.json`：fork 自己的 `{0} new` 词条；上游文件不碰。
 
 ### M3 逐页补改（docs/calm/overlay.md §12；每处一行接入点）
@@ -183,6 +184,23 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `tests/web-security.test.ts`：浏览器 cookie 做不了 studio 管理
 - `tsconfig.json`：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
 
+### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
+
+原因：「Over SSH」添加电脑时起的 `ssh … beluga pair --computer` 要随 Beluga 退出一起结束，不能等配对在那边过期；停止中的 `sshPairStart` 也要拒绝新配对。这是 fork 的功能，上游没有。
+
+- `src/machines/machines.ts`：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
+- `tests/machines-ssh.test.ts`：对应的用例
+
+### 设置里打开的表单盖在设置窗口之上（BLG-213：留在 fork，不提回上游）
+
+原因：上游的设置窗口是 `z-index` 44/45，`FormSheet`（表单弹窗）是 40/41，所以从设置里打开的表单（Studio 的「连接到 Studio…」、项目的 worktree 环境等）会被设置窗口盖住、无法输入。上游自己的做法是原生 sheet，不受影响；fork 的 Studio 入口在设置里，需要抬高。`FormSheet` 渲染时若页面上有设置窗口（`[data-settings]`），就加 `data-over-settings`，层级 48/49（仍低于 alert 50）。从项目 ⋯ 菜单等处打开时属性不出现，表现不变。
+
+- `packages/mac/src/components/FormSheet.tsx`：渲染时判断设置是否打开，两处加 `data-over-settings`
+- `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
+- `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
+
+已知限制：设置叠在引导页上时（`[data-over-welcome]`，`settings.module.css` 的 86/87），48/49 仍不够，从设置里打开的 FormSheet 会被盖住；BLG-213 没有加更高的 `'welcome'` 档。这条窄路径（引导页上开设置再进 Studio）留着将来一起处理。
+
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
 - `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
@@ -233,3 +251,25 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
 - Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
 - 以上通用修复已整理成 6 个基于上游 `main` 的分支（`upstream-pr/*`），准备提回上游；上游合并后这里的差异就消失。
+
+### 我的共享（M7 · BLG-217 / BLG-218，2026-11-13）
+
+沉稳模式开时，设置 › 成员与访问里「在房间中」「之前记住的」两组换成一个「我的共享」页（`docs/calm/sharing.md`）：顶部一个对所有圈生效的默认，下面只列与该默认不同的圈（例外），带搜索、筛选、多选批量与虚拟列表。数据仍是 `policy` / `levels` / `remembered`，写仍走已有的 `people.setTrust`、`people.forget` 与 `session.setClaudeSharing`，所以每个圈的实际共享结果与迁移前一致；沉稳关时 `People()` 与上游逐字相同。
+
+上游文件只有一处改动（一行接入点）：
+
+- `packages/mac/src/dialogs/Settings.tsx`：`People()` 里 `calm ? <MySharing /> : (原来的两组)`
+
+fork 自己的新增文件（上游没有）：
+
+- `packages/mac/src/fork/sharing/model.ts`（纯模型：合并三个来源、迁移、搜索、批量计划）
+- `packages/mac/src/fork/sharing/MySharing.tsx`、`sharing.module.css`（页面）
+- `packages/mac/src/fork/sharing/demo.ts`（DEV + `beluga.fork.sharing.demo.v1` 的 200 圈演示源）
+- `packages/mac/src/fork/sharing/quiet.ts`（批量改动期间不显示逐条成功 toast）
+- `packages/mac/src/fork/calm/one-toast.ts`：global 门加 `suppressed`（quiet 窗口里到达的 toast 永不显示）
+
+fork 的其他文件与测试：
+
+- `packages/mac/src/fork/settings-index.ts`：`people` 下加「我的共享」（All circles）的搜索行
+- `packages/mac/src/i18n/zh-CN.fork.json`：中文文案
+- `tests/sharing-defaults.test.ts`、`packages/mac/e2e/sharing-defaults.spec.ts`、`tests/fork-calm.test.ts`（Settings.tsx 的 canary）、`tests/mac-settings-search.test.ts`（people 页的来源加上 `fork/sharing/MySharing.tsx`）、`packages/mac/scripts/calm-check.mjs`（`sharing` 场景，200 圈演示源）

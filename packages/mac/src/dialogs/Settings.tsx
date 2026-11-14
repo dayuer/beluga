@@ -43,6 +43,8 @@ import { WebAccessSettings } from './WebAccessSettings.js';
 import { StudioSettings } from '../studio/ConnectDialog.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import { CalmRow } from '../fork/calm/settings.js';
+import { useCalm } from '../fork/calm/index.js';
+import { MySharing } from '../fork/sharing/MySharing.js';
 import { LOCALES, type LanguagePref, languagePref, setLanguage } from '../i18n/index.js';
 import { PANES } from './settings-index.js';
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './SettingsSearch.js';
@@ -575,6 +577,7 @@ function Workspaces() {
 function People() {
   const api = useApi();
   const { client, ui } = useBeluga();
+  const calm = useCalm();
   const state = useApp((st) => st);
   const others = state.peers.filter((p) => p.peerId !== state.selfId);
   const remembered = Object.entries(state.remembered).filter(([id]) => !others.some((p) => p.peerId === id));
@@ -582,47 +585,53 @@ function People() {
     <>
       <NetworkSettings />
       <AccessSettings />
-      {/* Trust is shown here and set on each friend's card (BLG-202). */}
-      <Group title="In the room">
-        {others.length ? (
-          others.map((p) => {
-            const friend = state.network.friends.some((f) => f.peerId === p.peerId);
-            return (
-              <Row key={p.peerId} label={p.name} detail={`${TRUST_INFO[trustOf(state, p.peerId)].label}. ${friend ? 'Change it on their card.' : 'Add them as a friend to set it.'}`}>
-                <Avatar name={p.name} id={p.peerId} size={20} />
-                {friend ? (
-                  <Button
-                    variant="quiet"
-                    onClick={() => {
-                      ui.patch({ settings: undefined });
-                      openFriendCard(client, p.peerId);
-                    }}
-                  >
-                    Their Card…
+      {calm ? (
+        <MySharing />
+      ) : (
+        <>
+          {/* Trust is shown here and set on each friend's card (BLG-202). */}
+          <Group title="In the room">
+            {others.length ? (
+              others.map((p) => {
+                const friend = state.network.friends.some((f) => f.peerId === p.peerId);
+                return (
+                  <Row key={p.peerId} label={p.name} detail={`${TRUST_INFO[trustOf(state, p.peerId)].label}. ${friend ? 'Change it on their card.' : 'Add them as a friend to set it.'}`}>
+                    <Avatar name={p.name} id={p.peerId} size={20} />
+                    {friend ? (
+                      <Button
+                        variant="quiet"
+                        onClick={() => {
+                          ui.patch({ settings: undefined });
+                          openFriendCard(client, p.peerId);
+                        }}
+                      >
+                        Their Card…
+                      </Button>
+                    ) : p.guest || state.guests[p.peerId] ? null : (
+                      <Button variant="quiet" onClick={() => void befriend(client, p.peerId, p.name)}>
+                        Add as Friend
+                      </Button>
+                    )}
+                  </Row>
+                );
+              })
+            ) : (
+              <div className={s.note}>Nobody else is here yet.</div>
+            )}
+          </Group>
+          {remembered.length ? (
+            <Group title="Remembered from before">
+              {remembered.map(([id, r]) => (
+                <Row key={id} label={r.name} detail={TRUST_INFO[r.trust].label}>
+                  <Button variant="quiet" onClick={() => void api.people.forget(id)}>
+                    Forget
                   </Button>
-                ) : p.guest || state.guests[p.peerId] ? null : (
-                  <Button variant="quiet" onClick={() => void befriend(client, p.peerId, p.name)}>
-                    Add as Friend
-                  </Button>
-                )}
-              </Row>
-            );
-          })
-        ) : (
-          <div className={s.note}>Nobody else is here yet.</div>
-        )}
-      </Group>
-      {remembered.length ? (
-        <Group title="Remembered from before">
-          {remembered.map(([id, r]) => (
-            <Row key={id} label={r.name} detail={TRUST_INFO[r.trust].label}>
-              <Button variant="quiet" onClick={() => void api.people.forget(id)}>
-                Forget
-              </Button>
-            </Row>
-          ))}
-        </Group>
-      ) : null}
+                </Row>
+              ))}
+            </Group>
+          ) : null}
+        </>
+      )}
       <Group title="Remote access">
         <Row label="How friends reach you" detail="Takes effect for the next invite.">
           <Select label="Tunnel" value={state.prefs.tunnel} onChange={(v) => void api.session.setPrefs({ tunnel: v })} options={TUNNEL_ORDER.map((t) => ({ value: t, label: TUNNEL_LABELS[t] }))} />
@@ -741,6 +750,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
         <Dialog.Overlay className={s.overlay} data-over-welcome={overWelcome} />
         <Dialog.Content
           className={s.window}
+          data-settings=""
           data-over-welcome={overWelcome}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {

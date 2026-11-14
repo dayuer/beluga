@@ -949,3 +949,17 @@ calm off dark : --subagent #ab93f3  --worktree #66c6bb  --plan #e892c3  --epic #
 | — | 同步 3.2.0 新增：`components/SelectionBar.module.css` 的 `rise`/`drop`、`call/pointer.module.css` 的 320/420ms 过渡 | 覆盖层已管到：M1 的全局 `animation-name: none` 停关键帧，M3 的过渡 clamp 收到 160ms；无需新规则 | `fork/calm/calm-motion.css`（已有规则） | calm-on/full 下 SelectionBar 无 keyframes、pointer 过渡 0.16s |
 
 快照在逐条裁决后用 `CALM_UPDATE=1 npx vitest run tests/fork-calm.test.ts` 接受这 6 条上游新增记录（它们仍是上游的静态事实，只是已确认被覆盖层或挂钩管到）。
+
+### 12.3 M6 开 PR 前修复：侧栏底部状态菜单（BLG-216）
+
+用户 2026-11-13 拿 Claude 桌面版左下角的账户菜单和 `network/StatusMenu.tsx` 的 `SelfStatus` → `statusCard` 对比：Beluga 的菜单把同一件事说了五遍（头像角标、「在线」文字、✓、彩色圆点、底部按钮），比侧栏宽（300 px 对 248 px），行宽被右侧说明撑得参差，输入框像嵌在菜单里的表单。沉稳模式下按 Claude 菜单的克制写法收束；沉稳关保持上游原样。
+
+| 编号 | 上游位置 | 做法 | 规则 / 接入点 | 验收 |
+| --- | --- | --- | --- | --- |
+| R4-01 | `network/StatusMenu.tsx:97-103` `statusHead`（头像、名字、状态） | 隐藏头部：名字与状态已经在触发按钮上，菜单不重复 | `calm-status.css`：`[data-radix-popper-content-wrapper] [class*='_statusHead_'] { display: none }` | 沉稳开：菜单里没有名字与状态文字 |
+| R4-02 | `network.module.css:244` `statusCard { width: 300px }` | 宽度跟随触发按钮（侧栏行 248 px）再让 16 px：Radix 的 `collisionPadding={10}` 会把贴着窗口左缘的菜单右移 10 px，宽度取 `侧栏宽 − 16px` 后右缘仍在侧栏内（留 6 px）；左对齐与 `sideOffset` 6 px 不变；独立的状态窗口（`StatusSheet`）不在 popover 容器里，保持上游 300 px | `width: min(300px, calc(var(--radix-popover-trigger-width) - 16px))` | 菜单右缘不越过侧栏右边线；与按钮间距 6 px |
+| R4-03 | `StatusMenu.tsx:151-152` ✓ 列 + `PresenceDot` 彩色圆点 | 当前状态只留一种标记：✓；菜单里隐藏彩色圆点，颜色只留在底部头像角标 | `[class*='_dot_'] { display: none }`，`_optionCheck_` 列宽 16 px | 菜单里无绿/橙/红/灰彩点；当前状态只有 ✓ |
+| R4-04 | `network.module.css:387` `.option { height: 28px }`、`:275` `.note` 30 px 内嵌输入框 | 行高统一 32 px；备注输入框变成同样式的一行（透明底、6 px 圆角、8 px 内边距），焦点改为安静的 2 px 环 | `calm-status.css` 的 `_option_` / `_note_` / `_note_:focus-within` | 四行状态、时长行、备注行等高；输入可用 |
+| R4-05 | `network/StatusMenu.tsx:154` `optionHint`（右侧灰色说明） | 沉稳开时说明藏起来、文字移到该行的 `title`（悬停可见），行宽不再参差 | 接入点：`title={calm && hint ? hint : undefined}`；`calm-status.css` 隐藏 `_optionHint_` | 行宽一致；悬停 Do Not Disturb 显示「Silences notifications」 |
+
+Dialog 版（同文件里 `StatusSheet`，菜单栏 ⌘ 快捷打开的 Set a Status…）同样套用 R4-03…R4-05，视觉语言一致；它是独立对话框、下面没有触发按钮，所以保留头部与 300 px 宽度（R4-01/R4-02 只锚 popover）。规则只在 `:root[data-calm]` 下生效；沉稳关时两种形态都与上游一致。`tests/fork-calm.test.ts` 的 `TOUCHPOINTS` 为 `StatusMenu.tsx` 的 `useCalm()` 加了 canary；`fork.md`「沉稳界面」一节登记了这处接入点。

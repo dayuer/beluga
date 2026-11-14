@@ -5,6 +5,20 @@
   background: rgba(0, 0, 0, 0.18);
   animation: fade var(--dur) var(--ease-out);
 }
+/* Opened from Settings (settings.module.css is 44/45): over that window (BLG-213). Below alert 50. */
+.overlay[data-over-settings] {
+  z-index: 48;
+}
+.sheet[data-over-settings] {
+  z-index: 49;
+}
+/* Settings opened from the welcome (its window is 86/87, the welcome 85): over both, under pop-ups (90). */
+.overlay[data-over-welcome] {
+  z-index: 88;
+}
+.sheet[data-over-welcome] {
+  z-index: 89;
+}
 :global([data-theme='dark']) .overlay {
   background: rgba(0, 0, 0, 0.35);
 }
