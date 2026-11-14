@@ -46,8 +46,8 @@ export function IssuePage({ projectId, number }: { projectId: string; number: nu
           detail={error}
           action={
             <EmptyActions>
-              <Button size="small" onClick={refresh}>Try Again</Button>
-              <Button size="small" variant="quiet" onClick={() => actions.run({ type: 'view', view: issueWayBack(projectId) })}>
+              <Button onClick={refresh}>Try Again</Button>
+              <Button variant="quiet" onClick={() => actions.run({ type: 'view', view: issueWayBack(projectId) })}>
                 Back
               </Button>
             </EmptyActions>
