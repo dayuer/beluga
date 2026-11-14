@@ -172,7 +172,7 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
           </Button>
         )}
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label={`More for ${item.name}`} />
+          <IconButton size="regular" icon="more" label={`More for ${item.name}`} />
         </ActionsDropdown>
       </div>
     </header>

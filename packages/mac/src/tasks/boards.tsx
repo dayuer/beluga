@@ -202,7 +202,7 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
         ? `Tasks here run in any of the repos it covers, each in the one it’s for. Keys start with ${saved?.prefix ?? '…'}-.`
         : 'One board for work across a few repos: each task on it runs in one of them, and Start makes its worktree there.',
       rows: [
-        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: own ? 'Launch' : (repoName ?? ''), focus: true, ...(own ? {} : { hint: `Empty: ${repoName ?? 'the project'}’s name` }) },
+        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: own ? 'Launch' : (repoName ?? ''), focus: true, maxLength: 60, ...(own ? {} : { hint: `Empty: ${repoName ?? 'the project'}’s name` }) },
         ...projects.map((p, i) => {
           const self = p.id === boardId && !own;
           return {
@@ -211,10 +211,11 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
             ...(i === 0 ? { label: 'Repos' } : {}),
             text: self ? `${p.name} · ${tr('Its own')}` : p.name,
             checked: self || repos.includes(p.id),
+            ...(self ? { disabled: true } : {}),
             ...(i === projects.length - 1 ? { hint: own ? 'Tick the repos its tasks run in.' : 'Other repos whose tasks go on this board too.' } : {}),
           };
         }),
-        ...(editing ? [] : [{ kind: 'text' as const, id: 'prefix', label: 'Keys', value: prefix, placeholder: 'LNCH', hint: 'What its task keys start with. Empty: made from the name.' }]),
+        ...(editing ? [] : [{ kind: 'text' as const, id: 'prefix', label: 'Keys', value: prefix, placeholder: 'LNCH', hint: 'What its task keys start with. Empty: made from the name.', maxLength: 6, upper: true, keep: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }]),
       ],
       ...(editing && own ? { aside: { id: 'delete', label: 'Delete Board…' } } : {}),
       submit: editing ? 'Save' : 'Create Board',

@@ -68,7 +68,7 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
         { kind: 'note', text: parts('The conversation', 'Your agent remembers it and carries on') },
         { kind: 'note', text: labelled('Stays behind', t('node_modules, build output and anything else git ignores, made again by the setup here. Never a .env file or a key.')) },
         ...(full ? [] : [{ kind: 'note' as const, text: `It’s ${ownerName}’s code: the setup waits until you’ve looked it over, and your .env files aren’t copied in.` }]),
-        { kind: 'text', id: 'name', label: 'Name', value: name, focus: true, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}` } : {}) },
+        { kind: 'text', id: 'name', label: 'Name', value: name, focus: true, maxLength: 120, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}` } : {}) },
       ],
       submit: 'Fork',
       canSubmit: Boolean(slug(name)),

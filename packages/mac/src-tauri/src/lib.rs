@@ -302,6 +302,7 @@ pub fn run() {
             native_menu::native_menu,
             native_menu::display_options,
             native_alert::native_alert,
+            native_alert::native_alert_close,
             native_files::quick_look,
             native_files::share_files,
             native_files::drag_files,

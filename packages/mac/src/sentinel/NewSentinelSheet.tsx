@@ -137,7 +137,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
           : []),
         ...(way === 'describe'
           ? [
-              { kind: 'textarea' as const, id: 'words', value: words, lines: 4, focus: true, placeholder: 'Every weekday morning, read yesterday’s commits and open issues, write me a brief, and create tasks for anything that looks urgent' },
+              { kind: 'textarea' as const, id: 'words', value: words, lines: 4, focus: true, maxLength: 8000, placeholder: 'Every weekday morning, read yesterday’s commits and open issues, write me a brief, and create tasks for anything that looks urgent' },
               { kind: 'note' as const, text: `Your agent sets it up in ${projectName ?? ASSISTANT_TITLE}, looking at the project first when that helps. It starts paused: look it over, then Turn On.` },
             ]
           : way === 'recipe'
@@ -153,7 +153,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
                     hint: chosenRecipe?.group === 'numbers' ? 'Numbers: they show on the sentinel’s page and your Dashboard' : '',
                   },
                 ]
-            : [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, placeholder: 'Morning brief', focus: true, hint: `In ${projectName ?? ASSISTANT_TITLE}; it runs when you press Run until you give it a schedule.` }]),
+            : [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, placeholder: 'Morning brief', focus: true, maxLength: 80, hint: `In ${projectName ?? ASSISTANT_TITLE}; it runs when you press Run until you give it a schedule.` }]),
       ],
       submit: way === 'build' ? 'Make Sentinel' : way === 'describe' ? 'Write It' : 'Use This Recipe',
       canSubmit: (way === 'build' && Boolean(name.trim())) || (way === 'describe' && Boolean(words.trim())) || (way === 'recipe' && Boolean(chosenRecipe)),
@@ -172,7 +172,15 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
       submit: () => {
         setProblem(undefined);
         if (way === 'recipe') return void (chosenRecipe && pick(chosenRecipe));
-        void submit()?.then((said) => said && setProblem(said));
+        // Busy until it's made: Return pressed twice doesn't make two (as the web sheet's Create holds).
+        if (busy) return;
+        const going = submit();
+        if (!going) return;
+        setBusy('make');
+        void going
+          .then((said) => said && setProblem(said))
+          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
+          .finally(() => setBusy(undefined));
       },
       cancel: close,
     },

@@ -174,7 +174,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
   return (
     <div className={s.page}>
       <header className={s.head}>
-        <IconButton icon="back" label="All Plans" onClick={back} />
+        <IconButton size="regular" icon="back" label="All Plans" onClick={back} />
         <div className={s.headMain}>
           <h1 className={s.title}>{plan.title}</h1>
           <div className={s.meta}>

@@ -218,7 +218,7 @@ function Lived({ state, scope, setScope, board, setBoard }: { state: SentinelSta
         </label>
         <span className={s.grow} />
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label="More for Sentinel" />
+          <IconButton size="regular" icon="more" label="More for Sentinel" />
         </ActionsDropdown>
         {asking ? null : (
           <Tip label="Say what you want watched; your agent sets it up beside this page">
