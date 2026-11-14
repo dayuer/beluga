@@ -91,9 +91,15 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 - `packages/mac/src/layout/Sidebar.tsx`：三行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、一行 `useOneSelected(drop.ref)`、顶部入口后一行 `<NewTaskButton /><SidebarEdge />`（`fork/sidebar/new-task.tsx`，侧栏唯一的主按钮，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它）。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。同一行的 `<SidebarEdge />`（`fork/sidebar/resize.tsx`）是侧栏右边可拖的边：复用上游右侧面板的 `ResizeHandle`，平时看不见，指针移上去才亮、光标变 col-resize；拖动时只改 `--sidebar-w`，松手才存进上游已有的 `sidebarWidth` 偏好（和设置里的滑块同一项，所以范围也一样：200–360），双击回到默认 248，键盘焦点在上面时 →/← 每次加减 8。减弱动态效果或沉稳界面下不做高亮过渡。范围与保存的用例：`tests/fork-sidebar-resize.test.ts`。
 
-### 原生控件
+### 原生控件（待提回上游）
 
-上游文件零改动：`packages/mac/src/fork/boot.ts` 引入 `fork/native/index.ts`，它在首帧前给 `<html>` 打上 `data-native`，并引入 `fork/native/native-controls.css`。公共控件按 AppKit 常规尺寸重画：FormSheet 的文本框（22px、5px 圆角、细边框，等宽字段用 SF Mono 小一号）、表单标签用主文字色、sheet/alert 的按钮与 ui 的 `Button`（自上而下的轻渐变、细边与投影，默认按钮是强调色渐变）、弹出按钮（Select）右侧的强调色双箭头方块、复选框（未选为凸起的白/灰面，选中是强调色渐变）、`Segmented` 的 NSSegmentedControl 外观（凹槽、选中段凸起、未选段之间的竖线），键盘焦点一律是外扩 3px 的强调色光环。颜色只用 `styles/tokens.css` 的 token（亮暗差异集中在文件开头的 `--nc-*`），主题、强调色照旧；不加任何动效。锚点是上游 `components/` 下 `form`、`alert`、`ui`、`select` 四个 CSS module 的类名，各自用相邻结构收窄（如 `[class*='_controlRow_'] > input[class*='_input_']`），由 `tests/fork-native-anchors.test.ts` 检查；同步后它失败就按报出的名字重接。
+控件规范（`docs/mac-controls.md`）直接改在上游自己的文件里，因为它本来就要提回上游：分支 `feat/mac-native-controls`（基于 `upstream/main`）就是给 beluga-labs/beluga 的 PR。上游合并之后，下面这些差异在同步时消失；合并之前，同步上游时这些文件可能冲突，按上游的新写法重新套用 `--control-*` token 即可。之前的 fork 覆盖层 `fork/native/` 已删掉。
+
+- `packages/mac/src/styles/tokens.css`：控件 token（三档尺寸、按 AppKit 语义色命名的颜色、焦点环、窗口不在前台时去掉强调色）、`zh-CN` 的苹方字体。
+- `packages/mac/src/components/`：`ui.tsx`（`ControlSize`，`Button`/`IconButton`/`Segmented` 的 `size`）、`Select.tsx`、`SelectMenu.tsx`，以及 `ui`、`alert`、`form`、`select` 四个 CSS module。
+- 标题栏与面板（大号 / 小号）：`layout/Toolbar.tsx`、`Toolbar.module.css`、`BranchControl.tsx`、`BranchControl.module.css`、`Sidebar.tsx`、`SidebarSearch.module.css`、`AppMenu.tsx`、`NotificationCenter.tsx`、`RightPanel.tsx`、`panel/*Tab.tsx`、`panel/TerminalPane.tsx`、`panel/panel.module.css`、`agent-term/ConvoSwitch.tsx`。
+- sheet（常规）：`dialogs/settings.module.css`、`dialogs/sheet.module.css`、`dialogs/env-settings.module.css`、`dialogs/add-project.module.css`、`dialogs/native/sharing.module.css`、`dialogs/native/menus.module.css`、`tasks/NewTaskSheet.module.css`，以及 `EnvironmentSettings.tsx`、`AddProjectSheet.tsx`、`native/MergeReview.tsx`、`native/WorkConfirm.tsx`、`native/ShareFolderSheet.tsx` 里按钮的 `size`。
+- 用例：`tests/mac-controls.test.ts`（上游的新测试文件，随 PR 一起提回）。
 
 ### 沉稳界面（docs/calm-ui.md）
 
