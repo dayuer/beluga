@@ -39,6 +39,7 @@ export function AutoRouteSettings() {
       <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Plan Audits' : 'Everything Else'}>
         {list.map((value, i) => {
           const runs = candidateRuns(runtimes, value);
+          // computer-wording: mac (fork feature, worded for the Mac app for now)
           const detail = value === used ? 'Used now' : runs ? 'If the one above stops working' : 'Not set up on this Mac: skipped';
           return (
             <Row key={`${tier}-${i}`} label={`Choice ${(i + 1)}`} detail={detail}>

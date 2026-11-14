@@ -25,6 +25,7 @@ import { liveFrom } from './progress.js';
 import { type PlanGit, planGitOf } from './plan-git.js';
 import { type PlanRoles, type Plans, UNTITLED } from './plans.js';
 import { architectBrief, checkFailedPrompt, checkerBrief, describePlan, headBrief, milestoneNote, planningBrief, reviewerBrief, sizeWords, workerNote } from './prompt.js';
+import { THIS_COMPUTER } from '../../shared/assistant.js';
 
 /**
  * Plans at work: making a plan (its own conversation, in the project's main folder where Claude
@@ -229,7 +230,7 @@ export class PlansWork {
     // One this Mac can't run would fail the first turn, so your default plans it and the plan keeps the pick.
     const planner = homeAgentOf(plan);
     if (planner && runsHere(this.deps.store.getState().runtimes, planner)) controller.manager.setAgent(chat.id, planner);
-    else if (planner) this.deps.store.dispatch({ type: 'system', channel: home, text: `${agentName(planner)} isn’t set up on this Mac, so your default agent plans this.`, level: 'warn' });
+    else if (planner) this.deps.store.dispatch({ type: 'system', channel: home, text: `${agentName(planner)} isn’t set up on ${THIS_COMPUTER}, so your default agent plans this.`, level: 'warn' });
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
     // A Studio customer's first turn is limited too (docs/studio-gates.md §5.3): the marker is up
     // before the run starts, and down again if no run could start.

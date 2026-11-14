@@ -65,7 +65,7 @@ describe('a browser can use Beluga but not decide who gets in', () => {
     for (const [i, method] of [...WEB_ADMIN].entries()) send({ t: 'call', id: `admin${i}`, method, args: method === 'web.sessions.revoke' ? ['x'] : [] });
     await expect.poll(() => frames.filter((f) => f.t === 'result').length).toBe(1 + WEB_ADMIN.size);
     expect(resultOf(frames, 'list')).toMatchObject({ ok: true });
-    for (let i = 0; i < WEB_ADMIN.size; i++) expect(resultOf(frames, `admin${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Mac app or `beluga web`/) });
+    for (let i = 0; i < WEB_ADMIN.size; i++) expect(resultOf(frames, `admin${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Beluga app or `beluga web`/) });
     ws.close();
   });
 
@@ -73,7 +73,7 @@ describe('a browser can use Beluga but not decide who gets in', () => {
     const { send, frames, ws } = await browserIn();
     for (const [i, method] of [...WEB_STUDIO].entries()) send({ t: 'call', id: `studio${i}`, method, args: method === 'studio.setProject' ? ['p1', true] : method === 'studio.link' ? ['ABCD-EFGH'] : [] });
     await expect.poll(() => frames.filter((f) => f.t === 'result').length).toBe(WEB_STUDIO.size);
-    for (let i = 0; i < WEB_STUDIO.size; i++) expect(resultOf(frames, `studio${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Mac app or `beluga studio`/) });
+    for (let i = 0; i < WEB_STUDIO.size; i++) expect(resultOf(frames, `studio${i}`)).toMatchObject({ ok: false, error: expect.stringMatching(/Beluga app or `beluga studio`/) });
     ws.close();
   });
 
