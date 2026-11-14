@@ -1,13 +1,13 @@
 import * as Context from '@radix-ui/react-context-menu';
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
-import { type ComponentPropsWithoutRef, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ComponentPropsWithoutRef, type MouseEvent, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
 import { useActions } from '../lib/actions.js';
 import { useBeluga } from '../lib/beluga.js';
 import { Icon, type IconName } from './Icon.js';
 import { guiHint } from '../lib/gui-copy.js';
 import { ContextRoot } from './ContextRoot.js';
-import { type NativeRow, nativeFits, nativeMenus, popUpNative } from '../lib/native-menu.js';
+import { type NativeRow, nativeContext, nativeDropdown } from '../lib/native-menu.js';
 import s from './SpecMenu.module.css';
 
 /**
@@ -36,43 +36,6 @@ const stayInMenu = (e: MouseEvent): void => e.stopPropagation();
 const isKeys = (hint: string | undefined): hint is string => !!hint && (/^[⌘⌥⇧⌃↩⌫]+.{0,3}$/.test(hint) || /^((Ctrl|Alt|Shift|Win|Super)\+)+.{1,5}$/.test(hint));
 
 const isDanger = (id: string): boolean => /delete|remove|leave|revoke|stop|hide/.test(id);
-
-/**
- * On a Mac, the app's menus are the Mac's own (lib/native-menu.ts). These open one from a
- * right-click or a press on the menu's button, ahead of Radix: the native menu calls
- * preventDefault, which Radix's own handler respects, so its web menu stays shut. Rows a native
- * menu can't say (an explanation under an item) leave the event alone, and the web menu opens.
- */
-function nativeContext(rows: () => readonly NativeRow[]) {
-  return (e: MouseEvent): void => {
-    if (e.defaultPrevented || !nativeMenus()) return;
-    const list = rows();
-    if (!nativeFits(list)) return;
-    e.preventDefault();
-    void popUpNative(list);
-  };
-}
-
-function nativeDropdown(rows: () => readonly NativeRow[]) {
-  // A Mac's pull-down opens on the press (as Radix's does), its top edge just under the button.
-  const open = (e: MouseEvent | KeyboardEvent): void => {
-    const list = rows();
-    if (!nativeFits(list)) return;
-    e.preventDefault();
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    void popUpNative(list, { x: box.left, y: box.bottom + 4 });
-  };
-  return {
-    onPointerDown: (e: PointerEvent): void => {
-      if (e.defaultPrevented || !nativeMenus() || e.button !== 0 || e.ctrlKey) return;
-      open(e);
-    },
-    onKeyDown: (e: KeyboardEvent): void => {
-      if (e.defaultPrevented || !nativeMenus() || !['Enter', ' ', 'ArrowDown'].includes(e.key)) return;
-      open(e);
-    },
-  };
-}
 
 /** A spec menu's rows as the web menu groups them: its own, this window's extras, the dangerous ones last. */
 function useSpecRows(menu: MenuKind, extra: readonly ActionItem[] = [], hide?: (id: string) => boolean): () => readonly NativeRow[] {
