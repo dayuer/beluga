@@ -6,7 +6,7 @@ import s from '../../dialogs/settings.module.css';
 
 /**
  * Settings › Agent › Auto Accept (fork, src/fork/federation/settings.ts): a task a teammate gives
- * this computer starts on its own, with Claude, when you trust them enough, a few at a time.
+ * this computer starts on its own, with the agent, when you trust them enough, a few at a time.
  * This computer's own: it never syncs to your other computers, and the phone doesn't offer it.
  * Drawn under Auto Route (dialogs/AutoRouteSettings.tsx), so Settings.tsx stays as upstream has it.
  */
@@ -37,7 +37,7 @@ export function FederationSettings() {
   };
   return (
     <Group title={'Auto Accept'}>
-      <Row label={'Start tasks teammates give me'} detail={'A Ready task a teammate gives you starts here by itself, with Claude in its own worktree. Never one you gave yourself.'}>
+      <Row label={'Start tasks teammates give me'} detail={'A Ready task a teammate gives you starts here by itself, with the agent in its own worktree. Never one you gave yourself.'}>
         <Select
           label={'Start tasks teammates give me'}
           value={cur.accept}

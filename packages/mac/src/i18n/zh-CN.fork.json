@@ -480,7 +480,7 @@
  "Resize the sidebar": "调整侧栏宽度",
  "Auto Accept": "自动接单",
  "Start tasks teammates give me": "队友派给我的任务自动开工",
- "A Ready task a teammate gives you starts here by itself, with Claude in its own worktree. Never one you gave yourself.": "队友派给你的就绪任务会在这台电脑上自己开工，由 Claude 在它自己的工作树里做。你派给自己的不会。",
+ "A Ready task a teammate gives you starts here by itself, with the agent in its own worktree. Never one you gave yourself.": "队友派给你的就绪任务会在这台电脑上自己开工，由 Agent 在它自己的工作树里做。你派给自己的不会。",
  "Tasks given to me": "派给我的",
  "Tasks given to me, and the pool": "派给我的，以及认领池",
  "Only from": "只接",
