@@ -4,6 +4,7 @@ import { agentEntries } from '../chat/ModelPicker.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
+import { FederationSettings } from '../fork/federation/FederationSettings.js';
 
 /**
  * Settings › Agent › Auto Route (fork, shared/auto-route.ts): a task nobody picked an agent for
@@ -84,6 +85,7 @@ export function AutoRouteSettings() {
       {on ? tierRows('hard') : null}
       {on ? tierRows('build') : null}
       {on ? tierRows('review') : null}
+      <FederationSettings />
     </>
   );
 }
