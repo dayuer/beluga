@@ -20,6 +20,7 @@ import { EXTERNAL_ACCESS } from '../src/external/coverage.js';
 import { STATE_ROWS } from '../src/external/adapters/tools/state-rows.js';
 import { MACHINE } from '../src/machines/coverage.js';
 import type { AgentRef } from '../src/protocol.js';
+import { encodeFailure } from '../src/shared/run-failure.js';
 import type { CombineResult } from '../src/workspaces/git.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 import { waitFor } from './helpers.js';
@@ -34,8 +35,10 @@ const MIN = 60_000;
 const ws = (id: string, projectId: string, name: string, kind: Workspace['kind'] = 'worktree'): Workspace => ({ id, projectId, name, path: `/tmp/${name}`, kind, projectRoot: '/tmp/p', branch: `beluga/${name}`, createdAt: 0, external: false, askOnly: kind === 'chat' }) as unknown as Workspace;
 const project = (id: string, name: string, workspaces: Workspace[] = []): Project => ({ id, name, root: `/tmp/${name}`, base: 'main', workspaces });
 
-function setup(opts: { workers?: 'milestone' | 'task'; combine?: PlansWorkDeps['combine']; dir?: string; now?: () => number } = {}) {
+function setup(opts: { workers?: 'milestone' | 'task'; combine?: PlansWorkDeps['combine']; dir?: string; now?: () => number; ladder?: readonly string[] } = {}) {
   const store = new Store(initialState('room'));
+  // The failure ladder (fork/plans/ladder.ts) off unless a test sets one: these are about the fix agent.
+  store.dispatch({ type: 'prefs', prefs: { autoRoute: { ladder: [...(opts.ladder ?? [])] } } });
   store.dispatch({ type: 'projects', projects: [project('api', 'bob-api', [ws('main', 'api', 'bob-api', 'chat')])] });
   const listeners: Array<(e: WorktreeEvent) => void> = [];
   const made: Array<{ id: string; agent?: AgentRef }> = [];
@@ -430,5 +433,72 @@ describe('the agent for the work, changed while a milestone is at work', () => {
     // It goes on now, on the new agent, instead of waiting for the reset.
     await waitFor(() => asks() > before);
     expect(t.plans.need(plan.id).watch?.retries?.limitUntil).toBeUndefined();
+  });
+});
+
+describe('the failure ladder (fork/plans/ladder.ts): a task whose model fails goes up one rung', () => {
+  const HAIKU: AgentRef = { runtime: 'claude', label: 'Claude', model: 'haiku' };
+  const SONNET: AgentRef = { runtime: 'claude', label: 'Claude', model: 'sonnet' };
+  const OPUS: AgentRef = { runtime: 'claude', label: 'Claude', model: 'opus' };
+  const LADDER = ['claude:haiku', 'claude:sonnet', 'claude:opus'];
+  /** What a run on a model that isn't there ends with (agent/runtime/claude/runner.ts classifies it). */
+  const NO_MODEL = encodeFailure({ kind: 'api', runtime: 'claude', detail: 'There’s an issue with the selected model (deepseek-flash). It may not exist or you may not have access to it.' });
+
+  async function started(ladder: readonly string[]) {
+    let now = Date.now();
+    const t = setup({ workers: 'task', now: () => now, ladder });
+    const plan = await approved(t, ONE, { autonomy: 'gated' });
+    const channel = `ws:${await waitFor(() => t.issue('Idempotent webhooks').worktrees.at(-1))}`;
+    const wakes = () => t.asked.filter((a) => a.channel === channel && a.prompt.startsWith('You stopped before handing off'));
+    const end = async (id: string, failed: boolean) => {
+      const before = wakes().length;
+      now += MIN;
+      t.run(channel, 'started', id, now);
+      t.store.dispatch({ type: 'agent_event', owner: 'p-me', requestId: id, requester: 'p-me', event: failed ? 'error' : 'done', text: failed ? NO_MODEL : '', ts: now, channel });
+      now += 1000;
+      t.work.pilot.tick();
+      return waitFor(() => (wakes().length > before ? true : t.plans.need(plan.id).watch?.retries?.needsYou));
+    };
+    return { t, plan, channel, wakes, end };
+  }
+
+  it('its model failing, it goes to the first rung at once (not woken on the same model), then one rung up each time it stops again, then waits for you', async () => {
+    const { t, plan, channel, wakes, end } = await started(LADDER);
+    await end('r1', true);
+    expect(wakes()).toHaveLength(1);
+    // A local model isn't on the ladder: it counts as below it, so the first rung.
+    expect(t.switched).toEqual([{ channel, agent: HAIKU, at: expect.any(Number) }]);
+    expect(t.plans.need(plan.id).watch?.retries).toMatchObject({ escalated: true });
+    const said = t.plans.need(plan.id).activity.map((e) => e.text);
+    // One worktree per task here (workers: 'task'), so the line names no milestone.
+    expect(said).toContain('handed a task whose model failed to Claude (Haiku)');
+    expect(said.some((x) => x.includes('’s model failed: gave it to Claude (Haiku)'))).toBe(true);
+    await end('r2', false);
+    expect(t.switched.map((x) => x.agent)).toEqual([HAIKU, SONNET]);
+    await end('r3', false);
+    expect(t.switched.map((x) => x.agent)).toEqual([HAIKU, SONNET, OPUS]);
+    // The top rung: it waits for you, and the plan's fix agent isn't used for it.
+    await end('r4', false);
+    expect(t.plans.need(plan.id).watch?.retries).toMatchObject({ needsYou: true });
+    expect(t.switched.map((x) => x.agent)).toEqual([HAIKU, SONNET, OPUS]);
+    expect(wakes()).toHaveLength(3);
+  });
+
+  it('an ordinary stop is woken on the same model first; stopping again soon after, it goes one rung up, not to the fix agent', async () => {
+    const { t, channel, wakes, end } = await started(LADDER);
+    await end('r1', false);
+    expect(wakes()).toHaveLength(1);
+    expect(t.switched).toEqual([]);
+    await end('r2', false);
+    expect(t.switched).toEqual([{ channel, agent: HAIKU, at: expect.any(Number) }]);
+  });
+
+  it('with no ladder, a failed model is woken where it is, and the fix agent takes it the second time, as before', async () => {
+    const { t, channel, wakes, end } = await started([]);
+    await end('r1', true);
+    expect(wakes()).toHaveLength(1);
+    expect(t.switched).toEqual([]);
+    await end('r2', true);
+    expect(t.switched).toEqual([{ channel, agent: STRONG, at: expect.any(Number) }]);
   });
 });

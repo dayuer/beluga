@@ -16,11 +16,13 @@ const read = (file: string): Record<string, string> => {
 const c = compile({ ...read('zh-CN.json'), ...read('zh-CN.fork.json') });
 
 /** Names that stay as they are. */
-const NAMES = /\b(Claude|Opus|Sonnet|Haiku|Codex|Beluga|Mac|git|BOB-\d+|\d+(\.\d+)?)\b/g;
+const NAMES = /\b(Claude|Opus|Sonnet|Haiku|Codex|Beluga|Anthropic|Mac|git|BOB-\d+|\d+(\.\d+)?)\b/g;
+/** An address's path stays too (…/api/compatible, /v1/messages). */
+const PATHS = /…?\/[\w/.…-]+/g;
 /** The English words left once translated, names and quoted titles aside. */
 const leftover = (en: string): string[] => {
   const zh = lookup(c, en) ?? en;
-  return (zh.replace(/“[^”]*”|'[^']*'/g, '').replace(NAMES, '').match(/[A-Za-z]{2,}/g) ?? []).map((w) => `${w} (in: ${zh})`);
+  return (zh.replace(/“[^”]*”|'[^']*'/g, '').replace(PATHS, '').replace(NAMES, '').match(/[A-Za-z]{2,}/g) ?? []).map((w) => `${w} (in: ${zh})`);
 };
 
 const SHEETS = [
@@ -66,6 +68,19 @@ const SHEETS = [
   'None of these runs here: a plan’s work agent checks it',
   'Used now',
   'Sonnet 5.5 · Local model',
+  // The failure ladder (fork/plans/ladder.ts).
+  'When a Model Fails',
+  'First step up',
+  'Next step up',
+  'A plan’s task whose model fails goes one step up, and again each time it stops, until the last one: then it waits for you',
+  'No step up: a task that stops twice goes to the plan’s fix agent once',
+  'Your own list. A model not on it (a local one) counts as below them all. Fix tasks after a failed check still go to the plan’s fix agent.',
+  // Settings › Local models: an endpoint that didn't pass its check (fork/endpoint-check.ts); its own words stay, in quotes.
+  'Not saved: that address isn’t an Anthropic-compatible one (“The specified action is invalid”). Press Save again to save it anyway. Use the base address, without /v1/messages or /chat/completions: Beluga adds /v1/messages itself.',
+  'Not saved: the key was refused (“invalid api key”). Press Save again to save it anyway.',
+  'Not saved: it has no model 4.1 (“The model does not exist”). Press Save again to save it anyway.',
+  'Not saved: it didn’t answer. Press Save again to save it anyway.',
+  'Not saved: it answered with an error (“boom”). Press Save again to save it anyway. The address should take Anthropic’s /v1/messages (for example …/api/anthropic or …/api/compatible).',
 ];
 
 const TOASTS = [
@@ -108,6 +123,10 @@ const FEED = [
   // A task that stopped twice (core/plans/watchdog.ts).
   'BOB-4 stopped again: gave it to Claude (Opus), woke it at 14:05',
   'BOB-4 stopped, woke it at 14:05',
+  // A task whose model failed, up the ladder (fork/plans/ladder.ts).
+  'BOB-4’s model failed: gave it to Claude (Haiku), woke it at 14:05',
+  'handed a task whose model failed in “Safe payments” to Claude (Haiku)',
+  'handed a task whose model failed to Claude (Haiku)',
   // A milestone's check, as the feed says it (the checker's own words after the colon stay as written).
   'checked “Safe payments”',
 ];

@@ -91,7 +91,7 @@ export function handoffsIn(activity: readonly PlanEvent[], title: string): Hando
     if (!m) continue;
     const what = m[1]!;
     if (!what.includes(`“${title}”`)) continue;
-    const kind: HandoffWhat = what.startsWith('the fix tasks') ? 'fix' : what.startsWith('a task that stopped twice') ? 'stopped' : what.startsWith('a stuck conversation') ? 'stuck' : 'conflict';
+    const kind: HandoffWhat = what.startsWith('the fix tasks') ? 'fix' : what.startsWith('a task that stopped twice') || what.startsWith('a task whose model failed') ? 'stopped' : what.startsWith('a stuck conversation') ? 'stuck' : 'conflict';
     out.push({ at: e.at, what: kind, to: m[2]! });
   }
   return out;

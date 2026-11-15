@@ -317,7 +317,7 @@ export class PlanPilot {
       ...(deps.takeOver ? { takeOver: deps.takeOver } : {}),
       ...(deps.promote ? { promote: deps.promote } : {}),
       ...(deps.now ? { now: deps.now } : {}),
-      escalate: (plan, channel, task) => this.fix.escalate(plan, channel, task),
+      escalate: (plan, channel, task, how) => this.fix.escalate(plan, channel, task, how),
     });
     this.off = deps.store.onAction((a: Action) => {
       if (a.type === 'agent_event') this.onRunEvent(a.channel);
