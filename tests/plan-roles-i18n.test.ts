@@ -137,6 +137,10 @@ const FEED = [
   'its model failed: moved the checker of “Safe payments” up to Claude (Opus)',
   'Claude (Haiku) isn’t working (“no such model”): this plan’s work goes on with Claude (Sonnet). Fix it, or pick another in Plan Settings',
   '“Safe payments” starts on Claude (Haiku): Claude (Sonnet) isn’t working',
+  // Back down once the work's own model is back (fork/plans/fixer.ts liftBack).
+  'Claude (Haiku) works again: “Safe payments” goes back to it',
+  'Claude (Haiku) works again: asked the agent doing “Safe payments” to end its turn, so its next task goes back to it',
+  'It failed before Beluga restarted',
   // A milestone's check, as the feed says it (the checker's own words after the colon stay as written).
   'checked “Safe payments”',
 ];

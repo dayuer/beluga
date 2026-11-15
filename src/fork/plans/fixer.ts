@@ -6,7 +6,7 @@ import type { Routable } from '../../shared/auto-route.js';
 import { FINISHED, type MilestoneView } from '../../core/plans/progress.js';
 import { handoffsIn, milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
 import { ladderAgents, modelFailed, modelGone, nextRung, rungKnown } from './ladder.js';
-import { failingModels, modelKey } from '../failing-models.js';
+import { FAILING_MS, failingModels, modelKey } from '../failing-models.js';
 import { decodeFailure, failureText } from '../../shared/run-failure.js';
 import type { PlanEvent } from '../../core/plans/model.js';
 
@@ -32,16 +32,36 @@ const WS_PREFIX = 'ws:';
 /** An agent as one string (its runtime and model), to tell whether a conversation is on it already. */
 const agentKey = (a: AgentRef): string => `${a.runtime}:${a.model ?? ''}`;
 
+/** A conversation moved up the ladder: the rung it's on, whether its model failed for sure, the model it came from, and the task it was moved up for. */
+interface Lift {
+  readonly key: string;
+  readonly stay: boolean;
+  /** When it was moved up (a model that failed for sure counts as failing from then). */
+  readonly at: number;
+  /** Read back from the activity after a restart (what marked its model failing was lost with it). */
+  readonly restored?: boolean;
+  readonly from?: AgentRef;
+  readonly task?: string;
+}
+
+/**
+ * Asked of a conversation moved up the ladder once the model its work runs on is back and the task it
+ * was moved up for is done: it ends its turn, so the next task starts on that model (the pilot sends
+ * it on). What it was in the middle of stays as it is, to be picked up there.
+ */
+export const BACK_PROMPT =
+  'The model this plan’s work runs on is working again, so the rest of this milestone goes back to it. Stop here and end your turn now: don’t start anything new, and leave what you’re in the middle of as it is (it picks it up from there). Say in a line where you stopped.';
+
 /** A move up the ladder, as the activity says it (escalate's lines). */
-const CLIMB = /^handed a task (whose model failed|whose model had an error|that stopped twice)(?: in “(.+)”)? to (.+)$/;
+const CLIMB = /^handed a task (whose model failed|whose model had an error)(?: in “(.+)”)? to (.+)$/;
 
 /** A milestone's last move up the ladder after `since`: who to, and whether it stays there (its model failed for sure). */
-function lastClimb(activity: readonly PlanEvent[], title: string, since: number): { readonly to: string; readonly stay: boolean } | undefined {
-  let out: { to: string; stay: boolean } | undefined;
+function lastClimb(activity: readonly PlanEvent[], title: string, since: number): { readonly to: string; readonly stay: boolean; readonly at: number } | undefined {
+  let out: { to: string; stay: boolean; at: number } | undefined;
   for (const e of activity) {
     if (e.kind !== 'note' || e.at <= since) continue;
     const m = CLIMB.exec(e.text);
-    if (m && m[2] === title) out = { to: m[3]!, stay: m[1] === 'whose model failed' };
+    if (m && m[2] === title) out = { to: m[3]!, stay: m[1] === 'whose model failed', at: e.at };
   }
   return out;
 }
@@ -58,7 +78,11 @@ export class PlanFixer {
    * and whether it stays there (its model failed for sure: going back would fail again) or goes back
    * once the task it was moved up for is done.
    */
-  private readonly lifted = new Map<string, { readonly key: string; readonly stay: boolean }>();
+  private readonly lifted = new Map<string, Lift>();
+  /** Lifted conversations whose model was marked failing again after a restart (once each). */
+  private readonly remarked = new Set<string>();
+  /** Lifted conversations already asked to end their turn so their next task goes back (one ask per lift). */
+  private readonly steered = new Set<string>();
   /** Models a plan was told aren't working (`plan:model`), so it's said once. */
   private readonly told = new Set<string>();
 
@@ -117,6 +141,7 @@ export class PlanFixer {
     this.onFixer.delete(channel);
     this.hard.delete(channel);
     this.lifted.delete(channel);
+    this.steered.delete(channel);
   }
 
   /**
@@ -145,15 +170,15 @@ export class PlanFixer {
     // Moved up the failure ladder (this session, or as the activity says after a restart: its last move
     // up names the model it's on now). Its model failed for sure: it stays, going back would fail again.
     const climb = lastClimb(plan.activity, m.milestone.title, lastBack);
-    const lift = this.lifted.get(channel) ?? (climb && onAgent && agentName(onAgent, { model: true }) === climb.to ? { key: on!, stay: climb.stay } : undefined);
-    const onLift = lift !== undefined && on === lift.key;
-    if (onLift && lift.stay) return;
+    const lift = this.lifted.get(channel) ?? (climb && onAgent && agentName(onAgent, { model: true }) === climb.to ? { key: on!, stay: climb.stay, at: climb.at, restored: true } : undefined);
+    // Moved up the ladder: back down once the task it was moved up for is done and its own model works again.
+    if (lift !== undefined && on === lift.key) return this.liftBack(plan, m, channel, lift, idle);
     const said = handoffsIn(plan.activity, m.milestone.title).some((h) => (h.what === 'fix' || h.what === 'stopped') && h.at > lastBack);
     const startedOnFixer = at.via === 'fix' && lastBack === -Infinity;
     // On the fix agent now, and put there by a handoff (this session, or one the activity or a
     // stopped-twice mark says): switched to another model by you since, it's left where you put it.
     const onFix = fixer !== undefined && on === agentKey(fixer) && (this.onFixer.has(channel) || said || startedOnFixer || m.tasks.some((t) => stoppedTwice.has(t.task.id)));
-    if (!onFix && !onLift) return;
+    if (!onFix) return;
     const left = m.tasks.filter((t) => (known ?? stoppedTwice).has(t.task.id) && !FINISHED.has(t.state));
     if (left.length || (!known && m.run.check?.verdict === 'fail') || !idle(channel)) return;
     const next = m.tasks.find((t) => t.issue && !FINISHED.has(t.state));
@@ -217,7 +242,9 @@ export class PlanFixer {
     if (!next) return undefined;
     const gone = modelGone(stall);
     this.deps.switchAgent(channel, next);
-    this.lifted.set(channel, { key: agentKey(next), stay: gone });
+    const was = this.lifted.get(channel);
+    this.lifted.set(channel, { key: agentKey(next), stay: gone || (was?.stay ?? false), at: was?.at ?? (this.deps.now?.() ?? Date.now()), ...((was?.from ?? current) ? { from: was?.from ?? current } : {}), ...((task ?? was?.task) ? { task: task ?? was?.task } : {}) });
+    this.steered.delete(channel);
     if (task) this.hard.set(channel, new Set([...(this.hard.get(channel) ?? []), task]));
     const name = agentName(next, { model: true });
     this.deps.plans.note(plan.id, 'note', `${said} ${name}`, { kind: 'beluga' });
@@ -235,13 +262,57 @@ export class PlanFixer {
     return name;
   }
 
+  /**
+   * A conversation moved up the ladder goes back to the model its work runs on as soon as it can: the
+   * task it was moved up for done, that model working again (a local one probed, at most once a
+   * minute: fork/failing-models.ts; a Claude one once nothing marks it failing), and the next task to
+   * start. Between turns it's switched back now; at work on the next task already (a milestone's agent
+   * goes on by itself), it's asked once to end its turn, and switched back when it has. So one
+   * failure doesn't keep the rest of the milestone on a dearer model.
+   */
+  private liftBack(plan: Plan, m: MilestoneView, channel: string, lift: Lift, idle: (channel: string) => boolean): void {
+    if (!this.deps.switchAgent) return;
+    const st = this.deps.store.getState();
+    const now = this.deps.now?.() ?? Date.now();
+    // Still on the task it was moved up for: it stays till that's done.
+    if (lift.task && m.tasks.some((t) => t.task.id === lift.task && !FINISHED.has(t.state))) return;
+    const next = m.tasks.find((t) => t.issue && !FINISHED.has(t.state));
+    // Nothing left to do: nothing to go back for.
+    if (!next) return;
+    const own = workAgentFor(plan, next.issue!, st).agent ?? lift.from;
+    const was = own?.runtime === 'claude' && !own.model && st.prefs.model ? { ...own, model: st.prefs.model } : own;
+    // Its model failed for sure, and nothing marks it now (Beluga restarted since): failing from when it was moved up, as it was.
+    if (was && lift.restored && lift.stay && failingModels.why(modelKey(was), now) === undefined && now - lift.at < FAILING_MS && !this.remarked.has(channel)) {
+      this.remarked.add(channel);
+      failingModels.mark(modelKey(was), 'It failed before Beluga restarted', lift.at);
+    }
+    if (was && failingModels.recovered(modelKey(was), now) !== 'yes') return;
+    const name = own ? agentName(own, { model: true }) : 'your default agent';
+    if (idle(channel)) {
+      this.lifted.delete(channel);
+      this.steered.delete(channel);
+      this.hard.delete(channel);
+      this.onFixer.delete(channel);
+      if (this.agentOn(channel) === (own ? agentKey(own) : undefined)) return;
+      this.deps.switchAgent(channel, own);
+      this.deps.plans.note(plan.id, 'note', `${name} works again: “${m.milestone.title}” goes back to it`, { kind: 'beluga' });
+      return;
+    }
+    if (this.steered.has(channel)) return;
+    this.steered.add(channel);
+    const asked = this.deps.askClaude(BACK_PROMPT, channel, false);
+    // Steered in now, not after its turn: it's on to the next task already.
+    if (typeof asked === 'string') this.deps.promote?.(asked);
+    this.deps.plans.note(plan.id, 'note', `${name} works again: asked the agent doing “${m.milestone.title}” to end its turn, so its next task goes back to it`, { kind: 'beluga' });
+  }
+
   /** The agent to use instead of one known to fail now (fork/failing-models.ts): the first rung above it that isn't. */
   private standIn(agent: AgentRef | undefined): AgentRef | undefined {
     const st = this.deps.store.getState();
     const now = this.deps.now?.() ?? Date.now();
     const ladder = ladderAgents(st.prefs.autoRoute, st.runtimes);
     let a = agent;
-    for (let i = 0; i <= ladder.length && a && failingModels.why(modelKey(a), now); i++) {
+    for (let i = 0; i <= ladder.length && a && failingModels.why(modelKey(a), now) && failingModels.recovered(modelKey(a), now) !== 'yes'; i++) {
       const up = nextRung(ladder, a, st.prefs.model);
       if (!up) break;
       a = up;

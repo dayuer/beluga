@@ -3,8 +3,9 @@ import { Store, initialState } from '../src/core/store.js';
 import type { Plan } from '../src/core/plans/model.js';
 import type { PilotDeps } from '../src/core/plans/pilot.js';
 import type { MilestoneView } from '../src/core/plans/progress.js';
-import { FAILING_MS, FailingModels, failingModels, modelKey } from '../src/fork/failing-models.js';
-import { PlanFixer } from '../src/fork/plans/fixer.js';
+import { FAILING_MS, FailingModels, PROBE_EVERY_MS, failingModels, modelKey } from '../src/fork/failing-models.js';
+import { waitFor } from './helpers.js';
+import { BACK_PROMPT, PlanFixer } from '../src/fork/plans/fixer.js';
 import { modelGone } from '../src/fork/plans/ladder.js';
 import type { AgentRef } from '../src/protocol.js';
 import type { RuntimeModel } from '../src/shared/agent-runtimes.js';
@@ -36,20 +37,29 @@ function make(opts: Opts = {}) {
   put(opts.on ?? CHEAP);
   const switched: Array<AgentRef | undefined> = [];
   const notes: Array<{ kind: string; text: string }> = [];
+  const asked: Array<{ prompt: string; channel: string }> = [];
+  const promoted: string[] = [];
   const activity = (opts.activity ?? []).map((text, i) => ({ id: `e${i}`, at: i + 1, by: { kind: 'beluga' as const }, kind: 'note' as const, text }));
   const deps = {
     store,
     now: () => now,
     fixer: () => opts.fixer ?? claude('opus'),
     switchAgent: (_c: string, a: AgentRef | undefined) => (switched.push(a), put(a)),
+    askClaude: (prompt: string, channel: string) => `ask-${asked.push({ prompt, channel })}`,
+    promote: (id: string) => (promoted.push(id), true),
     plans: { note: (_id: string, kind: string, text: string) => void notes.push({ kind, text }) },
   } as unknown as PilotDeps;
   const plan = { id: 'p', home: 'ws:home', agent: CHEAP, activity, watch: { t1: { escalated: true } }, runs: { safe: { agent: { worktree: 'w9', at: 0, tasks: ['t1'] } } }, body: { milestones: [{ id: 'safe', title: 'Safe payments' }] } } as unknown as Plan;
-  const milestone = (state: 'done' | 'ready') => ({ agent: { worktree: 'w9', at: 0, tasks: ['t1'], via: 'plan' }, milestone: { id: 'safe', title: 'Safe payments' }, tasks: [{ task: { id: 't1' }, state, issue: { labels: [], priority: 'none' } }], run: {} }) as unknown as MilestoneView;
-  return { store, deps, plan, milestone, switched, notes, fixer: new PlanFixer(deps), later: (ms: number) => (now += ms) };
+  /** The milestone: t1 (the task it was moved up for) in `state`, then t2 still to do (none when `last`). */
+  const milestone = (state: 'done' | 'ready', last = false) =>
+    ({ agent: { worktree: 'w9', at: 0, tasks: ['t1', 't2'], via: 'plan' }, milestone: { id: 'safe', title: 'Safe payments' }, tasks: [{ task: { id: 't1' }, state, issue: { labels: [], priority: 'none' } }, ...(last ? [] : [{ task: { id: 't2' }, state: 'ready', issue: { labels: [], priority: 'none' } }])], run: {} }) as unknown as MilestoneView;
+  return { store, deps, plan, milestone, switched, notes, asked, promoted, fixer: new PlanFixer(deps), later: (ms: number) => (now += ms) };
 }
 
-beforeEach(() => failingModels.clear());
+beforeEach(() => {
+  failingModels.clear();
+  failingModels.prober = undefined;
+});
 
 describe('what stays up the ladder, and what goes back', () => {
   it('a failure that won’t pass by itself is told from one that may', () => {
@@ -82,16 +92,21 @@ describe('what stays up the ladder, and what goes back', () => {
       // Still at it: it stays.
       t.fixer.settle(t.plan, t.milestone('ready'), () => true);
       expect(t.switched).toEqual([claude('haiku')]);
+      // Its task done, but nothing left to do: nothing to go back for.
+      t.fixer.settle(t.plan, t.milestone('done', true), () => true);
+      expect(t.switched).toEqual([claude('haiku')]);
       t.fixer.settle(t.plan, t.milestone('done'), () => true);
       expect(t.switched).toEqual([claude('haiku'), CHEAP]);
-      expect(t.notes.at(-1)!.text).toMatch(/^what was hard in “Safe payments” is done: its work is back on Local model/);
+      expect(t.notes.at(-1)!.text).toMatch(/^Local model .* works again: “Safe payments” goes back to it$/);
     }
   });
 
-  it('after a restart the activity says which: gone stays, the other goes back', () => {
+  it('after a restart the activity says which: gone stays (its model failing again from then, till probed back), the other goes back', () => {
     const stays = make({ on: claude('haiku'), activity: ['handed a task whose model failed in “Safe payments” to Claude (Haiku)'] });
     stays.fixer.settle(stays.plan, stays.milestone('done'), () => true);
     expect(stays.switched).toEqual([]);
+    expect(failingModels.why(modelKey(CHEAP), T0)).toBe('It failed before Beluga restarted');
+    failingModels.clear();
     const back = make({ on: claude('haiku'), activity: ['handed a task whose model had an error in “Safe payments” to Claude (Haiku)'] });
     back.fixer.settle(back.plan, back.milestone('done'), () => true);
     expect(back.switched).toEqual([CHEAP]);
@@ -166,3 +181,65 @@ describe('models kept as failing', () => {
     expect(f.why('local:deep/a', T0)).toBe('y');
   });
 });
+
+describe('back down once the model the work runs on is back (fork/plans/fixer.ts liftBack)', () => {
+  it('its local model gone, it’s probed when the next task comes: answering again, the next task goes back to it', async () => {
+    const t = make();
+    let answers = false;
+    let probes = 0;
+    failingModels.prober = async () => (probes++, answers);
+    t.fixer.escalate(t.plan, 'ws:w9', 't1', { first: true, stall: GONE });
+    // Still on the task it was moved up for: not even probed.
+    t.fixer.settle(t.plan, t.milestone('ready'), () => true);
+    expect(probes).toBe(0);
+    // Its task done, the next to start: probed (once a minute at most), not answering yet: it stays up.
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(probes).toBe(1);
+    await waitFor(() => failingModels.recovered(modelKey(CHEAP), T0) === 'no');
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(probes).toBe(1);
+    expect(t.switched).toEqual([claude('haiku')]);
+    // A minute on, it answers: its mark is cleared, and the next task goes back to it.
+    answers = true;
+    t.later(PROBE_EVERY_MS);
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(probes).toBe(2);
+    await waitFor(() => failingModels.recovered(modelKey(CHEAP), T0 + PROBE_EVERY_MS) === 'yes');
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(t.switched).toEqual([claude('haiku'), CHEAP]);
+    expect(failingModels.why(modelKey(CHEAP), T0 + PROBE_EVERY_MS)).toBeUndefined();
+    expect(t.notes.at(-1)!.text).toMatch(/^Local model .* works again: “Safe payments” goes back to it$/);
+  });
+
+  it('a Claude model kept as failing goes back once its mark is over (it can’t be probed)', () => {
+    const t = make({ on: claude('haiku'), ladder: ['claude:sonnet', 'claude:opus'] });
+    (t.plan as { agent?: AgentRef }).agent = claude('haiku');
+    t.fixer.escalate(t.plan, 'ws:w9', 't1', { first: true, stall: 'Claude Code isn’t signed in on this Mac' });
+    expect(t.switched).toEqual([claude('sonnet')]);
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(t.switched).toEqual([claude('sonnet')]);
+    t.later(FAILING_MS);
+    t.fixer.settle(t.plan, t.milestone('done'), () => true);
+    expect(t.switched).toEqual([claude('sonnet'), claude('haiku')]);
+  });
+
+  it('on to the next task by itself already, it’s asked once to end its turn, steered in now; switched back when it has', async () => {
+    const t = make();
+    failingModels.prober = async () => true;
+    t.fixer.escalate(t.plan, 'ws:w9', 't1', { first: true, stall: ERRORED });
+    let busy = true;
+    t.fixer.settle(t.plan, t.milestone('done'), () => !busy);
+    await waitFor(() => failingModels.recovered(modelKey(CHEAP), T0) === 'yes');
+    t.fixer.settle(t.plan, t.milestone('done'), () => !busy);
+    t.fixer.settle(t.plan, t.milestone('done'), () => !busy);
+    expect(t.asked).toEqual([{ prompt: BACK_PROMPT, channel: 'ws:w9' }]);
+    expect(t.promoted).toEqual(['ask-1']);
+    expect(t.switched).toEqual([claude('haiku')]);
+    expect(t.notes.at(-1)!.text).toMatch(/^Local model .* works again: asked the agent doing “Safe payments” to end its turn, so its next task goes back to it$/);
+    busy = false;
+    t.fixer.settle(t.plan, t.milestone('done'), () => !busy);
+    expect(t.switched).toEqual([claude('haiku'), CHEAP]);
+    expect(t.asked).toHaveLength(1);
+  });
+});
+

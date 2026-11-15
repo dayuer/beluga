@@ -74,7 +74,7 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
     });
   // Listed again with what each runtime last said about itself (BLG-507: a local endpoint answering never wipes Codex's sign-in state and models).
   const local = new LocalEndpoints({ endpoints: () => env.endpoints(), onChange: () => (workbench ? workbench.runtimesChanged() : opts.store.dispatch({ type: 'runtimes', runtimes: listRuntimes() })) });
-  failingModels.onChange = () => (workbench ? workbench.runtimesChanged() : opts.store.dispatch({ type: 'runtimes', runtimes: listRuntimes() })); // fork: a model that failed is greyed (fork/failing-models.ts)
+  failingModels.attach({ local, changed: () => (workbench ? workbench.runtimesChanged() : opts.store.dispatch({ type: 'runtimes', runtimes: listRuntimes() })) }); // fork: a model that failed is greyed, and probed till it's back (fork/failing-models.ts)
   if (opts.runtime) local.start();
   // Database views find the project's connection string (its variables, its .env).
   useViewEnv({ database: (dir) => env.viewEnv(dir), commands: (dir) => env.envFor({ dir }) });
