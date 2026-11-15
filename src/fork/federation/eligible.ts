@@ -35,15 +35,28 @@ export function assignerOf(shared: SharedTask | undefined): string | undefined {
 
 const no = (why: Why): Eligible => ({ ok: false, why });
 
+/** Who put a task in the pool: the peer that last set its labels on the team board (a pool task has no giver). */
+export function poolGiverOf(shared: SharedTask | undefined): string | undefined {
+  return shared?.fields.labels?.a;
+}
+
 export function eligible(issue: Issue, ctx: EligibleCtx): Eligible {
   if (issue.assignee?.id !== ctx.self) return no('assignee');
+  return eligibleCore(issue, ctx, assignerOf(ctx.sharedOf(issue.id)), { selfOk: false });
+}
+
+/**
+ * Every rule but who it's for, with the giver passed in: `eligible` passes the assigner, the pool
+ * (claim.ts) passes whoever labelled it. `selfOk`: a task this computer gave itself may start
+ * (the pool, where labelling is the explicit ask); otherwise it's 'self-assigned'.
+ */
+export function eligibleCore(issue: Issue, ctx: EligibleCtx, giver: string | undefined, opts: { readonly selfOk: boolean }): Eligible {
   if (issue.status !== 'todo') return no('status');
   if (issue.private || isArchived(issue) || issue.plan) return no('scope');
   const shared = ctx.sharedOf(issue.id);
-  const assigner = assignerOf(shared);
-  if (!shared || assigner === undefined) return no('not-team');
+  if (!shared || giver === undefined) return no('not-team');
   // Before trust: trustOf says 'full' for ourselves.
-  if (assigner === ctx.self) return no('self-assigned');
+  if (!opts.selfOk && giver === ctx.self) return no('self-assigned');
   if (issue.blockedBy.some((b) => {
     const s = ctx.statusOf(b);
     return s !== 'done' && s !== 'in_review';
@@ -52,7 +65,7 @@ export function eligible(issue: Issue, ctx: EligibleCtx): Eligible {
   for (const [name, f] of Object.entries(shared.fields)) {
     if (name.startsWith('working.') && name !== `working.${ctx.self}` && f.v === true) return no('working');
   }
-  const t = ctx.trustOf(assigner);
+  const t = ctx.trustOf(giver);
   if (!(t === 'full' || (ctx.from === 'trusted' && t === 'trusted'))) return no('trust');
   if (ctx.running >= ctx.atOnce) return no('capacity');
   return { ok: true };
