@@ -21,6 +21,12 @@ export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly ent
         ['Pick a model for each task', 'Which model a task without an agent goes to', 'auto route autopilot model pick'],
         ['Urgent and high are hard too', undefined, 'urgent high priority hard opus'],
       ]),
+      group('claude', 'Auto Accept', 'Start tasks teammates give me', 'auto accept federation 自动接单 接单 派活 联邦'),
+      ...rows('claude', 'Auto Accept', [
+        ['Start tasks teammates give me', undefined, 'auto accept start assigned teammate 自动接单 派给我的'],
+        ['Only from', undefined, 'trust full trusted 信任'],
+        ['Running at once', undefined, 'how many parallel 同时'],
+      ]),
     ],
   },
   {

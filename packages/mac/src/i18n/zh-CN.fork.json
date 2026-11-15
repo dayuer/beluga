@@ -477,5 +477,17 @@
  "{0} following the default · {1} exceptions": "{0} 个跟随默认 · {1} 个例外",
  "{0} selected": "已选 {0} 个",
  "Work": "计划",
- "Resize the sidebar": "调整侧栏宽度"
+ "Resize the sidebar": "调整侧栏宽度",
+ "Auto Accept": "自动接单",
+ "Start tasks teammates give me": "队友派给我的任务自动开工",
+ "A Ready task a teammate gives you starts here by itself, with Claude in its own worktree. Never one you gave yourself.": "队友派给你的就绪任务会在这台电脑上自己开工，由 Claude 在它自己的工作树里做。你派给自己的不会。",
+ "Tasks given to me": "派给我的",
+ "Tasks given to me, and the pool": "派给我的，以及认领池",
+ "Only from": "只接",
+ "Tasks from anyone else wait for you to start them.": "其他人派的任务等你自己开工。",
+ "People you fully trust": "完全信任的人",
+ "People you trust": "信任的人",
+ "How many tasks it starts by itself can run at the same time ({0}–{1}). The rest wait their turn.": "自动开工的任务最多同时跑几个（{0}–{1}）。其余的排队等。",
+ "Tasks at once": "同时任务数",
+ "Running at once": "同时进行"
 }
