@@ -41,7 +41,7 @@ accept 选「派给我的，以及认领池」时，带池标签（默认 `pool`
 | `src/core/team/protocol.ts` 和 `src/companion/protocol.ts` 没有改动；不新增上游接入点 | 上一节 |
 | 测试里没有 sleep，没有靠时间的竞争 | `fork-federation-claim`：claim.ts has no timers, clocks or randomness；`fork-federation-pool`：no real timers or waits: time moves only through the injected after。两台的测试只用 `settle` 等条件，不断言耗时 |
 | 本里程碑新增和改动的测试文件、`npm run typecheck` 通过 | 下面「运行结果」 |
-| 整套测试 | 下面「整套测试」，由计划最后一步填 |
+| 整套测试 | 下面「整套测试」：三个 typecheck 通过；整套 vitest 3 条在负载下失败，单独重跑通过；e2e 因负载没跑完 |
 
 其余顺带测到的：`fork-federation-pool`：pool still starts what a teammate gives me, straight away；a status line for myself counts as auto started（marker.ts 那一处改动）。`fork-federation-eligible` 原有 13 条一行没改，全部通过。
 
@@ -59,7 +59,30 @@ $ (cd packages/mac && npm run typecheck)  # 通过
 
 ## 整套测试
 
-由计划最后一步（审计）填写：整套 `npx vitest run`、`npm run typecheck`、`packages/companion` 的 `npm run typecheck` 的结果，以及那次的 `Tested-on` 行。本任务没有跑整套。
+BLG-240，2026-11-15，在本 worktree 跑，提交 `a020852c5`（包含 BLG-239 的文案修复）。四处依赖都是 worktree 创建时 `npm ci` 装好的真实目录，不是软链：根目录、`packages/mac`、`packages/companion`（有 `react-native`）、`packages/studio-app`（有 `react`）。没改 package.json、lock 文件，也没改代码。这台 Mac 整个过程都很忙：load average 大多在 60–120，最高到 360（10 核）。日志在 `.beluga/scratch/suite/`。
+
+| 命令 | 结果 |
+|---|---|
+| `npm run typecheck` | 通过 |
+| `(cd packages/mac && npm run typecheck)` | 通过 |
+| `(cd packages/companion && npm run typecheck)` | 通过（依赖装齐后，上次的 `react-native`、`--jsx` 报错没再出现） |
+| `npx vitest run` | 773 个文件：769 通过、3 失败、1 跳过；9612 条：9593 通过、3 失败、16 跳过；没有加载不了的文件。`tests/agent-wording.test.ts`（3 条）和 `tests/team/studio-app-submit.test.ts`（6 条）都通过 |
+| 失败的 3 个文件单独重跑一次：`npx vitest run tests/client-deploy-versions.test.ts tests/controller.test.ts tests/workbench.test.ts` | 3 个文件、64 条全部通过 |
+| `(cd packages/mac && npm run e2e)` | **没跑完**，见下 |
+
+整套 vitest 里失败的 3 条是 `client-deploy-versions`（versions.sh 检查点）、`controller`（归档对话带走子 agent 的 worktree）、`workbench`（删除或归档 worktree 时停掉里面的 agent）。都不是本里程碑碰过的文件，单独重跑都通过。按项目的规则（负载造成的失败，单独重跑一次还失败才算数），它们不算本分支的失败。所以没有在 main 上对照。
+
+**e2e（631 条，1 个 worker）**：分三段跑，因为这里一个后台命令最多跑 2 小时。
+
+| 段 | 范围 | 通过 | 失败 | 跳过 | 怎么结束的 |
+|---|---|---|---|---|---|
+| 1 | 从第一个 spec 到 `key-paste.spec.ts` 之前 | 142 | 30 | 13 | 1 小时后被停在第 185 条 |
+| 2 | `key-paste.spec.ts` 到 `sounds.spec.ts` | 227 | 59 | 22 | 2 小时后被停在第 308/424 条 |
+| 3 | `sounds.spec.ts` 到最后（125 条） | 0 | 23 | 2 | load 涨到 360、连续失败，跑到第 25 条时我停掉了 |
+
+失败的原因几乎都是 `Error: The demo daemon did not start: it was killed (SIGTERM)`（演示 daemon 在负载下没能按时起来），另有 `Fixture "demo" timeout … exceeded during setup`，以及 `ChunkLoadError`、剪贴板权限这类环境错误。都是在测试开始前或刚开始时出的错，不是哪条检查没过。失败分布在二十多个和本里程碑无关的 spec 里（chat、composer、keyboard、live-preview、project-home 等）。没有哪个 e2e 测自动接单的设置；`settings-search.spec.ts` 的 4 条都通过了。负载太高，没有重跑这些失败的，也没有在 main 上对照。等 Mac 空下来时，在 `packages/mac` 跑一次完整的 `npm run e2e`；`scripts/e2e-lock.mjs` 会在负载降下来后把失败的单独再跑一次。
+
+**`Tested-on` 行：不写。** `CLAUDE.md` 规定整套有失败或只跑了一部分时不加这一行。这次 vitest 有 3 条失败（单独重跑通过），e2e 也没跑完。
 
 ## 和设计不同的地方
 
