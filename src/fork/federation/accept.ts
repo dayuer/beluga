@@ -8,6 +8,11 @@
  * When: a teammate's change to who it's for or its status (sync.onChange), a task here moving
  * (board_issue: status or worktrees), a teammate coming online, settings turned on, and once at
  * start. A burst of these is one pass (`defer`, COALESCE_MS by default).
+ *
+ * The pool ('pool', milestone 2, claim.ts): a Ready task with the pool label and nobody on it is
+ * claimed (assignee set to this computer), then confirmed after `confirmDelay` (`after`): still
+ * ours on the board, it starts. Which claims wait for their confirm is read off the board too
+ * (`pickPending`), so a restart between claim and confirm confirms it once, later.
  */
 import type { Actor, Issue } from '../../core/board/model.js';
 import type { Action } from '../../core/store.js';
@@ -16,7 +21,8 @@ import type { Board } from '../../core/board/board.js';
 import type { TeamBoardSync } from '../../core/team/board-sync.js';
 import type { TeamBoards, TeamPart } from '../../core/team/service.js';
 import type { TrustLevel } from '../../shared/settings-schema.js';
-import { assignerOf, eligible } from './eligible.js';
+import { assignerOf, eligible, poolGiverOf } from './eligible.js';
+import { type ClaimCtx, confirmDelay, pickClaimable, pickPending, stillMine } from './claim.js';
 import { autoActor, isAutoRunning } from './marker.js';
 import type { FederationSettings } from './settings.js';
 
@@ -29,9 +35,18 @@ const later: Defer = (fn) => {
   (t as { unref?: () => void }).unref?.();
 };
 
+/** Runs `fn` after `ms` (a clock the tests drive). */
+export type After = (ms: number, fn: () => void) => void;
+
+const laterBy: After = (ms, fn) => {
+  const t = setTimeout(fn, ms);
+  (t as { unref?: () => void }).unref?.();
+};
+
 export interface AcceptDeps {
   readonly team: Pick<TeamBoards, 'self' | 'nameOf'>;
-  readonly board: Pick<Board, 'list' | 'get'>;
+  /** `update`: a claim sets who it's for (the pool only). */
+  readonly board: Pick<Board, 'list' | 'get' | 'update'>;
   readonly sync: Pick<TeamBoardSync, 'shared' | 'onChange'>;
   /** work.start(id, { claude: true, quiet: true, by }) */
   readonly start: (issueId: string, by: Actor) => Promise<unknown>;
@@ -40,6 +55,10 @@ export interface AcceptDeps {
   /** A worktree still there (not archived). */
   readonly live: (workspaceId: string) => boolean;
   readonly defer?: Defer;
+  /** The wait between a claim and its confirm (default: a timer). */
+  readonly after?: After;
+  /** The random source for `confirmDelay` (default Math.random). */
+  readonly random?: () => number;
   readonly log?: (line: string) => void;
 }
 
@@ -54,6 +73,10 @@ export class FederationAccept implements TeamPart {
   private pending = false;
   /** What each task looked like at the last board_issue (status, worktrees): only a change there asks for a pass. */
   private readonly seen = new Map<string, string>();
+  /** Claims with a confirm queued (dedupe only: lost on a restart, read off the board again). */
+  private readonly confirming = new Set<string>();
+  /** Starts a confirm is running. */
+  private readonly jobs = new Set<Promise<void>>();
 
   constructor(protected readonly d: AcceptDeps) {
     if (this.on()) {
@@ -89,7 +112,7 @@ export class FederationAccept implements TeamPart {
     if (this.subscribed) return;
     this.subscribed = true;
     this.d.sync.onChange((c) => {
-      if (c.won.assignee || c.won.status) this.schedule();
+      if (c.won.assignee || c.won.status || (c.won.labels && this.d.settings().accept === 'pool')) this.schedule();
     });
   }
 
@@ -124,13 +147,35 @@ export class FederationAccept implements TeamPart {
     return this.inFlight;
   }
 
-  /** Resolves once no pass is running (tests). */
+  /** Resolves once no pass and no confirmed start is running (tests). */
   async settled(): Promise<void> {
-    while (this.inFlight) await this.inFlight;
+    while (this.inFlight || this.jobs.size > 0) {
+      if (this.inFlight) await this.inFlight;
+      else await Promise.all([...this.jobs]);
+    }
   }
 
   stop(): void {
     this.stopped = true;
+  }
+
+  private claimCtx(s: FederationSettings, running: number): ClaimCtx {
+    return {
+      self: this.d.team.self,
+      sharedOf: (id) => this.d.sync.shared(id),
+      trustOf: this.d.trustOf,
+      from: s.from,
+      running,
+      atOnce: s.atOnce,
+      statusOf: (id) => this.d.board.get(id)?.status,
+      accept: s.accept,
+      poolLabel: s.poolLabel,
+    };
+  }
+
+  private actorFor(giver: string): Actor {
+    const self = this.d.team.self;
+    return autoActor(self, this.d.team.nameOf(self), giver, this.d.team.nameOf(giver));
   }
 
   private async pass(): Promise<void> {
@@ -139,26 +184,78 @@ export class FederationAccept implements TeamPart {
     const self = this.d.team.self;
     const issues = this.d.board.list();
     let running = issues.filter((i) => isAutoRunning(i, self, this.d.live)).length;
-    const statusOf = (id: string) => this.d.board.get(id)?.status;
+    // Claimed here, not confirmed yet: each holds a place (the pool only).
+    const pending = pickPending(issues, this.claimCtx(s, running));
+    for (const p of pending) {
+      const l = this.d.sync.shared(p.id)?.fields.assignee?.l;
+      if (l !== undefined && this.failed.get(p.id) === l) continue;
+      if (!this.confirming.has(p.id)) this.queueConfirm(p.id);
+    }
     for (const issue of [...issues].sort(listOrder)) {
-      if (this.stopped || running >= s.atOnce) return;
+      if (this.stopped || running + pending.length >= s.atOnce) break;
       const shared = this.d.sync.shared(issue.id);
       const l = shared?.fields.assignee?.l;
       if (l !== undefined && this.failed.get(issue.id) === l) continue;
       // The board as it is now: an earlier start in this pass may have moved things.
       const now = this.d.board.get(issue.id) ?? issue;
-      const ok = eligible(now, { self, sharedOf: (id) => this.d.sync.shared(id), trustOf: this.d.trustOf, from: s.from, running, atOnce: s.atOnce, statusOf });
+      const ok = eligible(now, this.claimCtx(s, running + pending.length));
       if (!ok.ok) continue;
       const assigner = assignerOf(shared)!;
       running++;
       try {
-        await this.d.start(issue.id, autoActor(self, this.d.team.nameOf(self), assigner, this.d.team.nameOf(assigner)));
+        await this.d.start(issue.id, this.actorFor(assigner));
         this.d.log?.(`federation: started ${issue.key} for ${this.d.team.nameOf(assigner)}`);
       } catch (e) {
         if (l !== undefined) this.failed.set(issue.id, l);
         this.d.log?.(`federation: couldn't start ${issue.key}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+    if (this.stopped || s.accept !== 'pool') return;
+    // Claims: synchronous, so two passes run back to back claim in the same tick.
+    for (const issue of pickClaimable(this.d.board.list(), this.claimCtx(s, running))) {
+      const giver = poolGiverOf(this.d.sync.shared(issue.id))!;
+      try {
+        this.d.board.update(issue.id, { assignee: { kind: 'person', id: self, name: this.d.team.nameOf(self) } }, this.actorFor(giver));
+      } catch (e) {
+        this.d.log?.(`federation: couldn't claim ${issue.key}: ${e instanceof Error ? e.message : String(e)}`);
+        continue;
+      }
+      this.d.log?.(`federation: claimed ${issue.key}`);
+      this.queueConfirm(issue.id);
+    }
+  }
+
+  /** After the wait, start a claim that's still ours. No places are counted here: the claim already holds one. */
+  private queueConfirm(id: string): void {
+    this.confirming.add(id);
+    (this.d.after ?? laterBy)(confirmDelay(this.d.random ?? Math.random), () => {
+      const s = this.d.settings();
+      const self = this.d.team.self;
+      if (this.stopped || s.accept !== 'pool') return void this.confirming.delete(id);
+      const now = this.d.board.get(id);
+      if (!stillMine(now, self)) {
+        this.d.log?.(`federation: lost the claim on ${now?.key ?? id}`);
+        return void this.confirming.delete(id);
+      }
+      if (pickPending([now!], this.claimCtx(s, 0)).length === 0) return void this.confirming.delete(id);
+      const shared = this.d.sync.shared(id);
+      const l = shared?.fields.assignee?.l;
+      const giver = poolGiverOf(shared)!;
+      const job: Promise<void> = this.d
+        .start(id, this.actorFor(giver))
+        .then(
+          () => this.d.log?.(`federation: started ${now!.key} from the pool`),
+          (e: unknown) => {
+            if (l !== undefined) this.failed.set(id, l);
+            this.d.log?.(`federation: couldn't start ${now!.key}: ${e instanceof Error ? e.message : String(e)}`);
+          },
+        )
+        .finally(() => {
+          this.jobs.delete(job);
+          this.confirming.delete(id);
+        });
+      this.jobs.add(job);
+    });
   }
 }
 

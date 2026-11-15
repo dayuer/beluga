@@ -9,7 +9,7 @@ import type { TeamBoards, TeamPart } from '../../core/team/service.js';
 import type { Store } from '../../core/store.js';
 import { trustOf } from '../../core/trust.js';
 import { blackbox } from '../../core/blackbox/recorder.js';
-import { type Defer, FederationAccept } from './accept.js';
+import { type After, type Defer, FederationAccept } from './accept.js';
 import { federationOf } from './settings.js';
 
 export interface FederationPartDeps {
@@ -21,7 +21,7 @@ export interface FederationPartDeps {
   readonly live: (workspaceId: string) => boolean;
 }
 
-export function federationParts(d: FederationPartDeps, inject?: { readonly defer?: Defer; readonly log?: (line: string) => void }): TeamPart[] {
+export function federationParts(d: FederationPartDeps, inject?: { readonly defer?: Defer; readonly after?: After; readonly random?: () => number; readonly log?: (line: string) => void }): TeamPart[] {
   return [
     new FederationAccept({
       team: d.team,
@@ -32,6 +32,8 @@ export function federationParts(d: FederationPartDeps, inject?: { readonly defer
       trustOf: (p) => trustOf(d.store.getState(), p),
       live: d.live,
       ...(inject?.defer ? { defer: inject.defer } : {}),
+      ...(inject?.after ? { after: inject.after } : {}),
+      ...(inject?.random ? { random: inject.random } : {}),
       log: inject?.log ?? ((line) => blackbox.record('log', line)),
     }),
   ];

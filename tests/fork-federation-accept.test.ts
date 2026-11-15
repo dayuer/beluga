@@ -67,6 +67,10 @@ function world(opts: { issues: Issue[]; by?: Record<string, string>; settings?: 
     board: {
       list: () => (reads++, issues),
       get: (ref: string) => issues.find((i) => i.id === ref || i.key === ref),
+      // Claims are the pool's (fork-federation-pool.test.ts): none here.
+      update: () => {
+        throw new Error('no claims without the pool');
+      },
     },
     sync: { shared: (id: string) => shared.get(id), onChange: (fn: (c: TeamChange) => void) => void listeners.push(fn) },
     start: async (id, by) => {
