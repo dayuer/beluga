@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Issue, IssueStatus } from '../src/core/board/model.js';
 import type { Field, SharedTask } from '../src/core/team/crdt.js';
-import { type ClaimCtx, pickClaimable, pickPending } from '../src/fork/federation/claim.js';
+import { CONFIRM_JITTER_MS, CONFIRM_MIN_MS, type ClaimCtx, confirmDelay, pickClaimable, pickPending, stillMine } from '../src/fork/federation/claim.js';
 import { eligible } from '../src/fork/federation/eligible.js';
 import type { TrustLevel } from '../src/shared/settings-schema.js';
 
@@ -163,5 +163,28 @@ describe('the pool, together', () => {
   it('claim.ts has no timers, clocks or randomness', () => {
     const src = readFileSync(new URL('../src/fork/federation/claim.ts', import.meta.url), 'utf8');
     for (const s of ['setTimeout', 'Date.now', 'Math.random']) expect(src).not.toContain(s);
+  });
+});
+
+describe('confirming a claim', () => {
+  it('confirmDelay spans [3000, 7000)', () => {
+    expect(CONFIRM_MIN_MS).toBe(3000);
+    expect(CONFIRM_MIN_MS + CONFIRM_JITTER_MS).toBe(7000);
+    expect(confirmDelay(() => 0)).toBe(3000);
+    const top = confirmDelay(() => 0.9999);
+    expect(top).toBeGreaterThanOrEqual(6999);
+    expect(top).toBeLessThan(7000);
+    expect(confirmDelay(() => 0.5)).toBe(5000);
+    // A source out of range is held inside it.
+    expect(confirmDelay(() => -1)).toBe(3000);
+    expect(confirmDelay(() => 1)).toBeLessThan(7000);
+    expect(confirmDelay(() => 2)).toBeLessThan(7000);
+  });
+
+  it('stillMine: mine / someone else / cleared', () => {
+    expect(stillMine(mine('a'), ME)).toBe(true);
+    expect(stillMine(task('a', { assignee: person(BOB) }), ME)).toBe(false);
+    expect(stillMine(task('a'), ME)).toBe(false);
+    expect(stillMine(undefined, ME)).toBe(false);
   });
 });

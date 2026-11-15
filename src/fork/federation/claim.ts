@@ -34,3 +34,18 @@ export function pickClaimable(issues: readonly Issue[], ctx: ClaimCtx): Issue[] 
   const room = Math.max(0, ctx.atOnce - ctx.running - pickPending(issues, ctx).length);
   return ordered(issues).filter((i) => !i.assignee && poolOk(i, ctx)).slice(0, room);
 }
+
+/** After a claim, wait this long plus up to the jitter before confirming: the board has time to merge a rival claim. */
+export const CONFIRM_MIN_MS = 3_000;
+export const CONFIRM_JITTER_MS = 4_000;
+
+/** How long to wait before confirming a claim, in [CONFIRM_MIN_MS, CONFIRM_MIN_MS + CONFIRM_JITTER_MS). `random` is injected. */
+export function confirmDelay(random: () => number): number {
+  const r = Math.min(Math.max(random(), 0), 1 - Number.EPSILON);
+  return CONFIRM_MIN_MS + Math.floor(r * CONFIRM_JITTER_MS);
+}
+
+/** Whether the claim held: the board still says this computer has it. */
+export function stillMine(issue: Pick<Issue, 'assignee'> | undefined, self: string): boolean {
+  return issue?.assignee?.id === self;
+}
