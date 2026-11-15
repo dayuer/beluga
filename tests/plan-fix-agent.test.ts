@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +21,7 @@ import { STATE_ROWS } from '../src/external/adapters/tools/state-rows.js';
 import { MACHINE } from '../src/machines/coverage.js';
 import type { AgentRef } from '../src/protocol.js';
 import { encodeFailure } from '../src/shared/run-failure.js';
+import { failingModels } from '../src/fork/failing-models.js';
 import type { CombineResult } from '../src/workspaces/git.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 import { waitFor } from './helpers.js';
@@ -31,6 +32,9 @@ const CHEAP: AgentRef = { runtime: 'local', label: 'Local model', model: 'deepse
 const STRONG: AgentRef = { runtime: 'claude', label: 'Claude', model: 'opus' };
 const MID: AgentRef = { runtime: 'claude', label: 'Claude', model: 'sonnet' };
 const MIN = 60_000;
+
+// A model one test's ladder kept as failing (fork/failing-models.ts) isn't failing in the next.
+beforeEach(() => failingModels.clear());
 
 const ws = (id: string, projectId: string, name: string, kind: Workspace['kind'] = 'worktree'): Workspace => ({ id, projectId, name, path: `/tmp/${name}`, kind, projectRoot: '/tmp/p', branch: `beluga/${name}`, createdAt: 0, external: false, askOnly: kind === 'chat' }) as unknown as Workspace;
 const project = (id: string, name: string, workspaces: Workspace[] = []): Project => ({ id, name, root: `/tmp/${name}`, base: 'main', workspaces });

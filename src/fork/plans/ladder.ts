@@ -59,6 +59,13 @@ export function nextRung(ladder: readonly AgentRef[], current: AgentRef | undefi
   return ladder.find((r) => (claudeRank(r) ?? -1) > rank);
 }
 
+/** Whether where a task is on (or below) the ladder is known: false for a Claude model whose strength isn't (no model, no default set). */
+export function rungKnown(ladder: readonly AgentRef[], current: AgentRef | undefined, defaultModel?: string): boolean {
+  const cur = current?.runtime === 'claude' && !current.model && defaultModel ? { ...current, model: defaultModel } : current;
+  if (!cur || cur.runtime !== 'claude') return true;
+  return ladder.some((r) => rungKey(r) === rungKey(cur)) || claudeRank(cur) !== undefined;
+}
+
 /**
  * Whether a run stopped because its model failed, by the watchdog's reason (shared/run-failure.ts
  * failureTitle): the API refused it (no such model, a wrong key, a bad request) or it couldn't sign
@@ -68,4 +75,16 @@ export function modelFailed(stall: string | undefined): boolean {
   if (!stall) return false;
   if (/usage limit|overloaded|rate.?limit|\b529\b|lost its connection/i.test(stall)) return false;
   return /API failed:|isn[’']t signed in|sign-in on .* expired|couldn[’']t sign in/i.test(stall);
+}
+
+/**
+ * Whether that failure is one that won't pass by itself: the model isn't there, the key or the
+ * sign-in is refused, the address is wrong. A conversation moved up for one of these stays up (going
+ * back would fail again) and the model is kept as failing (fork/failing-models.ts); moved up for
+ * anything else (a server error, a task that stopped twice), it goes back once that task is done.
+ */
+export function modelGone(stall: string | undefined): boolean {
+  if (!modelFailed(stall)) return false;
+  if (!/API failed:/i.test(stall!)) return true; // not signed in, a sign-in that expired
+  return /not exist|no such model|unknown model|model[^.]{0,40}not found|not_found|selected model|invalid[^.]{0,20}key|incorrect api key|authenticat|unauthori[sz]ed|forbidden|permission|have access|action is invalid|\b40[134]\b/i.test(stall!);
 }

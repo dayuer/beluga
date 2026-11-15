@@ -499,5 +499,14 @@
  "it answered with an error": "它返回了错误",
  "it answered with an error ({0})": "它返回了错误（{0}）",
  "Use the base address, without /v1/messages or /chat/completions: Beluga adds /v1/messages itself.": "请填基础地址，不要带 /v1/messages 或 /chat/completions：Beluga 会自己加上 /v1/messages。",
- "The address should take Anthropic’s /v1/messages (for example …/api/anthropic or …/api/compatible).": "地址要能接受 Anthropic 的 /v1/messages（比如 …/api/anthropic 或 …/api/compatible）。"
+ "The address should take Anthropic’s /v1/messages (for example …/api/anthropic or …/api/compatible).": "地址要能接受 Anthropic 的 /v1/messages（比如 …/api/anthropic 或 …/api/compatible）。",
+ "A task whose model fails, or that stops twice, first goes up the steps in Settings › Auto Route › When a Model Fails.": "模型失效或卡住两次的任务，先按 设置 › 自动路由 › 模型失效时 里的顺序升级。",
+ "handed a task whose model had an error in {0} to {1}": "把{0}里模型出错的任务交给了 {1}",
+ "handed a task whose model had an error to {0}": "把模型出错的任务交给了 {0}",
+ "its model failed: moved the architect of {0} up to {1}": "模型失效：{0}的架构对话已升到 {1}",
+ "its model failed: moved the checker of {0} up to {1}": "模型失效：{0}的审计对话已升到 {1}",
+ "{0} isn’t working ({1}): this plan’s work goes on with {2}. Fix it, or pick another in Plan Settings": "{0} 用不了（{1}）：这个计划的工作改由 {2} 继续。请修好它，或在计划设置里换一个",
+ "{0} starts on {1}: {2} isn’t working": "{0}从 {1} 开始：{2} 用不了",
+ "It failed a moment ago: {0}": "它刚才失败了：{0}",
+ "Its check didn’t pass: {0}": "它没通过校验：{0}"
 }

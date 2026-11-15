@@ -75,6 +75,10 @@ const SHEETS = [
   'A plan’s task whose model fails goes one step up, and again each time it stops, until the last one: then it waits for you',
   'No step up: a task that stops twice goes to the plan’s fix agent once',
   'Your own list. A model not on it (a local one) counts as below them all. Fix tasks after a failed check still go to the plan’s fix agent.',
+  'A task whose model fails, or that stops twice, first goes up the steps in Settings › Auto Route › When a Model Fails.',
+  // A model kept as failing, in the picker (fork/failing-models.ts).
+  'It failed a moment ago: “no such model”',
+  'Its check didn’t pass: it didn’t answer',
   // Settings › Local models: an endpoint that didn't pass its check (fork/endpoint-check.ts); its own words stay, in quotes.
   'Not saved: that address isn’t an Anthropic-compatible one (“The specified action is invalid”). Press Save again to save it anyway. Use the base address, without /v1/messages or /chat/completions: Beluga adds /v1/messages itself.',
   'Not saved: the key was refused (“invalid api key”). Press Save again to save it anyway.',
@@ -127,6 +131,12 @@ const FEED = [
   'BOB-4’s model failed: gave it to Claude (Haiku), woke it at 14:05',
   'handed a task whose model failed in “Safe payments” to Claude (Haiku)',
   'handed a task whose model failed to Claude (Haiku)',
+  'handed a task whose model had an error in “Safe payments” to Claude (Haiku)',
+  'handed a task whose model had an error to Claude (Haiku)',
+  'its model failed: moved the architect of “Safe payments” up to Claude (Opus)',
+  'its model failed: moved the checker of “Safe payments” up to Claude (Opus)',
+  'Claude (Haiku) isn’t working (“no such model”): this plan’s work goes on with Claude (Sonnet). Fix it, or pick another in Plan Settings',
+  '“Safe payments” starts on Claude (Haiku): Claude (Sonnet) isn’t working',
   // A milestone's check, as the feed says it (the checker's own words after the colon stay as written).
   'checked “Safe payments”',
 ];

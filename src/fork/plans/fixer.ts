@@ -5,7 +5,10 @@ import type { PilotDeps } from '../../core/plans/pilot.js';
 import type { Routable } from '../../shared/auto-route.js';
 import { FINISHED, type MilestoneView } from '../../core/plans/progress.js';
 import { handoffsIn, milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
-import { ladderAgents, modelFailed, nextRung } from './ladder.js';
+import { ladderAgents, modelFailed, modelGone, nextRung, rungKnown } from './ladder.js';
+import { failingModels, modelKey } from '../failing-models.js';
+import { decodeFailure, failureText } from '../../shared/run-failure.js';
+import type { PlanEvent } from '../../core/plans/model.js';
 
 /** What the watchdog says with its ask (watchdog.ts WatchdogDeps.escalate). */
 export interface EscalateHow {
@@ -29,6 +32,20 @@ const WS_PREFIX = 'ws:';
 /** An agent as one string (its runtime and model), to tell whether a conversation is on it already. */
 const agentKey = (a: AgentRef): string => `${a.runtime}:${a.model ?? ''}`;
 
+/** A move up the ladder, as the activity says it (escalate's lines). */
+const CLIMB = /^handed a task (whose model failed|whose model had an error|that stopped twice)(?: in “(.+)”)? to (.+)$/;
+
+/** A milestone's last move up the ladder after `since`: who to, and whether it stays there (its model failed for sure). */
+function lastClimb(activity: readonly PlanEvent[], title: string, since: number): { readonly to: string; readonly stay: boolean } | undefined {
+  let out: { to: string; stay: boolean } | undefined;
+  for (const e of activity) {
+    if (e.kind !== 'note' || e.at <= since) continue;
+    const m = CLIMB.exec(e.text);
+    if (m && m[2] === title) out = { to: m[3]!, stay: m[1] === 'whose model failed' };
+  }
+  return out;
+}
+
 export class PlanFixer {
   /** Conversations put on the plan's fix agent this session (by channel: the agent's key), so each is switched once. */
   private readonly onFixer = new Map<string, string>();
@@ -36,8 +53,14 @@ export class PlanFixer {
   private readonly hard = new Map<string, Set<string>>();
   /** Conflicts the plan's conversation is fixing (by plan: their folders), so one gone doesn't hand it back while another is still there. */
   private readonly fixing = new Map<string, Set<string>>();
-  /** Conversations moved up the failure ladder this session (ladder.ts): they stay where they climbed to, not handed back by settle. */
-  private readonly climbed = new Set<string>();
+  /**
+   * Conversations moved up the failure ladder this session (ladder.ts), by channel: the rung's key,
+   * and whether it stays there (its model failed for sure: going back would fail again) or goes back
+   * once the task it was moved up for is done.
+   */
+  private readonly lifted = new Map<string, { readonly key: string; readonly stay: boolean }>();
+  /** Models a plan was told aren't working (`plan:model`), so it's said once. */
+  private readonly told = new Set<string>();
 
   constructor(private readonly deps: PilotDeps) {}
 
@@ -50,7 +73,7 @@ export class PlanFixer {
   toFixer(plan: Plan, channel: string, what: string, tasks: readonly string[] = []): string | undefined {
     const fixer = this.deps.fixer?.(plan);
     // Handed for something hard now (fix tasks, a conflict): settle hands it back once that's done, ladder or not.
-    this.climbed.delete(channel);
+    this.lifted.delete(channel);
     if (fixer && tasks.length) this.hard.set(channel, new Set([...(this.hard.get(channel) ?? []), ...tasks]));
     if (!fixer || !this.deps.switchAgent || this.onFixer.get(channel) === agentKey(fixer)) return undefined;
     this.onFixer.set(channel, agentKey(fixer));
@@ -93,7 +116,7 @@ export class PlanFixer {
   forget(channel: string): void {
     this.onFixer.delete(channel);
     this.hard.delete(channel);
-    this.climbed.delete(channel);
+    this.lifted.delete(channel);
   }
 
   /**
@@ -107,11 +130,10 @@ export class PlanFixer {
   settle(plan: Plan, m: MilestoneView, idle: (channel: string) => boolean): void {
     const at = m.agent;
     const fixer = this.deps.fixer?.(plan);
-    if (!at || !fixer || !this.deps.switchAgent) return;
+    if (!at || !this.deps.switchAgent) return;
     const channel = `${WS_PREFIX}${at.worktree}`;
-    // Moved up the failure ladder: handing it back would put it on the model that failed.
-    if (this.climbed.has(channel)) return;
-    const on = this.agentOn(channel);
+    const onAgent = this.agentAt(channel);
+    const on = onAgent ? agentKey(onAgent) : undefined;
     const known = this.hard.get(channel);
     const stoppedTwice = new Set(Object.entries(plan.watch ?? {}).flatMap(([id, w]) => (w?.escalated ? [id] : [])));
     // Handed over this session, or (after a restart) on the fix agent with what says it was handed: its
@@ -120,18 +142,26 @@ export class PlanFixer {
     // Only what came after its last hand-back counts: once back, a model you put on yourself is yours.
     const back = `what was hard in “${m.milestone.title}” is done:`;
     const lastBack = plan.activity.reduce((t, e) => (e.kind === 'note' && e.text.startsWith(back) ? Math.max(t, e.at) : t), -Infinity);
+    // Moved up the failure ladder (this session, or as the activity says after a restart: its last move
+    // up names the model it's on now). Its model failed for sure: it stays, going back would fail again.
+    const climb = lastClimb(plan.activity, m.milestone.title, lastBack);
+    const lift = this.lifted.get(channel) ?? (climb && onAgent && agentName(onAgent, { model: true }) === climb.to ? { key: on!, stay: climb.stay } : undefined);
+    const onLift = lift !== undefined && on === lift.key;
+    if (onLift && lift.stay) return;
     const said = handoffsIn(plan.activity, m.milestone.title).some((h) => (h.what === 'fix' || h.what === 'stopped') && h.at > lastBack);
     const startedOnFixer = at.via === 'fix' && lastBack === -Infinity;
     // On the fix agent now, and put there by a handoff (this session, or one the activity or a
     // stopped-twice mark says): switched to another model by you since, it's left where you put it.
-    const handed = on === agentKey(fixer) && (this.onFixer.has(channel) || said || startedOnFixer || m.tasks.some((t) => stoppedTwice.has(t.task.id)));
-    if (!handed) return;
+    const onFix = fixer !== undefined && on === agentKey(fixer) && (this.onFixer.has(channel) || said || startedOnFixer || m.tasks.some((t) => stoppedTwice.has(t.task.id)));
+    if (!onFix && !onLift) return;
     const left = m.tasks.filter((t) => (known ?? stoppedTwice).has(t.task.id) && !FINISHED.has(t.state));
     if (left.length || (!known && m.run.check?.verdict === 'fail') || !idle(channel)) return;
     const next = m.tasks.find((t) => t.issue && !FINISHED.has(t.state));
-    const { agent: work } = workAgentFor(plan, next?.issue ?? { labels: [], priority: 'none' }, this.deps.store.getState());
+    // Not back onto a model known to fail: the rung above it instead.
+    const work = this.standIn(workAgentFor(plan, next?.issue ?? { labels: [], priority: 'none' }, this.deps.store.getState()).agent);
     this.hard.delete(channel);
     this.onFixer.delete(channel);
+    this.lifted.delete(channel);
     if (on === (work ? agentKey(work) : undefined)) return;
     this.deps.switchAgent(channel, work);
     const name = work ? agentName(work, { model: true }) : 'your default agent';
@@ -142,8 +172,9 @@ export class PlanFixer {
    * The watchdog's ask. `first`: a task just stopped (woken on its own model unless its model failed:
    * then it goes up the ladder at once). Otherwise it stopped again soon after a wake (`again`: it was
    * moved up before). With a ladder (Settings › Auto Route › When a Model Fails, ladder.ts) its
-   * conversation goes one rung up, each time, until the top; with none, to the fix agent once, as
-   * before. → the new agent's name, or undefined (it stays: woken where it is, or it waits for you).
+   * conversation goes one rung up, each time, until the top; with none, or when where it stands
+   * isn't known (Claude with no model and no default set), to the fix agent once, as before.
+   * → the new agent's name, or undefined (it stays: woken where it is, or it waits for you).
    */
   escalate(plan: Plan, channel: string, task?: string, how: EscalateHow = {}): string | undefined {
     // Which milestone (BLG-199): the plan page shows each handoff under its own.
@@ -151,23 +182,71 @@ export class PlanFixer {
     const where = title ? ` in “${title}”` : '';
     const st = this.deps.store.getState();
     const ladder = ladderAgents(st.prefs.autoRoute, st.runtimes);
-    if (!ladder.length) {
-      if (how.first || how.again) return undefined;
-      return this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}${where}`, task ? [task] : []);
-    }
+    const toFix = (): string | undefined => this.toFixer(plan, channel, `${channel.startsWith(WS_PREFIX) ? 'a task that stopped twice' : 'a stuck conversation'}${where}`, task ? [task] : []);
+    if (!ladder.length) return how.first || how.again ? undefined : toFix();
     const failed = modelFailed(how.stall);
     if (how.first && !failed) return undefined;
+    const current = this.agentAt(channel) ?? (channel.startsWith(WS_PREFIX) ? undefined : this.deps.homeAgent?.(plan));
+    // Where it stands isn't known: no rung to go to, so the fix agent takes it, once, as it always did.
+    if (!rungKnown(ladder, current, st.prefs.model)) return how.first || how.again ? undefined : toFix();
+    const what = !channel.startsWith(WS_PREFIX) ? 'a stuck conversation' : !failed ? 'a task that stopped twice' : modelGone(how.stall) ? 'a task whose model failed' : 'a task whose model had an error';
+    return this.climb(plan, channel, current, `handed ${what}${where} to`, how.stall, task);
+  }
+
+  /**
+   * A conversation of the plan's own (a milestone's architect, its checker) whose last turn ended
+   * because its model failed goes one rung up before it's asked again (pilot.ts). → the new agent's
+   * name, or undefined (its model didn't fail, no ladder, or nothing above).
+   */
+  lift(plan: Plan, channel: string, who: string): string | undefined {
+    const st = this.deps.store.getState();
+    const last = [...st.log].reverse().find((l): l is Extract<typeof l, { type: 'agent' }> => l.type === 'agent' && l.channel === channel);
+    const stall = last && last.status === 'error' && decodeFailure(last.text) ? failureText(last.text).split('\n')[0] : undefined;
+    if (!modelFailed(stall)) return undefined;
+    const ladder = ladderAgents(st.prefs.autoRoute, st.runtimes);
+    const current = this.agentAt(channel) ?? (channel === plan.home ? this.deps.homeAgent?.(plan) : undefined);
+    if (!ladder.length || !rungKnown(ladder, current, st.prefs.model)) return undefined;
+    return this.climb(plan, channel, current, `its model failed: moved ${who} up to`, stall);
+  }
+
+  /** One rung up: the switch, what stays, the model kept as failing, and the lines that say so. */
+  private climb(plan: Plan, channel: string, current: AgentRef | undefined, said: string, stall: string | undefined, task?: string): string | undefined {
+    const st = this.deps.store.getState();
     if (!this.deps.switchAgent) return undefined;
-    const current = channel.startsWith(WS_PREFIX) ? workspaceAgent(this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === channel.slice(WS_PREFIX.length))) : this.deps.homeAgent?.(plan);
-    const next = nextRung(ladder, current, st.prefs.model);
+    const next = nextRung(ladderAgents(st.prefs.autoRoute, st.runtimes), current, st.prefs.model);
     if (!next) return undefined;
+    const gone = modelGone(stall);
     this.deps.switchAgent(channel, next);
-    // Up the ladder, not handed for something hard: settle doesn't hand it back (to the model that failed).
-    this.climbed.add(channel);
+    this.lifted.set(channel, { key: agentKey(next), stay: gone });
+    if (task) this.hard.set(channel, new Set([...(this.hard.get(channel) ?? []), task]));
     const name = agentName(next, { model: true });
-    const what = !channel.startsWith(WS_PREFIX) ? 'a stuck conversation' : failed ? 'a task whose model failed' : 'a task that stopped twice';
-    this.deps.plans.note(plan.id, 'note', `handed ${what}${where} to ${name}`, { kind: 'beluga' });
+    this.deps.plans.note(plan.id, 'note', `${said} ${name}`, { kind: 'beluga' });
+    // It won't pass by itself: kept as failing (greyed in the pickers, skipped by auto route and by what starts next), and said once.
+    if (gone && current) {
+      const was = current.runtime === 'claude' && !current.model && st.prefs.model ? { ...current, model: st.prefs.model } : current;
+      const why = (stall ?? '').replace(/^.*?API failed:\s*/i, '').slice(0, 120);
+      failingModels.mark(modelKey(was), `It failed a moment ago: ${why}`, this.deps.now?.() ?? Date.now());
+      const key = `${plan.id}:${modelKey(was)}`;
+      if (!this.told.has(key)) {
+        this.told.add(key);
+        this.deps.plans.note(plan.id, 'problem', `${agentName(was, { model: true })} isn’t working (${why}): this plan’s work goes on with ${name}. Fix it, or pick another in Plan Settings`, { kind: 'beluga' });
+      }
+    }
     return name;
+  }
+
+  /** The agent to use instead of one known to fail now (fork/failing-models.ts): the first rung above it that isn't. */
+  private standIn(agent: AgentRef | undefined): AgentRef | undefined {
+    const st = this.deps.store.getState();
+    const now = this.deps.now?.() ?? Date.now();
+    const ladder = ladderAgents(st.prefs.autoRoute, st.runtimes);
+    let a = agent;
+    for (let i = 0; i <= ladder.length && a && failingModels.why(modelKey(a), now); i++) {
+      const up = nextRung(ladder, a, st.prefs.model);
+      if (!up) break;
+      a = up;
+    }
+    return a;
   }
 
   /**
@@ -177,15 +256,26 @@ export class PlanFixer {
    */
   workAgent(plan: Plan, title: string, failed: boolean, task: Routable & { readonly agent?: AgentRef }, pick?: AgentRef): { readonly agent?: AgentRef; readonly via: WorkVia } {
     const got = workAgentFor(plan, task, this.deps.store.getState(), pick, failed ? this.deps.fixer?.(plan) : undefined);
+    // The plan's (or auto route's) model is known to fail now: the rung above it, said in the activity. One you picked is yours.
+    const real = got.via === 'plan' || got.via === 'auto' ? this.standIn(got.agent) : got.agent;
+    if (real && got.agent && real !== got.agent) {
+      this.deps.plans.note(plan.id, 'note', `“${title}” starts on ${agentName(real, { model: true })}: ${agentName(got.agent, { model: true })} isn’t working`, { kind: 'beluga' });
+      return { agent: real, via: got.via };
+    }
     if (got.via === 'fix' && got.agent) this.deps.plans.note(plan.id, 'note', `handed the fix tasks for “${title}” to ${agentName(got.agent, { model: true })}`, { kind: 'beluga' });
     return got;
   }
 
   /** The agent a conversation runs on now (its key), as kept on its workspace. */
   private agentOn(channel: string): string | undefined {
+    const agent = this.agentAt(channel);
+    return agent ? agentKey(agent) : undefined;
+  }
+
+  /** The agent a conversation runs on now, as kept on its workspace. */
+  private agentAt(channel: string): AgentRef | undefined {
     const id = channel.startsWith(WS_PREFIX) ? channel.slice(WS_PREFIX.length) : undefined;
     // Its model kept apart on the workspace (the manager's agentFields): put back, so “on it already” compares models too.
-    const agent = id ? workspaceAgent(this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)) : undefined;
-    return agent ? agentKey(agent) : undefined;
+    return id ? workspaceAgent(this.deps.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === id)) : undefined;
   }
 }
