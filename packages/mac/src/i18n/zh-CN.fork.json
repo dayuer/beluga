@@ -489,5 +489,7 @@
  "People you trust": "信任的人",
  "How many tasks it starts by itself can run at the same time ({0}–{1}). The rest wait their turn.": "自动开工的任务最多同时跑几个（{0}–{1}）。其余的排队等。",
  "Tasks at once": "同时任务数",
- "Running at once": "同时进行"
+ "Running at once": "同时进行",
+ "Pool label": "池标签",
+ "Ready tasks with this label and nobody on them: a free computer takes one.": "带这个标签、还没人接的就绪任务：哪台电脑有空就领一个。"
 }
