@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Activity, Actor, Issue } from '../src/core/board/model.js';
 import type { Field, SharedTask } from '../src/core/team/crdt.js';
 import type { TeamChange } from '../src/core/team/board-sync.js';
@@ -219,5 +219,94 @@ describe('FederationAccept.reconcile', () => {
     await fa.settled();
     expect(most).toBe(1);
     expect(w.starts.map((s) => s.id)).toEqual([a.id, b.id]);
+  });
+});
+
+describe('FederationAccept: when it runs', () => {
+  /** Deferred passes, run when the test says (no sleeping). */
+  function deferred() {
+    const queue: Array<() => void> = [];
+    return { defer: (fn: () => void) => void queue.push(fn), flush: () => queue.splice(0).forEach((fn) => fn()), get size() { return queue.length; } };
+  }
+  const change = (won: Record<string, Field>): TeamChange => ({ won, fresh: false, issue: task(), link: {} as TeamChange['link'] });
+
+  it('off: never subscribes and asks for no pass', () => {
+    const w = world({ issues: [task()], settings: { accept: 'off' } });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    fa.linkUp();
+    fa.onAction({ type: 'board_issue', issue: w.issues[0]! });
+    expect(w.listeners).toHaveLength(0);
+    expect(q.size).toBe(0);
+  });
+
+  it('three onChange and a linkUp in one burst: one pass', async () => {
+    const w = world({ issues: [task()] });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    const spy = vi.spyOn(fa, 'reconcile');
+    expect(w.listeners).toHaveLength(1);
+    for (let i = 0; i < 3; i++) w.listeners[0]!(change({ assignee: field({}, BOB, 6 + i) }));
+    fa.linkUp();
+    expect(q.size).toBe(1);
+    q.flush();
+    await fa.settled();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(w.starts).toHaveLength(1);
+  });
+
+  it('a change to labels only asks for nothing', () => {
+    const w = world({ issues: [task()] });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    q.flush();
+    w.listeners[0]!(change({ labels: field(['bug'], BOB) }));
+    expect(q.size).toBe(0);
+    w.listeners[0]!(change({ status: field('todo', BOB) }));
+    expect(q.size).toBe(1);
+    void fa;
+  });
+
+  it('after stop() nothing runs', async () => {
+    const w = world({ issues: [task()] });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    const spy = vi.spyOn(fa, 'reconcile');
+    fa.stop();
+    q.flush();
+    w.listeners[0]!(change({ assignee: field({}, BOB, 7) }));
+    fa.linkUp();
+    q.flush();
+    await fa.settled();
+    expect(spy).not.toHaveBeenCalled();
+    expect(w.starts).toEqual([]);
+  });
+
+  it('turned on later: subscribes then, and runs', async () => {
+    const w = world({ issues: [task()], settings: { accept: 'off' } });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    expect(w.listeners).toHaveLength(0);
+    w.setSettings({ accept: 'assigned' });
+    fa.onAction({ type: 'prefs', prefs: { federation: { accept: 'assigned' } } });
+    fa.onAction({ type: 'prefs', prefs: { federation: { accept: 'assigned' } } });
+    expect(w.listeners).toHaveLength(1);
+    q.flush();
+    await fa.settled();
+    expect(w.starts).toHaveLength(1);
+  });
+
+  it('board_issue: a status change asks for a pass; the same again does not', () => {
+    const t = task({ status: 'in_progress', worktrees: ['x'] });
+    const w = world({ issues: [t] });
+    const q = deferred();
+    const fa = new FederationAccept({ ...w.deps, defer: q.defer });
+    q.flush();
+    fa.onAction({ type: 'board_issue', issue: t });
+    expect(q.size).toBe(0);
+    fa.onAction({ type: 'board_issue', issue: { ...t, title: 'renamed' } });
+    expect(q.size).toBe(0);
+    fa.onAction({ type: 'board_issue', issue: { ...t, status: 'in_review' } });
+    expect(q.size).toBe(1);
   });
 });
