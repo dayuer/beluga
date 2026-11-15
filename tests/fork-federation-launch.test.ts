@@ -63,5 +63,7 @@ describe('federationParts', () => {
     expect(line).toBeDefined();
     for (const part of ['teamSync', 'new TeamAssign(', 'teamPlans', 'new TeamContext(team, board)', 'knocks']) expect(line).toContain(part);
     expect(src).toContain("import { federationParts } from '../../fork/federation/parts.js';");
+    // The pool's loser stops and archives through the session (BLG-232): the same line, one more field.
+    expect(line).toContain('live, session })');
   });
 });

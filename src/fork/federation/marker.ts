@@ -3,6 +3,7 @@
  * knows them and no queue file is kept. Auto accept starts a task as "<you>'s Claude, for <the
  * one who gave it>" (`autoActor`); work.start writes the Ready → In Progress line with that actor
  * (work.ts `opts.by`). A task you start by hand says you; one your Claude starts for you has no `for`.
+ * A pool task this computer labelled and claimed itself is started "for" itself, and still counts.
  */
 import { type Activity, type Actor, type Issue, worktreeDoing } from '../../core/board/model.js';
 
@@ -12,7 +13,7 @@ export function autoActor(self: string, selfName: string, assigner: string, assi
 }
 
 const isAutoLine = (a: Activity, self: string): boolean =>
-  a.kind === 'status' && a.by.kind === 'claude' && a.by.owner === self && a.by.for !== undefined && a.by.for.id !== self && a.by.external === undefined;
+  a.kind === 'status' && a.by.kind === 'claude' && a.by.owner === self && a.by.for !== undefined && a.by.external === undefined;
 
 /** Auto accept started it here (once, at any time). */
 export function isAutoStarted(issue: Pick<Issue, 'activity'>, self: string): boolean {

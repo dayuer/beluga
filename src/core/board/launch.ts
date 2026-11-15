@@ -191,7 +191,7 @@ export function launchBoard(host: BoardHost): () => void {
         intend: (intent) => session.intend(intent),
         dir: teamDir,
       });
-      return [teamSync, new TeamAssign(team, { board, sync: teamSync, dir: teamDir }), teamPlans, new TeamContext(team, board), knocks, ...federationParts({ team, board, sync: teamSync, work, store, live })];
+      return [teamSync, new TeamAssign(team, { board, sync: teamSync, dir: teamDir }), teamPlans, new TeamContext(team, board), knocks, ...federationParts({ team, board, sync: teamSync, work, store, live, session })];
     },
   });
   let stopSeed = (): void => undefined;
