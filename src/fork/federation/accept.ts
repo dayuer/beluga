@@ -12,18 +12,21 @@
  * The pool ('pool', milestone 2, claim.ts): a Ready task with the pool label and nobody on it is
  * claimed (assignee set to this computer), then confirmed after `confirmDelay` (`after`): still
  * ours on the board, it starts. Which claims wait for their confirm is read off the board too
- * (`pickPending`), so a restart between claim and confirm confirms it once, later.
+ * (`pickPending`), so a restart between claim and confirm confirms it once, later. Two Macs that
+ * claim at once: the board's merge keeps one assignee, the other's confirm finds it lost. Cut off
+ * from each other, both may start: once merged, the one that lost stops its agent and archives the
+ * worktree auto accept made (`stopAndArchive`); a worktree started by hand is never touched.
  */
 import type { Actor, Issue } from '../../core/board/model.js';
 import type { Action } from '../../core/store.js';
-import { listOrder } from '../../core/board/model.js';
+import { listOrder, worktreeDoing } from '../../core/board/model.js';
 import type { Board } from '../../core/board/board.js';
 import type { TeamBoardSync } from '../../core/team/board-sync.js';
 import type { TeamBoards, TeamPart } from '../../core/team/service.js';
 import type { TrustLevel } from '../../shared/settings-schema.js';
 import { assignerOf, eligible, poolGiverOf } from './eligible.js';
 import { type ClaimCtx, confirmDelay, pickClaimable, pickPending, stillMine } from './claim.js';
-import { autoActor, isAutoRunning } from './marker.js';
+import { autoActor, isAutoRunning, isAutoStarted } from './marker.js';
 import type { FederationSettings } from './settings.js';
 
 /** Runs `fn` a little later; everything asked for meanwhile is one pass. */
@@ -59,6 +62,8 @@ export interface AcceptDeps {
   readonly after?: After;
   /** The random source for `confirmDelay` (default Math.random). */
   readonly random?: () => number;
+  /** Stop the agent in a worktree and archive it (the pool's loser; parts.ts wires the session). */
+  readonly stopAndArchive?: (workspaceId: string) => Promise<void>;
   readonly log?: (line: string) => void;
 }
 
@@ -77,6 +82,8 @@ export class FederationAccept implements TeamPart {
   private readonly confirming = new Set<string>();
   /** Starts a confirm is running. */
   private readonly jobs = new Set<Promise<void>>();
+  /** Worktrees already handed to stopAndArchive. */
+  private readonly retired = new Set<string>();
 
   constructor(protected readonly d: AcceptDeps) {
     if (this.on()) {
@@ -183,6 +190,7 @@ export class FederationAccept implements TeamPart {
     if (s.accept === 'off') return;
     const self = this.d.team.self;
     const issues = this.d.board.list();
+    if (s.accept === 'pool') await this.retireLost(issues, s.poolLabel);
     let running = issues.filter((i) => isAutoRunning(i, self, this.d.live)).length;
     // Claimed here, not confirmed yet: each holds a place (the pool only).
     const pending = pickPending(issues, this.claimCtx(s, running));
@@ -222,6 +230,27 @@ export class FederationAccept implements TeamPart {
       }
       this.d.log?.(`federation: claimed ${issue.key}`);
       this.queueConfirm(issue.id);
+    }
+  }
+
+  /**
+   * Pool tasks auto accept started here that someone else has now (the board merged their claim
+   * over ours): stop and archive our worktree, once. Cleared (nobody on it) is left alone.
+   */
+  private async retireLost(issues: readonly Issue[], poolLabel: string): Promise<void> {
+    const self = this.d.team.self;
+    for (const issue of issues) {
+      if (this.stopped) return;
+      if (!issue.labels.includes(poolLabel) || !issue.assignee || issue.assignee.id === self || !isAutoStarted(issue, self)) continue;
+      const ws = worktreeDoing(issue, this.d.live);
+      if (!ws || this.retired.has(ws)) continue;
+      this.retired.add(ws);
+      try {
+        await this.d.stopAndArchive?.(ws);
+        this.d.log?.(`federation: ${issue.key} went to ${issue.assignee.name}: stopped and archived ${ws}`);
+      } catch (e) {
+        this.d.log?.(`federation: couldn't archive ${ws}: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
   }
 

@@ -1,12 +1,18 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { Activity, Actor, Issue } from '../src/core/board/model.js';
 import type { Field, SharedTask } from '../src/core/team/crdt.js';
+import { TeamBoardSync } from '../src/core/team/board-sync.js';
+import { type Crowd, befriend, crowd, settle } from './mesh/helpers.js';
+import { type PartsFor, type TeamMac, personOf, teamMac } from './team/helpers.js';
 import { type AcceptDeps, FederationAccept } from '../src/fork/federation/accept.js';
 import { autoActor, isAutoRunning, isAutoStarted } from '../src/fork/federation/marker.js';
 import { type FederationSettings, federationOf } from '../src/fork/federation/settings.js';
 
-/** The pool wired into auto accept (BLG-231): claim, wait on an injected clock, start once if it's still ours. */
+/**
+ * The pool wired into auto accept (BLG-231): claim, wait on an injected clock, start once if it's
+ * still ours. Two Macs at once (BLG-232): one wins, the other, if it started, stops and archives.
+ */
 
 const ME = 'me00000000000001';
 const BOB = 'bob0000000000002';
@@ -60,6 +66,7 @@ function world(opts: { issues: Issue[]; givenBy?: Record<string, string>; settin
   let settings: FederationSettings = federationOf({ accept: 'pool', ...opts.settings });
   const starts: Array<{ id: string; by: Actor }> = [];
   const updates: string[] = [];
+  const archived: string[] = [];
   const timers: Array<{ ms: number; fn: () => void }> = [];
   const deferred: Array<() => void> = [];
   let reads = 0;
@@ -102,12 +109,18 @@ function world(opts: { issues: Issue[]; givenBy?: Record<string, string>; settin
     after: (ms, fn) => void timers.push({ ms, fn }),
     random: () => 0,
     defer: (fn) => void deferred.push(fn),
+    stopAndArchive: async (w) => {
+      archived.push(w);
+      live.delete(w);
+    },
   };
   return {
     deps,
     starts,
     updates,
+    archived,
     timers,
+    set,
     get reads() {
       return reads;
     },
@@ -287,4 +300,171 @@ describe('the pool in FederationAccept', () => {
     // Built from parts so this line isn't what it finds.
     for (const s of ['setTime' + 'out(', 'sle' + 'ep']) expect(src).not.toContain(s);
   });
+});
+
+describe('the pool, two Macs (BLG-232)', () => {
+  it('a worktree started by hand stays when the task goes to someone else; one auto accept started goes, once', async () => {
+    const handLine: Activity = { id: 'h', at: 2, by: person(ME), kind: 'status', text: 'moved this to In Progress' };
+    const byHand = task({ status: 'in_progress', assignee: person(ME), worktrees: ['hand'] as unknown as Issue['worktrees'], activity: [handLine] });
+    const auto = task();
+    const cleared = task();
+    const w = world({ issues: [byHand, auto, cleared] });
+    const fa = new FederationAccept(w.deps);
+    await fa.reconcile();
+    w.flush();
+    await fa.settled();
+    expect(w.starts.map((x) => x.id).sort()).toEqual([auto.id, cleared.id].sort());
+    // The board merges a teammate's claim over ours (and over the one I started by hand); one is cleared.
+    w.assign(byHand.id, BOB, BOB);
+    w.assign(auto.id, BOB, BOB);
+    w.assign(cleared.id, undefined, BOB);
+    await fa.reconcile();
+    await fa.reconcile();
+    expect(w.archived).toEqual([w.get(auto.id).worktrees.at(-1)]);
+  });
+
+  it('assigned: a lost pool task is never archived', async () => {
+    const t = task();
+    const w = world({ issues: [t] });
+    const fa = new FederationAccept(w.deps);
+    await fa.reconcile();
+    w.flush();
+    await fa.settled();
+    w.setSettings({ accept: 'assigned' });
+    w.assign(t.id, BOB, BOB);
+    await fa.reconcile();
+    expect(w.archived).toEqual([]);
+  });
+
+  let net: Crowd | undefined;
+  const macs: TeamMac[] = [];
+  afterEach(async () => {
+    for (const m of macs.splice(0)) await m.close();
+    await net?.close();
+    net = undefined;
+  });
+
+  /** One Mac's auto accept on its real board and sync; its clock, starts and archives kept per Mac. */
+  interface Rig {
+    fa?: FederationAccept;
+    sync?: TeamBoardSync;
+    readonly timers: Array<() => void>;
+    readonly starts: string[];
+    readonly archived: string[];
+    readonly live: Set<string>;
+  }
+  const rigs = new Map<string, Rig>();
+  const rigOf = (name: string): Rig => {
+    let r = rigs.get(name);
+    if (!r) rigs.set(name, (r = { timers: [], starts: [], archived: [], live: new Set() }));
+    return r;
+  };
+  const withPool: PartsFor = ({ team, board, dir, name }) => {
+    const r = rigOf(name);
+    const sync = new TeamBoardSync(team, { board, live: (id) => r.live.has(id), running: () => false, dir });
+    const fa = new FederationAccept({
+      team,
+      board,
+      sync,
+      // What work.start does to the board: a worktree linked, In Progress, as the actor it was given.
+      start: async (id, by) => {
+        r.starts.push(id);
+        const ws = `ws-${name}-${r.starts.length}`;
+        r.live.add(ws);
+        board.linkWorktree(id, ws, { name: ws }, by);
+        board.update(id, { status: 'in_progress' }, by);
+        return ws;
+      },
+      settings: () => federationOf({ accept: 'pool' }),
+      trustOf: () => 'full',
+      live: (w) => r.live.has(w),
+      after: (_ms, fn) => void r.timers.push(fn),
+      random: () => 0,
+      // Passes run only when the test calls reconcile.
+      defer: () => {},
+      stopAndArchive: async (w) => {
+        r.archived.push(w);
+        r.live.delete(w);
+      },
+      log: () => {},
+    });
+    r.fa = fa;
+    r.sync = sync;
+    return [sync, fa];
+  };
+  const flush = async (...names: string[]): Promise<void> => {
+    for (const n of names) for (const fn of rigOf(n).timers.splice(0)) fn();
+    for (const n of names) await rigOf(n).fa!.settled();
+  };
+
+  async function teamUp(a: TeamMac, pa: string, b: TeamMac, pb: string): Promise<void> {
+    await settle(() => a.store.getState().team.offers.find((o) => o.peerId === b.id && o.projectId === pa) && b.store.getState().team.offers.find((o) => o.peerId === a.id && o.projectId === pb));
+    a.team.answer(b.id, pa, true);
+    await settle(() => b.store.getState().team.offers.find((o) => o.peerId === a.id && o.state === 'invited'));
+    b.team.answer(a.id, pb, true);
+    await settle(() => a.store.getState().team.teams[pa]?.mates.some((m) => m.peerId === b.id) && b.store.getState().team.teams[pb]?.mates.some((m) => m.peerId === a.id));
+  }
+
+  async function pair(): Promise<{ ata: TeamMac; kay: TeamMac; id: string }> {
+    rigs.clear();
+    net = await crowd();
+    const ata = await teamMac(net, 'ata', [{ id: 'pa', name: 'api', repo: 'acme/api' }], withPool);
+    const kay = await teamMac(net, 'kay', [{ id: 'pk', name: 'api', repo: 'acme/api' }], withPool);
+    macs.push(ata, kay);
+    const t = ata.board.create({ projectId: 'pa', title: 'From the pool', status: 'todo', labels: ['pool'] }, personOf(ata));
+    await befriend(ata.person, kay.person);
+    await teamUp(ata, 'pa', kay, 'pk');
+    await settle(() => kay.board.get(t.id)?.labels.includes('pool') && rigOf('kay').sync!.shared(t.id)?.fields.labels);
+    return { ata, kay, id: t.id };
+  }
+
+  const owner = (m: TeamMac, id: string) => m.board.get(id)?.assignee?.id;
+
+  it('both claim at once: the merge keeps one, and only that one starts', async () => {
+    const { ata, kay, id } = await pair();
+    expect(kay.board.get(id)?.status).toBe('todo');
+    // Back to back, no await between: both claim in the same tick.
+    const both = [rigOf('ata').fa!.reconcile(), rigOf('kay').fa!.reconcile()];
+    await Promise.all(both);
+    expect(owner(ata, id)).toBe(ata.id);
+    expect(owner(kay, id)).toBe(kay.id);
+    await settle(() => owner(ata, id) === owner(kay, id) && rigOf('ata').sync!.shared(id)?.fields.assignee?.a === rigOf('kay').sync!.shared(id)?.fields.assignee?.a);
+    const winner = owner(ata, id) === ata.id ? 'ata' : 'kay';
+    const loser = winner === 'ata' ? 'kay' : 'ata';
+    await flush('ata', 'kay');
+    expect(rigOf(winner).starts).toEqual([id]);
+    expect(rigOf(loser).starts).toEqual([]);
+    expect(rigOf('ata').archived).toEqual([]);
+    expect(rigOf('kay').archived).toEqual([]);
+  }, 90_000);
+
+  it('partitioned: both start; after the merge the loser stops and archives once, the winner never', async () => {
+    const { ata, kay, id } = await pair();
+    await kay.stop();
+    await settle(() => ata.person.friend(kay.id)?.online === false);
+    // Ata, alone, claims and starts as auto accept does.
+    await rigOf('ata').fa!.reconcile();
+    await flush('ata');
+    expect(rigOf('ata').starts).toEqual([id]);
+    // Kay, cut off, did the same on its own board: claimed it, then started it as its Claude.
+    const by = autoActor(kay.id, kay.name, ata.id, ata.name);
+    kay.board.update(id, { assignee: personOf(kay) }, by);
+    rigOf('kay').live.add('ws-kay-offline');
+    kay.board.linkWorktree(id, 'ws-kay-offline', { name: 'ws-kay-offline' }, by);
+    kay.board.update(id, { status: 'in_progress' }, by);
+    await kay.start();
+    await settle(() => owner(ata, id) !== undefined && owner(ata, id) === owner(kay, id));
+    const winner = owner(ata, id) === ata.id ? 'ata' : 'kay';
+    const loser = winner === 'ata' ? 'kay' : 'ata';
+    for (let i = 0; i < 2; i++) {
+      await rigOf('ata').fa!.reconcile();
+      await rigOf('kay').fa!.reconcile();
+    }
+    await flush('ata', 'kay');
+    expect(rigOf(loser).archived).toEqual([loser === 'ata' ? 'ws-ata-1' : 'ws-kay-offline']);
+    expect(rigOf(winner).archived).toEqual([]);
+    // Nobody started it again.
+    expect(rigOf('ata').starts).toEqual([id]);
+    expect(rigOf('kay').starts).toEqual([]);
+  }, 90_000);
 });
