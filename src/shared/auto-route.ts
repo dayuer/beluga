@@ -33,6 +33,9 @@ export const BUILD_DEFAULT: readonly string[] = ['local:bigmodel/glm-5.3[1m]', '
 /** Checking the work (a plan's milestone checks and draft reviews): a model between the two, Sonnet on your API key, then on your subscription. */
 export const REVIEW_DEFAULT: readonly string[] = ['local:anthropic/claude-sonnet-5-5', 'claude:sonnet'];
 
+/** When a plan's task's model fails, up one rung at a time (a model not on it, a local one, counts as below them all). */
+export const LADDER_DEFAULT: readonly string[] = ['claude:haiku', 'claude:sonnet', 'claude:opus', 'claude:fable'];
+
 /** Settings › Auto Route, kept in settings.json. Every field unset: its default. */
 export const AutoRoute = z.object({
   /** Off: tasks without an agent go to your default agent, as before. Unset: on once a local candidate runs here (autoRouteOn). */
@@ -46,6 +49,8 @@ export const AutoRoute = z.object({
   build: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
   /** Who checks the work: a plan's milestone checks and draft reviews. Unset: REVIEW_DEFAULT. */
   review: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
+  /** Where a plan's task goes when its model fails, rung by rung (fork/plans/ladder.ts). Unset: LADDER_DEFAULT; empty: none (the plan's fix agent, once). */
+  ladder: z.array(z.string().regex(CHOICE)).max(MAX_CANDIDATES).optional(),
 });
 export type AutoRoute = z.infer<typeof AutoRoute>;
 
@@ -57,7 +62,7 @@ export type AutoTier = 'hard' | 'build';
  * roles draw from them: its architecture and its hard fixes from `hard`, its work from `build`
  * (task by task, as any task), its checks from `review`.
  */
-export type RouteList = AutoTier | 'review';
+export type RouteList = AutoTier | 'review' | 'ladder';
 
 /** From this many points a task is hard: a plan's writer sizes them 1, 2, 3 or 5 (8: split it). */
 export const HARD_ESTIMATE = 5;
@@ -89,7 +94,7 @@ export function autoTierOf(task: Routable, route: AutoRoute | undefined): AutoTi
 
 /** A list's candidates, in order (yours, else the defaults). */
 export const tierList = (tier: RouteList, route: AutoRoute | undefined): readonly string[] =>
-  tier === 'hard' ? (route?.hard ?? HARD_DEFAULT) : tier === 'review' ? (route?.review ?? REVIEW_DEFAULT) : (route?.build ?? BUILD_DEFAULT);
+  tier === 'hard' ? (route?.hard ?? HARD_DEFAULT) : tier === 'review' ? (route?.review ?? REVIEW_DEFAULT) : tier === 'ladder' ? (route?.ladder ?? LADDER_DEFAULT) : (route?.build ?? BUILD_DEFAULT);
 
 /** A candidate's runtime and model. */
 export function parseChoice(value: string): { readonly runtime: string; readonly model: string } | undefined {

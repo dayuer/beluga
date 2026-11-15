@@ -317,7 +317,7 @@ export class PlanPilot {
       ...(deps.takeOver ? { takeOver: deps.takeOver } : {}),
       ...(deps.promote ? { promote: deps.promote } : {}),
       ...(deps.now ? { now: deps.now } : {}),
-      escalate: (plan, channel, task) => this.fix.escalate(plan, channel, task),
+      escalate: (plan, channel, task, how) => this.fix.escalate(plan, channel, task, how),
     });
     this.off = deps.store.onAction((a: Action) => {
       if (a.type === 'agent_event') this.onRunEvent(a.channel);
@@ -950,6 +950,7 @@ export class PlanPilot {
     if (!ended) return true;
     if (nudged !== undefined) return skip();
     this.designNudged.set(round, this.deps.now?.() ?? Date.now());
+    this.fix.lift(plan, channel, `the architect of “${title}”`); // fork: its model failed, up the ladder first (fork/plans/ladder.ts)
     const again = this.deps.askClaude(designNudgePrompt(title), channel, false);
     if (again) this.designRuns.set(key, again);
     else this.designRuns.delete(key);
@@ -1177,6 +1178,7 @@ export class PlanPilot {
       return;
     }
     this.checkNudged.set(round, 'asked');
+    this.fix.lift(plan, channel, `the checker of “${m.milestone.title}”`); // fork: its model failed, up the ladder first
     const again = this.deps.askClaude(checkNudgePrompt(m.milestone.title), channel, false);
     if (again) this.checkRuns.set(key, again);
     else this.checkRuns.delete(key);
