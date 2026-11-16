@@ -246,6 +246,8 @@ describe('roles, piece by piece', () => {
   it('a task that stopped twice: the handoff line names its milestone (BLG-198 found it didn’t)', () => {
     const notes: string[] = [];
     const store = new Store(initialState('room'));
+    // No ladder (fork/plans/ladder.ts): the fix agent takes it, as it always did.
+    store.dispatch({ type: 'prefs', prefs: { autoRoute: { ladder: [] } } });
     const fixer = new PlanFixer({ store, fixer: () => SONNET, switchAgent: () => undefined, plans: { note: (_id: string, _k: string, text: string) => void notes.push(text) } } as unknown as PilotDeps);
     const plan = { id: 'p', runs: { safe: { agent: { worktree: 'w9', at: 0, tasks: [] } } }, body: { milestones: [{ id: 'safe', title: 'Safe payments' }] } } as unknown as Plan;
     expect(milestoneOfChannel(plan, 'ws:w9')).toBe('Safe payments');

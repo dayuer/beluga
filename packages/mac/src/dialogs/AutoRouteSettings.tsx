@@ -36,25 +36,29 @@ export function AutoRouteSettings() {
     const list = tierList(tier, route);
     const used = list.find((v) => candidateRuns(runtimes, v));
     const custom = route?.[tier];
+    const ladder = tier === 'ladder';
     return (
-      <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Plan Audits' : 'Everything Else'}>
+      <Group title={tier === 'hard' ? 'Hard Work' : tier === 'review' ? 'Plan Audits' : ladder ? 'When a Model Fails' : 'Everything Else'}>
         {list.map((value, i) => {
           const runs = candidateRuns(runtimes, value);
           // computer-wording: mac (fork feature, worded for the Mac app for now)
-          const detail = value === used ? 'Used now' : runs ? 'If the one above stops working' : 'Not set up on this Mac: skipped';
+          const detail = !runs ? 'Not set up on this Mac: skipped' : ladder ? (value === used ? 'First step up' : 'Next step up') : value === used ? 'Used now' : 'If the one above stops working';
           return (
             <Row key={`${tier}-${i}`} label={`Choice ${(i + 1)}`} detail={detail}>
               <Select label={`Choice ${(i + 1)}`} value={value} options={entries} placeholder={readable(value)} onChange={(v) => setList(tier, list.map((x, j) => (j === i ? v : x)))} />
               <Button disabled={i === 0} aria-label={'Move up'} onClick={() => setList(tier, list.map((x, j) => (j === i - 1 ? value : j === i ? list[i - 1]! : x)))}>
                 ↑
               </Button>
-              <Button disabled={list.length <= 1} aria-label={'Remove'} onClick={() => setList(tier, list.filter((_, j) => j !== i))}>
+              <Button disabled={!ladder && list.length <= 1} aria-label={'Remove'} onClick={() => setList(tier, list.filter((_, j) => j !== i))}>
                 ✕
               </Button>
             </Row>
           );
         })}
-        <Row label={tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? (tier === 'hard' ? 'Its tasks, and plans’ design and hard fixes, start on the one marked Used now' : 'Its tasks start on the one marked Used now') : 'None of these runs here: your default agent works these tasks'} detail={custom ? 'Your own list.' : 'The default list.'}>
+        <Row
+          label={ladder ? (used ? 'A plan’s task whose model fails goes one step up, and again each time it stops, until the last one: then it waits for you' : 'No step up: a task that stops twice goes to the plan’s fix agent once') : tier === 'review' ? (used ? 'Plans’ checks run on the one marked Used now' : 'None of these runs here: a plan’s work agent checks it') : used ? (tier === 'hard' ? 'Its tasks, and plans’ design and hard fixes, start on the one marked Used now' : 'Its tasks start on the one marked Used now') : 'None of these runs here: your default agent works these tasks'}
+          detail={ladder ? `${custom ? 'Your own list.' : 'The default list.'} A model not on it (a local one) counts as below them all. Fix tasks after a failed check still go to the plan’s fix agent.` : custom ? 'Your own list.' : 'The default list.'}
+        >
           {list.length < MAX_CANDIDATES ? (
             <Button onClick={() => setList(tier, [...list, 'claude:'])}>
               {'Add'}
@@ -85,6 +89,7 @@ export function AutoRouteSettings() {
       {on ? tierRows('hard') : null}
       {on ? tierRows('build') : null}
       {on ? tierRows('review') : null}
+      {tierRows('ladder')}
       <FederationSettings />
     </>
   );

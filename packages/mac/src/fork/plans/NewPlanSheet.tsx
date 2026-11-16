@@ -197,6 +197,7 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
           <>
             <PlanRoles tiers={tiers} picks={picks} onPick={(role, v) => setPicked((was) => ({ ...was, [role]: v }))} reveal />
             <div className={p.newPlanHint}>The strongest model designs it and takes over what’s hard (fix tasks after a failed check, conflicts, a task that stopped twice), an everyday one writes the code, one in between checks it. Change any of them later in Plan Settings.</div>
+            <div className={p.newPlanHint}>A task whose model fails, or that stops twice, first goes up the steps in Settings › Auto Route › When a Model Fails.</div>
           </>
         ) : null}
       </div>
