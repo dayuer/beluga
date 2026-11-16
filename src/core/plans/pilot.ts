@@ -318,6 +318,7 @@ export class PlanPilot {
       ...(deps.promote ? { promote: deps.promote } : {}),
       ...(deps.now ? { now: deps.now } : {}),
       escalate: (plan, channel, task, how) => this.fix.escalate(plan, channel, task, how),
+      sidestep: (plan, channel, until) => this.fix.sidestep(plan, channel, until), // fork: at a usage limit, the next model of the same list (fork/plans/same-tier.ts)
     });
     this.off = deps.store.onAction((a: Action) => {
       if (a.type === 'agent_event') this.onRunEvent(a.channel);

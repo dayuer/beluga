@@ -304,6 +304,8 @@ export interface WatchdogDeps {
    * undefined (no fix agent, or it's on it already).
    */
   readonly escalate?: (plan: Plan, channel: string, task?: string, how?: { readonly stall?: string; readonly first?: boolean; readonly again?: boolean }) => string | undefined;
+  /** fork: a task stopped by a usage limit may go on at once on the next model of the same auto route list → its name, or undefined (it waits for the reset). */
+  readonly sidestep?: (plan: Plan, channel: string, until: number) => string | undefined;
   readonly now?: () => number;
 }
 
@@ -427,6 +429,8 @@ export class TaskWatchdog {
         if (w?.resumed === run.requestId) continue; // resumed already; its run is on its way
         // Continuing on its own is off (Settings, this chat, or this session): it waits for you. Its line follows the switch.
         const off = !this.limitResumes(channel, until);
+        const side = !off && room > 0 && now < until + LIMIT_MARGIN_MS ? this.deps.sidestep?.(plan, channel, until) : undefined; // fork
+        if (side) { room--; this.wake(plan, t, t.issue, channel, stall!, run, `${t.issue.key} hit a usage limit: gave it to ${side}, resumed at ${hhmm(now)}`, { counts: false }); continue; }
         if (off || now < until + LIMIT_MARGIN_MS || room <= 0) {
           const line = `${t.issue.key} paused: usage limit · ${off ? 'continuing on its own is off' : `resumes at ${resetWords(until, now)}`}`;
           if (w?.run !== run.requestId || w.limitUntil !== until || w.line !== line) this.deps.plans.setWatch(plan.id, t.task.id, { at: now, reason: stall!, run: run.requestId, limitUntil: until, line });

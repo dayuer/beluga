@@ -333,7 +333,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const baseLaunchEnv = claudeLaunchEnv(input);
       const compat = zshCompatEnv(baseLaunchEnv ?? process.env);
       const launchEnv = withZshCompat(baseLaunchEnv, compat);
-      const failure = (end: RunEnd): RunFailedError => new RunFailedError(withSignInHint(classifyRun(end), launchEnv, inheritsDaemonEnv(input)));
+      const failure = (end: RunEnd): RunFailedError => new RunFailedError(withSignInHint({ ...classifyRun(end), ...(input.env?.ANTHROPIC_BASE_URL ? { endpoint: true } : {}) }, launchEnv, inheritsDaemonEnv(input))); // fork: an endpoint's limit isn't your Claude plan's
       const options: Options = {
         cwd,
         additionalDirectories: [...extraDirs, ...(fixup ? [fixup] : [])],

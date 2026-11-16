@@ -2,7 +2,8 @@ import type { AgentRef } from '../../protocol.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Plan } from '../../core/plans/model.js';
 import type { PilotDeps } from '../../core/plans/pilot.js';
-import type { Routable } from '../../shared/auto-route.js';
+import { type Routable, autoRouteOn } from '../../shared/auto-route.js';
+import { choiceOf, nextOfTier, sameLimit } from './same-tier.js';
 import { FINISHED, type MilestoneView } from '../../core/plans/progress.js';
 import { handoffsIn, milestoneOfChannel, type WorkVia, workAgentFor, workspaceAgent } from './roles.js';
 import { ladderAgents, modelFailed, modelGone, nextRung, rungKnown } from './ladder.js';
@@ -85,6 +86,8 @@ export class PlanFixer {
   private readonly steered = new Set<string>();
   /** Models a plan was told aren't working (`plan:model`), so it's said once. */
   private readonly told = new Set<string>();
+  /** Models at their usage limit (same-tier.ts), by candidate value: until when (the reset, or a guess). */
+  private readonly limited = new Map<string, number>();
 
   constructor(private readonly deps: PilotDeps) {}
 
@@ -328,6 +331,15 @@ export class PlanFixer {
   workAgent(plan: Plan, title: string, failed: boolean, task: Routable & { readonly agent?: AgentRef }, pick?: AgentRef): { readonly agent?: AgentRef; readonly via: WorkVia } {
     const got = workAgentFor(plan, task, this.deps.store.getState(), pick, failed ? this.deps.fixer?.(plan) : undefined);
     // The plan's (or auto route's) model is known to fail now: the rung above it, said in the activity. One you picked is yours.
+    // Auto route's model is at its usage limit: the next of its list starts it (same-tier.ts).
+    if (got.via === 'auto' && got.agent && this.atLimit(choiceOf(got.agent))) {
+      const st = this.deps.store.getState();
+      const side = nextOfTier(got.agent, st.prefs.autoRoute, st.runtimes, (v) => this.atLimit(v));
+      if (side) {
+        this.deps.plans.note(plan.id, 'note', `“${title}” starts on ${agentName(side, { model: true })}: ${agentName(got.agent, { model: true })} is at its usage limit`, { kind: 'beluga' });
+        return { agent: side, via: got.via };
+      }
+    }
     const real = got.via === 'plan' || got.via === 'auto' ? this.standIn(got.agent) : got.agent;
     if (real && got.agent && real !== got.agent) {
       this.deps.plans.note(plan.id, 'note', `“${title}” starts on ${agentName(real, { model: true })}: ${agentName(got.agent, { model: true })} isn’t working`, { kind: 'beluga' });
@@ -335,6 +347,37 @@ export class PlanFixer {
     }
     if (got.via === 'fix' && got.agent) this.deps.plans.note(plan.id, 'note', `handed the fix tasks for “${title}” to ${agentName(got.agent, { model: true })}`, { kind: 'beluga' });
     return got;
+  }
+
+  /** Whether a model is at a usage limit now: its own, or one it shares (another model of the same endpoint or sign-in), as a run that stopped on one said this session. */
+  private atLimit(value: string): boolean {
+    const now = this.deps.now?.() ?? Date.now();
+    for (const [v, until] of this.limited) {
+      if (now >= until) this.limited.delete(v);
+      else if (v === value || sameLimit(v, value)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The watchdog's ask for a task stopped by a usage limit (`until`: when it resets): with auto route
+   * on, its conversation goes to the next model of the same list (same-tier.ts) and is resumed there,
+   * instead of waiting for the reset. It stays there: the same tier, so nothing to go back for.
+   * → the new agent's name, or undefined (auto route off, a model on no list, or nothing else of its
+   * list can take it: it waits for the reset, as before).
+   */
+  sidestep(plan: Plan, channel: string, until: number): string | undefined {
+    const st = this.deps.store.getState();
+    const current = this.agentAt(channel);
+    if (!current || !this.deps.switchAgent || !autoRouteOn(st.prefs.autoRoute, st.runtimes)) return undefined;
+    this.limited.set(choiceOf(current), until);
+    const next = nextOfTier(current, st.prefs.autoRoute, st.runtimes, (v) => this.atLimit(v));
+    if (!next) return undefined;
+    this.deps.switchAgent(channel, next);
+    const name = agentName(next, { model: true });
+    const title = milestoneOfChannel(plan, channel);
+    this.deps.plans.note(plan.id, 'note', `${agentName(current, { model: true })} is at its usage limit: handed its work${title ? ` in “${title}”` : ''} to ${name}, the next of its list`, { kind: 'beluga' });
+    return name;
   }
 
   /** The agent a conversation runs on now (its key), as kept on its workspace. */

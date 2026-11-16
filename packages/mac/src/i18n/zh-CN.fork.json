@@ -511,5 +511,10 @@
  "Its check didn’t pass: {0}": "它没通过校验：{0}",
  "{0} works again: {1} goes back to it": "{0} 恢复了：{1}切回它继续",
  "{0} works again: asked the agent doing {1} to end its turn, so its next task goes back to it": "{0} 恢复了：已请做{1}的智能体结束这一轮，下一个任务切回它",
- "It failed before Beluga restarted": "Beluga 重启前它就失败了"
+ "It failed before Beluga restarted": "Beluga 重启前它就失败了",
+ "This model’s endpoint is at its usage limit{0}": "这个模型的接入点已达到用量额度{0}",
+ "{0} is at its usage limit: handed its work in {1} to {2}, the next of its list": "{0} 已达到用量额度：{1}的工作交给了同一列表里的下一个模型 {2}",
+ "{0} is at its usage limit: handed its work to {1}, the next of its list": "{0} 已达到用量额度：它的工作交给了同一列表里的下一个模型 {1}",
+ "{0} starts on {1}: {2} is at its usage limit": "{0}从 {1} 开始：{2} 已达到用量额度",
+ "{0} hit a usage limit: gave it to {1}, resumed at {2}": "{0} 碰到用量额度：已交给 {1}，在 {2} 继续"
 }

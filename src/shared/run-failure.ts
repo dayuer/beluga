@@ -22,6 +22,8 @@ export interface RunFailure {
   readonly detail: string;
   /** The runtime that failed ('codex'); unset: Claude Code. */
   readonly runtime?: string;
+  /** fork: the run was on a bring-your-own endpoint (a local model): its limit is the endpoint's, not your Claude plan's. */
+  readonly endpoint?: boolean;
   /**
    * A friend's or guest's run that couldn't sign in: the variable this Mac signs Claude Code in with
    * (ANTHROPIC_API_KEY…), which such a run is never given.
@@ -60,6 +62,7 @@ export function failureTitle(f: RunFailure, now = Date.now()): string {
   if (f.envSignIn && (f.kind === 'signed_out' || f.kind === 'api')) return `${who.app} couldn’t sign in for this run: ${THIS_COMPUTER} signs it in with ${f.envSignIn}, which friends’ runs never get`;
   switch (f.kind) {
     case 'usage_limit':
+      if (f.endpoint) return `This model’s endpoint is at its usage limit${f.resetsAt ? ` · resets at ${resetWords(f.resetsAt, now)}` : ''}`; // fork
       return `You hit your ${who.agent} plan usage limit${f.resetsAt ? ` · resets at ${resetWords(f.resetsAt, now)}` : ''}`;
     case 'signed_out':
       return EXPIRED.test(f.detail) ? `${who.app}’s sign-in on ${THIS_COMPUTER} expired` : `${who.app} isn’t signed in on ${THIS_COMPUTER}`;
