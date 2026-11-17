@@ -4,6 +4,7 @@ import { shareNameOf } from '@beluga/shared/share-names.js';
 import { dirName, joinPath } from '@beluga/shared/os-path.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { inApp, webServed } from './boot.js';
+import { isMac } from './system.js';
 import { runsWhenOpened } from './runs-when-opened.js';
 import { openThere } from './remote-open.js';
 import { t } from '../i18n/index.js';
@@ -68,6 +69,40 @@ export async function openFolderInFinder(client: SocketClient, path: string): Pr
   if (webServed()) return downloadOrSay(client, path);
   if (await openThere(client, path, 'reveal')) return;
   await client.api.local.openFolder(path);
+}
+
+/**
+ * Quick Look and the Share menu are the Mac's own panels (src-tauri/src/native_files.rs), for a
+ * file on this Mac: in the app on a Mac, not a served page or a computer's page.
+ */
+export const nativeFiles = (): boolean => inApp() && isMac() && !webServed();
+
+/** Where the pointer last pressed (a right-click's menu, a button): where the Share menu opens from. */
+let lastPress = { x: 0, y: 0 };
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  for (const type of ['pointerdown', 'contextmenu'] as const) window.addEventListener(type, (e) => (lastPress = { x: e.clientX, y: e.clientY }), true);
+}
+
+/** Quick Look on a file of yours (Space, as in Finder): macOS's own panel. False when it couldn't. */
+export async function quickLook(paths: readonly string[]): Promise<boolean> {
+  if (!nativeFiles() || !paths.length) return false;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<boolean>('quick_look', { paths }).catch(() => false);
+}
+
+/** Drags files of yours out of the window (Finder, Mail, another app), from a dragstart: the Mac's own drag. */
+export async function dragFiles(paths: readonly string[]): Promise<boolean> {
+  if (!nativeFiles() || !paths.length) return false;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<boolean>('drag_files', { paths }).catch(() => false);
+}
+
+/** The Share menu (Messages, Mail, AirDrop…) for files of yours, beside `at` (an element) or where you last pressed. */
+export async function shareFiles(paths: readonly string[], at?: Element | null): Promise<boolean> {
+  if (!nativeFiles() || !paths.length) return false;
+  const box = at?.getBoundingClientRect() ?? { left: lastPress.x, top: lastPress.y, width: 1, height: 1 };
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<boolean>('share_files', { paths, x: box.left, y: box.top, width: box.width, height: box.height }).catch(() => false);
 }
 
 /** Open a file of yours the way Finder would (its default app, usually your editor). One that runs something shows in Finder instead. */

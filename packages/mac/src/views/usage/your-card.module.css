@@ -44,8 +44,11 @@
   gap: 4px 10px;
   margin-bottom: 14px;
   color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 600;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 560;
+  cursor: var(--press-cursor);
+  transition: background var(--dur-fast), transform 160ms var(--ease-out);
 }
 .brandAside {
   color: var(--text-3);
@@ -132,7 +135,7 @@
   font: inherit;
   font-size: 0.88rem;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background var(--dur-fast), color var(--dur-fast);
 }
 .row > :global(svg:first-child) {
@@ -177,7 +180,7 @@
   font: inherit;
   font-size: 0.82rem;
   font-weight: 550;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .more:hover {
   color: var(--text);

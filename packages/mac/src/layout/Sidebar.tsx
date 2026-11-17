@@ -41,6 +41,8 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
+import { useSidebarHold } from '../fork/calm/hold-order.js';
+import { NewTaskButton, SidebarEdge, useOneSelected, useSidebarKeys } from '../fork/sidebar/index.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -95,6 +97,9 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 export function Sidebar() {
   const actions = useActions();
   const drop = useFolderDrop();
+  useSidebarHold(drop.ref);
+  useOneSelected(drop.ref);
+  useSidebarKeys(drop.ref);
   // A chat's row picked up: what's carried, and the chat that would take it.
   const chatDrag = useChatDrag();
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
@@ -131,8 +136,11 @@ export function Sidebar() {
             <AppMenu />
           </span>
         )}
-        <UsageButton />
-        <IconButton icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
+        <span className={s.titleTools}>
+          <UsageButton />
+          <IconButton size="large" icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
+          <NewTaskButton />
+        </span>
       </div>
       <SidebarSearch>
       <div className={s.scroll}>
@@ -161,6 +169,7 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
+        <SidebarEdge />
 
         {categories ? (
           <CategorySections />
@@ -230,7 +239,7 @@ function UsageButton() {
   const selected = useApp((st) => st.view.kind === 'usage');
   return (
     <span className={s.usage} data-level={week === undefined ? undefined : week >= 90 ? 'high' : week >= 70 ? 'mid' : 'low'}>
-      <IconButton icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
+      <IconButton size="large" icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
     </span>
   );
 }

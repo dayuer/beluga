@@ -100,7 +100,7 @@ function Header({ issue }: { issue: Issue }) {
   return (
     <>
       <nav className={t.crumbs} aria-label="Where this task is">
-        <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={() => back(boardOf(issue))} />
+        <IconButton size="regular" icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={() => back(boardOf(issue))} />
         <button type="button" className={t.crumb} onClick={() => openList(boardOf(issue))}>
           Tasks
         </button>
@@ -119,7 +119,7 @@ function Header({ issue }: { issue: Issue }) {
         <span className={t.grow} />
         <span className={t.pageKey}>{issue.key}</span>
         <ActionsDropdown items={menu(issue).filter((i) => i.label !== 'Open')}>
-          <IconButton icon="more" label="More" />
+          <IconButton size="regular" icon="more" label="More" />
         </ActionsDropdown>
       </nav>
       <header className={t.pageHead}>
@@ -317,10 +317,10 @@ function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Works
   if (live) {
     return (
       <>
-        <Button variant={secondary ? 'plain' : 'primary'} size="small" icon="branch" onClick={() => openWorktree(live.id)}>
+        <Button size="regular" variant={secondary ? 'plain' : 'primary'} icon="branch" onClick={() => openWorktree(live.id)}>
           Open Worktree
         </Button>
-        <Button size="small" variant="quiet" icon="folder" onClick={() => void showWorktreeFolder(client, live.id)}>
+        <Button size="regular" variant="quiet" icon="folder" onClick={() => void showWorktreeFolder(client, live.id)}>
           {revealWords}
         </Button>
         <span className={t.nextInfo}>
@@ -335,7 +335,7 @@ function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Works
   return (
     <>
       {ws ? (
-        <Button size="small" icon="chat" onClick={() => openWorktree(ws.id)}>
+        <Button size="regular" icon="chat" onClick={() => openWorktree(ws.id)}>
           Open the Conversation
         </Button>
       ) : null}
@@ -379,13 +379,13 @@ function NextStep({ issue }: { issue: Issue }) {
     <div className={t.nextStep}>
       {had || live ? (
         <>
-          <FixItButton issue={issue} />
+          <FixItButton issue={issue} size="regular" />
           <WorktreeLinks issue={issue} ws={ws} live={live} secondary={fixFirst} />
         </>
       ) : (
         <>
-          <SplitButton label="Start with another agent" disabled={starting || writing} items={items((a) => void start(a))}>
-            <Button variant="primary" size="small" icon="play" disabled={starting || writing} onClick={() => void start()}>
+          <SplitButton size="regular" label="Start with another agent" disabled={starting || writing} items={items((a) => void start(a))}>
+            <Button size="regular" variant="primary" icon="play" disabled={starting || writing} onClick={() => void start()}>
               {starting ? 'Starting…' : 'Start'}
             </Button>
           </SplitButton>
@@ -434,21 +434,21 @@ function Outcome({ issue, ws, live }: { issue: Issue; ws: Workspace | undefined;
       <span className={t.grow} />
       {pr ? <PrLink pr={pr} /> : null}
       {plan ? (
-        <Button size="small" variant="quiet" icon="graph" onClick={() => openPlan(plan.id)}>
+        <Button size="regular" variant="quiet" icon="graph" onClick={() => openPlan(plan.id)}>
           Open the Plan
         </Button>
       ) : null}
       {live ? (
         <>
-          <Button size="small" variant="quiet" icon="folder" onClick={() => void showWorktreeFolder(client, live.id)}>
+          <Button size="regular" variant="quiet" icon="folder" onClick={() => void showWorktreeFolder(client, live.id)}>
             {revealWords}
           </Button>
-          <Button size="small" icon="branch" onClick={() => openWorktree(live.id)}>
+          <Button size="regular" icon="branch" onClick={() => openWorktree(live.id)}>
             Open Worktree
           </Button>
         </>
       ) : ws ? (
-        <Button size="small" icon="chat" onClick={() => openWorktree(ws.id)}>
+        <Button size="regular" icon="chat" onClick={() => openWorktree(ws.id)}>
           Open the Conversation
         </Button>
       ) : null}
@@ -551,7 +551,7 @@ function Properties({ issue }: { issue: Issue }) {
                 {parent.key} {parent.title}
               </span>
             </button>
-            <IconButton icon="x" label="Make It a Task of Its Own" onClick={() => void act(() => api.update(issue.id, { parent: null }))} />
+            <IconButton size="small" icon="x" label="Make It a Task of Its Own" onClick={() => void act(() => api.update(issue.id, { parent: null }))} />
           </div>
         ) : (
           <TaskPicker label="Parent" candidates={parents} onPick={(p) => void act(() => api.update(issue.id, { parent: p.id }))} align="end">
@@ -640,7 +640,7 @@ function DuePicker({ issue, late, text }: { issue: Issue; late: boolean; text: s
         <Icon name="calendar" size={12} />
         {issue.due ? `${new Date(`${issue.due}T12:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${text ?? ''}` : 'Set Due Date'}
       </button>
-      {issue.due ? <IconButton icon="x" label="Remove the Due Date" onClick={() => void act(() => api.update(issue.id, { due: null }))} /> : null}
+      {issue.due ? <IconButton size="small" icon="x" label="Remove the Due Date" onClick={() => void act(() => api.update(issue.id, { due: null }))} /> : null}
       <input ref={input} type="date" className={t.dateHidden} tabIndex={-1} aria-hidden="true" value={issue.due ?? ''} onChange={(e) => void act(() => api.update(issue.id, { due: e.target.value || null }))} />
     </div>
   );

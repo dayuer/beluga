@@ -30,7 +30,7 @@
   font: inherit;
   text-align: left;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .tileButton:hover {
   box-shadow: inset 0 0 0 1px var(--hairline-strong);
@@ -145,7 +145,7 @@
   font-weight: 550;
   color: var(--text-2);
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .tab:hover {
   background: var(--bg-hover);
@@ -496,7 +496,7 @@
   font-size: 13px;
   text-align: left;
   color: var(--text);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .pick:hover {
   background: var(--bg-hover);
@@ -645,7 +645,7 @@
   background: none;
   font: inherit;
   color: var(--text-2);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .outputRun:hover {
   background: var(--bg-hover);
@@ -702,13 +702,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 22px;
+  height: var(--control-h-small);
   padding: 0 7px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--control-radius-small);
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--control-text-small);
   color: var(--text-2);
   cursor: default;
 }
@@ -968,7 +968,7 @@
   font-size: 11.5px;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .docChip span {
   overflow: hidden;

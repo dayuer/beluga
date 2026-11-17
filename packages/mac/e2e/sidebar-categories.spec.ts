@@ -258,6 +258,8 @@ test('a chat put off with the setting off is in Later once it is on, Remind Me L
   await expect(page.getByText('Nothing is created until you send the first message')).toBeVisible();
   await composer(page).fill(text);
   await composer(page).press('Enter');
+  // The pointer rests in the sidebar after the New chat click, and calm mode holds its order while it does (SH-08): step out.
+  await page.mouse.move(900, 450);
   const chat = sidebar(page).getByRole('button', { name: new RegExp(`^${text} ·`) });
   await expect(inList(page, 'Inbox', text)).toBeVisible({ timeout: 30_000 });
   await chat.click({ button: 'right' });

@@ -468,7 +468,7 @@ function HomeComposer({ project }: { project: Project }) {
       {att.dropTarget}
       <div className={s.composerHead}>
         <h2 className={s.prompt}>What do you want to do in {project.name}?</h2>
-        <Segmented<Mode>
+        <Segmented<Mode> size="small"
           label="How to start"
           value={mode}
           onChange={(m) => {

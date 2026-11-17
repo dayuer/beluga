@@ -40,6 +40,7 @@ import { KeyboardSettings } from './KeyboardSettings.js';
 import { ExperimentalSettings } from './ExperimentalSettings.js';
 import { WebAccessSettings } from './WebAccessSettings.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
+import { CalmRow } from '../fork/calm/settings.js';
 import { LOCALES, type LanguagePref, languagePref, setLanguage } from '../i18n/index.js';
 import { PANES } from './settings-index.js';
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from './SettingsSearch.js';
@@ -95,11 +96,11 @@ function PictureRow() {
       <span className={s.pictureRow}>
         {me ? <Avatar name={me.name || fallbackName} id={me.peerId} size={32} /> : null}
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
-        <Button size="small" icon="image" disabled={!on || busy} onClick={() => input.current?.click()}>
+        <Button icon="image" disabled={!on || busy} onClick={() => input.current?.click()}>
           {me?.avatar ? 'Change…' : 'Choose…'}
         </Button>
         {me?.avatar ? (
-          <Button size="small" variant="quiet" disabled={busy} onClick={() => run(null)}>
+          <Button variant="quiet" disabled={busy} onClick={() => run(null)}>
             Remove
           </Button>
         ) : null}
@@ -323,6 +324,7 @@ function Appearance() {
         <Row label="Reduce motion" {...(savingNote ? { detail: savingNote } : {})}>
           <Switch label="Reduce motion" on={prefs.reduceMotion} onChange={(v) => setPrefs({ reduceMotion: v })} />
         </Row>
+        <CalmRow />
         {keyPlatform() === 'mac' && !webServed() && (
           <Row label="Reduce transparency" detail={savingNote ?? 'A solid sidebar, with no blur behind the window. Lighter on slower Macs.'}>
             <Switch label="Reduce transparency" on={prefs.reduceTransparency} onChange={(v) => setPrefs({ reduceTransparency: v })} />
@@ -365,7 +367,7 @@ function AgentsGroup({ mine }: { mine: string }) {
             <Dot tone={row.state ? TONE[row.state] : 'muted'} />
             {row.words}
             {row.fix ? (
-              <Button size="small" onClick={() => act(row)}>
+              <Button onClick={() => act(row)}>
                 {fixLabel(row)}
               </Button>
             ) : null}
@@ -654,10 +656,10 @@ function About() {
           {client.clients}
         </Row>
         <Row label="Log" detail="~/.beluga/logs/daemon.log">
-          <Button size="small" onClick={() => void client.api.local.openFolder(logPath)}>
+          <Button onClick={() => void client.api.local.openFolder(logPath)}>
             Open in Console
           </Button>
-          <Button size="small" variant="quiet" onClick={() => void revealInFinder(client, logPath)}>
+          <Button variant="quiet" onClick={() => void revealInFinder(client, logPath)}>
             {revealLabel()}
           </Button>
         </Row>
@@ -669,7 +671,7 @@ function About() {
               Built and maintained by <MaintainerChip />. Stars are how other developers find it.
             </>
           }>
-          <Button size="small" icon="star" onClick={() => void openExternal(GITHUB_URL)}>
+          <Button icon="star" onClick={() => void openExternal(GITHUB_URL)}>
             Star on GitHub
           </Button>
         </Row>
@@ -751,6 +753,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
           <nav className={s.nav}>
             <Dialog.Title className={s.title}>Settings</Dialog.Title>
             <SettingsSearchField search={search} />
+            <div className={s.navList}>
             {panes.map((p) => (
               <button
                 key={p.id}
@@ -765,6 +768,7 @@ function SettingsWindow({ pane }: { pane: SettingsPane }) {
                 {p.label}
               </button>
             ))}
+            </div>
           </nav>
           <div className={s.body}>
             <div className={s.bodyHead}>

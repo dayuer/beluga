@@ -94,11 +94,11 @@ export function PrPage({ wsId }: { wsId: string }) {
           <div className={s.pageMeta}>
             <span>{data ? `${counts.said} ${counts.said === 1 ? 'comment' : 'comments'}${counts.open ? ` · ${counts.open} open ${counts.open === 1 ? 'thread' : 'threads'}` : ''}` : loading ? 'Reading GitHub…' : ''}</span>
             <span className={s.grow} />
-            <IconButton icon="refresh" label="Read GitHub again" disabled={loading} onClick={refresh} />
-            <IconButton icon="external" label="Open on GitHub" onClick={() => actions.openLink({ kind: 'url', url: pr.url })} />
+            <IconButton size="regular" icon="refresh" label="Read GitHub again" disabled={loading} onClick={refresh} />
+            <IconButton size="regular" icon="external" label="Open on GitHub" onClick={() => actions.openLink({ kind: 'url', url: pr.url })} />
             {counts.open ? (
               <Tip label="Back in the chat, your agent works through every open comment: changes the code or says why not, then commits">
-                <Button size="small" variant="primary" icon="claude" onClick={() => void api.workbench.addressPrComments(wsId)}>
+                <Button variant="primary" icon="claude" onClick={() => void api.workbench.addressPrComments(wsId)}>
                   Address All With Your Agent
                 </Button>
               </Tip>

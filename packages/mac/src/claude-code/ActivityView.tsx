@@ -130,7 +130,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
   return (
     <div className={s.sessionPage}>
       <header className={s.focusHead}>
-        <Button size="small" variant="quiet" icon="back" onClick={() => openActivity(client)}>
+        <Button variant="quiet" icon="back" onClick={() => openActivity(client)}>
           Activity
         </Button>
         <div className={s.focusTitles}>
@@ -142,7 +142,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
           </div>
         </div>
         {chat ? (
-          <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: chat })}>
+          <Button icon="chat" onClick={() => actions.run({ type: 'open_ws', id: chat })}>
             Open Chat
           </Button>
         ) : (
@@ -161,7 +161,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
         </div>
       ) : null}
       {agentId ? (
-        <Empty icon="clock" title="This agent went quiet" detail="Beluga stops watching agents a while after they finish." action={<Button onClick={() => openActivity(client, session.id)}>Show the Conversation</Button>} />
+        <Empty icon="clock" title="This agent went quiet" detail="Beluga stops watching agents a while after they finish." action={<Button size="small" onClick={() => openActivity(client, session.id)}>Show the Conversation</Button>} />
       ) : session.agent === 'codex' ? (
         <Empty icon="eye" title={session.step ?? 'Working in Codex'} detail="Beluga shows what this Codex session is doing now; its whole conversation is in Codex." />
       ) : (
@@ -181,7 +181,7 @@ export function ActivityView() {
   if (!session) {
     return (
       <div className={s.page}>
-        <Empty icon="clock" title="This session went quiet" detail="Beluga shows Claude Code sessions while they work, and for a while after." action={<Button onClick={() => openActivity(client)}>Show All Activity</Button>} />
+        <Empty icon="clock" title="This session went quiet" detail="Beluga shows Claude Code sessions while they work, and for a while after." action={<Button size="small" onClick={() => openActivity(client)}>Show All Activity</Button>} />
       </div>
     );
   }

@@ -26,6 +26,9 @@ async function lookAway(page: Page, away: boolean): Promise<void> {
 }
 
 test('what moves while Claude works rests while you look away, and moves again when you look back', async ({ page }) => {
+  // The fork's calm mode (on by default) rests every live mark outside the current step, the
+  // Working line's shimmer included (docs/calm/hooks.md §4); this is upstream's clock test.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
   await page.goto('/');
   await expect(sidebar(page)).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-window', 'active');

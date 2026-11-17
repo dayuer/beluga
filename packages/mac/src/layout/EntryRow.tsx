@@ -14,6 +14,7 @@ import { ExtrasName, Row, type RowExtras } from './sidebar-parts.js';
 import { WorkspaceWithAgents } from './SubAgents.js';
 import { WorkspaceRow } from './workspace-row.js';
 import { PlanRow } from './plan-row.js';
+import { useHeldEntries } from '../fork/calm/hold-order.js';
 import m from './signal.module.css';
 
 /** One conversation in a sidebar list, and opening it from there: the seam the Unread section and the categories share. */
@@ -109,7 +110,12 @@ export function useEntryList<E extends UnreadEntry>(entriesOf: (state: AppState)
     },
     [here, actions, client],
   );
-  return { here, entries: shown, ...(stayed && kept ? { kept: { entry: stayed, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? 'Shared', open };
+  // While you are working in the sidebar the list you opened from stays as it was (fork/calm/hold-order.ts).
+  const held = useHeldEntries(shown);
+  // The row you just opened is put back in its old place (`kept` below): leave it out here, or it
+  // would be drawn twice when the held group still has it.
+  const listed = useMemo(() => (stayed && kept ? held.filter((e) => e.channel !== kept.entry.channel) : held), [held, stayed, kept]);
+  return { here, entries: listed, ...(stayed && kept ? { kept: { entry: stayed, at: kept.at } } : {}), ownerName: (id) => owners[id] ?? 'Shared', open };
 }
 
 /** Entries as they were last time, by channel, while they read the same (sameEntry): fresh ones only for what changed. */

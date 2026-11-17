@@ -325,6 +325,19 @@ function vibrancy(on: boolean): void {
   void import('@tauri-apps/api/core').then(({ invoke }) => invoke('set_vibrancy', { on })).catch(() => undefined);
 }
 
+let themeShown: UiPrefs['appearance'] | undefined;
+/**
+ * The app's own Appearance for what macOS draws: the menus, sheets and alerts that are AppKit's
+ * (lib/native-menu.ts, native-sheet.ts, native-alert.ts), Quick Look, the Share menu and the
+ * window's own blur follow NSApp's appearance, not the page's CSS. Match the System gives it back
+ * to macOS.
+ */
+function nativeTheme(mode: UiPrefs['appearance']): void {
+  if (themeShown === mode || !('__TAURI_INTERNALS__' in globalThis)) return;
+  themeShown = mode;
+  void import('@tauri-apps/api/app').then(({ setTheme }) => setTheme(mode === 'system' ? null : mode)).catch(() => undefined);
+}
+
 /** Put the preferences on the document (CSS variables and data attributes do the rest). */
 export function apply(p: UiPrefs = shown): void {
   const root = document.documentElement;
@@ -338,9 +351,14 @@ export function apply(p: UiPrefs = shown): void {
   root.dataset.motion = p.reduceMotion ? 'reduce' : 'full';
   // Only a Mac's window blurs what's behind it: Linux and Windows get the solid look. A theme's own
   // sidebar is opaque (its colours, true black on OLED), so the blur under it would only cost.
-  const blur = !p.reduceTransparency && keyPlatform() === 'mac' && !isSolid(theme);
+  // macOS's own Reduce transparency (Accessibility › Display) does it too, blur inside the window included.
+  const reduce = p.reduceTransparency || systemDisplay.reduceTransparency;
+  const blur = !reduce && keyPlatform() === 'mac' && !isSolid(theme);
   root.dataset.os = keyPlatform();
   root.dataset.transparency = blur ? 'full' : 'reduce';
+  nativeTheme(p.appearance);
+  root.dataset.glass = reduce ? 'off' : 'on';
+  root.dataset.contrast = systemDisplay.increaseContrast ? 'more' : 'normal';
   vibrancy(blur);
   root.style.setProperty('--accent', accentCss(p.accent, CSS.supports('color', 'AccentColor')));
   root.style.setProperty('--text-size', `${p.textSize}px`);
@@ -349,8 +367,31 @@ export function apply(p: UiPrefs = shown): void {
   root.style.setProperty('--chat-max', p.chatWidth === 'narrow' ? '42rem' : p.chatWidth === 'wide' ? '60rem' : '100%');
 }
 
+/**
+ * macOS's Accessibility › Display settings, as the app last read them (the web view doesn't see
+ * Reduce transparency): read at start and each time the window comes back to the front, since
+ * they're changed in System Settings.
+ */
+let systemDisplay = { reduceTransparency: false, increaseContrast: false };
+async function readSystemDisplay(): Promise<void> {
+  if (!('__TAURI_INTERNALS__' in globalThis) || keyPlatform() !== 'mac') return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const next = await invoke<typeof systemDisplay>('display_options');
+    if (next.reduceTransparency === systemDisplay.reduceTransparency && next.increaseContrast === systemDisplay.increaseContrast) return;
+    systemDisplay = next;
+    apply();
+  } catch {
+    // An older shell without the command: the app's own setting only.
+  }
+}
+
 // (Not in tests, which load the pure parts of what imports this without a window.)
 if (typeof window !== 'undefined') window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => apply());
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  void readSystemDisplay();
+  window.addEventListener('focus', () => void readSystemDisplay());
+}
 
 /** ⌘+ / ⌘- / ⌘0: the window's text size. */
 export function zoom(dir: 'in' | 'out' | 'reset'): { ok: boolean; message: string } {

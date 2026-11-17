@@ -1,0 +1,26 @@
+/*
+ * Calm mode: one toast at a time (docs/calm/hooks.md §3). The two notices already sit in the same
+ * place (layout/Shell.module.css .toasts and lib/undo-toast.module.css .wrap); this makes them
+ * look like the same quiet card, so whichever one is on screen reads the same. The entrance
+ * animation is M1's calm-overlays.css, not this file.
+ */
+:root[data-calm] [data-one-toast="global"],
+:root[data-calm] [data-one-toast="undo"] {
+  z-index: 81;
+}
+
+:root[data-calm] [data-one-toast="global"] > div,
+:root[data-calm] [data-one-toast="undo"] > div {
+  padding: 7px 14px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+  box-shadow: var(--shadow-pop);
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+/* "N new" on the way back down (fork/calm/new-below.tsx): digits keep their width as the count grows. */
+:root[data-calm] [data-new] {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}

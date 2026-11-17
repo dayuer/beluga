@@ -19,7 +19,7 @@
   color: var(--text);
   text-align: left;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .card:hover {

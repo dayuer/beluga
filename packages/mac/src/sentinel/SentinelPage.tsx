@@ -105,7 +105,7 @@ function Crumbs({ item, back }: { item: Sentinel; back: () => void }) {
   const project = useApp((st) => st.projects.find((p) => p.id === item.projectId));
   return (
     <nav className={t.crumbs} aria-label="Where this sentinel is">
-      <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
+      <IconButton size="regular" icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
       <button type="button" className={t.crumb} onClick={() => a.openList()}>
         Sentinel
       </button>
@@ -158,21 +158,21 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
         {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
         <RunsOnLabel tip="It runs on the computer it was made on until you move it." />
         <Tip label={item.paused ? 'Once now, even though it’s paused' : 'Once now, whatever its schedule'}>
-          <Button size="small" icon="play" variant={item.paused ? 'plain' : 'primary'} onClick={() => void a.runNow(item)}>
+          <Button icon="play" variant={item.paused ? 'plain' : 'primary'} onClick={() => void a.runNow(item)}>
             Run Now
           </Button>
         </Tip>
         {item.paused ? (
-          <Button size="small" variant="primary" icon="check" onClick={() => void a.setPaused(item, false)}>
+          <Button variant="primary" icon="check" onClick={() => void a.setPaused(item, false)}>
             {item.pausedWhy && item.pausedWhy !== CLAUDE_CHANGED ? 'Resume' : 'Turn On'}
           </Button>
         ) : (
-          <Button size="small" icon="pause" onClick={() => void a.setPaused(item, true)}>
+          <Button icon="pause" onClick={() => void a.setPaused(item, true)}>
             Pause
           </Button>
         )}
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label={`More for ${item.name}`} />
+          <IconButton size="regular" icon="more" label={`More for ${item.name}`} />
         </ActionsDropdown>
       </div>
     </header>
@@ -360,7 +360,6 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
       <Prop label="Project">
         <Select
           label="Project"
-          size="small"
           value={item.projectId ?? MAC_SCOPE}
           options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
           onChange={(v) => save({ projectId: v === MAC_SCOPE ? null : v })}
@@ -369,7 +368,6 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
       <Prop label="Access">
         <Select<Access>
           label="Access"
-          size="small"
           value={item.access}
           options={ACCESS.map((x) => ({ value: x, label: ACCESS_INFO[x].label, description: accessSentence(x, item.steps) }))}
           onChange={(access) => {
@@ -387,23 +385,22 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
       </p>
       {claudeSteps ? (
         <Prop label="Agent">
-          <Select label="Agent and model for every agent step" size="small" value={agent ?? 'mixed'} placeholder="Mixed" options={agents} onChange={(v) => save({ steps: withAgent(item.steps, v) })} />
+          <Select label="Agent and model for every agent step" value={agent ?? 'mixed'} placeholder="Mixed" options={agents} onChange={(v) => save({ steps: withAgent(item.steps, v) })} />
         </Prop>
       ) : null}
       <Prop label="Time limit">
-        <Select label="Time limit" size="small" value={String(item.limits.minutes)} options={limits.map((n) => ({ value: String(n), label: n < 60 ? `${n} minutes` : n === 60 ? '1 hour' : `${n / 60} hours`, description: 'Per run; the agent is stopped and the run fails as timed out' }))} onChange={(v) => save({ limits: { minutes: Number(v) } })} />
+        <Select label="Time limit" value={String(item.limits.minutes)} options={limits.map((n) => ({ value: String(n), label: n < 60 ? `${n} minutes` : n === 60 ? '1 hour' : `${n / 60} hours`, description: 'Per run; the agent is stopped and the run fails as timed out' }))} onChange={(v) => save({ limits: { minutes: Number(v) } })} />
       </Prop>
       <Prop label="Runs per day">
-        <Select label="Runs per day" size="small" value={String(item.limits.perDay ?? 0)} options={perDay.map((n) => ({ value: String(n), label: perDayLabel(n) }))} onChange={(v) => save({ limits: { perDay: Number(v) } })} />
+        <Select label="Runs per day" value={String(item.limits.perDay ?? 0)} options={perDay.map((n) => ({ value: String(n), label: perDayLabel(n) }))} onChange={(v) => save({ limits: { perDay: Number(v) } })} />
       </Prop>
       <Prop label="Pause after">
-        <Select label="Pause after" size="small" value={String(item.limits.pauseAfter)} options={pauseAfter.map((n) => ({ value: String(n), label: pauseAfterLabel(n) }))} onChange={(v) => save({ limits: { pauseAfter: Number(v) } })} />
+        <Select label="Pause after" value={String(item.limits.pauseAfter)} options={pauseAfter.map((n) => ({ value: String(n), label: pauseAfterLabel(n) }))} onChange={(v) => save({ limits: { pauseAfter: Number(v) } })} />
       </Prop>
       {claudeSteps ? (
         <Prop label="Keep chats">
           <Select<KeepChats>
             label="Which runs’ chats to keep"
-            size="small"
             value={item.keepChats ?? DEFAULT_KEEP_CHATS}
             options={KEEP_CHATS.map((k) => ({ value: k, label: KEEP_CHATS_INFO[k].label, description: KEEP_CHATS_INFO[k].description }))}
             onChange={(keepChats) => save({ keepChats })}
@@ -411,7 +408,7 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
         </Prop>
       ) : null}
       <Prop label="Notify">
-        <Select label="Notify" size="small" value={item.notify} options={NOTIFY_WHERE.map((n) => ({ value: n, label: NOTIFY_LABEL[n], description: n === 'off' ? 'Only failures and pausing still tell you' : 'When a run ends (a Notify step says more)' }))} onChange={(notify) => save({ notify })} />
+        <Select label="Notify" value={item.notify} options={NOTIFY_WHERE.map((n) => ({ value: n, label: NOTIFY_LABEL[n], description: n === 'off' ? 'Only failures and pausing still tell you' : 'When a run ends (a Notify step says more)' }))} onChange={(notify) => save({ notify })} />
       </Prop>
       <div className={t.propsRule} />
       <Prop label="Id" quiet>

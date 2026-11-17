@@ -20,6 +20,11 @@
   padding: 0 10px 0 0;
   flex: none;
 }
+.titleTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 .trafficSpace {
   width: 78px;
   height: 100%;

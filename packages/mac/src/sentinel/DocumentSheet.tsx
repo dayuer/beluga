@@ -61,10 +61,10 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
   const tall = !error && (doc ? shown !== undefined && TALL.has(look ?? 'other') : TALL.has(documentLook(documentMime(name))));
   const buttons = (
     <>
-      <Button size="small" icon="external" onClick={() => open('open')}>
+      <Button icon="external" onClick={() => open('open')}>
         Open in Default App
       </Button>
-      <Button size="small" icon="folder" onClick={() => open('reveal')}>
+      <Button icon="folder" onClick={() => open('reveal')}>
         {revealLabel()}
       </Button>
     </>
@@ -77,7 +77,7 @@ export function DocumentSheet({ source, sentinelId, metric, column, name, close 
             <p className={n.docNote}>{error}</p>
             {source === 'storage' ? (
               <span className={n.docButtons}>
-                <Button size="small" icon="globe" onClick={inBrowser}>
+                <Button icon="globe" onClick={inBrowser}>
                   Open Link in Browser
                 </Button>
               </span>

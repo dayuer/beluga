@@ -1,6 +1,7 @@
 import { type RefObject, useEffect, useRef } from 'react';
 import { onWindowActive, windowActive } from './window-active.js';
 import { reducedMotion } from './reduced-motion.js';
+import { calmLive } from '../fork/calm/live-gate.js';
 
 /**
  * One slow clock for everything that moves while Claude works: the plan's glowing cards and
@@ -24,12 +25,14 @@ let observer: IntersectionObserver | undefined;
 
 function tick(): void {
   const t = performance.now();
-  for (const el of seen) marks.get(el)?.(t);
+  // Calm mode: only the one whitelisted loop moves; the rest are not even painted (a style write
+  // every frame is motion as far as calm-check can see, docs/calm/hooks.md §4.3).
+  for (const el of seen) if (calmLive(el)) marks.get(el)?.(t);
 }
 
 /** Runs the clock when there's something on screen to move and someone to see it; otherwise stops it. */
 function wake(): void {
-  const run = seen.size > 0 && windowActive() && !reducedMotion();
+  const run = [...seen].some(calmLive) && windowActive() && !reducedMotion();
   if (run && !timer) {
     tick();
     timer = setInterval(tick, 1000 / LIVE_FPS);
@@ -37,15 +40,19 @@ function wake(): void {
     clearInterval(timer);
     timer = undefined;
   }
-  if (reducedMotion()) for (const el of seen) marks.get(el)?.(null);
+  if (reducedMotion() || !run) for (const el of seen) marks.get(el)?.(null);
 }
 
 function watch(): void {
   if (watching) return;
   watching = true;
   window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', wake);
-  // Settings › Appearance › Reduce motion sets data-motion on the document.
-  new MutationObserver(wake).observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
+  // Settings › Appearance › Reduce motion sets data-motion on the document; calm mode sets
+  // data-calm. Either changes which marks may move, so rest the ones the gate just closed.
+  new MutationObserver(() => {
+    for (const el of seen) if (!calmLive(el)) marks.get(el)?.(null);
+    wake();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion', 'data-calm'] });
   onWindowActive(wake);
 }
 
@@ -69,7 +76,7 @@ export function joinLive(el: Element, paint: LivePaint): () => void {
   watch();
   marks.set(el, paint);
   observe(el);
-  paint(reducedMotion() ? null : performance.now());
+  paint(reducedMotion() || !calmLive(el) ? null : performance.now());
   return () => {
     marks.delete(el);
     seen.delete(el);

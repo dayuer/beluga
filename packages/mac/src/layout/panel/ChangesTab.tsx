@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Review } from '@beluga/workspaces/git.js';
 import { parseDiff } from '@beluga/shared/diff-lines.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
@@ -71,8 +72,8 @@ function Summary({ data, loading, grouped, onReload }: { data: Review; loading: 
         <span className={d.add}>+{totals.add}</span>
         <span className={d.del}>−{totals.del}</span>
         <span className={s.flex} />
-        <IconButton icon="folder" label={grouped ? 'Show as One List' : 'Group by Folder'} active={grouped} aria-pressed={grouped} onClick={() => setPrefs({ changesByFolder: !grouped })} />
-        <IconButton icon="refresh" label={loading ? 'Looking for changes…' : 'Look again'} className={cx(loading && s.spinning)} onClick={onReload} />
+        <IconButton size="small" icon="folder" label={grouped ? 'Show as One List' : 'Group by Folder'} active={grouped} aria-pressed={grouped} onClick={() => setPrefs({ changesByFolder: !grouped })} />
+        <IconButton size="small" icon="refresh" label={loading ? 'Looking for changes…' : 'Look again'} className={cx(loading && s.spinning)} onClick={onReload} />
       </div>
       <div className={s.summaryMeta}>
         <span className={s.base} title={data.base}>
@@ -232,7 +233,7 @@ function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose
         ) : null}
         <span className={s.flex} />
         {showable && !onlyAsFile(path) ? (
-          <Segmented
+          <Segmented size="small"
             label="Show"
             value={look}
             onChange={(v) => setPrefs({ changeLook: v })}
@@ -242,9 +243,9 @@ function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose
             ]}
           />
         ) : null}
-        {showable ? <IconButton icon="folder" label="Show in Files" onClick={showInFiles} /> : null}
-        <IconButton icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('diff', wsId)} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+        {showable ? <IconButton size="small" icon="folder" label="Show in Files" onClick={showInFiles} /> : null}
+        <IconButton size="small" icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('diff', wsId)} />
+        <IconButton size="small" icon="x" label="Close" keys="Esc" onClick={onClose} />
       </div>
       {look === 'file' && at ? (
         <div className={cx(s.previewBody, s.previewFile, 'selectable')} tabIndex={0}>
@@ -327,6 +328,7 @@ export function ChangesTab({ wsId }: { wsId: string }) {
     const i = files.findIndex((f) => f.path === asked);
     if (i >= 0) show(i);
   }, [data, reviewLoading]);
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const i = at < 0 ? -1 : at;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -346,6 +348,10 @@ export function ChangesTab({ wsId }: { wsId: string }) {
       e.preventDefault();
       e.stopPropagation();
       setOpen(undefined);
+    } else {
+      // Typing a file's name goes to it.
+      const to = typeAhead(e, order.map((k) => files[k]?.path.split('/').pop() ?? ''), order.indexOf(i));
+      if (to >= 0) show(order[to]!);
     }
   };
 

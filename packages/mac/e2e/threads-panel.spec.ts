@@ -56,6 +56,8 @@ test('with threads off, no row has a mark', async ({ page }) => {
   await openGroupChat(page);
   await unfold(page);
   await expect(sidebar(page).getByRole('button', { name: 'e2e-off', exact: true })).toBeVisible();
+  // Calm mode shows a row that appeared while the pointer was in the sidebar once it leaves (SH-08).
+  await page.mouse.move(900, 450);
   await expect(sidebar(page).getByRole('region', { name: 'Unread' }).getByRole('button', { name: /^e2e-off · / })).toBeVisible({ timeout: 40_000 });
   await expect(sidebar(page).locator('[data-harness]')).toHaveCount(0);
   await shot(page, 'flag-off');
@@ -70,6 +72,8 @@ test('a row shows its harness, and children fold under their parent', async ({ p
   await startParent(page, 'e2e-parent', 'one=codex:finish now; two=opencode:finish now; three=claude:finish now; four=claude:keep working; five=claude:keep working');
 
   await unfold(page);
+  // Calm mode shows rows that arrive while the pointer is in the sidebar once it leaves (SH-08).
+  await page.mouse.move(900, 450);
   const group = sidebar(page).getByRole('group', { name: 'Threads of e2e-parent' });
   await expect(group.getByRole('button', { name: 'five', exact: true })).toBeVisible({ timeout: 40_000 });
   const parent = sidebar(page).getByRole('button', { name: 'e2e-parent', exact: true });

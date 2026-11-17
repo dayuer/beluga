@@ -75,7 +75,7 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
         <div className={t.page}>
           <div className={t.pageMain}>
             <nav className={t.crumbs} aria-label="Where this run is">
-              <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
+              <IconButton size="regular" icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
               <button type="button" className={t.crumb} onClick={() => a.openList(projectId)}>
                 Actions
               </button>
@@ -86,9 +86,9 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
                 {run.workflow} #{run.number}
                 {run.attempt > 1 ? ` · attempt ${run.attempt}` : ''}
               </span>
-              <IconButton icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
+              <IconButton size="regular" icon="refresh" label={loading ? 'Asking GitHub…' : 'Ask GitHub Again'} className={cx(loading && s.spinning)} onClick={refresh} />
               <ActionsDropdown items={menu(run, { open: false, then: refresh })}>
-                <IconButton icon="more" label="More" />
+                <IconButton size="regular" icon="more" label="More" />
               </ActionsDropdown>
             </nav>
             <header className={t.pageHead}>
@@ -103,16 +103,16 @@ function Page({ projectId, repo, run, loading, refresh, late }: { projectId: str
                 </span>
                 <span className={t.grow} />
                 {failed ? (
-                  <Button size="small" icon="refresh" onClick={() => void a.rerun(projectId, run.id, true).then((ok) => ok && refresh())}>
+                  <Button icon="refresh" onClick={() => void a.rerun(projectId, run.id, true).then((ok) => ok && refresh())}>
                     Re-run Failed Jobs
                   </Button>
                 ) : null}
                 {live ? (
-                  <Button size="small" icon="stop" onClick={() => a.cancel(projectId, run.id, run.title, refresh)}>
+                  <Button icon="stop" onClick={() => a.cancel(projectId, run.id, run.title, refresh)}>
                     Cancel Run
                   </Button>
                 ) : null}
-                <Button size="small" variant="quiet" icon="external" onClick={() => a.openOnGitHub(run.url)}>
+                <Button variant="quiet" icon="external" onClick={() => a.openOnGitHub(run.url)}>
                   GitHub
                 </Button>
               </div>

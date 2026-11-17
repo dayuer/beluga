@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useListTypeahead } from '../../lib/list-typeahead.js';
 import type { Location } from '@beluga/core/store.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
 import { activeAssistantChannel, assistantChannel } from '@beluga/shared/assistant.js';
@@ -9,7 +10,7 @@ import { Icon, type IconName } from '../../components/Icon.js';
 import { Empty, IconButton, Segmented, cx } from '../../components/ui.js';
 import { ActionsDropdown } from '../../components/SpecMenu.js';
 import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
-import { openWithDefaultApp, revealInFinder } from '../../lib/files.js';
+import { dragFiles, nativeFiles, openWithDefaultApp, revealInFinder } from '../../lib/files.js';
 import { openFocus } from '../../lib/panel.js';
 import { SPLIT_DEFAULT, SPLIT_MAX, SPLIT_MIN, clampShare } from '../../lib/panel-model.js';
 import { setPrefs, usePrefs } from '../../lib/prefs.js';
@@ -221,11 +222,11 @@ function Preview({ of, file, list, onClose }: { of: ScratchOf; file: ScratchEntr
         </span>
         <span className={s.previewDir}>{timeAgo(file.mtime, Math.max(now, Date.now()))}</span>
         <span className={s.flex} />
-        {isViewable(file.path) ? null : <IconButton icon="toEnd" label="Follow the End" active={follow} onClick={followEnd} />}
-        {owner ? null : <IconButton icon="external" label="Open With Its App" onClick={() => void openWithDefaultApp(client, local)} />}
-        {owner ? null : <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, local)} />}
-        <IconButton icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={openFull} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+        {isViewable(file.path) ? null : <IconButton size="small" icon="toEnd" label="Follow the End" active={follow} onClick={followEnd} />}
+        {owner ? null : <IconButton size="small" icon="external" label="Open With Its App" onClick={() => void openWithDefaultApp(client, local)} />}
+        {owner ? null : <IconButton size="small" icon="folder" label={revealFile} onClick={() => void revealInFinder(client, local)} />}
+        <IconButton size="small" icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={openFull} />
+        <IconButton size="small" icon="x" label="Close" keys="Esc" onClick={onClose} />
       </div>
       <div ref={body} className={cx(s.previewBody, s.previewFile, 'selectable')} tabIndex={0} onScroll={onScroll}>
         {/* Kept as it is while the file changes (its text updated in place), so following doesn't flicker. */}
@@ -283,6 +284,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
     setClosed(false);
     setPicked(path);
   };
+  const typeAhead = useListTypeahead();
   const onKey = (e: KeyboardEvent): void => {
     const i = rows.findIndex((f) => f.path === shown);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -293,6 +295,10 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
       e.preventDefault();
       e.stopPropagation();
       setClosed(true);
+    } else {
+      // Typing a name goes to it.
+      const to = typeAhead(e, rows.map((f) => f.path.split('/').pop() ?? f.path), i);
+      if (to >= 0) pick(rows[to]!.path);
     }
   };
 
@@ -313,7 +319,7 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
       <div className={s.top} style={file ? { flex: `0 0 ${Math.round(share * 100)}%` } : undefined}>
         {split.sent.length ? (
           <div className={k.views}>
-            <Segmented
+            <Segmented size="small"
               label="Show"
               value={split.view}
               onChange={pickView}
@@ -336,9 +342,9 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
                 { label: 'Viewable First', hint: 'Pictures, videos, PDFs and web pages on top', icon: 'eye', checked: sort === 'viewable', onSelect: () => setPrefs({ scratchSort: 'viewable' }) },
               ]}
             >
-              <IconButton icon={sort === 'viewable' ? 'eye' : 'clock'} label={sort === 'viewable' ? 'Sorted: viewable first' : 'Sorted: newest first'} />
+              <IconButton size="small" icon={sort === 'viewable' ? 'eye' : 'clock'} label={sort === 'viewable' ? 'Sorted: viewable first' : 'Sorted: newest first'} />
             </ActionsDropdown>
-            {owner ? null : <IconButton icon="folder" label={revealFolder} onClick={() => void revealInFinder(client, sentView ? joinPath(list.root, SENT_DIR) : list.dir)} />}
+            {owner ? null : <IconButton size="small" icon="folder" label={revealFolder} onClick={() => void revealInFinder(client, sentView ? joinPath(list.root, SENT_DIR) : list.dir)} />}
           </div>
         </div>
         {working && !sentView ? <NextFileRow /> : null}
@@ -355,6 +361,13 @@ export function ScratchTab({ of }: { of: ScratchOf }) {
                 aria-selected={sel}
                 className={cx(s.row, sel && s.rowOn, fresh && k.arrived)}
                 title={f.path}
+                // Yours: dragged out of the window, as from Finder (the Mac's own drag).
+                draggable={!owner && nativeFiles()}
+                onDragStart={(e) => {
+                  if (owner || !nativeFiles()) return;
+                  e.preventDefault();
+                  void dragFiles([joinPath(list.root, f.path)]);
+                }}
                 onClick={() => pick(f.path)}
               >
                 <Icon name={ICONS[fileKind(f.path)]} size={13} className={s.fileIcon} />

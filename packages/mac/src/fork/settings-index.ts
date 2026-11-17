@@ -13,6 +13,10 @@ const group = (pane: SettingsPane, label: string, detail?: string, keywords?: st
 
 /** `after`: the upstream group (in the same pane) this block comes after. */
 export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly entries: readonly Entry[] }> = [
+  {
+    after: 'Reduce motion',
+    entries: rows('appearance', 'Layout', [['Calm mode', 'A still, predictable window: short motion, and nothing that moves on its own.', 'calm steady quiet still motion 沉稳 沉稳模式 动效 安静']]),
+  },
 ];
 
 /** Upstream's list with each fork block after its group's last row (at the end when that group is gone). */

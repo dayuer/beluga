@@ -1,4 +1,6 @@
 import { underPart } from '@beluga/shared/path-inside.js';
+import { nativeSheets, parts, useNativeSheet } from '../../lib/native-sheet.js';
+import { t } from '../../i18n/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import type { OutsideConversation } from '@beluga/core/workspace-controller.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -72,9 +74,61 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
     const all = found?.conversations ?? [];
     return q ? all.filter((c) => c.title.toLowerCase().includes(q) || c.cwd.toLowerCase().includes(q)) : all;
   }, [found, query]);
-  if (!project) return null;
-  const looking = found?.dir ?? dir ?? project.root;
+  const looking = found?.dir ?? dir ?? project?.root ?? '';
   const opening = Boolean(chosen?.wsId);
+  const go = (): void => {
+    if (!chosen || !found) return;
+    // The worktree's row and page show at once while it's made; a failure comes back as a toast.
+    void api.workspaces.importOutside(projectId, found.dir, chosen.sessionId, opening ? undefined : name.trim()).catch(() => undefined);
+    close();
+  };
+  const another = (): void =>
+    void pickFolders('Choose a folder Claude Code ran in', { machine }).then((p) => {
+      if (p?.[0]) setDir(p[0]);
+    });
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the conversations in a pop-up,
+  // each with where it ran and when on the line under it (the pop-up's type-ahead finds one by name).
+  const native = useNativeSheet(
+    // On a computer's page its folder browser is the page's own, which a native sheet would cover: the web sheet there.
+    nativeSheets() && Boolean(project) && !machine,
+    {
+      title: 'Import from Claude Code',
+      intro: `Pick a conversation from Terminal or another app. Your agent goes on with it in a new worktree of ${project?.name ?? ''}.`,
+      width: 580,
+      rows: [
+        { kind: 'button', id: 'folder', label: 'From', text: 'Choose Another Folder…', hint: parts(tildePath(home, looking), 'This folder and the folders inside it') },
+        !found
+          ? { kind: 'note', text: 'Looking for conversations…' }
+          : !found.conversations.length
+            ? { kind: 'note', text: 'No Claude Code conversation ran in this folder or inside it. Choose another folder, the one you started Claude in.' }
+            : {
+                kind: 'popup',
+                id: 'conversation',
+                label: 'Conversation',
+                value: picked ?? '',
+                options: found.conversations.map((c) => ({
+                  value: c.sessionId,
+                  label: c.title,
+                  icon: c.wsId ? ('branch' as const) : ('chat' as const),
+                  hint: parts(c.wsId && 'Brought in already', whereIn(found.dir, c.cwd, home), agoText(c.lastModified), formatBytes(c.bytes)),
+                })),
+              },
+        ...(chosen && !opening ? [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, maxLength: 120, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}${t(', from the commit that folder is on. Its uncommitted changes stay there.')}` } : {}) }] : []),
+      ],
+      submit: opening ? 'Open Its Worktree' : 'Continue in a Worktree',
+      canSubmit: Boolean(chosen) && (opening || Boolean(slug(name))),
+    },
+    {
+      change: (id, value) => {
+        if (id === 'folder') another();
+        else if (id === 'conversation') setPicked(value);
+        else if (id === 'name') (setName(value), setNamed(true));
+      },
+      submit: go,
+      cancel: close,
+    },
+  );
+  if (!project || native) return null;
   return (
     <FormSheet
       title="Import from Claude Code"
@@ -82,12 +136,7 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
       intro={`Pick a conversation from Terminal or another app. Your agent goes on with it in a new worktree of ${project.name}.`}
       submitLabel={opening ? 'Open Its Worktree' : 'Continue in a Worktree'}
       canSubmit={Boolean(chosen) && (opening || Boolean(slug(name)))}
-      onSubmit={() => {
-        if (!chosen || !found) return;
-        // The worktree's row and page show at once while it's made; a failure comes back as a toast.
-        void api.workspaces.importOutside(projectId, found.dir, chosen.sessionId, opening ? undefined : name.trim()).catch(() => undefined);
-        close();
-      }}
+      onSubmit={go}
       onCancel={close}
       width={580}
     >
@@ -95,14 +144,9 @@ export function ImportConversationSheet({ projectId, close }: { projectId: strin
         label="From"
         aside={
           <Button
-            size="small"
             variant="quiet"
             icon="folder"
-            onClick={() =>
-              void pickFolders('Choose a folder Claude Code ran in', { machine }).then((p) => {
-                if (p?.[0]) setDir(p[0]);
-              })
-            }
+            onClick={another}
           >
             Choose Another Folder…
           </Button>

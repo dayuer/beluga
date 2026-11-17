@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { labelled, nativeSheets, parts, useNativeSheet } from '../../lib/native-sheet.js';
+import { t } from '../../i18n/index.js';
 import type { SharedFork } from '@beluga/core/friend-share-store.js';
 import { trustOf } from '@beluga/core/trust.js';
 import { formatBytes } from '@beluga/shared/format.js';
@@ -45,7 +47,48 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
   const ownerName = useApp((st) => st.sharedProjects.find((p) => p.owner === owner)?.ownerName ?? st.network.friends.find((f) => f.peerId === owner)?.name ?? 'Your friend');
   const full = useApp((st) => trustOf(st, owner) === 'full');
   const [name, setName] = useState(ws?.name ?? '');
-  if (!ws) return null;
+  const fork = async (): Promise<void> => {
+    await api.sharing.fork(owner, wsId, name.trim());
+    close();
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): what comes with it and what stays, as lines.
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const native = useNativeSheet(
+    nativeSheets() && Boolean(ws),
+    {
+      title: `Fork “${ws?.name ?? ''}” to This ${computerTitle()}`,
+      intro: `A worktree of your own that starts where ${ownerName}’s is now, with your agent. ${ownerName}’s goes on as it is.`,
+      width: 540,
+      rows: [
+        // The web sheet's own rows, each in its language.
+        { kind: 'note', text: labelled('Comes with it', '') },
+        { kind: 'note', text: parts('Its commits and uncommitted changes', 'Uncommitted work stays uncommitted, as it was') },
+        { kind: 'note', text: parts('Its Scratch', 'Screenshots, notes and logs the agent saved') },
+        { kind: 'note', text: parts('The conversation', 'Your agent remembers it and carries on') },
+        { kind: 'note', text: labelled('Stays behind', t('node_modules, build output and anything else git ignores, made again by the setup here. Never a .env file or a key.')) },
+        ...(full ? [] : [{ kind: 'note' as const, text: `It’s ${ownerName}’s code: the setup waits until you’ve looked it over, and your .env files aren’t copied in.` }]),
+        { kind: 'text', id: 'name', label: 'Name', value: name, focus: true, maxLength: 120, ...(slug(name) ? { hint: `${t('Your branch')} beluga/${slug(name)}` } : {}) },
+      ],
+      submit: 'Fork',
+      canSubmit: Boolean(slug(name)),
+      busy,
+      ...(problem ? { error: problem } : {}),
+    },
+    {
+      change: (_id, value) => setName(value),
+      submit: () => {
+        if (!slug(name) || busy) return;
+        setBusy(true);
+        setProblem(undefined);
+        fork()
+          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
+          .finally(() => setBusy(false));
+      },
+      cancel: close,
+    },
+  );
+  if (!ws || native) return null;
   return (
     <FormSheet
       title={`Fork “${ws.name}” to This ${computerTitle()}`}
@@ -53,10 +96,7 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
       intro={`A worktree of your own that starts where ${ownerName}’s is now, with your agent. ${ownerName}’s goes on as it is.`}
       submitLabel="Fork"
       canSubmit={Boolean(slug(name))}
-      onSubmit={async () => {
-        await api.sharing.fork(owner, wsId, name.trim());
-        close();
-      }}
+      onSubmit={fork}
       onCancel={close}
       width={540}
     >

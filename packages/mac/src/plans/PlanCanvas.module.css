@@ -137,7 +137,7 @@
   border-radius: 7px;
   color: var(--text-3);
   background: transparent;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background-color 150ms, color 150ms;
 }
 .foldButton:hover {
@@ -161,7 +161,7 @@
   text-align: left;
   color: inherit;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background-color 150ms;
 }
 .foldRow:hover {
@@ -217,7 +217,7 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--bg-sunken) 55%, var(--bg-raised));
   box-shadow: inset 0 0 0 1px var(--hairline-strong);
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: box-shadow 220ms var(--ease-out), background 220ms var(--ease-out);
 }
 /* The threshold between a milestone's tasks and its gate. */
@@ -287,7 +287,7 @@
   border-radius: 6px;
   background: transparent;
   font: inherit;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .gateWatch:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
@@ -316,7 +316,7 @@
   font: inherit;
   font-weight: 600;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .gatePass {
   color: var(--accent);
@@ -620,7 +620,7 @@
 
 /* Click anywhere in a milestone (not on a card) for its details. */
 .ms:not(:has(.foldRow)) {
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 /* Its agent at work: a soft copper outline, even between tasks when no card is lit. */
 .ms.msLive {
@@ -657,7 +657,7 @@
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
-  cursor: pointer;
+  cursor: var(--press-cursor);
   transition: background 150ms var(--ease-out);
 }
 .agentNow:hover {

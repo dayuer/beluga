@@ -4,6 +4,7 @@ import { Icon, type IconName } from './Icon.js';
 import { cx } from './ui.js';
 import s from './alert.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
+import { nativeAlerts, useNativeAlert } from '../lib/native-alert.js';
 
 export interface AlertButton {
   readonly label: string;
@@ -45,6 +46,16 @@ export interface AlertProps {
  */
 export function Alert({ title, message, icon = 'alert', tone = 'caution', table, confirm, alternative, cancel = 'Cancel', onCancel, children }: AlertProps) {
   const ok = useRef<HTMLButtonElement>(null);
+  // In the app on a Mac, an alert that's only words and buttons is the Mac's own (lib/native-alert.ts).
+  const native = useNativeAlert(nativeAlerts() && !table && !children && !confirm.disabled && !alternative?.disabled, {
+    title,
+    message,
+    tone,
+    confirm: { label: confirm.label, ...(confirm.destructive ? { destructive: true } : {}), run: confirm.onClick },
+    ...(cancel !== false ? { cancel: { label: cancel, run: onCancel } } : {}),
+    ...(alternative ? { alternative: { label: alternative.label, ...(alternative.destructive ? { destructive: true } : {}), run: alternative.onClick } } : {}),
+  });
+  if (native) return null;
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>
       <Dialog.Portal>

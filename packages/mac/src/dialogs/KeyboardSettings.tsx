@@ -396,7 +396,7 @@ export function KeyboardSettings() {
               </div>
               <div className={k.keys}>
                 <span className={cx(k.chip, k.fixed)}>{chordLabel(prefs.sendWith === 'enter' ? 'Enter' : 'Cmd+Enter')}</span>
-                <Button size="small" variant="quiet" onClick={() => ui.patch({ settings: 'general' })}>
+                <Button variant="quiet" onClick={() => ui.patch({ settings: 'general' })}>
                   Change…
                 </Button>
               </div>

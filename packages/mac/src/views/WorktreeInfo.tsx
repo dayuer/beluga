@@ -179,7 +179,7 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
             <p className={s.origin}>{origin ? `Sub-agent · started by “${origin.sessionTitle ?? 'a Claude Code session'}”${origin.sessionCwd ? ` in ${baseName(origin.sessionCwd)}` : ''}` : (info?.origin.label ?? MADE_OUTSIDE)}</p>
           </div>
           {hasChat ? (
-            <Button size="small" variant="quiet" icon="back" onClick={() => setWorktreeFlag('about', ws.id, false)}>
+            <Button variant="quiet" icon="back" onClick={() => setWorktreeFlag('about', ws.id, false)}>
               Back to Conversation
             </Button>
           ) : null}

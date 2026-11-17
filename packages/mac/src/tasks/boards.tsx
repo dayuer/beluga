@@ -1,4 +1,6 @@
 import { type ReactNode, createContext, useContext, useMemo, useState } from 'react';
+import { nativeSheets, useNativeSheet } from '../lib/native-sheet.js';
+import { t as tr } from '../i18n/index.js';
 import { boardName, boardOf, isOwnBoard, isVisiting, reposOf } from '@beluga/core/board/model.js';
 import { Field, FormSheet, TextInput } from '../components/FormSheet.js';
 import { Icon } from '../components/Icon.js';
@@ -177,6 +179,69 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
   const toggle = (id: string): void => setRepos((now) => (now.includes(id) ? now.filter((r) => r !== id) : [...now, id]));
   const count = repos.length + (own ? 0 : 1);
   const canSubmit = (own ? Boolean(name.trim()) && repos.length > 0 : true) && (!prefix || /^[A-Za-z0-9]{2,6}$/.test(prefix));
+  const save = async (): Promise<void> => {
+    if (!editing) {
+      const id = await api.createBoard({ name: name.trim(), repos: [...repos], ...(prefix ? { prefix } : {}) });
+      close();
+      openList(id);
+      toast(client, `${name.trim()} is ready: new tasks there run in the repo you pick`, 'success');
+      return;
+    }
+    await api.editBoard(boardId, { name: name.trim(), repos: [...repos] });
+    close();
+    toast(client, count > 1 ? `The board covers ${count} repos` : 'Saved', 'success');
+  };
+  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): a checkbox for each repo.
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const native = useNativeSheet(
+    nativeSheets(),
+    {
+      title: editing ? `${saved?.name ?? repoName ?? 'Board'} Board` : 'New Board',
+      intro: editing
+        ? `Tasks here run in any of the repos it covers, each in the one it’s for. Keys start with ${saved?.prefix ?? '…'}-.`
+        : 'One board for work across a few repos: each task on it runs in one of them, and Start makes its worktree there.',
+      rows: [
+        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: own ? 'Launch' : (repoName ?? ''), focus: true, maxLength: 60, ...(own ? {} : { hint: `Empty: ${repoName ?? 'the project'}’s name` }) },
+        ...projects.map((p, i) => {
+          const self = p.id === boardId && !own;
+          return {
+            kind: 'checkbox' as const,
+            id: `repo:${p.id}`,
+            ...(i === 0 ? { label: 'Repos' } : {}),
+            text: self ? `${p.name} · ${tr('Its own')}` : p.name,
+            checked: self || repos.includes(p.id),
+            ...(self ? { disabled: true } : {}),
+            ...(i === projects.length - 1 ? { hint: own ? 'Tick the repos its tasks run in.' : 'Other repos whose tasks go on this board too.' } : {}),
+          };
+        }),
+        ...(editing ? [] : [{ kind: 'text' as const, id: 'prefix', label: 'Keys', value: prefix, placeholder: 'LNCH', hint: 'What its task keys start with. Empty: made from the name.', maxLength: 6, upper: true, keep: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' }]),
+      ],
+      ...(editing && own ? { aside: { id: 'delete', label: 'Delete Board…' } } : {}),
+      submit: editing ? 'Save' : 'Create Board',
+      canSubmit,
+      busy,
+      ...(problem ? { error: problem } : {}),
+    },
+    {
+      change: (id, value) => {
+        if (id === 'name') setName(value);
+        else if (id === 'prefix') setPrefix(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
+        else if (id === 'delete' && editing) deleteBoard(boardId);
+        else if (id.startsWith('repo:') && !(id.slice(5) === boardId && !own)) toggle(id.slice(5));
+      },
+      submit: () => {
+        if (!canSubmit || busy) return;
+        setBusy(true);
+        setProblem(undefined);
+        save()
+          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
+          .finally(() => setBusy(false));
+      },
+      cancel: close,
+    },
+  );
+  if (native) return null;
   return (
     <FormSheet
       title={editing ? `${saved?.name ?? repoName ?? 'Board'} Board` : 'New Board'}
@@ -192,23 +257,12 @@ export function BoardSheet({ boardId, repos: startRepos, close }: { boardId?: st
       onCancel={close}
       footer={
         editing && own ? (
-          <Button variant="quiet" size="small" onClick={() => deleteBoard(boardId)}>
+          <Button variant="quiet" onClick={() => deleteBoard(boardId)}>
             Delete Board…
           </Button>
         ) : null
       }
-      onSubmit={async () => {
-        if (!editing) {
-          const id = await api.createBoard({ name: name.trim(), repos: [...repos], ...(prefix ? { prefix } : {}) });
-          close();
-          openList(id);
-          toast(client, `${name.trim()} is ready: new tasks there run in the repo you pick`, 'success');
-          return;
-        }
-        await api.editBoard(boardId, { name: name.trim(), repos: [...repos] });
-        close();
-        toast(client, count > 1 ? `The board covers ${count} repos` : 'Saved', 'success');
-      }}
+      onSubmit={save}
     >
       <Field label="Name" htmlFor="board-name" {...(own ? {} : { hint: `Empty: ${repoName ?? 'the project'}’s name` })}>
         <TextInput id="board-name" value={name} onChange={setName} maxLength={60} placeholder={own ? 'Launch' : repoName} data-autofocus />

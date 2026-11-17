@@ -53,7 +53,7 @@ function PhoneClaude({ d }: { d: DeviceView }) {
       {c.use !== 'off' && (c.usb || c.adb !== 'off') ? <OverWifi id={d.id} on={c.adb !== undefined && c.adb !== 'off'} cable={c.usb === true} path={c.wifiPath} /> : null}
       {c.use !== 'off' && c.adb === 'unpaired' ? (
         <Row label="Wireless debugging" detail="On the phone, open Wireless debugging › Pair device with pairing code, then type the six digits into Beluga’s notification.">
-          <Button size="small" onClick={() => void quietly(client, client.api.companion['phone.pairAdb'](d.id))}>
+          <Button onClick={() => void quietly(client, client.api.companion['phone.pairAdb'](d.id))}>
             Connect
           </Button>
         </Row>
@@ -87,7 +87,7 @@ function BelugaLink({ id, reachable }: { id: string; reachable: boolean }) {
     : 'Beluga Link is the small app on the phone that lets your agent tap and type there without a cable. Downloaded on the phone, Android may block it (“App blocked to protect your device”); set up from here, it isn’t. Connect the phone with a USB cable first.';
   return (
     <Row label="Beluga Link" detail={said ?? detail}>
-      <Button size="small" disabled={busy || !reachable} onClick={() => void go()}>
+      <Button disabled={busy || !reachable} onClick={() => void go()}>
         {busy ? 'Setting Up…' : 'Set Up Beluga Link'}
       </Button>
     </Row>
@@ -125,11 +125,11 @@ function OverWifi({ id, on, cable, path }: { id: string; on: boolean; cable: boo
   return (
     <Row label="Over Wi‑Fi" detail={said ?? detail}>
       {on ? (
-        <Button size="small" disabled={busy} onClick={() => void go(false)}>
+        <Button disabled={busy} onClick={() => void go(false)}>
           {busy ? 'Turning Off…' : 'Turn Off'}
         </Button>
       ) : (
-        <Button size="small" disabled={busy || !cable} onClick={() => void go(true)}>
+        <Button disabled={busy || !cable} onClick={() => void go(true)}>
           {busy ? 'Waiting for the phone…' : 'Use over Wi‑Fi'}
         </Button>
       )}
@@ -358,7 +358,7 @@ function OnTheCable() {
     return (
       <Row label="On the cable" detail={said ?? `${name} is plugged in, but USB debugging is off, so your agent can’t use the cable yet. On the phone: Settings › About phone › Software information › tap Build number seven times; then Settings › Developer options › USB debugging.`}>
         {linked ? (
-          <Button size="small" disabled={busy} onClick={() => void run(showOnPhone)}>
+          <Button disabled={busy} onClick={() => void run(showOnPhone)}>
             Open on the Phone
           </Button>
         ) : (
@@ -370,7 +370,7 @@ function OnTheCable() {
   if (cable.canPair)
     return (
       <Row label="On the cable" detail={said ?? `${name} has Beluga but isn’t paired with ${thisComputer()}. Pair it over the cable: its Beluga opens the pairing, and you check the four pictures match.`}>
-        <Button size="small" disabled={busy} onClick={() => void run(() => client.api.companion['phone.pairCable']())}>
+        <Button disabled={busy} onClick={() => void run(() => client.api.companion['phone.pairCable']())}>
           {busy ? 'Opening…' : 'Pair over the Cable'}
         </Button>
       </Row>

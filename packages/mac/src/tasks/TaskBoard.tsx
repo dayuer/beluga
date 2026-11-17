@@ -6,6 +6,7 @@ import { type ActionItem, ActionsContext } from '../components/SpecMenu.js';
 import { Lifted, useLean } from '../components/Lifted.js';
 import { Icon } from '../components/Icon.js';
 import { IconButton, cx } from '../components/ui.js';
+import { useCalm } from '../fork/calm/index.js';
 import { useApp } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { openExternal } from '../lib/system.js';
@@ -88,7 +89,9 @@ const order = (a: Issue, b: Issue): number => byRank(a, b) || PRIORITY_INFO[a.pr
 /** `projectId`: the board shown; `repo`: the one repo you're looking at on a board of several (new tasks run there). */
 export function TaskBoard({ issues, statuses, projectId, repo }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string }) {
   const { api, act } = useTaskActions();
-  const reduce = useReducedMotion() ?? false;
+  // Calm mode treats the board's own layout motion as still: cards take their new places at once.
+  const calm = useCalm();
+  const reduce = (useReducedMotion() ?? false) || calm;
   const [lift, setLift] = useState<Lift>();
   const [over, setOver] = useState<Spot>();
   const [pending, setPending] = useState<Pending>();
@@ -451,7 +454,11 @@ function Fold({ side, count, reduce, board, scroller, onMove, children }: { side
     kept.current = { width: w, carry: Math.max(-1, Math.min(1, want - s.scrollLeft)) };
   }, [side, board, scroller]);
   // Opening at once (reduced motion) has no frames: hold the board before it paints.
-  useLayoutEffect(hold, [hold]);
+  // The drag reads the columns again for a moment after one opens (foldMoved): opening at once is that moment too.
+  useLayoutEffect(() => {
+    hold();
+    onMove();
+  }, [hold, onMove]);
   useEffect(() => () => void (side === 'before' && board()?.style.removeProperty('min-width')), [side, board]);
   return (
     <motion.div
@@ -539,7 +546,7 @@ const Column = memo(function Column({
             <span className={t.grow} />
             {status === 'in_plan' ? <PlanPrs issues={items} /> : null}
             {status === 'done' ? <ArchiveDoneButton projectId={projectId} /> : null}
-            <IconButton icon="plus" label={`New Task in ${label}`} onClick={() => openSheet({ kind: 'new_task', status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />
+            <IconButton size="small" icon="plus" label={`New Task in ${label}`} onClick={() => openSheet({ kind: 'new_task', status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />
           </>
         )}
       </header>

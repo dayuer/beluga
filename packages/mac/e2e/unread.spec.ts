@@ -52,7 +52,8 @@ test('a run that finishes while you are elsewhere marks its row and project unti
   await openWorkspace(page, 'new-hero', 'landing');
   await expect(auth).toHaveAttribute('data-signal-row', 'unread', { timeout: 40_000 });
   await expect(auth.locator('[data-signal="unread"]')).toHaveText('1');
-  await expect(auth.getByText('add-auth')).toHaveCSS('font-weight', '650');
+  // Calm mode signals unread by the count, not by a heavier name (docs/calm/overlay.md S2).
+  await expect(auth.getByText('add-auth')).toHaveCSS('font-weight', '400');
   await expect(auth).toHaveAttribute('title', /Your agent finished · 1 new message/);
 
   // The project adds it up, and folded, that's how you notice.
@@ -62,6 +63,8 @@ test('a run that finishes while you are elsewhere marks its row and project unti
   await expect(auth).toBeHidden();
   await expect(project.locator('[data-tally]')).toBeVisible();
   await project.getByRole('button', { name: "Show what's in bob-api" }).first().click();
+  // Calm mode shows a row that appeared while the pointer was in the sidebar once it leaves (SH-08).
+  await page.mouse.move(900, 450);
 
   // It's in Unread, a click away; opening it reads it (it stays there, plain, while you're in it).
   const listed = unreadSection(page).getByRole('button', { name: /^add-auth · Your agent finished/ });
@@ -95,6 +98,8 @@ test("Claude's question makes the row need you until it's answered; Unread comes
   await expect(hero.locator('[data-signal="needs"]')).toBeVisible();
   await expect(hero).toHaveAttribute('title', /Your agent asks a question/);
   await expect(projectRow(page, 'landing').locator('[data-tally]')).toHaveAttribute('data-tally', /^[1-9]/);
+  // Calm mode shows a row that appeared while the pointer was in the sidebar once it leaves (SH-08).
+  await page.mouse.move(900, 450);
   await expect(unreadSection(page).getByRole('button', { name: /^new-hero · Your agent asks a question/ })).toBeVisible();
 
   // Settings › Appearance can leave the section out.

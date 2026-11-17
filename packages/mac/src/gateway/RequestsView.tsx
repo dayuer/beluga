@@ -201,7 +201,7 @@ export function RequestsView() {
           )}
         </div>
         {done ? (
-          <Button variant="quiet" onClick={() => setAnswered(!answered)}>
+          <Button size="small" variant="quiet" onClick={() => setAnswered(!answered)}>
             {answered ? 'Hide answered' : `Show answered · ${done}`}
           </Button>
         ) : null}
