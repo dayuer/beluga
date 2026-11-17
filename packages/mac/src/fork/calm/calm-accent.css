@@ -48,6 +48,16 @@
   text-decoration: underline;
 }
 
+/* 5. The friends card (BLG-250): out of the navigation while calm is on. Its Turn On stays reachable from
+   Settings › People & access (the Talk with friends directly switch) and the command palette (net:turn-on).
+   A Friends section left with nothing but the card hides its heading too; with an offer in it, the heading stays. */
+:root[data-calm] [role='group'][aria-label='Talk with friends'] {
+  display: none;
+}
+:root[data-calm] section:has([class*='_sidebarList_'] > [role='group'][aria-label='Talk with friends']:only-child) {
+  display: none;
+}
+
 /* 4. The focus ring: a clear 2px line, not the 3px halo of the accent at 50%. Keyboard focus stays visible. */
 :root[data-calm] {
   --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);

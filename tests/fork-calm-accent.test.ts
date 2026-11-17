@@ -32,9 +32,10 @@ describe('calm-accent.css', () => {
       footLink: read('tasks', 'tasks.module.css'),
       invite: read('layout', 'Sidebar.module.css'),
       footer: read('layout', 'Sidebar.module.css'),
+      sidebarList: read('network', 'network.module.css'),
     };
     const names = anchorsIn(css);
-    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'invite', 'merge', 'primary']);
+    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'invite', 'merge', 'primary', 'sidebarList']);
     const missing = names.filter((name) => !classes(home[name]!).has(name));
     expect(missing).toEqual([]);
   });
@@ -53,6 +54,12 @@ describe('calm-accent.css', () => {
     expect(anchorsIn(look)).toContain('currentProject');
     expect(classes(read('layout', 'Sidebar.module.css')).has('currentProject')).toBe(true);
     expect(look).toContain(":root[data-calm] [data-fork-sidebar] [class*='_currentProject_']:not([class*='_selected_'])");
+  });
+
+  it('takes the friends card out of the navigation, and keeps its way back (settings switch, palette command)', () => {
+    expect(css).toContain("[role='group'][aria-label='Talk with friends'] {\n  display: none;");
+    expect(read('network', 'NetworkSettings.tsx')).toContain('label="Talk with friends directly"');
+    expect(read('network', 'net-palette.ts')).toContain("'net:turn-on'");
   });
 
   it('is imported by calm.css', () => {

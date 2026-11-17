@@ -445,3 +445,11 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 - 侧栏底部 Invite：由蓝字改为次要文字色，悬停加下划线。
 - 推广卡里的 Turn On：由实心蓝改为中性。整张卡在 BLG-250 移出导航。
 - Show All（任务页底栏）：规则已写入，但本次没有单独核对截图。
+
+## 1.6 推广卡移出导航（BLG-250）
+
+覆盖层：`fork/calm/calm-accent.css` 第 5 节。推广卡 `[role='group'][aria-label='Talk with friends']` 在沉稳开时整块隐藏；若 Friends 分组里只剩它，分组标题也隐藏（`:has` + `:only-child`）。有好友邀请或陌生人列表时，标题保留。
+
+![](img/m8-after250-workspace-light.png)
+
+找回的路：设置 › People & access 里的「Talk with friends directly」开关；命令面板的 `net:turn-on`。**没有找到 ••• 菜单里的入口**（代码里没有相应条目），本任务没有新增，需要的话另开任务。
