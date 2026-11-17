@@ -484,7 +484,7 @@ Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所�
 | M8-2 | 上游 64 层彩色光晕（BLG-245 只处理了 4 层） | **已解决**（BLG-256）：63 层构建时改写到令牌，1 层背景着色例外，计算样式扫描 0 个 |
 | M8-3 | 字号写法 ≤ 25 的目标未达：构建口径 51、测试口径 79（BLG-244） | **放宽**为实测值；需确认接受 |
 | M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
-| M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件，另有 113 个「已不再改」的名字 | **已解决**（BLG-257）：208 个都不是 M8 改的（206 个来自 `topic/native` 的快照提交 `da1993452`，`CLAUDE.md` 和 `zh-CN.json` 来自 `fork/base`/`topic/chinese`），已在 docs/fork.md「原生 Mac 控件与外壳的逐文件登记」逐个登记；「已不再改」的名字用链感知的检查重算后剩 100 个，从清单里拿下来。报告现在 0 个 `!`、0 条「已不再改」 |
+| M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件，另有 113 个「已不再改」的名字 | **已解决**（BLG-253）：208 个都不是 M8 改的，已在 docs/fork.md 逐个登记；「已不再改」的名字从清单里拿下来；报告 0 个 `!`、0 条「已不再改」，脚本没有改，见 §7 |
 | M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | 未做 |
 | M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | 未做，另开任务 |
 | M8-8 | 行尾收口的 200 行性能未测（BLG-243） | 未做 |
@@ -697,9 +697,28 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 | 六场景改后图（浅色、深色，12 张）+ 沉稳关 workspace、tasks（4 张） | 齐全：`docs/calm/img/m8-final-*` |
 | `npx vitest run tests/fork-calm* tests/fork-sidebar*` | 全部通过（75 个用例，单独运行） |
 | `npm run typecheck`（含 packages/mac） | 通过 |
-| `node scripts/sync-upstream.mjs --report` | **通过**（BLG-257）：0 个 `!`、0 条「已不再改」。这一行原来是 208 个 `!`（基线 `350e15ea9` 上同样是 208，M8 没有新增）；来源和处理见 §6 的 M8-5 和 docs/fork.md「原生 Mac 控件与外壳的逐文件登记」。脚本的「已不再改」检查改成链感知：fork.md 是整条链共用的一份文档，下层分支会看到只在上层才改的文件，现在算「链上任何一层还改它」（`CHAIN`、`staleInChain`，`tests/upstream-sync.test.ts` 有用例）。 |
+| `node scripts/sync-upstream.mjs --report` | **通过**（BLG-253）：0 个 `!`、0 条「已不再改」。原来是 208 个 `!`（基线 `350e15ea9` 上同样是 208，M8 没有新增）；来源和处理见 §7。脚本和 `tests/upstream-sync.test.ts` 没有改。 |
 | 全量 `npx vitest run`（树 0fe34fc37） | 737 个文件，9186 个用例：9167 通过、16 跳过、3 失败。3 个失败是 `tests/project-invites.test.ts`、`tests/test-lock.test.ts`（nice 用例）、`tests/chat/files.test.ts`，与 M8 无关；三者单独重跑全部通过，按「负载波动，单独重跑通过」处理。 |
 
 仍在播放的动画、reduced-motion、问题表见 §5。
 
 Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37（分支 beluga/blg-248-m8，基于 topic/native 350e15ea9）。`npx vitest run` 全量：737 个文件、9186 个用例，9167 通过、16 跳过、3 失败（均与 M8 无关，单独重跑通过）。sync-upstream --report 仍有 208 个未登记的 `!`（基线相同）。
+
+
+## 7. 同步报告清零（BLG-253）
+
+`node scripts/sync-upstream.mjs --report`：**0 个 `!`、0 条「已不再改」**，`tests/upstream-sync.test.ts` 通过。没有改脚本（也没有放宽规则）。
+
+**208 个未登记文件的来源**（`git diff` 按链上每一层分别量）：没有一个是 M8 改的（M8 的上游改动只有 `packages/mac/vite.config.ts` 两行，已登记）。206 个来自 `topic/native` 的那个快照提交 `da1993452`（原生 Mac 控件、菜单、sheet、警告框、侧栏、沉稳界面，从 `archive/main-2026-11-17` 拆出）：样式 56、TSX/TS 144、只加了 `size` 的 2、Tauri 外壳 4（`packages/mac/src-tauri/` 的 `Cargo.toml`、`Cargo.lock`、`capabilities/default.json`、`src/lib.rs`：NSMenu、NSAlert、Quick Look、拖拽、NSSheet 的命令与依赖）。另外 2 个：`CLAUDE.md`（`fork/base` 的「Working in this fork」）和 `packages/mac/src/i18n/zh-CN.json`（`topic/chinese`/`fork/base` 的简体中文）。任务描述里举的 `src/core/shares.ts`、`src/machines/identity-load.ts` 在这棵树上不在 208 里（它们是计划层的，只出现在「已不再改」名单里）。
+
+**登记**：`docs/fork.md` 新增小节「原生 Mac 控件与外壳的逐文件登记」，按改动性质列出全部完整路径；原因沿用该文档已有的「原生控件」「原生菜单与按下指针」两节（控件规范 `docs/mac-controls.md` 直接改在上游自己的文件里，因为它本来就要提回上游），`CLAUDE.md` 是 `fork/base` 的分支链说明，`zh-CN.json` 是中文翻译。
+
+**迁到 fork 文件的改动**：没有。这 208 处是控件规范直接改在上游文件里的（为了提回上游），不是可以搬进 `fork/` 的小改动；`CLAUDE.md` 和 `zh-CN.json` 本来就是 fork 的文档和翻译。
+
+**「已不再改」的 113 个名字**：这棵树（`topic/native` 的下游）没有改它们，从 `docs/fork.md` 的清单里拿下来（路径写成普通字、不加反引号，文档里加了一行说明）：100 个链上任何一层都不再改（上游已合并，或计划层改用了上游的实现）；13 个只有链上更靠后的分支改：
+
+`src/companion/protocol.ts`、`src/core/plans/pilot.ts`、`packages/mac/src/plans/plan-ask-model.ts`、`tests/plans.test.ts`、`src/daemon/core.ts`、`src/ipc/handlers.ts`、`tests/companion-views.test.ts`、`src/core/claude-code/skills.ts`、`tests/skills.test.ts`、`tests/plan-milestone-agent.test.ts`、`tests/delete-unpushed.test.ts`、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`
+
+其中 `src/companion/protocol.ts`、`src/core/plans/pilot.ts`、`packages/mac/src/plans/plan-ask-model.ts`、`tests/plans.test.ts`、`src/daemon/core.ts`、`src/ipc/handlers.ts`、`tests/companion-views.test.ts`、`src/core/claude-code/skills.ts`、`tests/skills.test.ts`、`tests/plan-milestone-agent.test.ts` 在 `topic/plans` 上还改（核对过），其余 3 个在链上哪一层都不改。
+
+**合回 topic/native 后应把非 native 的条目搬到对应链分支**：这份登记本属于链上更低的分支。`docs/fork.md` 里「原生 Mac 控件与外壳的逐文件登记」中，`CLAUDE.md` 属于 `fork/base`，`zh-CN.json` 属于 `topic/chinese`；上面那 10 个只在 `topic/plans` 改的文件，到 `topic/plans` 上要把反引号加回去，否则那里会出现 10 个 `!`。

@@ -289,15 +289,6 @@ export const stale = (touched, doc, upstreamFiles) => {
   return [...new Set(named)].filter((f) => upstreamFiles.has(f) && !changed.has(f) && !VERSION_FILES.includes(f));
 };
 
-/**
- * The fork's chain (docs/fork.md「分支」): docs/fork.md is one document for all of it, so on a lower
- * layer it names files only a later layer changes. A file is stale when no layer of the chain changes it.
- */
-export const CHAIN = ['topic/chinese', 'fork/base', 'topic/native', 'topic/plans', 'topic/fixes'];
-
-/** `stale`, counting the files the other layers of the chain change (`others`) as changed. */
-export const staleInChain = (touched, others, doc, upstreamFiles) => stale([...touched, ...others], doc, upstreamFiles);
-
 const git = (args, opts = {}) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', opts.quiet ? 'ignore' : 'inherit'], ...opts }).trim();
 const tryGit = (args) => {
   try {
@@ -463,11 +454,8 @@ function listing(remote, ref) {
   console.log(`\nThis fork: ${ahead} commits ahead of ${remote}/${ref}, ${behind} behind.`);
   console.log(`It changes ${touched.length} upstream files (each one can conflict on a sync; +added/-removed, then changed lines):`);
   for (const line of reportLines(touched, touchStats('HEAD', remote, ref), missing)) console.log(line);
-  // The other layers of the chain that exist here: the doc also names what they change.
-  const layers = CHAIN.filter((b) => tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${b}`]) !== undefined);
-  const others = layers.flatMap((b) => touchPoints(b, remote, ref));
-  const old = staleInChain(touched, others, doc(), new Set(names(tryGit(['ls-tree', '-r', '--name-only', `${remote}/${ref}`]))));
-  if (old.length) console.log(`\n${old.length} named in ${FORK_DOC} but changed by no layer of the chain (${layers.join(', ') || 'none found'}) (take them off the list):\n${old.map((f) => `    ${f}`).join('\n')}`);
+  const old = stale(touched, doc(), new Set(names(tryGit(['ls-tree', '-r', '--name-only', `${remote}/${ref}`]))));
+  if (old.length) console.log(`\n${old.length} named in ${FORK_DOC} but no longer changed (take them off the list):\n${old.map((f) => `    ${f}`).join('\n')}`);
   if (missing.length) console.log(`\n! ${missing.length} not explained in ${FORK_DOC} yet: move the change into a fork file, or add a line there saying why it has to stay.`);
   return missing.length;
 }
