@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Plugin } from 'vite';
-import { type TypeReport, rewriteType, skipFile } from './type-scale.js';
+import { REMAINING_LIMIT, type TypeReport, rewriteType, skipFile, summarize } from './type-scale.js';
 
 /**
  * Build-time (and dev-time) rewrite of the mac CSS onto the calm type scale (M8, BLG-244;
@@ -15,7 +15,7 @@ import { type TypeReport, rewriteType, skipFile } from './type-scale.js';
 const SRC = path.join('packages', 'mac', 'src') + path.sep;
 
 export function calmType(): Plugin {
-  const seen = new Map<string, { decls: number; mapped: number; kept: TypeReport['kept']; before: string[]; tokens: string[] }>();
+  const seen = new Map<string, ReturnType<typeof rewriteType>>();
   let repoRoot = process.cwd();
   return {
     name: 'beluga-calm-type',
@@ -30,9 +30,7 @@ export function calmType(): Plugin {
       if (skipFile(rel)) return null;
       try {
         const out = rewriteType(code, rel);
-        const before = [...code.matchAll(/font-(size|weight)\s*:\s*([^;{}]+?)\s*(?:!important)?\s*(?=[;}])/g)].map((m) => `${m[1]} ${m[2]!.trim()}`);
-        const tokens = [...out.code.matchAll(/var\((--calm-f[sw]-[\w]+),/g)].map((m) => m[1]!);
-        seen.set(rel, { decls: before.length, mapped: out.mapped, kept: out.kept, before, tokens });
+        seen.set(rel, out);
         return out.mapped ? { code: out.code, map: null } : null;
       } catch (err) {
         console.warn(`calm-type: ${rel} left as it is (${(err as Error).message})`);
@@ -41,32 +39,11 @@ export function calmType(): Plugin {
     },
     buildEnd() {
       try {
-        let decls = 0;
-        let mapped = 0;
-        const before = new Set<string>();
-        const tokens = new Set<string>();
-        const kept = new Map<string, TypeReport['kept'][number]>();
-        for (const f of seen.values()) {
-          decls += f.decls;
-          mapped += f.mapped;
-          for (const b of f.before) before.add(b);
-          for (const t of f.tokens) tokens.add(t);
-          for (const k of f.kept) {
-            const key = `${k.prop} ${k.value}`;
-            const hit = kept.get(key);
-            if (hit) hit.files.push(...k.files);
-            else kept.set(key, { ...k, files: [...k.files] });
-          }
-        }
-        const report: TypeReport = {
-          decls,
-          spellingsBefore: before.size,
-          mapped,
-          kept: [...kept.values()],
-          spellingsAfter: kept.size + tokens.size,
-        };
-        console.log(`calm-type: ${decls} decls, spellings ${before.size}→${kept.size + tokens.size} (kept ${kept.size}, tokens ${tokens.size}), mapped ${mapped}; exceptions:`);
+        // The same summary tests/fork-calm-type.test.ts prints: one definition of "spellings left".
+        const report: TypeReport = summarize([...seen.values()]);
+        console.log(`calm-type: ${report.decls} decls, spellings ${report.spellingsBefore}→${report.spellingsAfter} (tokens ${report.tokens}, kept ${report.kept.length}), mapped ${report.mapped}; remaining against the limit of ${REMAINING_LIMIT}: ${report.remaining}; exceptions:`);
         for (const k of report.kept) console.log(`  ${k.prop}  ${k.value}  (${k.why}; ${k.files.length} file${k.files.length === 1 ? '' : 's'})`);
+        if (report.unjustified.length) console.warn(`calm-type: ${report.unjustified.length} kept value(s) on no exception list: ${report.unjustified.join('; ')}`);
         const dir = path.join(repoRoot, '.context', 'calm');
         mkdirSync(dir, { recursive: true });
         writeFileSync(path.join(dir, 'type-report.json'), `${JSON.stringify(report, null, 2)}\n`);

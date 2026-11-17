@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { type TypeReport, planSize, planWeight, rewriteType, skipFile } from '../packages/mac/src/fork/calm/type-scale.js';
+import { JUSTIFIED, REMAINING_LIMIT, planSize, planWeight, rewriteType, skipFile, summarize } from '../packages/mac/src/fork/calm/type-scale.js';
 import { readdirSync, statSync } from 'node:fs';
 
 /** Every .css under packages/mac/src, with its path relative to src (as fork-calm-glow.test.ts reads them). */
@@ -46,6 +46,11 @@ describe('calm-type.css: the scale', () => {
     expect([...px].sort((a, b) => a - b)).toEqual(px);
   });
 
+  it('defines five relative (em) steps, rising', () => {
+    const em = [1, 2, 3, 4, 5].map((i) => decls[`--calm-fs-em-${i}`]);
+    expect(em).toEqual(['0.8em', '0.86em', '0.92em', '1.1em', '1.2em']);
+  });
+
   it('defines four weights', () => {
     expect([decls['--calm-fw-regular'], decls['--calm-fw-medium'], decls['--calm-fw-semibold'], decls['--calm-fw-bold']]).toEqual(['400', '500', '600', '700']);
   });
@@ -72,7 +77,16 @@ describe('type-scale: the rewrite', () => {
   });
 
   it('keeps em, percentages, calc, custom properties, shorthands and out-of-range sizes', () => {
-    for (const v of ['0.9em', '90%', 'calc(1rem + 2px)', 'var(--control-text)', 'inherit', '8px', '34px']) expect('keep' in planSize(v)).toBe(true);
+    for (const v of ['90%', 'calc(1rem + 2px)', 'var(--control-text)', 'inherit', '8px', '34px', '0.42em', '1.35em', '1em']) expect('keep' in planSize(v)).toBe(true);
+  });
+
+  it('maps em to the nearest of five relative steps when one is within 0.05em, and keeps the rest', () => {
+    expect(planSize('0.78em')).toEqual({ token: '--calm-fs-em-1', fallback: '0.78em' });
+    expect(planSize('0.85em')).toEqual({ token: '--calm-fs-em-2', fallback: '0.85em' });
+    expect(planSize('0.94em')).toEqual({ token: '--calm-fs-em-3', fallback: '0.94em' });
+    expect(planSize('1.12em')).toEqual({ token: '--calm-fs-em-4', fallback: '1.12em' });
+    expect(planSize('1.22em')).toEqual({ token: '--calm-fs-em-5', fallback: '1.22em' });
+    expect(planSize('1.05em')).toEqual({ keep: 'em outside the steps (1.05em)' });
   });
 
   it('maps weights by range and keeps what is outside 400–800', () => {
@@ -96,7 +110,7 @@ describe('type-scale: the rewrite', () => {
       if (skipFile(rel)) continue;
       const out = rewriteType(css, rel);
       // Unwrap every var(--calm-fs-N | --calm-fw-N, X) to X: what is left must be the original text, byte for byte.
-      const unwrapped = out.code.replace(/var\(--calm-f[sw]-\w+, ([^()]*)\)/g, '$1');
+      const unwrapped = out.code.replace(/var\(--calm-f[sw]-[\w-]+, ([^()]*)\)/g, '$1');
       expect(unwrapped).toBe(css);
       checked += out.mapped;
     }
@@ -104,42 +118,32 @@ describe('type-scale: the rewrite', () => {
   });
 
   it('skips the fork, the global styles and the keep-decor scenes', () => {
-    for (const f of ['fork/calm/calm.css', 'styles/tokens.css', 'onboarding/scenes/scenes.module.css', 'components/reactbits/GlassSurface.css', 'call/notes.module.css', 'components/YourCard.module.css', 'views/usage/usage.module.css']) {
+    for (const f of ['fork/calm/calm.css', 'styles/tokens.css', 'onboarding/scenes/scenes.module.css', 'components/reactbits/GlassSurface.css', 'call/notes.module.css', 'components/YourCard.module.css', 'sentinel/numbers.module.css', 'components/views/views.module.css', 'views/usage/usage.module.css']) {
       expect(skipFile(f)).toBe(f !== 'views/usage/usage.module.css');
     }
   });
 });
 
 describe('type-scale: the numbers (docs/calm/finish.md §3.3)', () => {
-  it('reports the before and after spellings across all mac CSS, and bounds what is left', () => {
-    const before = new Set<string>();
-    const after = new Set<string>();
-    const kept: TypeReport['kept'] = [];
-    let decls = 0;
-    for (const { rel, css } of macCss()) {
-      for (const m of css.matchAll(/font-(size|weight)\s*:\s*([^;{}]+?)\s*(?:!important)?\s*(?=[;}])/g)) {
-        decls++;
-        before.add(`${m[1]} ${m[2]!.trim()}`);
-      }
-      if (skipFile(rel)) {
-        for (const m of css.matchAll(/font-(size|weight)\s*:\s*([^;{}]+?)\s*(?:!important)?\s*(?=[;}])/g)) after.add(`${m[1]} ${m[2]!.trim()}`);
-        continue;
-      }
-      const out = rewriteType(css, rel);
-      kept.push(...out.kept);
-      for (const k of out.kept) after.add(`${k.prop} ${k.value}`);
-      for (const t of out.code.matchAll(/var\((--calm-f[sw]-\w+),/g)) after.add(t[1]!);
-    }
-    console.log(`type-scale: ${decls} decls; spellings ${before.size} → ${after.size}; kept ${kept.length}`);
-    expect(decls).toBeGreaterThan(2000);
-    expect(after.size).toBeLessThan(before.size * 0.75);
-    const byWhy = new Map<string, number>();
-    for (const k of kept) byWhy.set(k.why.replace(/\(.*\)/, '').trim(), (byWhy.get(k.why.replace(/\(.*\)/, '').trim()) ?? 0) + 1);
-    console.log(`type-scale kept, by reason: ${JSON.stringify([...byWhy])}`);
-    // Every kept value has a reason.
-    expect(kept.every((k) => k.why.length > 0)).toBe(true);
-    // The exceptions are bounded, and each one is explained: the brief's 25 is not reachable with em and
-    // out-of-range sizes kept (finish.md §3.4); the bound here is the measured one, 79 on this tree.
-    expect(after.size).toBeLessThanOrEqual(80);
+  // The same summary the build prints at buildEnd (type-plugin.ts): the processed files only, skipped ones are not counted.
+  const processed = macCss().filter(({ rel }) => !skipFile(rel));
+  const report = summarize(processed.map(({ rel, css }) => rewriteType(css, rel)));
+
+  it('reports the spellings before and after, and one number for the limit', () => {
+    console.log(`type-scale: ${report.decls} decls in ${processed.length} files; spellings ${report.spellingsBefore} → ${report.spellingsAfter} (tokens ${report.tokens}, kept ${report.kept.length} of which ${report.justified} justified); remaining against the limit: ${report.remaining}`);
+    expect(report.decls).toBeGreaterThan(2000);
+    expect(report.spellingsAfter).toBeLessThan(report.spellingsBefore * 0.5);
+  });
+
+  it('keeps the remaining spellings (calm tokens plus kept values on no exception list) within the design limit of 25', () => {
+    expect(REMAINING_LIMIT).toBe(25);
+    expect(report.unjustified).toEqual([]);
+    expect(report.remaining).toBeLessThanOrEqual(25);
+  });
+
+  it('gives every kept value a reason, and keeps no exception on the list that the rewrite no longer leaves', () => {
+    expect(report.kept.every((k) => k.why.length > 0)).toBe(true);
+    const stale = [...JUSTIFIED.keys()].filter((k) => !report.kept.some((x) => `${x.prop} ${x.value}` === k));
+    expect(stale).toEqual([]);
   });
 });

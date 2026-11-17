@@ -17,6 +17,13 @@
   --calm-fs-7: 1.692rem;
   --calm-fs-8: 2.154rem;
 
+  /* Relative steps for sizes written in em (of the parent), BLG-255. */
+  --calm-fs-em-1: 0.8em;
+  --calm-fs-em-2: 0.86em;
+  --calm-fs-em-3: 0.92em;
+  --calm-fs-em-4: 1.1em;
+  --calm-fs-em-5: 1.2em;
+
   --calm-fw-regular: 400;
   --calm-fw-medium: 500;
   --calm-fw-semibold: 600;

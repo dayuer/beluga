@@ -518,6 +518,8 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 ### 3.7 实测（BLG-244，`vite build` 的 `calm-type` 报告）
 
+> 本节的数字（116 → 51、上限放宽到 80）已被 §3.8 取代：口径统一、上限恢复为 25。保留本节是为了记录第一版的做法。
+
 插件在构建和开发服务器里改写 packages/mac/src 的 CSS（跳过 fork/、styles/ 和 keep-decor）。`npx vite build` 输出的报告（`.context/calm/type-report.json`）：
 
 - 处理的声明：2179 条（跳过的文件不计）；改写成令牌：2044 条；
@@ -611,6 +613,74 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 ### 4.6 决定（liyuqing，2026-11-18）
 
 剩下的 26 层未处理、22 层只在键盘焦点时覆盖，按用户决定**保留为例外**，逐条写进 `tests/fork-calm-glow.test.ts` 的 `GLOW_EXCEPTIONS`（共 48 条，每条带原因）。其中焦点容器（`:focus-within`）和非焦点的 3px 光晕另开 follow-up 逐个处理；大模糊的装饰光晕（chat/max、attention、plans、onboarding、graph）作为装饰保留。
+
+### 3.8 压到上限：一个数字、em 五档、例外清单、textSize 截图（BLG-255）
+
+**口径只留一个**。之前测试报 79、构建报 51，两个数字差在三处：测试把被跳过的文件（fork/、styles/、keep-decor）里的写法也算进「之后」；字号字重各算还是合算不同；构建里每个令牌算一种写法。现在两边都调用同一个函数 `summarize`（`type-scale.ts`），只统计构建真正处理的文件，所以 `vite build` 的 `calm-type:` 一行和 `tests/fork-calm-type.test.ts` 打印的是同一组数字：
+
+| 项 | 数字 |
+| --- | ---: |
+| 处理的声明（font-size 与 font-weight） | 2057 |
+| 改写前的不同写法 | 113 |
+| 改写成令牌的声明 | 2013 |
+| 改写后用到的令牌（8 个字号、5 个 em 档、4 个字重里用到的） | 17 |
+| 保留的写法（全部在例外清单上，有理由） | 23 |
+| 改写后不同写法总数（令牌 + 保留） | **40**（113 → 40） |
+| **按设计上限 25 计的剩余** = 令牌 + 不在例外清单上的保留项 | **17**（不在清单上的：0 个） |
+
+要说清的一点：**不含例外的剩余是 17，不超过 25；包含例外的写法总数是 40，超过 25。** 例外有 23 个，下面逐条列出，每条都有理由。测试把上限恢复为 25（`REMAINING_LIMIT`），断言「令牌 + 不在例外清单上的保留项 ≤ 25」且「不在清单上的 = 0」；清单是 `type-scale.ts` 的 `JUSTIFIED`，新出现的保留写法如果不在清单上，会算进 25 里，不会悄悄放过。
+
+**这次多归并了什么**：
+- em 写法按「离某一档不超过 0.05em 就归到那一档」归到五档：`--calm-fs-em-1..5` = 0.8、0.86、0.92、1.1、1.2em（定义在 `calm-type.css`，沉稳开时才有）。相对父元素的含义不变，最大改动 0.05em。
+- 离每一档都超过 0.05em 的 em（0.42、0.6、1.05、1.35、1.45、2、1em）保留。
+- 已经是设计系统变量的（`var(--control-text)` 等）不算散写法，保留在例外清单里。
+
+**例外清单**（改写后保留的 23 个写法；「文件数」是出现在几个文件里）：
+
+| 写法 | 文件数 | 为什么不归 |
+| --- | ---: | --- |
+| `font-size: clamp(1.05rem, 1.6vw, 1.3rem)` | 1 | calc/clamp |
+| `font-size: clamp(1.3rem, 2.4vw, 1.9rem)` | 1 | calc/clamp |
+| `font-size: clamp(2.4rem, 4.6vw, 3.6rem)` | 1 | calc/clamp |
+| `font-size: clamp(2.6rem, 5.4vw, 5.2rem)` | 1 | calc/clamp |
+| `font-size: clamp(28px, 3.4vw, 40px)` | 1 | calc/clamp |
+| `font-size: clamp(3.4rem, 9vw, 7.5rem)` | 1 | calc/clamp |
+| `font-size: clamp(38px, 5.4vw, 64px)` | 1 | calc/clamp |
+| `font-size: calc(1em * var(--fit, 1))` | 1 | custom property |
+| `font-size: calc(var(--control-text) - 1px)` | 3 | custom property |
+| `font-size: var(--control-text)` | 8 | custom property |
+| `font-size: var(--control-text-large)` | 2 | custom property |
+| `font-size: var(--control-text-small)` | 3 | custom property |
+| `font-size: var(--md-size)` | 1 | custom property |
+| `font-size: 0.42em` | 1 | em outside the steps (0.42em) |
+| `font-size: 0.6em` | 1 | em outside the steps (0.6em) |
+| `font-size: 1.05em` | 1 | em outside the steps (1.05em) |
+| `font-size: 1.35em` | 1 | em outside the steps (1.35em) |
+| `font-size: 1.45em` | 1 | em outside the steps (1.45em) |
+| `font-size: 1em` | 2 | em outside the steps (1em) |
+| `font-size: 2em` | 1 | em outside the steps (2em) |
+| `font-size: inherit` | 2 | keyword |
+| `font-size: 0` | 1 | other unit or keyword |
+| `font-size: 8.5px` | 1 | outside 9–30px (8.5px) |
+
+（每个值的详细理由在 `type-scale.ts` 的 `JUSTIFIED`：clamp 是随视口变化的流式字号；`var()`/`calc(var())` 是另一套设计系统变量；`em` 例外是离五档都太远；`inherit`、`0`、`8.5px` 不在 9–30px 的范围。）
+
+**因版式跳变而跳过的文件**：按设计，沉稳开时某个文件出现明显排版跳变就把它列为例外。在 textSize 16 下比较沉稳开和关，Sentinel 页「At a glance」的数字卡（`sentinel/numbers.module.css` 与它用的 `components/views/views.module.css` 的 tile 部分）标签和增量换行、被截断。它们的字号为适配固定宽度的卡片写成 px，换成 rem 就会随文字大小偏好变大。这两个文件整体跳过（`type-scale.ts` 的 `SKIP_FILES`），处理后重新拍图，卡片不再换行。其余页面（工作区、任务页、总览）在 11 和 16 下沉稳开和关没有换行或截断的差别；计数的差异来自沉稳开时推广卡被隐藏等本来就有的区别。
+
+**textSize 11 与 16 下的工作区**（沉稳关 = 上游；沉稳开 = 令牌生效）：
+
+| 文字大小 | 主题 | 沉稳关（上游） | 沉稳开 |
+| --- | --- | --- | --- |
+| 11 | 浅色 | ![](img/m8-textsize-workspace-light-off-11.png) | ![](img/m8-textsize-workspace-light-on-11.png) |
+| 11 | 深色 | ![](img/m8-textsize-workspace-dark-off-11.png) | ![](img/m8-textsize-workspace-dark-on-11.png) |
+| 16 | 浅色 | ![](img/m8-textsize-workspace-light-off-16.png) | ![](img/m8-textsize-workspace-light-on-16.png) |
+| 16 | 深色 | ![](img/m8-textsize-workspace-dark-off-16.png) | ![](img/m8-textsize-workspace-dark-on-16.png) |
+
+这是沉稳开时有意的变化：原来用 px 写的字号现在跟着文字大小偏好缩放，标题和说明比上游略大或略小，没有换行、截断上的差别。
+
+**沉稳关时字号字重与上游一致（脚本比对）**：同一个演示数据下，开两个开发服务器，一个带插件（沉稳关），一个用同一份配置去掉 `beluga-calm-type` 插件（即上游）；在工作区、任务页、Sentinel、总览四个页面里对每个有宽度的元素取计算后的 `font-size`/`font-weight`，用「标签 + 去掉哈希的 class + 开头文字」做键。比对 1012 个元素：**0 个不同**。（这个脚本是一次性的，在 `.beluga/scratch/type-check.mjs`，没有提交；沿用 §3.6 的测试，还原所有改写后与原 CSS 逐字节相同。）
+
+**构建**：`packages/mac` 的 `npm run build`（`tsc --noEmit && vite build`）通过；`typecheck` 通过。`npm run app:build` 的结果见本任务 brief。
 
 ## 6. BLG-246 复核（树 0fe34fc37）
 
