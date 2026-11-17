@@ -611,3 +611,18 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 ### 4.6 决定（liyuqing，2026-11-18）
 
 剩下的 26 层未处理、22 层只在键盘焦点时覆盖，按用户决定**保留为例外**，逐条写进 `tests/fork-calm-glow.test.ts` 的 `GLOW_EXCEPTIONS`（共 48 条，每条带原因）。其中焦点容器（`:focus-within`）和非焦点的 3px 光晕另开 follow-up 逐个处理；大模糊的装饰光晕（chat/max、attention、plans、onboarding、graph）作为装饰保留。
+
+## 6. BLG-246 复核（树 0fe34fc37）
+
+| 项 | 结果 |
+| --- | --- |
+| 六场景改前图（浅色、深色，12 张） | 齐全：`docs/calm/img/m8-before-*` |
+| 六场景改后图（浅色、深色，12 张）+ 沉稳关 workspace、tasks（4 张） | 齐全：`docs/calm/img/m8-final-*` |
+| `npx vitest run tests/fork-calm* tests/fork-sidebar*` | 全部通过（75 个用例，单独运行） |
+| `npm run typecheck`（含 packages/mac） | 通过 |
+| `node scripts/sync-upstream.mjs --report` | **未通过**：208 个 `!`。基线 `350e15ea9` 上同样是 208，M8 没有新增；这些是 fork 之前就存在、没有登记到 docs/fork.md 的改动，需要单独做登记或迁移，不属于 M8 的范围。 |
+| 全量 `npx vitest run`（树 0fe34fc37） | 737 个文件，9186 个用例：9167 通过、16 跳过、3 失败。3 个失败是 `tests/project-invites.test.ts`、`tests/test-lock.test.ts`（nice 用例）、`tests/chat/files.test.ts`，与 M8 无关；三者单独重跑全部通过，按「负载波动，单独重跑通过」处理。 |
+
+仍在播放的动画、reduced-motion、问题表见 §5。
+
+Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37（分支 beluga/blg-248-m8，基于 topic/native 350e15ea9）。`npx vitest run` 全量：737 个文件、9186 个用例，9167 通过、16 跳过、3 失败（均与 M8 无关，单独重跑通过）。sync-upstream --report 仍有 208 个未登记的 `!`（基线相同）。
