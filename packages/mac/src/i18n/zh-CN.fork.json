@@ -640,5 +640,6 @@
  "Its check didn’t pass: {0}": "它没通过校验：{0}",
  "{0} works again: {1} goes back to it": "{0} 恢复了：{1}切回它继续",
  "{0} works again: asked the agent doing {1} to end its turn, so its next task goes back to it": "{0} 恢复了：已请做{1}的智能体结束这一轮，下一个任务切回它",
- "It failed before Beluga restarted": "Beluga 重启前它就失败了"
+ "It failed before Beluga restarted": "Beluga 重启前它就失败了",
+ "No picture at {0}": "{0} 处没有图片"
 }
