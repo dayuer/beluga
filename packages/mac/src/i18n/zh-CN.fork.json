@@ -641,5 +641,6 @@
  "{0} works again: {1} goes back to it": "{0} 恢复了：{1}切回它继续",
  "{0} works again: asked the agent doing {1} to end its turn, so its next task goes back to it": "{0} 恢复了：已请做{1}的智能体结束这一轮，下一个任务切回它",
  "It failed before Beluga restarted": "Beluga 重启前它就失败了",
- "Beluga runs Claude Code, Codex, OpenCode, GitHub Copilot, Antigravity or a model of your own on each of your tasks, each in its own copy of the repository. You watch them work, answer when they ask, and merge what’s done.": "Beluga 让 Claude Code、Codex、OpenCode、GitHub Copilot、Antigravity 或你自己的模型分别处理你的每个任务，每个都在仓库的独立副本里。你看着它们工作，在它们提问时回答，然后合并完成的工作。"
+ "Beluga runs Claude Code, Codex, OpenCode, GitHub Copilot, Antigravity or a model of your own on each of your tasks, each in its own copy of the repository. You watch them work, answer when they ask, and merge what’s done.": "Beluga 让 Claude Code、Codex、OpenCode、GitHub Copilot、Antigravity 或你自己的模型分别处理你的每个任务，每个都在仓库的独立副本里。你看着它们工作，在它们提问时回答，然后合并完成的工作。",
+ "One default for every circle; only the ones that differ are listed.": "所有圈子共用一个默认值；只列出与默认不同的。"
 }
