@@ -44,7 +44,8 @@ import {
 import { type Issue, STATUS_INFO } from "@beluga/core/board/model.js";
 import { StatusIcon } from "../tasks/marks.js";
 import { useTaskActions } from "../tasks/use-tasks.js";
-import { branchOptions } from "../chat/WorktreeDraft.js";
+import { ThenField, branchOptions } from "../chat/WorktreeDraft.js";
+import { landChoice } from "../chat/land-choice.js";
 import { useBoxSuggestions } from "../chat/BoxSuggestions.js";
 import { useAttachments } from "../chat/use-attachments.js";
 import { MentionHighlighter } from "../chat/MentionHighlighter.js";
@@ -254,6 +255,8 @@ function HomeComposer({ project }: { project: Project }) {
   const [text, setText] = useState("");
   const [base, setBase] = useState<string>();
   const [name, setName] = useState("");
+  // Then (BLG-973): unset, as last time in this project.
+  const [land, setLand] = useState<boolean>();
   const [busy, setBusy] = useState(false);
   const startsAs = useDefaultAutonomy();
   const [autonomy, setAutonomy] = useState<Autonomy>(startsAs);
@@ -280,6 +283,7 @@ function HomeComposer({ project }: { project: Project }) {
     setText("");
     setName("");
     setBase(undefined);
+    setLand(undefined);
     setMode("worktree");
     setAutonomy(startsAs);
     ref.current?.focus();
@@ -295,8 +299,8 @@ function HomeComposer({ project }: { project: Project }) {
   const task = text.trim();
   // A plan with no goal yet opens the sheet, so the button is always ready.
   const ready = worktree
-    ? Boolean(task || name.trim() || att.images.length)
-    : plan || Boolean(task || att.images.length);
+    ? Boolean(task || name.trim() || att.images.length || att.files.length)
+    : plan || Boolean(task || att.images.length || att.files.length);
   const chosen = base ?? branches?.base ?? project.base;
   const options = branches?.branches.length
     ? branches.branches
@@ -329,7 +333,9 @@ function HomeComposer({ project }: { project: Project }) {
         );
       return;
     }
-    if (plan && !task && !att.images.length) {
+    // A long paste still being kept as a file (BLG-988): this goes once it is.
+    if (att.whenSaved(() => void send(agent))) return;
+    if (plan && !task && !att.images.length && !att.files.length) {
       openSheet({ kind: "new_plan", projectId: project.id });
       return;
     }
@@ -352,10 +358,11 @@ function HomeComposer({ project }: { project: Project }) {
     }
     // Runs on one of your computers (BLG-788): the plan, worktree or chat is made there and opens at once.
     const named = name.trim();
+    const straight = (land ?? landChoice(project.id)) ? { land: true } : {};
     const there: WorkToStart = plan
       ? { kind: "plan", input: { goal: message, autonomy } }
       : worktree
-        ? { kind: "worktree", text: message, opts: { ...(base ? { base } : {}), ...(named ? { name: named } : {}), ...(agent ? { agent } : {}) } }
+        ? { kind: "worktree", text: message, opts: { ...(base ? { base } : {}), ...(named ? { name: named } : {}), ...(agent ? { agent } : {}), ...straight } }
         : { kind: "chat", text: message };
     const sent = sendToComputer(startDeps, project.id, agent?.runtime ?? myRuntime(client.store.getState().prefs), there);
     // Held (the computer Runs on names can't take it now): nothing starts, the words stay.
@@ -386,6 +393,7 @@ function HomeComposer({ project }: { project: Project }) {
           ...(base ? { base } : {}),
           ...(named ? { name: named } : {}),
           ...(agent ? { agent } : {}),
+          ...straight,
           // Seen as its terminal (Settings › Terminal): the terminal opens on this message (BLG-553).
           ...(message.trim() && sendsToTerminal(client.store.getState(), getPrefs(), "draft", agent?.runtime) ? { terminal: true } : {}),
           ...(ahead ? { id: ahead.id } : {}),
@@ -568,6 +576,7 @@ function HomeComposer({ project }: { project: Project }) {
                   }
                 />
               </label>
+              <ThenField projectId={project.id} base={chosen} land={land} onChange={setLand} />
             </>
           ) : plan ? (
             <span className={s.note}>

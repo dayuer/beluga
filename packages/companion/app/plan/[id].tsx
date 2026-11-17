@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronDown, ChevronRight, Eye, Gauge, Hand, Monitor, Rocket } from 'lucide-react-native';
+import { Bot, Check, ChevronDown, ChevronRight, Eye, Gauge, Hand, Monitor, Rocket, User } from 'lucide-react-native';
 import { Options } from '../../components/Options';
 import { AgentMarkIcon, markIcon, runtimeMark } from '../../components/AgentMark';
 import { AgentChoiceSheet, agentOfRow } from '../../components/AgentPicker';
@@ -16,7 +16,7 @@ import { planUiTheme } from '../../components/PlanUiTheme';
 import { OutlineMilestoneRow, PlanUiThemeProvider, type OutlineMilestone } from '../../../ui-plan';
 import { Header, Screen, useScrolled } from '../../components/Screen';
 import { Card, More, Pill, Press, T, haptic, toneBg, toneInk, toneOf } from '../../components/ui';
-import { useView, useVisibleNeeds } from '../../lib/hooks';
+import { useSupports, useView, useVisibleNeeds } from '../../lib/hooks';
 import type { ConvView, PlanView, Topic } from '../../lib/link/protocol';
 import { color } from '../../lib/theme';
 import { calls } from '../../lib/link/calls';
@@ -30,6 +30,18 @@ const AUTONOMY = {
   autopilot: { label: 'Autopilot', sub: 'Runs to the end, stops only if something fails', Icon: Rocket },
 } as const;
 type Autonomy = keyof typeof AUTONOMY;
+/** 1.58 (BLG-981): Autopilot all the way, as the Mac's FULL_AUTOPILOT_INFO says it. */
+const FULL = { label: 'Full Autopilot', sub: 'Never waits for you: a stand-in agent answers', Icon: Bot } as const;
+/** 1.58 (BLG-982): the parts a plan's agents play, as the Mac's PLAN_ROLE_INFO says them. */
+const ROLES = { planner: 'Plans with', builder: 'Builds with', checker: 'Checks with' } as const;
+type Role = keyof typeof ROLES;
+
+/** Who plays each part, in one line (1.58, BLG-982): one agent for all, or each part's; a Mac before it: who works it. */
+function agentsSentence(roles: boolean, words: (role: Role) => string): string {
+  if (!roles) return `Worked by ${words('builder')}`;
+  const [planner, builder, checker] = (['planner', 'builder', 'checker'] as const).map(words);
+  return planner === builder && checker === builder ? `Planned, built and checked by ${builder}` : `Planned by ${planner} · built by ${builder} · checked by ${checker}`;
+}
 
 /**
  * A plan (Advanced Planning) as it's designed and run: its goal, decisions waiting on you (Approve
@@ -50,29 +62,27 @@ export default function Plan() {
   const done = tasks.filter((t) => t.state === 'done').length;
   const [menu, setMenu] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [pickingCheck, setPickingCheck] = useState(false);
+  const [picking, setPicking] = useState<Role | undefined>();
   const [pickingArch, setPickingArch] = useState(false);
   const [pickingFix, setPickingFix] = useState(false);
-  // Who works its milestones and tasks (1.35, BLG-498): its own pick, else your default; changed from ⋯.
+  // Who plans, builds and checks it (1.58, BLG-982; a Mac before it: who works it, 1.35): its own pick, else your default; changed from ⋯.
+  const roles = useSupports('planRoles');
+  const fullOk = useSupports('autopilot');
   const defaultGroup = p?.agents?.groups.find((g) => g.isDefault);
-  const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
-  const agentRuntime = p?.agent?.runtime ?? defaultGroup?.runtime;
-  const setAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
-    void store.call<string>(calls.setPlanAgent(id ?? '', agent, label)).then(
+  const yours = defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
+  const roleRef = (role: Role) => (role === 'planner' ? (p?.planner ?? p?.agent) : role === 'checker' ? (p?.checker ?? p?.agent) : p?.agent);
+  const roleWords = (role: Role): string => {
+    const ref = roleRef(role);
+    return ref ? agentName(ref, { model: true }) : yours;
+  };
+  const setAgent = (role: Role, agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
+    const call = roles ? calls.setPlanRole(id ?? '', role, agent, label) : calls.setPlanAgent(id ?? '', agent, label);
+    void store.call<string>(call).then(
       (said) => store.toast({ text: typeof said === 'string' ? said : `${label} works this plan`, tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  // Who checks its milestones and reviews its drafts (1.50): its own pick, else the agent for its work.
-  const checkWords = p?.checkAgent ? agentName(p.checkAgent, { model: true }) : 'Same as its work';
-  const setCheckAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
-    void store.call<string>(calls.setPlanCheckAgent(id ?? '', agent, label)).then(
-      (said) => store.toast({ text: typeof said === 'string' ? said : `${label} checks this plan`, tone: 'ok' }),
-      (e: Error) => store.toast({ text: e.message, tone: 'error' }),
-    );
-  };
-  // Who designs each milestone before its work starts (1.59): none, the milestones start right away.
+  // Who designs each milestone before its work starts (1.60, fork): none, the milestones start right away.
   const archWords = p?.archAgent ? agentName(p.archAgent, { model: true }) : 'No architect';
   const setArchAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanArchAgent(id ?? '', agent, label)).then(
@@ -80,7 +90,7 @@ export default function Plan() {
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  // Who takes over what's hard (1.60): fix tasks after a failed check, conflicts, a task that stopped twice. None: auto route's strongest.
+  // Who takes over what's hard (1.61, fork): fix tasks after a failed check, conflicts, a task that stopped twice. None: auto route's strongest.
   const fixWords = p?.fixAgent ? agentName(p.fixAgent, { model: true }) : 'Strongest model';
   const setFixAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanFixAgent(id ?? '', agent, label)).then(
@@ -88,7 +98,7 @@ export default function Plan() {
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
-  const how = p?.autonomy && p.autonomy in AUTONOMY ? AUTONOMY[p.autonomy as Autonomy] : undefined;
+  const how = p?.fullAuto ? FULL : p?.autonomy && p.autonomy in AUTONOMY ? AUTONOMY[p.autonomy as Autonomy] : undefined;
   const titles = new Map(tasks.map((t) => [t.id, t.title]));
   const milestoneTitles = new Map((p?.milestones ?? []).map((m) => [m.id, m.title]));
   const blocked = tasks.filter((t) => t.state === 'blocked').length;
@@ -119,30 +129,27 @@ export default function Plan() {
         onClose={() => setMenu(false)}
         title={p?.title}
         options={[
-          { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Agent for its work', sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
-          { Icon: markIcon(runtimeMark(p?.checkAgent?.runtime ?? agentRuntime)), label: 'Agent for its checks', sub: checkWords, tone: 'lavender', hidden: !p?.agents || !store.supports('checkAgent'), onPress: () => setPickingCheck(true) },
-          { Icon: markIcon(runtimeMark(p?.archAgent?.runtime ?? agentRuntime)), label: 'Agent for its architecture', sub: archWords, tone: 'lavender', hidden: !p?.agents || !store.supports('archAgent'), onPress: () => setPickingArch(true) },
-          { Icon: markIcon(runtimeMark(p?.fixAgent?.runtime ?? agentRuntime)), label: 'Agent for hard fixes', sub: fixWords, tone: 'lavender', hidden: !p?.agents || !store.supports('fixAgent'), onPress: () => setPickingFix(true) },
+          ...(roles ? (Object.keys(ROLES) as Role[]) : (['builder'] as Role[])).map((role) => ({
+            Icon: markIcon(runtimeMark(roleRef(role)?.runtime ?? defaultGroup?.runtime)),
+            label: roles ? ROLES[role] : 'Agent for its work',
+            sub: roleWords(role),
+            tone: 'lavender' as const,
+            hidden: !p?.agents,
+            onPress: () => setPicking(role),
+          })),
+          { Icon: markIcon(runtimeMark(p?.archAgent?.runtime ?? defaultGroup?.runtime)), label: 'Agent for its architecture', sub: archWords, tone: 'lavender', hidden: !p?.agents || !store.supports('archAgent'), onPress: () => setPickingArch(true) },
+          { Icon: markIcon(runtimeMark(p?.fixAgent?.runtime ?? defaultGroup?.runtime)), label: 'Agent for hard fixes', sub: fixWords, tone: 'lavender', hidden: !p?.agents || !store.supports('fixAgent'), onPress: () => setPickingFix(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
       <AgentChoiceSheet
-        title="Agent for its work"
-        caption={p?.running ? 'For what starts next: milestones at work keep their agent' : 'Works its milestones and tasks'}
+        title={picking && roles ? ROLES[picking] : 'Agent for its work'}
+        caption={picking === 'planner' ? 'Plans with you in the plan’s conversation' : picking === 'checker' ? 'Checks each milestone, and reviews drafts' : p?.running ? 'For what starts next: milestones at work keep their agent' : 'Works its milestones and tasks'}
         picker={p?.agents}
-        visible={picking}
-        onClose={() => setPicking(false)}
-        yours={{ on: !p?.agent, onPick: () => setAgent(null, 'Your agent') }}
-        onPick={(g, value, label) => setAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
-      />
-      <AgentChoiceSheet
-        title="Agent for its checks"
-        caption="Checks its milestones and reviews its drafts: a stronger model than the work's, say"
-        picker={p?.agents}
-        visible={pickingCheck}
-        onClose={() => setPickingCheck(false)}
-        yours={{ on: !p?.checkAgent, onPick: () => setCheckAgent(null, 'Same as its work'), label: 'Same as its work', caption: `Whoever works it checks it too (${agentWords})` }}
-        onPick={(g, value, label) => setCheckAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
+        visible={picking !== undefined}
+        onClose={() => setPicking(undefined)}
+        yours={{ on: !roleRef(picking ?? 'builder'), onPick: () => setAgent(picking ?? 'builder', null, 'Your agent') }}
+        onPick={(g, value, label) => setAgent(picking ?? 'builder', agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
       />
       <AgentChoiceSheet
         title="Agent for its architecture"
@@ -166,13 +173,17 @@ export default function Plan() {
         visible={howOpen}
         onClose={() => setHowOpen(false)}
         title="How it runs"
-        options={(Object.keys(AUTONOMY) as Autonomy[]).map((a) => ({
-          Icon: AUTONOMY[a].Icon,
-          label: AUTONOMY[a].label,
-          sub: AUTONOMY[a].sub,
-          tone: a === p?.autonomy ? ('lavender' as const) : ('plain' as const),
-          onPress: () => void store.call(calls.setAutonomy(id ?? '', a, AUTONOMY[a].label)).catch((e: Error) => store.toast({ text: e.message, tone: 'error' })),
-        }))}
+        options={[
+          ...(Object.keys(AUTONOMY) as Autonomy[]).map((a) => ({
+            Icon: AUTONOMY[a].Icon,
+            label: AUTONOMY[a].label,
+            sub: AUTONOMY[a].sub,
+            tone: a === p?.autonomy && !p?.fullAuto ? ('lavender' as const) : ('plain' as const),
+            // From Full Autopilot, Autopilot keeps it on Autopilot and lets questions wait for you again.
+            onPress: () => void store.call(p?.fullAuto && a === 'autopilot' ? calls.setFullAuto(id ?? '', false) : calls.setAutonomy(id ?? '', a, AUTONOMY[a].label)).catch((e: Error) => store.toast({ text: e.message, tone: 'error' })),
+          })),
+          { Icon: FULL.Icon, label: FULL.label, sub: FULL.sub, tone: p?.fullAuto ? ('lavender' as const) : ('plain' as const), hidden: !fullOk, onPress: () => void store.call(calls.setFullAuto(id ?? '', true)).catch((e: Error) => store.toast({ text: e.message, tone: 'error' })) },
+        ]}
       />
       <ScrollView ref={scroll} onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
         {p ? (
@@ -204,9 +215,9 @@ export default function Plan() {
               ) : null}
               {p.agent || p.agents ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <AgentMarkIcon mark={runtimeMark(agentRuntime)} size={14} color={color.text2} />
-                  <T v="caption" c={color.text2}>
-                    Worked by {agentWords}
+                  <AgentMarkIcon mark={runtimeMark(roleRef('builder')?.runtime ?? defaultGroup?.runtime)} size={14} color={color.text2} />
+                  <T v="caption" c={color.text2} style={{ flexShrink: 1 }}>
+                    {agentsSentence(roles, roleWords)}
                   </T>
                 </View>
               ) : null}

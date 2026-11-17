@@ -7,7 +7,7 @@ import { remoteScratch } from '../core/friend-share/scratch.js';
 import type { AddResult, WorkspaceController } from '../core/workspace-controller.js';
 import type { Workbench } from '../core/workbench.js';
 import { browseDir, listLocalDirs, localDirKey, openWithSystem } from '../core/local.js';
-import { ATTACHMENT_SHARE, type FetchShared, attachmentOnDisk, chipText, expandChips, importImageFitting, mediaTypeOf, pathInfo, publishForRoom, reattach, readAttachment, registerAttachment, roomAttachmentsDir, saveImageBytes } from '../core/attachments.js';
+import { ATTACHMENT_SHARE, type FetchShared, attachmentOnDisk, chipText, expandChips, importImageFitting, mediaTypeOf, pathInfo, publishForRoom, reattach, readAttachment, registerAttachment, roomAttachmentsDir, saveImageBytes, savePastedText } from '../core/attachments.js';
 import { fetchBytes } from '../core/downloads.js';
 import { testDatabase } from '../core/views/sources.js';
 import { existsSync, statSync } from 'node:fs';
@@ -100,6 +100,8 @@ export const HANDLERS = {
   'session.copyText': (s, text, success) => s.copyText(text, success),
   'session.setPrefs': (s, prefs) => s.setPrefs(prefs),
   'session.setPlanMode': (s, channel, on) => s.setPlanMode(channel, on),
+  'session.setAutopilot': (s, channel, on) => s.setAutopilot(channel, on),
+  'session.setBuildWith': (s, channel, agent) => s.setBuildWith(channel, agent ?? null),
   'session.setClaudeSharing': (s, policy) => s.setClaudeSharing(policy),
   'session.rename': (s, name) => s.rename(name),
   'session.zoom': (s, dir) => s.zoom(dir),
@@ -230,7 +232,7 @@ export const HANDLERS = {
     const vars = opts?.vars?.filter((v) => v.key) ?? [];
     const preset = vars.length > 0 && Boolean(opts?.id) && s.env.presetWorktree(opts!.id!, vars);
     try {
-      const id = (maybeStatsOf(s)?.prompt(`new-worktree:${projectId}`, text, opts?.agent?.runtime), await byYourHand(text, () => ctl(s)?.startWorktree(projectId, text, (prompt) => s.nameTask(prompt), { ...(opts?.base ? { base: opts.base } : {}), ...(opts?.name ? { name: opts.name } : {}), ...(opts?.plan ? { plan: true } : {}), ...(opts?.tasks ? { tasks: true } : {}), ...(opts?.quiet ? { quiet: true } : {}), ...(opts?.agent ? { agent: opts.agent } : {}), ...(opts?.terminal ? { terminal: true } : {}), ...(opts?.id ? { id: opts.id } : {}), nameLater: true })))?.id;
+      const id = (maybeStatsOf(s)?.prompt(`new-worktree:${projectId}`, text, opts?.agent?.runtime), await byYourHand(text, () => ctl(s)?.startWorktree(projectId, text, (prompt) => s.nameTask(prompt), { ...(opts?.base ? { base: opts.base } : {}), ...(opts?.name ? { name: opts.name } : {}), ...(opts?.plan ? { plan: true } : {}), ...(opts?.tasks ? { tasks: true } : {}), ...(opts?.quiet ? { quiet: true } : {}), ...(opts?.agent ? { agent: opts.agent } : {}), ...(opts?.terminal ? { terminal: true } : {}), ...(opts?.id ? { id: opts.id } : {}), ...(opts?.land ? { land: true } : {}), nameLater: true })))?.id;
       if (id && preset && opts?.id === id) s.env.listInExample(id, vars);
       else if (id && vars.length) s.env.keepPasted({ workspaceId: id }, vars);
       // Made under another id (or not at all): the preset goes.
@@ -262,6 +264,8 @@ export const HANDLERS = {
   'workspaces.remove': (s, id, opts) => ctl(s)?.remove(id, opts),
   'workspaces.commit': (s, id, message) => ctl(s)?.commit(id, message),
   'workspaces.merge': (s, id) => ctl(s)?.merge(id),
+  'workspaces.land': (s, id) => ctl(s)?.land(id),
+  'workspaces.setLandOnBase': (s, id, on) => ctl(s)?.setLandOnBase(id, on),
   'workspaces.prepareRemoval': (s, id) => ctl(s)?.prepareRemoval(id),
   'workspaces.applyEnvBack': (s, id, removed) => ctl(s)?.applyEnvBack(id, removed),
   'workspaces.keepEnvHere': (s, id) => ctl(s)?.keepEnvHere(id),
@@ -361,6 +365,7 @@ export const HANDLERS = {
   'env.carryWorktree': (s, id) => s.env.carryWorktree(id),
   'env.pastedKeys': (s, where, text) => s.env.pastedKeys(where, text),
   'env.keepPasted': (s, where, rows) => s.env.keepPasted(where, rows),
+  'env.notAKey': (s, prefix, on) => s.env.notAKey(prefix, on),
   'env.overview': (s, projectId) => s.env.overview(projectId),
   'env.addToExample': (s, projectId) => s.env.addToExample(projectId),
   'env.exampleSync': (s, projectId, on) => s.env.setExampleSync(projectId, on),
@@ -392,6 +397,7 @@ export const HANDLERS = {
     const a = registerAttachment(saved, statSync(saved).size);
     return { n: a.n, chip: chipText(a.n), file: path.basename(saved) };
   },
+  'attachments.addText': (_s, text) => savePastedText(text),
   'attachments.reattach': (_s, file) => {
     const a = reattach(file);
     if (!a) throw new Error('That image is gone from this computer');

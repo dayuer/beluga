@@ -109,7 +109,7 @@ export function milestoneOfChannel(plan: Pick<Plan, 'runs' | 'body'>, channel: s
  * agent) and hard fixes (its handoffs), each next to what the plan sets now.
  */
 export function milestoneRoles(
-  plan: Pick<Plan, 'agent' | 'checkAgent' | 'archAgent' | 'fixAgent' | 'activity'>,
+  plan: Pick<Plan, 'agent' | 'checker' | 'archAgent' | 'fixAgent' | 'activity'>,
   m: { readonly milestone: { readonly title: string }; readonly run: MilestoneRun; readonly agent?: MilestoneAgent },
   st: RolesState,
 ): MilestoneRoles {

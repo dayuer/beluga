@@ -54,7 +54,7 @@ export function roleStart(role: PlanRole, d: PlanRoleDefaults): string {
 }
 
 /** The plan's roles for plans.create, from each pop-up's value (`forChoice`: a `runtime:model` value as an agent). */
-export function rolesInput(picks: Readonly<Record<PlanRole, string>>, d: PlanRoleDefaults, forChoice: (value: string) => AgentRef): { agent?: AgentRef; archAgent?: AgentRef; checkAgent?: AgentRef; fixAgent?: AgentRef } {
+export function rolesInput(picks: Readonly<Record<PlanRole, string>>, d: PlanRoleDefaults, forChoice: (value: string) => AgentRef): { agent?: AgentRef; archAgent?: AgentRef; checker?: AgentRef; fixAgent?: AgentRef } {
   const pick = (role: PlanRole): AgentRef | undefined => {
     const v = picks[role];
     if (v === BY_TIER) return tierAgent(role, d);
@@ -63,20 +63,21 @@ export function rolesInput(picks: Readonly<Record<PlanRole, string>>, d: PlanRol
   };
   const agent = pick('work');
   const archAgent = pick('arch');
-  const checkAgent = pick('check');
+  const checker = pick('check');
   const fixAgent = pick('fix');
-  return { ...(agent ? { agent } : {}), ...(archAgent ? { archAgent } : {}), ...(checkAgent ? { checkAgent } : {}), ...(fixAgent ? { fixAgent } : {}) };
+  return { ...(agent ? { agent } : {}), ...(archAgent ? { archAgent } : {}), ...(checker ? { checker } : {}), ...(fixAgent ? { fixAgent } : {}) };
 }
 
 /** A plan's roles as it has them (Plan Settings): unset is what it does without one. */
 export interface PlanRoleAgents {
   readonly agent?: AgentRef | undefined;
   readonly archAgent?: AgentRef | undefined;
-  readonly checkAgent?: AgentRef | undefined;
+  /** Upstream's checker (BLG-982): the fork's Audit role. */
+  readonly checker?: AgentRef | undefined;
   readonly fixAgent?: AgentRef | undefined;
 }
 
-const FIELD: Record<PlanRole, keyof PlanRoleAgents> = { arch: 'archAgent', work: 'agent', check: 'checkAgent', fix: 'fixAgent' };
+const FIELD: Record<PlanRole, keyof PlanRoleAgents> = { arch: 'archAgent', work: 'agent', check: 'checker', fix: 'fixAgent' };
 
 /**
  * Where a role's pop-up starts in Plan Settings: the plan's own agent (as the tiers, when it is the
@@ -110,4 +111,4 @@ export function roleChanges(from: Readonly<Record<PlanRole, string>>, to: Readon
 }
 
 /** A plan note worth its feed (fork, BLG-125): who does each part changed, what's hard handed to the fix agent, when tests run. */
-export const roleNote = (text: string): boolean => /^(gave its (work|checks|milestones’ designs)\b|gave what’s hard\b|handed .+ to .+|starts its milestones without a design|runs the test suites\b)/.test(text);
+export const roleNote = (text: string): boolean => /^(gave its (work|checks|planning|milestones’ designs)\b|gave what’s hard\b|handed .+ to .+|starts its milestones without a design|runs the test suites\b)/.test(text);

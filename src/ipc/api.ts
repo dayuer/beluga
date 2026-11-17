@@ -168,6 +168,10 @@ export const API = {
   'session.copyText': args(str, z.string().max(500)),
   'session.setPrefs': args(PrefsPatch),
   'session.setPlanMode': args(channel, bool),
+  // Full Autopilot in a conversation (BLG-981): a stand-in agent answers what your agent asks there (a plan's own: the plan).
+  'session.setAutopilot': args(channel, bool),
+  // Plan here, build with another agent (BLG-982): who builds what's planned in this conversation once approved (null: the same agent).
+  'session.setBuildWith': args(channel, AgentRef.nullish()),
   'session.setClaudeSharing': args(Policy),
   'session.rename': args(z.string().max(64)),
   'session.zoom': args(z.enum(['in', 'out', 'reset'])),
@@ -313,7 +317,8 @@ export const API = {
   // → the new worktree's id. `plan`: its Claude plans first. `tasks`: Plan with Tasks, its conversation is a
   // draft plan's home, written from the first message. `quiet`: started from the phone, the Mac's window stays put.
   // `id`: the id it gets, chosen by the screen that shows it as being made already (BLG-942; taken only when free).
-  'workspaces.startWorktree': args(id, str, opt(z.object({ base: opt(z.string().min(1).max(250)), name: opt(z.string().max(200)), plan: opt(bool), tasks: opt(bool), quiet: opt(bool), agent: opt(AgentRef), terminal: opt(bool), id: opt(WorktreeId), vars: opt(EnvRows) }))),
+  // `land`: Straight to main, its work lands on its base in the main folder each time its agent's turn ends (no PR).
+  'workspaces.startWorktree': args(id, str, opt(z.object({ base: opt(z.string().min(1).max(250)), name: opt(z.string().max(200)), plan: opt(bool), tasks: opt(bool), quiet: opt(bool), agent: opt(AgentRef), terminal: opt(bool), id: opt(WorktreeId), vars: opt(EnvRows), land: opt(bool) }))),
   // What a new worktree can start from: → { base: the default, branches: default first, then newest }.
   'workspaces.branches': args(id),
   'workspaces.fork': args(id, z.string().max(200)),
@@ -347,6 +352,10 @@ export const API = {
   'workspaces.remove': args(id, opt(z.object({ children: opt(z.enum(['with', 'keep'])), quiet: opt(bool) }).strict())),
   'workspaces.commit': args(id, opt(z.string().max(2000))),
   'workspaces.merge': args(id),
+  // Straight to main: land a worktree's work on its base in the main folder now (rebased, fast-forwarded, nothing pushed) → how it went.
+  'workspaces.land': args(id),
+  // Straight to main on or off for a worktree: on, each finished turn of its agent lands on its base in the main folder.
+  'workspaces.setLandOnBase': args(id, bool),
   'workspaces.prepareRemoval': args(id),
   'workspaces.applyEnvBack': args(id, opt(bool)),
   // A worktree's env changes stay there: not asked about again until they change (BLG-369).
@@ -482,6 +491,8 @@ export const API = {
   'env.pastedKeys': args(z.object({ workspaceId: opt(id), projectId: opt(id) }), str),
   // Keep pasted keys as a chat's own variables (its workspace's; none: yours everywhere) → the .env.example it listed them in.
   'env.keepPasted': args(z.object({ workspaceId: opt(id), projectId: opt(id) }), EnvRows),
+  // "Not a key" on a paste's card (BLG-977): that prefix (`rtl_`) is never asked about as maybe a key again; on false takes it back.
+  'env.notAKey': args(z.string().min(3).max(24), z.boolean()),
   // A project's environment in names and counts (its page, the phone): never a value.
   'env.overview': args(id),
   // List in the main folder's .env.example what's set and it doesn't list (placeholders, never values) → the names added.
@@ -500,6 +511,8 @@ export const API = {
   'attachments.add': args(z.enum(['png', 'jpg', 'jpeg', 'gif', 'webp']), z.string().max(6_000_000)),
   // An image file on this Mac (its path was pasted), copied in and made smaller if it's too big. → { n, chip, file }
   'attachments.addFile': args(path),
+  // A long paste kept as a text file (BLG-988): it goes with the message as its path. → PathInfo
+  'attachments.addText': args(z.string().min(1).max(2_000_000)),
   // An image you linked in a message (its file name), waiting in the box again. → { n, chip }
   'attachments.reattach': args(z.string().min(1).max(255)),
   // `only`: the images waiting in the box (others' "[image N]" stay words). `shown`: the number each
@@ -552,7 +565,7 @@ export const API = {
   ...REVENUECAT_API,
   // ---- supporting Beluga: the star and coffee asks merges bring (support-api.ts)
   ...SUPPORT_API,
-  // ---- usage statistics: your level (Off, Limited, On), the ask after an update, what's sent (telemetry-api.ts)
+  // ---- usage statistics: your level (Off, Essential, On), the ask after an update, what's sent (telemetry-api.ts)
   ...TELEMETRY_API,
   // ---- your stats in the Usage tab: counted by the daemon, pastes and dictation from the Mac (stats-api.ts)
   ...STATS_API,

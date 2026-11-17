@@ -513,6 +513,8 @@ export interface AgentPlace {
   readonly shipped?: { readonly number: number; readonly url?: string; readonly into: string };
   /** Its pull request is open (BLG-840): the run pushes its commits there (see prompt.ts buildCommitAppend). */
   readonly openPr?: OpenPr;
+  /** Straight to main (no open PR): when its turn ends, Beluga lands its commits on this branch in the main folder. */
+  readonly landsOn?: string;
 }
 
 /** A worktree's open pull request, for its run's commit rules (BLG-840). */
@@ -591,6 +593,8 @@ export interface AgentBackend {
   describeProject?(dir: string, project: string): Promise<string | undefined>;
   /** A pull request reviewed before a sentinel merges it: ship or hold, in one sentence (a small model, read-only). */
   reviewPr?(input: import('./pr-reviewer.js').PrReviewInput): Promise<import('./pr-reviewer.js').PrReview | undefined>;
+  /** Full Autopilot's stand-in (BLG-981): answer for you what your agent asked (one turn, no tools) → its reply (JSON). */
+  standIn?(req: import('./stand-in.js').StandInRequest): Promise<string>;
   /** Models this Claude Code offers, for the model picker. */
   listModels?(): Promise<ReadonlyArray<{ value: string; label: string; description: string; efforts?: readonly string[] }> | undefined>;
   /**
