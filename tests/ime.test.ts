@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isImeComposing } from '../packages/mac/src/lib/ime.js';
 
-describe('isImeComposing (BLG-118)', () => {
+describe('isImeComposing', () => {
   it('is composing while the native event says so', () => {
     expect(isImeComposing({ keyCode: 13, nativeEvent: { isComposing: true, keyCode: 13 } })).toBe(true);
     expect(isImeComposing({ isComposing: true, keyCode: 13 })).toBe(true);

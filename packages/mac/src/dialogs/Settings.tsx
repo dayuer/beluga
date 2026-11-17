@@ -29,6 +29,7 @@ import { ParallelSettings } from './ParallelSettings.js';
 import { AutoRouteSettings } from './AutoRouteSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
+import { AutopilotWaitSettings } from './AutopilotWaitSettings.js';
 import { ArchiveSettledRow } from './ArchiveSettledRow.js';
 import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
@@ -422,6 +423,7 @@ function AgentPane() {
           <Switch label="Self approval" on={p.selfApproval === 'ask'} onChange={(v) => void api.session.setPrefs({ selfApproval: v ? 'ask' : 'never' })} />
         </Row>
       </Group>
+      <AutopilotWaitSettings />
       <AgentsGroup mine={runtime} />
       <AutoRouteSettings />
       <LaunchFlagsSettings />
