@@ -363,7 +363,7 @@ M8 只改 fork 自己的文件，上游文件只留接入点。每个接入点�
 | `packages/mac/src/fork/sidebar/one-mark.ts`（fork 文件） | 优先级纯函数 `pickMark`/`settleMarks`、锚点 `MARKS`、DOM 钩子 `useOneMark` | BLG-251 / BLG-243 |
 | `packages/mac/src/fork/sidebar/sidebar-look.css` | 落选标记 `display:none`；行悬停或焦点时 `display:revert`（沉稳开时） | BLG-243 |
 | `packages/mac/src/fork/calm/calm-accent.css`（新，fork 文件） | 强调色收口、推广卡移出导航（沉稳开时） | BLG-242 / BLG-249 / BLG-250 |
-| `packages/mac/src/fork/calm/calm-glow.css`（新，fork 文件） | 三处光晕的覆盖层规则 | BLG-245（部分） |
+| `packages/mac/src/fork/calm/calm-glow.css`、`glow-scan.ts`（新，fork 文件） | 三个令牌 `--calm-ring`、`--calm-ring-alpha`、`--calm-glow-off`；光晕的扫描与构建时改写（由 `type-plugin.ts` 调用，`vite.config.ts` 的接入点已登记） | BLG-245 / BLG-256 |
 | `packages/mac/src/fork/calm/calm-type.css`（新，fork 文件） | 字号字重令牌，只在 `:root[data-calm]` 下定义 | BLG-252 |
 | `packages/mac/vite.config.ts`（上游文件，2 行） | `import { calmType }`，plugins 数组加 `calmType()` | BLG-244：构建时把散字号字重改成带原值兜底的令牌引用（沉稳关时等价） |
 | `packages/mac/src/fork/calm/type-scale.ts`、`type-plugin.ts`（新，fork 文件） | 纯改写函数与 Vite 插件 | BLG-244 |
@@ -378,5 +378,5 @@ M8 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm
 | --- | ---: | --- |
 | `packages/mac/vite.config.ts` | 2 | 接入构建时字号改写插件 `calmType()`（BLG-244）；沉稳关时变量未定义，改写后的值与原值一致 |
 
-`fork/calm/calm-glow.css` 的覆盖层规则只在 `:root[data-calm]` 下生效。`onboarding/scenes`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call`、`YourCard` 是 keep-decor，不做字号改写，也不动光晕（`fork/calm/type-scale.ts` 的 `skipFile`）。
+`fork/calm/calm-glow.css` 只定义令牌，且只在 `:root[data-calm]` 下；上游 CSS 里的光晕在构建时改写成带原值回退的令牌引用（`glow-scan.ts`），沉稳关时变量未定义，画面与上游一致，不动上游文件。`onboarding/scenes`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call`、`YourCard` 是 keep-decor，不做字号改写，也不动光晕（`type-scale.ts` 的 `skipFile`、`glow-scan.ts` 的 `skipGlowFile`）。
 

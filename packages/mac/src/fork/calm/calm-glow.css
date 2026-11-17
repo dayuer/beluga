@@ -6,32 +6,21 @@
  * tests/fork-calm-glow.test.ts (GLOW_EXCEPTIONS and the printed scan).
  */
 
-/* A drop target (chat-drag.module.css `.over`): a 2px line, not a 5px halo. */
-:root[data-calm] [class*='_over_'] {
-  box-shadow: 0 0 0 2px var(--accent);
+/*
+ * The tokens the build-time rewrite points at (type-plugin.ts, glow-scan.ts). Every halo's spread in the
+ * upstream CSS reads `var(--calm-ring, 3px)` and every blurred glow's layer reads
+ * `var(--calm-glow-off, <the layer>)`; a halo's colour percentage reads `var(--calm-ring-alpha, 22%)`. With calm
+ * off these are undefined and the fallback, upstream's own value, is drawn. With calm on a halo is a 2px ring
+ * of its own colour at 60% (clearly seen, so keyboard focus stays visible) and a blurred glow is a transparent
+ * no-op layer.
+ */
+:root[data-calm] {
+  --calm-ring: 2px;
+  --calm-ring-alpha: 60%;
+  --calm-glow-off: 0 0 0 0 transparent;
 }
 
-/* The message box a drop would land in (chat-drag.module.css `.boxGlow`): the line stays, the breathing
-   halo goes. A drop target holds still. */
+/* The message box a drop would land in (chat-drag.module.css `.boxGlow`): its halo is a ring now; it also stopped breathing. */
 :root[data-calm] [class*='_boxGlow_'] {
-  box-shadow: 0 0 0 2px var(--accent);
   animation: none;
-}
-
-/* The needs-you edge (layout/signal.module.css `.edge`): the amber bar stays, its blur does not. */
-:root[data-calm] [class*='_edge_'] {
-  box-shadow: none;
-}
-
-/* 4. Keyboard focus on the element itself: one 2px accent ring instead of the 3–3.5px halos the
-   upstream fields and dialogs draw on focus (BLG-245). `:focus-visible` matches the focused element
-   only, never its ancestors, so panels keep their own shadows. Error and "bad" fields keep theirs
-   (they are excluded by class), so the red stays red. */
-:root[data-calm] :focus-visible:not([class*='_invalid_']):not([class*='_bad_']) {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);
-}
-
-/* 5. A drop target in the composer (chat/composer.module.css `.dropping`): the 2px line, not the 5px halo. */
-:root[data-calm] [class*='_dropping_'] {
-  box-shadow: 0 0 0 2px var(--accent);
 }

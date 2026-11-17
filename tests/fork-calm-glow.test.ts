@@ -1,13 +1,17 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { findGlows, rewriteGlow, skipGlowFile, withCalmValues, withoutCalm } from '../packages/mac/src/fork/calm/glow-scan.js';
 
 /**
- * Colored glows (M8 BLG-245; docs/calm/finish.md §4). A glow is a box-shadow or drop-shadow whose
- * colour is the accent, a status colour or a saturated literal, and whose blur is above 0 or whose
- * spread is above 2px. Neutral shadows, 0.5–2px outlines and insets are not glows. The overlay
- * (fork/calm/calm-glow.css) takes the glows it can reach; the rest are listed in GLOW_EXCEPTIONS
- * with the reason. fork/** must have none outside that list.
+ * Colored glows (M8 BLG-245 and BLG-256; docs/calm/finish.md §4). A glow is a box-shadow or
+ * drop-shadow whose colour is the accent, a status colour or a saturated literal, and whose blur is
+ * above 0 or whose spread is above 2px. Neutral shadows, 0.5–2px outlines and insets are not glows.
+ *
+ * The build rewrites the upstream CSS onto two tokens (type-plugin.ts → glow-scan.ts): a halo's spread
+ * becomes `var(--calm-ring, 3px)` and a blurred glow's layer becomes `var(--calm-glow-off, <layer>)`.
+ * calm-glow.css defines them under :root[data-calm] only, so calm off draws upstream's own values.
+ * What stays is in GLOW_EXCEPTIONS (and the keep-decor directories the rewrite skips), each with a reason.
  */
 
 const mac = path.join('packages', 'mac', 'src');
@@ -22,134 +26,9 @@ export function macCss(dir = mac, rel = ''): { rel: string; css: string }[] {
   });
 }
 
-export interface Glow {
-  line: number;
-  value: string;
-  kind: 'box-shadow' | 'drop-shadow';
-  why: string;
-}
-
-/** Splits on the commas that are not inside parentheses. */
-function layers(value: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let cur = '';
-  for (const ch of value) {
-    if (ch === '(') depth++;
-    if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) {
-      out.push(cur.trim());
-      cur = '';
-    } else cur += ch;
-  }
-  if (cur.trim()) out.push(cur.trim());
-  return out;
-}
-
-const COLOURED = /--(accent|warn|error|success|merged?|claude|busy|live|danger|ok|done|failed|running)\b|#[0-9a-f]{3,8}\b|oklch\(|hsl\(|rgb\(\s*(?!0\s+0\s+0\b)\d/i;
-const NEUTRAL = /--(hairline|shadow|control-drop|control-bezel|lift|bg-sunken|text\b)|rgb\(\s*0\s+0\s+0\b|\bblack\b/i;
-
-/** Drops every (…) group, innermost first, so colour functions do not contribute numbers. */
-const stripFns = (s: string): string => {
-  let prev = '';
-  let out = s;
-  while (out !== prev) {
-    prev = out;
-    out = out.replace(/\([^()]*\)/g, ' C ');
-  }
-  return out;
-};
-
-/** The lengths in one shadow layer, in px (rem at 13px); the colour is what is left over once functions are dropped. */
-function lengthsOf(layer: string): number[] {
-  return [...stripFns(layer).matchAll(/(?<![\w.-])(-?\d*\.?\d+)(px|rem)?(?![\d.]*%)/g)].map((m) => Number(m[1]) * (m[2] === 'rem' ? 13 : 1));
-}
-
-/** Whether one shadow layer is a glow, and why. */
-function glowLayer(layer: string, kind: Glow['kind']): string | undefined {
-  const body = layer.replace(/^inset\s+/, '');
-  if (!COLOURED.test(body) || NEUTRAL.test(body)) return undefined;
-  const nums = lengthsOf(body);
-  // box-shadow: x y blur spread; drop-shadow(): x y blur.
-  const blur = nums[2] ?? 0;
-  const spread = kind === 'box-shadow' ? (nums[3] ?? 0) : 0;
-  if (blur > 0) return `blur ${blur}px`;
-  if (spread > 2) return `spread ${spread}px`;
-  return undefined;
-}
-
-/** Every coloured glow in one stylesheet, with its line. Comments are blanked first so their text is not read. */
-export function findGlows(css: string): Glow[] {
-  const blank = css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  const found: Glow[] = [];
-  for (const m of blank.matchAll(/(box-shadow|drop-shadow)\s*\(?\s*:?\s*([^;{}]+)/g)) {
-    const kind = m[1] as Glow['kind'];
-    const value = m[2]!.replace(/\s+/g, ' ').trim();
-    const line = blank.slice(0, m.index ?? 0).split('\n').length;
-    if (kind === 'box-shadow' && value.startsWith('none')) continue;
-    const parts = kind === 'drop-shadow' ? [`drop-shadow(${value}`] : layers(value);
-    for (const p of parts) {
-      const why = glowLayer(p.replace(/^drop-shadow\(/, '').replace(/\)\s*$/, ''), kind);
-      if (why) found.push({ line, value: p.slice(0, 120), kind, why });
-    }
-  }
-  return found;
-}
-
-/**
- * Glows that stay, with the reason. Keyed by `file` (relative to src) and the first value's text.
- * Upstream files that keep one are the keep-decor list (docs/calm/finish.md §4.2) or the
- * inline/JS-written shadows the overlay cannot reach.
- */
+/** Glows that stay with calm on, in files the rewrite processes: the file and the start of the layer, with the reason. */
 export const GLOW_EXCEPTIONS: ReadonlyArray<{ file: string; match: string; why: string }> = [
-  { file: "chat/composer.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "chat/edit-prompt.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "chat/max.module.css", match: "0 2px 14px color-mix(in srgb", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "chat/max.module.css", match: "0 4px 22px color-mix(in srgb", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "components/form.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "components/graph/graph.module.css", match: "0 0 0 5px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/graph/graph.module.css", match: "0 0 0 5px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/graph/graph.module.css", match: "0 8px 24px -8px color-mix(in", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "components/graph/graph.module.css", match: "0 0 0 6px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/graph/graph.module.css", match: "0 0 0 4px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/graph/graph.module.css", match: "0 1px 2px color-mix(in srgb,", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "components/markdown/code-editor.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "components/markdown/code-editor.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "components/telemetry-levels.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/update.module.css", match: "inset 0 0 0 100px color-mix(", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/views/views.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "components/views/views.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "dialogs/env-settings.module.css", match: "0 0 0 3.5px color-mix(in srg", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "dialogs/keyboard.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "dialogs/native/person.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "dialogs/settings.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "dialogs/support.module.css", match: "0 0 0 4px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "layout/panel/panel.module.css", match: "0 0 0 3.5px color-mix(in srg", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "network/network.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "network/network.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "network/network.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "network/network.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "network/network.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "onboarding/onboarding.module.css", match: "0 10px 30px -10px color-mix(", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "onboarding/onboarding.module.css", match: "0 0 10px var(--claude)", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "onboarding/onboarding.module.css", match: "0 18px 40px -18px color-mix(", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "onboarding/onboarding.module.css", match: "inset 0 0 0 4px var(--accent", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "onboarding/onboarding.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "onboarding/onboarding.module.css", match: "inset 0 0 0 4px color-mix(in", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "plans/plan-ask.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "plans/plans.module.css", match: "0 10px 28px -14px color-mix(", why: "未处理: 大模糊装饰光晕，需决定保留（例外）或改" },
-  { file: "plans/plans.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "sentinel/sentinel.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "sentinel/sentinel.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "tasks/NewTaskSheet.module.css", match: "0 0 0 3.5px hsl(var(--hue) v", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
-  { file: "tasks/tasks.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "tasks/tasks.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "tasks/tasks.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "tasks/tasks.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "views/history/history.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "views/project-home.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "views/shared-search.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "部分: 鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖" },
-  { file: "views/terminal.module.css", match: "0 0 0 3px color-mix(in srgb,", why: "未处理: 非焦点的 3px 光晕，需逐个判定" },
+  { file: 'components/update.module.css', match: 'inset 0 0 0 100px', why: 'a background tint written as an inset shadow (100px spread, 8% accent): a fill, not a halo' },
 ];
 
 describe('fork-calm-glow: findGlows', () => {
@@ -161,6 +40,54 @@ describe('fork-calm-glow: findGlows', () => {
     expect(findGlows('.a { box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }')).toHaveLength(0);
     expect(findGlows('.a { box-shadow: var(--shadow-pop); }')).toHaveLength(0);
     expect(findGlows('.a { filter: drop-shadow(0 0 6px var(--warn)); }')).toHaveLength(1);
+  });
+});
+
+describe('fork-calm-glow: the rewrite', () => {
+  it('puts a halo’s spread on --calm-ring and a blurred glow’s layer on --calm-glow-off, and leaves the other layers alone', () => {
+    const halo = rewriteGlow('.a:focus { box-shadow: 0 0 0 0.5px var(--hairline-strong), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }');
+    expect(halo.code).toBe('.a:focus { box-shadow: 0 0 0 0.5px var(--hairline-strong), 0 0 0 var(--calm-ring, 3px) color-mix(in srgb, var(--accent) var(--calm-ring-alpha, 22%), transparent); }');
+    expect(halo.rings).toBe(1);
+    const glow = rewriteGlow('.b { box-shadow: var(--lift), 0 8px 24px -8px color-mix(in srgb, var(--accent) 40%, transparent) !important; }');
+    expect(glow.code).toBe('.b { box-shadow: var(--lift), var(--calm-glow-off, 0 8px 24px -8px color-mix(in srgb, var(--accent) 40%, transparent)) !important; }');
+    expect(glow.glows).toBe(1);
+  });
+
+  it('leaves neutral shadows, thin outlines and background tints as they are', () => {
+    const css = '.a { box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }\n.b { box-shadow: 0 0 0 2px var(--accent); }\n.c { box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--accent) 8%, transparent); }';
+    const out = rewriteGlow(css);
+    expect(out.code).toBe(css);
+    expect(out.kept).toHaveLength(1);
+  });
+
+  it('with calm off (every variable undefined) draws what upstream wrote: unwrapping gives back each file byte for byte', () => {
+    let rewritten = 0;
+    for (const { rel, css } of macCss()) {
+      if (skipGlowFile(rel)) continue;
+      const out = rewriteGlow(css);
+      expect(withoutCalm(out.code), rel).toBe(css);
+      rewritten += out.rings + out.glows;
+    }
+    expect(rewritten).toBeGreaterThan(50);
+  });
+
+  it('with calm on leaves no coloured glow in a processed file, except GLOW_EXCEPTIONS', () => {
+    const left: string[] = [];
+    for (const { rel, css } of macCss()) {
+      if (skipGlowFile(rel)) continue;
+      for (const g of findGlows(withCalmValues(rewriteGlow(css).code))) {
+        if (!GLOW_EXCEPTIONS.some((e) => e.file === rel && g.value.startsWith(e.match))) left.push(`${rel}:${g.line} ${g.value} (${g.why})`);
+      }
+    }
+    expect(left).toEqual([]);
+  });
+
+  it('keeps every exception on the list real: each is still a glow in its file', () => {
+    for (const e of GLOW_EXCEPTIONS) {
+      const file = macCss().find((f) => f.rel === e.file);
+      expect(file, e.file).toBeDefined();
+      expect(findGlows(file!.css).some((g) => g.value.startsWith(e.match)), `${e.file} ${e.match}`).toBe(true);
+    }
   });
 });
 
@@ -177,32 +104,28 @@ describe('fork-calm-glow: the scan', () => {
     expect(offending).toEqual([]);
   });
 
-  it('prints the whole list (file:line, value, why) so the status table can be kept current', () => {
-    const rows = macCss().flatMap(({ rel, css }) => findGlows(css).map((g) => `${rel}:${g.line}  ${g.why.padEnd(14)} ${g.value}`));
+  it('prints the whole list: every glow in the source, what the rewrite does with it (file:line, value)', () => {
+    const rows = macCss().flatMap(({ rel, css }) => findGlows(css).map((g) => `${rel}:${g.line}  ${g.why.padEnd(14)} ${skipGlowFile(rel) ? 'keep-decor ' : g.why.startsWith('blur') ? 'glow-off   ' : 'ring       '} ${g.value}`));
     console.log(`fork-calm-glow: ${rows.length} coloured glows under packages/mac/src\n${rows.join('\n')}`);
     expect(rows.length).toBeGreaterThan(0);
   });
 });
 
-describe('fork-calm-glow: calm-glow.css is clean by the same rules as fork/calm', () => {
+describe('fork-calm-glow: calm-glow.css', () => {
   const css = readFileSync(path.join(mac, 'fork', 'calm', 'calm-glow.css'), 'utf8');
-  it('gates every rule under :root[data-calm], with no keyframes, no scaling and no motion over 200ms', () => {
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('defines the two tokens under :root[data-calm] only, and is imported by calm.css', () => {
+    expect(body).toMatch(/:root\[data-calm\] \{[^}]*--calm-ring: 2px;[^}]*--calm-ring-alpha: 60%;[^}]*--calm-glow-off: 0 0 0 0 transparent;/);
+    expect(readFileSync(path.join(mac, 'fork', 'calm', 'calm.css'), 'utf8')).toContain("@import './calm-glow.css';");
+  });
+
+  it('is clean by the same rules as fork/calm: gated, no keyframes, no scaling, no motion over 200ms', () => {
     expect(css).not.toMatch(/@keyframes/);
     expect(css).not.toMatch(/scale\(\s*[1-9]/);
     const durations = [...css.matchAll(/(?:transition|animation)[^;]*?(\d*\.?\d+)(ms|s)\b/g)].map((m) => (m[2] === 's' ? Number(m[1]) * 1000 : Number(m[1])));
     expect(durations.every((d) => d <= 200)).toBe(true);
-    const selectors = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)].map((m) => m[1]!.trim());
+    const selectors = [...body.matchAll(/([^{}]+)\{/g)].map((m) => m[1]!.trim());
     expect(selectors.filter((sel) => !sel.startsWith(':root[data-calm]'))).toEqual([]);
-  });
-});
-
-describe('fork-calm-glow: the focus and drop rules (calm-glow.css §4–5)', () => {
-  const css = readFileSync(path.join(mac, 'fork', 'calm', 'calm-glow.css'), 'utf8');
-  it('draws focus on the element only, and leaves error and bad fields alone', () => {
-    expect(css).toContain(":root[data-calm] :focus-visible:not([class*='_invalid_']):not([class*='_bad_'])");
-    expect(css).not.toMatch(/:focus-within\s*\{/);
-  });
-  it('anchors the composer drop class on an upstream module', () => {
-    expect(readFileSync(path.join(mac, 'chat', 'composer.module.css'), 'utf8')).toMatch(/\.dropping\b/);
   });
 });

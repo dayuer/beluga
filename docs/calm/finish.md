@@ -8,7 +8,7 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | [§1](#1-强调色) | 六场景改前图、实心强调色清单、每页主操作 | 本页（改后图待 BLG-242） |
 | [§2](#2-行尾只占一个位置) | 行尾标记优先级表、锚点核对 | 本页（改后图待 BLG-243） |
 | [§3](#3-字号字重) | 字号字重阶梯、映射表、例外、沉稳关时如何保持原值 | 本页（插件待 BLG-244） |
-| [§4](#4-彩色光晕) | 光晕清单逐文件分类 | 本页（清理待 BLG-245） |
+| [§4](#4-彩色光晕) | 光晕清单与处理 | 本页（BLG-256 完成） |
 | §5 仍在播放的动画、reduced-motion、问题表 | 复核 | 待 BLG-246 |
 
 ## 0. 基线与约定
@@ -326,95 +326,121 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 ## 4. 彩色光晕
 
-状态：**部分完成**（BLG-245，第二轮）。fork/** 已无光晕层。上游 64 层的处理结果在 §4.2：16 层由覆盖层完整接管，22 层只在键盘聚焦时接管（鼠标聚焦仍是原光晕），1 个错误态焦点按设计保留，其余 26 层未处理。所以「不再有彩色光晕」还没有达到。
+状态：**完成**（BLG-245 做了扫描与测试，BLG-256 处理全部 64 层）。fork/** 里没有光晕层；上游 64 层中 63 层在构建时改写到令牌上，1 层是明说的例外；keep-decor 目录里没有光晕层。（BLG-245 第二轮写的「保留 48 条为例外」的决定已被 BLG-256 取代：用户要求逐条处理，这些例外和那组泛化规则都删掉了。）
 
-### 4.1 判定（`findGlows`，与 `tests/fork-calm-glow.test.ts` 一致）
+### 4.1 判定（`findGlows`，在 `fork/calm/glow-scan.ts`，测试 `tests/fork-calm-glow.test.ts` 用同一个）
 
 光晕 = `box-shadow` 或 `filter: drop-shadow`，且满足：
 - 颜色引用 `--accent`、`--warn`、`--error`、`--success`、`--merged`、`--merge`、`--claude`、状态色，或是饱和的字面色；**并且**
 - blur > 0 或 spread > 2px。
 
-不算光晕：`--hairline`、`rgb(0 0 0 / x)`、`--shadow-*`、`--control-drop` 这类中性阴影；0.5–2px 的实线描边（bezel、拖放目标的清晰框）。键盘焦点圈按 §1.3 的清晰细圈处理，归为无障碍例外。
+不算光晕：`--hairline`、`rgb(0 0 0 / x)`、`--shadow-*`、`--control-drop` 这类中性阴影；0.5–2px 的实线描边（bezel、拖放目标的清晰框）。键盘焦点圈（`--focus-ring`）按 §1 的清晰细圈处理。
 
-### 4.2 清单（BLG-245，由 `findGlows` 实测：64 层）
+### 4.2 怎么处理：构建时改写到令牌（不是逐文件覆盖）
 
-扫描结果：64 条彩色光晕层（`tests/fork-calm-glow.test.ts` 打印，口径见 §4.1），涉及 28 个文件。fork/** 里没有光晕层。
+选择器覆盖（`[class*='_x_']`）做不到：CSS Modules 的类名只有 `_名字_哈希_行号`，没有文件名，`.search`、`.input`、`.edit`、`.rename` 这类名字在好几个模块里重名（64 层里有 33 层是这样），一条覆盖规则会把别的模块的阴影一并改掉。所以和字号一样，由 `type-plugin.ts` 在构建和开发服务器里改写上游 CSS，**只加令牌、不改数值**：
 
-| 文件 | 行 | 原因 | 值 | 处理 |
-| --- | ---: | --- | --- | --- |
-| `chat/composer.module.css` | 29 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `chat/composer.module.css` | 400 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 覆盖：规则 5（投放目标 2px 线） |
-| `chat/edit-prompt.module.css` | 8 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `chat/max.module.css` | 17 | blur 14px | `0 2px 14px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 14%), tra` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `chat/max.module.css` | 21 | blur 22px | `0 4px 22px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 22%), tra` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `components/form.module.css` | 142 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 40%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `components/graph/graph.module.css` | 275 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/graph/graph.module.css` | 293 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/graph/graph.module.css` | 293 | blur 24px | `0 8px 24px -8px color-mix(in srgb, var(--accent) 40%, transparent)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `components/graph/graph.module.css` | 300 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/graph/graph.module.css` | 735 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/graph/graph.module.css` | 1111 | blur 2px | `0 1px 2px color-mix(in srgb, var(--accent) 40%, transparent)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `components/markdown/code-editor.module.css` | 18 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `components/markdown/code-editor.module.css` | 22 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 18%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `components/telemetry-levels.module.css` | 41 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/update.module.css` | 72 | spread 100px | `inset 0 0 0 100px color-mix(in srgb, var(--accent) 8%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/views/views.module.css` | 371 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `components/views/views.module.css` | 1281 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `dialogs/env-settings.module.css` | 56 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `dialogs/keyboard.module.css` | 31 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `dialogs/native/person.module.css` | 73 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `dialogs/settings.module.css` | 391 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `dialogs/support.module.css` | 171 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `dialogs/support.module.css` | 199 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `dialogs/support.module.css` | 229 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `layout/chat-drag.module.css` | 18 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 覆盖：`.over` 改 2px 线（calm-glow.css §1） |
-| `layout/chat-drag.module.css` | 27 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent)` | 覆盖：`.boxGlow` 改 2px 线、停止呼吸（§2） |
-| `layout/chat-drag.module.css` | 27 | blur 32px | `0 0 32px 6px color-mix(in srgb, var(--accent) 34%, transparent)` | 覆盖：`.boxGlow` 改 2px 线、停止呼吸（§2） |
-| `layout/chat-drag.module.css` | 36 | spread 8px | `0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent)` | 覆盖：`.boxGlow` 的呼吸帧（§2） |
-| `layout/chat-drag.module.css` | 36 | blur 44px | `0 0 44px 10px color-mix(in srgb, var(--accent) 26%, transparent)` | 覆盖：`.boxGlow` 的呼吸帧（§2） |
-| `layout/panel/panel.module.css` | 663 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `layout/signal.module.css` | 63 | blur 6px | `0 0 6px 0 color-mix(in srgb, var(--warn) 80%, transparent)` | 覆盖：`.edge` 去掉模糊（§3） |
-| `network/network.module.css` | 290 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `network/network.module.css` | 722 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `network/network.module.css` | 987 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `network/network.module.css` | 991 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 16%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `network/network.module.css` | 1118 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `onboarding/onboarding.module.css` | 191 | blur 30px | `0 10px 30px -10px color-mix(in srgb, var(--claude) 70%, transparent)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `onboarding/onboarding.module.css` | 260 | blur 10px | `0 0 10px var(--claude)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `onboarding/onboarding.module.css` | 345 | blur 40px | `0 18px 40px -18px color-mix(in srgb, var(--accent) 60%, transparent)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `onboarding/onboarding.module.css` | 373 | spread 4px | `inset 0 0 0 4px var(--accent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `onboarding/onboarding.module.css` | 639 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `onboarding/onboarding.module.css` | 1258 | spread 4px | `inset 0 0 0 4px color-mix(in srgb, var(--accent) 35%, var(--bg))` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `plans/plan-ask.module.css` | 30 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `plans/plans.module.css` | 671 | blur 28px | `0 10px 28px -14px color-mix(in srgb, var(--claude) 70%, transparent)` | 未处理：大模糊装饰光晕，需决定保留（例外）或改 |
-| `plans/plans.module.css` | 1295 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `plans/plans.module.css` | 1566 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `plans/plans.module.css` | 1605 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `plans/plans.module.css` | 1613 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `plans/plans.module.css` | 2293 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `sentinel/sentinel.module.css` | 423 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `sentinel/sentinel.module.css` | 932 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `sentinel/sentinel.module.css` | 940 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `sentinel/sentinel.module.css` | 1022 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `tasks/NewTaskSheet.module.css` | 42 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 覆盖：规则 4（`:focus-visible` 2px 环，calm-glow.css） |
-| `tasks/NewTaskSheet.module.css` | 147 | spread 3.5px | `0 0 0 3.5px hsl(var(--hue) var(--sat) 50%)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
-| `tasks/tasks.module.css` | 338 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `tasks/tasks.module.css` | 1195 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `tasks/tasks.module.css` | 1466 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `tasks/tasks.module.css` | 1955 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `views/history/history.module.css` | 297 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `views/project-home.module.css` | 145 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `views/shared-search.module.css` | 15 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 部分：鼠标聚焦时仍是原光晕（`:focus`）；键盘聚焦由规则 4 覆盖 |
-| `views/terminal.module.css` | 111 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理：非焦点的 3px 光晕，需逐个判定 |
+- **光晕环**（blur 为 0、spread 大于 2px，共 52 层）：第四个长度换成 `var(--calm-ring, 3px)`，颜色里的百分比换成 `var(--calm-ring-alpha, 22%)`，其余原样。
+- **模糊光晕**（blur 大于 0，共 11 层）：整层换成 `var(--calm-glow-off, <原来的整层>)`。
+- `fork/calm/calm-glow.css` 在 `:root[data-calm]` 下定义 `--calm-ring: 2px`、`--calm-ring-alpha: 60%` 和 `--calm-glow-off: 0 0 0 0 transparent`。
 
-`.over`/`.boxGlow`/`.edge` 的覆盖层规则在 `fork/calm/calm-glow.css`；它们在沉稳关时不生效。keep-decor 目录（onboarding/scenes、Wormhole、reactbits、PixelBurst、star-scene、call、YourCard）按设计维持原状，目前 `onboarding/scenes` 里没有光晕层，`onboarding/onboarding.module.css` 不在 keep-decor 内，列入未处理。
+沉稳关时三个变量没有定义，回退值就是上游的原值，画面与上游一致。测试：把改写还原，64 个文件逐字节等于原 CSS（层之间的换行、缩进也一样）。沉稳开时：光晕环变成 2px 的同色环，不透明度统一为 60%；模糊光晕变成一个透明的空层，其余层不动。
 
-### 4.3 已知的几处（设计所列）
+**无障碍**：光晕环大多是输入框的 `:focus`/`:focus-within`。环从 3px 缩到 2px，不透明度改为 60%（原来多是 16–50%，作为软光晕），所以聚焦时是一圈清楚的 2px 线而不是一团光。聚焦的文本框，沉稳关（左）与沉稳开（右）：
 
-- `layout/chat-drag.module.css:18`：5px 外晕 → 覆盖成 2px 实线（design §4 的例子）。
-- `layout/project-groups.module.css`、`layout/Sidebar.module.css`：拖放环。
-- `callfloat/callfloat.module.css`：`inset` 的 1.5px 实线可保留；`var(--lift)` 的外晕要去掉。
-- `dialogs/support.module.css`：`0 0 0 4px` 的 accent 半透明外环，是焦点型的光晕，按 §1.3 改成细圈。
+| 沉稳关（上游） | 沉稳开 |
+| --- | --- |
+| ![](img/m8-focus-off.png) | ![](img/m8-focus-on.png) |
+
+错误态（`.invalid`、`.bad`）的红色光晕同样变成 60% 的红色 2px 环：红色还在，不再是光晕。
+
+**跳过的文件**：fork/、styles/ 和 keep-decor 目录（`onboarding/scenes/`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call/`、`YourCard`）不改写。这些目录里目前没有光晕层，所以没有例外要写。
+
+**例外**：`components/update.module.css:72`（`inset 0 0 0 100px` 的 8% 强调色）是用 inset 阴影写的背景着色，不是光晕，维持原状（`GLOW_EXCEPTIONS`，测试检查它仍在文件里）。
+
+**BLG-245 留下的问题，这次一并修了**：① `calm-glow.css` 当时没有被 `calm.css` 引入，所以它的规则（包括第二轮那条 `:focus-visible` 泛化规则）从来没有生效；② 其中 `[class*='_over_']`、`[class*='_edge_']`、`[class*='_dropping_']` 会碰到别的模块的同名类（例如 fork 的侧栏拖拽条 `edge`）。这些规则全部删掉，只留 `.boxGlow` 的 `animation: none`（类名唯一）。
+
+### 4.3 清单：64 层，每层的处理和结果
+
+| 文件 | 行 | 原因 | 值 | 处理 | 结果 |
+| --- | ---: | --- | --- | --- | --- |
+| `chat/composer.module.css` | 29 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `chat/composer.module.css` | 400 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `chat/edit-prompt.module.css` | 8 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `chat/max.module.css` | 17 | blur 14px | `0 2px 14px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 14%), tra` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `chat/max.module.css` | 21 | blur 22px | `0 4px 22px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 22%), tra` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `components/form.module.css` | 142 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 40%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/graph/graph.module.css` | 275 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/graph/graph.module.css` | 293 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/graph/graph.module.css` | 293 | blur 24px | `0 8px 24px -8px color-mix(in srgb, var(--accent) 40%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `components/graph/graph.module.css` | 300 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/graph/graph.module.css` | 735 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/graph/graph.module.css` | 1111 | blur 2px | `0 1px 2px color-mix(in srgb, var(--accent) 40%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `components/markdown/code-editor.module.css` | 18 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/markdown/code-editor.module.css` | 22 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/telemetry-levels.module.css` | 41 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/update.module.css` | 72 | spread 100px | `inset 0 0 0 100px color-mix(in srgb, var(--accent) 8%, transparent)` | 例外：背景着色 | 维持原状：用 inset 阴影写的 8% 强调色底，不是光晕 |
+| `components/views/views.module.css` | 371 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `components/views/views.module.css` | 1281 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/env-settings.module.css` | 56 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/keyboard.module.css` | 31 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/native/person.module.css` | 73 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/settings.module.css` | 391 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/support.module.css` | 171 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/support.module.css` | 199 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `dialogs/support.module.css` | 229 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `layout/chat-drag.module.css` | 18 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `layout/chat-drag.module.css` | 27 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `layout/chat-drag.module.css` | 27 | blur 32px | `0 0 32px 6px color-mix(in srgb, var(--accent) 34%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `layout/chat-drag.module.css` | 36 | spread 8px | `0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `layout/chat-drag.module.css` | 36 | blur 44px | `0 0 44px 10px color-mix(in srgb, var(--accent) 26%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `layout/panel/panel.module.css` | 663 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `layout/signal.module.css` | 63 | blur 6px | `0 0 6px 0 color-mix(in srgb, var(--warn) 80%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `network/network.module.css` | 290 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `network/network.module.css` | 722 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `network/network.module.css` | 987 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `network/network.module.css` | 991 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 16%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `network/network.module.css` | 1118 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 191 | blur 30px | `0 10px 30px -10px color-mix(in srgb, var(--claude) 70%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 260 | blur 10px | `0 0 10px var(--claude)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 345 | blur 40px | `0 18px 40px -18px color-mix(in srgb, var(--accent) 60%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 373 | spread 4px | `inset 0 0 0 4px var(--accent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 639 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 1258 | spread 4px | `inset 0 0 0 4px color-mix(in srgb, var(--accent) 35%, var(--bg))` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plan-ask.module.css` | 30 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plans.module.css` | 671 | blur 28px | `0 10px 28px -14px color-mix(in srgb, var(--claude) 70%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
+| `plans/plans.module.css` | 1295 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plans.module.css` | 1566 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plans.module.css` | 1605 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plans.module.css` | 1613 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `plans/plans.module.css` | 2293 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `sentinel/sentinel.module.css` | 423 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `sentinel/sentinel.module.css` | 932 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `sentinel/sentinel.module.css` | 940 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `sentinel/sentinel.module.css` | 1022 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/NewTaskSheet.module.css` | 42 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/NewTaskSheet.module.css` | 147 | spread 3.5px | `0 0 0 3.5px hsl(var(--hue) var(--sat) 50%)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/tasks.module.css` | 338 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/tasks.module.css` | 1195 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/tasks.module.css` | 1466 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `tasks/tasks.module.css` | 1955 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `views/history/history.module.css` | 297 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `views/project-home.module.css` | 145 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `views/shared-search.module.css` | 15 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `views/terminal.module.css` | 111 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+
+### 4.4 计算样式证据（沉稳开时没有未登记的彩色光晕）
+
+Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所有元素及其 `::before`/`::after` 取计算后的 `box-shadow` 和 `filter`，把「blur 大于 0 或 spread 大于 2px、且颜色饱和度大于 0.15」的层算作彩色光晕；并且依次聚焦每页最多 80 个可聚焦元素，再扫一遍（光晕大多是聚焦态）。浅色、深色各一遍：
+
+| 页面 | 沉稳关：静止 / 聚焦后新增 | 沉稳开：静止 / 聚焦后新增 |
+| --- | --- | --- |
+| 工作区 | 0 / 0 | 0 / 0 |
+| 任务页 | 0 / 1（`label._find`：`0 0 0 3px` 强调色 25%） | 0 / 0 |
+| Sentinel | 0 / 0 | 0 / 0 |
+| 总览 | 0 / 1（`label._field`：`0 0 0 3px` 强调色 50%） | 0 / 0 |
+
+没有覆盖的状态：计划和用量页（没有单独扫），以及需要特定操作才出现的状态（拖放、对话框内的聚焦）。这些靠源码层的测试覆盖：沉稳开时处理过的文件里没有任何光晕层（`tests/fork-calm-glow.test.ts`）。
 
 ## 5. 最终复核（BLG-246）
 
@@ -455,7 +481,7 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | 编号 | 问题 | 状态 |
 | --- | --- | --- |
 | M8-1 | 工作区 Create PR 周围的光没有定位来源，改后仍在（BLG-242 的未完成项） | **未解决**，需要单独确认：在 DevTools 里找出 box-shadow 来源 |
-| M8-2 | 上游 60 层彩色光晕未处理（BLG-245 的未完成项） | **未解决**，需要后续任务 |
+| M8-2 | 上游 64 层彩色光晕（BLG-245 只处理了 4 层） | **已解决**（BLG-256）：63 层构建时改写到令牌，1 层背景着色例外，计算样式扫描 0 个 |
 | M8-3 | 字号写法 ≤ 25 的目标未达：构建口径 51、测试口径 79（BLG-244） | **放宽**为实测值；需确认接受 |
 | M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
 | M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件（本 M8 的 vite.config.ts 已登记，不计入）。这些是 M8 之前 fork 已有的改动，不是 M8 造成的 | **未达标**，需要另外补登记 |
@@ -594,25 +620,6 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 
 说明：插入 200 行是测试自己的动作（把整页内容往下推），不是标记合并造成的，所以分开写；突发阶段（标记变化、滚动）的 CLS 为 0，无长任务、无掉帧。插入时的长任务在机器忙时沉稳开更高（309–374 ms 对 130 ms），没有拆开是钩子还是沉稳的 `:has()` 样式造成的；真实侧栏不会一次插入 200 行。
 
-
-### 4.4 例外与未处理的原因（BLG-245）
-
-- **错误态焦点（保留）**：`.invalid`、`.bad`、`jsonBad` 类的焦点仍是红色光晕，规则 4 不覆盖它们，红色是错误信号。
-- **鼠标聚焦（部分）**：`:focus` 写的焦点（多为文本框）在键盘聚焦时被规则 4 覆盖；鼠标点击聚焦时 `:focus-visible` 多半不匹配，原光晕保留。是否改成统一规则要在复核时看截图再定。
-- **焦点容器（未处理）**：`.searchRow:focus-within`、`.editor:focus-within` 之类。`:focus-within` 会匹配祖先，泛化规则会把整块面板套上环，所以不能用通用选择器，要逐个改。
-- **大模糊装饰（未处理）**：`chat/max`、`chat/attention .urgent`、`plans` 与 `onboarding` 里的 claude/accent 大模糊光晕、`components/graph`。这些是装饰，需要决定保留（写进例外）还是改成中性阴影。
-- **非焦点的 3px 光晕（未处理）**：如 `dialogs/keyboard .searchOn`、`dialogs/settings .search:focus-within` 等，需逐个判定。
-
-### 4.5 验证
-
-- `tests/fork-calm-glow.test.ts`：fork/** 无光晕层（通过）；calm-glow.css 无 keyframes、不放大、时长不超过 200ms（通过）；规则 4 只用 `:focus-visible`，不用 `:focus-within`（通过）。
-- `tests/fork-calm.test.ts`：上游报告 491 条，未变（通过）。
-- 视觉：规则 4 未经截图核对（这轮没有拍图）；BLG-246 复核时要看一张有焦点的文本框。
-- 沉稳关：所有规则在 `:root[data-calm]` 下，关闭时不匹配。
-
-### 4.6 决定（liyuqing，2026-11-18）
-
-剩下的 26 层未处理、22 层只在键盘焦点时覆盖，按用户决定**保留为例外**，逐条写进 `tests/fork-calm-glow.test.ts` 的 `GLOW_EXCEPTIONS`（共 48 条，每条带原因）。其中焦点容器（`:focus-within`）和非焦点的 3px 光晕另开 follow-up 逐个处理；大模糊的装饰光晕（chat/max、attention、plans、onboarding、graph）作为装饰保留。
 
 ### 3.8 压到上限：一个数字、em 五档、例外清单、textSize 截图（BLG-255）
 
