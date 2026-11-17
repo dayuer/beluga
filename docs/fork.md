@@ -352,3 +352,18 @@ fork 的其他文件与测试：
 - `packages/mac/src/fork/settings-index.ts`：`people` 下加「我的共享」（All circles）的搜索行
 - `packages/mac/src/i18n/zh-CN.fork.json`：中文文案
 - `tests/sharing-defaults.test.ts`、`packages/mac/e2e/sharing-defaults.spec.ts`、`tests/fork-calm.test.ts`（Settings.tsx 的 canary）、`tests/mac-settings-search.test.ts`（people 页的来源加上 `fork/sharing/MySharing.tsx`）、`packages/mac/scripts/calm-check.mjs`（`sharing` 场景，200 圈演示源）
+
+### 沉稳收尾（M8）
+
+M8 只改 fork 自己的文件，上游文件只留接入点。每个接入点在这里登记。
+
+| 文件 | 改动 | 原因 |
+| --- | --- | --- |
+| `packages/mac/src/fork/sidebar/one-selected.ts`（fork 文件） | `useOneSelected` 内调用 `useOneMark(ref)`，沉稳关时属性仍写、样式不生效 | BLG-243：侧栏行尾只显示一个标记。挂在已有的侧栏接入点上，`Sidebar.tsx` 不用改 |
+| `packages/mac/src/fork/sidebar/one-mark.ts`（fork 文件） | 优先级纯函数 `pickMark`/`settleMarks`、锚点 `MARKS`、DOM 钩子 `useOneMark` | BLG-251 / BLG-243 |
+| `packages/mac/src/fork/sidebar/sidebar-look.css` | 落选标记 `display:none`；行悬停或焦点时 `display:revert`（沉稳开时） | BLG-243 |
+| `packages/mac/src/fork/calm/calm-accent.css`（新，fork 文件） | 强调色收口、推广卡移出导航（沉稳开时） | BLG-242 / BLG-249 / BLG-250 |
+| `packages/mac/src/fork/calm/calm-glow.css`（新，fork 文件） | 三处光晕的覆盖层规则 | BLG-245（部分） |
+| `packages/mac/src/fork/calm/calm-type.css`（新，fork 文件） | 字号字重令牌，只在 `:root[data-calm]` 下定义 | BLG-252 |
+
+锚点在 `tests/fork-sidebar-anchors.test.ts` 与 `tests/fork-calm-accent.test.ts` 里检查，同步上游后失效会失败并指出名字。
