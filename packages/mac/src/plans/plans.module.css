@@ -2282,7 +2282,7 @@ textarea.goalBox {
   color: var(--text-3);
   font: inherit;
   font-size: 0.88rem;
-  cursor: pointer;
+  cursor: var(--press-cursor);
 }
 .rolesSwitch:hover {
   background: var(--bg-hover);
