@@ -46,7 +46,24 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | 计划 plan | ![](img/m8-before-plan-light.png) | ![](img/m8-before-plan-dark.png) |
 | 用量 usage | ![](img/m8-before-usage-light.png) | ![](img/m8-before-usage-dark.png) |
 
-改后图在 BLG-242 补：`img/m8-after-<scene>-<theme>.png`，与上表并排。
+### 1.4 改后（BLG-242，浅色、深色，同上）
+
+覆盖层：`fork/calm/calm-accent.css`，由 `calm.css` 引入。
+
+| 场景 | 改前 浅色 | 改后 浅色 | 改后 深色 |
+| --- | --- | --- | --- |
+| 任务页 tasks | ![](img/m8-before-tasks-light.png) | ![](img/m8-after-tasks-light.png) | ![](img/m8-after-tasks-dark.png) |
+| 对话进行中 chatsteps | ![](img/m8-before-chatsteps-light.png) | ![](img/m8-after-chatsteps-light.png) | ![](img/m8-after-chatsteps-dark.png) |
+| Sentinel | ![](img/m8-before-sentinel-light.png) | ![](img/m8-after-sentinel-light.png) | ![](img/m8-after-sentinel-dark.png) |
+| 工作区 workspace | ![](img/m8-before-workspace-light.png) | ![](img/m8-after-workspace-light.png) | ![](img/m8-after-workspace-dark.png) |
+
+改了什么（浅色图已核对）：
+- 任务页：「Everyone」下拉的箭头块由蓝改为中性；侧栏 bob-api 的计数由蓝底改为中性灰。「New Task」仍是唯一实心蓝。「Show All」仍是蓝字，属于 BLG-249。
+- Sentinel：「需要你」卡里的「Merge」（原实心绿）和「Resume」（原实心蓝）改为中性次按钮；「New Sentinel」仍是唯一实心蓝。
+- 工作区：「Create PR」仍是唯一实心蓝。**未确认的一点**：改前图里 Create PR 周围的那圈光，改后肉眼看不出变化。`--focus-ring` 已改成 2px 细线，但截图时按钮没有焦点，所以那圈光不是焦点圈；它的来源（可能是 `--control-accent-sheen` 或别的阴影）还没定位。这一点留给 BLG-246 复核，不算完成。
+- 对话进行中：只有 Create PR 是实心蓝；停止按钮是中性深色。
+
+主操作清单（实施后）：任务页 = New Task；工作区 = Create PR；对话进行中 = Create PR（停止按钮不算）；Sentinel = New Sentinel。对话框的默认按钮不动。计划页、用量页未在本任务核对。
 
 ### 1.2 每页实心强调色清单与去留
 
