@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentRef } from '../src/protocol.js';
 import type { RuntimeChoice, RuntimeModel } from '../src/shared/agent-runtimes.js';
-import { agentModelItems } from '../packages/mac/src/components/agent-options.js';
+import { agentModelItems } from '../packages/mac/src/components/agent-model-items.js';
 
 const model = (value: string, label: string, why?: string): RuntimeModel => ({ value, label, description: '', ...(why ? { why } : {}) });
 const runtimes: RuntimeChoice[] = [
