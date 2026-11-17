@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { type Plugin, defineConfig } from 'vite';
+import { calmType } from './src/fork/calm/type-plugin.js';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 
@@ -73,7 +74,7 @@ function pdfjsAssets(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), daemonEndpoint(), pdfjsAssets()],
+  plugins: [react(), daemonEndpoint(), pdfjsAssets(), calmType()],
   resolve: { alias: { '@beluga': path.join(repo, 'src') } },
   clearScreen: false,
   // Loaded only when the first graph or chart shows (components/graph, components/views/Chart):

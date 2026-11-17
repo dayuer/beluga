@@ -365,5 +365,18 @@ M8 只改 fork 自己的文件，上游文件只留接入点。每个接入点�
 | `packages/mac/src/fork/calm/calm-accent.css`（新，fork 文件） | 强调色收口、推广卡移出导航（沉稳开时） | BLG-242 / BLG-249 / BLG-250 |
 | `packages/mac/src/fork/calm/calm-glow.css`（新，fork 文件） | 三处光晕的覆盖层规则 | BLG-245（部分） |
 | `packages/mac/src/fork/calm/calm-type.css`（新，fork 文件） | 字号字重令牌，只在 `:root[data-calm]` 下定义 | BLG-252 |
+| `packages/mac/vite.config.ts`（上游文件，2 行） | `import { calmType }`，plugins 数组加 `calmType()` | BLG-244：构建时把散字号字重改成带原值兜底的令牌引用（沉稳关时等价） |
+| `packages/mac/src/fork/calm/type-scale.ts`、`type-plugin.ts`（新，fork 文件） | 纯改写函数与 Vite 插件 | BLG-244 |
 
 锚点在 `tests/fork-sidebar-anchors.test.ts` 与 `tests/fork-calm-accent.test.ts` 里检查，同步上游后失效会失败并指出名字。
+
+### 沉稳收尾（M8）
+
+M8 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm-glow.css`、`calm-type.css`、`type-scale.ts`、`type-plugin.ts`；`fork/sidebar/one-mark.ts`、`sidebar-look.css`）。改上游文件只登记下面这些：
+
+| 文件 | 改了几行 | 原因 |
+| --- | ---: | --- |
+| `packages/mac/vite.config.ts` | 2 | 接入构建时字号改写插件 `calmType()`（BLG-244）；沉稳关时变量未定义，改写后的值与原值一致 |
+
+`fork/calm/calm-glow.css` 的覆盖层规则只在 `:root[data-calm]` 下生效。`onboarding/scenes`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call`、`YourCard` 是 keep-decor，不做字号改写，也不动光晕（`fork/calm/type-scale.ts` 的 `skipFile`）。
+

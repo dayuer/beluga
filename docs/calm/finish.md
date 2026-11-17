@@ -468,3 +468,27 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 「收起的信息悬停仍能看到」：成立，悬停时收起的标记展开。**一个例外**：金额在悬停时（calm 开）同样展开，但 calm 关时上游自己在悬停时隐藏金额；这是上游行为，没有改。金额的数字还在项目主页和用量页。
 
 **未做**：同一行的改前、改后、悬停三张图（§2.3 原计划）；200 行侧栏的卡顿测量（设计的风险项）。两项都留给 BLG-246 复核。
+
+### 3.7 实测（BLG-244，`vite build` 的 `calm-type` 报告）
+
+插件在构建和开发服务器里改写 packages/mac/src 的 CSS（跳过 fork/、styles/ 和 keep-decor）。`npx vite build` 输出的报告（`.context/calm/type-report.json`）：
+
+- 处理的声明：2179 条（跳过的文件不计）；改写成令牌：2044 条；
+- 写法（font-size 与 font-weight 合计，处理的文件内）：**116 → 51**（保留 39 种 + 12 个令牌：8 个字号、4 个字重）；
+- 字号和字重分开的口径（测试 `tests/fork-calm-type.test.ts`，含跳过的文件）：121 → 79；
+- 保留的 104 处按原因分：em 72、自定义属性 21、calc/clamp 7、其他 4。
+
+**与设计的差异，需要说明**：设计写「改写后剩余的不同写法 ≤ 25」。实测做不到：`em` 是相对父元素的，不能换成 rem 令牌（会改变布局），它占了保留项的大部分。测试的上限写的是实测值（≤ 80），并在测试注释里说明，没有把它改成 25。
+
+沉稳关时的等价：`tests/fork-calm-type.test.ts` 把所有改写的 `var(--calm-fs-N, X)` 还原成 X，结果与原 CSS 逐字节相同。
+
+**未做**：设计要求的 textSize 11 和 16 下各一张 workspace 图（看字号随偏好缩放的影响）；六场景改后截图与改前的排版对比（留给 BLG-246）。
+
+### 3.7 实施结果（BLG-244）
+
+- 实现：`fork/calm/type-scale.ts`（纯函数：`planSize`、`planWeight`、`rewriteType`、`skipFile`），`fork/calm/type-plugin.ts`（`calmType()`，`enforce: 'pre'`，transform 只处理 `packages/mac/src` 下的 CSS，失败时原样返回），接入点 `packages/mac/vite.config.ts` 一行（已登记到 docs/fork.md「沉稳收尾（M8）」）。
+- 构建输出（`npx vite build`，本树）：`calm-type: 2179 decls, spellings 116→51 (kept 39, tokens 12), mapped 2044`。报告写入 `.context/calm/type-report.json`。
+- 测试口径（`tests/fork-calm-type.test.ts`，覆盖全部 mac CSS，含未打包的文件）：2323 条声明，写法 121 → 79（保留 67 种 + 12 个令牌）。保留的按原因：`em` 72 处、`var()` 21、`calc/clamp` 7、超出 9–30px 的 1 处、关键字等 3 处（按文件-值计）。
+- **与设计的差异**：设计要求改写后剩余 ≤ 25 种。按设计保留 em、超范围、自定义属性之后达不到，所以测试上限定为实测值（≤ 80，当前 79），并要求减少到原来的 75% 以下。这是一项放宽，需要 BLG-246 或你确认是否接受。
+- **未做**：文字大小 11 和 16 下的 workspace 对比图（设计要求）；六场景改后对比（BLG-246）。
+- 沉稳关时的等价性：测试对全部 mac CSS 做了「去掉 var 包装后与原文逐字节相同」的检查，证明 fallback 就是上游原值。
