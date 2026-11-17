@@ -241,6 +241,7 @@ const Team = z.object({
 - "How it runs" 里的 Full Autopilot 一行、对话 ••• 表里的 Full Autopilot 一行删掉（§8）。
 - 协议 1.64：新增 `PlanView.autoTeam`、`PlanView.team`（那行搭配的文字）、`SINCE.autoTeam`。
   老手机看不到开关，三行里显示的是 Mac 解析后的结果。
+- 三行各自的选择器已经列出 Mac 上的每个 agent 和模型（`AgentChoice`），所以手机上本来就能选具体的模型，不用改。
 - 外观按 `packages/companion/lib/theme.ts`：不加按钮，都在 ••• 表里。
 
 ## 8. 删掉 Full Autopilot
@@ -313,7 +314,7 @@ Studio 这边只有一行改动（zod 多拒一个字段）和测试。
 | `src/fork/plans/escalate.ts`（新） | §5 的顺序。`fixer.ts`、`ladder.ts` 只改"换给谁" |
 | `src/shared/auto-route.ts` | 删掉 |
 | `src/core/plans/model.ts`、`plans.ts` | `autoTeam`；删 `archAgent`、`fixAgent`；`roleAgent` 改回上游原样 |
-| `src/core/plans/work.ts`、`pilot.ts`、`src/core/board/launch.ts`、`board/work.ts` | 取人的地方改调 `teamAgent` / `taskAgent`，每处一两行 |
+| `src/core/plans/work.ts`、`pilot.ts`、`src/core/board/work.ts` | 取人的地方改调 `teamAgent` / `taskAgent`，每处一两行 |
 | `src/ipc/plans-api.ts` | `plans.setAutoTeam`，`plans.create` 的 `autoTeam` |
 | `src/companion/` | `coverage.ts`、`views.ts`、`protocol.ts`（1.64：加编队的字段，去掉 Full Autopilot 的两个字段） |
 | Full Autopilot（删） | §8.2 整张表 |

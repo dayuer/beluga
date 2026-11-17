@@ -14,17 +14,20 @@
 
 ## 和上一版计划的区别（2026-11-17，上游 3.6.0 之后）
 
-- **第一期 Full Autopilot（原任务 1–8）整期删掉。** 上游 #556 已经做了（`src/core/autopilot/`、`Plan.fullAuto`、
-  `plans.setFullAuto`、`session.setAutopilot`），3.6.0 已合进 `main`。不要再写 `auto-answer.ts`、
-  `plan_answer`、`plan_defer`、`Autonomy` 的第四个值。
+- **第一期 Full Autopilot（原任务 1–8）整期删掉。** 不要再写 `auto-answer.ts`、`plan_answer`、`plan_defer`、
+  `Autonomy` 的第四个值。上游 #556 自己做了一版（`src/core/autopilot/`、`Plan.fullAuto`），3.6.0 已合进 `main`；
+  那一版本分叉也不要，由任务 0 删掉（见本节最后一条）。
 - **第二期改成建在上游的三个部分之上。** 名字用上游的 `planner` / `builder` / `checker`。不再有 `Plan.team`
   和 `plans.setTeam`：每个部分指定谁，用上游的 `plans.setRoleAgent`；分叉只加 `Plan.autoTeam` 和
-  `plans.setAutoTeam`，写法照上游的 `fullAuto`。
+  `plans.setAutoTeam`：计划上一个可选的布尔值，一个开关它的方法。
 - **第三期没有了。** #546 已被维护者关闭；endpoint 检查早在 `main` 上（`src/fork/endpoint-check.ts`）。
   上游还提不提东西，是最后一节留给负责人的决定。
 - 所以只剩**一期、一个 PR、一个 worktree**：分支 `fork/model-team`。
 - **2026-11-17 负责人的决定：上游的 Full Autopilot 整个删掉**（设计文档 §8）。新增任务 0，排在最前面，
   这样后面的任务不用去接一个要删的东西。后面任务里原来写"照 `setFullAuto`"的地方都改掉了。
+- **2026-11-17 负责人看了计划页的截图后提的：每个部分要能选具体的模型**（设计文档 §7.2）。上游计划页的子菜单
+  只列 agent。并进任务 7 第 3 步，不单列任务。手机上不用改：三个部分用的 `AgentChoice` 选择器已经列出
+  Mac 上的每个 agent 和模型（已核对 `packages/companion/components/AgentChoice.tsx`）。
 
 ## 怎么读这份计划
 
@@ -50,12 +53,12 @@
 | `src/fork/plans/escalate.ts`（新） | 升级顺序：builder → checker → planner |
 | `src/fork/plans/roles.ts`、`fixer.ts`、`ladder.ts` | 只改"换给谁"，机制不动 |
 | `src/core/plans/model.ts`、`plans.ts` | `autoTeam`；删 `archAgent`、`fixAgent`；`roleAgent` 改回上游原样 |
-| `src/core/plans/work.ts`、`pilot.ts`、`src/core/board/launch.ts`、`board/work.ts` | 接入点：取人改调 `teamAgent` / `taskAgent` |
+| `src/core/plans/work.ts`、`pilot.ts`、`src/core/board/work.ts` | 接入点：取人改调 `teamAgent` / `taskAgent` |
 | `src/ipc/plans-api.ts`、`plans-handlers.ts` | `plans.setAutoTeam`、`plans.create` 的 `autoTeam` |
 | `src/companion/protocol.ts`、`views.ts`、`coverage.ts` | 1.64：`PlanView.autoTeam`、`team`、`SINCE.autoTeam` |
 | `src/shared/auto-route.ts` | 删除 |
 | `packages/mac/src/fork/plans/auto-team.ts`（新） | "Automatic"这一项的纯逻辑 |
-| `packages/mac/src/plans/AgentRoles.tsx` | 接入点：下拉框多一项，菜单多一行 |
+| `packages/mac/src/plans/AgentRoles.tsx` | 接入点：下拉框多一项，菜单多一行；计划页的子菜单列出具体模型 |
 | `packages/mac/src/dialogs/TeamSettings.tsx`（新） | 设置里的开关和自定义表 |
 | `packages/companion/app/plan/[id].tsx` | 一行开关；两行旧的按版本隐藏 |
 | `src/core/autopilot/`、`src/agent/stand-in.ts`、`packages/mac/src/chat/AutopilotChip.tsx`、`tests/autopilot.test.ts`、`packages/mac/e2e/autopilot.spec.ts` | 删除（任务 0） |
@@ -912,7 +915,7 @@ Expected: PASS（`plan-roles.test.ts` 是上游的，没改，必须通过）。
 
 **Files:**
 - Create: `src/fork/plans/team.ts`
-- Modify（接入点）: `src/core/plans/work.ts:120,171,177,178,243,491`、`src/core/plans/pilot.ts:870,895`、`src/core/board/launch.ts`（替身那一行）、`src/core/board/work.ts:372`、`src/companion/views.ts:1141`
+- Modify（接入点）: `src/core/plans/work.ts:120,171,177,178,243,491`、`src/core/plans/pilot.ts:870,895`、`src/core/board/work.ts:372`、`src/companion/views.ts:1141`
 - Modify: `src/fork/plans/roles.ts`（`workAgentFor`、`milestoneRoles`）
 - Test: `tests/plan-team-agent.test.ts`（新），改 `tests/fork-plan-roles.test.ts`、`tests/fork-plan-roles-visible.test.ts`、`tests/plan-arch-agent.test.ts`
 
@@ -1026,7 +1029,8 @@ export function taskAgent(plan: Parts | undefined, task: { readonly agent?: Agen
 `prefs` 里默认 agent 的字段按 `defaultAgentOf`（`src/protocol.ts:92`）读的写；`state.models` 的形状先
 `grep -n "models" src/core/store.ts | head` 确认，不是 `{ value }[]` 就在 `lineupOf` 里按实际的取。
 
-接入点，逐个替换（`st` 都是 `deps.store.getState()`）：
+接入点，逐个替换（`st` 都是 `deps.store.getState()`）：行号是任务 0 之前的，任务 0 删过代码后会往前移，先 grep 再改。
+`src/core/board/launch.ts` 里原来有一处取人（Full Autopilot 的替身），任务 0 已经连那一段一起删了，那个文件不用再动。
 
 | 现在 | 换成 |
 |---|---|
@@ -1034,7 +1038,6 @@ export function taskAgent(plan: Parts | undefined, task: { readonly agent?: Agen
 | `work.ts:178,243,491` `homeAgentOf(plan)` | `teamAgent(plan, 'planner', st)` |
 | `work.ts:171` `if (ws && plan.archAgent) …setAgent(ws.id, plan.archAgent)` | 条件改成 `plan.autoTeam`，agent 用 `teamAgent(plan, 'planner', st)`（没有就不设） |
 | `pilot.ts:870,895` 里的 `plan.archAgent` | `plan.autoTeam`：里程碑的设计步骤只在 Automatic 的计划上运行 |
-| `launch.ts` 替身的 `roleAgent(plan, 'planner')` | `teamAgent(plan, 'planner', store.getState())`：Automatic 的计划由强档模型代答 |
 | `work.ts:177` `fixer: plan.fixAgent ?? autoFixer(st)` | 任务 5 |
 | `board/work.ts:372`、`views.ts:1141` 的 `routedAgent(issue, state)` | `taskAgent(planOfIssue, issue, state)`；项目自己的 agent（`prefs.projectAgents`）仍然排在它前面，照 `routedAgent` 原来的顺序写 |
 | `roles.ts` 的 `workAgentFor(plan, task, st, pick, fixer)` | 里面 `autoAgentFor(...)` 那一步换成 `teamAgent(plan, 'builder', st)`，`via` 仍是 `'auto'`；其余顺序不变 |
