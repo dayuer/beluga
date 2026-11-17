@@ -1,0 +1,15 @@
+# Copy to .dev.vars for `wrangler dev` (never commit that file).
+OPERATOR_TOKEN=dev-operator-token
+# outbox (default): keep links in D1 for the admin page. resend: real email (BLG-82/114).
+# console: only logs "link issued" (no token).
+MAIL_MODE=outbox
+# For MAIL_MODE=resend: the Resend key goes here (gitignored) locally, and in
+# `npx wrangler secret put RESEND_API_KEY` when deployed. Never in code or wrangler.toml.
+# RESEND_API_KEY=re_...
+# MAIL_FROM must use a domain you verified in Resend (SPF/DKIM).
+MAIL_FROM=Synon Studio <login@your-verified-domain>
+# Required for magic links; a missing/non-absolute origin makes the hub refuse to issue a link.
+# Use http://localhost:8790 with the app's dev-proxy, or http://localhost:8787 when only the hub is open.
+HUB_ORIGIN=http://localhost:8790
+# P1 never signs preview links; P2 sets this.
+PREVIEW_SECRET=

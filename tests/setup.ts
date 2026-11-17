@@ -58,3 +58,8 @@ process.env.BELUGA_DELETE_PRIORITY ??= 'normal';
 
 // The tests are a Mac's wherever they run ("Your Mac"; shared/assistant.ts).
 process.env.BELUGA_COMPUTER ??= 'mac';
+
+// git's own messages are read in English (tests/main-sync.test.ts, tests/plan-branch.test.ts): a
+// Mac whose git speaks Chinese must not change what the code parses and says.
+process.env.LC_ALL = 'C';
+process.env.LANG = 'C';

@@ -11,7 +11,7 @@ import { errorText, quietly } from '../network/use-net.js';
 import { Group, Row, Select } from '../dialogs/settings-controls.js';
 import type { KeepAwake } from '@beluga/shared/settings-schema.js';
 import { pathLabel } from '../../../../src/companion/diagnose.js';
-import { leftText, markOf, seenText } from './phone-model.js';
+import { DEFAULT_INVITE_DAYS, INVITE_DAYS, clientInviteArgs, clientTag, leftText, markOf, seenText } from './phone-model.js';
 import p from '../dialogs/native/person.module.css';
 import s from './phone.module.css';
 import { computerWord, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
@@ -174,6 +174,7 @@ function Reaching() {
 function DeviceList({ now, control = false }: { now: number; control?: boolean }) {
   const { client } = useBeluga();
   const devices = useDevices();
+  const projects = useApp((st) => st.projects, sameDeep);
   if (!devices.length) return <div className={s.empty}>No phone yet. Pair one to see what your agent is doing, answer and ask from anywhere.</div>;
   return (
     <ul className={s.devices} aria-label="Your phones">
@@ -185,6 +186,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
             </span>
             <span className={s.deviceText}>
               <span className={s.deviceName}>{d.name}</span>
+              {clientTag(d, projects) ? <span className={s.path} data-client="true">{clientTag(d, projects)}</span> : null}
               <span className={s.dim}>
                 {d.platform === 'ios' ? 'iPhone' : 'Android'}
                 {d.app ? ` · app ${d.app}` : ''} · {seenText(d, now)}
@@ -196,10 +198,10 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
               ) : null}
             </span>
             <Button size="small" variant="quiet" onClick={() => void client.api.companion['devices.remove'](d.id)}>
-              Remove
+              {d.client ? 'Revoke' : 'Remove'}
             </Button>
           </div>
-          {control ? <PhoneClaude d={d} /> : null}
+          {control && !d.client ? <PhoneClaude d={d} /> : null}
         </li>
       ))}
     </ul>
@@ -271,6 +273,61 @@ export function Pairing({ now }: { now: number }) {
         <Button onClick={() => void client.api.companion['pair.cancel']()}>Cancel</Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * 邀请客户 (BLG-33): a pairing for a customer's phone, tied to one project and good for a day or
+ * more. It shows the same link and code as Pair a Phone…; what pairs becomes that project's client.
+ */
+export function ClientInvite({ now }: { now: number }) {
+  const { client } = useBeluga();
+  const projects = useApp((st) => st.projects.filter((x) => x.root && !x.error), sameDeep);
+  const pairing = usePairing();
+  const [project, setProject] = useState<string>();
+  const [days, setDays] = useState(DEFAULT_INVITE_DAYS);
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const chosen = project ?? projects[0]?.id;
+  if (pairing) {
+    // An invite is open: its link and code (or "Pair this phone?"); a pairing of your own phone isn't this group's.
+    if (!pairing.project) return <div className={s.dim}>{'A pairing for your own phone is open. Finish or cancel it first.'}</div>;
+    const name = projects.find((x) => x.id === pairing.project)?.name ?? pairing.project;
+    return (
+      <>
+        <div className={s.dim}>{`Invitation for the project “${name}”:`}</div>
+        <Pairing now={now} />
+      </>
+    );
+  }
+  if (!projects.length) return <div className={s.dim}>{'Add a project first.'}</div>;
+  const start = async (): Promise<void> => {
+    if (!chosen) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await quietly(client, client.api.companion['pair.start'](clientInviteArgs(chosen, days)));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Row label={'Project'} detail={'The customer sees only this project: its conversations, cards and screenshots.'}>
+        <Select label={'Project'} value={chosen ?? ''} onChange={setProject} options={projects.map((x) => ({ value: x.id, label: x.name }))} />
+      </Row>
+      <Row label={'Link valid for'} detail={'After that the link stops working; a phone already paired stays until you remove it.'}>
+        <Select label={'Link valid for'} value={String(days)} onChange={(v) => setDays(Number(v))} options={INVITE_DAYS.map((d) => ({ value: String(d), label: `${d} days` }))} />
+      </Row>
+      <div className={s.pairRow}>
+        {error ? <div className={s.error}>{error}</div> : null}
+        <Button variant="primary" disabled={busy || !chosen} aria-busy={busy || undefined} onClick={() => void start()}>
+          {'Invite a customer…'}
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -414,8 +471,11 @@ export function PhoneSettings() {
         <Row label="The Beluga app" detail={`Your phone gets its own key, signed by ${yourComputer()}: it shows what your agent is doing and lets you answer, ask and chat. It never sees code. Up to 4 phones; Remove cuts one off at once.`}>
           <span />
         </Row>
+        <div className={s.inSettings}>{usePairing()?.project ? null : <Pairing now={now} />}</div>
+      </Group>
+      <Group title={'Invite a customer'}>
         <div className={s.inSettings}>
-          <Pairing now={now} />
+          <ClientInvite now={now} />
         </div>
       </Group>
     </>

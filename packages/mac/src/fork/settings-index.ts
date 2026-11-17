@@ -21,11 +21,36 @@ export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly ent
         ['Pick a model for each task', 'Which model a task without an agent goes to', 'auto route autopilot model pick'],
         ['Urgent and high are hard too', undefined, 'urgent high priority hard opus'],
       ]),
+      group('claude', 'Auto Accept', 'Start tasks teammates give me', 'auto accept federation 自动接单 接单 派活 联邦 认领池 pool'),
+      ...rows('claude', 'Auto Accept', [
+        ['Start tasks teammates give me', undefined, 'auto accept start assigned teammate 自动接单 派给我的'],
+        ['Only from', undefined, 'trust full trusted 信任'],
+        ['Running at once', undefined, 'how many parallel 同时'],
+        ['Pool label', undefined, 'pool claim 认领池 池标签 标签'],
+      ]),
+    ],
+  },
+  {
+    after: 'Pair a phone',
+    entries: [
+      group('phone', 'Invite a customer', 'The customer sees only this project: its conversations, cards and screenshots.', 'invite customer client project link expires share'),
+      ...rows('phone', 'Invite a customer', [
+        ['Project', 'The customer sees only this project: its conversations, cards and screenshots.', 'invite customer client project'],
+        ['Link valid for', 'After that the link stops working; a phone already paired stays until you remove it.', 'invite link expires days validity'],
+      ]),
     ],
   },
   {
     after: 'Reduce motion',
     entries: rows('appearance', 'Layout', [['Calm mode', 'A still, predictable window: short motion, and nothing that moves on its own.', 'calm steady quiet still motion 沉稳 沉稳模式 动效 安静']]),
+  },
+  {
+    // BLG-218: 「我的共享」——一个默认 + 少数例外，取代沉稳模式下「在房间中」那两组。
+    after: 'In the room',
+    entries: [
+      group('people', 'My sharing', 'One default for every circle; only the ones that differ are listed.', '我的共享 共享 圈 信任 默认 例外 批量 sharing trust default circle'),
+      ...rows('people', 'My sharing', [['All circles', 'The level for every circle that doesn’t have its own.', '默认 所有圈 policy ask trusted blocked full 共享级别']]),
+    ],
   },
 ];
 

@@ -20,6 +20,7 @@ import { macNoticeTarget, openNoticeTarget } from '../lib/notices.js';
 import { sameFields } from '../lib/stable.js';
 import { PartBoundary } from '../lib/part-boundary.js';
 import { type Waiting, type WaitingAction, bellCount, isCovered, noticeNeedView, sameWaiting, waitingList } from './waiting-model.js';
+import { type StartGateAnswer, type StartGateResult, StartGateCard } from '../studio/StartGateCard.js';
 import s from './notifications.module.css';
 
 /** A few marks the shared icon set doesn't have, drawn the same way (16 grid, 1.5 strokes). */
@@ -311,9 +312,26 @@ function Center({ close }: { close: () => void }) {
               Waiting for you <span className={s.count}>{shownWaiting.length}</span>
             </h3>
             <ul className={s.list}>
-              {shownWaiting.map((w) => (
-                <WaitingRow key={w.item.id} w={w} now={now} close={close} />
-              ))}
+              {shownWaiting.map((w) => {
+                // A Synon Studio start Gate has its own card (BLG-75): plan, milestones, points, and
+                // Decline with a sentence. Everything else keeps the row it always had.
+                const gate = w.item.kind === 'studio-start' ? w.item.gate : undefined;
+                if (!gate) return <WaitingRow key={w.item.id} w={w} now={now} close={close} />;
+                return (
+                  <StartGateCard
+                    key={w.item.id}
+                    gate={gate}
+                    from={w.item.from}
+                    askedAt={w.item.askedAt}
+                    now={now}
+                    onAnswer={async (answer: StartGateAnswer): Promise<StartGateResult> => {
+                      const gateId = w.item.id.slice('studio:'.length);
+                      const result = (await api.studio.answerGate(gateId, answer)) as { readonly ok?: boolean; readonly error?: string } | undefined;
+                      return result?.ok ? { ok: true } : { ok: false, error: result?.error ?? 'failed' };
+                    }}
+                  />
+                );
+              })}
             </ul>
           </section>
         ) : null}

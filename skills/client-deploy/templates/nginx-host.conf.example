@@ -1,0 +1,21 @@
+# 不用 Docker、服务器上已有 Nginx 时使用。
+# 1. 把 site/ 里的所有文件复制到 /var/www/app/
+# 2. 把本文件复制到 /etc/nginx/conf.d/app.conf,把 app.example.com 改成你的域名
+# 3. nginx -t && systemctl reload nginx
+# 4. 启用 HTTPS(推荐): certbot --nginx -d app.example.com
+server {
+    listen 80;
+    server_name app.example.com;
+    root /var/www/app;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location = /sw.js {
+        add_header Cache-Control "no-cache";
+    }
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+}

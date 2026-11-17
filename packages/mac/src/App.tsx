@@ -37,6 +37,7 @@ import { MessageBanner } from './network/MessageBanner.js';
 import { RequestSheet } from './gateway/RequestSheet.js';
 import { useRequestNative } from './gateway/request-native.js';
 import { EarningsSheet } from './dialogs/EarningsSheet.js';
+import { StudioConnectDialog } from './studio/ConnectDialog.js';
 import { SupportSheets } from './dialogs/SupportSheets.js';
 import { TelemetrySheets } from './dialogs/TelemetrySheets.js';
 import { useIdleAway, useTrayPresence } from './network/net-native.js';
@@ -255,6 +256,7 @@ export function App() {
       <NetworkSheets />
       <RequestSheet />
       <EarningsSheet />
+      <StudioConnectDialog />
       {welcome.open ? null : <SupportSheets />}
       {welcome.open ? null : <TelemetrySheets />}
       {joining ? <JoinSheet invite={joining} onCancel={() => setJoining(undefined)} onJoin={() => void joinRoom(joining)} /> : null}

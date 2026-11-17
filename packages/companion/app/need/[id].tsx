@@ -46,7 +46,7 @@ export default function Need() {
         {n ? (
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12, gap: 18 }} keyboardShouldPersistTaps="handled">
             <NeedFace item={n} full onAnswered={() => close()} />
-            <NeedButtons item={n} onAnswer={(t) => act(t)} />
+            <NeedButtons item={n} onAnswer={(t) => act(t)} inSheet />
             <Card style={{ marginHorizontal: -4 }}>
               {always ? <Row first Icon={Always} tone="peach" label={always.label} sub="Don't ask again for this" onPress={() => act('plain')} chevron={false} /> : null}
               {opens ? (
@@ -66,9 +66,15 @@ export default function Need() {
             </Card>
             {n.answer?.text ? (
               <View style={{ gap: 8 }}>
-                <T v="eyebrow">{n.choices?.length ? 'Or in your words' : 'Your answer'}</T>
+                <T v="eyebrow">{n.kind === 'studio-start' ? 'Decline with a reason' : n.choices?.length ? 'Or in your words' : 'Your answer'}</T>
                 <Card style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 6, paddingVertical: 6 }}>
-                  <TextInput value={words} onChangeText={setWords} placeholder="Type an answer" placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 15.5, paddingVertical: 8, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
+                  <TextInput
+                    value={words}
+                    onChangeText={setWords}
+                    placeholder={n.kind === 'studio-start' ? 'Why not? The customer reads this' : 'Type an answer'}
+                    placeholderTextColor={color.text3}
+                    style={{ flex: 1, color: color.text, fontSize: 15.5, paddingVertical: 8, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }}
+                  />
                   <Press disabled={!words.trim()} onPress={() => sendOwn(n, words.trim()) && close()} style={{ height: 36, paddingHorizontal: 14, borderRadius: 18, justifyContent: 'center', backgroundColor: words.trim() ? color.primary : color.sunken }}>
                     <T v="callout" c={words.trim() ? color.onPrimary : color.text3} style={{ fontWeight: '600' }}>
                       {n.answer.label ?? 'Send'}

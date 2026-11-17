@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, CircleCheck, Flag, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, SquareTerminal, X } from 'lucide-react-native';
+import { Check, CircleCheck, Flag, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, Sparkles, SquareTerminal, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -20,7 +20,7 @@ import { Button, Card, haptic, IconBadge, More, Pill, Press, T, type Tone, toneB
  * card that says "Open on your Mac" (docs/companion.md, staying in step).
  */
 
-export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call']);
+export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'studio-start']);
 
 export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof Monitor } => {
   switch (kind) {
@@ -37,6 +37,9 @@ export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof 
     // Someone rings you (BLG-706): swipe right answers on your Mac, left declines.
     case 'call':
       return { label: 'Call', tone: 'mint', Icon: PhoneIncoming };
+    // Synon Studio (BLG-76): a customer confirmed a plan; Approve starts it, Decline says why.
+    case 'studio-start':
+      return { label: 'Start', tone: 'butter', Icon: Sparkles };
     default:
       return { label: 'On your Mac', tone: 'plain', Icon: Monitor };
   }
@@ -181,17 +184,19 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
 }
 
 /** Approve and Decline: the only buttons on the surface. */
-export function NeedButtons({ item, onAnswer }: { readonly item: NeedsYou; readonly onAnswer: (tone: 'main' | 'danger') => void }) {
+export function NeedButtons({ item, onAnswer, inSheet = false }: { readonly item: NeedsYou; readonly onAnswer: (tone: 'main' | 'danger') => void; /** Drawn in the item's own sheet: Decline means it here. */ readonly inSheet?: boolean }) {
   const known = KNOWN.has(item.kind) || item.actions.length > 0;
   // With choices on the card, only the way out (Skip) stays as a button.
   const main = item.choices?.length ? undefined : mainOf(item);
   const danger = dangerOf(item);
   // Words only (no options, no yes): Reply opens the item's sheet to write them.
   const reply = !main && !item.choices?.length && item.answer?.text;
+  // A Studio decline takes a sentence the customer reads: the card opens its sheet to write it.
+  const reasonFirst = item.kind === 'studio-start' && !!item.answer?.text && !inSheet;
   if (!known || (!main && !danger && !reply)) return null;
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
-      {danger ? <Button quiet flex={1} Icon={X} label={danger.label} onPress={() => onAnswer('danger')} /> : null}
+      {danger ? <Button quiet flex={1} Icon={X} label={danger.label} onPress={() => (reasonFirst ? openDetail(item) : onAnswer('danger'))} /> : null}
       {main ? <Button flex={1} Icon={Check} label={main.label} onPress={() => onAnswer('main')} /> : null}
       {reply ? <Button flex={1} Icon={PenLine} label="Reply" onPress={() => openDetail(item)} /> : null}
     </View>

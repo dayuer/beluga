@@ -10,7 +10,7 @@ const repo = path.resolve(project, '../..');
 // (src/shared: views, graphs, inline elements, as the Mac app reads them; src/ui: the screens'
 // models, such as which agents you can pick; src/machines: only its browser-safe words.ts and
 // look.ts, how a computer of yours is said and drawn).
-const shared = [path.join(repo, 'src/companion'), path.join(repo, 'src/shared'), path.join(repo, 'src/ui'), path.join(repo, 'src/machines')];
+const shared = [path.join(repo, 'src/companion'), path.join(repo, 'src/shared'), path.join(repo, 'src/ui'), path.join(repo, 'src/machines'), path.join(repo, 'packages/ui-plan')];
 
 const config = getDefaultConfig(project);
 

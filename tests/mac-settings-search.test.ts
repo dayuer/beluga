@@ -26,6 +26,14 @@ describe('matching', () => {
     expect(settingAnchor('Read .env files without asking')).toBe('read-env-files-without-asking');
   });
 
+  it('finds Invite a customer (BLG-36) by its name, and goes to its group', () => {
+    for (const q of ['invite a customer', 'invite customer']) {
+      const hit = top(q);
+      expect(hit, q).toMatchObject({ pane: 'phone', label: 'Invite a customer' });
+    }
+    expect(flatHits(search('link valid')).map((h) => h.label)).toContain('Link valid for');
+  });
+
   it('finds nothing for an empty query or nonsense', () => {
     expect(search('')).toEqual([]);
     expect(search('   ')).toEqual([]);
@@ -142,7 +150,7 @@ const s = (...names: string[]) => names.map((n) => fn(SETTINGS_TSX, n)).join('\n
 const PANE_SOURCES: Record<string, string> = {
   general: [s('General', 'PictureRow'), fn(read('dialogs/UpdateSettings.tsx'), 'UpdateSettingsGroup'), read('dialogs/TelemetrySettings.tsx'), read('dialogs/EarningsSettings.tsx')].join('\n'),
   appearance: [s('Appearance'), read('dialogs/ThemePicker.tsx'), read('dialogs/ArchiveSettledRow.tsx'), read('fork/calm/settings.tsx')].join('\n'),
-  claude: [s('AgentPane', 'AgentsGroup'), ...['LaunchFlagsSettings', 'McpSettings', 'LocalModelsSettings', 'ContextSettings', 'UsageLimitSettings', 'ParallelSettings', 'ChatLimitSettings', 'AutoRouteSettings'].map((f) => read(`dialogs/${f}.tsx`)), fn(read('dialogs/AgentThreadsSettings.tsx'), 'ThreadLimitsSettings'), ...THREAD_LIMIT_ROWS.map(({ label }) => `'${label}'`)].join('\n'),
+  claude: [s('AgentPane', 'AgentsGroup'), ...['LaunchFlagsSettings', 'McpSettings', 'LocalModelsSettings', 'ContextSettings', 'UsageLimitSettings', 'ParallelSettings', 'ChatLimitSettings', 'AutoRouteSettings'].map((f) => read(`dialogs/${f}.tsx`)), read('fork/federation/FederationSettings.tsx'), fn(read('dialogs/AgentThreadsSettings.tsx'), 'ThreadLimitsSettings'), ...THREAD_LIMIT_ROWS.map(({ label }) => `'${label}'`)].join('\n'),
   notifications: ['dialogs/NotificationSettings.tsx', 'dialogs/sound/SoundSettings.tsx', 'dialogs/sound/TestNotification.tsx'].map(read).join('\n'),
   // Its toolbar buttons' rows are made from HIDEABLE_BUTTONS, and so are their entries.
   workspaces: [s('Workspaces', 'HiddenProjectsGroup', 'BranchPrefixRow', 'FetchEveryRow'), ...HIDEABLE_BUTTONS.map(([, label]) => `'${label}'`)].join('\n'),
@@ -150,7 +158,7 @@ const PANE_SOURCES: Record<string, string> = {
   fire: read('dialogs/FireSettings.tsx'),
   menubar: read('dialogs/MenuBarSettings.tsx'),
   environment: read('dialogs/EnvironmentSettings.tsx'),
-  people: [s('People'), read('network/NetworkSettings.tsx'), read('gateway/AccessSettings.tsx')].join('\n'),
+  people: [s('People'), read('network/NetworkSettings.tsx'), read('gateway/AccessSettings.tsx'), read('fork/sharing/MySharing.tsx')].join('\n'),
   phone: read('phone/Phone.tsx'),
   external: read('dialogs/ExternalAgentsSettings.tsx'),
   computers: read('dialogs/MachinesSettings.tsx'),

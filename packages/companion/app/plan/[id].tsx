@@ -12,8 +12,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { convHref } from '../../components/Conv';
 import { answer, NeedButtons, NeedFace } from '../../components/Needs';
 import { MilestoneMap, PlanChat, PlanDrafting } from '../../components/PlanParts';
+import { planUiTheme } from '../../components/PlanUiTheme';
+import { OutlineMilestoneRow, PlanUiThemeProvider, type OutlineMilestone } from '../../../ui-plan';
 import { Header, Screen, useScrolled } from '../../components/Screen';
-import { Card, More, Pill, Press, T, toneBg, toneInk, toneOf } from '../../components/ui';
+import { Card, More, Pill, Press, T, haptic, toneBg, toneInk, toneOf } from '../../components/ui';
 import { useSupports, useView, useVisibleNeeds } from '../../lib/hooks';
 import type { ConvView, PlanView, Topic } from '../../lib/link/protocol';
 import { color } from '../../lib/theme';
@@ -135,6 +137,8 @@ export default function Plan() {
             hidden: !p?.agents,
             onPress: () => setPicking(role),
           })),
+          { Icon: markIcon(runtimeMark(p?.archAgent?.runtime ?? defaultGroup?.runtime)), label: 'Agent for its architecture', sub: archWords, tone: 'lavender', hidden: !p?.agents || !store.supports('archAgent'), onPress: () => setPickingArch(true) },
+          { Icon: markIcon(runtimeMark(p?.fixAgent?.runtime ?? defaultGroup?.runtime)), label: 'Agent for hard fixes', sub: fixWords, tone: 'lavender', hidden: !p?.agents || !store.supports('fixAgent'), onPress: () => setPickingFix(true) },
           { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
@@ -341,36 +345,62 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
   // Its design from the plan's architect (1.59), folded until tapped.
   const [designOpen, setDesignOpen] = useState(false);
   const n = m.tasks.filter((t) => t.state === 'done').length;
+  const agentNow = m.agentNow;
+  const checker = m.checker;
+  const outline: OutlineMilestone = {
+    id: m.id,
+    title: m.title,
+    index: i + 1,
+    tone: toneOf(m.state),
+    statusLabel: m.designing ? 'The architect is designing it' : m.state === 'gate' ? 'Waiting for you to pass it' : m.state,
+    done: n,
+    total: m.tasks.length,
+    passed: m.state === 'done',
+    criteria: m.criteria,
+    tasks: m.tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      tone: toneOf(t.state),
+      statusLabel: t.state,
+      ...(t.goal ? { goal: t.goal } : {}),
+      ...(t.acceptance?.length ? { acceptance: t.acceptance } : {}),
+      ...(t.blockedBy?.length ? { sub: `Waits on ${t.blockedBy.map((b) => titles.get(b) ?? b).join(', ')}` } : {}),
+      ...(t.why ? { note: t.why } : {}),
+      ...(t.mine ? { mine: true } : {}),
+      ...(t.topic ? { opens: true } : {}),
+    })),
+    ...(after.length ? { after } : {}),
+    ...(m.dependsOn ? { dependsOn: m.dependsOn } : {}),
+  };
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={{ flexDirection: 'row', gap: 14 }}>
-      <View style={{ width: 26, alignItems: 'center' }}>
-        <View style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: toneBg(tone) }}>
-          {done ? <Check color={toneInk(tone)} size={15} strokeWidth={2.2} /> : <T v="caption" c={toneInk(tone)} style={{ fontWeight: '800' }}>{i + 1}</T>}
-        </View>
-        {!last ? <View style={{ width: 2, flex: 1, marginVertical: 4, borderRadius: 1, backgroundColor: done ? toneBg('mint') : color.hairlineStrong }} /> : null}
-      </View>
-      <View style={{ flex: 1, paddingBottom: last ? 0 : 18 }}>
-        <Press scaleTo={0.985} onPress={() => setOpen((o) => !o)} haptics>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 }}>
-            <T v="heading" style={{ flex: 1, color: done ? color.text2 : color.text }}>
-              {m.title}
-            </T>
-            <T v="caption">
-              {n}/{m.tasks.length}
-            </T>
-          </View>
-          <T v="caption" c={toneInk(tone)} style={{ fontWeight: "600", marginTop: 2, textTransform: "capitalize" }}>
-            {m.state === 'gate' ? 'Waiting for you to pass it' : m.state}
-          </T>
-          {m.agentNow ? (
+    <PlanUiThemeProvider theme={planUiTheme()}>
+      <OutlineMilestoneRow
+        m={outline}
+        last={last}
+        open={open}
+        onToggle={() => {
+          haptic.tap();
+          setOpen((o) => !o);
+        }}
+        expandedTask={task}
+        onTaskPress={(t) => {
+          haptic.tap();
+          const raw = m.tasks.find((x) => x.id === t.id);
+          if (!raw) return;
+          // Its worktree's conversation once it has one; until then a tap shows what it's for.
+          if (raw.topic) router.push(convHref(raw.topic));
+          else setTask((shown) => (shown === raw.id ? undefined : raw.id));
+        }}
+        renderHeaderExtra={() =>
+          agentNow ? (
             // Its agent at work right now, even between tasks (1.40): a tap opens its conversation.
-            <Press scaleTo={0.98} onPress={() => (m.agentNow!.topic ? router.push(convHref(m.agentNow!.topic)) : setOpen(true))}>
+            <Press scaleTo={0.98} onPress={() => (agentNow.topic ? router.push(convHref(agentNow.topic)) : setOpen(true))}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: (m.agentNow.asking ? color.warn : color.claude) }} />
-                <T v="caption" c={(m.agentNow.asking ? color.warn : color.claude)} numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>
-                  {m.agentNow.text}
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: agentNow.asking ? color.warn : color.claude }} />
+                <T v="caption" c={agentNow.asking ? color.warn : color.claude} numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>
+                  {agentNow.text}
                 </T>
-                {m.agentNow.topic ? <ChevronRight color={color.text3} size={13} /> : null}
+                {agentNow.topic ? <ChevronRight color={color.text3} size={13} /> : null}
               </View>
             </Press>
           ) : null
@@ -388,7 +418,6 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                     <T v="caption" c={color.text3}>
                       From its architect
                     </T>
-                    <ChevronRight color={color.text3} size={15} />
                   </View>
                   {designOpen ? (
                     <Animated.View entering={FadeIn.duration(180)}>
@@ -400,9 +429,26 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                 </View>
               </Press>
             ) : null}
-          </Animated.View>
-        ) : null}
-      </View>
-    </Animated.View>
+            <MilestoneRoles {...(m.roles ? { roles: m.roles } : {})} />
+            {checker ? (
+            // Its checker (a Claude of its own, off the Mac's sidebar): watched live, or read once it said (1.39).
+            <Press scaleTo={0.98} onPress={() => router.push(convHref(checker))}>
+              <Card r={16}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12 }}>
+                  <Eye color={toneInk('lavender')} size={15} />
+                  <T v="callout" style={{ flex: 1 }}>
+                    {m.state === 'checking' ? 'Watch the check' : 'Open the check'}
+                  </T>
+                  <ChevronRight color={color.text3} size={15} />
+                </View>
+              </Card>
+            </Press>
+            ) : null}
+          </>
+        )}
+        wrapRow={(node) => <Animated.View entering={FadeIn.duration(180)}>{node}</Animated.View>}
+        wrapExpanded={(node) => <Animated.View entering={FadeIn.duration(180)}>{node}</Animated.View>}
+      />
+    </PlanUiThemeProvider>
   );
 }

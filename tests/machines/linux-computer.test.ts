@@ -1,5 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import dgram from 'node:dgram';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import createTestnet, { type Testnet } from 'hyperdht/testnet.js';
@@ -24,6 +26,45 @@ import { waitFor } from '../helpers.js';
  * forget that cuts it off. scripts/linux-test.sh runs it on Linux in Docker; it runs on a Mac and on Windows too.
  */
 
+/**
+ * What the test needs of this machine, checked before it starts (BLG-150): UDP on loopback (the
+ * local DHT), a TCP port on 127.0.0.1 (the app's door), and a child process. A sandbox that blocks
+ * them (an agent's) would leave the pairing waiting until it timed out; it says so and skips instead.
+ * Nothing here is Beluga's own code: a regression in it still fails the test.
+ */
+async function missing(): Promise<string | undefined> {
+  const udp = await new Promise<string | undefined>((resolve) => {
+    const sock = dgram.createSocket('udp4');
+    const done = (why?: string) => {
+      clearTimeout(timer);
+      sock.close();
+      resolve(why);
+    };
+    const timer = setTimeout(() => done('UDP on 127.0.0.1 never arrived (the local DHT needs it)'), 3000);
+    sock.once('error', (e) => done(`UDP on 127.0.0.1 is refused here (${e.message})`));
+    sock.once('message', () => done());
+    sock.bind(0, '127.0.0.1', () => sock.send('ping', sock.address().port, '127.0.0.1'));
+  });
+  if (udp) return udp;
+  const tcp = await new Promise<string | undefined>((resolve) => {
+    const server = net.createServer((c) => c.end());
+    server.once('error', (e) => resolve(`a TCP port on 127.0.0.1 is refused here (${e.message})`));
+    server.listen(0, '127.0.0.1', () => {
+      const c = net.connect((server.address() as net.AddressInfo).port, '127.0.0.1');
+      c.once('connect', () => (c.destroy(), server.close(), resolve(undefined)));
+      c.once('error', (e) => (server.close(), resolve(`connecting to 127.0.0.1 is refused here (${e.message})`)));
+    });
+  });
+  if (tcp) return tcp;
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ['-e', '0'], { stdio: 'ignore' });
+    child.once('error', (e) => resolve(`a child process can't start here (${e.message})`));
+    child.once('exit', () => resolve(undefined));
+  });
+}
+const MISSING = await missing();
+if (MISSING) console.warn(`tests/machines/linux-computer.test.ts skipped: ${MISSING}`);
+
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const TOKEN = 'a'.repeat(32);
 
@@ -31,15 +72,25 @@ let testnet: Testnet;
 let bootstrap = '';
 const cleanup: Array<() => Promise<void> | void> = [];
 beforeAll(async () => {
+  if (MISSING) return;
   testnet = await createTestnet(3);
   bootstrap = (testnet.bootstrap as Array<{ host: string; port: number }>).map((b) => `${b.host}:${b.port}`).join(',');
 }, 30_000);
 afterAll(async () => {
-  await testnet.destroy();
+  await testnet?.destroy();
 });
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
+
+/** A wait that says which step it was, and what the computer said, when it runs out (never a longer wait). */
+async function waitStep<T>(what: string, fn: () => T | undefined | false | null, ms: number, said: () => string): Promise<T> {
+  try {
+    return await waitFor(fn, ms);
+  } catch (err) {
+    throw new Error(`${what}: ${(err as Error).message} after ${ms} ms. What it said:\n${said().slice(-4000)}`);
+  }
+}
 
 /** The `beluga` command from source, against the computer's home and the local DHT. */
 function beluga(home: string, args: readonly string[]): ChildProcess {
@@ -65,20 +116,21 @@ async function headless(name: string): Promise<{ home: string; proc: ChildProces
     await new Promise((r) => (proc.exitCode !== null ? r(undefined) : proc.once('exit', r)));
     rmSync(home, { recursive: true, force: true });
   });
-  await waitFor(() => existsSync(path.join(home, 'daemon.json')) || proc.exitCode !== null, 60_000);
+  await waitStep('the headless Beluga starting', () => existsSync(path.join(home, 'daemon.json')) || proc.exitCode !== null, 60_000, () => log);
   if (proc.exitCode !== null) throw new Error(`The headless Beluga stopped:\n${log}`);
   return { home, proc, log: () => log };
 }
 
 /** `beluga pair --computer --json` there: each line it prints, as it prints them. */
-function pairThere(home: string): { lines: () => Array<Record<string, unknown>>; exited: Promise<number | null> } {
+function pairThere(home: string): { text: () => string; lines: () => Array<Record<string, unknown>>; exited: Promise<number | null> } {
   const proc = beluga(home, ['pair', '--computer', '--json']);
   let out = '';
   proc.stdout!.on('data', (d: Buffer) => void (out += d.toString()));
-  proc.stderr!.on('data', () => undefined);
+  let err = '';
+  proc.stderr!.on('data', (d: Buffer) => void (err += d.toString()));
   const exited = new Promise<number | null>((r) => proc.once('exit', (code) => r(code)));
   cleanup.push(() => void proc.kill('SIGTERM'));
-  return { lines: () => out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => JSON.parse(l) as Record<string, unknown>), exited };
+  return { text: () => `${out}${err}`, lines: () => out.split('\n').filter((l) => l.trim().startsWith('{')).map((l) => JSON.parse(l) as Record<string, unknown>), exited };
 }
 
 /** The app: this test's daemon (its door, its machines, its companion host), in this process. */
@@ -123,19 +175,19 @@ async function app() {
   return { machines, port };
 }
 
-describe('a real headless Beluga, paired and driven', () => {
+describe.skipIf(Boolean(MISSING))(MISSING ? `a real headless Beluga, paired and driven — skipped: ${MISSING}` : 'a real headless Beluga, paired and driven', () => {
   it('pairs with the real CLI, then a screen drives it: snapshot, call, terminal, refusal, a dropped link, a forget', async () => {
     const box = await headless('linux-box');
     const mac = await app();
 
     // `beluga pair --computer --json` there; the app joins it with the link it printed.
     const pairing = pairThere(box.home);
-    const opened = await waitFor(() => pairing.lines().find((l) => typeof l.link === 'string'), 60_000);
+    const opened = await waitStep('`beluga pair --computer` printing its link', () => pairing.lines().find((l) => typeof l.link === 'string'), 60_000, () => `${pairing.text()}\n— its daemon:\n${box.log()}`);
     expect(opened.code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     const offer = await mac.machines.joinStart(opened.link as string);
     expect(offer).toMatchObject({ name: 'linux-box' });
     // The computer printed the same four pictures the app shows.
-    const waiting = await waitFor(() => pairing.lines().find((l) => typeof l.fingerprint === 'string'), 20_000);
+    const waiting = await waitStep('`beluga pair --computer` showing the pictures', () => pairing.lines().find((l) => typeof l.fingerprint === 'string'), 20_000, () => `${pairing.text()}\n— its daemon:\n${box.log()}`);
     expect(waiting.fingerprint).toBe(offer.fingerprint);
     const added = await mac.machines.joinApprove();
     expect(await pairing.exited).toBe(0);
@@ -155,7 +207,7 @@ describe('a real headless Beluga, paired and driven', () => {
     term.onData((d) => (out += d));
     // Typed as a person does, with Enter (\r); on Windows the shell there is PowerShell.
     term.write(process.platform === 'win32' ? 'echo "from-the-$(40+2)-box"\r' : 'echo from-the-$((40+2))-box\r');
-    await waitFor(() => out.includes('from-the-42-box'), 20_000);
+    await waitStep('the terminal there echoing', () => out.includes('from-the-42-box'), 20_000, () => `${out}\n— its daemon:\n${box.log()}`);
 
     // Admin is refused there, in plain words.
     await expect(screen.call('web.link')).rejects.toThrow(/not from a screen driving it/);
@@ -179,7 +231,7 @@ describe('a real headless Beluga, paired and driven', () => {
     }
     expect(back).toBe(true);
     // The change made there reaches this screen's state, as every action after a reconnect does.
-    await waitFor(() => screen.store.getDomain().prefs.mouse === false, 20_000);
+    await waitStep('the change made there reaching this screen', () => screen.store.getDomain().prefs.mouse === false, 20_000, box.log);
 
     // An app on another protocol is told so by the real computer, in plain words, and which side to update.
     const raw = await mac.machines.openLink(mac.machines.book.get(added.id)!);

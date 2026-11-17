@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Synon Studio",
+    "slug": "synon-studio",
+    "version": "0.1.0",
+    "scheme": "synon",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F6F6F7",
+    "platforms": ["web"],
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "lang": "zh-CN",
+      "themeColor": "#FFFFFF"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

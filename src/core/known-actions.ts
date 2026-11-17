@@ -156,6 +156,7 @@ const KNOWN = {
   shell: true,
   shell_choices: true,
   status: true,
+  studio_state: true,
   support: true,
   system: true,
   team_off: true,

@@ -332,6 +332,7 @@ export interface Prefs {
   /** Per-project defaults over `defaultAgent`, by project name. */
   readonly projectAgents?: Readonly<Record<string, AgentRef>>;
   readonly autoRoute?: Settings['autoRoute']; // fork: shared/auto-route.ts
+  readonly federation?: Settings['federation']; // fork: src/fork/federation/settings.ts
   readonly autoSetup: boolean;
   /** What new worktrees' branches start with (`beluga/`; empty: none). */
   readonly branchPrefix: string;
@@ -553,11 +554,35 @@ export interface MyShare {
   readonly writable?: boolean;
 }
 
+/** A Synon Studio Gate waiting on you, as a screen needs it (docs/studio-gates.md §2.6, §3.7). */
+export interface StudioGateNeed {
+  readonly id: string;
+  readonly planId: string;
+  readonly kind: 'start' | 'changes';
+  readonly draftRev: number;
+  readonly askedAt: number;
+  readonly by?: string;
+  readonly title: string;
+  readonly milestones: number;
+  readonly points: number;
+  readonly added?: { readonly milestones: number; readonly tasks: number; readonly points: number };
+}
+
+/** Synon Studio in the shared state: what is shared and the Gates waiting on you. Not persisted; the inbox's file restores it. */
+export interface StudioSlice {
+  readonly studio: {
+    readonly shared: readonly string[];
+    readonly gates: readonly StudioGateNeed[];
+  };
+}
+
+export const initialStudio: StudioSlice = { studio: { shared: [], gates: [] } };
+
 /**
  * Everything Beluga knows that isn't about a screen: the room, people, projects, conversations,
  * approvals… The core (the daemon) owns it and every client sees the same.
  */
-export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, TelemetrySlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
+export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, TelemetrySlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice, StudioSlice {
   readonly room: string;
   readonly projects: readonly Project[];
   /** The first scan of the projects is done: a workspace that isn't in `projects` now is really gone. */
@@ -693,6 +718,8 @@ export type Action =
   | { type: 'agent_event'; owner: string; requestId: string; requester: string; event: AgentEventKind; text: string; ts: number; channel?: string; itemId?: string; slotWait?: SlotWait; agent?: AgentRef; via?: MessageVia; fromChat?: { origin: ChatOrigin; text: string } }
   /** One owner's waiting requests in a conversation, in their new order (see orderQueued). */
   | { type: 'queue_order'; owner: string; ids: readonly string[] }
+  /** Synon Studio: the projects shared, and the Gates waiting on you (docs/studio-gates.md). */
+  | { type: 'studio_state'; shared: readonly string[]; gates: readonly StudioGateNeed[] }
   | { type: 'projects'; projects: readonly Project[]; groups?: readonly ProjectGroup[]; order?: readonly string[]; hidden?: readonly string[] }
   | { type: 'conflicts'; id: string; files: readonly string[] }
   | { type: 'review'; review?: ReviewDomain }
@@ -882,6 +909,7 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     ...initialPlans,
     ...initialDialogues,
     ...initialTeam,
+    ...initialStudio,
     companion: { devices: [] },
     assistant: NO_ASSISTANT_CHATS,
     triage: {},
@@ -1467,6 +1495,8 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
     case 'team_state':
     case 'team_off':
       return { ...state, ...reduceTeam(state, action) };
+    case 'studio_state':
+      return { ...state, studio: { shared: action.shared, gates: action.gates } };
     case 'context_reset': {
       const { [action.channel]: _gone, ...context } = state.context;
       return { ...state, context };

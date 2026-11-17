@@ -1,0 +1,13 @@
+:root { --brand: #4f46e5; --bg: #f7f7fb; --text: #1f2937; --radius: 12px; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 -apple-system, "PingFang SC", system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-tap-highlight-color: transparent; }
+.bar { position: sticky; top: 0; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--brand); color: #fff; }
+.bar h1 { margin: 0; font-size: 18px; }
+.page { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+.row { display: flex; gap: 8px; }
+input { flex: 1; min-width: 0; font-size: 16px; padding: 12px; border: 1px solid #d1d5db; border-radius: var(--radius); }
+button { min-height: 44px; padding: 0 16px; font-size: 16px; border: 0; border-radius: var(--radius); background: var(--brand); color: #fff; }
+button.ghost { background: transparent; color: var(--brand); }
+.list { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; }
+.list li { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 4px 16px; background: #fff; border-radius: var(--radius); }
+.muted { color: #9ca3af; text-align: center; }

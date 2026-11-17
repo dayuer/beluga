@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toasts } from '../components/Screen';
 import { useScheme } from '../lib/appearance';
 import { startSaved } from '../lib/saved';
+import { useLink } from '../lib/hooks';
 import { store } from '../lib/store';
 import { startUpdates } from '../lib/update';
 import { startWidgets } from '../lib/widgets';
@@ -38,6 +39,7 @@ export default function Root() {
     const open = (topic: unknown): void => {
       if (typeof topic !== 'string') return;
       if (topic.startsWith('conv:')) router.push(`/conv/${encodeURIComponent(topic.slice(5))}`);
+      else if (topic.startsWith('client:')) router.push(`/client/${encodeURIComponent(topic.slice(7))}`);
       else if (topic.startsWith('chat:')) router.push(`/chat/${encodeURIComponent(topic.slice(5))}`);
       else if (topic.startsWith('sentinel:')) router.push(`/sentinel/${encodeURIComponent(topic.slice(9))}`);
       else if (topic.startsWith('dashboard:')) router.push(`/dashboard/${encodeURIComponent(topic.slice(10))}`);
@@ -47,6 +49,11 @@ export default function Root() {
   }, []);
   // A new theme remounts the screens (every color is read afresh); come back to where you were.
   const pathname = usePathname();
+  // A customer's phone stays on the customer screens (the viewer is a modal over them).
+  const client = useLink().client;
+  useEffect(() => {
+    if (client && pathname !== '/' && !pathname.startsWith('/client') && pathname !== '/viewer') router.replace('/client');
+  }, [client, pathname]);
   const where = useRef({ path: pathname, scheme });
   useEffect(() => {
     const was = where.current;

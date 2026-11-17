@@ -18,9 +18,12 @@ export * from '@playwright/test';
 const run = { home: process.env.BELUGA_HOME!, claude: process.env.BELUGA_CLAUDE_HOME! };
 const port = Number(process.env.E2E_PORT);
 
+/** How long a warmed-up daemon stays fit for the next file: well inside the demo's first timed event (90 s). */
+const WARM_FOR_MS = 45_000;
+
 class Demos {
   private current?: { demo: Demo; file: string; slot: 0 | 1 };
-  private next?: { demo: Promise<Demo>; slot: 0 | 1 };
+  private next?: { demo: Promise<Demo>; slot: 0 | 1; at: number };
 
   constructor(
     private readonly worker: number,
@@ -36,7 +39,11 @@ class Demos {
     if (this.current?.file === file) return this.current.demo;
     const old = this.current;
     const slot = this.next?.slot ?? 0;
-    const demo = this.next?.demo ?? this.start(slot);
+    // A warm one that waited too long (the file before ran long: a timeout, a busy Mac) has spent its
+    // demo's clock: Watch the web's run ends 90 s after it starts (src/core/sentinel/demo.ts). A fresh one instead.
+    const stale = this.next && Date.now() - this.next.at > WARM_FOR_MS;
+    if (stale) await this.next!.demo.then((d) => d.stop(), () => undefined);
+    const demo = (!stale && this.next?.demo) || this.start(slot);
     this.next = undefined;
     this.current = undefined;
     // The old daemon goes first: the next one warms up in its home.
@@ -49,7 +56,7 @@ class Demos {
     const warming = this.start(other);
     // Its failure is the next file's (it's awaited there), not an unhandled rejection now.
     warming.catch(() => undefined);
-    this.next = { demo: warming, slot: other };
+    this.next = { demo: warming, slot: other, at: Date.now() };
     return ready;
   }
 

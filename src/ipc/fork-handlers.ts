@@ -4,6 +4,7 @@ import { type CheckDeps, checkEndpoint } from '../fork/endpoint-check.js';
 import { type FailingModels, failingModels } from '../fork/failing-models.js';
 import type { Args } from './api.js';
 import type { Handlers } from './handlers.js';
+import { STUDIO_HANDLERS } from './studio-handlers.js';
 
 /**
  * This fork's handlers, spread into upstream's table with one line (docs/fork.md): Synon Studio's,
@@ -80,5 +81,6 @@ const ENDPOINT_HANDLERS: Partial<Pick<Handlers, 'env.saveEndpoint'>> = {
 };
 
 export const FORK_HANDLERS = {
+  ...STUDIO_HANDLERS,
   ...ENDPOINT_HANDLERS,
 };

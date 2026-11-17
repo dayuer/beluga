@@ -33,6 +33,8 @@ export interface TaskInput {
   readonly assignee?: 'claude' | 'me';
   /** A task for you: what you're asked when it's ready (see PlanDecision). */
   readonly decision?: PlanDecision;
+  /** Who may answer it: the customer (Synon Studio) or you; left out, you (src/studio/decisions.ts). */
+  readonly audience?: 'customer' | 'operator';
   /** A task already on the board that this plan task is (adopted into the plan). */
   readonly issueId?: string;
 }
@@ -207,6 +209,7 @@ function task(input: TaskInput, id: string, keep?: PlanTask): PlanTask {
     ...(touches.length ? { touches } : {}),
     ...(input.assignee === 'me' ? { assignee: 'me' as const } : {}),
     ...(decision ? { decision } : {}),
+    ...(input.audience === 'customer' || input.audience === 'operator' ? { audience: input.audience } : {}),
     ...((input.issueId ?? keep?.issueId) ? { issueId: (input.issueId ?? keep?.issueId)! } : {}),
   };
 }
@@ -341,6 +344,7 @@ function applyOp(body: PlanBody, op: PlanOp): PlanBody {
         ...((p.touches ?? t.touches) ? { touches: (p.touches ?? t.touches)! } : {}),
         ...((p.assignee ?? t.assignee) ? { assignee: (p.assignee ?? t.assignee)! } : {}),
         ...((p.decision ?? t.decision) ? { decision: (p.decision ?? t.decision)! } : {}),
+        ...((p.audience ?? t.audience) ? { audience: (p.audience ?? t.audience)! } : {}),
         ...(p.issueId ? { issueId: p.issueId } : {}),
       };
       return mapTasks((x) => (x.id === t.id ? task(merged, t.id, t) : x));
