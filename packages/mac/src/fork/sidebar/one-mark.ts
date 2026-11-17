@@ -87,12 +87,13 @@ export function settleMarks(marks: readonly MarkLike[]): void {
 const ANY_MARK = MARKS.map((m) => m.selector).join(',');
 /** A row's trailing area: where its marks sit (layout/sidebar-parts.tsx). */
 const TRAILING = "[class*='_trailing_']";
-/** The hover tools are not marks: they open on hover and are never merged. */
-const HOVER_TOOLS = "[class*='_hoverTools_']";
-
-/** The marks of one trailing area, minus the hover tools. */
+/**
+ * The marks of one trailing area. A project row keeps its busy dot and its tally (needs edge, count)
+ * inside the hover tools' span (layout/ProjectTree.tsx), so that span is searched too: the tools'
+ * own buttons match no anchor, so they are never merged or hidden.
+ */
 function marksIn(trailing: Element): Element[] {
-  return [...trailing.querySelectorAll(ANY_MARK)].filter((el) => !el.closest(HOVER_TOOLS));
+  return [...trailing.querySelectorAll(ANY_MARK)];
 }
 
 /** Whether a change in the sidebar can change which marks show: a mark or a trailing area coming or going. */

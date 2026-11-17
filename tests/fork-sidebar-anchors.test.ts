@@ -79,5 +79,7 @@ describe('the one-mark anchors (fork/sidebar/one-mark.ts MARKS)', () => {
     expect(read('team', 'Team.tsx')).toContain("Team on ${team.repo}");
     expect(read('components', 'EarningsPill.tsx')).toContain('data-earnings-pill={projectId}');
     expect(read('layout', 'ProjectTree.tsx')).toContain('<span className={side.status} data-busy>');
+    // A project row keeps its busy dot and its tally inside the hover tools' span, so one-mark.ts must search it (BLG-254).
+    expect(read('layout', 'ProjectTree.tsx')).toMatch(/className=\{side\.hoverTools\}[\s\S]*data-busy[\s\S]*<TallyMark/);
   });
 });
