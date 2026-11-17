@@ -19,7 +19,20 @@ describe('calm-accent.css', () => {
   it('gates every rule under :root[data-calm]', () => {
     const selectors = [...stripComments(css).matchAll(/([^{}]+)\{/g)].map((m) => m[1]!.trim());
     expect(selectors.length).toBeGreaterThan(0);
-    const bare = selectors.flatMap((sel) => sel.split(',').map((s) => s.trim())).filter((sel) => !sel.startsWith(':root[data-calm]'));
+    // Split on the commas outside parentheses: `:not(:disabled, :active)` is one selector.
+    const split = (sel: string): string[] => {
+      const out: string[] = [];
+      let depth = 0;
+      let cur = '';
+      for (const ch of sel) {
+        if (ch === '(') depth++;
+        if (ch === ')') depth--;
+        if (ch === ',' && depth === 0) (out.push(cur.trim()), (cur = ''));
+        else cur += ch;
+      }
+      return [...out, cur.trim()];
+    };
+    const bare = selectors.flatMap(split).filter((sel) => !sel.startsWith(':root[data-calm]'));
     expect(bare).toEqual([]);
   });
 
@@ -60,6 +73,14 @@ describe('calm-accent.css', () => {
     expect(css).toContain("[role='group'][aria-label='Talk with friends'] {\n  display: none;");
     expect(read('network', 'NetworkSettings.tsx')).toContain('label="Talk with friends directly"');
     expect(read('network', 'net-palette.ts')).toContain("'net:turn-on'");
+  });
+
+  it('draws the solid action flat: no gradient, no shadow, and leaves pressed, focused, disabled, error and idle-window states to upstream', () => {
+    const rule = /:root\[data-calm\]:not\(\[data-window='idle'\]\) :where\(\[class\*='_primary_'\]\)([^{]*)\{([^}]*)\}/.exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule![1]).toContain(':not(:disabled, :active, :focus-visible, [class*=\'Error_\'])');
+    expect(rule![2]).toContain('background: var(--control-accent);');
+    expect(rule![2]).toContain('box-shadow: none;');
   });
 
   it('is imported by calm.css', () => {

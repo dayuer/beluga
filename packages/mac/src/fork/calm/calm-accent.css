@@ -22,6 +22,18 @@
   color: var(--text-2);
 }
 
+/* 2b. The solid action (New Task, Create PR, New Sentinel) is flat: one accent fill, no edge. Upstream's glossy
+   gradient, the white inset sheen, the drop under it and, in the dark theme, a pale 0.5px ring (--control-accent-edge
+   is lighter than the fill there) read as a glow around the button (BLG-253: computed styles show no blurred or
+   coloured halo on Create PR or its ancestors; these layers are what there is, ui.module.css `.primary`,
+   tokens.css `--control-accent-edge` / `--control-accent-sheen`). A window that is not key keeps
+   upstream's plain look; pressed, focused, disabled and error states keep their own rules. This rule sits before
+   the needs-you and friends-card rules below, which are as specific and come later, so they win. */
+:root[data-calm]:not([data-window='idle']) :where([class*='_primary_']):not(:disabled, :active, :focus-visible, [class*='Error_']) {
+  background: var(--control-accent);
+  box-shadow: none;
+}
+
 /* 3. Needs-you rows (Sentinel home): Merge and Resume are secondary there, so the page keeps one solid action. */
 :root[data-calm] [data-need] [class*='_primary_'],
 :root[data-calm] [data-need] [class*='_merge_'] {

@@ -60,7 +60,7 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 改了什么（浅色图已核对）：
 - 任务页：「Everyone」下拉的箭头块由蓝改为中性；侧栏 bob-api 的计数由蓝底改为中性灰。「New Task」仍是唯一实心蓝。「Show All」仍是蓝字，属于 BLG-249。
 - Sentinel：「需要你」卡里的「Merge」（原实心绿）和「Resume」（原实心蓝）改为中性次按钮；「New Sentinel」仍是唯一实心蓝。
-- 工作区：「Create PR」仍是唯一实心蓝。**未确认的一点**：改前图里 Create PR 周围的那圈光，改后肉眼看不出变化。`--focus-ring` 已改成 2px 细线，但截图时按钮没有焦点，所以那圈光不是焦点圈；它的来源（可能是 `--control-accent-sheen` 或别的阴影）还没定位。这一点留给 BLG-246 复核，不算完成。
+- 工作区：「Create PR」仍是唯一实心蓝。图里那圈「光」的来源已在 BLG-253 查清并处理，见 §1.7。
 - 对话进行中：只有 Create PR 是实心蓝；停止按钮是中性深色。
 
 主操作清单（实施后）：任务页 = New Task；工作区 = Create PR；对话进行中 = Create PR（停止按钮不算）；Sentinel = New Sentinel。对话框的默认按钮不动。计划页、用量页未在本任务核对。
@@ -541,3 +541,26 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 - 沉稳关时的等价性：测试对全部 mac CSS 做了「去掉 var 包装后与原文逐字节相同」的检查，证明 fallback 就是上游原值。
 
 Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619（分支 beluga/blg-248-m8，基于 topic/native 350e15ea9）。`npx vitest run` 全量 3 次：737 个文件、9179 个用例，每次 9162 通过、16 跳过；每次 1 个失败 `tests/test-lock.test.ts` 的「nices a run that carries KLAUD_WORKTREE」（单独运行通过；与 M8 改动无关，未在 topic/native 上复现核对）。另外第 1 次全量里还有 `tests/clone-project.test.ts` 一个失败（单独运行通过）。**因此这一行不是「零失败」**，零失败需要在 test-lock 的这条用例修好或确认是负载波动后再跑一次。
+
+## 1.7 Create PR 的「光晕」从哪来（BLG-253）
+
+用 Playwright 在沉稳开、沉稳关各取一次工具栏 Create PR 按钮及其 6 层祖先（含 `::before`/`::after`）的计算样式（探针脚本：`packages/mac/scripts` 里的一次性脚本，输出摘在下表）。
+
+| 项 | 沉稳关（上游） | 沉稳开（改前，BLG-242 后） | 沉稳开（BLG-253 后） |
+| --- | --- | --- | --- |
+| 按钮 `background-image`（浅色） | `linear-gradient(#2a8bff, #0075ff)` | 同左 | 无，纯色 `rgb(0 117 255)` |
+| 按钮 `box-shadow`（浅色） | 0.5px 深蓝边 + `0 0.5px 1px` 黑色下沿 + 白色 inset 高光 | 同左 | `none` |
+| 按钮 `box-shadow`（深色） | 0.5px **浅蓝**边（比填充还亮）+ 下沿 + inset 高光 | 同左 | `none` |
+| `filter`、`outline`、伪元素 | 无 | 无 | 无 |
+| 6 层祖先（`.wrap`、工具栏容器、`header`…）的 `box-shadow`/`filter`/`outline` | 全部无 | 全部无 | 全部无 |
+
+结论：
+
+- **没有彩色的模糊光晕，也不是焦点圈**（截图时按钮没有焦点；BLG-242 的猜测 (a) 不成立）。祖先、`.primaryWrap`、BranchControl `.main`、`calm-state.css` 都没有往上画任何阴影或滤镜。
+- 看起来像「光」的是按钮自己的三样：① `ui.module.css:36` 的 `linear-gradient(var(--control-accent-top), var(--control-accent))`（顶部更亮的渐变）；② `ui.module.css:38` 的 `box-shadow: 0 0 0 0.5px var(--control-accent-edge), var(--control-drop), var(--control-accent-sheen)`；其中 `--control-accent-sheen` 是 `styles/tokens.css:157` 的白色 inset 高光；③ 深色主题下 `--control-accent-edge` 比填充更亮，成了一圈浅蓝细框。
+- 处理：`fork/calm/calm-accent.css` 的 2b 节，沉稳开时实心主操作（New Task、Create PR、New Sentinel）改成纯色、无阴影；窗口不在前台、按下、聚焦、禁用、出错的状态保持上游规则。没有改上游文件。
+
+| | 沉稳关（上游） | 沉稳开（BLG-253 后） |
+| --- | --- | --- |
+| 浅色 | ![](img/m8-cpr-off-light.png) | ![](img/m8-cpr-on-light.png) |
+| 深色 | ![](img/m8-cpr-off-dark.png) | ![](img/m8-cpr-on-dark.png) |
