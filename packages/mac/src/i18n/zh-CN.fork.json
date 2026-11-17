@@ -644,5 +644,6 @@
  "Beluga runs Claude Code, Codex, OpenCode, GitHub Copilot, Antigravity or a model of your own on each of your tasks, each in its own copy of the repository. You watch them work, answer when they ask, and merge what’s done.": "Beluga 让 Claude Code、Codex、OpenCode、GitHub Copilot、Antigravity 或你自己的模型分别处理你的每个任务，每个都在仓库的独立副本里。你看着它们工作，在它们提问时回答，然后合并完成的工作。",
  "Default Model": "默认模型",
  "Default model": "默认模型",
- "Whatever {0} defaults to": "{0} 默认用的那个"
+ "Whatever {0} defaults to": "{0} 默认用的那个",
+ "No picture at {0}": "{0} 处没有图片"
 }
