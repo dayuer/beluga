@@ -2,8 +2,8 @@ import { expect, test, type Locator, type Page } from './fixtures.js';
 import { openTasks, openWork } from './helpers.js';
 
 /**
- * Fork (BLG-118, BLG-187): Enter that picks an input method's words never sends, submits or
- * closes, in any box: one guard on the window (src/fork/ime-guard.ts), none in the boxes. WebKit
+ * Enter that picks an input method's words never sends, submits or closes, in any box: one guard
+ * on the window (src/lib/ime-guard.ts), none in the boxes. WebKit
  * ends the composition before keydown, so isComposing is already false there: only keyCode 229
  * tells, and that is what these press. The next, plain Enter does what it always did.
  */

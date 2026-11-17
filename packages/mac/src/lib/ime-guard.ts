@@ -1,14 +1,18 @@
-import { isImeComposing } from '../lib/ime.js';
+import { isImeComposing } from './ime.js';
 
 /**
- * Fork (BLG-118, BLG-187): Enter that picks an input method's words (Chinese, Japanese, Korean…),
- * and Tab, Escape and the arrows pressed while it composes (they move through its candidates), never
- * reach the app's own key handlers, so no box sends, submits, closes, completes or moves on them, as
- * each box's own check did before (IME_KEYS; letters are left alone, so shortcuts are too). One place
- * instead of a check in every box: a keydown listener on the window, capture phase, installed in
- * main.tsx before anything else listens. It runs before React (whose listeners sit on the root)
- * and before every other window listener (dictation's ↩, the sheets'), and only stops the event's
- * propagation: never preventDefault, which would also drop the characters the IME is committing.
+ * Enter that picks an input method's words (Chinese, Japanese, Korean…), and Tab, Escape and the
+ * arrows pressed while it composes (they move through its candidates), never reach the app's own
+ * key handlers, so no box sends, submits, closes, completes or moves on them (IME_KEYS; letters are
+ * left alone, so shortcuts are too). WebKit, the Mac app's webview, ends the composition before
+ * keydown fires for that Enter, so `isComposing` is already false there and only keyCode 229 tells
+ * (lib/ime.ts). Most boxes checked `isComposing` alone, some nothing at all.
+ *
+ * One place instead of a check in every box: a keydown listener on the window, capture phase,
+ * installed first thing in main.tsx (lib/install-ime-guard.ts). It runs before React (whose
+ * listeners sit on the root) and before every other window listener (dictation's ↩, the sheets'),
+ * and only stops the event's propagation: never preventDefault, which would also drop the
+ * characters the IME is committing.
  *
  * Left alone: the terminal (xterm reads keyCode 229 itself to pick up what the IME typed). The IME
  * itself never sees the difference: it handles its keys before the page does.

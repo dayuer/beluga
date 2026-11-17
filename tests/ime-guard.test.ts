@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { installImeGuard, swallowsImeEnter } from '../packages/mac/src/fork/ime-guard.js';
+import { installImeGuard, swallowsImeEnter } from '../packages/mac/src/lib/ime-guard.js';
 
 /** A target inside the terminal (xterm's helper textarea) or anywhere else. */
 const inTerminal = { closest: (sel: string) => (sel === '.xterm' ? {} : null) };
 const elsewhere = { closest: () => null };
 
-describe('the IME guard on the window (fork, BLG-187)', () => {
+describe('the IME guard on the window', () => {
   it('swallows Enter that picks an IME’s words: keyCode 229 (WebKit) or isComposing', () => {
     expect(swallowsImeEnter({ key: 'Enter', keyCode: 229, isComposing: false, target: elsewhere as never })).toBe(true);
     expect(swallowsImeEnter({ key: 'Enter', keyCode: 13, isComposing: true, target: elsewhere as never })).toBe(true);
   });
 
-  it('swallows the other keys while composing too (Tab, arrows, Escape), as each box’s own check did', () => {
+  it('swallows the other keys while composing too (Tab, arrows, Escape), as the boxes that checked for themselves did', () => {
     expect(swallowsImeEnter({ key: 'ArrowDown', keyCode: 229, isComposing: true, target: elsewhere as never })).toBe(true);
     expect(swallowsImeEnter({ key: 'Escape', keyCode: 229, target: elsewhere as never })).toBe(true);
     expect(swallowsImeEnter({ key: 'Tab', keyCode: 9, isComposing: true, target: elsewhere as never })).toBe(true);
