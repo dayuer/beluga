@@ -326,7 +326,9 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 ## 4. 彩色光晕
 
-### 4.1 判定（BLG-245 用 `findGlows` 时照这个）
+状态：**部分完成**。fork/** 已无光晕层；上游文件里 4 层已由覆盖层接管，其余 60 层未处理（见 §4.2），BLG-245 在这些层上还没有完成。
+
+### 4.1 判定（`findGlows`，与 `tests/fork-calm-glow.test.ts` 一致）
 
 光晕 = `box-shadow` 或 `filter: drop-shadow`，且满足：
 - 颜色引用 `--accent`、`--warn`、`--error`、`--success`、`--merged`、`--merge`、`--claude`、状态色，或是饱和的字面色；**并且**
@@ -334,92 +336,80 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 不算光晕：`--hairline`、`rgb(0 0 0 / x)`、`--shadow-*`、`--control-drop` 这类中性阴影；0.5–2px 的实线描边（bezel、拖放目标的清晰框）。键盘焦点圈按 §1.3 的清晰细圈处理，归为无障碍例外。
 
-### 4.2 清单（实测，74 个文件、212 行）
+### 4.2 清单（BLG-245，由 `findGlows` 实测：64 层）
 
-分类含义：
-- **fork 自有**：在 `fork/` 下，我们自己的文件，可以直接覆盖。
-- **例外：keep-decor**：维持原状，不动。
-- **上游文件**：默认先试 `fork/calm/calm-glow.css` 覆盖（门控 `:root[data-calm]`）；覆盖不了（内联 style、JS 写的阴影）才改上游文件，并登记到 docs/fork.md。
+扫描结果：64 条彩色光晕层（`tests/fork-calm-glow.test.ts` 打印），涉及 28 个文件。fork/** 里没有光晕层；下表是 packages/mac/src 里的全部。
 
-「首个值」只显示第一条，供核对。BLG-245 逐行确认，结果写进 §4 的状态列。
+| 文件 | 行 | 原因 | 值 | 处理 |
+| --- | ---: | --- | --- | --- |
+| `chat/composer.module.css` | 29 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `chat/composer.module.css` | 400 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `chat/edit-prompt.module.css` | 8 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `chat/max.module.css` | 17 | blur 14px | `0 2px 14px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 14%), transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `chat/max.module.css` | 21 | blur 22px | `0 4px 22px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 22%), transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/form.module.css` | 142 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 40%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 275 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 293 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 293 | blur 24px | `0 8px 24px -8px color-mix(in srgb, var(--accent) 40%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 300 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 735 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/graph/graph.module.css` | 1111 | blur 2px | `0 1px 2px color-mix(in srgb, var(--accent) 40%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/markdown/code-editor.module.css` | 18 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/markdown/code-editor.module.css` | 22 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/telemetry-levels.module.css` | 41 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/update.module.css` | 72 | spread 100px | `inset 0 0 0 100px color-mix(in srgb, var(--accent) 8%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/views/views.module.css` | 371 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `components/views/views.module.css` | 1281 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/env-settings.module.css` | 56 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/keyboard.module.css` | 31 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/native/person.module.css` | 73 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/settings.module.css` | 391 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/support.module.css` | 171 | spread 4px | `0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/support.module.css` | 199 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `dialogs/support.module.css` | 229 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `layout/chat-drag.module.css` | 18 | spread 5px | `0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent)` | 覆盖层 `.over`：2px 线 |
+| `layout/chat-drag.module.css` | 27 | spread 6px | `0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent)` | 覆盖层 `.boxGlow`：2px 线，停止呼吸 |
+| `layout/chat-drag.module.css` | 27 | blur 32px | `0 0 32px 6px color-mix(in srgb, var(--accent) 34%, transparent)` | 覆盖层 `.boxGlow`：2px 线，停止呼吸 |
+| `layout/chat-drag.module.css` | 36 | spread 8px | `0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent)` | 覆盖层 `.boxGlow`（keyframes）：停止呼吸 |
+| `layout/chat-drag.module.css` | 36 | blur 44px | `0 0 44px 10px color-mix(in srgb, var(--accent) 26%, transparent)` | 覆盖层 `.boxGlow`（keyframes）：停止呼吸 |
+| `layout/panel/panel.module.css` | 663 | spread 3.5px | `0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `layout/signal.module.css` | 63 | blur 6px | `0 0 6px 0 color-mix(in srgb, var(--warn) 80%, transparent)` | 覆盖层 `.edge`：去掉模糊，琥珀条保留 |
+| `network/network.module.css` | 290 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `network/network.module.css` | 722 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `network/network.module.css` | 987 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `network/network.module.css` | 991 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 16%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `network/network.module.css` | 1118 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 191 | blur 30px | `0 10px 30px -10px color-mix(in srgb, var(--claude) 70%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 260 | blur 10px | `0 0 10px var(--claude)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 345 | blur 40px | `0 18px 40px -18px color-mix(in srgb, var(--accent) 60%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 373 | spread 4px | `inset 0 0 0 4px var(--accent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 639 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `onboarding/onboarding.module.css` | 1258 | spread 4px | `inset 0 0 0 4px color-mix(in srgb, var(--accent) 35%, var(--bg))` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plan-ask.module.css` | 30 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 671 | blur 28px | `0 10px 28px -14px color-mix(in srgb, var(--claude) 70%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 1295 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 1566 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 1605 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 1613 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `plans/plans.module.css` | 2293 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `sentinel/sentinel.module.css` | 423 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `sentinel/sentinel.module.css` | 932 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `sentinel/sentinel.module.css` | 940 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `sentinel/sentinel.module.css` | 1022 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/NewTaskSheet.module.css` | 42 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/NewTaskSheet.module.css` | 147 | spread 3.5px | `0 0 0 3.5px hsl(var(--hue) var(--sat) 50%)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/tasks.module.css` | 338 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/tasks.module.css` | 1195 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/tasks.module.css` | 1466 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `tasks/tasks.module.css` | 1955 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `views/history/history.module.css` | 297 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `views/project-home.module.css` | 145 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `views/shared-search.module.css` | 15 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
+| `views/terminal.module.css` | 111 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)` | 未处理（BLG-245 续：覆盖层规则待写，或列入例外） |
 
-| --- | ---: | --- | --- |
-| `agent-term/agent-term.module.css` | 2 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip-accent, #a99ad9) 42%, transparen | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `call/notes.module.css` | 3 | box-shadow: inset 0 0 0 1.5px var(--accent) | 例外：keep-decor 目录，维持原状 |
-| `call/pointer.module.css` | 1 | box-shadow: 0 0 0 1.5px #ffffff | 例外：keep-decor 目录，维持原状 |
-| `callfloat/callfloat.module.css` | 1 | box-shadow: var(--lift), inset 0 0 0 1.5px color-mix(in srgb, var(--error) 50%, transparen | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/attention.module.css` | 2 | box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 55%, transparent), 0 2px 12px rgba(0, | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/chat-keys.module.css` | 1 | box-shadow: inset 0 0 0 1px var(--error) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/composer.module.css` | 2 | box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 3px color- | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/draft.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/key-paste.module.css` | 1 | box-shadow: inset 0 0 0 1px var(--error) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/max.module.css` | 2 | box-shadow: 0 2px 14px color-mix(in srgb, var(--f1, #3fa2ff) calc(var(--burn, 1) * 14%), t | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/mention.module.css` | 3 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `chat/picker.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `claude-code/agent-monitor.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--claude) 35%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `claude-code/claude-code.module.css` | 1 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/ProjectIcon.module.css` | 1 | box-shadow: inset 0 0 0 0.5px hsl(var(--h) 40% 50% / 0.25) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/code/code.module.css` | 1 | box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/form.module.css` | 1 | box-shadow: inset 0 0 0 0.5px var(--error), 0 0 0 3px color-mix(in srgb, var(--error) 40%, | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/graph/graph.module.css` | 11 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/markdown/code-editor.module.css` | 1 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--error) 70%, transparent), 0 0 0 3px c | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/preview/preview.module.css` | 2 | box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/reactbits/GlassSurface.css` | 3 | box-shadow: 0 0 2px 1px light-dark(color-mix(in oklch, black, transparent 85%), color-mix( | 例外：keep-decor 目录，维持原状 |
-| `components/select.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/telemetry-levels.module.css` | 3 | box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/update.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/views/inline.module.css` | 3 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 22%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `components/views/views.module.css` | 15 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/env-settings.module.css` | 4 | box-shadow: 0 0 0 1px var(--accent), 0 0 0 3.5px color-mix(in srgb, var(--accent) 22%, tra | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/fire-settings.module.css` | 2 | box-shadow: 0 0 0 1.5px var(--accent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/keyboard.module.css` | 3 | box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/menubar-settings.module.css` | 1 | box-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/native/person.module.css` | 2 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 0 0.5px var( | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/native/shared.module.css` | 1 | box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--accent) 40%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/settings.module.css` | 1 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 0 0 1px  | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/sound/sound.module.css` | 1 | box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/support.module.css` | 3 | box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px color-mix(in srgb, var(--accent) 45%, tr | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/terminal-settings.module.css` | 1 | box-shadow: 0 0 0 2px var(--accent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `dialogs/themes.module.css` | 1 | box-shadow: 0 0 0 2px var(--accent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `fork/calm/calm-status.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) | fork 自有：覆盖层或改成清晰细圈（BLG-245 逐条） |
-| `fork/sidebar/sidebar-look.css` | 1 | box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent) | fork 自有：覆盖层或改成清晰细圈（BLG-245 逐条） |
-| `gateway/gateway.module.css` | 1 | box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 32%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/Sidebar.module.css` | 5 | box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/SidebarSearch.module.css` | 1 | box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/chat-drag.module.css` | 3 | box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px color-mix(in srgb, var(--accent) 18%, trans | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/panel/panel.module.css` | 3 | box-shadow: inset 2px 0 0 var(--accent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/people-here.module.css` | 1 | box-shadow: inset 0 0 0 1px #c9c9cf, 0 0 0 1.5px var(--bg) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/project-groups.module.css` | 2 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `layout/signal.module.css` | 2 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 32%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `lib/undo-toast.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `network/network.module.css` | 3 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 0 0.5px var( | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `onboarding/onboarding.module.css` | 9 | box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--claude) 30%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `onboarding/scenes/machines.module.css` | 2 | box-shadow: 0 0 0 1px oklch(0.75 0.08 250 / 0.7), 0 30px 80px -20px rgba(0, 0, 0, 0.35) | 例外：keep-decor 目录，维持原状 |
-| `onboarding/scenes/scenes.module.css` | 5 | box-shadow: 0 0 0 0 color-mix(in srgb, var(--claude) 60%, transparent) | 例外：keep-decor 目录，维持原状 |
-| `onboarding/scenes/together.module.css` | 4 | box-shadow: 0 0 0 1px var(--accent) | 例外：keep-decor 目录，维持原状 |
-| `onboarding/scenes/tour-scenes.module.css` | 2 | box-shadow: 0 0 0 1.5px var(--accent) | 例外：keep-decor 目录，维持原状 |
-| `plans/PlanCanvas.module.css` | 10 | box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ok) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `plans/plan-ask.module.css` | 1 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 0 3px  | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `plans/plans.module.css` | 21 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `sentinel/add-tile.module.css` | 3 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `sentinel/home.module.css` | 4 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 1px 2px  | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `sentinel/numbers.module.css` | 3 | box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `sentinel/sentinel.module.css` | 6 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 0 0 1px  | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `sentinel/showcase.module.css` | 2 | box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `tasks/NewTaskSheet.module.css` | 4 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `tasks/task-ref.module.css` | 2 | box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent), 0 1px 1.5p | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `tasks/tasks.module.css` | 10 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 0 0 1px  | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/diff.module.css` | 1 | box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/earnings-card.module.css` | 2 | box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/history/history.module.css` | 3 | box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/overview/filter-bar.module.css` | 1 | box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/overview.module.css` | 1 | box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/project-home.module.css` | 3 | box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/shared-search.module.css` | 1 | box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 0 0.5px var( | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/terminal.module.css` | 1 | box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, trans | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
-| `views/usage/usage.module.css` | 2 | box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--accent) 28%, transparent) | 上游文件：先试 calm-glow.css 覆盖；覆盖不了才改上游并登记 |
+`.over`/`.boxGlow`/`.edge` 的覆盖层规则在 `fork/calm/calm-glow.css`；它们在沉稳关时不生效。keep-decor 目录（onboarding/scenes、Wormhole、reactbits、PixelBurst、star-scene、call、YourCard）按设计维持原状，目前 `onboarding/scenes` 里没有光晕层，`onboarding/onboarding.module.css` 不在 keep-decor 内，列入未处理。
 
-### 4.3 已知的几处（设计所列，BLG-245 核对；优先）
+### 4.3 已知的几处（设计所列）
 
 - `layout/chat-drag.module.css:18`：5px 外晕 → 覆盖成 2px 实线（design §4 的例子）。
 - `layout/project-groups.module.css`、`layout/Sidebar.module.css`：拖放环。

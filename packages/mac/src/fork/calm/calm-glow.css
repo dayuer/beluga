@@ -1,0 +1,24 @@
+/*
+ * Calm mode: coloured glows the overlay can reach (M8, BLG-245; docs/calm/finish.md §4). Every rule
+ * is under :root[data-calm], so with calm mode off none of it matches. A glow is a box-shadow or
+ * drop-shadow in the accent or a status colour with a blur, or a spread above 2px; the 2px lines
+ * that stay are outlines, not glows. The list of what is still left, and why, is in
+ * tests/fork-calm-glow.test.ts (GLOW_EXCEPTIONS and the printed scan).
+ */
+
+/* A drop target (chat-drag.module.css `.over`): a 2px line, not a 5px halo. */
+:root[data-calm] [class*='_over_'] {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* The message box a drop would land in (chat-drag.module.css `.boxGlow`): the line stays, the breathing
+   halo goes. A drop target holds still. */
+:root[data-calm] [class*='_boxGlow_'] {
+  box-shadow: 0 0 0 2px var(--accent);
+  animation: none;
+}
+
+/* The needs-you edge (layout/signal.module.css `.edge`): the amber bar stays, its blur does not. */
+:root[data-calm] [class*='_edge_'] {
+  box-shadow: none;
+}
