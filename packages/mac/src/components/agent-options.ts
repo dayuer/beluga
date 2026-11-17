@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
-import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
+import type { RuntimeChoice, RuntimeModel } from '@beluga/shared/agent-runtimes.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { runtimeMark } from '@beluga/shared/agent-marks.js';
 import { agentName } from '@beluga/shared/agent-label.js';
@@ -73,18 +73,36 @@ export function useStartWith(): (current: AgentRef | undefined, pick: (agent: Ag
 }
 
 /**
- * Just the agents, one row each with its mark (Claude, Codex, OpenCode…), no models: for a menu
- * that asks who does a part of the work (Build With ▸, a plan's Planner ▸). The agent runs its
- * default model; its own model picker changes that later. One not set up here is greyed, saying why.
- * `current` is checked by its runtime; `pick` gets the agent.
+ * Who does a part of the work (Build With ▸, a plan's Planner ▸), one row per agent with its mark
+ * (Claude, Codex, OpenCode…), each a submenu of its models: "Default Model" first (the agent runs
+ * whatever it defaults to), then every model it offers here. An agent with no models to pick is a
+ * plain row; one not set up here, or a model that can't be picked now, is greyed, saying why.
+ * `current` is checked (its agent's row too); `pick` gets the agent, with its model when one was picked.
  */
-export function agentOnlyItems(runtimes: readonly RuntimeChoice[], current: AgentRef | undefined, pick: (agent: AgentRef) => void): ActionItem[] {
+export function agentModelItems(runtimes: readonly RuntimeChoice[], claudeModels: readonly RuntimeModel[], current: AgentRef | undefined, pick: (agent: AgentRef) => void): ActionItem[] {
   const known = runtimes.length ? runtimes : [{ id: CLAUDE_AGENT.runtime, label: CLAUDE_AGENT.label, available: true }];
-  return known.map((r) => ({
-    label: r.label,
-    icon: runtimeMark(r.id),
-    ...(r.available ? {} : { disabled: true, ...(r.why ? { hint: r.why } : {}) }),
-    checked: current?.runtime === r.id,
-    onSelect: () => pick({ runtime: r.id, label: r.label }),
-  }));
+  return known.map((r): ActionItem => {
+    const row = { label: r.label, icon: runtimeMark(r.id), checked: current?.runtime === r.id };
+    if (!r.available) return { ...row, disabled: true, ...(r.why ? { hint: r.why } : {}), onSelect: () => undefined };
+    const agent = { runtime: r.id, label: r.label };
+    const models = (r.id === CLAUDE_AGENT.runtime ? claudeModels : (r.models ?? [])).filter((m) => m.value);
+    if (!models.length) return { ...row, onSelect: () => pick(agent) };
+    const mine = row.checked ? current?.model : undefined;
+    const now = mine ? models.find((m) => m.value === mine)?.label ?? mine : undefined;
+    return {
+      ...row,
+      ...(row.checked ? { hint: now ?? 'Default model' } : {}),
+      submenu: [
+        { label: 'Default Model', hint: `Whatever ${r.label} defaults to`, checked: row.checked && !mine, onSelect: () => pick(agent) },
+        ...models.map((m, i): ActionItem => ({
+          label: m.label,
+          ...(m.why ? { disabled: true, hint: m.why } : {}),
+          ...(i === 0 ? { separate: true } : {}),
+          checked: mine === m.value,
+          onSelect: () => pick({ ...agent, model: m.value }),
+        })),
+      ],
+      onSelect: () => undefined,
+    };
+  });
 }
