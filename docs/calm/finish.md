@@ -484,7 +484,7 @@ Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所�
 | M8-2 | 上游 64 层彩色光晕（BLG-245 只处理了 4 层） | **已解决**（BLG-256）：63 层构建时改写到令牌，1 层背景着色例外，计算样式扫描 0 个 |
 | M8-3 | 字号写法 ≤ 25 的目标未达：构建口径 51、测试口径 79（BLG-244） | **放宽**为实测值；需确认接受 |
 | M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
-| M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件（本 M8 的 vite.config.ts 已登记，不计入）。这些是 M8 之前 fork 已有的改动，不是 M8 造成的 | **未达标**，需要另外补登记 |
+| M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件，另有 113 个「已不再改」的名字 | **已解决**（BLG-257）：208 个都不是 M8 改的（206 个来自 `topic/native` 的快照提交 `da1993452`，`CLAUDE.md` 和 `zh-CN.json` 来自 `fork/base`/`topic/chinese`），已在 docs/fork.md「原生 Mac 控件与外壳的逐文件登记」逐个登记；「已不再改」的名字用链感知的检查重算后剩 100 个，从清单里拿下来。报告现在 0 个 `!`、0 条「已不再改」 |
 | M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | 未做 |
 | M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | 未做，另开任务 |
 | M8-8 | 行尾收口的 200 行性能未测（BLG-243） | 未做 |
@@ -697,7 +697,7 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 | 六场景改后图（浅色、深色，12 张）+ 沉稳关 workspace、tasks（4 张） | 齐全：`docs/calm/img/m8-final-*` |
 | `npx vitest run tests/fork-calm* tests/fork-sidebar*` | 全部通过（75 个用例，单独运行） |
 | `npm run typecheck`（含 packages/mac） | 通过 |
-| `node scripts/sync-upstream.mjs --report` | **未通过**：208 个 `!`。基线 `350e15ea9` 上同样是 208，M8 没有新增；这些是 fork 之前就存在、没有登记到 docs/fork.md 的改动，需要单独做登记或迁移，不属于 M8 的范围。 |
+| `node scripts/sync-upstream.mjs --report` | **通过**（BLG-257）：0 个 `!`、0 条「已不再改」。这一行原来是 208 个 `!`（基线 `350e15ea9` 上同样是 208，M8 没有新增）；来源和处理见 §6 的 M8-5 和 docs/fork.md「原生 Mac 控件与外壳的逐文件登记」。脚本的「已不再改」检查改成链感知：fork.md 是整条链共用的一份文档，下层分支会看到只在上层才改的文件，现在算「链上任何一层还改它」（`CHAIN`、`staleInChain`，`tests/upstream-sync.test.ts` 有用例）。 |
 | 全量 `npx vitest run`（树 0fe34fc37） | 737 个文件，9186 个用例：9167 通过、16 跳过、3 失败。3 个失败是 `tests/project-invites.test.ts`、`tests/test-lock.test.ts`（nice 用例）、`tests/chat/files.test.ts`，与 M8 无关；三者单独重跑全部通过，按「负载波动，单独重跑通过」处理。 |
 
 仍在播放的动画、reduced-motion、问题表见 §5。

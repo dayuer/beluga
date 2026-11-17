@@ -96,6 +96,8 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ## 改了上游的文件（touch points）
 
+> 链上没有哪一层还改的上游文件（上游已合并，或计划层改用了上游的实现），路径在文字里写成普通字、不加反引号；`node scripts/sync-upstream.mjs --report` 只数加反引号的路径，把它们列为「已不再改」。要再改其中一个文件，先在某一层真的改它，再把反引号加回来。
+
 下面每个文件都可能在同步时冲突。目标是让这份清单越来越短：第二阶段会把大块改动抽成 fork 文件，再只留一行接入点。
 
 ### 只有一行接入点（已隔离，几乎不会冲突）
@@ -107,7 +109,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/main.tsx`：一行 `import './fork/boot.js'`（fork 随页面启动的东西，现在是输入法拦截）
 - `packages/mac/src/dialogs/native/WorkSheets.tsx`：两行，`forkSheet`（`packages/mac/src/fork/sheets.tsx`）先接管 fork 的对话框（新建计划、计划设置）
 - `packages/mac/src/plans/PlanSheets.tsx`：末尾一行导出 `AutonomyCards`、`GoalBox`，给 fork 的 `packages/mac/src/fork/plans/NewPlanSheet.tsx` 用（上游的 `NewPlanSheet` 原样留着；上游改它时，把改动带进 fork 版）
-- `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
+- packages/mac/src/lib/sheets.ts：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
 - `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
 
 ### 侧边栏
@@ -150,6 +152,17 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
   - 审计（2026-11-15，PR 39 / 41 / 44）后的修正：原生 sheet 的回调在更新中被系统回调时不再 panic（`peek`/`try_borrow`），正在输入的文本框不被页面回传覆盖，每个 sheet 有编号（更新、关闭只作用于自己），输入规则（`maxLength`/`upper`/`keep`）在原生框里即时生效，复选框可禁用，单选行去掉（已由卡片取代）；原生菜单的标题、分隔线 tag 为 -1；窗口指针改在主线程里取；空路径不拖；警告框随页面卸载收起、内容变了重新弹出；`useNativeSheet` 卸载后不再打开或更新，每次改动后重发让控件显示页面认可的值。修复智能体只在仍在它身上、且最近一次交还之后又有交接时才交还。对比度规则压过自定义配色；几处图标按钮补成常规尺寸。留着的：Quick Look 没按面板控制者协议接入（能用，会打警告）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
+
+### 原生 Mac 控件与外壳的逐文件登记（BLG-257 补登记）
+
+BLG-257 查清了 `sync-upstream --report` 的 208 个未登记文件：**没有一个是 M8 改的**（M8 的上游改动只有 `packages/mac/vite.config.ts` 两行，已登记）。其中 206 个来自 `topic/native` 的那一个快照提交 `da1993452`（「Native Mac: controls, menus, sheets, alerts, the sidebar and the calm UI」，从 `archive/main-2026-11-17` 拆出来的），1 个来自 `fork/base`（`CLAUDE.md`），1 个来自 `topic/chinese`/`fork/base`（`zh-CN.json`）。上面「原生控件」「原生菜单与按下指针」两节只用简写路径描述了这些改动（比如 `layout/Toolbar.tsx`），脚本按完整路径找，所以一直显示未登记。下面按改动的性质逐个列出完整路径；原因同上面两节：控件规范 `docs/mac-controls.md` 直接改在上游自己的文件里，因为它本来就要提回上游，所以不能搬进 fork 文件。
+
+- 样式：控件、菜单、侧栏、对话的 CSS（尺寸、边框、按下态、颜色，`docs/mac-controls.md`）（56 个）：`packages/mac/src/agent-term/agent-term.module.css`、`packages/mac/src/call/call.module.css`、`packages/mac/src/call/notes.module.css`、`packages/mac/src/chat/chat.module.css`、`packages/mac/src/chat/mcp-app/mcp-app.module.css`、`packages/mac/src/chat/pr-strip.module.css`、`packages/mac/src/components/ProjectIcon.module.css`、`packages/mac/src/components/alert.module.css`、`packages/mac/src/components/code/code.module.css`、`packages/mac/src/components/form.module.css`、`packages/mac/src/components/graph/graph.module.css`、`packages/mac/src/components/preview/preview.module.css`、`packages/mac/src/components/select.module.css`、`packages/mac/src/components/telemetry-levels.module.css`、`packages/mac/src/components/ui.module.css`、`packages/mac/src/components/views/views.module.css`、`packages/mac/src/dialogs/add-project.module.css`、`packages/mac/src/dialogs/env-settings.module.css`、`packages/mac/src/dialogs/fire-settings.module.css`、`packages/mac/src/dialogs/native/menus.module.css`、`packages/mac/src/dialogs/native/person.module.css`、`packages/mac/src/dialogs/native/sharing.module.css`、`packages/mac/src/dialogs/terminal-settings.module.css`、`packages/mac/src/dialogs/themes.module.css`、`packages/mac/src/gateway/access.module.css`、`packages/mac/src/gateway/gateway.module.css`、`packages/mac/src/issues/issues.module.css`、`packages/mac/src/layout/BranchControl.module.css`、`packages/mac/src/layout/Sidebar.module.css`、`packages/mac/src/layout/SidebarSearch.module.css`、`packages/mac/src/layout/Toolbar.module.css`、`packages/mac/src/layout/panel/panel.module.css`、`packages/mac/src/network/network.module.css`、`packages/mac/src/onboarding/scenes/scenes.module.css`、`packages/mac/src/onboarding/scenes/tour-scenes.module.css`、`packages/mac/src/phone/phone-view.module.css`、`packages/mac/src/plans/PlanCanvas.module.css`、`packages/mac/src/popup/popup.module.css`、`packages/mac/src/pr/pr-conversation.module.css`、`packages/mac/src/sentinel/data.module.css`、`packages/mac/src/sentinel/home.module.css`、`packages/mac/src/sentinel/numbers.module.css`、`packages/mac/src/sentinel/sentinel.module.css`、`packages/mac/src/styles/base.css`、`packages/mac/src/tasks/NewTaskSheet.module.css`、`packages/mac/src/tasks/board-people.module.css`、`packages/mac/src/tasks/tasks.module.css`、`packages/mac/src/team/team.module.css`、`packages/mac/src/threads/threads.module.css`、`packages/mac/src/views/lists.module.css`、`packages/mac/src/views/overview.module.css`、`packages/mac/src/views/overview/filter-bar.module.css`、`packages/mac/src/views/project/main-sync.module.css`、`packages/mac/src/views/usage/recap.module.css`、`packages/mac/src/views/usage/usage.module.css`、`packages/mac/src/views/usage/your-card.module.css`
+- TSX/TS：`Button`/`IconButton`/`Select`/`Segmented` 的 `size`、原生菜单与 sheet 的接入、侧栏与对话的结构（`docs/mac-controls.md`，「原生控件」「原生菜单与按下指针」两节）（144 个）：`packages/mac/src/agent-term/ConvoSwitch.tsx`、`packages/mac/src/agent-term/TermPane.tsx`、`packages/mac/src/agent-term/VisualsPanel.tsx`、`packages/mac/src/chat/AskBanner.tsx`、`packages/mac/src/chat/AssistantTabs.tsx`、`packages/mac/src/chat/Attention.tsx`、`packages/mac/src/chat/EditPrompt.tsx`、`packages/mac/src/chat/FindBar.tsx`、`packages/mac/src/chat/PathLink.tsx`、`packages/mac/src/ci/ActionsView.tsx`、`packages/mac/src/ci/RunPage.tsx`、`packages/mac/src/ci/parts.tsx`、`packages/mac/src/claude-code/ActivityView.tsx`、`packages/mac/src/claude-code/AgentMonitor.tsx`、`packages/mac/src/claude-code/AgentOutputs.tsx`、`packages/mac/src/claude-code/BackgroundTasks.tsx`、`packages/mac/src/components/Alert.tsx`、`packages/mac/src/components/ProjectIcon.tsx`、`packages/mac/src/components/Select.tsx`、`packages/mac/src/components/SelectMenu.tsx`、`packages/mac/src/components/code/CodeRefBlock.tsx`、`packages/mac/src/components/graph/FlowGraph.tsx`、`packages/mac/src/components/graph/GraphBlock.tsx`、`packages/mac/src/components/graph/Inspector.tsx`、`packages/mac/src/components/graph/Walkthrough.tsx`、`packages/mac/src/components/markdown/DocFind.tsx`、`packages/mac/src/components/preview/PreviewBlock.tsx`、`packages/mac/src/components/preview/PreviewParts.tsx`、`packages/mac/src/components/ui.tsx`、`packages/mac/src/components/views/Chart.tsx`、`packages/mac/src/components/views/ViewBlock.tsx`、`packages/mac/src/dialogs/AddProjectSheet.tsx`、`packages/mac/src/dialogs/EnvEditor.tsx`、`packages/mac/src/dialogs/EnvRows.tsx`、`packages/mac/src/dialogs/EnvironmentSettings.tsx`、`packages/mac/src/dialogs/FireSettings.tsx`、`packages/mac/src/dialogs/KeyboardSettings.tsx`、`packages/mac/src/dialogs/LocalModelsSettings.tsx`、`packages/mac/src/dialogs/MachinesSettings.tsx`、`packages/mac/src/dialogs/ReportProblemRow.tsx`、`packages/mac/src/dialogs/TerminalThemes.tsx`、`packages/mac/src/dialogs/UpdateSettings.tsx`、`packages/mac/src/dialogs/UsageLimitSettings.tsx`、`packages/mac/src/dialogs/native/ContinueSheet.tsx`、`packages/mac/src/dialogs/native/ForkToMacSheet.tsx`、`packages/mac/src/dialogs/native/ImportConversationSheet.tsx`、`packages/mac/src/dialogs/native/MergeReview.tsx`、`packages/mac/src/dialogs/native/ShareFolderSheet.tsx`、`packages/mac/src/dialogs/native/TemplatesSheet.tsx`、`packages/mac/src/dialogs/native/WorkConfirm.tsx`、`packages/mac/src/dialogs/native/parts.tsx`、`packages/mac/src/gateway/RequestsView.tsx`、`packages/mac/src/gateway/TaskCard.tsx`、`packages/mac/src/issues/IssueComposer.tsx`、`packages/mac/src/issues/IssuePage.tsx`、`packages/mac/src/issues/IssuesView.tsx`、`packages/mac/src/issues/PullsView.tsx`、`packages/mac/src/issues/parts.tsx`、`packages/mac/src/layout/AppMenu.tsx`、`packages/mac/src/layout/BranchControl.tsx`、`packages/mac/src/layout/CategorySections.tsx`、`packages/mac/src/layout/ChatsMenu.tsx`、`packages/mac/src/layout/RightPanel.tsx`、`packages/mac/src/layout/SharedProjects.tsx`、`packages/mac/src/layout/Toolbar.tsx`、`packages/mac/src/layout/panel/ChangesTab.tsx`、`packages/mac/src/layout/panel/FilesTab.tsx`、`packages/mac/src/layout/panel/ScratchSkeleton.tsx`、`packages/mac/src/layout/panel/ScratchTab.tsx`、`packages/mac/src/layout/panel/TerminalPane.tsx`、`packages/mac/src/layout/row-triage-actions.tsx`、`packages/mac/src/lib/files.ts`、`packages/mac/src/lib/prefs.ts`、`packages/mac/src/machines/GettingReady.tsx`、`packages/mac/src/machines/MachinePane.tsx`、`packages/mac/src/machines/StartingThere.tsx`、`packages/mac/src/network/ConversationHeader.tsx`、`packages/mac/src/network/ConversationView.tsx`、`packages/mac/src/network/GroupInfo.tsx`、`packages/mac/src/network/NetComposer.tsx`、`packages/mac/src/network/NetworkSidebar.tsx`、`packages/mac/src/phone/PhoneView.tsx`、`packages/mac/src/plans/PlansView.tsx`、`packages/mac/src/plans/marks.tsx`、`packages/mac/src/popup/RequestPopup.tsx`、`packages/mac/src/pr/PrConversation.tsx`、`packages/mac/src/pr/PrPage.tsx`、`packages/mac/src/sentinel/DataCard.tsx`、`packages/mac/src/sentinel/DataSheet.tsx`、`packages/mac/src/sentinel/DocumentSheet.tsx`、`packages/mac/src/sentinel/MeasureFields.tsx`、`packages/mac/src/sentinel/NewSentinelSheet.tsx`、`packages/mac/src/sentinel/NumberParts.tsx`、`packages/mac/src/sentinel/NumbersCard.tsx`、`packages/mac/src/sentinel/RunPage.tsx`、`packages/mac/src/sentinel/SentinelCards.tsx`、`packages/mac/src/sentinel/SentinelChat.tsx`、`packages/mac/src/sentinel/SentinelHome.tsx`、`packages/mac/src/sentinel/SentinelPage.tsx`、`packages/mac/src/tasks/Brief.tsx`、`packages/mac/src/tasks/NewTaskSheet.tsx`、`packages/mac/src/tasks/ProjectContextSheet.tsx`、`packages/mac/src/tasks/ProofPreview.tsx`、`packages/mac/src/tasks/TaskList.tsx`、`packages/mac/src/tasks/TaskPage.tsx`、`packages/mac/src/tasks/TaskSections.tsx`、`packages/mac/src/tasks/TasksView.tsx`、`packages/mac/src/tasks/boards.tsx`、`packages/mac/src/team/SharedPlans.tsx`、`packages/mac/src/team/Team.tsx`、`packages/mac/src/views/ChatView.tsx`、`packages/mac/src/views/DiffView.tsx`、`packages/mac/src/views/EarningsCard.tsx`、`packages/mac/src/views/FilesView.tsx`、`packages/mac/src/views/Overview.tsx`、`packages/mac/src/views/TerminalView.tsx`、`packages/mac/src/views/UsageView.tsx`、`packages/mac/src/views/WorktreeInfo.tsx`、`packages/mac/src/views/history/CommitDetail.tsx`、`packages/mac/src/views/history/HistoryFilters.tsx`、`packages/mac/src/views/overview/OverviewRows.tsx`、`packages/mac/src/views/project/EarningsSection.tsx`、`packages/mac/src/views/project/EnvAsks.tsx`、`packages/mac/src/views/project/GitHubRow.tsx`、`packages/mac/src/views/project/PullRow.tsx`、`packages/mac/src/views/reader/EditTools.tsx`、`packages/mac/src/views/reader/FileFocus.tsx`、`packages/mac/src/views/reader/FileReader.tsx`、`packages/mac/src/views/reader/PdfView.tsx`、`packages/mac/src/views/reader/component-preview.tsx`、`packages/mac/src/views/room/ConnectionStatus.tsx`、`packages/mac/src/views/usage/Breakdown.tsx`、`packages/mac/src/views/usage/CleanupCard.tsx`、`packages/mac/src/views/usage/EarningsSummaryCard.tsx`、`packages/mac/src/views/usage/Leaderboard.tsx`、`packages/mac/src/views/usage/PlanCard.tsx`、`packages/mac/src/views/usage/Recap.tsx`、`packages/mac/src/views/usage/SessionsCard.tsx`、`packages/mac/src/views/usage/StatsSection.tsx`、`packages/mac/src/views/usage/StorageCard.tsx`、`packages/mac/src/views/usage/YourCard.tsx`、`packages/mac/src/views/worktrees/WorktreeItem.tsx`、`packages/mac/src/views/worktrees/WorktreesView.tsx`、`packages/mac/src/work/NoProjects.tsx`
+- 只加了 `size` 的 TSX（规范第 4 步）（2 个）：`packages/mac/src/dialogs/MenuBarSettings.tsx`、`packages/mac/src/dialogs/WebAccessSettings.tsx`
+- Tauri 外壳：objc2 依赖、`native_menu`、`native_alert`、`native_files`、`native_sheet` 命令的注册和权限（NSMenu、NSAlert、Quick Look、拖拽、NSSheet）（4 个）：`packages/mac/src-tauri/Cargo.lock`、`packages/mac/src-tauri/Cargo.toml`、`packages/mac/src-tauri/capabilities/default.json`、`packages/mac/src-tauri/src/lib.rs`
+- `fork/base`：「Working in this fork」一节，写分支链和规矩（1 个）：`CLAUDE.md`
+- `topic/chinese`/`fork/base`：Mac 端的简体中文翻译（`docs/chinese.md`）（1 个）：`packages/mac/src/i18n/zh-CN.json`
 
 ### 沉稳界面（docs/calm-ui.md）
 
@@ -196,7 +209,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 手机协议的 minor 编号（3.3.0、3.4.0 及之后同步时顺延）
 
-fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、`docs/companion.md`（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 `src/companion/calls.ts`、`src/companion/views.ts`、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
+fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、docs/companion.md（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 src/companion/calls.ts、src/companion/views.ts、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
 
 ### 版本号（脚本自动处理）
 
@@ -208,73 +221,73 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 疑难修复做完要交还：修复智能体只接手难事（检查失败后的修复任务、停了两次的任务），这些任务做完、工作树空闲时，里程碑的工作交还给编码角色（`fixer.ts` 的 `settle`；重启后凭活动记录里的交接行和 `watch.escalated` 认出来；你自己换的模型不动）。上游文件的接入点：`pilot.ts` 每轮一行调用 `settle`、`hand()` 和 `escalate` 多传任务 id，`watchdog.ts` 的 `escalate` 多一个任务 id 参数。
 
-模型失效的升级梯子（`src/fork/plans/ladder.ts`，设置 › 自动路由 › When a Model Fails，`autoRoute.ladder`，默认 Haiku → Sonnet → Opus → Fable）：计划里的任务因为模型报错停下（API 拒绝、找不到模型、Key 不对、登录不上；用量上限、断网、过载不算），不再在同一个模型上叫醒，立刻沿梯子升一级；普通卡住仍先叫醒一次，再停才升一级，之后每停一次再升一级，到顶就等你。不在梯子上的模型（比如本地模型）算在最底下。梯子设为空，就是原来的做法（停两次交给修复智能体一次）。检查没过的修复任务和冲突仍归修复智能体。上游文件的接入点：`watchdog.ts` 的 `escalate` 多一个 `how` 参数（原有那一行改成每次都问，由 `fixer.ts` 决定），第一次停下前多两行"模型失效就升一级"；`pilot.ts` 那一行把 `how` 传过去。升上去之后尽快降回来（`fixer.ts` 的 `liftBack`）：为之升级的那个任务做完、要进入下一个任务时，检查编码模型是否恢复。本地模型按运行时的方式探测一次（1 个 token，每个模型最多每分钟一次，`failing-models.ts` 的 `recovered`）；Claude 模型没有失效记录就算恢复（不会自己好的失效记 30 分钟，临时报错不记）。恢复了：对话空闲就立刻切回；agent 已经接着做下一个任务（一个里程碑一个 agent 时它会在同一轮里连着做），就请它结束这一轮（插队发送），等它停下再切回，下一个任务由 pilot 发给恢复的模型。没恢复就留在高一级，下次再查。重启后凭动态里的那一行认出失效性质，确定失效的从当时起重新记上。判断不出当前模型强弱时（Claude 没指定模型、也没设默认模型），不走梯子，照旧交给修复智能体一次。确定失效的模型记进 `src/fork/failing-models.ts`（30 分钟，或它的接入点重新保存并通过校验为止）：选择器里变灰并写明原因，自动路由跳过它，计划接下来开工的里程碑从上一级开始，计划里提醒一次。没通过校验却仍然保存的接入点，它的模型也记在这里。里程碑的架构和审计对话，上一轮因模型失效结束的，再问之前先升一级（`fixer.ts` 的 `lift`）。上游文件的接入点：`src/core/session-parts.ts` 3 行（import、给本地模型列表套一层 `failingModels.grey`、`failingModels.attach` 交给它重新发布列表的方法和解析本地模型的 `local`）；`pilot.ts` 在两处“再问一次”前各加一行 `this.fix.lift(...)`；`packages/mac/src/plans/PlanSettingsSheet.tsx` 加一行提示。
+模型失效的升级梯子（`src/fork/plans/ladder.ts`，设置 › 自动路由 › When a Model Fails，`autoRoute.ladder`，默认 Haiku → Sonnet → Opus → Fable）：计划里的任务因为模型报错停下（API 拒绝、找不到模型、Key 不对、登录不上；用量上限、断网、过载不算），不再在同一个模型上叫醒，立刻沿梯子升一级；普通卡住仍先叫醒一次，再停才升一级，之后每停一次再升一级，到顶就等你。不在梯子上的模型（比如本地模型）算在最底下。梯子设为空，就是原来的做法（停两次交给修复智能体一次）。检查没过的修复任务和冲突仍归修复智能体。上游文件的接入点：`watchdog.ts` 的 `escalate` 多一个 `how` 参数（原有那一行改成每次都问，由 `fixer.ts` 决定），第一次停下前多两行"模型失效就升一级"；`pilot.ts` 那一行把 `how` 传过去。升上去之后尽快降回来（`fixer.ts` 的 `liftBack`）：为之升级的那个任务做完、要进入下一个任务时，检查编码模型是否恢复。本地模型按运行时的方式探测一次（1 个 token，每个模型最多每分钟一次，`failing-models.ts` 的 `recovered`）；Claude 模型没有失效记录就算恢复（不会自己好的失效记 30 分钟，临时报错不记）。恢复了：对话空闲就立刻切回；agent 已经接着做下一个任务（一个里程碑一个 agent 时它会在同一轮里连着做），就请它结束这一轮（插队发送），等它停下再切回，下一个任务由 pilot 发给恢复的模型。没恢复就留在高一级，下次再查。重启后凭动态里的那一行认出失效性质，确定失效的从当时起重新记上。判断不出当前模型强弱时（Claude 没指定模型、也没设默认模型），不走梯子，照旧交给修复智能体一次。确定失效的模型记进 `src/fork/failing-models.ts`（30 分钟，或它的接入点重新保存并通过校验为止）：选择器里变灰并写明原因，自动路由跳过它，计划接下来开工的里程碑从上一级开始，计划里提醒一次。没通过校验却仍然保存的接入点，它的模型也记在这里。里程碑的架构和审计对话，上一轮因模型失效结束的，再问之前先升一级（`fixer.ts` 的 `lift`）。上游文件的接入点：src/core/session-parts.ts 3 行（import、给本地模型列表套一层 `failingModels.grey`、`failingModels.attach` 交给它重新发布列表的方法和解析本地模型的 `local`）；`pilot.ts` 在两处“再问一次”前各加一行 `this.fix.lift(...)`；`packages/mac/src/plans/PlanSettingsSheet.tsx` 加一行提示。
 
 已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、“谁做的”（BLG-198～201：`src/fork/plans/roles.ts` 算出各角色实际用的模型，里程碑工作树用谁也由它的 `workAgentFor` 决定；手机协议 `src/fork/companion/plan-roles-view.ts`、`plan-roles-views.ts`；Mac `packages/mac/src/fork/plans/MilestoneRoles.tsx`；手机 `packages/companion/components/fork/MilestoneRoles.tsx`、`packages/companion/lib/fork/roles-words.ts`；上游文件各只留接入点：`model.ts` 的 `MilestoneAgent` 两个可选字段，`pilot.ts` 的 `launch()` 两行，`protocol.ts` 的 `roles` 字段和 `SINCE.rolesSeen`，`views.ts` 一行，`PlanDetails.tsx`、`PlanOutline.tsx`、`PlanCanvas.tsx`、`app/plan/[id].tsx` 各一行加一个 import）、新建计划的角色选择（`packages/mac/src/fork/plans/NewPlanSheet.tsx`）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
 
-- 核心：`src/core/plans/pilot.ts`、`src/core/plans/work.ts`、`src/core/plans/plans.ts`、`src/core/plans/prompt.ts`、`src/core/plans/model.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/progress.ts`、`src/core/plans/owner.ts`、`src/core/plans/move.ts`、`src/core/plans/move-work.ts`、`src/core/notify.ts`、`src/core/board/launch.ts`
-- Agent：`src/agent/plan-tools.ts`、`src/agent/policy.ts`、`src/agent/types.ts`
-- API：`src/ipc/plans-api.ts`、`src/ipc/plans-handlers.ts`、`src/external/domain/tools.ts`、`src/external/adapters/tools/state-rows.ts`
-- 手机：`src/companion/protocol.ts`、`src/companion/views.ts`、`src/companion/calls.ts`、`packages/companion/app/plan/[id].tsx`、`packages/companion/lib/link/calls.ts`、`packages/companion/components/AgentPicker.tsx`
-- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/PlanCanvas.tsx`（任务卡上的模型，一行）、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
-- 测试：`tests/plans.test.ts`、`tests/agent-change.test.ts`
+- 核心：`src/core/plans/pilot.ts`、src/core/plans/work.ts、src/core/plans/plans.ts、src/core/plans/prompt.ts、src/core/plans/model.ts、src/core/plans/watchdog.ts、src/core/plans/progress.ts、src/core/plans/owner.ts、src/core/plans/move.ts、src/core/plans/move-work.ts、src/core/notify.ts、src/core/board/launch.ts
+- Agent：src/agent/plan-tools.ts、src/agent/policy.ts、src/agent/types.ts
+- API：src/ipc/plans-api.ts、src/ipc/plans-handlers.ts、src/external/domain/tools.ts、src/external/adapters/tools/state-rows.ts
+- 手机：`src/companion/protocol.ts`、src/companion/views.ts、src/companion/calls.ts、packages/companion/app/plan/[id].tsx、packages/companion/lib/link/calls.ts、packages/companion/components/AgentPicker.tsx
+- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/PlanCanvas.tsx`（任务卡上的模型，一行）、`packages/mac/src/plans/plan-ask-model.ts`、packages/mac/src/plans/plans-model.ts、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
+- 测试：`tests/plans.test.ts`、tests/agent-change.test.ts
 
 ### 自动路由（没指定 agent 的任务交给合适的模型）
 
-- `src/core/board/work.ts`、`src/core/store.ts`、`src/ipc/api.ts`、`src/machines/sync.ts`
-- `src/shared/settings-schema.ts`：fork 字段从 `src/fork/settings-fields.ts` 展开（一行 import、一行 `...forkSettingFields`）
-- `packages/mac/src/tasks/use-task-start.ts`、`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`、`packages/companion/app/task/[id].tsx`
+- src/core/board/work.ts、src/core/store.ts、src/ipc/api.ts、src/machines/sync.ts
+- src/shared/settings-schema.ts：fork 字段从 `src/fork/settings-fields.ts` 展开（一行 import、一行 `...forkSettingFields`）
+- packages/mac/src/tasks/use-task-start.ts、`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`、packages/companion/app/task/[id].tsx
 
 ### 联邦制：自动接单（队友派给本机的任务自己开工）
 
 设置形状在 `src/fork/federation/settings.ts`，字段经 `src/fork/settings-fields.ts` 进到上游的 Settings 和 PrefsPatch。
 
-- `src/machines/sync.ts`：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
-- `src/core/store.ts`：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
-- `src/ipc/api.ts`：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
-- `src/core/board/launch.ts`：把 `federationParts` 装进看板部件（BLG-225）
+- src/machines/sync.ts：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
+- src/core/store.ts：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
+- src/ipc/api.ts：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
+- src/core/board/launch.ts：把 `federationParts` 装进看板部件（BLG-225）
 
 ### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
 
 计划图与大綱抽成 `packages/ui-plan`，Mac、客户 web 应用和手机读同一份；上游文件里只有「换成共用组件」的接入点。
 
-- `packages/companion/components/PlanParts.tsx`：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
-- `packages/companion/metro.config.js`、`packages/companion/tsconfig.json`：把 `packages/ui-plan` 加进手机端的共享路径
+- packages/companion/components/PlanParts.tsx：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
+- packages/companion/metro.config.js、packages/companion/tsconfig.json：把 `packages/ui-plan` 加进手机端的共享路径
 
 ### Synon Studio（客户写需求、看计划；开工前由你确认）
 
 客户 web 应用（`packages/studio-app`）、中台（`packages/studio-hub`）与 daemon 的 `src/studio/` 都是 fork 自己的文件；下面这些上游文件里只有接入点。
 
-- `src/cli/args.ts`、`src/cli/main.ts`：`beluga studio link/status/unlink/share/unshare` 命令
-- `src/core/agent-host.ts`：`plans` 的返回值把 `customerTurn` 透传给 agent
-- `src/core/plans/edit.ts`：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
+- src/cli/args.ts、src/cli/main.ts：`beluga studio link/status/unlink/share/unshare` 命令
+- src/core/agent-host.ts：`plans` 的返回值把 `customerTurn` 透传给 agent
+- src/core/plans/edit.ts：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
 - `src/daemon/core.ts`：起停 `launchStudio`（没连接时什么都不做）
-- `src/daemon/server.ts`：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
+- src/daemon/server.ts：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
 - `src/ipc/handlers.ts`：展开 `FORK_HANDLERS`（`src/ipc/fork-handlers.ts`：Synon Studio 的 `STUDIO_HANDLERS`，加上保存前先校验的 `env.saveEndpoint`。它排在上游自己的那一项后面，所以覆盖了上游的处理器；上游那一项原样留着，同步上游时如果上游改了 `env.saveEndpoint` 的保存逻辑，要把改动带进 `checkedSave`）
-- `src/agent/runtime/copilot/runner.ts`、`src/agent/runtime/opencode/runner.ts`：客户回合的 policy 带 `customerTurn`
-- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、`packages/mac/src/layout/waiting-model.ts`：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
-- `packages/companion/app/need/[id].tsx`、`packages/companion/components/Needs.tsx`：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
-- `docs/companion.md`、`docs/how-it-works.md`：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
-- `tests/boundaries.test.ts`：`src/studio` 算核心（不含 UI）
-- `tests/browser-safe.test.ts`：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
-- `tests/machine-coverage.test.ts`：studio 的管理与 Gate 方法不从「你的电脑」放行
-- `tests/web-security.test.ts`：浏览器 cookie 做不了 studio 管理
-- `tsconfig.json`：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
+- src/agent/runtime/copilot/runner.ts、src/agent/runtime/opencode/runner.ts：客户回合的 policy 带 `customerTurn`
+- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、packages/mac/src/layout/waiting-model.ts：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
+- packages/companion/app/need/[id].tsx、packages/companion/components/Needs.tsx：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
+- docs/companion.md、docs/how-it-works.md：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
+- tests/boundaries.test.ts：`src/studio` 算核心（不含 UI）
+- tests/browser-safe.test.ts：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
+- tests/machine-coverage.test.ts：studio 的管理与 Gate 方法不从「你的电脑」放行
+- tests/web-security.test.ts：浏览器 cookie 做不了 studio 管理
+- tsconfig.json：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
 
 ### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
 
-上游 3.5.0 起 `src/machines/machines.ts`、`tests/machines-ssh.test.ts` 与上游一致（上游有了同样的结束处理），这里的差异已经没有了。
+上游 3.5.0 起 src/machines/machines.ts、tests/machines-ssh.test.ts 与上游一致（上游有了同样的结束处理），这里的差异已经没有了。
 
 原因：「Over SSH」添加电脑时起的 `ssh … beluga pair --computer` 要随 Beluga 退出一起结束，不能等配对在那边过期；停止中的 `sshPairStart` 也要拒绝新配对。这是 fork 的功能，上游没有。
 
-- `src/machines/machines.ts`：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
-- `tests/machines-ssh.test.ts`：对应的用例
+- src/machines/machines.ts：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
+- tests/machines-ssh.test.ts：对应的用例
 
 ### 设置里打开的表单盖在设置窗口之上（BLG-213：留在 fork，不提回上游）
 
 原因：上游的设置窗口是 `z-index` 44/45，`FormSheet`（表单弹窗）是 40/41，所以从设置里打开的表单（Studio 的「连接到 Studio…」、项目的 worktree 环境等）会被设置窗口盖住、无法输入。上游自己的做法是原生 sheet，不受影响；fork 的 Studio 入口在设置里，需要抬高。`FormSheet` 渲染时若页面上有设置窗口（`[data-settings]`），就加 `data-over-settings`，层级 48/49（仍低于 alert 50）。从项目 ⋯ 菜单等处打开时属性不出现，表现不变。
 
-- `packages/mac/src/components/FormSheet.tsx`：渲染时判断设置是否打开，两处加 `data-over-settings`
+- packages/mac/src/components/FormSheet.tsx：渲染时判断设置是否打开，两处加 `data-over-settings`
 - `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
 - `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
 
@@ -282,10 +295,10 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
-- `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
-- `packages/mac/src/phone/Phone.tsx`、`packages/mac/src/phone/phone-model.ts`
-- `packages/companion/app/_layout.tsx`、`packages/companion/app/(tabs)/_layout.tsx`、`packages/companion/app/index.tsx`、`packages/companion/lib/store.ts`
-- `tests/companion-coverage.test.ts`、`tests/companion-views.test.ts`、`tests/mac-settings-search.test.ts`
+- src/companion/pair.ts、src/companion/devices.ts、src/companion/host.ts、src/ipc/companion-api.ts、src/ipc/companion-handlers.ts
+- `packages/mac/src/phone/Phone.tsx`、packages/mac/src/phone/phone-model.ts
+- packages/companion/app/_layout.tsx、packages/companion/app/(tabs)/_layout.tsx、packages/companion/app/index.tsx、packages/companion/lib/store.ts
+- tests/companion-coverage.test.ts、`tests/companion-views.test.ts`、`tests/mac-settings-search.test.ts`
 
 ### 菜单完整显示、中文不带结尾的“…”
 
@@ -295,11 +308,11 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 原因：中文系统下 git 的提示是中文，Beluga 按英文原话判断 git 的结果（冲突、没有改动、分支不存在等）会判断错，全量测试也因此拿不到 Tested-on（见 `docs/reports/plan-roles-git-locale.md`）。每处只加一行 `LC_MESSAGES=C LANGUAGE=C`。
 
-- `src/workspaces/git.ts`、`src/workspaces/pr.ts`、`src/machines/ready.ts`、`tests/machines-ready.test.ts`、`tests/git-env.test.ts`（BLG-144：`gitEnv` 固定 `LC_MESSAGES=C` 并保留 `LC_CTYPE`）
+- src/workspaces/git.ts、src/workspaces/pr.ts、`src/machines/ready.ts`、`tests/machines-ready.test.ts`、tests/git-env.test.ts（BLG-144：`gitEnv` 固定 `LC_MESSAGES=C` 并保留 `LC_CTYPE`）
 
 ### 中文输入法组字时 Enter 只选词（BLG-133：留在 fork，不提回上游）
 
-原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown（keyCode 229，`isComposing` 已是 false），输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断在 fork 自己的 `packages/mac/src/lib/ime.ts`（`isImeComposing`），只有一处用它：`packages/mac/src/fork/ime-guard.ts` 在 window 的捕获阶段拦下组字中的 Enter，以及组字时的 Tab、Esc 和方向键（各输入框以前自己的判断也挡这些；字母不拦，快捷键照常）（`stopImmediatePropagation`，从不 `preventDefault`，否则会吃掉上屏的字），终端（`.xterm` 里）放行。各输入框与上游一致。测试：`tests/ime.test.ts`、`tests/ime-guard.test.ts`、`packages/mac/e2e/fork-ime.spec.ts`。
+原因：Mac 应用的 WebKit 里用输入法组字时，按 Enter 选词也会触发 keydown（keyCode 229，`isComposing` 已是 false），输入框把它当成发送或提交（见 `docs/reports/plan-roles-ime.md`）。判断在 fork 自己的 packages/mac/src/lib/ime.ts（`isImeComposing`），只有一处用它：`packages/mac/src/fork/ime-guard.ts` 在 window 的捕获阶段拦下组字中的 Enter，以及组字时的 Tab、Esc 和方向键（各输入框以前自己的判断也挡这些；字母不拦，快捷键照常）（`stopImmediatePropagation`，从不 `preventDefault`，否则会吃掉上屏的字），终端（`.xterm` 里）放行。各输入框与上游一致。测试：tests/ime.test.ts、tests/ime-guard.test.ts、`packages/mac/e2e/fork-ime.spec.ts`。
 
 - 上游文件只有 `packages/mac/src/main.tsx` 一行（见上面“只有一行接入点”）。
 
@@ -309,27 +322,27 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 - 设置窗口标题和搜索框固定、只有列表滚动：`packages/mac/src/dialogs/Settings.tsx`、`packages/mac/src/dialogs/settings.module.css`
 - 路径上不存在的图片显示为“缺失”：`packages/mac/src/chat/images.ts`、`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`tests/mac-chat-images-cache.test.ts`
-- 本地模型在自己的文件夹里运行 Claude Code：`src/agent/runtime/local.ts`、`tests/local-endpoints.test.ts`（上游 3.4.0 合并了 #500 的最终版：设置文件改为清理过的副本；同步时 `endpoint-home.ts` 以上游为准）
+- 本地模型在自己的文件夹里运行 Claude Code：src/agent/runtime/local.ts、tests/local-endpoints.test.ts（上游 3.4.0 合并了 #500 的最终版：设置文件改为清理过的副本；同步时 `endpoint-home.ts` 以上游为准）
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
 - 用量时间轴的「Now」线不挡悬停（`pointer-events: none`，标记不是点击目标）：`packages/mac/src/views/usage/stats.module.css`
-- e2e 夹具：预热太久的 demo daemon 不复用（它的时钟已经走过 demo 的定时事件），超过 45 秒就另起一个：`packages/mac/e2e/fixtures.ts`
-- Linux 机器测试先探测 UDP/TCP/子进程，被沙箱挡住就跳过并说明原因，而不是等配对超时：`tests/machines/linux-computer.test.ts`
-- 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`（上游 3.4.0 合并了 #511 的最终版：按钮仍叫 Resume，原话放在说明里；同步时这几处文案以上游为准，`passable` 也加上了合并失败后可再次通过）
+- e2e 夹具：预热太久的 demo daemon 不复用（它的时钟已经走过 demo 的定时事件），超过 45 秒就另起一个：packages/mac/e2e/fixtures.ts
+- Linux 机器测试先探测 UDP/TCP/子进程，被沙箱挡住就跳过并说明原因，而不是等配对超时：tests/machines/linux-computer.test.ts
+- 任务需要你出手时用卡片提问，停下时显示它最后说的话：src/core/plans/prompt.ts、src/core/plans/watchdog.ts、src/core/plans/model.ts、src/core/notify.ts、src/companion/needs-you.ts、packages/mac/src/plans/plans-model.ts、tests/plans-watchdog.test.ts、tests/notify.test.ts、`tests/plan-milestone-agent.test.ts`（上游 3.4.0 合并了 #511 的最终版：按钮仍叫 Resume，原话放在说明里；同步时这几处文案以上游为准，`passable` 也加上了合并失败后可再次通过）
 
 ### 从其他 fork 移植的修复（2026-11-12）
 
 都是对所有人有用的修复，原样（或按本 fork 调整后）cherry-pick 进来，提交说明里有 `cherry picked from` 原提交。上游合并同样的改动后，这里的差异就消失；上游合并的是改过的版本时，同步时以上游为准。
 
-- 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：`src/agent/policy.ts`、`src/agent/runtime/claude/runner.ts`、`src/net/crypto.ts`、`tests/policy.test.ts`、`tests/identity.test.ts`。上游 3.4.0 合并了最终版（#490），同步时 `policy.ts` 的目录搜索、`identity-load.ts` 以上游为准，只留 fork 的 `decideCustomerTurn`
-- macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：`src/workspaces/test-procs.ts`、`tests/setup.ts`、`tests/background-tasks.test.ts`、`tests/delete-unpushed.test.ts`、`tests/friend-share/fork.test.ts`、`tests/friend-share/projects.test.ts`、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`。上游 3.4.0 合并了最终版（#491），同步时以上游为准
-- Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：`src/agent/runtime/codex/runner.ts`、`tests/codex-parity.test.ts`
+- 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：src/agent/policy.ts、src/agent/runtime/claude/runner.ts、src/net/crypto.ts、tests/policy.test.ts、tests/identity.test.ts。上游 3.4.0 合并了最终版（#490），同步时 `policy.ts` 的目录搜索、`identity-load.ts` 以上游为准，只留 fork 的 `decideCustomerTurn`
+- macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：src/workspaces/test-procs.ts、tests/setup.ts、tests/background-tasks.test.ts、`tests/delete-unpushed.test.ts`、tests/friend-share/fork.test.ts、tests/friend-share/projects.test.ts、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`。上游 3.4.0 合并了最终版（#491），同步时以上游为准
+- Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：src/agent/runtime/codex/runner.ts、tests/codex-parity.test.ts
 - ~~MCP 服务需要登录时，会话里直接点 Sign in~~：上游 3.3.0 合并了 #427 的最终版（agent 调 `mcp__beluga_mcp__mcp_sign_in` 登录，没有会话里的提示条），同步时撤掉了这里移植的早期版本，以上游为准。
 - Autopilot 不再放过合并失败的里程碑（voshond/beluga `5accb683`）：`src/core/plans/pilot.ts`、`tests/plans.test.ts`。上游 3.4.0 合并了最终版（#493），同步时以上游为准
-- 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：`src/core/attachments.ts`、`src/agent/runtime/claude/runner.ts`、`packages/mac/src/chat/use-attachments.tsx`、`packages/mac/src/plans/PlanAsk.tsx`、`packages/mac/src/plans/plan-ask.module.css`、`tests/attachments.test.ts`
-- zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`
-- 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
-- Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
-- 以上通用修复提回上游的 6 个 PR（beluga-labs/beluga #490–#495）已于 2026-11-13 全部合并，3.4.0 / 3.5.0 起这些文件与上游一致（`src/agent/policy.ts` 里 Studio 客户回合那部分是 fork 自己的，仍留着），同步 3.5.0 时从「改了上游的文件」清单里消失。
+- 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：src/core/attachments.ts、src/agent/runtime/claude/runner.ts、packages/mac/src/chat/use-attachments.tsx、packages/mac/src/plans/PlanAsk.tsx、`packages/mac/src/plans/plan-ask.module.css`、tests/attachments.test.ts
+- zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、src/agent/runtime/claude/runner.ts、src/agent/runtime/claude/terminal.ts
+- 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。src/agent/policy.ts、src/core/shares.ts、src/machines/identity-load.ts、src/net/crypto.ts、src/agent/runtime/claude/runner.ts、src/agent/runtime/claude/zsh-compat.ts，以及对应测试。
+- Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：src/agent/policy.ts 的 `decideCustomerTurn`、tests/policy.test.ts。
+- 以上通用修复提回上游的 6 个 PR（beluga-labs/beluga #490–#495）已于 2026-11-13 全部合并，3.4.0 / 3.5.0 起这些文件与上游一致（src/agent/policy.ts 里 Studio 客户回合那部分是 fork 自己的，仍留着），同步 3.5.0 时从「改了上游的文件」清单里消失。
 
 ### 我的共享（M7 · BLG-217 / BLG-218，2026-11-13）
 

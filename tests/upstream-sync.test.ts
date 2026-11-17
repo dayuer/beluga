@@ -13,7 +13,9 @@ import {
   parseNumstat,
   reportLines,
   selectorsIn,
+  CHAIN,
   stale,
+  staleInChain,
   staleSelectors,
   unexplained,
   versionOf,
@@ -54,6 +56,20 @@ describe('syncing upstream', () => {
 
   it('names the touch points docs/fork.md doesn’t explain', () => {
     expect(unexplained(['a.ts', 'b.ts'], 'why `a.ts` stays')).toEqual(['b.ts']);
+  });
+
+  it('does not call a file stale when a later layer of the chain still changes it, but does when no layer does', () => {
+    const doc = '## 改了上游的文件\n`a.ts` `b.ts` `c.ts`';
+    const upstream = new Set(['a.ts', 'b.ts', 'c.ts']);
+    expect(stale(['a.ts'], doc, upstream)).toEqual(['b.ts', 'c.ts']);
+    expect(staleInChain(['a.ts'], ['b.ts'], doc, upstream)).toEqual(['c.ts']);
+    expect(staleInChain(['a.ts'], [], doc, upstream)).toEqual(['b.ts', 'c.ts']);
+  });
+
+  it('names the chain’s layers as docs/fork.md「分支」does, in order', () => {
+    const doc = readFileSync('docs/fork.md', 'utf8');
+    for (const b of CHAIN) expect(doc).toContain(`\`${b}\``);
+    expect(CHAIN.slice(0, 4)).toEqual(['topic/chinese', 'fork/base', 'topic/native', 'topic/plans']);
   });
 
   it('explains every touch point it knows of in docs/fork.md', () => {

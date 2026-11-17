@@ -51,3 +51,7 @@ export interface NumstatRow {
 export function parseNumstat(text: string): NumstatRow[];
 export function reportLines(touched: readonly string[], stats: readonly NumstatRow[], missing: readonly string[]): string[];
 export function stale(touched: readonly string[], doc: string, upstreamFiles: ReadonlySet<string>): string[];
+/** The fork's chain of layers (docs/fork.md「分支」), lowest first. */
+export const CHAIN: readonly string[];
+/** `stale`, counting the files the other layers of the chain change (`others`) as changed. */
+export function staleInChain(touched: readonly string[], others: readonly string[], doc: string, upstreamFiles: ReadonlySet<string>): string[];
