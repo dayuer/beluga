@@ -416,11 +416,58 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 - `callfloat/callfloat.module.css`：`inset` 的 1.5px 实线可保留；`var(--lift)` 的外晕要去掉。
 - `dialogs/support.module.css`：`0 0 0 4px` 的 accent 半透明外环，是焦点型的光晕，按 §1.3 改成细圈。
 
-## 5. 待填（后续任务）
+## 5. 最终复核（BLG-246）
 
-- §5 仍在播放的动画（只剩那一种进度指示和 keep-decor）、reduced-motion 下的表现、问题表：BLG-246。
-- 改后图：BLG-242（强调色）、BLG-243（行尾）、BLG-244（字号）、BLG-246（全量复核）。
-- Tested-on 行：BLG-246。
+最终树（`0a97e0619` 之后的 M8 提交）重拍：六场景 × 浅色深色，calm 开、full 动效、loaded；对话进行中取 running。改前图见 §1.1，改后中间结果见 §1.4、§1.5、§1.6、§2.4。
+
+| 场景 | 浅色 | 深色 |
+| --- | --- | --- |
+| 工作区 | ![](img/m8-final-workspace-light.png) | ![](img/m8-final-workspace-dark.png) |
+| 对话进行中 | ![](img/m8-final-chatsteps-light.png) | ![](img/m8-final-chatsteps-dark.png) |
+| 任务页 | ![](img/m8-final-tasks-light.png) | ![](img/m8-final-tasks-dark.png) |
+| 计划 | ![](img/m8-final-plan-light.png) | ![](img/m8-final-plan-dark.png) |
+| Sentinel | ![](img/m8-final-sentinel-light.png) | ![](img/m8-final-sentinel-dark.png) |
+| 用量 | ![](img/m8-final-usage-light.png) | ![](img/m8-final-usage-dark.png) |
+
+沉稳关（上游样子）的工作区、任务页，浅色深色各一张：`img/m8-final-off-workspace-*.png`、`img/m8-final-off-tasks-*.png`。**说明**：改前的沉稳关截图在重拍时被覆盖，没有保留下来，所以不能用图直接对比「改前沉稳关」。沉稳关与上游一致的证据是：(a) `tests/fork-calm-type.test.ts` 的 fallback 逐字节检查；(b) `:root[data-calm]` 门控的规则测试；(c) 下表沉稳关数字与沉稳开一致的方向。
+
+### 5.1 动效与 CLS（`calm-check`，calm 开 full 对比 calm 关 full）
+
+| 场景 | 浅色 CLS 开 / 关 | 深色 CLS 开 / 关 | 仍在播放的动画（calm 开、full） |
+| --- | --- | --- | --- |
+| 工作区 | 0.002 / 0 | 0.005 / 0.009 | 无 |
+| 对话进行中 | 0.099 / 0.086 | 0.086 / 0.083 | 无 |
+| 任务页 | 0.003 / 0 | 0.003 / 0 | 无 |
+| 计划 | 0.004 / 0 | 0.003 / 0 | 无 |
+| Sentinel | 0.005 / 0.141 | 0.003 / 0.075 | 无 |
+| 用量 | 0.003 / 0 | 0.003 / 0 | 一次性标题淡入（`_titleIn`，420ms，只播一次，浅色） |
+
+- 沉稳开时没有循环动画。calm 关时 usage 有 9 个动画，calm 开时 0 个（用量页的标题淡入除外，它只播一次，属于 keep-decor 以外的一次性入场，记为例外）。
+- 对话进行中的 CLS 0.09–0.10 与 M4 的 §7.2 P-5 一致（已接受的基线），沉稳关时同量级。
+- Sentinel 在沉稳开时 CLS 从 0.14 降到 0.005（推广卡移出导航和侧栏行尾收口带来的）。
+
+### 5.2 reduced-motion
+
+`calm-on/reduce` 下六个场景的动画数均为 0，CLS 与 `calm-on/full` 同量级。
+
+### 5.3 问题表
+
+| 编号 | 问题 | 状态 |
+| --- | --- | --- |
+| M8-1 | 工作区 Create PR 周围的光没有定位来源，改后仍在（BLG-242 的未完成项） | **未解决**，需要单独确认：在 DevTools 里找出 box-shadow 来源 |
+| M8-2 | 上游 60 层彩色光晕未处理（BLG-245 的未完成项） | **未解决**，需要后续任务 |
+| M8-3 | 字号写法 ≤ 25 的目标未达：构建口径 51、测试口径 79（BLG-244） | **放宽**为实测值；需确认接受 |
+| M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
+| M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件（本 M8 的 vite.config.ts 已登记，不计入）。这些是 M8 之前 fork 已有的改动，不是 M8 造成的 | **未达标**，需要另外补登记 |
+| M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | 未做 |
+| M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | 未做，另开任务 |
+| M8-8 | 行尾收口的 200 行性能未测（BLG-243） | 未做 |
+| M8-9 | Sentinel 的 Merge、Resume 改中性是本任务的决定，设计未写 | 已记录，待确认 |
+
+## 6. 合并状态
+
+- 本页列出的 M8 提交都在 `beluga/blg-248-m8` 上，没有开 PR，没有推送。
+- Tested-on 行见下。
 
 ## 1.5 侧栏蓝色收口（BLG-249）
 
@@ -492,3 +539,5 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 - **与设计的差异**：设计要求改写后剩余 ≤ 25 种。按设计保留 em、超范围、自定义属性之后达不到，所以测试上限定为实测值（≤ 80，当前 79），并要求减少到原来的 75% 以下。这是一项放宽，需要 BLG-246 或你确认是否接受。
 - **未做**：文字大小 11 和 16 下的 workspace 对比图（设计要求）；六场景改后对比（BLG-246）。
 - 沉稳关时的等价性：测试对全部 mac CSS 做了「去掉 var 包装后与原文逐字节相同」的检查，证明 fallback 就是上游原值。
+
+Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619（分支 beluga/blg-248-m8，基于 topic/native 350e15ea9）。`npx vitest run` 全量 3 次：737 个文件、9179 个用例，每次 9162 通过、16 跳过；每次 1 个失败 `tests/test-lock.test.ts` 的「nices a run that carries KLAUD_WORKTREE」（单独运行通过；与 M8 改动无关，未在 topic/native 上复现核对）。另外第 1 次全量里还有 `tests/clone-project.test.ts` 一个失败（单独运行通过）。**因此这一行不是「零失败」**，零失败需要在 test-lock 的这条用例修好或确认是负载波动后再跑一次。
