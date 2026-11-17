@@ -37,6 +37,7 @@ import { TeamContext } from '../team/context-share.js';
 import { TeamKnocks } from '../team/knock.js';
 import { TeamPlans } from '../team/plan-share.js';
 import { blackbox } from '../blackbox/recorder.js';
+import { federationParts } from '../../fork/federation/parts.js';
 
 /**
  * Start the board and plans for the daemon (the Mac app's Beluga): tasks in ~/.beluga/board.json,
@@ -202,7 +203,7 @@ export function launchBoard(host: BoardHost): () => void {
         intend: (intent) => session.intend(intent),
         dir: teamDir,
       });
-      return [teamSync, new TeamAssign(team, { board, sync: teamSync, dir: teamDir }), teamPlans, new TeamContext(team, board), knocks];
+      return [teamSync, new TeamAssign(team, { board, sync: teamSync, dir: teamDir }), teamPlans, new TeamContext(team, board), knocks, ...federationParts({ team, board, sync: teamSync, work, store, live, session })];
     },
   });
   let stopSeed = (): void => undefined;

@@ -93,6 +93,7 @@ export const LOCAL_SETTINGS = [
   'askMeFor',
   'askFreely',
   'capabilities',
+  'federation',
 ] as const satisfies ReadonlyArray<keyof Settings>;
 
 /** What Settings calls each synced setting, for a conflict said in words. */

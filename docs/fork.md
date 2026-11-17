@@ -198,8 +198,18 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 自动路由（没指定 agent 的任务交给合适的模型）
 
-- `src/core/board/work.ts`、`src/core/store.ts`、`src/shared/settings-schema.ts`、`src/ipc/api.ts`、`src/machines/sync.ts`
+- `src/core/board/work.ts`、`src/core/store.ts`、`src/ipc/api.ts`、`src/machines/sync.ts`
+- `src/shared/settings-schema.ts`：fork 字段从 `src/fork/settings-fields.ts` 展开（一行 import、一行 `...forkSettingFields`）
 - `packages/mac/src/tasks/use-task-start.ts`、`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`、`packages/companion/app/task/[id].tsx`
+
+### 联邦制：自动接单（队友派给本机的任务自己开工）
+
+设置形状在 `src/fork/federation/settings.ts`，字段经 `src/fork/settings-fields.ts` 进到上游的 Settings 和 PrefsPatch。
+
+- `src/machines/sync.ts`：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
+- `src/core/store.ts`：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
+- `src/ipc/api.ts`：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
+- `src/core/board/launch.ts`：把 `federationParts` 装进看板部件（BLG-225）
 
 ### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
 
