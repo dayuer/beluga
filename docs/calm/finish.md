@@ -111,9 +111,9 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | 1 | 需要你 | `NeedMark`（非问题）：左侧亮边 | `[data-signal='needs']:not([class*='_markProblem_'])` | 悬停展开；行的 `detail` |
 | 2 | 问题 | `NeedMark`（conflict、checks）：红色 `!` | `[data-signal='needs'][class*='_markProblem_']` | 悬停展开；行的 `detail` |
 | 3 | 计数 | `SignalMark` 的 `unread` → `Badge urgent` | `[data-signal='unread']`，`[data-tally] [class*='_badge_']` | 悬停展开；侧栏「Unread」分组 |
-| 4 | 进行中（点阵） | `SignalMark` 的 `working` → `DotMark live` | `[data-signal='working']`，`[data-busy]`（**未找到**，见 §2.2） | 聊天页的步骤条 |
-| 5 | 金额 | `ProjectTree.tsx:277` 的 `EarningsPill` | `[data-earnings-pill]`（**未找到**，见 §2.2） | 项目主页；用量页 |
-| 6 | 团队 | `ProjectTree` 的 `TeamBadge`（`team/Team.tsx:66`） | 待定（BLG-251 确认类名，避免和 `_badge_` 撞） | 项目主页的团队区 |
+| 4 | 进行中（点阵） | `SignalMark` 的 `working` → `DotMark live`；项目行的 busy 点 | `[data-signal='working']`，`[data-busy]`（`ProjectTree.tsx:286`，已存在） | 聊天页的步骤条 |
+| 5 | 金额 | `ProjectTree.tsx:277` 的 `EarningsPill` | `[data-earnings-pill]`（`components/EarningsPill.tsx:110`，已存在） | 项目主页；用量页 |
+| 6 | 团队 | `ProjectTree` 的 `TeamBadge`（`team/Team.tsx:66`） | `button[aria-label^='Team on']`（按钮的 label 以 `Team on` 开头；不用 class，避免和 `_badge_` 撞） | 项目主页的团队区 |
 | 7 | 安静 | `LaterMark`（`data-signal='later'`）、`ScheduledMark`（`data-scheduled`）、`DotMark` 的 git 点（无 signal，即 `fallback`） | `[data-signal='later']`，`[data-scheduled]`，无 `data-signal` 的 `_mark_` | 悬停；定时的去 Sentinel 页 |
 | 容器 | 项目/文件夹的 `TallyMark` | `TallyMark`（`data-tally="needs:unread"`） | 不单独计级：里面的需要你 edge 按 1 计，Badge 按 3 计；收起时整体只占一个位置 | 展开项目 |
 
@@ -131,10 +131,10 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | `[data-tally]` | 存在（signal-marks.tsx:98） | 直接用 |
 | `[data-scheduled]`、`[data-driven-by]`、`[data-archiving]` | 存在（signal-marks.tsx:64；workspace-row.tsx:223、229） | 直接用 |
 | `[class*='_markProblem_']` | 存在（signal-marks.tsx:30 的 `m.markProblem`） | 直接用 |
-| `[data-earnings-pill]` | **不存在**：`EarningsPill` 没有这个属性 | BLG-251 在 `EarningsPill` 根元素加 `data-earnings-pill`（1 行，登记到 docs/fork.md）；或改用 `[class*='_pill_']`（不稳，不推荐） |
-| `[data-busy]` | **不存在**：`ProjectTree` 的 busy 点没有这个属性 | BLG-251 在 busy 的 `Dot claude live` 外层加 `data-busy`（1 行，登记）；或用 `[data-signal='working']` 的点，这是已存在的锚点 |
-| `[class*='_making_']` | 未在 layout 的 CSS 里找到 | 实施时先 grep；找不到就删掉这一行，不要硬写 |
-| TeamBadge 的类名 | 未核对 | BLG-251 看 `team/team.module.css` 后确定 |
+| `[data-earnings-pill]` | 存在（`components/EarningsPill.tsx:110`，值为 projectId） | 直接用 |
+| `[data-busy]` | 存在（`layout/ProjectTree.tsx:286`，在 busy 的 `side.status` span 上） | 直接用 |
+| `[class*='_making_']` | 未在 layout 的 CSS 里找到 | 保留在 MARKS 里；`tests/fork-sidebar-anchors.test.ts` 会检查它的类名是否在上游源码里（若不在，删掉这一行） |
+| TeamBadge | 按钮无 data 属性；用 `aria-label` 前缀 `Team on` | 直接用 `button[aria-label^='Team on']` |
 
 ### 2.3 改前图（同一行：浅色 bob-api 项目行、深色 bob-api 行）
 
