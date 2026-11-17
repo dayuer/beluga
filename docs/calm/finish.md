@@ -607,3 +607,7 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 - `tests/fork-calm.test.ts`：上游报告 491 条，未变（通过）。
 - 视觉：规则 4 未经截图核对（这轮没有拍图）；BLG-246 复核时要看一张有焦点的文本框。
 - 沉稳关：所有规则在 `:root[data-calm]` 下，关闭时不匹配。
+
+### 4.6 决定（liyuqing，2026-11-18）
+
+剩下的 26 层未处理、22 层只在键盘焦点时覆盖，按用户决定**保留为例外**，逐条写进 `tests/fork-calm-glow.test.ts` 的 `GLOW_EXCEPTIONS`（共 48 条，每条带原因）。其中焦点容器（`:focus-within`）和非焦点的 3px 光晕另开 follow-up 逐个处理；大模糊的装饰光晕（chat/max、attention、plans、onboarding、graph）作为装饰保留。
