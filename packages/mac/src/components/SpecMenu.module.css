@@ -3,9 +3,10 @@
   z-index: 88;
   min-width: 220px;
   max-width: 380px;
-  /* Shown whole: no height of its own (FitContent picks the side it fits on). Only a menu taller
-     than the window itself scrolls, and then without a bar. */
-  max-height: calc(100vh - 16px);
+  /* As tall as the room Radix found for it (inside the edges it keeps clear, the title bar
+     included), so a long menu shows whole when the window has space and scrolls only when it
+     truly doesn't, then without a bar (fork: FitContent picks the side it fits on). */
+  max-height: var(--radix-dropdown-menu-content-available-height, var(--radix-context-menu-content-available-height, calc(100vh - 60px)));
   overflow-y: auto;
   scrollbar-width: none;
   padding: 5px;

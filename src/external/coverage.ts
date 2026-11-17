@@ -14,6 +14,7 @@ import { EXTERNAL_FORK } from '../fork/coverage.js';
 export type ExternalAccess = 'covered' | 'gated' | 'ui_only' | { readonly refused: string };
 
 const APPROVALS = 'An approval is a person\'s answer: no agent says yes to a step or a request.';
+const AUTOPILOT = 'Full Autopilot answers approvals for the person (BLG-981): only the person turns it on.';
 const GRANTS = 'An agent never reads or changes a grant, its own or another agent\'s.';
 const SECRET_VALUES = 'It holds or returns a secret value.';
 const ENV_LIST = 'It replaces the whole list of variables, and an agent cannot read the values it would have to keep.';
@@ -45,6 +46,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.copyText': 'ui_only',
   'session.setPrefs': 'gated',
   'session.setPlanMode': 'covered',
+  'session.setAutopilot': { refused: AUTOPILOT },
+  'session.setBuildWith': { refused: 'Who builds what a chat plans is the person’s pick in its mode menu; plan_set_role_agent changes a plan’s builder.' },
   'session.setClaudeSharing': 'gated',
   'session.rename': 'gated',
   'session.zoom': 'ui_only',
@@ -137,6 +140,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.remove': 'covered',
   'workspaces.commit': 'covered',
   'workspaces.merge': 'covered',
+  'workspaces.land': { refused: NO_TOOL },
+  'workspaces.setLandOnBase': { refused: NO_TOOL },
   'workspaces.prepareRemoval': 'covered',
   'workspaces.applyEnvBack': 'gated',
   'workspaces.keepEnvHere': 'gated',
@@ -219,6 +224,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'env.carryWorktree': 'gated',
   'env.pastedKeys': { refused: SECRET_VALUES },
   'env.keepPasted': { refused: SECRET_VALUES },
+  'env.notAKey': { refused: SECRET_VALUES },
   'env.overview': 'gated',
   'env.addToExample': 'gated',
   'env.exampleSync': 'gated',
@@ -228,6 +234,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'env.checkEndpoints': 'gated',
   'attachments.add': 'ui_only',
   'attachments.addFile': 'ui_only',
+  'attachments.addText': 'ui_only',
   'attachments.reattach': 'ui_only',
   'attachments.expand': 'ui_only',
   'attachments.read': { refused: NO_SCOPE },
@@ -417,6 +424,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'plans.setParallel': 'covered',
   'plans.setTestsAt': 'covered',
   'plans.setWorkAgent': 'covered',
+  'plans.setRoleAgent': 'covered',
+  'plans.setFullAuto': { refused: AUTOPILOT },
   'plans.tidyUp': 'covered',
   'plans.pass': 'covered',
   'plans.recheck': 'covered',
@@ -464,6 +473,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'git.fetch': 'covered',
   'git.fetchIfStale': 'covered',
   'git.updateMain': 'covered',
+  'git.pushMain': 'covered',
   'git.stashAndUpdate': 'covered',
   'git.moveAndUpdate': 'covered',
   'git.switchToDefault': 'covered',

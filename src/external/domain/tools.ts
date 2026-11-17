@@ -226,6 +226,7 @@ export const WORK_TOOLS = [
   'issue_fix',
   'issue_to_task',
   'issue_comment',
+  'git_push_main',
 ] as const;
 
 /** Files and terminals with no run in between, and adding or removing projects. */
@@ -288,7 +289,7 @@ export const MORE_STATE_TOOLS = [
   'plan_set_parallel',
   'plan_set_tests_at',
   'plan_set_work_agent',
-  'plan_set_check_agent',
+  'plan_set_role_agent',
   'plan_set_arch_agent',
   'plan_set_fix_agent',
   'plan_tidy_up',
@@ -733,6 +734,7 @@ export const TOOL_ACCESS: ToolAccess<ExternalTool> = {
   issue_fix: 'destructive',
   issue_to_task: 'state_write',
   issue_comment: 'destructive',
+  git_push_main: 'destructive',
   file_list: 'read',
   file_read: 'read',
   file_find: 'read',
@@ -783,7 +785,7 @@ export const TOOL_ACCESS: ToolAccess<ExternalTool> = {
   plan_set_parallel: 'state_write',
   plan_set_tests_at: 'state_write',
   plan_set_work_agent: 'state_write',
-  plan_set_check_agent: 'state_write',
+  plan_set_role_agent: 'state_write',
   plan_set_arch_agent: 'state_write',
   plan_set_fix_agent: 'state_write',
   plan_tidy_up: 'state_write',

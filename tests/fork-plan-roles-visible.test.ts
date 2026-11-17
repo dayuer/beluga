@@ -99,7 +99,7 @@ export const ONE: BodyInput = {
 };
 
 type T = ReturnType<typeof setup>;
-async function approved(t: T, roles: { agent?: AgentRef; checkAgent?: AgentRef; archAgent?: AgentRef; fixAgent?: AgentRef }) {
+async function approved(t: T, roles: { agent?: AgentRef; checker?: AgentRef; archAgent?: AgentRef; fixAgent?: AgentRef }) {
   const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'autopilot', ...roles }, t.claude);
   t.work.forRun('ws:main', 'p-me')!.tools!.write(ONE);
   t.work.approve(plan.id);
@@ -109,7 +109,7 @@ async function approved(t: T, roles: { agent?: AgentRef; checkAgent?: AgentRef; 
 describe('a plan’s four roles, where each really runs', () => {
   it('architect Opus, work DeepSeek, check GLM, fixes Sonnet: each workspace is on its own', async () => {
     const t = setup();
-    const plan = await approved(t, { archAgent: OPUS, agent: DEEPSEEK, checkAgent: GLM, fixAgent: SONNET });
+    const plan = await approved(t, { archAgent: OPUS, agent: DEEPSEEK, checker: GLM, fixAgent: SONNET });
     // Architect: a chat of its own, on Opus, before any work.
     const architect = await waitFor(() => t.plans.need(plan.id).runs.safe?.architect);
     expect(t.agentOf(architect)).toEqual(OPUS);
@@ -154,7 +154,7 @@ describe('a plan’s four roles, where each really runs', () => {
 
   it('no architect set: no design chat is made (the role is off, as set)', async () => {
     const t = setup();
-    const plan = await approved(t, { agent: DEEPSEEK, checkAgent: GLM });
+    const plan = await approved(t, { agent: DEEPSEEK, checker: GLM });
     const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
     expect(t.plans.need(plan.id).runs.safe?.architect).toBeUndefined();
     expect(t.agentOf(agent.worktree)).toEqual(DEEPSEEK);
@@ -177,7 +177,7 @@ describe('a plan’s four roles, where each really runs', () => {
   // BLG-198 found, BLG-199 fixed: work on auto route started the milestone's worktree on your default agent.
   it('work on auto route: the milestone’s worktree goes to the build list’s first (DeepSeek), as a task would', async () => {
     const t = setup({ autoRoute: true });
-    const plan = await approved(t, { checkAgent: GLM });
+    const plan = await approved(t, { checker: GLM });
     const agent = await waitFor(() => t.plans.need(plan.id).runs.safe?.agent);
     expect(t.agentOf(agent.worktree)).toEqual(DEEPSEEK);
     // Auto route's pick is what's set: no mismatch to mark.

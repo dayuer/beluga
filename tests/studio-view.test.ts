@@ -52,7 +52,8 @@ const plan = (over: Partial<Plan> = {}): Plan => ({
   maxParallel: 3,
   testsAt: 'end',
   agent: { runtime: 'claude', model: 'claude-opus-5-5' } as Plan['agent'],
-  checkAgent: { runtime: 'claude', model: 'claude-fable-5-2' } as Plan['agent'],
+  checker: { runtime: 'claude', model: 'claude-fable-5-2' } as Plan['agent'],
+  planner: { runtime: 'claude', model: 'claude-opus-5-5' } as Plan['agent'],
   paused: false,
   runs: {},
   branch: 'plan/synon-secret',
@@ -106,7 +107,7 @@ const keys = (v: unknown): string[] => (Array.isArray(v) ? v.flatMap(keys) : v &
 function expectClean(view: unknown): void {
   const json = JSON.stringify(view);
   for (const s of strings(view)) for (const re of FORBIDDEN) expect(s, `${re} in «${s}»`).not.toMatch(re);
-  for (const k of ['needsYou', 'topic', 'agent', 'checkAgent', 'agents', 'checker', 'touches', 'blockedBy', 'worktree', 'branch', 'issue', 'key', 'qid', 'method', 'args', 'home', 'projectId', 'why', 'base', 'findings'])
+  for (const k of ['needsYou', 'topic', 'agent', 'checkAgent', 'planner', 'agents', 'checker', 'touches', 'blockedBy', 'worktree', 'branch', 'issue', 'key', 'qid', 'method', 'args', 'home', 'projectId', 'why', 'base', 'findings'])
     expect(keys(view), k).not.toContain(k);
   expect(json).not.toMatch(/decide:|questions\.|plans\.|host\./);
 }

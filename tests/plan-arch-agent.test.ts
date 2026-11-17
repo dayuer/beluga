@@ -251,7 +251,7 @@ describe('a plan’s agent for its architecture', () => {
     expect(EXTERNAL_ACCESS['plans.setArchAgent']).toBe('covered');
     expect(STATE_ROWS.find((r) => r.method === 'plans.setArchAgent')?.name).toBe('plan_set_arch_agent');
     expect(NOT_EXPOSED.plan_design).toBe('checker_only');
-    expect(MACHINE['plans.setArchAgent']).toBe(MACHINE['plans.setCheckAgent']);
+    expect(MACHINE['plans.setArchAgent']).toBe(MACHINE['plans.setRoleAgent']);
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
     expect(planPageView(t.store.getState(), plan.id)!.archAgent).toBeUndefined();

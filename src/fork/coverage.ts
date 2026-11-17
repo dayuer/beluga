@@ -11,19 +11,16 @@ import type { MachineSide } from '../machines/coverage.js';
 
 /** Who works each kind of plan role (by tier): a pick from a list, so the phone does it too. */
 export const PHONE_FORK = {
-  'plans.setCheckAgent': 'phone',
   'plans.setArchAgent': 'phone',
   'plans.setFixAgent': 'phone',
 } as const satisfies Partial<Record<Method, Side>>;
 
 export const EXTERNAL_FORK = {
-  'plans.setCheckAgent': 'covered',
   'plans.setArchAgent': 'covered',
   'plans.setFixAgent': 'covered',
 } as const satisfies Partial<Record<Method, ExternalAccess>>;
 
 export const MACHINE_FORK = {
-  'plans.setCheckAgent': 'drive',
   'plans.setArchAgent': 'drive',
   'plans.setFixAgent': 'drive',
 } as const satisfies Partial<Record<Method, MachineSide>>;

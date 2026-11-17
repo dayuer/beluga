@@ -53,6 +53,6 @@ describe('the plan page’s “Agent for hard fixes” on old and new Macs', () 
     // the roles before it keep their own minors
     (store as unknown as { state: { proto: { major: number; minor: number } } }).state.proto = { major: 1, minor: 60 };
     expect(store.supports('archAgent')).toBe(true);
-    expect(store.supports('checkAgent')).toBe(true);
+    expect(store.supports('planRoles')).toBe(true);
   });
 });
