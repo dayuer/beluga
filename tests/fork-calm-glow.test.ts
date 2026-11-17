@@ -146,3 +146,14 @@ describe('fork-calm-glow: calm-glow.css is clean by the same rules as fork/calm'
     expect(selectors.filter((sel) => !sel.startsWith(':root[data-calm]'))).toEqual([]);
   });
 });
+
+describe('fork-calm-glow: the focus and drop rules (calm-glow.css §4–5)', () => {
+  const css = readFileSync(path.join(mac, 'fork', 'calm', 'calm-glow.css'), 'utf8');
+  it('draws focus on the element only, and leaves error and bad fields alone', () => {
+    expect(css).toContain(":root[data-calm] :focus-visible:not([class*='_invalid_']):not([class*='_bad_'])");
+    expect(css).not.toMatch(/:focus-within\s*\{/);
+  });
+  it('anchors the composer drop class on an upstream module', () => {
+    expect(readFileSync(path.join(mac, 'chat', 'composer.module.css'), 'utf8')).toMatch(/\.dropping\b/);
+  });
+});

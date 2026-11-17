@@ -22,3 +22,16 @@
 :root[data-calm] [class*='_edge_'] {
   box-shadow: none;
 }
+
+/* 4. Keyboard focus on the element itself: one 2px accent ring instead of the 3–3.5px halos the
+   upstream fields and dialogs draw on focus (BLG-245). `:focus-visible` matches the focused element
+   only, never its ancestors, so panels keep their own shadows. Error and "bad" fields keep theirs
+   (they are excluded by class), so the red stays red. */
+:root[data-calm] :focus-visible:not([class*='_invalid_']):not([class*='_bad_']) {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);
+}
+
+/* 5. A drop target in the composer (chat/composer.module.css `.dropping`): the 2px line, not the 5px halo. */
+:root[data-calm] [class*='_dropping_'] {
+  box-shadow: 0 0 0 2px var(--accent);
+}
