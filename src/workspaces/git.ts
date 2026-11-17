@@ -10,16 +10,15 @@ import { withSshRoutes } from './ssh-routes.js';
 export class GitError extends Error {}
 
 /**
- * Git must never ask for a password on Beluga's screen: fail instead, and say why. And git speaks
- * English to Beluga whatever the Mac's language: its messages are read ("would be overwritten",
- * conflicts, fetch failures), and a 中文 git hid "changes in the way" behind "Couldn't update".
- * Only the messages: LC_ALL (which outranks LC_MESSAGES) moves to LC_CTYPE, so paths stay UTF-8.
+ * Git's messages in English, whatever the computer's language: Beluga reads them (changes in the
+ * way of an update, a branch not fully merged, why a clone or a push failed), and on a Mac set to
+ * Chinese git answers in Chinese even with LANG unset. LANGUAGE too: it wins over LC_ALL. File
+ * names are unaffected (that's core.quotePath).
  */
-export function gitEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const { LC_ALL, ...rest } = base;
-  return { ...rest, ...(LC_ALL && !rest.LC_CTYPE ? { LC_CTYPE: LC_ALL } : {}), LC_MESSAGES: 'C', LANGUAGE: 'C', GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_SSH_COMMAND: base.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes' };
-}
-const GIT_ENV: NodeJS.ProcessEnv = gitEnv(process.env);
+export const GIT_IN_ENGLISH = { LC_ALL: 'en_US.UTF-8', LANGUAGE: 'en' } as const;
+
+/** Git must never ask for a password on Beluga's screen: fail instead, and say why. */
+const GIT_ENV: NodeJS.ProcessEnv = { ...process.env, ...GIT_IN_ENGLISH, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes' };
 
 /**
  * Run git in a directory; resolves stdout, rejects with git's own message. `env`: more of git's

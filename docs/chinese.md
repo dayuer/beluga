@@ -17,6 +17,7 @@
   | “{0}” runs on {1} now. Pick how it runs from here on. | “{0}”现在运行于 {1}。选择从现在起它如何运行。 | “{0}”现在按{1}运行。选择从现在起怎么运行。 |
   | {0} waits for you | {0} 在等你处理 | {0} 在等你 |
 
+- **上游还没译的界面文字**：上游代码里会显示、但上游中文表里还没有的，写在改译之后（按英文排序）。用 `node scripts/i18n-extract.mjs --missing --locale zh-CN` 找出来，只译界面上真会出现的；给智能体的提示词、日志、搜索关键词、代码、品牌和字体名都不译。上游以后自己译了同一句，`zh-check` 会列出来，留一个说法。
 - fork 自己功能的文案（计划分工、Studio、沉稳界面……）不在这里：它们跟着各自的分支，写在同一个文件里这几条之后。
 
 ## 同步上游时
@@ -27,9 +28,9 @@
    node scripts/zh-check.mjs HEAD upstream/main
    ```
 
-   它列出上游新增、改了说法、删掉的中文，以及 fork 的改译里要处理的三种：上游改了说法的（再看一遍 fork 的说法还是不是更好）、上游删掉了英文的（删掉这条改译）、和上游现在一模一样的（删掉，多余）。有要处理的，退出码是 1。
+   它列出上游新增、改了说法、删掉的中文，以及 fork 的改译里要处理的三种：上游改了说法的（再看一遍 fork 的说法还是不是更好）、上游删掉了英文的（删掉这条改译）、和上游现在一模一样的（删掉，多余），以及 fork 替上游补译、上游现在也译了的（比一比，留一个）。有要处理的，退出码是 1。
 
-2. 合并，按上面的清单改 `zh-CN.fork.json`，跑 `npx vitest run tests/i18n.test.ts tests/zh-check.test.ts`。
+2. 合并，按上面的清单改 `zh-CN.fork.json`。再跑一次 `node scripts/i18n-extract.mjs --missing --locale zh-CN`，把上游新加、还没中文的界面文字补上。然后跑 `npx vitest run tests/i18n.test.ts tests/zh-check.test.ts`。
 3. 合进 `fork/base`，再顺着链往下合。
 
 只改了说法、不跟上游同步时，也在这里改，再往下合。
