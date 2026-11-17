@@ -1,6 +1,6 @@
 import { ClientStore, type DomainSource } from '../client/client-store.js';
 import type { Intent } from '../core/intents.js';
-import { type Action, type DomainState, reduceDomain } from '../core/store.js';
+import { type Action, type DomainState, initialState, reduceDomain } from '../core/store.js';
 import type { PtyExit } from '../terminal/pty-host.js';
 import type { AttachOptions, PtyLink } from '../terminal/emulator.js';
 import type { Args, Method } from './api.js';
@@ -37,14 +37,33 @@ export interface SocketClientOptions {
 
 const OPEN = 1;
 
+let defaults: DomainState | undefined;
+
+/**
+ * A daemon's snapshot with every part this screen knows about: one of another version (an older
+ * one, or upstream's without this fork's parts, on another computer you paired) leaves out what it
+ * doesn't have, and those take their empty defaults. Without it, a screen that reads one (the bell
+ * reading another computer's `studio.gates`) took the whole window down.
+ */
+export function withDefaults(snapshot: DomainState): DomainState {
+  defaults ??= initialState('');
+  const missing = Object.keys(defaults).filter((k) => (snapshot as unknown as Record<string, unknown>)[k] === undefined);
+  if (!missing.length) return snapshot;
+  return { ...snapshot, ...Object.fromEntries(missing.map((k) => [k, (defaults as unknown as Record<string, unknown>)[k]])) } as DomainState;
+}
+
 /** The daemon's shared state, kept in step by replaying its actions. */
 class Replica implements DomainSource {
   private readonly listeners = new Set<() => void>();
 
+  private state: DomainState;
+
   constructor(
-    private state: DomainState,
+    state: DomainState,
     public seq: number,
-  ) {}
+  ) {
+    this.state = withDefaults(state);
+  }
 
   getState = (): DomainState => this.state;
 
@@ -65,7 +84,7 @@ class Replica implements DomainSource {
 
   reset(state: DomainState, seq: number): void {
     this.seq = seq;
-    this.set(state);
+    this.set(withDefaults(state));
   }
 
   private set(next: DomainState): void {
