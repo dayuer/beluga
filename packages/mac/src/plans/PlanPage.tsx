@@ -370,9 +370,9 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           {pr ? <PlanPrChip pr={pr} size="regular" /> : null}
           {/* How it runs: nothing to run while Claude writes it. A real decision: its sheet says what changes. */}
           {drafting ? null : (
-<<<<<<< HEAD
             <Button variant="quiet" icon={plan.fullAuto ? 'bot' : 'gauge'} title={plan.fullAuto ? FULL_AUTOPILOT_INFO.hint : AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
               Runs on {plan.fullAuto ? FULL_AUTOPILOT_INFO.label : AUTONOMY_INFO[plan.autonomy].label}
+              {!plan.fullAuto && view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
             </Button>
           )}
           {/* Who plans, builds and checks it (BLG-982): one name, or how many; each part changed from its menu. */}

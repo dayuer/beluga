@@ -111,7 +111,7 @@ export function PlanAgentsButton({ plan, pick }: { plan: Plan; pick: (role: Plan
   const tip = PLAN_ROLES.map((r, i) => `${PLAN_ROLE_INFO[r].label}: ${names[i]}`).join(' · ');
   return (
     <ActionsDropdown items={items}>
-      <Button size="small" variant="quiet" icon="people" title={tip} aria-label={`Agents: ${tip}`}>
+      <Button variant="quiet" icon="people" title={tip} aria-label={`Agents: ${tip}`}>
         {one ? names[0] : `${new Set(names).size} Agents`}
       </Button>
     </ActionsDropdown>
