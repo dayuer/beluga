@@ -7,8 +7,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 /**
  * Beluga reads git's English messages ("would be overwritten", "not fully merged"…). On a Mac set
  * to Chinese git answers in Chinese, even with no LANG (it reads the system's languages), so its
- * environment pins the message language: LC_MESSAGES=C and LANGUAGE=C, never LC_ALL, so file
- * names and commit messages come out byte for byte as before. GIT_ENV is read once, when git.ts
+ * environment pins the message language (upstream's GIT_IN_ENGLISH: LC_ALL=en_US.UTF-8 and
+ * LANGUAGE=en), and file names and commit messages still come out byte for byte as before. GIT_ENV is read once, when git.ts
  * loads: the Chinese locale goes in before the import.
  */
 

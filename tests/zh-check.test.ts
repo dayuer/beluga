@@ -19,5 +19,13 @@ describe("comparing upstream's Chinese with the fork's (docs/chinese.md)", () =>
     expect(r.recheck).toEqual(['Work']);
     expect(r.gone).toEqual(['Old']);
     expect(r.redundant).toEqual(['Open']);
+    expect(r.taken).toEqual([]);
+  });
+
+  it('says when upstream starts translating a string the fork filled in for it', () => {
+    const fork = { New: '新加的', Work: '计划' };
+    const r = compareZh({ before, after, fork });
+    expect(r.taken).toEqual(['New']);
+    expect(compareZh({ before, after, fork: { New: '新的' } }).taken).toEqual([]);
   });
 });
