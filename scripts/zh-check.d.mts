@@ -11,4 +11,5 @@ export function compareZh(input: { before: Catalog; after: Catalog; fork: Catalo
   recheck: string[];
   gone: string[];
   redundant: string[];
+  taken: string[];
 };

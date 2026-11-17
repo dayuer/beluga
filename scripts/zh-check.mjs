@@ -6,7 +6,7 @@
 //   node scripts/zh-check.mjs <from> <to>      # between any two refs
 //
 // Exits 1 when an override of the fork's needs a look (its upstream wording changed, or its key is gone),
-// or one only repeats upstream's wording.
+// one only repeats upstream's wording, or upstream now translates a string the fork filled in for it.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -35,6 +35,8 @@ export function compareZh({ before, after, fork }) {
     gone: overrides.filter((k) => removed.includes(k)),
     /** The fork says what upstream now says: drop the override. */
     redundant: overrides.filter((k) => k in after && after[k] === fork[k]),
+    /** Upstream now translates a string the fork translated for it, in other words: keep the fork's, or drop it? */
+    taken: overrides.filter((k) => added.includes(k) && after[k] !== fork[k]),
   };
 }
 
@@ -58,8 +60,9 @@ function main() {
   list('fork overrides to look at again (upstream reworded them)', r.recheck, (k) => `${JSON.stringify(k)}: upstream ${after[k]}, fork ${fork[k]}`);
   list('fork overrides of strings upstream dropped (remove them)', r.gone, (k) => JSON.stringify(k));
   list('fork overrides that only repeat upstream (remove them)', r.redundant, (k) => `${JSON.stringify(k)} → ${fork[k]}`);
+  list('strings the fork filled in that upstream now translates (keep one)', r.taken, (k) => `${JSON.stringify(k)}: upstream ${after[k]}, fork ${fork[k]}`);
   console.log(`\nthe fork overrides ${r.overrides.length} of upstream's strings`);
-  process.exitCode = r.recheck.length || r.gone.length || r.redundant.length ? 1 : 0;
+  process.exitCode = r.recheck.length || r.gone.length || r.redundant.length || r.taken.length ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main();
