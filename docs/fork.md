@@ -208,6 +208,8 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - `packages/mac/src/plans/PlanPage.tsx`、`PlanChat.tsx`、`PlanOutline.tsx`、`PlanDetails.tsx`、`plan-ask-model.ts`（`tests/mac-plan-decide.test.ts`）：你要做的任务点 Decide…，计划的对话打开并滚到这个任务的卡片
 - `packages/mac/src/plans/plans.module.css`：末尾三行，窄屏时操作换到计划名下面（BLG-124）
 
+任务卡片上的模型（2026-11-18 从原来的角色代码里挪出来，改成只读上游的数据）：数据在 `src/fork/plans/task-agent.ts`（`taskAgentSeen`），界面在 `packages/mac/src/fork/plans/TaskAgentChip.tsx` 和 `task-agent.module.css`，测试 `tests/fork-task-agent.test.ts`。开工后显示任务所在工作树当前的 agent 和模型；没开工时显示将来做它的：任务自己的 agent，否则计划的建造者（`Plan.agent`），否则项目的 agent，都没有就不显示（用你的默认 agent）；你自己做的任务不显示。名字按上游计划页的写法，agent 加模型（“Claude (Haiku)”）。大纲没开工也显示，画布只在开工后显示（画布的任务节点拿不到计划，补上要改上游文件三行以上）。上游文件的接入点：`packages/mac/src/plans/PlanCanvas.tsx`、`PlanOutline.tsx` 各两行（import 和一行组件）。只在 Mac 上，手机的计划页没有任务卡片上的模型。
+
 ### 联邦制：自动接单（队友派给本机的任务自己开工）
 
 设置形状在 `src/fork/federation/settings.ts`，字段经 `src/fork/settings-fields.ts` 进到上游的 Settings 和 PrefsPatch。

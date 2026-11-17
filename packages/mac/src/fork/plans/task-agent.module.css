@@ -1,0 +1,19 @@
+/* Fork: the model on a plan's task card (fork/plans/TaskAgentChip.tsx). */
+.taskAgent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-2);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.taskAgent > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.taskAgent[data-ran='no'] {
+  opacity: 0.7;
+}

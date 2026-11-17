@@ -7,6 +7,7 @@ import { IconButton, cx } from '../components/ui.js';
 import { openSheet } from '../lib/sheets.js';
 import { MILESTONE_STATE, TASK_STATE, changeMarks, milestoneLabel, milestoneRows, taskWords } from './plans-model.js';
 import { TaskChatMark, TaskStateIcon } from './marks.js';
+import { TaskAgentChip } from '../fork/plans/TaskAgentChip.js';
 import { openDecision } from './plan-ask-model.js';
 import { useCheckerChat, useClock, usePlanActions } from './use-plans.js';
 import { useStartWith } from '../components/agent-options.js';
@@ -137,6 +138,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
         </div>
         <span className={p.oTaskMeta}>
           {info.sub && (t.pulse || t.state === 'running') ? <span className={p.oStep}>{info.sub}</span> : t.state === 'blocked' ? <span className={p.muted}>{t.why}</span> : null}
+          <TaskAgentChip plan={plan} t={t} />
           {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
           {t.forYou ? <Icon name="person" size={12} className={p.forYou} /> : null}
           {canStart ? (
