@@ -51,7 +51,7 @@ mod mac {
     use objc2::rc::Retained;
     use objc2::runtime::{AnyObject, NSObject};
     use objc2::{define_class, msg_send, sel, AnyThread, ClassType, MainThreadMarker, MainThreadOnly};
-    use objc2_app_kit::{NSControlStateValueOn, NSEvent, NSEventModifierFlags, NSImage, NSMenu, NSMenuItem, NSView};
+    use objc2_app_kit::{NSControlStateValueOn, NSEvent, NSEventModifierFlags, NSImage, NSMenu, NSMenuItem, NSScreen, NSView};
     use objc2_foundation::{NSData, NSPoint, NSSize, NSString};
     use std::cell::Cell;
 
@@ -177,36 +177,97 @@ mod mac {
     ///
     /// `at` is in the window's points from its top-left; with `selected`, that item is put there
     /// (a pop-up button: its chosen value over the button), else the menu's top-left corner is.
-    /// Without `at`, the menu opens at the pointer.
-    pub fn show(view: *mut std::ffi::c_void, items: &[NativeItem], at: Option<(f64, f64)>, selected: Option<i64>) -> Option<i64> {
+    /// Without `at`, the menu opens at the pointer. `above` is the y (same points) of the button's
+    /// top edge, for a pull-down that doesn't fit below it: it then opens above the button.
+    ///
+    /// A menu is never squeezed into a scrolling one while the screen has room for all of it:
+    /// AppKit only scrolls a menu that runs off the screen, so one that wouldn't fit where it
+    /// opens is moved first (up over the pointer, above its button, or as far as it needs).
+    pub fn show(view: *mut std::ffi::c_void, items: &[NativeItem], at: Option<(f64, f64)>, selected: Option<i64>, above: Option<f64>) -> Option<i64> {
         let mtm = MainThreadMarker::new()?;
         let target = Target::new(mtm);
         let menu = build(items, &target, mtm);
         PICKED.with(|p| p.set(None));
-        let positioning = selected.and_then(|id| menu.itemWithTag(id as isize));
+        let mut positioning = selected.and_then(|id| menu.itemWithTag(id as isize));
         // SAFETY: the window's own content view, alive while its window is.
         let view: Option<&NSView> = unsafe { view.cast::<NSView>().as_ref() };
-        match (view, at) {
+        // Where it opens, in screen points (y up), and the edge it can flip above.
+        let (point, flip) = match (view, at) {
             (Some(view), Some((x, y))) => {
-                let height = view.frame().size.height;
-                let point = if view.isFlipped() { NSPoint::new(x, y) } else { NSPoint::new(x, height - y) };
-                menu.popUpMenuPositioningItem_atLocation_inView(positioning.as_deref(), point, Some(view));
+                let to_screen = |y: f64| -> Option<NSPoint> {
+                    let height = view.frame().size.height;
+                    let local = if view.isFlipped() { NSPoint::new(x, y) } else { NSPoint::new(x, height - y) };
+                    let window = view.window()?;
+                    Some(window.convertPointToScreen(view.convertPoint_toView(local, None)))
+                };
+                match to_screen(y) {
+                    Some(point) => (point, above.and_then(to_screen).map(|p| p.y)),
+                    None => (NSEvent::mouseLocation(), None),
+                }
             }
             _ => {
                 let point = NSEvent::mouseLocation();
-                menu.popUpMenuPositioningItem_atLocation_inView(None, point, None);
+                // At the pointer, a menu that doesn't fit below opens upward from it, as a Mac's
+                // context menu does.
+                (point, Some(point.y))
             }
-        }
+        };
+        let room = screen_room(point, mtm);
+        let height = menu.size().height;
+        let top = match (room, positioning.as_deref()) {
+            (None, _) => None,
+            (Some((low, high)), Some(item)) => {
+                // Where the chosen row puts the menu's top: rows taken as alike, which is close
+                // enough to tell whether it would run off the screen.
+                let count = menu.numberOfItems().max(1) as f64;
+                let row = height / count;
+                let top = point.y + (menu.indexOfItem(item).max(0) as f64 + 1.0) * row;
+                if top <= high && top - height >= low {
+                    None
+                } else {
+                    positioning = None;
+                    Some(fit(top, height, low, high))
+                }
+            }
+            (Some((low, high)), None) => {
+                if point.y - height >= low {
+                    None
+                } else {
+                    let top = flip.map(|edge| edge + height).unwrap_or(point.y);
+                    Some(fit(top, height, low, high))
+                }
+            }
+        };
+        let point = top.map(|y| NSPoint::new(point.x, y)).unwrap_or(point);
+        menu.popUpMenuPositioningItem_atLocation_inView(positioning.as_deref(), point, None);
         // The item's action runs before the menu returns: read what it noted.
         let picked = PICKED.with(|p| p.take());
         drop(target);
         picked
     }
+
+    /// The bottom and top (screen points) of the visible part of the screen the point is on.
+    fn screen_room(point: NSPoint, mtm: MainThreadMarker) -> Option<(f64, f64)> {
+        let screens = NSScreen::screens(mtm);
+        let on = screens.iter().find(|s| {
+            let f = s.frame();
+            point.x >= f.origin.x && point.x <= f.origin.x + f.size.width && point.y >= f.origin.y && point.y <= f.origin.y + f.size.height
+        });
+        let screen = on.or_else(|| NSScreen::mainScreen(mtm))?;
+        let v = screen.visibleFrame();
+        Some((v.origin.y, v.origin.y + v.size.height))
+    }
+
+    /// The menu's top moved as little as it takes for all of it to be on the screen; only a menu
+    /// taller than the screen still starts at the top and scrolls.
+    fn fit(top: f64, height: f64, low: f64, high: f64) -> f64 {
+        top.max(low + height).min(high)
+    }
 }
 
 /// Shows a menu built from `items` (see `NativeItem`) and returns the id of the item picked.
 #[tauri::command]
-pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Option<f64>, y: Option<f64>, selected: Option<i64>) -> Result<Option<i64>, String> {
+pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Option<f64>, y: Option<f64>, selected: Option<i64>, above: Option<f64>) -> Result<Option<i64>, String> {
     #[cfg(target_os = "macos")]
     {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -215,7 +276,7 @@ pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Optio
         window
             .run_on_main_thread(move || {
                 // The view's pointer, read here on the main thread, where it's used.
-                let picked = on.ns_view().ok().and_then(|view| mac::show(view, &items, at, selected));
+                let picked = on.ns_view().ok().and_then(|view| mac::show(view, &items, at, selected, above));
                 let _ = tx.send(picked);
             })
             .map_err(|e| e.to_string())?;
@@ -223,7 +284,7 @@ pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Optio
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (window, items, x, y, selected);
+        let _ = (window, items, x, y, selected, above);
         Err("native menus are the Mac's".into())
     }
 }

@@ -113,6 +113,8 @@ export interface PopUpAt {
   readonly y: number;
   /** A pop-up button's chosen row (its index in `rows`), put at the point, over the button. */
   readonly selected?: number;
+  /** A pull-down's button top edge: when the menu doesn't fit below the button, it opens above it. */
+  readonly above?: number;
 }
 
 /**
@@ -131,7 +133,7 @@ export async function popUpNative(rows: readonly NativeRow[], at?: PopUpAt): Pro
     // The chosen row's id is where its action went in `picks`.
     const chosen = at?.selected === undefined ? undefined : list[at.selected]?.onSelect;
     const selected = chosen && picks.includes(chosen) ? picks.indexOf(chosen) : null;
-    const picked = await invoke<number | null>('native_menu', { items, x: at?.x ?? null, y: at?.y ?? null, selected });
+    const picked = await invoke<number | null>('native_menu', { items, x: at?.x ?? null, y: at?.y ?? null, selected, above: at?.above ?? null });
     if (picked != null) picks[picked]?.();
     return true;
   } catch (e) {
@@ -166,7 +168,7 @@ export function nativeDropdown(rows: () => readonly NativeRow[], selected?: () =
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const at = selected?.();
     // When the Mac's menu couldn't be shown, the web menu opens instead: a press never does nothing.
-    void popUpNative(rows(), at === undefined || at < 0 ? { x: box.left, y: box.bottom + 4 } : { x: box.left, y: box.top, selected: at }).then((shown) => {
+    void popUpNative(rows(), at === undefined || at < 0 ? { x: box.left, y: box.bottom + 4, above: box.top - 4 } : { x: box.left, y: box.top, selected: at }).then((shown) => {
       if (!shown) fallback?.();
     });
   };
