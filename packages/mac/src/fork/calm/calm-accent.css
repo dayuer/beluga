@@ -30,6 +30,24 @@
   box-shadow: var(--control-bezel);
 }
 
+/* 3b. The friends card's Turn On (sidebar; BLG-250 takes the whole card out of the sidebar). Secondary now. */
+:root[data-calm] [role='group'][aria-label='Talk with friends'] [class*='_primary_'] {
+  background: linear-gradient(var(--control-top), var(--control));
+  color: var(--text);
+  box-shadow: var(--control-bezel);
+}
+
+/* 3c. Text links in accent: Show All under the tasks board, Invite in the sidebar's room bar. Secondary; underline on hover. */
+:root[data-calm] [class*='_footLink_'],
+:root[data-calm] [class*='_footer_'] [class*='_invite_'] {
+  color: var(--text-2);
+}
+:root[data-calm] [class*='_footLink_']:hover,
+:root[data-calm] [class*='_footer_'] [class*='_invite_']:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 /* 4. The focus ring: a clear 2px line, not the 3px halo of the accent at 50%. Keyboard focus stays visible. */
 :root[data-calm] {
   --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent);

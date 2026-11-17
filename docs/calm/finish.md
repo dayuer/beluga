@@ -431,3 +431,17 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 - §5 仍在播放的动画（只剩那一种进度指示和 keep-decor）、reduced-motion 下的表现、问题表：BLG-246。
 - 改后图：BLG-242（强调色）、BLG-243（行尾）、BLG-244（字号）、BLG-246（全量复核）。
 - Tested-on 行：BLG-246。
+
+## 1.5 侧栏蓝色收口（BLG-249）
+
+覆盖层：`fork/sidebar/sidebar-look.css`（当前项目行，选中行除外）和 `fork/calm/calm-accent.css`（Turn On、Show All、Invite）。
+
+| 场景 | 改后 浅色 |
+| --- | --- |
+| 工作区 workspace | ![](img/m8-after249-workspace-light.png) |
+| 任务页 tasks | ![](img/m8-after249-tasks-light.png) |
+
+- bob-api 项目行：去掉蓝底和蓝框，图标改 `--text-2`，与 landing 等普通项目行同为中性。选中的 add-auth 行仍是唯一看起来被选中的行。
+- 侧栏底部 Invite：由蓝字改为次要文字色，悬停加下划线。
+- 推广卡里的 Turn On：由实心蓝改为中性。整张卡在 BLG-250 移出导航。
+- Show All（任务页底栏）：规则已写入，但本次没有单独核对截图。

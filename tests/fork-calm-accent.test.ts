@@ -29,9 +29,12 @@ describe('calm-accent.css', () => {
       primary: read('components', 'ui.module.css'),
       merge: read('components', 'ui.module.css'),
       chevrons: read('components', 'select.module.css'),
+      footLink: read('tasks', 'tasks.module.css'),
+      invite: read('layout', 'Sidebar.module.css'),
+      footer: read('layout', 'Sidebar.module.css'),
     };
     const names = anchorsIn(css);
-    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'merge', 'primary']);
+    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'invite', 'merge', 'primary']);
     const missing = names.filter((name) => !classes(home[name]!).has(name));
     expect(missing).toEqual([]);
   });
@@ -43,6 +46,13 @@ describe('calm-accent.css', () => {
 
   it('keeps the Talk with friends card findable (the promo card is hidden in BLG-250, not renamed)', () => {
     expect(read('network', 'NetworkSidebar.tsx')).toContain('aria-label="Talk with friends"');
+  });
+
+  it('anchors the sidebar’s current-project row on its upstream class (sidebar-look.css, BLG-249)', () => {
+    const look = read('fork', 'sidebar', 'sidebar-look.css');
+    expect(anchorsIn(look)).toContain('currentProject');
+    expect(classes(read('layout', 'Sidebar.module.css')).has('currentProject')).toBe(true);
+    expect(look).toContain(":root[data-calm] [data-fork-sidebar] [class*='_currentProject_']:not([class*='_selected_'])");
   });
 
   it('is imported by calm.css', () => {
