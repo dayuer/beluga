@@ -9,7 +9,8 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { ActionsDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { usePrefs } from '../lib/prefs.js';
 import { PLAN_CHAT_TOGGLE } from '../lib/panel.js';
-import { OPEN_DECISION } from './plan-ask-model.js';
+import { type DecisionWanted, OPEN_DECISION, wantDecision } from './plan-ask-model.js';
+import { decisionQid } from '@beluga/core/plans/decisions.js';
 import { ResizeHandle } from '../layout/panel/ResizeHandle.js';
 import { taskChatsItem } from '../layout/plan-task-chats.js';
 import { Button, Empty, IconButton, Segmented, Tip, Working, cx } from '../components/ui.js';
@@ -178,16 +179,30 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     return () => watch.disconnect();
   }, []);
   const chatWidth = drag ?? clampChatWidth(prefs.chatWidth, areaWidth || window.innerWidth);
-  const start = useCallback(
-    (taskId: string, agent?: AgentRef) => (view.ready.some((t) => t.task.id === taskId && t.forYou) ? showChat(true) : void act(() => api.startTask(plan.id, taskId, agent))),
-    [plan.id, act, api, view, showChat],
+  // Decide… on a task of yours (the canvas, the outline, its details): the conversation opens on its card,
+  // scrolled to; with no card for it yet, a toast says why (the plan is paused, or it isn't its turn).
+  const decide = useCallback(
+    (taskId: string) => {
+      const qid = decisionQid(plan.id, taskId);
+      showChat(true);
+      wantDecision(qid);
+      if (!client.store.getState().questions.some((q) => q.qid === qid)) toast(client, plan.paused ? "Plan paused: it asks for your decisions once it's resumed" : 'Not its turn yet: it waits on the tasks or milestone before it', 'info');
+    },
+    [plan.id, plan.paused, showChat, client],
   );
-  // Decide… on a task of yours (the outline, its details): the conversation, where its card is.
+  const start = useCallback(
+    (taskId: string, agent?: AgentRef) => (view.ready.some((x) => x.task.id === taskId && x.forYou) ? decide(taskId) : void act(() => api.startTask(plan.id, taskId, agent))),
+    [plan.id, act, api, view, decide],
+  );
   useEffect(() => {
-    const open = (): void => showChat(true);
+    const open = (e: Event): void => {
+      const want = (e as CustomEvent<DecisionWanted | undefined>).detail;
+      if (want?.planId === plan.id) decide(want.taskId);
+      else showChat(true);
+    };
     document.addEventListener(OPEN_DECISION, open);
     return () => document.removeEventListener(OPEN_DECISION, open);
-  }, [showChat]);
+  }, [plan.id, decide, showChat]);
   const next = view.next;
   const words = nextWords(next);
   const checker = useCheckerChat(next.kind === 'checking' ? next.milestone : undefined);
@@ -317,6 +332,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     ...(plan.body && plan.status === 'active' ? [{ label: plan.paused ? 'Resume' : 'Pause', onSelect: () => void act(() => api.setPaused(plan.id, !plan.paused)) }] : []),
     { label: 'Run at Once', submenu: [1, 2, 3, 4, 6, MAX_PARALLEL].map((n) => ({ label: `${n} ${n === 1 ? 'milestone' : 'milestones'}`, checked: plan.maxParallel === n, onSelect: () => void act(() => api.setParallel(plan.id, n)) })), onSelect: () => undefined },
     { label: 'When to Run Tests', submenu: TESTS_AT.map((t) => ({ label: TESTS_AT_INFO[t].label, hint: TESTS_AT_INFO[t].hint, checked: plan.testsAt === t, onSelect: () => void act(() => api.setTestsAt(plan.id, t), t === 'end' ? 'From now on, milestone checks skip the test suites; they all run once, in the final step' : 'From now on, each milestone’s check runs the full suites once, on its combined work') })), onSelect: () => undefined },
+    ...(plan.status !== 'done' ? [{ label: 'Plan Settings…', onSelect: () => openSheet({ kind: 'plan_settings', planId: plan.id }) }] : []), // fork: how it runs, its tests, who does each part (PlanSettingsSheet.tsx)
     ...(review === 'reviewing' ? [{ label: 'Approve Without Waiting', onSelect: approvePlan }] : []),
     ...(review !== 'off' && review !== 'reviewing' ? [{ label: review === 'none' ? 'Verify the Plan' : 'Verify the Plan Again', onSelect: () => verify(false) }] : []),
     ...(next.kind === 'stalled' ? next.tasks.flatMap((t) => (t.worktree ? [{ label: `Open ${t.issue?.key ?? 'Its'} Chat`, onSelect: () => openWorktree(t.worktree!) }] : [])) : []),
@@ -370,7 +386,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           {pr ? <PlanPrChip pr={pr} size="regular" /> : null}
           {/* How it runs: nothing to run while Claude writes it. A real decision: its sheet says what changes. */}
           {drafting ? null : (
-            <Button size="small" variant="quiet" icon={plan.fullAuto ? 'bot' : 'gauge'} title={plan.fullAuto ? FULL_AUTOPILOT_INFO.hint : AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
+            <Button variant="quiet" icon={plan.fullAuto ? 'bot' : 'gauge'} title={plan.fullAuto ? FULL_AUTOPILOT_INFO.hint : AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
               Runs on {plan.fullAuto ? FULL_AUTOPILOT_INFO.label : AUTONOMY_INFO[plan.autonomy].label}
               {!plan.fullAuto && view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
             </Button>

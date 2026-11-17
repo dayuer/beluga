@@ -1,0 +1,7 @@
+{
+  "name": "beluga-design",
+  "version": "0.1.0",
+  "description": "Design work for Beluga's agents: design and build a screen, rebuild one from a mock, review a UI, and make icons and store assets — every one checked with screenshots.",
+  "author": { "name": "dayuer" },
+  "license": "MIT"
+}

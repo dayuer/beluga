@@ -43,6 +43,8 @@ export const STATE_ROWS: readonly MethodRow[] = [
   { name: 'plan_set_tests_at', method: 'plans.setTestsAt', params: ['plan', 'when'], scope: plan, description: 'When a plan\'s long test suites run.' },
   { name: 'plan_set_work_agent', method: 'plans.setWorkAgent', params: ['plan', 'agent'], scope: plan, description: 'Who works a plan from here on.' },
   { name: 'plan_set_role_agent', method: 'plans.setRoleAgent', params: ['plan', 'role', 'agent'], scope: plan, description: 'Who plans, builds or checks a plan from here on (role: planner, builder or checker).' },
+  { name: 'plan_set_arch_agent', method: 'plans.setArchAgent', params: ['plan', 'agent'], scope: plan, description: 'Who writes each of a plan’s milestones’ technical design before its work starts (none: no architect step, milestones start right away).' },
+  { name: 'plan_set_fix_agent', method: 'plans.setFixAgent', params: ['plan', 'agent'], scope: plan, description: 'Who takes over what’s hard in a plan: fix tasks after a failed check, conflicts, a task that stopped twice (none: auto route’s strongest model, else whoever is at it).' },
   { name: 'plan_tidy_up', method: 'plans.tidyUp', params: ['plan', 'on'], scope: plan, description: 'Turn a plan\'s tidying up on or off.' },
   { name: 'plan_pass', method: 'plans.pass', params: ['plan', 'milestone'], scope: { on: 'plan_not_its_own', arg: 'plan' }, description: 'Pass a milestone, so the next one opens. A person is asked each time. Refused on a plan that this agent changed: a checker stays separate.' },
   { name: 'plan_recheck', method: 'plans.recheck', params: ['plan', 'milestone'], scope: plan, description: 'Ask the plan\'s agent to check a milestone again.' },

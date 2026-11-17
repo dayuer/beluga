@@ -287,6 +287,7 @@ describe('Pass Anyway is instant (BLG-16)', () => {
       ensureBranch: async () => ({ made: true }),
       mergeInto: async (_p, into, branches) => (merged.push(branches), { ok: true, branch: into }),
       inMain: async () => false,
+      hasBranch: async () => true,
       retire,
       findPr: async () => undefined,
       openPr: async () => {

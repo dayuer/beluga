@@ -8,7 +8,7 @@ import { Popup } from '../components/FormSheet.js';
 import { Icon } from '../components/Icon.js';
 import { ActionsDropdown, type ActionItem } from '../components/SpecMenu.js';
 import { Button } from '../components/ui.js';
-import { YOUR_AGENT, agentOnlyItems, useAgentEntries } from '../components/agent-options.js';
+import { YOUR_AGENT, agentModelItems, useAgentEntries } from '../components/agent-options.js';
 import { useApp } from '../lib/beluga.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import p from './plans.module.css';
@@ -80,20 +80,21 @@ export function AgentRoles({ value, onChange }: { value: RoleChoice; onChange: (
   );
 }
 
-/** What each part's agent is called on a plan's page ("your agent" when it follows your default). */
+/** What each part's agent is called on a plan's page, with its model when one was picked ("your agent" when it follows your default). */
 function roleName(plan: Plan, role: PlanRole, mine: AgentRef): string {
   const ref = roleAgent(plan, role);
-  return ref ? agentName(ref) : agentName(mine);
+  return agentName(ref ?? mine, { model: true });
 }
 
 /**
  * A plan's agents in its header: one name when one agent plays every part, else how many; its menu
- * names who plans, builds and checks, each a short submenu of agents (no models: each runs its
- * default) to change it from here on. `pick` gets null for "your agent" (the builder) or "same as
+ * names who plans, builds and checks, each a submenu of agents and, under each agent, its models
+ * to change it from here on. `pick` gets null for "your agent" (the builder) or "same as
  * the builder" (the planner, the checker).
  */
 export function PlanAgentsButton({ plan, pick }: { plan: Plan; pick: (role: PlanRole, agent: AgentRef | null) => void }) {
   const runtimes = useApp((s) => s.runtimes);
+  const models = useApp((s) => s.models);
   const mine = useMyAgent();
   const names = PLAN_ROLES.map((r) => roleName(plan, r, mine));
   const one = new Set(names).size === 1;
@@ -104,14 +105,14 @@ export function PlanAgentsButton({ plan, pick }: { plan: Plan; pick: (role: Plan
       role === 'builder'
         ? { label: `Your Agent (${agentName(mine)})`, hint: 'Whatever your default agent is', checked: !plan.agent, onSelect: () => pick(role, null) }
         : { label: 'Same as the Builder', hint: `${roleName(plan, 'builder', mine)} does this part too`, checked: !plan[role], onSelect: () => pick(role, null) },
-      ...agentOnlyItems(runtimes, role === 'builder' ? plan.agent : plan[role], (agent) => pick(role, agent)).map((row, j) => (j === 0 ? { ...row, separate: true } : row)),
+      ...agentModelItems(runtimes, models, role === 'builder' ? plan.agent : plan[role], (agent) => pick(role, agent)).map((row, j) => (j === 0 ? { ...row, separate: true } : row)),
     ],
     onSelect: () => undefined,
   }));
   const tip = PLAN_ROLES.map((r, i) => `${PLAN_ROLE_INFO[r].label}: ${names[i]}`).join(' · ');
   return (
     <ActionsDropdown items={items}>
-      <Button size="small" variant="quiet" icon="people" title={tip} aria-label={`Agents: ${tip}`}>
+      <Button variant="quiet" icon="people" title={tip} aria-label={`Agents: ${tip}`}>
         {one ? names[0] : `${new Set(names).size} Agents`}
       </Button>
     </ActionsDropdown>

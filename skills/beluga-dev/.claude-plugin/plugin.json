@@ -1,0 +1,7 @@
+{
+  "name": "beluga-dev",
+  "version": "0.1.0",
+  "description": "How Beluga's agents work in each language: one shared dev loop, plus WeChat mini programs, web front ends, Node back ends, Swift, Rust and Python.",
+  "author": { "name": "dayuer" },
+  "license": "MIT"
+}

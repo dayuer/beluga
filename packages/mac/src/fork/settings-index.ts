@@ -14,6 +14,16 @@ const group = (pane: SettingsPane, label: string, detail?: string, keywords?: st
 /** `after`: the upstream group (in the same pane) this block comes after. */
 export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly entries: readonly Entry[] }> = [
   {
+    after: 'Your agents',
+    entries: [
+      group('claude', 'Auto Route', 'Which model a task without an agent goes to', 'auto route model glm deepseek haiku opus hard'),
+      ...rows('claude', 'Auto Route', [
+        ['Pick a model for each task', 'Which model a task without an agent goes to', 'auto route autopilot model pick'],
+        ['Urgent and high are hard too', undefined, 'urgent high priority hard opus'],
+      ]),
+    ],
+  },
+  {
     after: 'Reduce motion',
     entries: rows('appearance', 'Layout', [['Calm mode', 'A still, predictable window: short motion, and nothing that moves on its own.', 'calm steady quiet still motion 沉稳 沉稳模式 动效 安静']]),
   },

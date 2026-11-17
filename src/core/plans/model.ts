@@ -169,6 +169,16 @@ export interface GateCheck {
   readonly notes: string;
 }
 
+/** A milestone's design, at most (`plan_design`). */
+export const MAX_DESIGN = 12000;
+
+/** A milestone's technical design, written before its work starts. */
+export interface MilestoneDesign {
+  readonly text: string;
+  readonly at: number;
+  readonly by: Actor;
+}
+
 /** How a milestone is going (by milestone id). */
 export interface MilestoneRun {
   readonly passedAt?: number;
@@ -184,6 +194,15 @@ export interface MilestoneRun {
    * plan's conversation stays free while it checks and milestones are checked side by side.
    */
   readonly checker?: string;
+  /**
+   * The conversation that writes its technical design before its work starts (a workspace id),
+   * when the plan has an agent for its architecture (`Plan.archAgent`); retired once it passed.
+   */
+  readonly architect?: string;
+  /** When its architect was asked for the design (asked once per round). */
+  readonly designAsked?: number;
+  /** Its technical design, written by the architect (`plan_design`): its worker follows it, its checker checks against it. */
+  readonly design?: MilestoneDesign;
   /** Passing it couldn't merge its tasks into the plan's branch (not a conflict: a dirty checkout, no git identity): why, until it's passed again. */
   readonly mergeFailed?: { readonly at: number; readonly reason: string };
   /**
@@ -215,6 +234,8 @@ export interface MilestoneAgent {
   readonly at: number;
   /** Plan task ids handed to it so far (more come when a check adds fix tasks). */
   readonly tasks: readonly string[];
+  /** Fork (BLG-199): the agent it started on and why (src/fork/plans/roles.ts workAgentFor); none: your default. */
+  readonly agent?: AgentRef; readonly via?: 'pick' | 'task' | 'fix' | 'plan' | 'auto' | 'default';
 }
 
 /** A task that builds on several unmerged tasks: their branches are being combined into its start. */
@@ -293,6 +314,8 @@ export interface TaskWatch {
   readonly wokeAt?: number;
   /** It stalled again soon after a wake: it waits for you (Resume, or Open Chat). */
   readonly needsYou?: boolean;
+  /** It stalled again soon after a wake and went to the plan's fix agent, woken once more there. */
+  readonly escalated?: boolean;
   /** What it said last when it came to wait for you (often what it needs from you), clipped. */
   readonly said?: string;
   /** The one line it's shown with: “KLD-36 stopped, woke it at 11:13”. */
@@ -348,10 +371,17 @@ export interface Plan {
   readonly agent?: AgentRef;
   /** Who plans it (its own conversation), when not the builder (BLG-982). */
   readonly planner?: AgentRef;
-  /** Who checks its milestones and reviews its drafts, when not the builder (BLG-982). */
+  /** Who checks its milestones and reviews its drafts, when not the builder (BLG-982; the fork's check agent before it). */
   readonly checker?: AgentRef;
   /** Full Autopilot (BLG-981): it runs on Autopilot, and a stand-in agent answers what would wait on you. */
   readonly fullAuto?: boolean;
+  /** The agent that writes each milestone's technical design before its work starts; none: no architect step (fork). */
+  readonly archAgent?: AgentRef;
+  /**
+   * The agent that takes over what's hard: a milestone's fix tasks after its check failed, a
+   * conflict, a task that stopped twice. None: auto route's strongest, else whoever was at it (fork).
+   */
+  readonly fixAgent?: AgentRef;
   readonly paused: boolean;
   readonly runs: Readonly<Record<string, MilestoneRun>>;
   /** Tasks whose start is being combined from several branches (by plan task id). */
@@ -493,6 +523,14 @@ export function checkerOf(state: PlansState, channel: string): { readonly plan: 
   return undefined;
 }
 
+/** The plan and milestone a conversation designs (see MilestoneRun.architect). */
+export function architectOf(state: PlansState, channel: string): { readonly plan: Plan; readonly milestone: string } | undefined {
+  if (!channel.startsWith('ws:')) return undefined;
+  const id = channel.slice(3);
+  for (const plan of state.plans) for (const [milestone, run] of Object.entries(plan.runs ?? {})) if (run?.architect === id) return { plan, milestone };
+  return undefined;
+}
+
 /** The draft plan a conversation reviews (see DraftReview.chat). */
 export function reviewerOf(state: PlansState, channel: string): Plan | undefined {
   if (!channel.startsWith('ws:')) return undefined;
@@ -556,12 +594,21 @@ export const planAutonomy = (plan: Pick<Plan, 'autonomy' | 'fullAuto'>): Autonom
 /** A milestone's own autonomy, else its plan's (Full Autopilot: every milestone's Autopilot). */
 export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => (plan.fullAuto ? 'autopilot' : (milestone?.autonomy ?? plan.autonomy));
 
-/** The agent a plan picked for a part (BLG-982): the planner and checker are the builder's unless picked. Undefined: your default. */
-export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, role: PlanRole): AgentRef | undefined {
-  if (role === 'planner') return plan.planner ?? plan.agent;
+/**
+ * The agent a plan picked for a part (BLG-982): the planner and checker are the builder's unless picked. Undefined: your default.
+ * Fork: with no planner picked, its architect plans (cutting it into milestones is design work).
+ */
+export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker' | 'archAgent'>, role: PlanRole): AgentRef | undefined {
+  if (role === 'planner') return plan.planner ?? plan.archAgent ?? plan.agent;
   if (role === 'checker') return plan.checker ?? plan.agent;
   return plan.agent;
 }
+
+/** Who checks a plan's milestones and reviews its drafts (fork's name for roleAgent's checker). */
+export const checkerAgentOf = (plan: Pick<Plan, 'agent' | 'checker'>): AgentRef | undefined => roleAgent(plan, 'checker');
+
+/** Who the plan's own conversation plans on (fork's name for roleAgent's planner). */
+export const homeAgentOf = (plan: Pick<Plan, 'agent' | 'planner' | 'archAgent'>): AgentRef | undefined => roleAgent(plan, 'planner');
 
 /**
  * The milestones a milestone waits on (ids): what it says, else the milestones its tasks' blockers

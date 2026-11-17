@@ -12,6 +12,7 @@ import { ShareProjectSheet } from './ShareProjectSheet.js';
 import { SyncSheet } from '../../tasks/SyncSheet.js';
 import { NewPlanSheet, PlanModeSheet, PlanStyleSheet, SendBackSheet } from '../../plans/PlanSheets.js';
 import { useState } from 'react';
+import { forkSheet } from '../../fork/sheets.js';
 import { channelOf } from '@beluga/core/store.js';
 import { canRunOn } from '@beluga/core/trust.js';
 import { menuSpec } from '@beluga/ui/menus.js';
@@ -210,6 +211,7 @@ export function NativeSheets() {
   const sheet = useSheet(useMachine());
   if (!sheet) return null;
   const close = closeSheet;
+  const fork = forkSheet(sheet, close); if (fork) return fork;
   switch (sheet.kind) {
     case 'fork':
       return <ForkSheet key={sheet.wsId} wsId={sheet.wsId} close={close} />;

@@ -331,6 +331,7 @@ export interface Prefs {
   readonly defaultAgent?: AgentRef;
   /** Per-project defaults over `defaultAgent`, by project name. */
   readonly projectAgents?: Readonly<Record<string, AgentRef>>;
+  readonly autoRoute?: Settings['autoRoute']; // fork: shared/auto-route.ts
   readonly autoSetup: boolean;
   /** What new worktrees' branches start with (`beluga/`; empty: none). */
   readonly branchPrefix: string;
@@ -822,7 +823,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'autoRoute', 'federation', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

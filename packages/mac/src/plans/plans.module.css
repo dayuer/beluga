@@ -2253,6 +2253,9 @@ textarea.goalBox {
     animation: none;
   }
 }
+/* fork (BLG-124): narrow, the actions go under the plan’s name */
+.pageHead { flex-wrap: wrap; gap: 6px 16px; }
+.headMain { flex: 1 1 260px; }
 
 /* Who plans, builds and checks (BLG-982): one sentence, its agents the pickers in it. */
 .roles {
