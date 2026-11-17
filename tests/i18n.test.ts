@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compile, lookup } from '../packages/mac/src/i18n/match.js';
@@ -6,7 +6,12 @@ import { resolveLocale } from '../packages/mac/src/i18n/index.js';
 
 /** The window's languages (docs/i18n.md): English in the code, other languages in catalogs. */
 
-const catalog = (name: string): Record<string, string> => JSON.parse(readFileSync(path.join(import.meta.dirname, `../packages/mac/src/i18n/${name}.json`), 'utf8')) as Record<string, string>;
+const readCatalog = (file: string): Record<string, string> => JSON.parse(readFileSync(path.join(import.meta.dirname, `../packages/mac/src/i18n/${file}`), 'utf8')) as Record<string, string>;
+/** Upstream's catalog plus this fork's own strings beside it (docs/fork.md). */
+const catalog = (name: string): Record<string, string> => {
+  const fork = path.join(import.meta.dirname, `../packages/mac/src/i18n/${name}.fork.json`);
+  return { ...readCatalog(`${name}.json`), ...(existsSync(fork) ? readCatalog(`${name}.fork.json`) : {}) };
+};
 
 describe('lookup', () => {
   const c = compile({

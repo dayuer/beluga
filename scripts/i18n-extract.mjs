@@ -9,7 +9,7 @@
 // label (not ids, paths, CSS, commands or comparisons). Template literals become patterns:
 // `On ${x}.` → "On {0}.". Over-collecting is harmless: the catalog decides what gets translated.
 // No dependencies: a small scanner, good enough for this purpose.
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -223,7 +223,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const keys = [...all.keys()].sort();
   if (process.argv.includes('--missing')) {
     const locale = flag('--locale', 'zh-CN');
-    const catalog = JSON.parse(readFileSync(path.join(root, `packages/mac/src/i18n/${locale}.json`), 'utf8'));
+    const read = (f) => (existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {});
+    // Upstream's catalog plus this fork's own strings beside it (docs/fork.md).
+    const catalog = { ...read(path.join(root, `packages/mac/src/i18n/${locale}.json`)), ...read(path.join(root, `packages/mac/src/i18n/${locale}.fork.json`)) };
     const missing = keys.filter((k) => !(k in catalog));
     for (const k of missing) console.log(`${all.get(k)}\t${k}`);
     console.error(`${missing.length} of ${keys.length} not in ${locale}`);
