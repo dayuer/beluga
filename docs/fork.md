@@ -14,14 +14,15 @@ fork 自己的改动是一条链，后一个建在前一个上面：
 | `fork/base` | fork 结构、登记表、fork 功能的中文、输入法 Enter、git 英文输出、构建号、新旧版本混用的容错 | `topic/chinese` |
 | `topic/native` | Mac 原生的控件、菜单、sheet、警告框，侧栏，沉稳界面 | `fork/base` |
 | `topic/plans` | 计划按档位分工、自动路由、模型梯队与团队、Autopilot、Antigravity、本地模型端点 | `topic/native` |
-| `topic/studio` | Synon Studio、客户邀请与模板、联邦制自动接单、我的共享 | `topic/plans` |
 | `topic/fixes` | 准备提回上游的小修复 | `upstream/main` |
 
-为什么是链而不是并列：计划设置用的是原生 sheet，Studio 建在计划之上，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/studio`；需要时再合进 `topic/fixes`。
+为什么是链而不是并列：计划设置用的是原生 sheet，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/plans`；需要时再合进 `topic/fixes`。
+
+Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）原来是链上最后的 `topic/studio`，2026-11-18 起迁成独立的仓库 `~/sproot/synon-studio`（带着完整历史，建在 `topic/plans` 上，远端 `beluga` 指回这个 fork，用来合进链上的更新）。下面讲 Studio 的几节是迁出前的记录。
 
 - **新改动**放在它所属的、链上最靠前的那个分支：从它开 worktree 和 PR，合进去之后，再把这个分支依次合进链上后面的每个分支（merge，不 rebase，分支都已推送）。
 - **同步上游**从链头进：先在 `topic/chinese` 上跑 `node scripts/zh-check.mjs` 看上游的中文变了什么，把 `upstream/main` 合进 `topic/chinese` 并处理好中文（`docs/chinese.md`），再顺着链往下合。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，在 `topic/native` 及之后）照旧用。
-- **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/studio`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
+- **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/plans`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
 
 ## 原则：加自己的文件，不改上游的文件

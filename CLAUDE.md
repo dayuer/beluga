@@ -102,15 +102,16 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   `topic/chinese` (the fork's Chinese beside upstream's, checked against upstream's latest:
   `docs/chinese.md`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
   `topic/native` (the Mac's own controls, menus, sheets, sidebar, calm UI) → `topic/plans` (plan
-  roles, auto route, models, Autopilot) → `topic/studio` (Synon Studio, clients, federation, My
-  Sharing). `topic/fixes` stands apart on `upstream/main`: small fixes meant for upstream.
+  roles, auto route, models, Autopilot). `topic/fixes` stands apart on `upstream/main`: small
+  fixes meant for upstream. Synon Studio (clients, federation, My Sharing) is no longer here: since
+  2026-11-18 it is its own repository, `~/sproot/synon-studio`, built on `topic/plans`.
 - **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
   into that branch; once merged, merge that branch forward into each one after it (merge, never
   rebase: they're pushed).
 - **Syncing upstream** goes in at the top: check the Chinese (`node scripts/zh-check.mjs`), merge `upstream/main` into `topic/chinese`
   (`node scripts/sync-upstream.mjs` on `topic/native` and after), then forward down the chain.
 - **Builds are composed when needed.** From a clean worktree on the chain branch that has what
-  the build should carry (`topic/studio` has all of it), merge `topic/fixes` if wanted, then
+  the build should carry (`topic/plans` has all of it), merge `topic/fixes` if wanted, then
   `npm run app:build`. One build number per distinct code: don't build the same tree twice.
 - **One session writes in a checkout at a time.** Parallel work goes in its own worktree, and every
   worktree ends merged or removed. Never leave uncommitted changes behind for another session.
