@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 计划可以选 Automatic：没人指定的部分（planner、builder、checker）按本机现在能跑的模型搭配，做不下去时自动换模型、向上升级。
+**Goal:** 删掉上游的 Full Autopilot；计划可以选 Automatic：没人指定的部分（planner、builder、checker）按本机现在能跑的模型搭配，做不下去时自动换模型、向上升级。
 
-**Architecture:** 角色、界面和 Full Autopilot 都用上游 3.6.0 的（`Plan.planner` / `agent` / `checker`、`plans.setRoleAgent`、`Plan.fullAuto`）。本分叉只加三样：一个纯函数模块（`src/shared/model-tiers.ts`）把可用模型归成强、中、快三档并搭出三个部分的候选；计划上一个开关 `autoTeam`；一个取人的函数 `teamAgent`，在上游的 `roleAgent` 找不到人时用编队。分叉原来的四个角色、自动路由和它们的界面删掉。
+**Architecture:** 角色和界面用上游 3.6.0 的（`Plan.planner` / `agent` / `checker`、`plans.setRoleAgent`）。上游的 Full Autopilot（`Plan.fullAuto`、`src/core/autopilot/`、*Never wait for me* 勾选框）整个删掉，运行方式回到三档。本分叉另外只加三样：一个纯函数模块（`src/shared/model-tiers.ts`）把可用模型归成强、中、快三档并搭出三个部分的候选；计划上一个开关 `autoTeam`；一个取人的函数 `teamAgent`，在上游的 `roleAgent` 找不到人时用编队。分叉原来的四个角色、自动路由和它们的界面删掉。
 
 **Tech Stack:** TypeScript、zod、vitest、Playwright（Mac）、React Native（手机）。
 
@@ -23,15 +23,19 @@
 - **第三期没有了。** #546 已被维护者关闭；endpoint 检查早在 `main` 上（`src/fork/endpoint-check.ts`）。
   上游还提不提东西，是最后一节留给负责人的决定。
 - 所以只剩**一期、一个 PR、一个 worktree**：分支 `fork/model-team`。
+- **2026-11-17 负责人的决定：上游的 Full Autopilot 整个删掉**（设计文档 §8）。新增任务 0，排在最前面，
+  这样后面的任务不用去接一个要删的东西。后面任务里原来写"照 `setFullAuto`"的地方都改掉了。
 
 ## 怎么读这份计划
 
 - 开工：`git worktree add ../beluga-model-team -b fork/model-team main`（`main` 要已经包含 3.6.0 的合并 `a86d20f42`）。
-- 任务 1–6 是内核，7–9 是界面、手机和收尾。任务 2–6 中间类型检查是红的，到任务 6 结尾一起变绿、一起提交。
+- 任务 0 删 Full Autopilot，做完类型检查和测试是绿的，单独提交。任务 1–6 是内核，7–9 是界面、手机和收尾。
+  任务 2–6 中间类型检查是红的，到任务 6 结尾一起变绿、一起提交。
 - 每个任务先写失败的测试，再实现。测试遵守 CLAUDE.md "Tests that pass everywhere"：用 `waitFor`
   （`tests/helpers.ts`）等条件；时钟和定时器传进去；路径用 `path.join`。
 - **上游的文件尽量少动。** 凡是标了"接入点"的地方，只改写明的那一两行，逻辑放在 `src/fork/`、
-  `packages/mac/src/fork/` 里。上游的测试 `tests/autopilot.test.ts`、`tests/plan-roles.test.ts` 不改，必须原样通过。
+  `packages/mac/src/fork/` 里。上游的测试 `tests/plan-roles.test.ts` 里角色的部分不改，必须原样通过。
+  唯一的例外是任务 0：它按设计文档 §8 删上游的代码，删干净，不留开关。
 - 最后一个任务跑完整的 `npx vitest run`，把结尾的 `Tested-on: macOS <tree>` 一行原样放进最后一次提交。
   本机 git 说中文时用 `LC_ALL=C npx vitest run`。
 - 不推送，不开 PR，不碰上游，除非负责人在当次会话里说了。
@@ -54,6 +58,300 @@
 | `packages/mac/src/plans/AgentRoles.tsx` | 接入点：下拉框多一项，菜单多一行 |
 | `packages/mac/src/dialogs/TeamSettings.tsx`（新） | 设置里的开关和自定义表 |
 | `packages/companion/app/plan/[id].tsx` | 一行开关；两行旧的按版本隐藏 |
+| `src/core/autopilot/`、`src/agent/stand-in.ts`、`packages/mac/src/chat/AutopilotChip.tsx`、`tests/autopilot.test.ts`、`packages/mac/e2e/autopilot.spec.ts` | 删除（任务 0） |
+| `tests/fork-no-full-autopilot.test.ts`（新） | 守门：同步上游时它不会悄悄回来 |
+
+---
+
+### Task 0: 删掉 Full Autopilot
+
+设计文档 §8。上游 #556（`a46012a57`）加的 Full Autopilot 整个删掉：计划的 `fullAuto`、聊天里的开关、替身、
+Mac 的 *Never wait for me* 勾选框、手机上的两行。同一个提交里上游还加了三个部分的角色（BLG-982）和
+"计划等你批准"（BLG-979），**这两样不动**。
+
+不要动的同名东西：`src/machines/` 里的 stand-in（另一台 Mac 顶替常开的那台，BLG-799）、
+`src/fork/plans/fixer.ts` 里的 `standIn`、`tests/machines-*.test.ts`。
+
+**Files:**
+- Delete: `src/core/autopilot/model.ts`、`src/core/autopilot/stand-in.ts`、`src/agent/stand-in.ts`、
+  `packages/mac/src/chat/AutopilotChip.tsx`、`tests/autopilot.test.ts`、`packages/mac/e2e/autopilot.spec.ts`
+- Create: `tests/fork-no-full-autopilot.test.ts`
+- Modify（内核）: `src/core/plans/model.ts`、`plans.ts`、`work.ts`、`prompt.ts`、`src/core/session.ts`、
+  `src/core/collab-store.ts`、`src/core/board/launch.ts`、`src/agent/types.ts`、`side-calls.ts`、`mock.ts`、
+  `runtime/router.ts`
+- Modify（API、手机链路）: `src/ipc/api.ts`、`handlers.ts`、`plans-api.ts`、`plans-handlers.ts`、
+  `src/companion/protocol.ts`、`views.ts`、`calls.ts`、`coverage.ts`、`src/external/coverage.ts`、`src/machines/coverage.ts`
+- Modify（Mac）: `packages/mac/src/plans/PlanSheets.tsx`、`PlanPage.tsx`、`plans.module.css`、`packages/mac/src/chat/Composer.tsx`
+- Modify（手机）: `packages/companion/app/plan/[id].tsx`、`app/conv/[id].tsx`、`lib/link/calls.ts`、`lib/link/demo/transport.ts`
+- Modify（测试、文档）: `tests/plan-roles.test.ts`、`docs/tasks-and-plans.md`、`docs/parity.md`、`docs/companion.md`、`docs/fork.md`
+
+- [ ] **Step 1: 写失败的测试**
+
+`tests/fork-no-full-autopilot.test.ts`：
+
+```ts
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { planAutonomy } from '../src/core/plans/model.js';
+import { Plans } from '../src/core/plans/plans.js';
+import { Store, initialState } from '../src/core/store.js';
+import { fullAutopilotGone } from '../src/fork/no-full-autopilot.js';
+
+const root = path.join(__dirname, '..');
+
+/** Every source file under a folder, node_modules left out. */
+function sources(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === 'dist') continue;
+    const at = path.join(dir, name);
+    if (statSync(at).isDirectory()) out.push(...sources(at));
+    else if (/\.(ts|tsx)$/.test(name)) out.push(at);
+  }
+  return out;
+}
+
+/** Fork: Full Autopilot (upstream BLG-981) isn't part of this Beluga. A sync that brings it back fails here, not as a new checkbox. */
+describe('no Full Autopilot (fork)', () => {
+  it('has no stand-in that answers for you', () => {
+    expect(existsSync(path.join(root, 'src', 'core', 'autopilot'))).toBe(false);
+    expect(existsSync(path.join(root, 'src', 'agent', 'stand-in.ts'))).toBe(false);
+  });
+
+  it('shows it on neither screen', () => {
+    const screens = [path.join(root, 'packages', 'mac', 'src'), path.join(root, 'packages', 'companion', 'app')];
+    const found = screens.flatMap(sources).filter((f) => /Never wait for me|Full Autopilot/.test(readFileSync(f, 'utf8')));
+    expect(found.map((f) => path.relative(root, f))).toEqual([]);
+  });
+
+  it('reads a plan saved on Full Autopilot as one on Autopilot', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'no-full-auto-'));
+    try {
+      const first = new Plans({ store: new Store(initialState('room')), dir, saveDelayMs: 0 });
+      const plan = first.create({ projectId: 'api', home: 'ws:h', autonomy: 'autopilot' }, { kind: 'beluga' });
+      first.flush?.();
+      // As upstream 3.6.0 saved it: the flag beside autonomy 'autopilot'.
+      const file = path.join(dir, 'plans.json');
+      const saved = JSON.parse(readFileSync(file, 'utf8')) as { plans: Array<Record<string, unknown>> };
+      saved.plans[0]!.fullAuto = true;
+      writeFileSync(file, JSON.stringify(saved));
+      const again = new Plans({ store: new Store(initialState('room')), dir }).need(plan.id);
+      expect('fullAuto' in again).toBe(false);
+      expect(planAutonomy(again)).toBe('autopilot');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('answers an older phone that still asks for it with a plain refusal', () => {
+    expect(() => fullAutopilotGone()).toThrow(/isn.t part of this Beluga/);
+    for (const file of [path.join(root, 'src', 'ipc', 'handlers.ts'), path.join(root, 'src', 'ipc', 'plans-handlers.ts')]) expect(readFileSync(file, 'utf8')).toContain('fullAutopilotGone()');
+  });
+});
+```
+
+搭法照 `tests/plan-roles.test.ts` 第 134–145 行（建计划、`flush`、用同一个目录再开一个 `Plans`）。`plans.json` 里计划
+数组的键以实际文件为准（`plans.ts:141` 写的是 `{ version: 1, plans }`）。
+
+- [ ] **Step 2: 确认失败**
+
+Run: `npx vitest run tests/fork-no-full-autopilot.test.ts`
+Expected: FAIL（`src/fork/no-full-autopilot.ts` 还没有）。先建这个文件（下一步），再跑一次，四条里前三条 FAIL。
+
+- [ ] **Step 3: 内核**
+
+新文件 `src/fork/no-full-autopilot.ts`：
+
+```ts
+/**
+ * Fork: Full Autopilot (upstream BLG-981) isn't part of this Beluga. Its two API methods are kept
+ * for one release, so a phone on 1.58–1.63 that still offers it gets words it can show.
+ */
+export function fullAutopilotGone(): never {
+  throw new Error('Full Autopilot isn’t part of this Beluga. On Autopilot, what your agents ask still waits for you.');
+}
+```
+
+然后删文件，跟着类型错误改：
+
+```bash
+git rm -r src/core/autopilot src/agent/stand-in.ts tests/autopilot.test.ts
+npm run typecheck 2>&1 | grep -E "error TS" | cut -d'(' -f1 | sort | uniq -c
+```
+
+`src/core/plans/model.ts`：删 `FULL_AUTOPILOT_INFO` 和它上面的注释、`Plan.fullAuto`。两个函数留着名字
+（五个文件在用），去掉 `fullAuto` 那一支：
+
+```ts
+/** How the plan runs as a whole. */
+export const planAutonomy = (plan: Pick<Plan, 'autonomy'>): Autonomy => plan.autonomy;
+
+/** A milestone's own autonomy, else its plan's. */
+export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => milestone?.autonomy ?? plan.autonomy;
+```
+
+`src/core/plans/plans.ts`：
+
+- 读存档的 schema 里删 `fullAuto: z.boolean().optional().catch(undefined),` 一行，注释里
+  ", and Full Autopilot (BLG-981)" 去掉。这个 schema 是 `.passthrough()` 的，不认识的键会留下，所以要在结尾的
+  `transform` 里显式丢掉（`autonomy` 上游当时已经写成了 `autopilot`，不用补）：
+
+```ts
+  // A plan saved with the fork's check agent: it's the plan's checker now (one picked since wins).
+  // One saved on Full Autopilot (upstream 3.6.0, not in this fork): the flag is dropped, it stays on Autopilot.
+  .transform(({ checkAgent, fullAuto: _gone, ...plan }) => (checkAgent && !plan.checker ? { ...plan, checker: checkAgent } : plan));
+```
+- `create`：参数里的 `fullAuto` 和 `...(input.fullAuto ? { fullAuto: true, autonomy: 'autopilot' as const } : {})` 删掉。
+- `setAutonomy`（第 283–286 行）改回：
+
+```ts
+    if (autonomy === plan.autonomy && !(plan.body ?? plan.draft)?.milestones.some((m) => m.autonomy)) return plan;
+    // A plan-wide choice wins over every milestone's own.
+    const clear = (b: PlanBody | undefined): PlanBody | undefined => (b ? { ...b, milestones: b.milestones.map(({ autonomy: _a, ...m }) => m) } : b);
+    return this.change(plan, { autonomy, body: clear(plan.body), draft: clear(plan.draft) }, [event(by, 'autonomy', `switched the plan to ${AUTONOMY_INFO[autonomy].label}`, this.now())]);
+```
+
+- `setFullAuto` 整个方法删掉。
+
+`src/core/plans/work.ts`：`create` 输入里的 `fullAuto`（第 90 行）和往下传的地方删掉，注释里
+"Full Autopilot: BLG-981." 去掉。`setFullAuto`（第 521–5xx 行）整个删掉。
+
+`src/core/plans/prompt.ts` 第 237 行：`plan.fullAuto ? '…Full Autopilot…' : <另一支>` 只留另一支。
+
+`src/core/session.ts`：`standIn`、`setAutopilot` 两个方法和 `StandInRequest` 的 import 删掉。
+
+`src/core/collab-store.ts`：`CollabState.autopilot`（第 130–131 行）、action `{ type: 'autopilot'; … }`（153）、
+`initialCollab` 里的 `autopilot: {}`（167）、reducer 的 `case 'autopilot'`（200–201）四处删掉。
+
+`src/core/board/launch.ts`：`AutopilotStandIn` 的 import（32）和第 157–166 行 `const standIn = new AutopilotStandIn({…})`
+整段删掉；往下 `grep -n "standIn" src/core/board/launch.ts`，把它的 `stop` / 订阅也删掉。`roleAgent` 的 import
+如果因此没人用了，一起删。
+
+`src/agent/`：`types.ts` 第 596–597 行的 `standIn?` 删掉；`side-calls.ts` 的 import、`SideCalls` 里的 `'standIn'`、
+第 32 行的实现、注释里那半句删掉；`runtime/router.ts` 第 10 行 `SideCallBackend` 的 `'standIn'` 删掉；
+`mock.ts` 第 897–9xx 行的 `standIn: async (req) => {…}` 整段删掉（第 339、857、863 行说的是别的，不动）。
+
+- [ ] **Step 4: API 和手机链路**
+
+`src/ipc/api.ts` 第 171–172 行、`plans-api.ts` 第 75 行：两个方法**留着**，注释改成
+
+```ts
+  // Kept for one release (fork): Full Autopilot isn't part of this Beluga; a phone on 1.58–1.63 that still offers it gets a plain refusal.
+```
+
+两个 handler 改成只回话（`import { fullAutopilotGone } from '../fork/no-full-autopilot.js';`）：
+
+```ts
+  'session.setAutopilot': () => fullAutopilotGone(),   // handlers.ts
+  'plans.setFullAuto': () => fullAutopilotGone(),      // plans-handlers.ts
+```
+
+`src/companion/coverage.ts`、`calls.ts`、`src/external/coverage.ts`、`src/machines/coverage.ts` 里这两个方法的条目
+留着（方法还在，类型检查要它们）；下个版本和方法一起删。
+
+`src/companion/protocol.ts`：
+
+- `ConvView.autopilot`（第 793–796 行）和 `PlanView.fullAuto`（第 855 行）删掉；852 行注释里 BLG-981 那半句去掉。
+- `SINCE` 里的 `autopilot: 58` **留着**（编号不复用；老手机靠它画那一行）。
+- 第 153–154 行 1.58 的说明后面加一句：
+
+```ts
+ * Fork, 1.64: Full Autopilot is gone. The Mac sends neither field any more (an older phone reads "off");
+ * `plans.setFullAuto` and `session.setAutopilot` answer with a refusal for one more release.
+```
+
+`src/companion/views.ts`：`autopilotIn` 的 import（22）、`...autopilotOf(state, channel),`（787）、
+`autopilotOf` 函数（792–796）、`...(plan.fullAuto ? { fullAuto: true } : {}),`（1014）删掉。
+
+- [ ] **Step 5: Mac**
+
+```bash
+git rm packages/mac/src/chat/AutopilotChip.tsx packages/mac/e2e/autopilot.spec.ts
+```
+
+`packages/mac/src/chat/Composer.tsx`：import（31）、`const autopilot = useAutopilot(channel);` 和注释（240–241）、
+模式菜单里的两处 `autopilot.item`（830、847：847 行整个 `...(channel.startsWith('ws:') ? [autopilot.item] : [])` 删掉）、
+`<AutopilotChip …/>`（857）删掉。
+
+`packages/mac/src/plans/PlanSheets.tsx`：
+
+- `FullAutoBox`（第 108–115 行）和它的两处使用（95、251）删掉；`FULL_AUTOPILOT_INFO` 的 import 删掉。
+- New Plan：`const [full, setFull]`（43）删掉；第 68 行改成
+  `const input = { goal: goal.trim(), autonomy, testsAt, ...agents };`
+- "How it runs" 表单：`full`、`fullNow`、`fullChange`（188–191）删掉；`nowLabel`（193）改成
+  `plan ? AUTONOMY_INFO[plan.autonomy].label : ''`；第 197–198 行两个 `api.setFullAuto` 分支删掉；
+  原生表单里 `id: 'full'` 的 checkbox 项（217）和 `else if (id === 'full') …`（227）删掉；
+  `fullAutoChange` 函数（265 起）删掉。用到 `fullChange` 的地方跟着类型错误改回只看 `modeChange`。
+- 文件头注释第 27 行那半句去掉。
+
+`PlanPage.tsx` 第 390–392 行改回：
+
+```tsx
+            <Button variant="quiet" icon="gauge" title={AUTONOMY_INFO[plan.autonomy].hint} …>
+              Runs on {AUTONOMY_INFO[plan.autonomy].label}
+              {view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
+```
+
+（`…` 处的其余属性原样保留。）`plans.module.css` 第 2298 行起的 `.fullAuto` 规则删掉。
+
+分叉自己的 New Plan（`fork/plans/NewPlanSheet.tsx`）本来就没有这个勾选框，这一步不用动它；任务 7 换回上游表单时，
+换回的已经是删过勾选框的版本。
+
+- [ ] **Step 6: 手机**
+
+- `packages/companion/app/plan/[id].tsx`：`FULL` 常量（33–34）、`fullOk`（70）、表里 Full Autopilot 一行（185）删掉；
+  第 101 行改成 `const how = p?.autonomy && p.autonomy in AUTONOMY ? AUTONOMY[p.autonomy as Autonomy] : undefined;`；
+  第 181–183 行改回 `tone: a === p?.autonomy ? …`、`onPress: () => void store.call(calls.setAutonomy(id ?? '', a, …))`。
+- `app/conv/[id].tsx`：`autopilotOk`（118–119）和 ••• 表里那一项（400–404）删掉。
+- `lib/link/calls.ts`：`setAutopilot`（76–77）、`setFullAuto`（117–118）删掉。
+- `lib/link/demo/transport.ts`：`delete p.fullAuto;`（809）和两个 `case`（814–829）删掉。
+
+手机的界面规则不受影响：少了一行，没有多按钮。
+
+- [ ] **Step 7: 上游的测试和文档**
+
+`tests/plan-roles.test.ts`：`describe('Full Autopilot on a plan (BLG-981)', …)` 整组（第 148 行起）删掉；
+第 138、141 行去掉 `fullAuto: true`（141 行的断言里 `autonomy: 'autopilot'` 也去掉，除非 138 行的 `create`
+自己传了 `autonomy`）；第 8 行没用到的 import、第 16 行注释里 BLG-981 那半句去掉。角色的用例一行不改。
+
+文档：
+
+- `docs/tasks-and-plans.md`：运行方式表里 **Full Autopilot** 一行（202）和 "Full Autopilot's stand-in" 一段（204）删掉。
+- `docs/parity.md`：`session.setAutopilot`（144）、`plans.setFullAuto`（700）两行的 Mac 一栏改成
+  "— not in this fork: answered with a refusal for one release"（`tests/parity.test.ts` 要求方法还在表里）。
+- `docs/companion.md`：加一段"1.64：Full Autopilot 删除"，写清两个字段不再发送、两个方法再答一个版本、
+  `SINCE.autopilot` 留着不复用、不升 major 的理由。
+- `docs/fork.md`：加一节"没有 Full Autopilot"，写：负责人 2026-11-17 的决定；删了哪些上游文件；同步上游时这些文件
+  会冲突，按 `tests/fork-no-full-autopilot.test.ts` 再删一遍；上游的新功能如果建在替身上，要重新评估。
+
+- [ ] **Step 8: 跑测试**
+
+```bash
+grep -rnE "fullAuto|FULL_AUTOPILOT|AutopilotStandIn|autopilotIn|Never wait for me|Full Autopilot" src packages/mac/src packages/companion/app packages/companion/lib tests --include="*.ts" --include="*.tsx" | grep -v "fork-no-full-autopilot"
+```
+
+Expected: 只剩 `protocol.ts` 的那句说明、`plans.ts` 的 `fullAuto: _gone` 和注释、`fork/no-full-autopilot.ts`、
+两个 API 条目的注释、`external/coverage.ts` 的 `AUTOPILOT` 常量。
+
+Run: `npm run typecheck && (cd packages/companion && npm run typecheck) && npx vitest run tests/fork-no-full-autopilot.test.ts tests/plan-roles.test.ts tests/plans.test.ts tests/companion-* tests/parity.test.ts tests/boundaries.test.ts tests/browser-safe.test.ts && (cd packages/mac && npx playwright test e2e/plan-roles.spec.ts e2e/start-with.spec.ts)`
+Expected: PASS。
+
+- [ ] **Step 9: 提交**
+
+```bash
+git add -A && git commit -m "Remove Full Autopilot (fork)
+
+Upstream's stand-in that answers for you (BLG-981) isn't part of this fork: a plan runs step by
+step, with check-ins or on Autopilot, and what its agents ask waits for you. A plan saved on Full
+Autopilot goes on on Autopilot. plans.setFullAuto and session.setAutopilot answer older phones
+with a refusal for one release.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
+```
+
+（这一次提交不带 `Tested-on`：没有跑全量。全量在任务 9。）
 
 ---
 
@@ -498,7 +796,7 @@ Expected: FAIL。
 
 - [ ] **Step 3: 实现**
 
-`model.ts`，`Plan` 里删掉 `archAgent`、`fixAgent` 两个字段，在 `fullAuto` 下面加：
+`model.ts`，`Plan` 里删掉 `archAgent`、`fixAgent` 两个字段，在 `checker` 下面加：
 
 ```ts
   /** Automatic (fork): a part nobody picked goes to the model team worked out from what runs here (shared/model-tiers.ts), not to your default agent. */
@@ -524,7 +822,7 @@ export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, rol
 ```ts
   // Saved by the fork before 3.6: its check agent is the checker, its architect the planner (one picked since wins);
   // a plan that had an architect or a fix agent ran on roles by tier, so it is on Automatic now.
-  .transform(({ checkAgent, archAgent, fixAgent, ...plan }) => {
+  .transform(({ checkAgent, archAgent, fixAgent, fullAuto: _gone, ...plan }) => {
     const planner = plan.planner ?? archAgent;
     const checker = plan.checker ?? checkAgent;
     const auto = plan.autoTeam ?? (archAgent || fixAgent ? true : undefined);
@@ -534,7 +832,7 @@ export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, rol
 
 - `PlanRoles` 去掉 `archAgent`、`fixAgent`。`create` 的参数加 `readonly autoTeam?: boolean`，对象里加
   `...(input.autoTeam ? { autoTeam: true } : {})`，去掉 `archAgent`、`fixAgent` 两行。
-- `setArchAgent`、`setFixAgent` 两个方法删掉，照 `setFullAuto` 加：
+- `setArchAgent`、`setFixAgent` 两个方法删掉，加：
 
 ```ts
   /** Automatic on or off (fork): on, a part nobody picked goes to the model team; off, to your default agent, as upstream. */
@@ -546,7 +844,16 @@ export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, rol
   }
 ```
 
-`work.ts`：`create` 的输入加 `autoTeam`（`fullAuto` 旁边，第 90 行）；加 `setAutoTeam(id, on)`，照它的 `setFullAuto` 写；
+`work.ts`：`create` 的输入加 `autoTeam`（`checker` 旁边）；加
+
+```ts
+  /** Automatic on or off (fork): see Plans.setAutoTeam. */
+  setAutoTeam(id: string, on: boolean): Plan {
+    return this.plans.setAutoTeam(id, on, this.me());
+  }
+```
+
+（如果旁边的 `setRoleAgent` 在改完后还做别的事，比如通知、重排，照它补上。）
 `setArchAgent`、`setFixAgent` 留一个版本（老手机还会调）：
 
 ```ts
@@ -563,7 +870,7 @@ export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, rol
 
 （`setRoleAgent` 的返回值按 `work.ts:509` 附近实际的写。）
 
-`plans-api.ts`：`plans.create` 的对象里去掉 `archAgent`、`fixAgent`，加 `autoTeam: z.boolean().optional()`；在 `plans.setFullAuto` 下面加
+`plans-api.ts`：`plans.create` 的对象里去掉 `archAgent`、`fixAgent`，加 `autoTeam: z.boolean().optional()`；在 `plans.setRoleAgent` 下面加
 
 ```ts
   // Automatic on or off (fork): on, the parts nobody picked go to the model team worked out from what runs here → the plan.
@@ -571,7 +878,7 @@ export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker'>, rol
 ```
 
 `plans.setArchAgent`、`plans.setFixAgent` 两行留着，注释改成 "kept for one release"。`plans-handlers.ts` 加一个 handler。
-四个 coverage 文件各加一行：`src/companion/coverage.ts` 里是 `'plans.setAutoTeam': 'phone'`，其余三个按 `plans.setFullAuto`
+四个 coverage 文件各加一行：`src/companion/coverage.ts` 里是 `'plans.setAutoTeam': 'phone'`，其余三个按 `plans.setRoleAgent`
 在各自表里的取值写。`src/external/domain/tools.ts` 里的 `plan_set_arch_agent`、`plan_set_fix_agent` 跟着两个 setter
 留一个版本；给不给外部 agent 一个开 Automatic 的工具，照 `plans.setRoleAgent` 在那里的做法（有就加，没有就不加）。
 
@@ -742,7 +1049,7 @@ export function taskAgent(plan: Parts | undefined, task: { readonly agent?: Agen
 
 - [ ] **Step 5: 跑测试**
 
-Run: `npx vitest run tests/plan-team-agent.test.ts tests/plan-roles.test.ts tests/autopilot.test.ts tests/fork-plan-roles.test.ts tests/fork-plan-roles-visible.test.ts tests/plan-arch-agent.test.ts`
+Run: `npx vitest run tests/plan-team-agent.test.ts tests/plan-roles.test.ts tests/fork-no-full-autopilot.test.ts tests/fork-plan-roles.test.ts tests/fork-plan-roles-visible.test.ts tests/plan-arch-agent.test.ts`
 Expected: PASS。
 
 ### Task 5: 升级顺序
@@ -814,7 +1121,7 @@ import { modelKey } from '../failing-models.js';
  * is stood in for by the next candidate of the same part. Then up the plan's own agents: builder,
  * checker, planner, one step each time a task stops twice. A failed check's fix tasks go to the
  * builder the first time and to the planner from the second; a conflict goes straight to the
- * planner. Above the planner: you (Full Autopilot too: this isn't a question its stand-in answers).
+ * planner. Above the planner: you.
  */
 
 /** The three parts as they resolve now (team.ts teamOf). */
@@ -915,7 +1222,7 @@ Expected: PASS。
  * Mac sends neither, and the phone offers nothing.
 ```
 
-`SINCE` 末尾加 `autoTeam: 64`（`archAgent: 60`、`fixAgent: 61` 留着）。`PlanView` 里 `fullAuto` 下面加：
+`SINCE` 末尾加 `autoTeam: 64`（`archAgent: 60`、`fixAgent: 61` 留着）。`PlanView` 里 `checker` 下面加：
 
 ```ts
   /** 1.64 (fork): Automatic is on; and the team in a line ("Opus plans · Haiku builds · Sonnet checks"), whenever one can be made on that Mac. */
@@ -933,7 +1240,7 @@ Expected: PASS。
     ...(lineupOf(state) ? { team: lineupWords(lineupOf(state)!) } : {}),
 ```
 
-`src/companion/calls.ts` 加 `plans.setAutoTeam`，照 `plans.setFullAuto` 那一行。
+`src/companion/calls.ts` 加 `plans.setAutoTeam`，照 `plans.setRoleAgent` 那一行。
 
 - [ ] **Step 3: 删文件，跟着类型错误改**
 
@@ -960,7 +1267,7 @@ npm run typecheck
 
 - [ ] **Step 4: 核心的类型检查和测试全绿**
 
-Run: `npm run typecheck && npx vitest run tests/plan-* tests/fork-* tests/autopilot.test.ts tests/model-tiers.test.ts tests/team-migrate.test.ts tests/companion-* tests/parity.test.ts tests/browser-safe.test.ts tests/boundaries.test.ts`
+Run: `npm run typecheck && npx vitest run tests/plan-* tests/fork-* tests/model-tiers.test.ts tests/team-migrate.test.ts tests/companion-* tests/parity.test.ts tests/browser-safe.test.ts tests/boundaries.test.ts`
 Expected: PASS。`tests/parity.test.ts` 会要求 `docs/parity.md` 里有 `plans.setAutoTeam`：现在就加这一行
 （Mac 一栏写 "Plan page › Agents › Automatic; New Plan › agent picker"），其余文档留到任务 9。
 
@@ -1094,6 +1401,23 @@ Expected: PASS。
 - `roleName` 在 `plan.autoTeam` 时先看 `teamAgent(plan, role, state)`，有就显示它的名字（带模型）；按钮上
   三个部分不全相同时仍是 "3 Agents"。
 - builder 子菜单里 "Your Agent (…)" 一行在 Automatic 开着时写成 "Automatic (Haiku)"，选它仍是 `pick(role, null)`。
+- **每个部分能选具体的模型**（设计 §7.2）。现在子菜单用的是 `agentOnlyItems`，只列 agent。换成完整列表
+  （`components/agent-options.ts` 里已有的 `useAgentEntries` 和 `agentMenuItems`，New Plan 用的就是它们）：
+
+```tsx
+  const entries = useAgentEntries();
+  // Every agent and model, a section per runtime; the first entry ("Your agent") is this menu's own first row.
+  const models = entries.filter((e) => 'section' in e);
+  // …在每个部分的 submenu 里，把 ...agentOnlyItems(…) 那一行换成：
+      ...agentMenuItems(models, role === 'builder' ? plan.agent : plan[role], (value) => pick(role, agentForChoice(value, runtimes))),
+```
+
+  `agentMenuItems` 自己给每段的第一行加分隔线，所以原来的 `.map((row, j) => (j === 0 ? { ...row, separate: true } : row))`
+  去掉。`agentOnlyItems` 的 import 没人用了就删（`chat/BuildWith.tsx` 还在用它，函数本身留着）。函数上方注释里的
+  "(no models: each runs its default)" 改成 "(every agent and model, as New Plan lists them)"。打勾按
+  `choiceForAgent` 比较，所以 planner 是 Claude Opus 时只有 Opus 那一行打勾。
+- 截图里 "与 the Builder 相同" 是半句没翻译：`zh-CN.json` 里补上 "Same as the Builder" 的整句
+  （`tests/plan-roles-i18n.test.ts` 加一条断言）。
 
 `PlanPage.tsx`：••• 里"计划设置…"一行（分叉加的）删掉，连同 `PlanSettingsSheet` 的 sheet 类型。
 `MilestoneRoles.tsx`：整块只在 `plan.autoTeam` 时渲染；"架构"一栏的标题改成 "Design"，"疑难修复"改成 "Escalations"，
@@ -1113,18 +1437,19 @@ Expected: PASS。
 
 - [ ] **Step 5: 端到端**
 
-`packages/mac/e2e/plan-auto-team.spec.ts`，照 `e2e/autopilot.spec.ts` 的搭法（demo 状态里放 Opus、Sonnet、Haiku）：
+`packages/mac/e2e/plan-auto-team.spec.ts`，照 `e2e/plan-roles.spec.ts` 的搭法（demo 状态里放 Opus、Sonnet、Haiku）：
 
 1. New Plan：下拉框第一项是 Automatic，下面是 "Opus plans · Haiku builds · Sonnet checks"；选它建计划，
    计划页 agents 按钮的菜单里 Automatic 勾着，三行是 Opus、Haiku、Sonnet。
 2. Mix Agents：planner 选 Sonnet，其余留在 Automatic；建出的计划 planner 是 Sonnet，builder 是 Haiku。
-3. 计划页取消 Automatic：三行回到 Your Agent。
+3. 计划页取消 Automatic：三行回到 Your Agent。再在 Planner ▸ 里选 Opus：按钮变成 "2 Agents"，
+   菜单里 Planner 一行是 "Claude Opus"，子菜单里只有 Opus 打勾。
 4. Settings › Agent：打开开关后，New Plan 默认选中 Automatic。
-5. *Never wait for me* 在 New Plan 的 Autopilot 下面（换回上游表单后应该有；这条防止以后又被整个替换）。
+5. New Plan 选 Autopilot：下面**没有** *Never wait for me*（任务 0 删的；这条防止换回上游表单时把它带回来）。
 
 `e2e/plan-roles.spec.ts`、`e2e/start-with.spec.ts` 是上游的，不改，必须通过。
 
-Run: `npm run typecheck && npx vitest run tests/mac-* tests/plan-roles-i18n.test.ts && (cd packages/mac && npx playwright test e2e/plan-auto-team.spec.ts e2e/plan-roles.spec.ts e2e/autopilot.spec.ts)`
+Run: `npm run typecheck && npx vitest run tests/mac-* tests/plan-roles-i18n.test.ts && (cd packages/mac && npx playwright test e2e/plan-auto-team.spec.ts e2e/plan-roles.spec.ts)`
 Expected: PASS。
 
 - [ ] **Step 6: 截图和提交**
@@ -1154,7 +1479,14 @@ git add -A && git commit -m "Mac: Automatic in a plan's agent pickers; back on u
 
 图标用 `lucide-react-native` 里已经在用的一个，柔和的粉彩，不加发光（`lib/theme.ts`）。
 "Agent for its architecture"、"Agent for hard fixes" 两行的 `hidden` 各加一个条件 `|| store.supports('autoTeam')`：
-连到新 Mac 时不显示，连到老 Mac 时照旧。`calls.ts` 加 `setAutoTeam`，照 `setFullAuto`。demo transport 里的示例计划加
+连到新 Mac 时不显示，连到老 Mac 时照旧。`calls.ts` 加
+
+```ts
+  /** 1.64 (fork): Automatic on a plan. */
+  setAutoTeam: (planId: string, on: boolean): Call => make('plans.setAutoTeam', [planId, on], on ? 'Automatic' : 'Your agent'),
+```
+
+demo transport 里的示例计划加
 `autoTeam: true` 和 `team`。`roles-words.ts` 里"架构""疑难修复"的中英文跟着 Mac 改成 Design、Escalations。
 
 - [ ] **Step 2: 新老两头都测**
@@ -1193,7 +1525,7 @@ git add -A && git commit -m "Phone: Automatic on a plan's page (protocol 1.64); 
 - `docs/tasks-and-plans.fork.md`：四个角色的段落换成 Automatic；上游的 `docs/tasks-and-plans.md` 不动。
 - `docs/parity.md`、`parity.fork.md`：`plans.setAutoTeam`；`plans.setArchAgent`、`plans.setFixAgent` 标 "kept for one release"；
   去掉 Auto Route 设置页和 Plan Settings 表单的行。
-- `docs/companion.md`：1.64 一段。
+- `docs/companion.md`：1.64 一段（Automatic；Full Autopilot 的删除任务 0 已写，合成一段）。
 
 - [ ] **Step 2: 全量**
 
@@ -1218,7 +1550,8 @@ Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
 
 #546 已被维护者关闭，他选了更小的粒度（三个部分，下拉框里只列 agent，不列模型）。三个选项：
 
-1. **先不向上游提任何东西**（建议）。在分叉里用一段时间，有真实的截图和 GIF 再说。
+1. **先不向上游提任何东西**（建议）。在分叉里用一段时间，有真实的截图和 GIF 再说。本分叉删了维护者刚做的
+   Full Autopilot，方向已经和上游分开，这时候提 Automatic 更难被接受。
 2. 把 Automatic 作为一个小 PR 提给上游，建在 BLG-982 之上：只有 `model-tiers.ts`、`autoTeam`、下拉框里一项，
    不带升级和设置页。说明里放任务 7 的截图和 GIF。
 3. 把 endpoint 检查（`src/fork/endpoint-check.ts`，保存前先验证）单独提给上游。它和编队无关，原来夹在 #546 里。
@@ -1227,8 +1560,12 @@ Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
 
 ## 自查记录
 
-- 设计文档 §2–§8 各有对应任务：§4 → 任务 1；§6.2、§6.3 → 任务 2、3；§2、§3 → 任务 4；§5 → 任务 5；
-  §7.4、协议 → 任务 6、8；§7.1–7.3 → 任务 7；§8 → 任务 8。
+- 设计文档 §2–§9 各有对应任务：§8 → 任务 0；§4 → 任务 1；§6.2、§6.3 → 任务 2、3；§2、§3 → 任务 4；§5 → 任务 5；
+  §7.4、协议 → 任务 6、8；§7.1–7.3 → 任务 7；§9 → 任务 8。
+- 任务 0 里的行号是 2026-11-17 `main`（`1a148bfe8`）上的；动手前用第 8 步的 grep 重新定位。没有验证过的假设：
+  `plans.json` 里计划数组的键名；handler 的参数个数不对时 TypeScript 是否接受零参数的写法（不接受就写
+  `(_s, _id, _on) => fullAutopilotGone()`）。已核对：计划的 schema 是 `.passthrough()` 的，所以 `fullAuto` 在
+  `transform` 里显式丢掉；`e2e/plan-roles.spec.ts`、`e2e/start-with.spec.ts` 里没有 Full Autopilot。
 - 名字前后一致：`ROLES` / `PlanRole` 都是 `planner`、`builder`、`checker`；`Lineup` 是每个部分的候选列表，
   `Resolved` 是每个部分解析出的一个 agent；`teamAgent`（一个部分）、`teamOf`（三个）、`taskAgent`（一个任务）。
 - 执行时要对着真实代码核对的地方，都在各步里写了 grep：`state.models` 的形状、里程碑检查轮次的字段、
