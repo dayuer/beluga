@@ -136,3 +136,11 @@
 :root[data-calm] [data-fork-sidebar] [class*='_currentProject_'] [class*='_rowIcon_'] {
   color: var(--text-2);
 }
+
+/* M8 (BLG-243): a row's trailing area shows one mark (one-mark.ts settles which); the others wait for hover or keyboard focus on the row. */
+:root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {
+  display: none;
+}
+:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden] {
+  display: revert;
+}

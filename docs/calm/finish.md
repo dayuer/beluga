@@ -453,3 +453,18 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 ![](img/m8-after250-workspace-light.png)
 
 找回的路：设置 › People & access 里的「Talk with friends directly」开关；命令面板的 `net:turn-on`。**没有找到 ••• 菜单里的入口**（代码里没有相应条目），本任务没有新增，需要的话另开任务。
+
+### 2.4 实施结果（BLG-243）
+
+实现：`fork/sidebar/one-mark.ts` 的 `useOneMark`，由 `useOneSelected` 调用（`one-selected.ts` 一行，`Sidebar.tsx` 不变）。一个 MutationObserver 只看 class、data-signal、data-tally，用 rAF 合批；只遍历 `[class*='_trailing_']`；悬停工具按钮不参与。CSS 在 `sidebar-look.css`：落选的标记 `display:none`，行悬停或键盘焦点时 `display:revert`。沉稳关时属性还在、规则不生效。
+
+截图（calm 开、full 动效、loaded；工作区、任务页）：
+
+| 场景 | 浅色 | 深色 |
+| --- | --- | --- |
+| 任务页 | ![](img/m8-after243-tasks-light.png) | ![](img/m8-after243-tasks-dark.png) |
+| 工作区 | ![](img/m8-after243-workspace-light.png) | ![](img/m8-after243-workspace-dark.png) |
+
+改前（同一个 bob-api 行，浅色任务页 `m8-before-tasks-light.png`）行尾是「$131.1K + 点阵 + 蓝底计数 1」三样；改后只剩金额。但这次拍图时 bob-api 的未读数已经是 0（演示数据在两次拍图之间变了），所以这张不是同一状态的对照，「只剩一个」的证据主要是单测（`tests/fork-sidebar-one-mark.test.ts`）。
+
+**未做**：同一行的改前、改后、悬停三张图（§2.3 原计划）；200 行侧栏上的卡顿测量（设计的风险项）。两项都留给 BLG-246 复核，结果未知。

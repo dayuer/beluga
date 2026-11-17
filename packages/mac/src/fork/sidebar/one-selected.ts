@@ -1,5 +1,6 @@
 import { type RefObject, useEffect } from 'react';
 import './sidebar-look.css';
+import { useOneMark } from './one-mark.js';
 
 /**
  * The sidebar shows one selected row, never two (fork; docs/fork.md, "侧边栏").
@@ -101,8 +102,10 @@ function touchesSelection(m: MutationRecord): boolean {
   return nodes.some((n) => n instanceof Element && (n.className.toString().includes(SELECTED_CLASS) || n.querySelector(`[class*='${SELECTED_CLASS}']`) !== null));
 }
 
-/** One line in Sidebar.tsx: `useOneSelected(drop.ref)`. Also turns on sidebar-look.css for this nav. */
+/** One line in Sidebar.tsx: `useOneSelected(drop.ref)`. Also turns on sidebar-look.css for this nav, and settles its trailing marks (one-mark.ts). */
 export function useOneSelected(ref: RefObject<HTMLElement | null>): void {
+  // The trailing marks follow the same nav, so they are settled here too (BLG-243): one line in Sidebar.tsx still.
+  useOneMark(ref);
   useEffect(() => {
     const nav = ref.current;
     if (!nav) return;

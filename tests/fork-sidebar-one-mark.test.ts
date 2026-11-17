@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HIDDEN_ATTR, MARK_ORDER, type MarkKind, MARKS, type MarkLike, kindOf, pickMark, settleMarks } from '../packages/mac/src/fork/sidebar/one-mark.js';
 
@@ -97,5 +99,13 @@ describe('settleMarks', () => {
 describe('MARKS', () => {
   it('lists every kind at least once, and nothing outside MARK_ORDER', () => {
     expect(new Set(MARKS.map((m) => m.kind))).toEqual(new Set(MARK_ORDER));
+  });
+});
+
+describe('the hiding and the hover that brings marks back (sidebar-look.css)', () => {
+  const look = readFileSync(path.join('packages', 'mac', 'src', 'fork', 'sidebar', 'sidebar-look.css'), 'utf8');
+  it('hides the settled-out marks only with calm on, and shows them again on hover or keyboard focus', () => {
+    expect(look).toContain(":root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {\n  display: none;");
+    expect(look).toContain(":root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden] {\n  display: revert;");
   });
 });
