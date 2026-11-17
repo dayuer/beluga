@@ -1,6 +1,7 @@
 import { ClientStore, type DomainSource } from '../client/client-store.js';
 import type { Intent } from '../core/intents.js';
-import { type Action, type DomainState, initialState, reduceDomain } from '../core/store.js';
+import type { Action, DomainState } from '../core/store.js';
+import { replay, withDefaults } from './state-compat.js';
 import type { PtyExit } from '../terminal/pty-host.js';
 import type { AttachOptions, PtyLink } from '../terminal/emulator.js';
 import type { Args, Method } from './api.js';
@@ -33,24 +34,13 @@ export interface SocketClientOptions {
   readonly connect?: (url: string) => SocketLike;
   /** Give up waiting for the daemon's welcome after this long. */
   readonly timeoutMs?: number;
+  /** After a newer daemon's action this screen can't replay, a fresh snapshot this long after (several in that time: one). */
+  readonly catchUpMs?: number;
 }
 
 const OPEN = 1;
-
-let defaults: DomainState | undefined;
-
-/**
- * A daemon's snapshot with every part this screen knows about: one of another version (an older
- * one, or upstream's without this fork's parts, on another computer you paired) leaves out what it
- * doesn't have, and those take their empty defaults. Without it, a screen that reads one (the bell
- * reading another computer's `studio.gates`) took the whole window down.
- */
-export function withDefaults(snapshot: DomainState): DomainState {
-  defaults ??= initialState('');
-  const missing = Object.keys(defaults).filter((k) => (snapshot as unknown as Record<string, unknown>)[k] === undefined);
-  if (!missing.length) return snapshot;
-  return { ...snapshot, ...Object.fromEntries(missing.map((k) => [k, (defaults as unknown as Record<string, unknown>)[k]])) } as DomainState;
-}
+/** How soon after a newer daemon's action this screen can't replay it asks for a fresh snapshot. */
+const CATCH_UP_MS = 5000;
 
 /** The daemon's shared state, kept in step by replaying its actions. */
 class Replica implements DomainSource {
@@ -72,14 +62,19 @@ class Replica implements DomainSource {
     return () => void this.listeners.delete(listener);
   };
 
-  /** Apply the next action; false when one was missed (ask for a fresh snapshot). */
-  apply(seq: number, action: Action): boolean {
-    if (seq <= this.seq) return true;
-    if (seq !== this.seq + 1) return false;
+  /**
+   * Apply the next action: `ok`; `resync` when one was missed or the reducer threw on it (nothing
+   * applied: ask for a fresh snapshot now); `behind` when it came from a newer daemon and this
+   * reducer doesn't know it (skipped: a fresh snapshot soon). See state-compat.ts.
+   */
+  apply(seq: number, action: Action): 'ok' | 'resync' | 'behind' {
+    if (seq <= this.seq) return 'ok';
+    if (seq !== this.seq + 1) return 'resync';
+    const { state, outcome } = replay(this.state, action);
+    if (outcome === 'failed') return 'resync';
     this.seq = seq;
-    const next = reduceDomain(this.state, action);
-    if (next !== this.state) this.set(next);
-    return true;
+    if (state !== this.state) this.set(state);
+    return outcome === 'unknown' ? 'behind' : 'ok';
   }
 
   reset(state: DomainState, seq: number): void {
@@ -221,6 +216,8 @@ export class SocketClient implements BelugaClient {
   private closed = false;
   // A snapshot was asked for and hasn't come yet.
   private resyncing = false;
+  // A newer daemon's action was skipped: a snapshot is asked for when this goes off.
+  private catchUp: ReturnType<typeof setTimeout> | undefined;
   /** Pings waiting for their pong, oldest first. */
   private readonly pongs: Array<() => void> = [];
 
@@ -345,6 +342,13 @@ export class SocketClient implements BelugaClient {
     this.ended('closed');
   }
 
+  /** Ask once for a fresh snapshot: actions keep coming until it arrives, each also out of step. */
+  private resync(): void {
+    if (this.resyncing) return;
+    this.resyncing = true;
+    this.send({ t: 'resync' });
+  }
+
   private send(frame: ClientFrame): void {
     if (!this.closed && this.socket.readyState === OPEN) this.socket.send(encodeFrame(frame));
   }
@@ -353,15 +357,27 @@ export class SocketClient implements BelugaClient {
     const frame = parseDaemonFrame(text);
     switch (frame.t) {
       case 'action':
-        // Ask once: actions keep coming until the snapshot arrives, each also out of step.
-        if (!this.replica.apply(frame.seq, frame.action) && !this.resyncing) {
-          this.resyncing = true;
-          this.send({ t: 'resync' });
+        switch (this.replica.apply(frame.seq, frame.action)) {
+          case 'resync':
+            this.resync();
+            return;
+          case 'behind':
+            // A newer daemon's action (a paired computer on a later Beluga): what it changed comes with a
+            // snapshot, one for a burst of them, so a chatty newer daemon isn't asked for one per action.
+            this.catchUp ??= setTimeout(() => {
+              this.catchUp = undefined;
+              this.resync();
+            }, this.opts.catchUpMs ?? CATCH_UP_MS);
+            return;
+          case 'ok':
+            return;
         }
         return;
       case 'snapshot':
         this.replica.reset(frame.snapshot, frame.seq);
         this.resyncing = false;
+        clearTimeout(this.catchUp);
+        this.catchUp = undefined;
         return;
       case 'result': {
         const p = this.pending.get(frame.id);
@@ -424,6 +440,7 @@ export class SocketClient implements BelugaClient {
   private ended(reason: string): void {
     if (this.closed) return;
     this.closed = true;
+    clearTimeout(this.catchUp);
     for (const p of this.pending.values()) p.reject(new Error(reason));
     this.pending.clear();
     for (const t of this.terms.values()) t.status(false, { code: null });
