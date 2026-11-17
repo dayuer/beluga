@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Board } from '../src/core/board/board.js';
@@ -10,12 +10,6 @@ import { Plans } from '../src/core/plans/plans.js';
 import { PlansWork } from '../src/core/plans/work.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController, WorktreeEvent } from '../src/core/workspace-controller.js';
-import { PLANS_API } from '../src/ipc/plans-api.js';
-import { PLANS_HANDLERS } from '../src/ipc/plans-handlers.js';
-import { PhoneCalls } from '../src/companion/calls.js';
-import { PHONE } from '../src/companion/coverage.js';
-import { COMPANION_PROTO, PlanView, SINCE } from '../src/companion/protocol.js';
-import { planPageView } from '../src/companion/views.js';
 import type { AgentRef } from '../src/protocol.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
 
@@ -72,9 +66,10 @@ function setup(dir: string | null = null) {
   return { store, board, work, plans, plansWork, worktrees, chats, agentOf, issue };
 }
 
-describe('a plan’s agent for its checks', () => {
+/** The fork's check agent is upstream's checker now (BLG-982): a strong model checks what cheap ones built. */
+describe('a plan’s checker', () => {
   it('falls back to the agent for its work, then to your default', () => {
-    expect(checkerAgentOf({ agent: CHEAP, checkAgent: STRONG })).toEqual(STRONG);
+    expect(checkerAgentOf({ agent: CHEAP, checker: STRONG })).toEqual(STRONG);
     expect(checkerAgentOf({ agent: CHEAP })).toEqual(CHEAP);
     expect(checkerAgentOf({})).toBeUndefined();
   });
@@ -82,21 +77,21 @@ describe('a plan’s agent for its checks', () => {
   it('kept on the plan with a line in its activity; null goes back to the agent for its work; the same pick changes nothing', () => {
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'autopilot' }, t.work.myClaude());
-    expect(t.plansWork.setCheckAgent(plan.id, STRONG)).toBe('Claude (Opus) checks this plan’s milestones and reviews its drafts');
-    expect(t.plans.need(plan.id).checkAgent).toEqual(STRONG);
+    expect(t.plansWork.setRoleAgent(plan.id, 'checker', STRONG)).toBe('Claude (Opus) checks this plan’s milestones from the next check on');
+    expect(t.plans.need(plan.id).checker).toEqual(STRONG);
     expect(t.plans.need(plan.id).activity.at(-1)!.text).toBe('gave its checks to Claude (Opus) from here on');
     const lines = t.plans.need(plan.id).activity.length;
-    t.plansWork.setCheckAgent(plan.id, STRONG);
+    t.plansWork.setRoleAgent(plan.id, 'checker', STRONG);
     expect(t.plans.need(plan.id).activity.length).toBe(lines);
-    expect(t.plansWork.setCheckAgent(plan.id, null)).toBe('The agent for its work checks this plan’s milestones');
-    expect('checkAgent' in t.plans.need(plan.id)).toBe(false);
+    t.plansWork.setRoleAgent(plan.id, 'checker', null);
+    expect(t.plans.need(plan.id).checker).toBeUndefined();
   });
 
   it('cheap work, strong checks: the milestone’s worktree runs the work agent, its checker the check agent', async () => {
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'autopilot' }, t.work.myClaude());
     t.plansWork.setWorkAgent(plan.id, CHEAP);
-    t.plansWork.setCheckAgent(plan.id, STRONG);
+    t.plansWork.setRoleAgent(plan.id, 'checker', STRONG);
     t.plansWork.forRun('ws:main', 'p-me')!.tools!.write(BODY);
     t.plansWork.approve(plan.id);
     await tick(10);
@@ -124,7 +119,7 @@ describe('a plan’s agent for its checks', () => {
     const t = setup();
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'gated' }, t.work.myClaude());
     t.plansWork.setWorkAgent(plan.id, CHEAP);
-    t.plansWork.setCheckAgent(plan.id, STRONG);
+    t.plansWork.setRoleAgent(plan.id, 'checker', STRONG);
     t.plansWork.forRun('ws:main', 'p-me')!.tools!.write(BODY);
     await t.plansWork.verify(plan.id, false);
     const chat = t.plans.need(plan.id).review!.chat!;
@@ -135,28 +130,25 @@ describe('a plan’s agent for its checks', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'plan-check-agent-'));
     const t = setup(dir);
     const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
-    t.plansWork.setCheckAgent(plan.id, STRONG);
+    t.plansWork.setRoleAgent(plan.id, 'checker', STRONG);
     t.plans.flush();
-    expect(setup(dir).plans.need(plan.id).checkAgent).toEqual(STRONG);
+    expect(setup(dir).plans.need(plan.id).checker).toEqual(STRONG);
   });
 
-  it('the API, the phone’s calls and coverage, and the plan page on the phone', () => {
-    const args = PLANS_API['plans.setCheckAgent'].args;
-    expect(args.parse(['p1', STRONG])[1]).toEqual(STRONG);
-    expect(args.parse(['p1', null])[1]).toBeNull();
-    expect(() => args.parse(['p1', { runtime: 'Bad one', label: 'x' }])).toThrow();
-    expect(typeof PLANS_HANDLERS['plans.setCheckAgent']).toBe('function');
-    expect(PHONE['plans.setCheckAgent']).toBe('phone');
-    expect(PhoneCalls['plans.setCheckAgent'].result.parse('x')).toBe('x');
-    expect(SINCE.checkAgent).toBe(58);
-    expect(COMPANION_PROTO.minor).toBeGreaterThanOrEqual(SINCE.checkAgent);
-    const t = setup();
-    const plan = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
-    expect(planPageView(t.store.getState(), plan.id)!.checkAgent).toBeUndefined();
-    t.plansWork.setCheckAgent(plan.id, STRONG);
-    const view = planPageView(t.store.getState(), plan.id)!;
-    expect(view.checkAgent).toEqual(STRONG);
-    // Additive: an older phone's schema reads it without the field.
-    expect(PlanView.parse(view).checkAgent).toEqual(STRONG);
+  it('a plan saved with the fork’s check agent reads it as its checker; a checker picked since wins', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'plan-check-agent-'));
+    const t = setup(dir);
+    const a = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
+    const b = t.plans.create({ projectId: 'api', home: 'ws:main' }, t.work.myClaude());
+    t.plans.flush();
+    const file = path.join(dir, 'plans.json');
+    const saved = JSON.parse(readFileSync(file, 'utf8')) as { plans: Array<Record<string, unknown>> };
+    for (const p of saved.plans) p.checkAgent = STRONG;
+    saved.plans.find((p) => p.id === b.id)!.checker = CHEAP;
+    writeFileSync(file, JSON.stringify(saved));
+    const again = setup(dir).plans;
+    expect(again.need(a.id).checker).toEqual(STRONG);
+    expect(again.need(b.id).checker).toEqual(CHEAP);
+    expect('checkAgent' in again.need(a.id)).toBe(false);
   });
 });

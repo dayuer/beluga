@@ -35,6 +35,27 @@ export const TESTS_AT_INFO: Readonly<Record<TestsAt, { readonly label: string; r
 /** A new plan's autonomy. */
 export const DEFAULT_AUTONOMY: Autonomy = 'gated';
 
+/**
+ * Full Autopilot (BLG-981): Autopilot, and nothing waits for you either: a stand-in agent answers
+ * what the plan's agents would ask you (see core/autopilot). Kept beside the three autonomies, as
+ * how a plan runs, so a screen offers it as a fourth way.
+ */
+export const FULL_AUTOPILOT_INFO = { label: 'Full Autopilot', summary: 'Never waits for you: a stand-in agent answers', hint: 'Autopilot, and what your agents would ask you a stand-in agent answers, so it never waits on you' } as const;
+
+/**
+ * The parts a plan's agents play (BLG-982): who plans it (its own conversation), who builds it (its
+ * milestones and tasks) and who checks it (each milestone's check, a draft's review). One agent
+ * plays all three unless you pick another for a part.
+ */
+export const PLAN_ROLES = ['planner', 'builder', 'checker'] as const;
+export type PlanRole = (typeof PLAN_ROLES)[number];
+
+export const PLAN_ROLE_INFO: Readonly<Record<PlanRole, { readonly label: string; readonly verb: string; readonly hint: string }>> = {
+  planner: { label: 'Planner', verb: 'Planned', hint: 'Writes the plan with you, in its own conversation' },
+  builder: { label: 'Builder', verb: 'built', hint: 'Works the milestones and tasks, each in its worktree' },
+  checker: { label: 'Checker', verb: 'checked', hint: 'Checks each milestone against its criteria, and reviews drafts' },
+};
+
 /** One task of a plan, before and after it's on the board. */
 export interface PlanTask {
   /** Stable inside the plan ("auth-api"): Claude names tasks by it, and it survives re-planning. */
@@ -352,13 +373,17 @@ export interface Plan {
   readonly testsAt: TestsAt;
   /** The agent (and model) its milestones and tasks are worked on by (BLG-497); none: your default. A task's own agent beats it. */
   readonly agent?: AgentRef;
-  /** The agent its milestone checkers and draft reviews run on: a stronger model than the work's; none: `agent`'s. */
-  readonly checkAgent?: AgentRef;
-  /** The agent that writes each milestone's technical design before its work starts; none: no architect step. */
+  /** Who plans it (its own conversation), when not the builder (BLG-982). */
+  readonly planner?: AgentRef;
+  /** Who checks its milestones and reviews its drafts, when not the builder (BLG-982; the fork's check agent before it). */
+  readonly checker?: AgentRef;
+  /** Full Autopilot (BLG-981): it runs on Autopilot, and a stand-in agent answers what would wait on you. */
+  readonly fullAuto?: boolean;
+  /** The agent that writes each milestone's technical design before its work starts; none: no architect step (fork). */
   readonly archAgent?: AgentRef;
   /**
    * The agent that takes over what's hard: a milestone's fix tasks after its check failed, a
-   * conflict, a task that stopped twice. None: auto route's strongest, else whoever was at it.
+   * conflict, a task that stopped twice. None: auto route's strongest, else whoever was at it (fork).
    */
   readonly fixAgent?: AgentRef;
   readonly paused: boolean;
@@ -567,14 +592,27 @@ export function planTaskOfIssue(state: PlansState, issueId: string): { readonly 
   return undefined;
 }
 
-/** Who checks a plan's milestones and reviews its drafts: its check agent, else its work agent, else your default. */
-export const checkerAgentOf = (plan: Pick<Plan, 'agent' | 'checkAgent'>): AgentRef | undefined => plan.checkAgent ?? plan.agent;
+/** How the plan runs as a whole: on Full Autopilot it's Autopilot, whatever was picked before. */
+export const planAutonomy = (plan: Pick<Plan, 'autonomy' | 'fullAuto'>): Autonomy => (plan.fullAuto ? 'autopilot' : plan.autonomy);
 
-/** Who the plan's own conversation plans on (cutting it into milestones is design work): its architect, else its work agent, else your default. */
-export const homeAgentOf = (plan: Pick<Plan, 'agent' | 'archAgent'>): AgentRef | undefined => plan.archAgent ?? plan.agent;
+/** A milestone's own autonomy, else its plan's (Full Autopilot: every milestone's Autopilot). */
+export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => (plan.fullAuto ? 'autopilot' : (milestone?.autonomy ?? plan.autonomy));
 
-/** A milestone's own autonomy, else its plan's. */
-export const autonomyOf = (plan: Plan, milestone: PlanMilestone | undefined): Autonomy => milestone?.autonomy ?? plan.autonomy;
+/**
+ * The agent a plan picked for a part (BLG-982): the planner and checker are the builder's unless picked. Undefined: your default.
+ * Fork: with no planner picked, its architect plans (cutting it into milestones is design work).
+ */
+export function roleAgent(plan: Pick<Plan, 'agent' | 'planner' | 'checker' | 'archAgent'>, role: PlanRole): AgentRef | undefined {
+  if (role === 'planner') return plan.planner ?? plan.archAgent ?? plan.agent;
+  if (role === 'checker') return plan.checker ?? plan.agent;
+  return plan.agent;
+}
+
+/** Who checks a plan's milestones and reviews its drafts (fork's name for roleAgent's checker). */
+export const checkerAgentOf = (plan: Pick<Plan, 'agent' | 'checker'>): AgentRef | undefined => roleAgent(plan, 'checker');
+
+/** Who the plan's own conversation plans on (fork's name for roleAgent's planner). */
+export const homeAgentOf = (plan: Pick<Plan, 'agent' | 'planner' | 'archAgent'>): AgentRef | undefined => roleAgent(plan, 'planner');
 
 /**
  * The milestones a milestone waits on (ids): what it says, else the milestones its tasks' blockers

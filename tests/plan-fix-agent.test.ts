@@ -134,8 +134,8 @@ describe('a plan’s agent for hard fixes', () => {
   it('a new plan takes every role at once, saved and read back; its conversation plans on its architect', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'plan-fix-agent-'));
     const t = setup({ dir });
-    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CHEAP, checkAgent: MID, archAgent: STRONG, fixAgent: STRONG }, { quiet: true });
-    expect(t.plans.need(plan.id)).toMatchObject({ agent: CHEAP, checkAgent: MID, archAgent: STRONG, fixAgent: STRONG });
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CHEAP, checker: MID, archAgent: STRONG, fixAgent: STRONG }, { quiet: true });
+    expect(t.plans.need(plan.id)).toMatchObject({ agent: CHEAP, checker: MID, archAgent: STRONG, fixAgent: STRONG });
     expect(t.setAgent.at(-1)).toEqual({ id: plan.home.slice('ws:'.length), agent: STRONG });
     expect(homeAgentOf({ agent: CHEAP })).toEqual(CHEAP);
     // Another architect later: the plan's conversation follows it; none, back on the work's agent.
@@ -145,7 +145,7 @@ describe('a plan’s agent for hard fixes', () => {
     expect(t.switched.at(-1)).toMatchObject({ channel: plan.home, agent: CHEAP });
     t.plans.flush();
     const again = new Plans({ store: new Store(initialState('room')), dir });
-    expect(again.need(plan.id)).toMatchObject({ agent: CHEAP, checkAgent: MID, fixAgent: STRONG });
+    expect(again.need(plan.id)).toMatchObject({ agent: CHEAP, checker: MID, fixAgent: STRONG });
   });
 
   it('what Plan Settings saves (BLG-123) is still there after the daemon restarts', async () => {
@@ -155,12 +155,12 @@ describe('a plan’s agent for hard fixes', () => {
     t.work.setAutonomy(plan.id, 'gated');
     t.work.setTestsAt(plan.id, 'end');
     t.work.setWorkAgent(plan.id, MID);
-    t.work.setCheckAgent(plan.id, STRONG);
+    t.work.setRoleAgent(plan.id, 'checker', STRONG);
     t.work.setArchAgent(plan.id, STRONG);
     t.work.setFixAgent(plan.id, MID);
     t.plans.flush();
     const again = new Plans({ store: new Store(initialState('room')), dir });
-    expect(again.need(plan.id)).toMatchObject({ autonomy: 'gated', testsAt: 'end', agent: MID, checkAgent: STRONG, archAgent: STRONG, fixAgent: MID });
+    expect(again.need(plan.id)).toMatchObject({ autonomy: 'gated', testsAt: 'end', agent: MID, checker: STRONG, archAgent: STRONG, fixAgent: MID });
   });
 
   it('fix tasks after a failed check: the milestone’s worktree goes to the fix agent before it’s told about them, once', async () => {
@@ -397,7 +397,7 @@ describe('a plan’s agent for hard fixes', () => {
     const args = PLANS_API['plans.setFixAgent'].args;
     expect(args.parse(['p1', STRONG])[1]).toEqual(STRONG);
     expect(args.parse(['p1', null])[1]).toBeNull();
-    expect(PLANS_API['plans.create'].args.parse([{ projectId: 'api', goal: 'x', archAgent: STRONG, checkAgent: MID, fixAgent: STRONG }])[0]).toMatchObject({ archAgent: STRONG, checkAgent: MID, fixAgent: STRONG });
+    expect(PLANS_API['plans.create'].args.parse([{ projectId: 'api', goal: 'x', archAgent: STRONG, checker: MID, fixAgent: STRONG }])[0]).toMatchObject({ archAgent: STRONG, checker: MID, fixAgent: STRONG });
     expect(typeof PLANS_HANDLERS['plans.setFixAgent']).toBe('function');
     expect(PHONE['plans.setFixAgent']).toBe('phone');
     expect(PhoneCalls['plans.setFixAgent'].result.parse('x')).toBe('x');

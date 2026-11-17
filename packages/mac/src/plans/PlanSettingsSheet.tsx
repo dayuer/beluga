@@ -17,7 +17,6 @@ import { AutonomyCards } from './PlanSheets.js';
 import { usePlanActions, usePlanView, usePlans } from './use-plans.js';
 import p from './plans.module.css';
 
-const SETTER = { work: 'setWorkAgent', check: 'setCheckAgent', arch: 'setArchAgent', fix: 'setFixAgent' } as const;
 
 /**
  * Plan Settings (fork, BLG-123; design in docs/reports/plan-roles-mac-ui.md): what New Plan asked,
@@ -63,7 +62,11 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
       // The same words as ••• › When to Run Tests.
       said.push(testsAt === 'end' ? 'From now on, milestone checks skip the test suites; they all run once, in the final step' : 'From now on, each milestone’s check runs the full suites once, on its combined work');
     }
-    for (const [role, agent] of Object.entries(roles) as [PlanRole, (typeof roles)[PlanRole]][]) await run(() => api[SETTER[role]](plan.id, agent ?? null));
+    for (const [role, agent] of Object.entries(roles) as [PlanRole, (typeof roles)[PlanRole]][]) {
+      // Audit is upstream's checker (BLG-982); the others are the plan's own setters.
+      if (role === 'check') await run(() => api.setRoleAgent(plan.id, 'checker', agent ?? null));
+      else await run(() => api[role === 'work' ? 'setWorkAgent' : role === 'arch' ? 'setArchAgent' : 'setFixAgent'](plan.id, agent ?? null));
+    }
     // One toast (a new one replaces the last): saved, then what each change did, each part translated on its own.
     if (ok) toast(client, ['Plan settings saved', ...said].join(' · '), 'success');
   };

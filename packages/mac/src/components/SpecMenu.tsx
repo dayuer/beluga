@@ -35,6 +35,15 @@ const stayInMenu = (e: MouseEvent): void => e.stopPropagation();
 /** A hint that is a shortcut (⌘J) sits at the right like a menu bar's; a description is a tooltip. */
 const isKeys = (hint: string | undefined): hint is string => !!hint && (/^[⌘⌥⇧⌃↩⌫]+.{0,3}$/.test(hint) || /^((Ctrl|Alt|Shift|Win|Super)\+)+.{1,5}$/.test(hint));
 
+/**
+ * How close a menu may come to the window's edges. The top keeps clear of the title bar,
+ * where the traffic lights would draw over the first rows (52 is --titlebar-h).
+ */
+const EDGES = { top: 52, right: 8, bottom: 8, left: 8 } as const;
+
+/** Whether a menu's rows leave room for an icon in front, so every row starts at the same place. */
+const hasIcons = (items: readonly ActionItem[]): boolean => items.some((it) => it.icon || it.mark || it.checked !== undefined);
+
 const isDanger = (id: string): boolean => /delete|remove|leave|revoke|stop|hide/.test(id);
 
 /** A spec menu's rows as the web menu groups them: its own, this window's extras, the dangerous ones last. */
@@ -57,10 +66,13 @@ function useSpecRows(menu: MenuKind, extra: readonly ActionItem[] = [], hide?: (
 function Items({ menu, Item, Separator, extra = [], hide, kit }: { menu: MenuKind; Item: typeof Dropdown.Item; Separator: typeof Dropdown.Separator; extra?: readonly ActionItem[]; hide?: (id: string) => boolean; kit: SubKit }) {
   const actions = useActions();
   const items = useItems(menu, hide);
+  // The extras' icons set the column the names start in; the spec's own rows line up with it.
+  const icons = hasIcons(extra);
   // The spec's own actions first, then this window's extras (groups, icon), the dangerous ones last.
   const row = (o: (typeof items)[number]) => (
     <Item key={o.id} className={`${s.item} ${isDanger(o.id) ? s.danger : ''}`} onSelect={() => actions.pick(menu, o.index)} title={isKeys(guiHint(o.hint)) ? undefined : guiHint(o.hint)}>
       <span className={s.line}>
+        {icons ? <span className={s.icon} aria-hidden="true" /> : null}
         <span className={s.label}>{o.label}</span>
         {isKeys(guiHint(o.hint)) ? <span className={s.keys}>{guiHint(o.hint)}</span> : null}
       </span>
@@ -118,7 +130,7 @@ export function FitContent({ children, ...props }: ComponentPropsWithoutRef<type
     return () => cancelAnimationFrame(frame);
   }, []);
   return (
-    <Dropdown.Content side={side} sideOffset={OFFSET} collisionPadding={EDGE} sticky="always" {...props} ref={ref}>
+    <Dropdown.Content side={side} sideOffset={OFFSET} collisionPadding={EDGES} sticky="always" {...props} ref={ref}>
       {children}
     </Dropdown.Content>
   );
@@ -151,7 +163,7 @@ function SpecContextOf({ menu, children, extra, hide }: { menu: MenuKind; childr
     <ContextRoot>
       <Context.Trigger asChild onContextMenu={nativeContext(rows)}>{children}</Context.Trigger>
       <Context.Portal>
-        <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGE} sticky="always">
+        <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGES} sticky="always">
           <Items menu={menu} Item={Context.Item as unknown as typeof Dropdown.Item} Separator={Context.Separator as unknown as typeof Dropdown.Separator} kit={CONTEXT_SUB} {...(extra ? { extra } : {})} {...(hide ? { hide } : {})} />
         </Context.Content>
       </Context.Portal>
@@ -196,7 +208,7 @@ type AnySeparator = typeof Dropdown.Separator;
 
 /** The rows of an action menu: a line between groups and before the first dangerous one. */
 function ActionRows({ items, Item, Separator, kit = DROPDOWN_SUB }: { items: readonly ActionItem[]; Item: AnyItem; Separator: AnySeparator; kit?: SubKit }) {
-  const icons = items.some((it) => it.icon || it.mark || it.checked !== undefined);
+  const icons = hasIcons(items);
   return (
     <>
       {items.map((it, i) => (
@@ -213,7 +225,7 @@ function ActionRows({ items, Item, Separator, kit = DROPDOWN_SUB }: { items: rea
                 {it.hint ? <span className={`${s.hint} ${icons ? s.hintIndent : ''}`}>{it.hint}</span> : null}
               </kit.SubTrigger>
               <kit.Portal>
-                <kit.SubContent className={s.menu} sideOffset={2} alignOffset={-5} collisionPadding={EDGE} sticky="always">
+                <kit.SubContent className={s.menu} sideOffset={2} alignOffset={-5} collisionPadding={EDGES} sticky="always">
                   <ActionRows items={it.submenu} Item={Item} Separator={Separator} kit={kit} />
                 </kit.SubContent>
               </kit.Portal>
@@ -246,7 +258,7 @@ export function ActionsContext({ items, children }: { items: readonly ActionItem
     <ContextRoot>
       <Context.Trigger asChild onContextMenu={nativeContext(() => (typeof items === 'function' ? items() : items))}>{children}</Context.Trigger>
       <Context.Portal>
-        <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGE} sticky="always">
+        <Context.Content className={s.menu} onClick={stayInMenu} onCloseAutoFocus={keepFocus} collisionPadding={EDGES} sticky="always">
           <LazyRows items={items} />
         </Context.Content>
       </Context.Portal>
