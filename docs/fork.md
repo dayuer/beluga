@@ -13,10 +13,10 @@ fork 自己的改动是一条链，后一个建在前一个上面：
 | `topic/chinese` | 中文对照：fork 的中文接在上游的中文表上，对上游文案的改译，和上游最新中文的对照（`docs/chinese.md`） | `upstream/main` |
 | `fork/base` | fork 结构、登记表、fork 功能的中文、输入法 Enter、git 英文输出、构建号、新旧版本混用的容错 | `topic/chinese` |
 | `topic/native` | Mac 原生的控件、菜单、sheet、警告框，侧栏，沉稳界面 | `fork/base` |
-| `topic/plans` | 计划按档位分工、自动路由、模型梯队与团队、Autopilot、Antigravity、本地模型端点 | `topic/native` |
+| `topic/plans` | Antigravity、本地模型端点保存前校验、计划里“Decide…”直接打开那张卡片、技能包、用量统计（计划的规划者 / 建造者 / 检查者以上游为准） | `topic/native` |
 | `topic/fixes` | 准备提回上游的小修复 | `upstream/main` |
 
-为什么是链而不是并列：计划设置用的是原生 sheet，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/plans`；需要时再合进 `topic/fixes`。
+为什么是链而不是并列：上层的界面建在下层的原生控件和中文上，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/plans`；需要时再合进 `topic/fixes`。
 
 Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）原来是链上最后的 `topic/studio`，2026-11-18 起迁成独立的仓库 `~/sproot/synon-studio`（带着完整历史，建在 `topic/plans` 上，远端 `beluga` 指回这个 fork，用来合进链上的更新）。下面讲 Studio 的几节是迁出前的记录。
 
@@ -43,7 +43,7 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 
 1. **每个上游文件最多 3 行。** 只放接入点：一个 import、一次调用、一个展开或一个导出。改动行 = 增加行与删除行里较多的一边，`--report` 会列出每个文件的行数和超过 3 行的个数。
 2. **一处集中，不处处改。** 同一种判断要加进很多文件时，在一个公共入口拦下（例：输入法组字时的 Enter 在 window 捕获阶段统一拦，各输入框不动；这套做法后来被上游采纳为 `packages/mac/src/lib/ime-guard.ts`）。
-3. **不删上游代码行。** 要换掉上游的一个组件，就在 `fork/` 里放自己的版本，用钩子打开它，上游的版本原样留着（例：`packages/mac/src/fork/sheets.tsx` 的 `forkSheet` 先于上游的 switch 接管“新建计划”和“计划设置”）。上游以后改了被替换的组件，同步时要把改动带进 fork 的版本。
+3. **不删上游代码行。** 要换掉上游的一个组件，就在 `fork/` 里放自己的版本，用钩子打开它，上游的版本原样留着。上游以后改了被替换的组件，同步时要把改动带进 fork 的版本。
 4. **不往上游测试文件里加用例。** fork 的用例放 fork 自己的文件：`tests/fork-*.test.ts`、`packages/mac/e2e/fork-*.spec.ts`。上游测试只在上游自己也坏了的时候改（并提回上游）。
 
 ## 同步上游
@@ -104,9 +104,6 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
-- `packages/mac/src/dialogs/native/WorkSheets.tsx`：两行，`forkSheet`（`packages/mac/src/fork/sheets.tsx`）先接管 fork 的对话框（新建计划、计划设置）
-- `packages/mac/src/plans/PlanSheets.tsx`：末尾一行导出 `AutonomyCards`，给 `PlanSettingsSheet.tsx` 用。新建计划用上游的 `NewPlanSheet`，原样不改（2026-11-18 起，fork 不再自己画这张表）
-- `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
 - `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
 
 ### 侧边栏
@@ -145,7 +142,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 打字跳转：`lib/list-typeahead.ts`（新文件），接在 `layout/panel/FilesTab.tsx`、`ChangesTab.tsx`、`ScratchTab.tsx` 的 `onKey`。
   - 原生表单 sheet：`src-tauri/src/native_sheet.rs`（通用的 NSPanel 表单：多行文本带 @ 补全与高亮、文本框、弹出按钮、分段控件、展开三角、底部复选框），`lib/native-sheet.ts`（`useNativeSheet`，React 仍是状态来源）。第一个用它的是 `tasks/NewTaskSheet.tsx`（提交逻辑抽成 `create`，网页版不变）。
   - 也用原生 sheet 的：`fork/plans/NewPlanSheet.tsx`（新建计划，提交逻辑抽成 `create`）、`dialogs/native/WorkSheets.tsx` 的 Fork 与在朋友电脑上运行命令。弹出按钮的选项支持说明行、分组和禁用（`choicesOf` 把 `Select` 的选项原样转过去），另有行内复选框。新建标签（带删除按钮的标签列表）仍是网页。
-  - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSettingsSheet.tsx`（`plans/PlanSheets.tsx` 导出 `AUTONOMY_ICON`）、`plans/PlanSheets.tsx` 的 `PlanModeSheet`（如何运行：三张卡片，下面是改变了什么的提示框）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
+  - 第三批原生 sheet：`tasks/boards.tsx`（看板）、`tasks/ProjectContextSheet.tsx`、`dialogs/native/ForkToMacSheet.tsx`、`dialogs/native/ImportConversationSheet.tsx`、`dialogs/native/ContinueSheet.tsx`、`plans/PlanSheets.tsx` 的 `PlanModeSheet`（如何运行：三张卡片，下面是改变了什么的提示框）、`dialogs/native/TemplatesSheet.tsx` 的新建模板、`sentinel/NewSentinelSheet.tsx`。原生 sheet 另加按钮行和按钮行左侧的次要按钮。仍是网页的：添加到仪表盘（双栏预览）、拉取请求、项目设置（环境变量编辑器）、收入、Studio 连接、同步的连接表单、模板列表、新建标签，以及没有输入控件的说明类 sheet。
   - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
   - 审计（2026-11-15，PR 39 / 41 / 44）后的修正：原生 sheet 的回调在更新中被系统回调时不再 panic（`peek`/`try_borrow`），正在输入的文本框不被页面回传覆盖，每个 sheet 有编号（更新、关闭只作用于自己），输入规则（`maxLength`/`upper`/`keep`）在原生框里即时生效，复选框可禁用，单选行去掉（已由卡片取代）；原生菜单的标题、分隔线 tag 为 -1；窗口指针改在主线程里取；空路径不拖；警告框随页面卸载收起、内容变了重新弹出；`useNativeSheet` 卸载后不再打开或更新，每次改动后重发让控件显示页面认可的值。修复智能体只在仍在它身上、且最近一次交还之后又有交接时才交还。对比度规则压过自定义配色；几处图标按钮补成常规尺寸。留着的：Quick Look 没按面板控制者协议接入（能用，会打警告）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
@@ -201,28 +198,15 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 - `packages/mac/package.json`、`packages/mac/src-tauri/tauri.conf.json`
 
-### 计划按档位分工（架构 / 编码 / 审核 / 疑难修复）：第二阶段要抽出来
+### 计划的角色：以上游为准（2026-11-18）
 
-和上游 3.6.0 合并后（2026-11-17）：上游的 BLG-982 也给计划加了“谁规划 / 谁写 / 谁检查”（`planner` / `agent` / `checker`，`plans.setRoleAgent`，计划页头部的 agents 按钮），fork 统一用上游这一套。fork 原来的审核 agent（`checkAgent`、`plans.setCheckAgent`）去掉了：读旧的 plans.json 时 `checkAgent` 自动变成 `checker`（`plans.ts` 的 SavedPlan），Mac 的计划设置里“审核”一项改走 `setRoleAgent(…, 'checker', …)`，手机上“检查用谁”用上游的那一行。fork 只留上游没有的两项：架构（`archAgent`，每个里程碑先出设计）和疑难修复（`fixAgent`）。没选 planner 时由架构 agent 规划（`roleAgent` 里 `planner ?? archAgent ?? agent`，即原来的 `homeAgentOf`）；没选 checker 时检查仍落到自动路由的审核档（`work.ts` 的 `autoChecker`）。手机协议 1.58 让给上游（Full Autopilot、planner/checker），fork 的 1.59–1.63 编号不变。
+计划谁规划、谁建造、谁检查，用上游 BLG-982 的那一套（`planner` / `agent` / `checker`，`plans.setRoleAgent`，新建计划里的一句话和计划页头部的 agents 按钮，手机协议 1.58）。fork 原来的那一套在 2026-11-18 整个删了：按档位分工（架构师每个里程碑先写设计稿、疑难修复智能体、计划设置表）、自动路由（`autoRoute`，没指定 agent 的任务按难度挑模型）、模型失效的升级梯子和失效模型记录、“谁做的”、任务卡片上的模型标签。上游文件里它们的改动都恢复成上游原样；手机协议里它们占过的 1.59–1.61、1.63 不再使用。旧的 plans.json 里留下的 `archAgent`、`fixAgent`、`checkAgent` 读进来不起作用。
 
-疑难修复做完要交还：修复智能体只接手难事（检查失败后的修复任务、停了两次的任务），这些任务做完、工作树空闲时，里程碑的工作交还给编码角色（`fixer.ts` 的 `settle`；重启后凭活动记录里的交接行和 `watch.escalated` 认出来；你自己换的模型不动）。上游文件的接入点：`pilot.ts` 每轮一行调用 `settle`、`hand()` 和 `escalate` 多传任务 id，`watchdog.ts` 的 `escalate` 多一个任务 id 参数。
+留下的、不属于角色的两处修复：
 
-模型失效的升级梯子（`src/fork/plans/ladder.ts`，设置 › 自动路由 › When a Model Fails，`autoRoute.ladder`，默认 Haiku → Sonnet → Opus → Fable）：计划里的任务因为模型报错停下（API 拒绝、找不到模型、Key 不对、登录不上；用量上限、断网、过载不算），不再在同一个模型上叫醒，立刻沿梯子升一级；普通卡住仍先叫醒一次，再停才升一级，之后每停一次再升一级，到顶就等你。不在梯子上的模型（比如本地模型）算在最底下。梯子设为空，就是原来的做法（停两次交给修复智能体一次）。检查没过的修复任务和冲突仍归修复智能体。上游文件的接入点：`watchdog.ts` 的 `escalate` 多一个 `how` 参数（原有那一行改成每次都问，由 `fixer.ts` 决定），第一次停下前多两行"模型失效就升一级"；`pilot.ts` 那一行把 `how` 传过去。升上去之后尽快降回来（`fixer.ts` 的 `liftBack`）：为之升级的那个任务做完、要进入下一个任务时，检查编码模型是否恢复。本地模型按运行时的方式探测一次（1 个 token，每个模型最多每分钟一次，`failing-models.ts` 的 `recovered`）；Claude 模型没有失效记录就算恢复（不会自己好的失效记 30 分钟，临时报错不记）。恢复了：对话空闲就立刻切回；agent 已经接着做下一个任务（一个里程碑一个 agent 时它会在同一轮里连着做），就请它结束这一轮（插队发送），等它停下再切回，下一个任务由 pilot 发给恢复的模型。没恢复就留在高一级，下次再查。重启后凭动态里的那一行认出失效性质，确定失效的从当时起重新记上。判断不出当前模型强弱时（Claude 没指定模型、也没设默认模型），不走梯子，照旧交给修复智能体一次。确定失效的模型记进 `src/fork/failing-models.ts`（30 分钟，或它的接入点重新保存并通过校验为止）：选择器里变灰并写明原因，自动路由跳过它，计划接下来开工的里程碑从上一级开始，计划里提醒一次。没通过校验却仍然保存的接入点，它的模型也记在这里。里程碑的架构和审计对话，上一轮因模型失效结束的，再问之前先升一级（`fixer.ts` 的 `lift`）。上游文件的接入点：`src/core/session-parts.ts` 3 行（import、给本地模型列表套一层 `failingModels.grey`、`failingModels.attach` 交给它重新发布列表的方法和解析本地模型的 `local`）；`pilot.ts` 在两处“再问一次”前各加一行 `this.fix.lift(...)`；`packages/mac/src/plans/PlanSettingsSheet.tsx` 加一行提示。
-
-已抽出来的：疑难修复的切换（`src/fork/plans/fixer.ts`，`pilot.ts` 只留调用）、“谁做的”（BLG-198～201：`src/fork/plans/roles.ts` 算出各角色实际用的模型，里程碑工作树用谁也由它的 `workAgentFor` 决定；手机协议 `src/fork/companion/plan-roles-view.ts`、`plan-roles-views.ts`；Mac `packages/mac/src/fork/plans/MilestoneRoles.tsx`；手机 `packages/companion/components/fork/MilestoneRoles.tsx`、`packages/companion/lib/fork/roles-words.ts`；上游文件各只留接入点：`model.ts` 的 `MilestoneAgent` 两个可选字段，`pilot.ts` 的 `launch()` 两行，`protocol.ts` 的 `roles` 字段和 `SINCE.rolesSeen`，`views.ts` 一行，`PlanDetails.tsx`、`PlanOutline.tsx`、`PlanCanvas.tsx`、`app/plan/[id].tsx` 各一行加一个 import）、设计稿折叠的样式（`packages/mac/src/fork/plans/plans-fork.module.css`）、计划说明（`docs/tasks-and-plans.fork.md`）、测试（`tests/fork-plans.test.ts`）。下面的还在上游文件里，下一步先抽 `pilot.ts` 里的建筑师（architect）那块。
-
-- 核心：`src/core/plans/pilot.ts`、`src/core/plans/work.ts`、`src/core/plans/plans.ts`、`src/core/plans/prompt.ts`、`src/core/plans/model.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/progress.ts`、`src/core/plans/owner.ts`、`src/core/plans/move.ts`、`src/core/plans/move-work.ts`、`src/core/notify.ts`、`src/core/board/launch.ts`
-- Agent：`src/agent/plan-tools.ts`、`src/agent/policy.ts`、`src/agent/types.ts`
-- API：`src/ipc/plans-api.ts`、`src/ipc/plans-handlers.ts`、`src/external/domain/tools.ts`、`src/external/adapters/tools/state-rows.ts`
-- 手机：`src/companion/protocol.ts`、`src/companion/views.ts`、`src/companion/calls.ts`、`packages/companion/app/plan/[id].tsx`、`packages/companion/lib/link/calls.ts`、`packages/companion/components/AgentPicker.tsx`
-- Mac：`packages/mac/src/plans/PlanPage.tsx`（••• 里“计划设置…”一行，其余是“任务需要你出手”的 decide）、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`、`packages/mac/src/plans/PlanCanvas.tsx`（任务卡上的模型，一行）、`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/plans-model.ts`、`packages/mac/src/plans/plans.module.css`（末尾三行：窄屏时操作换到名字下面；CSS module 的类名带哈希，fork 自己的 module 改不到 `.pageHead`）
-- 测试：`tests/plans.test.ts`、`tests/agent-change.test.ts`
-
-### 自动路由（没指定 agent 的任务交给合适的模型）
-
-- `src/core/board/work.ts`、`src/core/store.ts`、`src/ipc/api.ts`、`src/machines/sync.ts`
-- `src/shared/settings-schema.ts`：fork 字段从 `src/fork/settings-fields.ts` 展开（一行 import、一行 `...forkSettingFields`）
-- `packages/mac/src/tasks/use-task-start.ts`、`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`、`packages/companion/app/task/[id].tsx`
+- `src/core/plans/pilot.ts`、`src/core/plans/plan-git.ts`（`hasBranch`）、`tests/plans.test.ts`、`tests/plan-milestone-agent.test.ts`：任务的分支已经随前一个里程碑合并、删掉时，里程碑照样通过，不再去合并它
+- `packages/mac/src/plans/PlanPage.tsx`、`PlanChat.tsx`、`PlanOutline.tsx`、`PlanDetails.tsx`、`plan-ask-model.ts`（`tests/mac-plan-decide.test.ts`）：你要做的任务点 Decide…，计划的对话打开并滚到这个任务的卡片
+- `packages/mac/src/plans/plans.module.css`：末尾三行，窄屏时操作换到计划名下面（BLG-124）
 
 ### 联邦制：自动接单（队友派给本机的任务自己开工）
 

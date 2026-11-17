@@ -9,18 +9,8 @@ import type { MachineSide } from '../machines/coverage.js';
  * (docs/fork.md). The typecheck still fails when a method is missing from a table.
  */
 
-/** Who works each kind of plan role (by tier): a pick from a list, so the phone does it too. */
-export const PHONE_FORK = {
-  'plans.setArchAgent': 'phone',
-  'plans.setFixAgent': 'phone',
-} as const satisfies Partial<Record<Method, Side>>;
+export const PHONE_FORK = {} as const satisfies Partial<Record<Method, Side>>;
 
-export const EXTERNAL_FORK = {
-  'plans.setArchAgent': 'covered',
-  'plans.setFixAgent': 'covered',
-} as const satisfies Partial<Record<Method, ExternalAccess>>;
+export const EXTERNAL_FORK = {} as const satisfies Partial<Record<Method, ExternalAccess>>;
 
-export const MACHINE_FORK = {
-  'plans.setArchAgent': 'drive',
-  'plans.setFixAgent': 'drive',
-} as const satisfies Partial<Record<Method, MachineSide>>;
+export const MACHINE_FORK = {} as const satisfies Partial<Record<Method, MachineSide>>;

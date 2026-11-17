@@ -46,8 +46,7 @@ export const PLANS_API = {
   // A new plan with Claude: its own conversation (in the project's main folder) and its page → the plan.
   // `agent`: who works its milestones and tasks (BLG-497); none: your default. `planner` / `checker`: who plans it
   // and who checks it when not that agent (BLG-982). `fullAuto`: Full Autopilot, a stand-in answers for you (BLG-981).
-  // Fork: `archAgent` designs each milestone before its work starts, `fixAgent` takes over what's hard.
-  'plans.create': { args: z.tuple([z.object({ projectId: z.string().min(1).max(200), goal: z.string().min(1).max(8000), autonomy: autonomy.optional(), testsAt: z.enum(TESTS_AT).optional(), agent: AgentRef.optional(), planner: AgentRef.optional(), checker: AgentRef.optional(), fullAuto: z.boolean().optional(), archAgent: AgentRef.optional(), fixAgent: AgentRef.optional() })]) },
+  'plans.create': { args: z.tuple([z.object({ projectId: z.string().min(1).max(200), goal: z.string().min(1).max(8000), autonomy: autonomy.optional(), testsAt: z.enum(TESTS_AT).optional(), agent: AgentRef.optional(), planner: AgentRef.optional(), checker: AgentRef.optional(), fullAuto: z.boolean().optional() })]) },
   // Plan in this conversation (the composer's Plan with Tasks) → the plan.
   'plans.here': { args: z.tuple([z.string().min(1).max(200), autonomy.optional()]) },
   // The draft goes on the board (a new plan, or changes to one).
@@ -72,10 +71,6 @@ export const PLANS_API = {
   'plans.setRoleAgent': { args: z.tuple([id, z.enum(PLAN_ROLES), AgentRef.nullish()]) },
   // Full Autopilot on or off (BLG-981): on, Autopilot and a stand-in agent answers what would wait on you → the plan.
   'plans.setFullAuto': { args: z.tuple([id, z.boolean()]) },
-  // Who writes each milestone's technical design before its work starts: an agent, or null for no architect step → in words.
-  'plans.setArchAgent': { args: z.tuple([id, AgentRef.nullish()]) },
-  // Who takes over what's hard (fix tasks after a failed check, conflicts, a task that stopped twice): an agent, or null for auto route's strongest → in words.
-  'plans.setFixAgent': { args: z.tuple([id, AgentRef.nullish()]) },
   'plans.tidyUp': { args: z.tuple([id, z.boolean()]) },
   // Pass a milestone (the next one opens), or send it back to the head Claude with what's missing.
   'plans.pass': { args: z.tuple([id, ref]) },

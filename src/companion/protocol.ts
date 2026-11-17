@@ -154,24 +154,14 @@ export const COMPANION_PROTO = { major: 1, minor: 63 } as const;
  * (`ConvView.autopilot`, `session.setAutopilot`) and a plan's (`PlanView.fullAuto`, `plans.setFullAuto`);
  * and who plans, builds and checks a plan (`PlanView.planner` / `checker`, `plans.setRoleAgent`). An
  * older Mac sends none, and the phone offers neither.
- * (fork: 1.58 was its own `checkAgent` until upstream took 1.58; the plan's `checker` stands for it now.)
- * 1.59 (was 1.58 until upstream took 1.57, fork, auto route; was 1.57, before that 1.56): a task nobody picked an agent for carries the one auto route gives it
- * (`TaskPageView.agent`) with `autoAgent`, and the phone says "auto" beside it. An older Mac sends neither.
- * 1.60 (was 1.59 until upstream took 1.57, fork; was 1.58, before that 1.57): a plan says who designs each milestone before its work starts (`archAgent`), changed
- * with `plans.setArchAgent` (SINCE.archAgent), and a milestone carries its design (`design`, its
- * code taken out) and that it's being designed (`designing`). An older Mac sends none of them, and
- * an older phone shows the milestone without its design.
- * 1.61 (was 1.60 until upstream took 1.57, fork; was 1.59, before that 1.58): a plan says who takes over what's hard (`fixAgent`: fix tasks after a failed check,
- * conflicts, a task that stopped twice), changed with `plans.setFixAgent` (SINCE.fixAgent). An older
- * Mac leaves it out (auto route's strongest, else whoever is at it), and an older phone doesn't show it.
+ * 1.59–1.61 and 1.63 (fork): auto route's pick on a task, a plan's architect and fix agent, and who did each
+ * part of a milestone. Taken out on 2026-11-18, when the fork went back to upstream's planner, builder and
+ * checker (1.58); their numbers aren't used again.
  * 1.62 (was 1.61 until upstream took 1.57, BLG-74, fork; was 1.60, before that 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
- * 1.63 (was 1.62 until upstream took 1.57, fork; was 1.61, before that 1.55 on its branch, then 1.60, as main took 1.55–1.59 and upstream 3.4.0 took 1.55): who did each part of a plan's milestone
- * (`PlanView` milestone `roles`, MilestoneRolesView), read only. An older Mac leaves it out, and
- * the phone shows nothing (`supports('rolesSeen')`).
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autoAgent: 59, archAgent: 60, fixAgent: 61, rolesSeen: 63, autopilot: 58, planRoles: 58 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autopilot: 58, planRoles: 58 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -440,11 +430,6 @@ export type SubAgentDetailView = z.infer<typeof SubAgentDetailView>;
 /** Which agent it is (src/protocol.ts AgentRef, repeated here: this file is the phone's whole contract). */
 export const AgentRefView = z.object({ runtime: z.string().max(32), model: z.string().max(64).optional(), label: z.string().max(64) });
 export type AgentRefView = z.infer<typeof AgentRefView>;
-/** 1.60 (fork): who did one part of a milestone (src/fork/plans/roles.ts): state off|waiting|skipped|on, the agent that did it (mine: your default), what's set (auto: auto route), why they differ (pick|task|fix|default|changed), now (Coding, after a handoff), and the fix agent's handoffs. */
-export const RoleSeenView = z.object({ state: z.string().max(20), agent: AgentRefView.optional(), mine: z.boolean().optional(), set: AgentRefView.optional(), auto: z.boolean().optional(), why: z.string().max(20).optional(), now: AgentRefView.optional(), handoffs: z.array(z.object({ at: z.number(), what: z.string().max(20), to: z.string().max(80) })).max(20).optional() });
-export const MilestoneRolesView = z.object({ arch: RoleSeenView, work: RoleSeenView, check: RoleSeenView, fix: RoleSeenView });
-export type RoleSeenView = z.infer<typeof RoleSeenView>;
-export type MilestoneRolesView = z.infer<typeof MilestoneRolesView>;
 
 /** 1.41 (BLG-702): one emoji under a message: how many put it there, whether you did, and who (their names, you as "You"). */
 export const ChatReactionView = z.object({
@@ -811,11 +796,6 @@ export const PlanView = z.object({
         checker: Topic.optional(),
         /** 1.40: its agent at work right now (“Working on BLG-12 · Edit README.md”), and its conversation. */
         agentNow: z.object({ text: z.string().max(300), asking: z.boolean().optional(), topic: Topic.optional() }).optional(),
-        /** 1.53 (fork): its technical design from the plan's architect (code taken out), and that the architect is writing it now. */
-        design: z.string().max(12000).optional(),
-        designing: z.boolean().optional(),
-        /** 1.60 (fork): who did each part of it: architecture, coding, audit, hard fixes (RoleSeenView). */
-        roles: MilestoneRolesView.optional(),
       }),
     )
     .max(50),
@@ -832,10 +812,6 @@ export const PlanView = z.object({
   planner: AgentRefView.optional(),
   checker: AgentRefView.optional(),
   fullAuto: z.boolean().optional(),
-  /** 1.60 (fork): who writes each milestone's design before its work starts (none: no architect step); changed with `plans.setArchAgent` from the same list. */
-  archAgent: AgentRefView.optional(),
-  /** 1.61 (fork): who takes over what's hard (fix tasks, conflicts, a task that stopped twice; none: auto route's strongest); changed with `plans.setFixAgent` from the same list. */
-  fixAgent: AgentRefView.optional(),
   /** 1.45 (BLG-772): what the plan has decided, in order (a replaced one marked), and its draft's review before approval. */
   decisions: z.array(z.object({ text: z.string().max(1000), replaced: z.boolean().optional() })).max(60).optional(),
   review: z
@@ -939,8 +915,6 @@ export const TaskPageView = TaskSummary.extend({
    * changed in that conversation); a newer phone no longer changes it from here (`board.setAgent`).
    */
   agent: AgentRefView.optional(),
-  /** 1.52 (fork): `agent` is auto route's pick (nobody chose one): the phone says "auto". An older Mac never sends it. */
-  autoAgent: z.boolean().optional(),
   agents: AgentPickerView.optional(),
 });
 export type TaskPageView = z.infer<typeof TaskPageView>;

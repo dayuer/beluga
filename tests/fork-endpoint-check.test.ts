@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { checkEndpoint, problemOf } from '../src/fork/endpoint-check.js';
-import { FailingModels } from '../src/fork/failing-models.js';
 import { SAVE_ANYWAY_MS, SAVE_ENDPOINT, checkedSave } from '../src/ipc/fork-handlers.js';
 import { HANDLERS } from '../src/ipc/handlers.js';
 
@@ -181,32 +180,5 @@ describe('saving an endpoint', () => {
 
   it('is what the daemon runs for env.saveEndpoint (the override rests on where FORK_HANDLERS is spread)', () => {
     expect(HANDLERS['env.saveEndpoint']).toBe(SAVE_ENDPOINT);
-  });
-
-  it('saved anyway, the models that didn’t pass are kept as failing; saved passing later, they’re cleared', async () => {
-    let now = 1_000;
-    const failing = new FailingModels();
-    const save = checkedSave({ fetch: ark.f, now: () => now, failing });
-    const { s } = session();
-    const bad = { label: 'DeepSeek', baseUrl: 'https://ark.example/api/compatible', key: 'k', models: ['deepseek-flash', 'deepseek-v4-1-flash-261017'] };
-    await expect(save(s, bad)).rejects.toThrow(/it has no model deepseek-flash/);
-    expect(failing.why('local:deepseek/deepseek-flash', now)).toBeUndefined();
-    await save(s, bad);
-    expect(failing.why('local:deepseek/deepseek-flash', now)).toMatch(/^Its check didn’t pass: it has no model deepseek-flash/);
-    // The model that passed beside it isn't greyed.
-    expect(failing.why('local:deepseek/deepseek-v4-1-flash-261017', now)).toBeUndefined();
-    now += 1;
-    await save(s, { ...bad, models: ['deepseek-v4-1-flash-261017'] });
-    expect(failing.why('local:deepseek/deepseek-flash', now)).toBeUndefined();
-  });
-
-  it('saved anyway with a wrong address, every model of it is kept as failing', async () => {
-    const failing = new FailingModels();
-    const save = checkedSave({ fetch: ark.f, now: () => 5, failing });
-    const { s } = session();
-    const bad = { label: 'DeepSeek', baseUrl: 'https://ark.example/api/v3/chat/completions', key: 'k', models: ['m1', 'm2'] };
-    await expect(save(s, bad)).rejects.toThrow(/Not saved/);
-    await save(s, bad);
-    expect([failing.why('local:deepseek/m1', 5), failing.why('local:deepseek/m2', 5)].every((w) => w?.startsWith('Its check didn’t pass: that address'))).toBe(true);
   });
 });

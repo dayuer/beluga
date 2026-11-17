@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Session } from '../core/session.js';
 import { type CheckDeps, checkEndpoint } from '../fork/endpoint-check.js';
-import { type FailingModels, failingModels } from '../fork/failing-models.js';
 import type { Args } from './api.js';
 import type { Handlers } from './handlers.js';
 
@@ -15,8 +14,6 @@ type SaveChange = Args<'env.saveEndpoint'>[0];
 
 export interface CheckedSaveDeps extends CheckDeps {
   readonly now?: () => number;
-  /** Where models that don't work are kept (default: this daemon's). */
-  readonly failing?: FailingModels;
 }
 
 /** How long a save that didn't pass the check can be pressed again to save it anyway. */
@@ -32,9 +29,8 @@ export const notSaved = (words: string, hint: string): string => `Not saved: ${w
  * leaves the address, key and models as they were (a new name) isn't checked.
  */
 export function checkedSave(deps: CheckedSaveDeps = {}): (s: Pick<Session, 'env' | 'local'>, change: SaveChange) => Promise<string> {
-  /** What didn't pass (a hash: the key is in it): when, which models, and why. */
-  const refused = new Map<string, { readonly at: number; readonly models: readonly string[]; readonly words: string }>();
-  const failing = deps.failing ?? failingModels;
+  /** What didn't pass (a hash: the key is in it), and when. */
+  const refused = new Map<string, number>();
   return async (s, change) => {
     const now = (deps.now ?? Date.now)();
     const before = change.id ? s.env.endpoints().find((e) => e.id === change.id) : undefined;
@@ -44,28 +40,20 @@ export function checkedSave(deps: CheckedSaveDeps = {}): (s: Pick<Session, 'env'
     const key = change.key === undefined ? before?.key : change.key || undefined;
     const models = [...new Set((change.models ?? before?.models ?? []).map((m) => m.trim()).filter(Boolean))];
     const same = before !== undefined && before.baseUrl === baseUrl && (before.key ?? undefined) === key && JSON.stringify(before.models) === JSON.stringify(models);
-    /** Saved though it didn't pass: its models that failed, kept as failing (greyed in the pickers, skipped by auto route). */
-    let anyway: { readonly models: readonly string[]; readonly words: string } | undefined;
-    let passed = false;
     if (!same) {
       const what = createHash('sha256').update(JSON.stringify([baseUrl, key ?? '', models])).digest('hex');
-      for (const [k, r] of refused) if (now - r.at > SAVE_ANYWAY_MS) refused.delete(k);
-      anyway = refused.get(what);
-      if (anyway) refused.delete(what);
+      for (const [k, at] of refused) if (now - at > SAVE_ANYWAY_MS) refused.delete(k);
+      // Pressed again after it didn't pass: saved anyway.
+      if (refused.has(what)) refused.delete(what);
       else {
         const got = await checkEndpoint({ baseUrl, ...(key ? { key } : {}), models }, deps);
         if (!got.ok) {
-          // The address, the key or no answer at all: every model of it; else the ones that failed.
-          const all = got.checks.some((c) => !c.ok && c.problem !== 'model' && c.problem !== 'other');
-          refused.set(what, { at: now, models: all ? models : got.checks.filter((c) => !c.ok).map((c) => c.model), words: got.words });
+          refused.set(what, now);
           throw new Error(notSaved(got.words, got.hint));
         }
-        passed = true;
       }
     }
     const saved = s.env.saveEndpoint(change);
-    if (passed) failing.clearEndpoint(saved);
-    for (const m of anyway?.models ?? []) if (m) failing.mark(`local:${saved}/${m}`, `Its check didn’t pass: ${anyway!.words}`, now);
     await s.local.look();
     return saved;
   };

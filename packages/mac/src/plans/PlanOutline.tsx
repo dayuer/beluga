@@ -16,7 +16,6 @@ import type { AgentRef } from '@beluga/protocol.js';
 /** A change you make to a plan (as the API takes it). */
 type PlanOp = Parameters<ReturnType<typeof usePlanActions>['api']['edit']>[1][number];
 import p from './plans.module.css';
-import { TaskAgentChip } from '../fork/plans/MilestoneRoles.js';
 
 /**
  * A plan as an outline: milestones in order, each with what passes it and its tasks. Names change
@@ -138,7 +137,6 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
         </div>
         <span className={p.oTaskMeta}>
           {info.sub && (t.pulse || t.state === 'running') ? <span className={p.oStep}>{info.sub}</span> : t.state === 'blocked' ? <span className={p.muted}>{t.why}</span> : null}
-          <TaskAgentChip plan={plan} t={t} />
           {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
           {t.forYou ? <Icon name="person" size={12} className={p.forYou} /> : null}
           {canStart ? (

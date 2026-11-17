@@ -26,7 +26,6 @@ import { ReportProblemRow } from './ReportProblemRow.js';
 import { ContextSettings } from './ContextSettings.js';
 import { UsageLimitSettings } from './UsageLimitSettings.js';
 import { ParallelSettings } from './ParallelSettings.js';
-import { AutoRouteSettings } from './AutoRouteSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { AutopilotWaitSettings } from './AutopilotWaitSettings.js';
@@ -425,7 +424,6 @@ function AgentPane() {
       </Group>
       <AutopilotWaitSettings />
       <AgentsGroup mine={runtime} />
-      <AutoRouteSettings />
       <LaunchFlagsSettings />
       <McpSettings />
       <div id={LOCAL_MODELS_ID}>
