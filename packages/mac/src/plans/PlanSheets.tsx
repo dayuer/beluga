@@ -317,4 +317,4 @@ export function SendBackSheet({ planId, milestone, close }: { planId: string; mi
     </FormSheet>
   );
 }
-export { AutonomyCards, GoalBox }; // fork: fork/plans/NewPlanSheet.tsx and plans/PlanSettingsSheet.tsx use them
+export { AutonomyCards }; // fork: plans/PlanSettingsSheet.tsx uses it
