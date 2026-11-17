@@ -106,7 +106,9 @@ export function buildChatVarsAppend(names: readonly string[]): string {
 }
 
 /** A workspace's scratch folder: where screenshots and intermediate output go (shown live to the owner). */
-export function buildScratchAppend(dir: string): string {
+export function buildScratchAppend(dir: string, cwd?: string): string {
+  // Its full path too: a model shown only the relative one has written images as `/.beluga/scratch/…`.
+  const full = cwd ? `${cwd.replace(/\/+$/, '')}/${dir}` : undefined;
   return [
     '',
     `Scratch folder: ${dir}/ in your working folder (git-ignored, already created). Save what you make while`,
@@ -114,6 +116,7 @@ export function buildScratchAppend(dir: string): string {
     'JSON you fetched or produced, notes. Give files short descriptive names (e.g. 01-login-page.png,',
     'api-response.json) and prefer .png/.json/.md/.txt. The owner watches this folder live to follow what',
     'you are doing, so write there as you go instead of only to /tmp. Never put secrets in it.',
+    ...(full ? [`Its full path is ${full}/. A picture from it in your answer takes that whole path: ![Login page](${full}/01-login.png).`] : []),
     `When you name a file or folder in your answer, write its whole path from your working folder (${dir}/pr-12/,`,
     `not scratch/pr-12/ or pr-12/): the app makes it a link that opens it. A file in a checkout you made in the`,
     `scratch folder (to land or review a pull request) too: ${dir}/land-12/src/app.ts, not src/app.ts.`,

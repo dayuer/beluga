@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "app:dev": "tauri dev",
-    "app:build": "node ../../scripts/build-sidecar.mjs && node ../../scripts/build-widgets.mjs && tauri build --bundles app && node scripts/make-dmg.mjs",
+    "app:build": "node ../../scripts/build-sidecar.mjs && node ../../scripts/build-widgets.mjs && node scripts/tauri-build.mjs --bundles app && node scripts/make-dmg.mjs",
     "widgets": "node ../../scripts/build-widgets.mjs",
     "dmg": "node scripts/make-dmg.mjs",
     "release": "node ../../scripts/release-mac.mjs",

@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { PHONE_FORK } from '../fork/coverage.js';
 
 /**
  * What your phone may ask your Mac to do: every API method (src/ipc/api.ts) is `phone` or `mac`.
@@ -757,6 +758,8 @@ export const PHONE: Record<Method, Side> = {
   'external.stopAll': 'phone',
   'external.setPaused': 'mac',
   'external.activity': 'phone',
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...PHONE_FORK,
 };
 
 /** A method the phone may call (unknown names are not). */

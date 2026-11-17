@@ -176,7 +176,7 @@ describe('a run on a pretend computer', () => {
     expect(readyLine(started)).toBe('Getting build-box ready: its folder, cloning, tools, setup');
     const asking = await settled(r, started.id, ['asking', 'failed', 'done']);
     expect(asking.state).toBe('asking');
-    expect(c.ran.some((cmd) => cmd === "gh repo clone 'Kayra/bob-api' '/home/k/projects/bob-api'")).toBe(true);
+    expect(c.ran.some((cmd) => cmd === "LC_MESSAGES=C LANGUAGE=C gh repo clone 'Kayra/bob-api' '/home/k/projects/bob-api'")).toBe(true);
     expect(asking.path).toBe('/home/k/projects/bob-api');
     expect(asking.steps.find((s) => s.id === 'folder')).toMatchObject({ state: 'done', detail: '~/projects' });
     expect(asking.steps.find((s) => s.id === 'tools')).toMatchObject({ state: 'asking', detail: 'Missing on build-box: Node 20' });
@@ -215,7 +215,7 @@ describe('a run on a pretend computer', () => {
     const run = r.start('git@github.com:Kayra/bob-api.git');
     const failed = await settled(r, run.id, ['failed', 'done']);
     expect(failed.state).toBe('failed');
-    expect(c.ran.some((cmd) => cmd.startsWith('GIT_TERMINAL_PROMPT=0 git clone '))).toBe(true);
+    expect(c.ran.some((cmd) => cmd.startsWith('LC_MESSAGES=C LANGUAGE=C GIT_TERMINAL_PROMPT=0 git clone '))).toBe(true);
     expect(failed.steps.find((s) => s.id === 'clone')).toMatchObject({ state: 'failed', error: 'build-box isn’t signed in to GitHub, so it can’t get the repository', fix: { words: 'Sign In There', command: 'gh auth login' } });
     expect(readyLine(failed)).toBe('build-box couldn’t get ready: build-box isn’t signed in to GitHub, so it can’t get the repository');
   });

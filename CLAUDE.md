@@ -90,3 +90,32 @@ a Mac it ends with a `Tested-on: macOS <tree>` line. Put that line, as it is, at
 commit message, and commit every file it tested (nothing changed since the run). CI then skips its
 macOS run for that commit (`scripts/local-pass.mjs`), and Linux and Windows still run there. No line
 (a failure, part of the suite, a file changed during the run) means don't add one.
+
+## Working in this fork (dayuer/beluga)
+
+This section is the fork's own; keep it last so upstream syncs merge cleanly.
+
+- **`main` is upstream's, exactly.** It only ever fast-forwards to `upstream/main`
+  (`git fetch upstream && git push origin upstream/main:main`); nothing of the fork is committed
+  on it. What upstream has already merged gets no branch of its own here.
+- **The fork's work is a chain of branches, each on the one before** (`docs/fork.md`, "分支"):
+  `topic/chinese` (the fork's Chinese beside upstream's, checked against upstream's latest:
+  `docs/chinese.md`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
+  `topic/native` (the Mac's own controls, menus, sheets, sidebar, calm UI) → `topic/plans` (plan
+  roles, auto route, models, Autopilot) → `topic/studio` (Synon Studio, clients, federation, My
+  Sharing). `topic/fixes` stands apart on `upstream/main`: small fixes meant for upstream.
+- **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
+  into that branch; once merged, merge that branch forward into each one after it (merge, never
+  rebase: they're pushed).
+- **Syncing upstream** goes in at the top: check the Chinese (`node scripts/zh-check.mjs`), merge `upstream/main` into `topic/chinese`
+  (`node scripts/sync-upstream.mjs` on `topic/native` and after), then forward down the chain.
+- **Builds are composed when needed.** From a clean worktree on the chain branch that has what
+  the build should carry (`topic/studio` has all of it), merge `topic/fixes` if wanted, then
+  `npm run app:build`. One build number per distinct code: don't build the same tree twice.
+- **One session writes in a checkout at a time.** Parallel work goes in its own worktree, and every
+  worktree ends merged or removed. Never leave uncommitted changes behind for another session.
+- **One PR per piece of work.** Fold small fixes into the open PR instead of opening another; the
+  build-number change goes in the same PR as the code it ships.
+- **Merges and pushes follow the owner's word.** When the request already says to merge or push
+  (for example "测好就合并"), do it without stopping; otherwise finish the PR and ask once.
+- Nothing goes to upstream (`beluga-labs/beluga`) unless the owner asks for it in this session.

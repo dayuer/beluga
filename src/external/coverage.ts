@@ -1,4 +1,5 @@
 import type { Method } from '../ipc/api.js';
+import { EXTERNAL_FORK } from '../fork/coverage.js';
 
 /**
  * What external agents may reach of the API: every method (src/ipc/api.ts) is decided here. The type
@@ -668,4 +669,6 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'workspaces.ports': { refused: NO_TOOL },
   'chats.resolve': { refused: NO_TOOL },
   'chats.snapshot': { refused: NO_TOOL },
+  // This fork's own methods (src/fork/coverage.ts, docs/fork.md).
+  ...EXTERNAL_FORK,
 };
