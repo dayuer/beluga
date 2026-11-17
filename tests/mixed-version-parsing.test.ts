@@ -71,9 +71,9 @@ describe('a newer computer’s info and sync', () => {
       want: ['info', 'aNewerAsk'],
       info: { ...INFO, cpus: 'not a number any more' },
       update: { mode: 'aNewerMode' },
-      look: { name: 'Studio', icon: 'aNewerIcon' },
+      look: { name: 'Office Mac', icon: 'aNewerIcon' },
     });
-    expect(sync).toMatchObject({ t: 'devset', forgotten: [], want: ['info'], look: { name: 'Studio' } });
+    expect(sync).toMatchObject({ t: 'devset', forgotten: [], want: ['info'], look: { name: 'Office Mac' } });
     expect(sync.info).toBeUndefined();
     expect(sync.update).toBeUndefined();
     expect(sync.look?.icon).toBeUndefined();
