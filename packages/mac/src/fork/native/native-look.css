@@ -1,0 +1,162 @@
+/*
+ * Mac-native touches on the web view (fork; docs/fork.md, "Mac 原生"). Reviewed against macOS's own
+ * apps in Claude Design ("Beluga topic/native · Mac 原生走查", 1a–1c). Only the look: every rule
+ * reuses an existing token (styles/tokens.css, components/ui.module.css), and the
+ * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/calm and fork/sidebar do;
+ * tests/fork-native-look.test.ts checks they still exist.
+ */
+
+/*
+ * The branch's next step in the toolbar (layout/BranchControl.tsx): a Mac toolbar has no accent-filled
+ * buttons, so Create PR and its ▾ are drawn as any bordered toolbar button, in the text colour.
+ * A failed step, a merged branch and Merge (green, its own variant) keep their colours. `:root` puts
+ * these above calm-accent.css's rule that repaints every primary button in the accent.
+ */
+:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
+  background: linear-gradient(var(--control-top), var(--control));
+  color: var(--text);
+  box-shadow: var(--control-bezel);
+  font-weight: 400;
+}
+:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']):active:not(:disabled) {
+  background: linear-gradient(var(--control-press), var(--control-press));
+}
+:root button[data-branch-more][class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_'])::before {
+  background: var(--hairline-strong);
+}
+
+/* The dock's tabs (layout/panel/panel.module.css): the one you're on is in bold text, not underlined. */
+[role='tablist'][class*='_dockTabs_'] > [class*='_tabOn_'][class*='_tabOn_'] {
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* The panel's views when there is only one (Overview: Info): a title, not a lone raised segment. */
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) {
+  background: none;
+}
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) > [role='tab'] {
+  background: none;
+  box-shadow: none;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* An empty chat's starters (views/ChatView.tsx): plain bordered buttons, words only. */
+[class*='_emptyActions_'] > button > svg {
+  display: none;
+}
+
+/* ── 1a Overview ─────────────────────────────────────────────────────────────── */
+
+/* The rows of a Mac list: 28pt, as Finder's and Mail's at the default size (views/overview.module.css). */
+[role='list'][class*='_table_'] > [class*='_row_'] {
+  height: 28px;
+  border-radius: 5px;
+}
+
+/* ── 1b Worktree ─────────────────────────────────────────────────────────────── */
+
+/* Where the branch stands, beside the worktree's name (layout/BranchControl.module.css): a line of
+   secondary text in its tone's colour, not a pill. */
+[data-branch-state][class*='_pill_'][class*='_pill_'] {
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+[class*='_pillButton_']:hover > [data-branch-state][class*='_pill_'] {
+  background: none;
+  text-decoration: underline;
+}
+
+/* Changes' second view (Changes / History, layout/RightPanel.tsx): one segmented control in the
+   inspector is the panel's own; this one is a row of words, the one you're on in bold. */
+[class*='_views_'] > [role='radiogroup'][class*='_segmented_'] {
+  gap: 12px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+[class*='_views_'] > [role='radiogroup'] > [class*='_segment_'] {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-3);
+}
+[class*='_views_'] > [role='radiogroup'] > [class*='_segment_']::before {
+  display: none;
+}
+[class*='_views_'] > [role='radiogroup'] > [class*='_segmentOn_'][class*='_segmentOn_'] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── 1c Settings ─────────────────────────────────────────────────────────────── */
+
+/* A window of its own, as a Mac app's Settings: nothing dims the window behind it, the close button
+   is the red one at the top left (with minimise and zoom off, as Settings windows have them), and
+   the pane's name is the title, centred (dialogs/Settings.tsx, settings.module.css). */
+[class*='_overlay_']:has(+ [data-settings-window]) {
+  background: none;
+}
+[data-settings-window] {
+  box-shadow: 0 0 0 0.5px var(--hairline-strong), 0 22px 70px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+[data-settings-window] [class*='_nav_'] {
+  padding-top: 44px;
+}
+[data-settings-window] [class*='_nav_'] > [class*='_title_'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+[data-settings-window] [class*='_bodyHead_'] {
+  justify-content: center;
+}
+[data-settings-window] [class*='_paneTitle_'] {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  color: transparent;
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:hover,
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:focus-visible {
+  color: rgba(0, 0, 0, 0.55);
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] svg {
+  width: 8px;
+  height: 8px;
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before,
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
+  content: '';
+  position: absolute;
+  top: -0.5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--segment-track);
+  box-shadow: inset 0 0 0 0.5px var(--hairline-strong);
+  pointer-events: none;
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before {
+  left: 20px;
+}
+[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
+  left: 40px;
+}

@@ -1,0 +1,73 @@
+/*
+ * Liquid Glass (fork; docs/fork.md, "Mac 原生走查"): the window as macOS 26 draws its own apps.
+ * The sidebar and the inspector float as rounded panes of glass above the window, controls are
+ * capsules, and the toolbar's buttons sit on glass. Looked at rdev/liquid-glass-react (MIT), but its
+ * refraction is an SVG displacement filter that WebKit (the Mac app's WKWebView) doesn't draw and
+ * it follows the pointer, which calm mode doesn't allow: this is CSS only, and still.
+ *
+ * Only on a Mac with transparency on (lib/prefs.ts sets data-os and data-glass): Windows and Linux,
+ * and macOS's or the app's Reduce transparency, keep the flat window. The anchors are upstream's
+ * CSS-module classes; tests/fork-native-look.test.ts checks they still exist.
+ */
+
+:root[data-os='mac'][data-glass='on'] {
+  --control-radius-large: 999px;
+  --control-radius: 999px;
+  --control-radius-small: 999px;
+  --lg-inset: 8px;
+  --lg-radius: 16px;
+  --lg-fill: color-mix(in srgb, var(--bg-sidebar-solid) 72%, transparent);
+  --lg-edge: rgba(255, 255, 255, 0.7);
+  --lg-rim: rgba(0, 0, 0, 0.1);
+  --lg-drop: 0 10px 30px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --lg-chip: color-mix(in srgb, var(--bg-raised, #fff) 70%, transparent);
+}
+:root[data-os='mac'][data-glass='on'][data-theme='dark'] {
+  --lg-edge: rgba(255, 255, 255, 0.16);
+  --lg-rim: rgba(0, 0, 0, 0.5);
+  --lg-drop: 0 12px 34px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --lg-chip: color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+/* The window behind the panes: the content's own colour, as in macOS 26, where the sidebar floats over it. */
+:root[data-os='mac'][data-glass='on'] #root > [class*='_app_'] {
+  background: var(--bg);
+}
+
+/* The sidebar (inside fork/sidebar's resize wrapper, hence its own data-fork-sidebar): a pane of
+   glass, inset from the window's edges, its width kept by giving the inset back. */
+:root[data-os='mac'][data-glass='on'] nav[data-fork-sidebar][class*='_sidebar_'] {
+  width: calc(var(--sidebar-w) - var(--lg-inset));
+  height: calc(100% - 2 * var(--lg-inset));
+  margin: var(--lg-inset) 0 var(--lg-inset) var(--lg-inset);
+  border-right: 0;
+  border-radius: var(--lg-radius);
+  background: var(--lg-fill);
+  backdrop-filter: blur(30px) saturate(1.8);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  box-shadow: inset 0 0 0 0.5px var(--lg-edge), 0 0 0 0.5px var(--lg-rim), var(--lg-drop);
+  overflow: hidden;
+}
+
+/* The inspector: the same glass on the right. */
+:root[data-os='mac'][data-glass='on'] #root > [class*='_app_'] > aside[class*='_panel_'] {
+  height: auto;
+  margin: var(--lg-inset) var(--lg-inset) var(--lg-inset) 0;
+  border-radius: var(--lg-radius);
+  box-shadow: inset 0 0 0 0.5px var(--lg-edge), 0 0 0 0.5px var(--lg-rim), var(--lg-drop);
+  overflow: hidden;
+}
+:root[data-os='mac'][data-glass='on'] #root > [class*='_app_'] > aside[class*='_panel_'] > [class*='_inner_'] {
+  border-left: 0;
+}
+
+/* The toolbar's icon buttons sit on glass capsules. */
+:root[data-os='mac'][data-glass='on'] header[class*='_toolbar_'] button[class*='_iconButton_'] {
+  border-radius: 999px;
+  background: var(--lg-chip);
+  box-shadow: inset 0 0 0 0.5px var(--lg-edge), 0 0 0 0.5px var(--lg-rim), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+:root[data-os='mac'][data-glass='on'] header[class*='_toolbar_'] button[class*='_iconButton_']:disabled {
+  background: none;
+  box-shadow: none;
+}
