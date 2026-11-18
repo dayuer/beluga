@@ -39,6 +39,8 @@ describe('calm-accent.css', () => {
   it('finds every upstream class it anchors on, in the module that defines it', () => {
     const home: Record<string, string> = {
       badgeUrgent: read('components', 'ui.module.css'),
+      iconBadge: read('components', 'ui.module.css'),
+      pill_info: read('layout', 'BranchControl.module.css'),
       primary: read('components', 'ui.module.css'),
       merge: read('components', 'ui.module.css'),
       chevrons: read('components', 'select.module.css'),
@@ -48,7 +50,7 @@ describe('calm-accent.css', () => {
       sidebarList: read('network', 'network.module.css'),
     };
     const names = anchorsIn(css);
-    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'invite', 'merge', 'primary', 'sidebarList']);
+    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'iconBadge', 'invite', 'merge', 'pill_info', 'primary', 'sidebarList']);
     const missing = names.filter((name) => !classes(home[name]!).has(name));
     expect(missing).toEqual([]);
   });

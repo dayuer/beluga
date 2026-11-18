@@ -326,7 +326,7 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 ## 4. 彩色光晕
 
-状态：**完成**（BLG-245 做了扫描与测试，BLG-256 处理全部 64 层）。fork/** 里没有光晕层；上游 64 层中 63 层在构建时改写到令牌上，1 层是明说的例外；keep-decor 目录里没有光晕层。（BLG-245 第二轮写的「保留 48 条为例外」的决定已被 BLG-256 取代：用户要求逐条处理，这些例外和那组泛化规则都删掉了。）
+状态：**完成**（BLG-245 做了扫描与测试，BLG-256 处理全部 64 层）。fork/** 里没有光晕层；上游 64 层中 57 层在构建时改写到令牌上，引导页 6 层属于 keep-decor 不改写（§10），1 层是明说的例外。（BLG-245 第二轮写的「保留 48 条为例外」的决定已被 BLG-256 取代：用户要求逐条处理，这些例外和那组泛化规则都删掉了。）
 
 ### 4.1 判定（`findGlows`，在 `fork/calm/glow-scan.ts`，测试 `tests/fork-calm-glow.test.ts` 用同一个）
 
@@ -354,7 +354,7 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 
 错误态（`.invalid`、`.bad`）的红色光晕同样变成 60% 的红色 2px 环：红色还在，不再是光晕。
 
-**跳过的文件**：fork/、styles/ 和 keep-decor 目录（`onboarding/scenes/`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call/`、`YourCard`）不改写。这些目录里目前没有光晕层，所以没有例外要写。
+**跳过的文件**：fork/、styles/ 和 keep-decor 目录（整个 `onboarding/`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call/`、`YourCard`）不改写。原来只跳过 `onboarding/scenes/`，`onboarding.module.css` 的 6 层被改写了；按 `docs/calm-ui.md` §7.4（`onboarding/**` 是 keep-decor），审计后改为跳过整个目录（§10）。
 
 **例外**：`components/update.module.css:72`（`inset 0 0 0 100px` 的 8% 强调色）是用 inset 阴影写的背景着色，不是光晕，维持原状（`GLOW_EXCEPTIONS`，测试检查它仍在文件里）。
 
@@ -401,12 +401,12 @@ BLG-248 的产物。给后面 BLG-242、251、249、250、243、245、252、244�
 | `network/network.module.css` | 987 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
 | `network/network.module.css` | 991 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--error) 16%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
 | `network/network.module.css` | 1118 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 191 | blur 30px | `0 10px 30px -10px color-mix(in srgb, var(--claude) 70%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 260 | blur 10px | `0 0 10px var(--claude)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 345 | blur 40px | `0 18px 40px -18px color-mix(in srgb, var(--accent) 60%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 373 | spread 4px | `inset 0 0 0 4px var(--accent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 639 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
-| `onboarding/onboarding.module.css` | 1258 | spread 4px | `inset 0 0 0 4px color-mix(in srgb, var(--accent) 35%, var(--bg))` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
+| `onboarding/onboarding.module.css` | 191 | blur 30px | `0 10px 30px -10px color-mix(in srgb, var(--claude) 70%, transparent)` | keep-decor，不改写（§10） | 原样
+| `onboarding/onboarding.module.css` | 260 | blur 10px | `0 0 10px var(--claude)` | keep-decor，不改写（§10） | 原样
+| `onboarding/onboarding.module.css` | 345 | blur 40px | `0 18px 40px -18px color-mix(in srgb, var(--accent) 60%, transparent)` | keep-decor，不改写（§10） | 原样
+| `onboarding/onboarding.module.css` | 373 | spread 4px | `inset 0 0 0 4px var(--accent)` | keep-decor，不改写（§10） | 原样
+| `onboarding/onboarding.module.css` | 639 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent)` | keep-decor，不改写（§10） | 原样
+| `onboarding/onboarding.module.css` | 1258 | spread 4px | `inset 0 0 0 4px color-mix(in srgb, var(--accent) 35%, var(--bg))` | keep-decor，不改写（§10） | 原样
 | `plans/plan-ask.module.css` | 30 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
 | `plans/plans.module.css` | 671 | blur 28px | `0 10px 28px -14px color-mix(in srgb, var(--claude) 70%, transparent)` | 构建时改写 → `--calm-glow-off` | 沉稳开：该层变成透明空层；沉稳关：原样 |
 | `plans/plans.module.css` | 1295 | spread 3px | `0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)` | 构建时改写 → `--calm-ring` | 沉稳开：扩散改为 2px 环；沉稳关：原样 |
@@ -444,7 +444,7 @@ Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所�
 
 ## 5. 最终复核（BLG-246）
 
-最终树（`0a97e0619` 之后的 M8 提交）重拍：六场景 × 浅色深色，calm 开、full 动效、loaded；对话进行中取 running。改前图见 §1.1，改后中间结果见 §1.4、§1.5、§1.6、§2.4。
+最终树重拍（2026-11-18 审计修复之后，含 §10 的改动；原来那组拍在 f9053e40c 修行尾之前，图里行尾还是四个标记、铃铛还是蓝的，已整组换掉）：六场景 × 浅色深色，calm 开、full 动效、loaded；对话进行中取 running。改前图见 §1.1，改后中间结果见 §1.4、§1.5、§1.6、§2.4。
 
 | 场景 | 浅色 | 深色 |
 | --- | --- | --- |
@@ -480,20 +480,25 @@ Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所�
 
 | 编号 | 问题 | 状态 |
 | --- | --- | --- |
-| M8-1 | 工作区 Create PR 周围的光没有定位来源，改后仍在（BLG-242 的未完成项） | **未解决**，需要单独确认：在 DevTools 里找出 box-shadow 来源 |
-| M8-2 | 上游 64 层彩色光晕（BLG-245 只处理了 4 层） | **已解决**（BLG-256）：63 层构建时改写到令牌，1 层背景着色例外，计算样式扫描 0 个 |
+| M8-1 | 工作区 Create PR 周围的光没有定位来源，改后仍在（BLG-242 的未完成项） | **已解决**（BLG-253，§1.7）：来源是光泽渐变、白色内高光、下方投影和深色下的 0.5px 浅环，沉稳下主按钮改为平的纯色 |
+| M8-2 | 上游 64 层彩色光晕（BLG-245 只处理了 4 层） | **已解决**（BLG-256；审计修复后）：57 层构建时改写到令牌，引导页 6 层按 keep-decor 不改写（§10），1 层背景着色例外 |
 | M8-3 | 字号写法 ≤ 25 的目标未达：构建口径 51、测试口径 79（BLG-244） | **放宽**为实测值；需确认接受 |
 | M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
 | M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件，另有 113 个「已不再改」的名字 | **已解决**（BLG-253）：208 个都不是 M8 改的，已在 docs/fork.md 逐个登记；「已不再改」的名字从清单里拿下来；报告 0 个 `!`、0 条「已不再改」，脚本没有改，见 §7 |
-| M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | 未做 |
+| M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | **已做**（BLG-255，§3.8） |
 | M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | 未做，另开任务 |
-| M8-8 | 行尾收口的 200 行性能未测（BLG-243） | 未做 |
+| M8-8 | 行尾收口的 200 行性能未测（BLG-243） | **已做**（BLG-254，§2.5） |
 | M8-9 | Sentinel 的 Merge、Resume 改中性是本任务的决定，设计未写 | 已记录，待确认 |
+| M8-10 | 沉稳开时顶栏铃铛的计数仍是强调色实底，「2 commits · no PR」chip 仍是蓝色（§1.2 要求中性） | **已解决**（§10） |
+| M8-11 | `project-home-narrow.spec.ts` 用 `waitForTimeout(300)` 等过渡 | **已解决**（§10）：改为等到没有 CSS 过渡在跑 |
+| M8-12 | 引导页 `onboarding.module.css` 的 6 层光晕被改写，而 `docs/calm-ui.md` §7.4 把 `onboarding/**` 整个列为 keep-decor | **已解决**（§10）：光晕扫描跳过整个 `onboarding/` |
+| M8-13 | 长分支名时 Create Worktree 超出盒子（#527，基线就有），e2e 标了 `test.fixme` | **未修**：上游布局问题，需另开任务 |
+| M8-14 | 悬停项目行时名字被挤成「bob-…」：展开的工具和标记占掉了名字的宽度 | **未修**：另开任务 |
 
 ## 6. 合并状态
 
-- 本页列出的 M8 提交都在 `beluga/blg-248-m8` 上，没有开 PR，没有推送。
-- Tested-on 行见下。
+- M8 的提交在 `beluga/blg-248-m8` 上，已合进计划分支 `plan/mac-fork`（`89cd2c452`）；§10 的审计修复也提交在 `plan/mac-fork` 上。
+- 还没有合回 `topic/native`（之后 `topic/native` 又走了 8 个提交），没有开 PR，没有推送。合回时按 §7 末尾搬动 `docs/fork.md` 的条目。
 
 ## 1.5 侧栏蓝色收口（BLG-249）
 
@@ -596,6 +601,8 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0a97e0619
 ### 2.5 同一行改前、改后、悬停，与 200 行测量（BLG-254）
 
 **行**：侧栏里 bob-api 项目行。演示数据里它自己只有金额；这次从别的行克隆了「需要你」的琥珀点和「进行中」的点阵，放进它的 hover 工具 span（`ProjectTree.tsx` 里 busy 点和 tally 本来就在那里），所以行尾同时有三样：金额、琥珀点、点阵。演示数据里没有未读，所以没有第四样（计数）；计数与琥珀点的取舍在单测里覆盖。
+
+（2026-11-18 重拍：演示数据现在让这一行自己同时有点阵、琥珀点、计数「1」三样，「改后」「悬停」两张按真实状态拍，不再克隆；见 §10。）
 
 | 状态 | 浅色 | 深色 |
 | --- | --- | --- |
@@ -776,3 +783,19 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 **M8 自己造成、已修的两处**：network 的两条推广卡用例（卡片在沉稳下被隐藏，用例以沉稳关运行）；subagents:82（悬停时把金额点阵一起翻出来，改成悬停不翻出金额，见 sidebar-look.css）。
 
 **整轮结果**：`E2E_WORKERS=3 npm run e2e`，636 个用例：606 通过、8 失败、15 跳过、7 未运行，用时 27.3 分钟。机器负载在 13–25 之间（同时有别的会话在跑），不算空闲；因此 8 个失败都单独重跑：background-fetch:12、render-calm:31、sentinel:358、sidebar-calm:12、calls:73、worktree-link:15 单独重跑全部通过（负载抖动）；network:249 单独重跑也失败，原因是漏了沉稳关，补上后通过；project-home-narrow 的长分支名一例见上，标 fixme。清零后：失败 0，fixme 1。
+
+## 10. 审计后的修复（2026-11-18）
+
+对 M8 结果做了一次独立审计（代码、检查、最终树实拍），以下问题在 `plan/mac-fork` 上直接修了：
+
+| 问题 | 修法 | 证据 |
+| --- | --- | --- |
+| 铃铛计数仍是强调色实底（计算样式 `rgb(0,117,255)`） | `calm-accent.css` 1b：`_iconBadge_` 用与 `_badgeUrgent_` 相同的中性 | `tests/fork-calm-accent.test.ts` 锚点检查；§5 工作区、任务页图 |
+| 「2 commits · no PR」chip 仍是蓝色 | `calm-accent.css` 1c：`_pill_info_` 的 `--pill` 改为 `--text-2` | 同上 |
+| 右侧面板的视图 tab（Changes、Files、Scratch、Info）随面板宽度伸缩（上游 `.tabs { width: 100% }`、`.tab { flex: 1 1 0 }`） | 新文件 `fork/calm/calm-tabs.css`：沉稳下每个 tab 按图标和名字定宽，整条居中；面板很窄时上游的折叠（只显示当前 tab 的名字）照旧 | `tests/fork-calm-tabs.test.ts`；§5 工作区图 |
+| 引导页 6 层光晕被改写 | `glow-scan.ts` 的跳过目录从 `onboarding/scenes/` 改为 `onboarding/` | `vite build`：`calm-glow: 49 halo spreads on --calm-ring, 8 blurred glows on --calm-glow-off in 27 files; kept on purpose: 1` |
+| `waitForTimeout(300)` | 改为 `waitForFunction`，等到页面上没有正在播放的 CSS 过渡 | `packages/mac/e2e/project-home-narrow.spec.ts` |
+| §5 的最终图过时 | 六场景 × 浅色深色、沉稳关工作区和任务页，全部重拍（`calm-check`，calm 开/关、full、loaded）；§2.5 的「改后」「悬停」两张也重拍。演示数据里 bob-api 行本身就同时有点阵、琥珀点、计数三样，不用再克隆：静止时只露琥珀点，悬停时三样都展开 | `docs/calm/img/m8-final-*`、`m8-row-after-*`、`m8-row-hover-*` |
+| §5.3、§6 过时 | 已更新 | 本页 |
+
+仍未做：M8-7（••• 菜单里找回推广卡的入口）、M8-13（长分支名时 Create Worktree 超出盒子）、M8-14（悬停时名字被挤短）。

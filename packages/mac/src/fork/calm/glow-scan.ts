@@ -90,8 +90,8 @@ export function findGlows(css: string): Glow[] {
 
 // ---- the rewrite ---------------------------------------------------------------------------------
 
-/** Files the glow rewrite leaves alone: the fork's own, the global styles, and the keep-decor scenes (docs/calm-ui.md §7.4). */
-const SKIP_GLOW_DIRS = ['fork/', 'styles/', 'onboarding/scenes/', 'Wormhole', 'reactbits', 'PixelBurst', 'star-scene', 'call/', 'YourCard'];
+/** Files the glow rewrite leaves alone: the fork's own, the global styles, and the keep-decor paths, onboarding/** included (docs/calm-ui.md §7.4). */
+const SKIP_GLOW_DIRS = ['fork/', 'styles/', 'onboarding/', 'Wormhole', 'reactbits', 'PixelBurst', 'star-scene', 'call/', 'YourCard'];
 
 export function skipGlowFile(file: string): boolean {
   const f = file.replace(/\\/g, '/').replace(/^\.?\/?/, '');
