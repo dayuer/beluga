@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { hexOf } from '../packages/mac/src/lib/native-sheet.js';
+import { hexOf } from '../packages/mac/src/lib/hex-colour.js';
 
 /**
  * The Mac's native sheets draw in the page's colours (Settings › Appearance: light or dark, the
  * theme, the accent), not the Mac's own: the page reads them as WebKit computes them and sends
- * them as #rrggbb (lib/native-sheet.ts; native_sheet.rs takes them).
+ * them as #rrggbb (lib/hex-colour.ts, used by lib/native-sheet.ts; native_sheet.rs takes them).
  */
 describe('hexOf', () => {
   it('reads the colours WebKit computes', () => {
