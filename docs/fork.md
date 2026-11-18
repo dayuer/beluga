@@ -10,7 +10,7 @@ fork 自己的改动是一条链，后一个建在前一个上面：
 
 | 分支 | 内容 | 基于 |
 |---|---|---|
-| `topic/chinese` | 中文对照：fork 的中文接在上游的中文表上，对上游文案的改译，和上游最新中文的对照（`docs/chinese.md`） | `upstream/main` |
+| `topic/chinese` | 中文对照：fork 的中文接在上游的中文表上，对上游文案的改译，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
 | `fork/base` | fork 结构、登记表、fork 功能的中文、输入法 Enter、git 英文输出、构建号、新旧版本混用的容错 | `topic/chinese` |
 | `topic/native` | Mac 原生的控件、菜单、sheet、警告框，侧栏，沉稳界面 | `fork/base` |
 | `topic/plans` | 计划按档位分工、自动路由、模型梯队与团队、Autopilot、Antigravity、本地模型端点 | `topic/native` |
