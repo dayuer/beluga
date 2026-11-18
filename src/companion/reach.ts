@@ -2,6 +2,7 @@ import type DHT from 'hyperdht';
 import type { KeyPair } from 'hyperdht';
 import { openTunnel, waitUntilReachable } from '../net/tunnel.js';
 import type { RelayRecord } from './protocol.js';
+import { parseCustomAddress } from '../shared/custom-address.js';
 import { RelayServer } from './relay.js';
 
 /**
@@ -30,14 +31,7 @@ export interface CustomRelayState {
   readonly error?: string;
 }
 
-/** `host:port` (a name, an IPv4 address or a bracketed IPv6 one, and a port), or undefined if it isn't one. */
-export function parseCustomAddress(text: string | undefined): { host: string; port: number } | undefined {
-  const m = /^(\[[0-9a-fA-F:.]+\]|[\w.-]+):(\d{1,5})$/.exec((text ?? '').trim());
-  if (!m) return undefined;
-  const port = Number(m[2]);
-  if (port < 1 || port > 65535) return undefined;
-  return { host: m[1]!.replace(/^\[|\]$/g, ''), port };
-}
+export { parseCustomAddress };
 
 export interface ReachOptions {
   readonly tunnel: RelayTunnel;
