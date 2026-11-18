@@ -44,6 +44,15 @@ describe('the sidebar look’s upstream anchors', () => {
     expect(field).not.toMatch(/height:\s*\d+px/);
   });
 
+  it('spaces the marks at a row’s end 6px apart, each as wide as it draws', () => {
+    const look = read('fork', 'sidebar', 'sidebar-look.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const block = (sel: string): string => new RegExp(`${sel.replace(/[[\]*()|:>]/g, (c) => `\\${c}`)}[^{]*\\{([^}]*)\\}`).exec(look)?.[1] ?? '';
+    expect(block("[data-fork-sidebar] [class*='_trailing_'] [class*='_tally_']")).toContain('gap: 6px');
+    expect(block("[data-fork-sidebar] [class*='_trailing_'] [class*='_hoverTools_'] > :not(button)")).toContain('margin-left: 6px');
+    // The needs-you dot has no margins of its own any more: the gap places it.
+    expect(look).not.toMatch(/margin: 0 3\.5px 0 5\.5px/);
+  });
+
   it('finds the needs-you edge the overlay draws as a dot', () => {
     const marks = read('layout', 'signal-marks.tsx');
     expect(marks).toContain('<span className={m.edge} data-signal="needs"');

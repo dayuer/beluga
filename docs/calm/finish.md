@@ -797,5 +797,6 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 | `waitForTimeout(300)` | 改为 `waitForFunction`，等到页面上没有正在播放的 CSS 过渡 | `packages/mac/e2e/project-home-narrow.spec.ts` |
 | §5 的最终图过时 | 六场景 × 浅色深色、沉稳关工作区和任务页，全部重拍（`calm-check`，calm 开/关、full、loaded）；§2.5 的「改后」「悬停」两张也重拍。演示数据里 bob-api 行本身就同时有点阵、琥珀点、计数三样，不用再克隆：静止时只露琥珀点，悬停时三样都展开 | `docs/calm/img/m8-final-*`、`m8-row-after-*`、`m8-row-hover-*` |
 | §5.3、§6 过时 | 已更新 | 本页 |
+| 行尾几个标记之间的间隙不一（4、7.5、8.5px：各自的 2px 外边距、14px 槽、琥珀点的 5.5/3.5px 外边距） | `sidebar-look.css`：每个标记按自身宽度，任意两个之间 6px，最后一个贴右边；琥珀点不再带外边距 | `tests/fork-sidebar-anchors.test.ts`；实测点阵→琥珀点 6px、琥珀点→计数 6px；`m8-row-after-*`、`m8-row-hover-*` 已重拍 |
 
 仍未做：M8-7（••• 菜单里找回推广卡的入口）、M8-13（长分支名时 Create Worktree 超出盒子）、M8-14（悬停时名字被挤短）。
