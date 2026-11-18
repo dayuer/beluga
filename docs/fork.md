@@ -96,6 +96,8 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ## 改了上游的文件（touch points）
 
+> 这个分支上写成普通字、不加反引号的上游文件，现在没有改它们（上游已合并，或这个分支撤回了 fork 原来的改动，如 2026-11-18 起计划角色以上游为准）：`sync-upstream --report` 只数加反引号的路径。以后又改它们时，把反引号加回来。
+
 下面每个文件都可能在同步时冲突。目标是让这份清单越来越短：第二阶段会把大块改动抽成 fork 文件，再只留一行接入点。
 
 ### 只有一行接入点（已隔离，几乎不会冲突）
@@ -203,7 +205,7 @@ BLG-257 查清了 `sync-upstream --report` 的 208 个未登记文件：**没有
 
 ### 手机协议的 minor 编号（3.3.0、3.4.0 及之后同步时顺延）
 
-fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、`docs/companion.md`（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 `src/companion/calls.ts`、`src/companion/views.ts`、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
+fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、docs/companion.md（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 src/companion/calls.ts、src/companion/views.ts、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
 
 ### 版本号（脚本自动处理）
 
@@ -225,52 +227,52 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 设置形状在 `src/fork/federation/settings.ts`，字段经 `src/fork/settings-fields.ts` 进到上游的 Settings 和 PrefsPatch。
 
-- `src/machines/sync.ts`：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
-- `src/core/store.ts`：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
-- `src/ipc/api.ts`：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
-- `src/core/board/launch.ts`：把 `federationParts` 装进看板部件（BLG-225）
+- src/machines/sync.ts：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
+- src/core/store.ts：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
+- src/ipc/api.ts：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
+- src/core/board/launch.ts：把 `federationParts` 装进看板部件（BLG-225）
 
 ### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
 
 计划图与大綱抽成 `packages/ui-plan`，Mac、客户 web 应用和手机读同一份；上游文件里只有「换成共用组件」的接入点。
 
-- `packages/companion/components/PlanParts.tsx`：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
-- `packages/companion/metro.config.js`、`packages/companion/tsconfig.json`：把 `packages/ui-plan` 加进手机端的共享路径
+- packages/companion/components/PlanParts.tsx：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
+- packages/companion/metro.config.js、packages/companion/tsconfig.json：把 `packages/ui-plan` 加进手机端的共享路径
 
 ### Synon Studio（客户写需求、看计划；开工前由你确认）
 
 客户 web 应用（`packages/studio-app`）、中台（`packages/studio-hub`）与 daemon 的 `src/studio/` 都是 fork 自己的文件；下面这些上游文件里只有接入点。
 
-- `src/cli/args.ts`、`src/cli/main.ts`：`beluga studio link/status/unlink/share/unshare` 命令
-- `src/core/agent-host.ts`：`plans` 的返回值把 `customerTurn` 透传给 agent
-- `src/core/plans/edit.ts`：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
+- src/cli/args.ts、src/cli/main.ts：`beluga studio link/status/unlink/share/unshare` 命令
+- src/core/agent-host.ts：`plans` 的返回值把 `customerTurn` 透传给 agent
+- src/core/plans/edit.ts：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
 - `src/daemon/core.ts`：起停 `launchStudio`（没连接时什么都不做）
-- `src/daemon/server.ts`：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
+- src/daemon/server.ts：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
 - `src/ipc/handlers.ts`：展开 `FORK_HANDLERS`（`src/ipc/fork-handlers.ts`：Synon Studio 的 `STUDIO_HANDLERS`，加上保存前先校验的 `env.saveEndpoint`。它排在上游自己的那一项后面，所以覆盖了上游的处理器；上游那一项原样留着，同步上游时如果上游改了 `env.saveEndpoint` 的保存逻辑，要把改动带进 `checkedSave`）
-- `src/agent/runtime/copilot/runner.ts`、`src/agent/runtime/opencode/runner.ts`：客户回合的 policy 带 `customerTurn`
-- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、`packages/mac/src/layout/waiting-model.ts`：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
-- `packages/companion/app/need/[id].tsx`、`packages/companion/components/Needs.tsx`：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
-- `docs/companion.md`、`docs/how-it-works.md`：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
-- `tests/boundaries.test.ts`：`src/studio` 算核心（不含 UI）
-- `tests/browser-safe.test.ts`：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
-- `tests/machine-coverage.test.ts`：studio 的管理与 Gate 方法不从「你的电脑」放行
-- `tests/web-security.test.ts`：浏览器 cookie 做不了 studio 管理
-- `tsconfig.json`：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
+- src/agent/runtime/copilot/runner.ts、src/agent/runtime/opencode/runner.ts：客户回合的 policy 带 `customerTurn`
+- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、packages/mac/src/layout/waiting-model.ts：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
+- packages/companion/app/need/[id].tsx、packages/companion/components/Needs.tsx：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
+- docs/companion.md、docs/how-it-works.md：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
+- tests/boundaries.test.ts：`src/studio` 算核心（不含 UI）
+- tests/browser-safe.test.ts：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
+- tests/machine-coverage.test.ts：studio 的管理与 Gate 方法不从「你的电脑」放行
+- tests/web-security.test.ts：浏览器 cookie 做不了 studio 管理
+- tsconfig.json：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
 
 ### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
 
-上游 3.5.0 起 `src/machines/machines.ts`、`tests/machines-ssh.test.ts` 与上游一致（上游有了同样的结束处理），这里的差异已经没有了。
+上游 3.5.0 起 src/machines/machines.ts、tests/machines-ssh.test.ts 与上游一致（上游有了同样的结束处理），这里的差异已经没有了。
 
 原因：「Over SSH」添加电脑时起的 `ssh … beluga pair --computer` 要随 Beluga 退出一起结束，不能等配对在那边过期；停止中的 `sshPairStart` 也要拒绝新配对。这是 fork 的功能，上游没有。
 
-- `src/machines/machines.ts`：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
-- `tests/machines-ssh.test.ts`：对应的用例
+- src/machines/machines.ts：关闭时停掉 `this.ssh`；停止中不再接受新的 SSH 配对
+- tests/machines-ssh.test.ts：对应的用例
 
 ### 设置里打开的表单盖在设置窗口之上（BLG-213：留在 fork，不提回上游）
 
 原因：上游的设置窗口是 `z-index` 44/45，`FormSheet`（表单弹窗）是 40/41，所以从设置里打开的表单（Studio 的「连接到 Studio…」、项目的 worktree 环境等）会被设置窗口盖住、无法输入。上游自己的做法是原生 sheet，不受影响；fork 的 Studio 入口在设置里，需要抬高。`FormSheet` 渲染时若页面上有设置窗口（`[data-settings]`），就加 `data-over-settings`，层级 48/49（仍低于 alert 50）。从项目 ⋯ 菜单等处打开时属性不出现，表现不变。
 
-- `packages/mac/src/components/FormSheet.tsx`：渲染时判断设置是否打开，两处加 `data-over-settings`
+- packages/mac/src/components/FormSheet.tsx：渲染时判断设置是否打开，两处加 `data-over-settings`
 - `packages/mac/src/dialogs/sheet.module.css`：`[data-over-settings]` 的 48/49
 - `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
 
@@ -278,10 +280,10 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
 
-- `src/companion/pair.ts`、`src/companion/devices.ts`、`src/companion/host.ts`、`src/ipc/companion-api.ts`、`src/ipc/companion-handlers.ts`
-- `packages/mac/src/phone/Phone.tsx`、`packages/mac/src/phone/phone-model.ts`
-- `packages/companion/app/_layout.tsx`、`packages/companion/app/(tabs)/_layout.tsx`、`packages/companion/app/index.tsx`、`packages/companion/lib/store.ts`
-- `tests/companion-coverage.test.ts`、`tests/companion-views.test.ts`、`tests/mac-settings-search.test.ts`
+- src/companion/pair.ts、src/companion/devices.ts、src/companion/host.ts、src/ipc/companion-api.ts、src/ipc/companion-handlers.ts
+- `packages/mac/src/phone/Phone.tsx`、packages/mac/src/phone/phone-model.ts
+- packages/companion/app/_layout.tsx、packages/companion/app/(tabs)/_layout.tsx、packages/companion/app/index.tsx、packages/companion/lib/store.ts
+- tests/companion-coverage.test.ts、`tests/companion-views.test.ts`、`tests/mac-settings-search.test.ts`
 
 ### 菜单完整显示、中文不带结尾的“…”
 
@@ -296,33 +298,33 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 中文输入法组字时 Enter 只选词（上游已采纳：beluga-labs/beluga#573）
 
-上游收下了整套做法（`packages/mac/src/lib/ime.ts`、`lib/ime-guard.ts`、`lib/install-ime-guard.ts`，`main.tsx` 一行），fork 不再改任何文件：原来的 `packages/mac/src/fork/boot.ts`、`fork/ime-guard.ts`、`e2e/fork-ime.spec.ts` 已删，测试用上游的 `tests/ime.test.ts`、`tests/ime-guard.test.ts`、`packages/mac/e2e/ime.spec.ts`。原因和经过见 `docs/reports/plan-roles-ime.md`。
+上游收下了整套做法（packages/mac/src/lib/ime.ts、`lib/ime-guard.ts`、`lib/install-ime-guard.ts`，`main.tsx` 一行），fork 不再改任何文件：原来的 `packages/mac/src/fork/boot.ts`、`fork/ime-guard.ts`、`e2e/fork-ime.spec.ts` 已删，测试用上游的 tests/ime.test.ts、tests/ime-guard.test.ts、packages/mac/e2e/ime.spec.ts。原因和经过见 `docs/reports/plan-roles-ime.md`。
 
 ### 适合提回上游的通用修复
 
 - 设置窗口标题和搜索框固定、只有列表滚动：`packages/mac/src/dialogs/Settings.tsx`、`packages/mac/src/dialogs/settings.module.css`
 - 路径上不存在的图片显示为“缺失”：`packages/mac/src/chat/images.ts`、`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`tests/mac-chat-images-cache.test.ts`
-- 本地模型在自己的文件夹里运行 Claude Code：`src/agent/runtime/local.ts`、`tests/local-endpoints.test.ts`（上游 3.4.0 合并了 #500 的最终版：设置文件改为清理过的副本；同步时 `endpoint-home.ts` 以上游为准）
+- 本地模型在自己的文件夹里运行 Claude Code：src/agent/runtime/local.ts、tests/local-endpoints.test.ts（上游 3.4.0 合并了 #500 的最终版：设置文件改为清理过的副本；同步时 `endpoint-home.ts` 以上游为准）
 - `/` 列表跟随链接的技能和命令：`src/core/claude-code/skills.ts`、`tests/skills.test.ts`
 - 用量时间轴的「Now」线不挡悬停（`pointer-events: none`，标记不是点击目标）：`packages/mac/src/views/usage/stats.module.css`
-- e2e 夹具：预热太久的 demo daemon 不复用（它的时钟已经走过 demo 的定时事件），超过 45 秒就另起一个：`packages/mac/e2e/fixtures.ts`
-- Linux 机器测试先探测 UDP/TCP/子进程，被沙箱挡住就跳过并说明原因，而不是等配对超时：`tests/machines/linux-computer.test.ts`
-- 任务需要你出手时用卡片提问，停下时显示它最后说的话：`src/core/plans/prompt.ts`、`src/core/plans/watchdog.ts`、`src/core/plans/model.ts`、`src/core/notify.ts`、`src/companion/needs-you.ts`、`packages/mac/src/plans/plans-model.ts`、`tests/plans-watchdog.test.ts`、`tests/notify.test.ts`、`tests/plan-milestone-agent.test.ts`（上游 3.4.0 合并了 #511 的最终版：按钮仍叫 Resume，原话放在说明里；同步时这几处文案以上游为准，`passable` 也加上了合并失败后可再次通过）
+- e2e 夹具：预热太久的 demo daemon 不复用（它的时钟已经走过 demo 的定时事件），超过 45 秒就另起一个：packages/mac/e2e/fixtures.ts
+- Linux 机器测试先探测 UDP/TCP/子进程，被沙箱挡住就跳过并说明原因，而不是等配对超时：tests/machines/linux-computer.test.ts
+- 任务需要你出手时用卡片提问，停下时显示它最后说的话：src/core/plans/prompt.ts、src/core/plans/watchdog.ts、src/core/plans/model.ts、src/core/notify.ts、src/companion/needs-you.ts、packages/mac/src/plans/plans-model.ts、tests/plans-watchdog.test.ts、tests/notify.test.ts、`tests/plan-milestone-agent.test.ts`（上游 3.4.0 合并了 #511 的最终版：按钮仍叫 Resume，原话放在说明里；同步时这几处文案以上游为准，`passable` 也加上了合并失败后可再次通过）
 
 ### 从其他 fork 移植的修复（2026-11-12）
 
 都是对所有人有用的修复，原样（或按本 fork 调整后）cherry-pick 进来，提交说明里有 `cherry picked from` 原提交。上游合并同样的改动后，这里的差异就消失；上游合并的是改过的版本时，同步时以上游为准。
 
-- 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：`src/agent/policy.ts`、`src/agent/runtime/claude/runner.ts`、`src/net/crypto.ts`、`tests/policy.test.ts`、`tests/identity.test.ts`。上游 3.4.0 合并了最终版（#490），同步时 `policy.ts` 的目录搜索、`identity-load.ts` 以上游为准，只留 fork 的 `decideCustomerTurn`
-- macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：`src/workspaces/test-procs.ts`、`tests/setup.ts`、`tests/background-tasks.test.ts`、`tests/delete-unpushed.test.ts`、`tests/friend-share/fork.test.ts`、`tests/friend-share/projects.test.ts`、`tests/other-worktrees.test.ts`、`tests/smart-archive.test.ts`。上游 3.4.0 合并了最终版（#491），同步时以上游为准
-- Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：`src/agent/runtime/codex/runner.ts`、`tests/codex-parity.test.ts`
+- 目录搜索打不开凭据文件、朋友的 Claude 不继承 daemon 的环境变量、损坏的 identity.json 不被覆盖（faufderhar/beluga `fcc78b30`，未提上游）：src/agent/policy.ts、src/agent/runtime/claude/runner.ts、src/net/crypto.ts、tests/policy.test.ts、tests/identity.test.ts。上游 3.4.0 合并了最终版（#490），同步时 `policy.ts` 的目录搜索、`identity-load.ts` 以上游为准，只留 fork 的 `decideCustomerTurn`
+- macOS 上 `ps` 卡住会让归档一直挂着；测试用独立的系统 HOME（gardinermichael/beluga `f97b40a9`，未提上游）：src/workspaces/test-procs.ts、tests/setup.ts、tests/background-tasks.test.ts、tests/delete-unpushed.test.ts、tests/friend-share/fork.test.ts、tests/friend-share/projects.test.ts、tests/other-worktrees.test.ts、tests/smart-archive.test.ts。上游 3.4.0 合并了最终版（#491），同步时以上游为准
+- Codex 把 Beluga 自己工具的调用交给 Beluga 的权限检查（`default_tools_approval_mode: 'approve'`；JoeHosman/beluga `1816d986`，未提上游）：src/agent/runtime/codex/runner.ts、tests/codex-parity.test.ts
 - ~~MCP 服务需要登录时，会话里直接点 Sign in~~：上游 3.3.0 合并了 #427 的最终版（agent 调 `mcp__beluga_mcp__mcp_sign_in` 登录，没有会话里的提示条），同步时撤掉了这里移植的早期版本，以上游为准。
 - Autopilot 不再放过合并失败的里程碑（voshond/beluga `5accb683`）：`src/core/plans/pilot.ts`、`tests/plans.test.ts`。上游 3.4.0 合并了最终版（#493），同步时以上游为准
-- 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：`src/core/attachments.ts`、`src/agent/runtime/claude/runner.ts`、`packages/mac/src/chat/use-attachments.tsx`、`packages/mac/src/plans/PlanAsk.tsx`、`packages/mac/src/plans/plan-ask.module.css`、`tests/attachments.test.ts`
-- zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/terminal.ts`
-- 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。`src/agent/policy.ts`、`src/core/shares.ts`、`src/machines/identity-load.ts`、`src/net/crypto.ts`、`src/agent/runtime/claude/runner.ts`、`src/agent/runtime/claude/zsh-compat.ts`，以及对应测试。
-- Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：`src/agent/policy.ts` 的 `decideCustomerTurn`、`tests/policy.test.ts`。
-- 以上通用修复提回上游的 6 个 PR（beluga-labs/beluga #490–#495）已于 2026-11-13 全部合并，3.4.0 / 3.5.0 起这些文件与上游一致（`src/agent/policy.ts` 里 Studio 客户回合那部分是 fork 自己的，仍留着），同步 3.5.0 时从「改了上游的文件」清单里消失。
+- 回答 agent 提问时附的图片（voshond/beluga `a577f13f`）：src/core/attachments.ts、src/agent/runtime/claude/runner.ts、packages/mac/src/chat/use-attachments.tsx、packages/mac/src/plans/PlanAsk.tsx、`packages/mac/src/plans/plan-ask.module.css`、tests/attachments.test.ts
+- zsh 接受 agent 写的 bash（voshond/beluga `2563a35f`；上游没有 `INSTRUCTION_PIECES`，改成接进 `runInstructions` 的字符串）：`src/agent/prompt.ts`、`src/agent/run-instructions.ts`、src/agent/runtime/claude/runner.ts、src/agent/runtime/claude/terminal.ts
+- 审计 PR 24 后的修正（2026-11-13，提交 `554152d3f`）：目录搜索带自己的 glob 时不再被换掉；`~/.beluga/attachments` 可读（回答里的图片才读得到）；`identity.json` 损坏时 daemon 照常启动（一次性身份，文件不动）；朋友的运行保留 Claude Code 自己的设置变量；zsh-compat 在 Windows 上不设、文件整写。src/agent/policy.ts、src/core/shares.ts、src/machines/identity-load.ts、src/net/crypto.ts、src/agent/runtime/claude/runner.ts、src/agent/runtime/claude/zsh-compat.ts，以及对应测试。
+- Studio 客户回合的目录搜索也查打开的凭据文件（`a663330e3`，fork 自己的，留在 fork）：src/agent/policy.ts 的 `decideCustomerTurn`、tests/policy.test.ts。
+- 以上通用修复提回上游的 6 个 PR（beluga-labs/beluga #490–#495）已于 2026-11-13 全部合并，3.4.0 / 3.5.0 起这些文件与上游一致（src/agent/policy.ts 里 Studio 客户回合那部分是 fork 自己的，仍留着），同步 3.5.0 时从「改了上游的文件」清单里消失。
 
 ### 我的共享（M7 · BLG-217 / BLG-218，2026-11-13）
 
@@ -345,6 +347,15 @@ fork 的其他文件与测试：
 - `packages/mac/src/fork/settings-index.ts`：`people` 下加「我的共享」（All circles）的搜索行
 - `packages/mac/src/i18n/zh-CN.fork.json`：中文文案
 - `tests/sharing-defaults.test.ts`、`packages/mac/e2e/sharing-defaults.spec.ts`、`tests/fork-calm.test.ts`（Settings.tsx 的 canary）、`tests/mac-settings-search.test.ts`（people 页的来源加上 `fork/sharing/MySharing.tsx`）、`packages/mac/scripts/calm-check.mjs`（`sharing` 场景，200 圈演示源）
+
+### topic/plans 的逐文件登记（M9 补登记，2026-11-18）
+
+M9 合并后 `sync-upstream --report` 在这个分支上查出的未登记文件。全部是这个分支自己的改动（快照提交 `1556b0730` 以及之后改用上游计划角色的几个提交），按用途登记：
+
+- Antigravity（Google 的编码 agent，经 `agy acp` 运行；运行时在 fork 自己的 `src/agent/runtime/antigravity/`）：上游文件只加它的名字、标记、登录与清理的接入点。`src/protocol.ts`、`src/shared/agent-label.ts`、`src/shared/agent-marks.ts`、`src/shared/agent-runtimes.ts`、`src/shared/run-failure.ts`、`src/shared/runtime-fallbacks.ts`、`src/agent/runtime/registry.ts`、`src/agent/runtime/router.ts`、`src/agent/runtime/drop-session.ts`、`src/agent/runtime/opencode/acp.ts`（工具的原名）、`src/core/dialogues/launch.ts`、`src/core/sentinel/tool-draft.ts`、`src/machines/words.ts`、`src/telemetry/turn.ts`、`src/workspaces/manager.ts`（清理 Antigravity 的会话与文件夹，另加 `hasBranch`）、`packages/mac/src/chat/Items.tsx`、`packages/mac/src/chat/model-words.ts`、`packages/mac/src/onboarding/Steps.tsx`、`packages/mac/src/onboarding/agent-setup.ts`、`packages/mac/src/views/usage/stats-model.ts`、`packages/mac/e2e/onboarding-agents.spec.ts`、`docs/security.md`、`docs/sentinel.md`、`docs/telemetry.md`、`docs/terminal-view.md`；测试 `tests/agent-marks.test.ts`、`tests/agent-picker.test.ts`、`tests/runtime-conformance.test.ts`、`tests/side-call-protocol-errors.test.ts`、`tests/work-ui.test.ts`、`tests/__snapshots__/companion-views.test.ts.snap`
+- 计划里“Decide…”直接打开那张卡片（并滚到它）：`packages/mac/src/plans/plan-ask-model.ts`、`packages/mac/src/plans/PlanChat.tsx`、`packages/mac/src/plans/PlanDetails.tsx`、`packages/mac/src/plans/PlanOutline.tsx`（另加任务卡上的 `TaskAgentChip`，在 fork 自己的 `fork/plans/` 里）
+- 计划与 worktree 的原生 sheet（`lib/native-sheet.ts`）：`packages/mac/src/plans/PlanSheets.tsx`（如何运行，`AUTONOMY_ICON` 导出给新建计划用）、`packages/mac/src/dialogs/native/WorkSheets.tsx`（Fork）
+- 原生控件的 `size`（`docs/mac-controls.md`，与「原生控件」一节同一规范，这几个文件只有这个分支还在改）：`packages/mac/src/tasks/parts.tsx`、`packages/mac/src/views/ProjectHome.tsx`
 
 ### 沉稳收尾（M8）
 
