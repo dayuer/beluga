@@ -253,8 +253,9 @@ npm run proxy -- --dist       # 同源代理，http://localhost:8790
 ## 12. 留给 P2 / P3
 
 P2 里「需求入口」与「交付验收」这两头的设计稿（需求单、哨兵分析、交付 Gate、再来一轮）在
-[`studio-loop.md`](studio-loop.md)；还没实施，也还没审计。把 Studio 做成独立的桌面与手机应用、后面接一组 Beluga
-节点的设计稿在 [`studio-standalone.md`](studio-standalone.md)，同样未实施。界面规划（三栏工作台）在
+[`studio-loop.md`](studio-loop.md)；还没实施，也还没审计。把 Studio 做成独立的桌面与手机应用、后面接一组
+**无人值守**的 Beluga 节点（客户自己批准开工、维护密钥，交付自动）的设计稿在
+[`studio-standalone.md`](studio-standalone.md)，同样未实施。界面规划（三栏工作台）在
 [`studio-ui.md`](studio-ui.md)，代码交付与 GitHub / GitLab / CNB 的适配在 [`studio-forges.md`](studio-forges.md)。
 每个项目的上线环境、变量与密钥，以及提需求时整包上传设计稿，在 [`studio-env.md`](studio-env.md)，同样是未实施的
 设计稿。

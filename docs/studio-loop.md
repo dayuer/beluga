@@ -5,6 +5,11 @@
 是 Beluga 已有的，本文不改；本文只设计**最前面**（入口到计划）和**最后面**（交付到下一轮），以及两头与
 中间段的接缝。
 
+> **2026-11-18 改：Beluga 无人值守，客户自己做决定。** 本文原稿里「你批准开工」「你确认交付」「你加预览」「你合并」
+> 都默认有人坐在 Beluga 前面。现在：**客户在 Studio 里批准开工（设备签名）**；**交付 Gate 在检查通过、预览生成后
+> 自动通过**；预览由节点部署到测试环境自动生成；合并由节点自动做。下文相关段落已按此改过，签名与无人值守的细节
+> 见 [`studio-standalone.md`](studio-standalone.md) §3、§5。
+
 读这篇之前先读：[`studio.md`](studio.md)（P1 运营手册）、[`studio-gates.md`](studio-gates.md)（收件箱、开工
 Gate、客户回合）、[`studio-protocol.md`](studio-protocol.md)（视图与动作白名单）、[`sentinel.md`](sentinel.md)。
 
@@ -16,12 +21,12 @@ Gate、客户回合）、[`studio-protocol.md`](studio-protocol.md)（视图与�
 - **P1 已经有的**：客户提需求（`plan.create`）、计划长出来、对话、确认计划、开工 Gate、里程碑验收（通过 /
   还不行）。
 - **P2 在两头各补一段**：
-  1. 前面：**需求单**（`StudioRequest`）。客户提的是需求或反馈，不直接变成计划；哨兵接住，用你指定的模型分析、
+  1. 前面：**需求单**（`StudioRequest`）。客户提的是需求或反馈，不直接变成计划；哨兵接住，用搭环境时指定的模型分析、
      追问、给出理解，客户确认后才起计划。
-  2. 后面：**交付 Gate**（`deliver`）。开发跑完后先等你确认可以交付，客户才看得到结果；客户「通过」结束这一
-     轮，「还不行」带着原因回到分析，开下一轮。
-- **接缝改一处**：P1 禁止共享计划用 autopilot（`studio-gates.md` §3.6）。P2 允许你在批准开工时选 Autopilot，
-  条件是这个计划改成**交付时验收**（§4.2）。Full Autopilot 仍然禁止。
+  2. 后面：**交付 Gate**（`deliver`）。开发跑完、检查通过、预览生成后自动通过，客户就看得到结果；客户「通过」
+     结束这一轮，「还不行」带着原因回到分析，开下一轮。
+- **接缝改一处**：P1 禁止共享计划用 autopilot（`studio-gates.md` §3.6）。P2 允许 Autopilot，条件是这个计划改成
+  **交付时验收**（§4.2）。运行方式是项目的设置，客户批准开工时按它跑。Full Autopilot 仍然禁止。
 
 ## 1. 一条闭环
 
@@ -29,12 +34,12 @@ Gate、客户回合）、[`studio-protocol.md`](studio-protocol.md)（视图与�
 |---|---|---|---|---|
 | 1 | 提需求或反馈 | 客户 | `request.create` | P2 新 |
 | 2 | 接住 | 哨兵 | 触发器 `studio`：`request-received` | P2 新 |
-| 3 | 分析、追问、给出理解 | 你指定的模型 | 哨兵的 Ask Your Agent 步骤 + `studio_reply` | P2 新 |
+| 3 | 分析、追问、给出理解 | 指定的模型 | 哨兵的 Ask Your Agent 步骤 + `studio_reply` | P2 新 |
 | 4 | 确认理解 | 客户 | `request.confirm` | P2 新 |
 | 5 | 写计划草稿 | 规划 agent | `plans.create`（客户回合，只改草稿） | P1 |
-| 6 | 检查计划，批准开工 | 你 | 开工 Gate（`studio-start` 卡） | P1，卡上多一个选择 |
-| 7 | 全自动开发 | AI 团队 | Autopilot：pilot、checker | Beluga 已有，P2 解禁 |
-| 8 | 确认可以交付 | 你 | 交付 Gate（`studio-deliver` 卡） | P2 新 |
+| 6 | 看计划，批准开工 | 客户 | 开工 Gate，Studio 里的批准，设备签名 | P1 是你在 Beluga 里批；改 |
+| 7 | 全自动开发 | AI 团队 | Autopilot：pilot、checker，自动合并 | Beluga 已有，P2 解禁 |
+| 8 | 交付 | 自动 | 交付 Gate：检查通过且预览已生成时自己通过 | P2 新 |
 | 9 | 看结果 | 客户 | `previews[]` + 预览链接 | P2（中台门控已写好） |
 | 10 | 通过，或还不行 | 客户 | `delivery.accept` / `delivery.sendBack` | P2 新 |
 | 11 | 再来一轮 | 哨兵 | 触发器 `studio`：`delivery-sent-back`，回到 3 | P2 新 |
@@ -76,7 +81,7 @@ StudioRequest = {
 | `asking` | 分析问了问题，等回答 | 在等你：回答问题 | 客户 |
 | `ready` | 理解写好了 | 在等你：确认我们的理解 | 客户 |
 | `planned` | 已确认，计划已起 | 已变成计划「{title}」 | — |
-| `closed` | 客户撤回，或你关掉 | 已关闭 | — |
+| `closed` | 客户撤回 | 已关闭 | — |
 
 `ready` 时客户页的主按钮是 **「就是这样」**（`request.confirm{requestRef, rev}`），次要动作是继续对话（回到
 `analysing`，`summary.rev` 会变，旧确认一律 `stale`）。
@@ -110,7 +115,7 @@ StudioRequest = {
 - core 的触发器只读 store 的 `studio` slice，不 import `src/studio/`（与 §3.6 的写法一致，`boundaries.test`
   照旧通过）。游标是已见过的 `(requestRef, turn 数)`，重启不重发。
 
-**步骤**：就是哨兵已有的 Ask Your Agent（`claude`），`where: 'project'`，`runtime` / `model` 由你在哨兵页上选——
+**步骤**：就是哨兵已有的 Ask Your Agent（`claude`），`where: 'project'`，`runtime` / `model` 由搭环境的人选——
 「指定的模型」就落在这里，不新造配置。由 `studio` 触发的 run 多两条规则：
 
 - **工具边界与客户回合相同**（`PolicyContext.customerTurn`）：Read / Grep / Glob 只限本项目且避开密钥；Bash、
@@ -121,15 +126,17 @@ StudioRequest = {
     `asking: true` 把状态置 `asking`。
   - `studio_summarize(requestRef, {title, points, outOfScope?})`：写出理解，`summary.rev + 1`，状态置 `ready`。
 
-**内置配方「接需求」**：项目第一次 `studio share` 时建一个，暂停着；你选模型、点 Turn On。提示词要点：先读需求单
+**内置配方「接需求」**：项目第一次 `studio share` 时建一个并直接开着；模型由搭环境的人在
+`beluga studio share --model …` 时选（不选就用这台节点的默认）。提示词要点：先读需求单
 和相关代码；说不清的地方一次问完（最多 3 个问题）；能说清就写理解；是反馈就先判断是缺陷、改动还是新需求。
 
-**兜底，不丢需求**：
+**兜底，不丢需求**（Beluga 前面没有人，兜底不能是一张等人点的卡）：
 
-- 没有开着的 `studio` 哨兵，或它失败 / 被暂停：需求单留在 `received`，你收到一张 `studio-request` 卡
-  （NeedsYou，Mac 与手机），可以自己用 `studio.say` 回，或点 **Analyse Now** 手动跑一次。
+- 没有开着的 `studio` 哨兵，或它失败 / 被暂停：连接器直接跑一次同样配方的分析，不经哨兵；连这个也失败，需求单留在
+  `received`，客户看到「等待：这条需求需要人看一下」，节点发 `needsHuman`，中台给搭环境的人发邮件
+  （`studio-standalone.md` §4.6）。
 - 一个需求单同时只有一个分析 run；run 期间来的客户消息排队，run 结束后触发一次 `request-reply`。
-- 一个需求单最多 8 轮分析，超过转成 `studio-request` 卡交给你。
+- 一个需求单最多 8 轮分析，超过同样按「需要人」处理。
 
 ### 2.6 确认之后：变成计划
 
@@ -137,19 +144,21 @@ StudioRequest = {
 客户的原话），`{customerTurn: true}`，并记下 `plan.requestRef`。之后与 P1 相同：规划 agent 写草稿，客户页跟着
 长出来。
 
-**一处与 P1 不同（需要你定）**：P1 要客户再点一次「确认计划」才升起开工 Gate。本设计建议：来自需求单的计划，
-草稿写完（不在 typing、有里程碑）就**自动升起开工 Gate**，`by` 是确认需求单的那位客户。理由：客户已经确认过
-理解，再确认一次里程碑清单对非技术的人是负担。客户仍看得到草稿，在你批准前说话会让草稿变、Gate 变 `stale`
-（P1 已有的行为）。另一种做法是保留第二次确认，代价是多一步、多一次等待。
+**与 P1 不同**：P1 是客户「确认计划」升起开工 Gate，再由你在 Beluga 里批准。现在两步合成客户的一步：草稿写完
+（不在 typing、有里程碑）就升起开工 Gate，**由客户在 Studio 里批准**。客户在批准前说话会让草稿变、Gate 变
+`stale`（P1 已有的行为）。
 
-## 3. 开工 Gate 上多一个选择
+## 3. 开工 Gate：客户批准
 
-`studio-start` 卡（Mac 铃铛与手机）：
+开工 Gate 显示在客户的对话里与待办里（`studio-ui.md` 的「批准开工」卡）：
 
-- 多显示：需求单的 `summary`，以及「原话」折叠区。
-- 主按钮仍是 **Approve**。它带一个你事先在项目的 Studio 设置里选好的默认运行方式：**Check-ins**（P1 的行为）
-  或 **Autopilot**。卡上不多放按钮；要临时换，走 ••• 。
+- 显示：确认过的 `summary`、计划的几步与每步「做好的标准」、预计时长、按项目上限还能不能马上开始
+  （`studio-standalone.md` §7）。
+- 主按钮 **开始做**：`gate.answer{gateId, approve: true, draftRev}`，**客户设备签名**，节点验签后调用那一次
+  `plans.approve`。运行方式取项目设置（**每一步都验收** 或 **全自动，交付时验收一次**），卡上不放选项。
+- 次要 **先不做…**：写一句原因，草稿留着，客户可以接着说。
 - `plans.approve` 仍然只从 Gate 调用一次，`draftRev` 不符仍是 `stale`。
+- P1 在 Beluga 铃铛里出的 `studio-start` 卡不再升起（Beluga 前面没有人）。
 
 ## 4. 与中间段的接缝
 
@@ -159,7 +168,7 @@ StudioRequest = {
 |---|---|---|
 | 共享计划设 `autopilot` | 抛错，已有的降回 `gated` | 允许，前提是验收方式为 `delivery` |
 | 共享计划设 `fullAuto` | 抛错 | **仍然抛错**：替身 agent 会替人回答问题，其中可能有客户的决策 |
-| pilot 自动通过里程碑 | 从不 | `delivery` 方式下，checker 通过的中间里程碑由 pilot 通过；**最后的交付从不自动** |
+| pilot 自动通过里程碑 | 从不 | `delivery` 方式下，checker 通过的里程碑由 pilot 通过；最后一个通过后交付 Gate 按 §5.1 自动通过，**客户的验收从不自动** |
 
 ### 4.2 验收方式
 
@@ -173,7 +182,8 @@ StudioRequest = {
 ### 4.3 客户的决策
 
 Autopilot 跑的过程中，`audience: 'customer'` 的决策照常到客户页的 `decide` 阶段，计划在那一步等着；pilot 不替
-客户回答。运营方的决策照常到你的 NeedsYou。
+客户回答。没有运营方在场：原本问运营方的技术决策（`audience: 'operator'`）由 pilot 按默认做并记进动态；要外部
+条件才能继续的（账号、权限、额度）按「需要人」处理（`studio-standalone.md` §4.6），客户看到「等待」。
 
 ## 5. 交付与验收（最后面）
 
@@ -185,26 +195,30 @@ Autopilot 跑的过程中，`audience: 'customer'` 的决策照常到客户页�
 StudioGate.kind 追加 'deliver'    // studio-protocol.md §3.4 已留位
 ```
 
-**`studio-deliver` 卡**（NeedsYou，Mac 与手机，`kind: 'decision'`）：计划标题、checker 的结论一句、PR 是否已开 /
-已合并、已附的预览。动作：
+**自动通过，没有人点**。连接器在三件事都满足时调用 `gates.ts` 通过它：
 
-- **Deliver**（主）：`studio.answerGate(gateId, {approve: true, notes?})`。`notes` 是给客户的验收说明，过净化器。
-- **Not Yet**：必须写一句原因。原因**不给客户**，进 `plan.home` 给 head agent，它补任务；客户页仍是
-  `running`。
+1. 最后一个里程碑 checker 通过；
+2. 这一轮的代码已合并到默认分支（`studio-forges.md` §3.2，自动合并）；
+3. 至少一个预览已生成（§5.2）。
 
-没有至少一个预览时 Deliver 置灰并说明原因——交付就是让客户看到东西。
+验收说明（`review.notes`）由规划 agent 按计划里每一步「做好的标准」写一段「怎么看、看什么」，过净化器。
+
+任何一条不满足就不交付：checker 不过，pilot 接着补任务；合并有冲突或预览生成失败，重试三次，仍不行按「需要人」
+处理，客户看到「等待：快好了，在准备给你看的版本」。不会把半成品交给客户。
 
 ### 5.2 预览从哪来
 
 `previews: [{ milestoneRef?, kind: 'web' | 'testflight' | 'apk' | 'miniprogram', title, url?, expiresAt? }]`
-（形状已在 `studio-protocol.md` §3.4）。两种来源，都由你在 Mac 的计划页上加，agent 不能加：
+（形状已在 `studio-protocol.md` §3.4）。**由节点上的上线步骤生成，不由 agent 加**：
 
-- **上传到中台**：静态 Web 构建或截图包，得到 `objectKey`；客户通过 `GET /v1/app/projects/:pid/previews/:m` 拿
-  15 分钟的签名链接。中台的门控已写好：只有 `deliver` + `approved` 才签（`studio-hub.md` §9）。
-- **外部链接**：TestFlight、小程序体验版、你自己部署的预览站。只收 `https`，去掉查询参数里像密钥的东西。
+- 每个项目有一个**测试环境**（`studio-env.md`）。合并后，节点按测试环境的配置部署一次：Web 构建上传到中台得到
+  `objectKey`，或上传小程序体验版、TestFlight、APK，得到外部链接。部署结果就是预览。
+- 上传到中台的：客户通过 `GET /v1/app/projects/:pid/previews/:m` 拿 15 分钟的签名链接。中台的门控已写好：只有
+  `deliver` + `approved` 才签（`studio-hub.md` §9）。
+- 外部链接只收 `https`，去掉查询参数里像密钥的东西。
 
-预览里永远没有源代码、diff、分支名。上传的构建由你负责不带 `.env` 与 source map；上传前本机先扫一遍
-`isSecretPath`，命中就拒。
+预览里永远没有源代码、diff、分支名。上传前节点先扫一遍：`isSecretPath` 命中、带 source map、带 `.env` 的一律拒绝，
+按「需要人」处理。agent 写不了预览，也调不了上线步骤：它们是节点的流水线，不是 agent 的工具。
 
 ### 5.3 客户看到什么
 
@@ -218,20 +232,21 @@ StudioGate.kind 追加 'deliver'    // studio-protocol.md §3.4 已留位
 
 | 动作 | 载荷 | 结果 |
 |---|---|---|
-| `delivery.accept` | `{planRef, draftRev}` | 计划 `done`；需求单保持 `planned`；触发 `delivery-accepted` |
+| `delivery.accept` | `{planRef, draftRev}`，设备签名 | 计划 `done`；需求单保持 `planned`；触发 `delivery-accepted`；按项目的代码交付方式打标签、推送（`studio-forges.md` §3.2） |
 | `delivery.sendBack` | `{planRef, draftRev, reason 10–4000}` | 见下 |
 
-- **通过不碰 git。** 合并是你的事，可以在交付前也可以在之后；客户的动作白名单里没有任何 git。
+- **合并在交付前就做了**（§5.1），所以「通过」只打交付标签、按设置推送，客户的动作本身不碰 git。
 - **还不行**：`deliver` Gate 作废，预览链接立刻失效；原因作为一条客户 turn 追加到需求单，状态回 `analysing`；
   触发 `delivery-sent-back`，哨兵的分析步骤判断：
   - 是**没做对**（在确认过的 `summary` 之内）→ 用 `plan_update` 在同一个计划上起草改动，走 P1 已有的
-    `draftDiff` + `changes` Gate：你批准改动，Autopilot 接着跑，再到交付 Gate。
+    `draftDiff` + `changes` Gate：**客户**批准改动（签名），Autopilot 接着跑，再到交付 Gate。
   - 是**新要求**（超出 `summary`）→ 回客户一句说明，写一版新 `summary`，客户确认后是一个新计划，
     `plan.follows = 旧 planRef`。
 - **通过之后还有意见**：客户在项目页点「提反馈」→ `request.create{kind: 'feedback', about: planRef}`，从 §2
   重新走。这就是下一轮。
 
-一个计划最多 5 次 `delivery.sendBack`，再多转成 `studio-request` 卡由你和客户直接谈。
+一个计划最多 5 次 `delivery.sendBack`，再多按「需要人」处理：客户看到「这条需求需要人看一下」，搭环境的人收到
+邮件。
 
 ## 6. 协议与视图的改动（都是加法）
 
@@ -241,20 +256,21 @@ StudioGate.kind 追加 'deliver'    // studio-protocol.md §3.4 已留位
   `delivery.sendBack`。
 - 视图：项目视图 `requests?: StudioRequestView[]`；计划视图 `previews?`、`acceptance?`、`requestRef?`、
   `follows?`；`gate.kind` 追加 `'deliver'`。
-- 旧客户端：不认识 `deliver` 的按未知 Gate 处理（显示「在等工作室」），不会出现可点却无效的按钮。
+- 旧客户端：不认识 `deliver` 的按未知 Gate 处理（显示「快好了」），不会出现可点却无效的按钮。旧客户端不会签名，
+  所以批准开工、通过交付在旧客户端上不可用，提示升级。
 - `callRefusal` 放行名单不变；新动作在 daemon 里走 `src/studio/requests.ts` 与 `gates.ts`，不经 `PLANS_API`。
   `plans.approve` 仍只有开工 Gate 持有。
 
 ## 7. Mac 与手机
 
-按 `CLAUDE.md`「Keep the phone in step」：
+Beluga 前面没有人，所以这个循环**不在 Beluga 的 Mac 应用与手机伴侣里新增任何「等你」的卡**；所有决定都在客户的
+Studio 应用里（它自己的手机 App 负责通知）。原稿里的 `studio-request`、`studio-deliver` 两张卡不做。
 
-- 新的等你的东西两张卡：`studio-request`（兜底）、`studio-deliver`。都作为 `NeedsYou` 到手机并通知；不认识的旧
-  手机显示普通卡片。
-- `src/companion/coverage.ts`：`studio.answerGate` 已是 `phone`；`studio.analyse`（Analyse Now）归 `phone`；加
-  预览、改默认运行方式、上传构建归 `mac`。
-- `studio.say` 仍只在 Mac（手机上不冒充运营方说话）。
-- Mac 计划页：Studio 区块多「预览」列表与「验收方式」一行；`docs/parity.md` 各加一行。
+Beluga 里只多一点只读的东西，给搭环境的人排查用：
+
+- Mac 计划页的 Studio 区块多「预览」列表、「验收方式」与「交付状态」三行，只读。`docs/parity.md` 各加一行。
+- `beluga studio status` 多列出排队、等待中与「需要人」的需求单。
+- `src/companion/coverage.ts`：新增的只读方法归 `mac`；没有新的 `phone` 方法。
 
 ## 8. 安全边界（不变的与新增的）
 
@@ -273,28 +289,29 @@ StudioGate.kind 追加 'deliver'    // studio-protocol.md §3.4 已留位
 | 项 | P1 | 本设计 | 理由 |
 |---|---|---|---|
 | 入口 | `plan.create` 直接起计划 | 先需求单，确认后起计划 | 模糊需求、反馈无处落 |
-| 分析的模型 | 规划 agent（计划的 planner） | 哨兵步骤上选 | 你要指定模型；复用哨兵的限额、历史、暂停 |
-| 客户确认 | 确认计划 | 确认理解（计划确认改为自动升 Gate，待定） | 非技术客户确认理解比确认里程碑容易 |
+| 分析的模型 | 规划 agent（计划的 planner） | 哨兵步骤上选，搭环境时定 | 指定模型；复用哨兵的限额、历史 |
+| 客户确认 | 确认计划 | 确认理解，再批准开工（都是客户，签名） | Beluga 无人值守 |
+| 谁批准开工 | 你，在 Beluga | 客户，在 Studio | 同上 |
 | Autopilot | 共享计划禁止 | `delivery` 验收方式下允许 | 批准后全自动开发 |
 | 验收 | 每个里程碑 | 可选：只在交付时 | 配合 Autopilot |
-| 交付 | 无（留给 P2） | 交付 Gate + 预览 | 你确认后客户才看到结果 |
+| 交付 | 无（留给 P2） | 交付 Gate 自动通过 + 自动生成的预览 | 检查通过就给客户看 |
 | 不满意 | 里程碑 `sendBack` | 交付 `sendBack` → 分析 → 改动或新一轮 | 闭环 |
 
 ## 10. 建议的里程碑
 
 | # | 内容 | 依赖 |
 |---|---|---|
-| M8 | 需求单：协议、动作白名单、`requests.ts`、落盘、视图、中台缓存；客户 Web 的需求单页；`studio-request` 卡 | — |
-| M9 | 哨兵：`studio` 触发器、`beluga_studio` 三个工具、工具边界、配方「接需求」、兜底与上限 | M8 |
-| M10 | 接缝：`acceptance`、解禁 Autopilot、开工卡的默认运行方式；改 `studio-gates.md` §3.6 及其测试 | M8 |
-| M11 | 交付：`deliver` Gate、`studio-deliver` 卡、预览上传与外链、客户页 `delivered` 阶段、`delivery.*` 动作 | M10 |
+| M8 | 需求单：协议、动作白名单、`requests.ts`、落盘、视图、中台缓存；客户 Web 的需求单页 | — |
+| M9 | 哨兵：`studio` 触发器、`beluga_studio` 三个工具、工具边界、配方「接需求」、兜底（直接分析与「需要人」）与上限 | M8 |
+| M10 | 接缝：`acceptance`、解禁 Autopilot、项目的默认运行方式；客户批准开工（依赖签名，`studio-standalone.md` S2）；改 `studio-gates.md` §3.6 及其测试 | M8 |
+| M11 | 交付：自动合并、测试环境部署生成预览、`deliver` Gate 自动通过、客户页 `delivered` 阶段、`delivery.*` 动作 | M10 |
 | M12 | 再来一轮：`delivery-sent-back` 的两条分支、`follows`、提反馈入口；全链路演练与独立审计 | M9, M11 |
 
 每个里程碑照 P1 的做法：先接口说明，后实施，独立审计，一次真实链路演练。
 
 ## 11. 待你决定
 
-1. 来自需求单的计划，是否省掉客户的第二次确认、草稿写完自动升开工 Gate（§2.6）。
-2. 默认运行方式：新共享的项目默认 Check-ins 还是 Autopilot（§3）。
-3. 预览文件放哪：中台自带存储（Cloudflare R2）还是只支持外部链接起步（§5.2）。只做外链的话 M11 小得多。
-4. 客户通过交付后，是否要自动提醒你合并（现在的设计是完全不碰 git）。
+1. 默认运行方式：新共享的项目默认「每一步都验收」还是「全自动，交付时验收一次」（§3）。本稿倾向后者：Beluga
+   无人值守，前者让客户多等多点。
+2. 预览文件放哪：中台自带存储（Cloudflare R2）还是只支持外部链接起步（§5.2）。只做外链的话 M11 小得多。
+3. 原本问运营方的技术决策由 pilot 按默认做（§4.3），还是一律转给客户用大白话问。本稿按默认做并记进动态。
