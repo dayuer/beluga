@@ -177,3 +177,12 @@
   min-width: 76px;
   padding: 0 14px;
 }
+
+/* A project's chips (Active, Can merge, Archived, Environment, GitHub, Private, people, PRs, stars):
+   capsules whose ring was a faint 0.5px inset shadow, which WebKit blurs round the ends. A real
+   0.5px border, a step stronger, draws them whole. */
+[class*='_stats_'] > [class*='_stat_'],
+[class*='_ghRow_'] [class*='_ghPill_'] {
+  border: 0.5px solid var(--hairline-strong);
+  box-shadow: none;
+}

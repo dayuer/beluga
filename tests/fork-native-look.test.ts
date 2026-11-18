@@ -24,6 +24,8 @@ describe('the Mac-native look’s upstream anchors', () => {
         ['layout', 'panel', 'panel.module.css'],
         ['views', 'overview.module.css'],
         ['dialogs', 'settings.module.css'],
+        ['views', 'project-home.module.css'],
+        ['views', 'project', 'main-sync.module.css'],
       ].flatMap((parts) => [...classes(read(...parts))]),
     );
     expect(anchorsIn(look).filter((name) => !upstream.has(name))).toEqual([]);
