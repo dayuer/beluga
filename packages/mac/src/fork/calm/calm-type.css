@@ -1,0 +1,31 @@
+/*
+ * Calm mode: the type scale (M8, BLG-252; docs/calm/finish.md §3). Eight size steps and four weights,
+ * defined only under :root[data-calm]. With calm mode off the variables are undefined, so every
+ * `var(--calm-fs-x, <original>)` falls back to the value upstream wrote: the computed style is the
+ * same as upstream. The steps are rem, so with the text-size preference they scale as the rest of
+ * the type does (a known change, finish.md §3.5).
+ *
+ * At a 13px base: fs-1 10px, fs-2 11px, fs-3 12px, fs-4 13px, fs-5 15px, fs-6 18px, fs-7 22px, fs-8 28px.
+ */
+:root[data-calm] {
+  --calm-fs-1: 0.77rem;
+  --calm-fs-2: 0.846rem;
+  --calm-fs-3: 0.923rem;
+  --calm-fs-4: 1rem;
+  --calm-fs-5: 1.154rem;
+  --calm-fs-6: 1.385rem;
+  --calm-fs-7: 1.692rem;
+  --calm-fs-8: 2.154rem;
+
+  /* Relative steps for sizes written in em (of the parent), BLG-255. */
+  --calm-fs-em-1: 0.8em;
+  --calm-fs-em-2: 0.86em;
+  --calm-fs-em-3: 0.92em;
+  --calm-fs-em-4: 1.1em;
+  --calm-fs-em-5: 1.2em;
+
+  --calm-fw-regular: 400;
+  --calm-fw-medium: 500;
+  --calm-fw-semibold: 600;
+  --calm-fw-bold: 700;
+}
