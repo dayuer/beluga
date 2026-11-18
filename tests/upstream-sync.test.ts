@@ -58,7 +58,7 @@ describe('syncing upstream', () => {
 
   it('explains every touch point it knows of in docs/fork.md', () => {
     const doc = readFileSync('docs/fork.md', 'utf8');
-    for (const f of ['src/companion/coverage.ts', 'packages/mac/src/dialogs/settings-index.ts', 'packages/mac/src/i18n/index.ts', 'tests/parity.test.ts']) expect(doc).toContain(`\`${f}\``);
+    for (const f of ['src/companion/coverage.ts', 'packages/mac/src/dialogs/settings-index.ts', 'tests/parity.test.ts']) expect(doc).toContain(`\`${f}\``);
   });
 });
 

@@ -99,8 +99,7 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   (`git fetch upstream && git push origin upstream/main:main`); nothing of the fork is committed
   on it. What upstream has already merged gets no branch of its own here.
 - **The fork's work is a chain of branches, each on the one before** (`docs/fork.md`, "分支"):
-  `topic/chinese` (the fork's Chinese beside upstream's, checked against upstream's latest:
-  `docs/chinese.md`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
+  `topic/chinese` (the fork's Chinese, written into upstream's `zh-CN.json`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
   `topic/native` (the Mac's own controls, menus, sheets, sidebar, calm UI) → `topic/plans` (plan
   roles, auto route, models, Autopilot). `topic/fixes` stands apart on `upstream/main`: small
   fixes meant for upstream. Synon Studio (clients, federation, My Sharing) is no longer here: since
@@ -108,7 +107,8 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
 - **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
   into that branch; once merged, merge that branch forward into each one after it (merge, never
   rebase: they're pushed).
-- **Syncing upstream** goes in at the top: check the Chinese (`node scripts/zh-check.mjs`), merge `upstream/main` into `topic/chinese`
+- **Syncing upstream** goes in at the top: merge `upstream/main` into `topic/chinese` (the fork's Chinese is
+  in upstream's own `zh-CN.json`, nothing else differs there)
   (`node scripts/sync-upstream.mjs` on `topic/native` and after), then forward down the chain.
 - **Builds are composed when needed.** From a clean worktree on the chain branch that has what
   the build should carry (`topic/plans` has all of it), merge `topic/fixes` if wanted, then
