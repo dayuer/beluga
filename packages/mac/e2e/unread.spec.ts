@@ -143,6 +143,10 @@ test('the project you are in is lit, and its tools leave with the pointer', asyn
 
 test("an Unread row has its chat's right-click menu, and Rename… there renames it", async ({ page }) => {
   test.setTimeout(90_000);
+  // Calm mode keeps the sidebar's order still while it has the pointer or focus (BLG-165), so the Unread row would wait; this test is about the row, so it runs with calm off.
+  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
+  await page.reload();
+  await expect(sidebar(page)).toBeVisible();
   // Its agent answers while you are elsewhere.
   await openWorkspace(page, 'webhook-retries', 'bob-api');
   await composer(page).fill('hello');

@@ -29,6 +29,8 @@ const REPO = path.join(__dirname, '..');
  * below). Each task that adds a hook adds its row here.
  */
 const TOUCHPOINTS: readonly { readonly file: string; readonly match: RegExp; readonly why: string }[] = [
+  { file: 'packages/mac/vite.config.ts', match: /calmType\(\)/, why: 'the build-time type scale rewrite (M8 BLG-244)' },
+  { file: 'packages/mac/vite.config.ts', match: /calmType\(\)/, why: 'the build-time type scale rewrite (M8, BLG-244; docs/fork.md 沉稳收尾)' },
   { file: 'packages/mac/src/main.tsx', match: /import '\.\/fork\/calm\/index\.js'/, why: 'calm overlay loads before the first frame (M0)' },
   { file: 'packages/mac/src/dialogs/Settings.tsx', match: /<CalmRow \/>/, why: 'the calm switch in Settings › Appearance (M0)' },
   { file: 'tests/mac-settings-search.test.ts', match: /read\('fork\/calm\/settings\.tsx'\)/, why: 'settings search reads the fork row (M0)' },

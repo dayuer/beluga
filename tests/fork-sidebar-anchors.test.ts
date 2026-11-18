@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { IN_CHAT_SELECTION, SELECTED_CLASS } from '../packages/mac/src/fork/sidebar/one-selected.js';
 import { FOLD, ROW } from '../packages/mac/src/fork/sidebar/keys.js';
+import { MARKS } from '../packages/mac/src/fork/sidebar/one-mark.js';
 
 /**
  * The fork's sidebar look (packages/mac/src/fork/sidebar/) hangs on upstream's class names and
@@ -51,5 +52,34 @@ describe('the sidebar look’s upstream anchors', () => {
   it('finds the scroll area and the fold button the arrow keys (keys.ts) go by', () => {
     expect(anchorsIn(`${ROW} ${FOLD}`.replace('button[', '[')).filter((name) => !upstream.has(name) && !classes(read('layout', 'project-groups.module.css')).has(name))).toEqual([]);
     expect(read('layout', 'ProjectTree.tsx')).toContain('aria-expanded={foldable ? !fold.folded : undefined}');
+  });
+});
+
+/** Every source file under packages/mac/src, read once: the one-mark anchors are looked up across them. */
+const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => (statSync(path.join(dir, f)).isDirectory() ? walk(path.join(dir, f)) : [path.join(dir, f)]));
+const sources = walk(path.join(mac)).filter((f) => /\.(tsx?|css)$/.test(f) && !f.includes(`${path.sep}fork${path.sep}`)).map((f) => readFileSync(f, 'utf8'));
+
+describe('the one-mark anchors (fork/sidebar/one-mark.ts MARKS)', () => {
+  it('finds every data attribute a mark anchors on in upstream TSX', () => {
+    const attrs = [...new Set(MARKS.flatMap((m) => [...m.selector.matchAll(/\[(data-[\w-]+)/g)].map((x) => x[1]!)))];
+    expect(attrs.length).toBeGreaterThan(0);
+    const missing = attrs.filter((a) => !sources.some((src) => src.includes(a)));
+    expect(missing).toEqual([]);
+  });
+
+  it('finds every upstream class a mark anchors on (`_x_` in a module css)', () => {
+    const names = [...new Set(MARKS.flatMap((m) => [...m.selector.matchAll(/\[class\*='_([A-Za-z][\w-]*)_'\]/g)].map((x) => x[1]!)))];
+    expect(names.length).toBeGreaterThan(0);
+    const missing = names.filter((n) => !sources.some((src) => new RegExp(`\\.${n}\\b`).test(src)));
+    expect(missing).toEqual([]);
+  });
+
+  it('finds the team badge by its label, and the earnings pill and busy dot where one-mark expects them', () => {
+    expect(read('team', 'Team.tsx')).toContain("aria-label={tip}");
+    expect(read('team', 'Team.tsx')).toContain("Team on ${team.repo}");
+    expect(read('components', 'EarningsPill.tsx')).toContain('data-earnings-pill={projectId}');
+    expect(read('layout', 'ProjectTree.tsx')).toContain('<span className={side.status} data-busy>');
+    // A project row keeps its busy dot and its tally inside the hover tools' span, so one-mark.ts must search it (BLG-254).
+    expect(read('layout', 'ProjectTree.tsx')).toMatch(/className=\{side\.hoverTools\}[\s\S]*data-busy[\s\S]*<TallyMark/);
   });
 });

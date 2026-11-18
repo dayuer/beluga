@@ -236,9 +236,9 @@ const measureAnchor = async (page) => {
     }`),
     before.index,
   );
-  const jump = page.locator('button').filter({ hasText: /^(Latest|\d+ new)$/ });
+  const jump = page.locator('button').filter({ hasText: /^(Latest|\d+ new( below)?)$/ });
   const hint = (await jump.count()) ? (await jump.first().innerText()).replace(/\s+/g, ' ').trim() : null;
-  const newRows = Number(/^(\d+) new$/.exec(hint ?? '')?.[1] ?? 0);
+  const newRows = Number(/^(\d+) new( below)?$/.exec(hint ?? '')?.[1] ?? 0);
   return { offsetPx: after === null ? null : after - before.y, hint, newRows };
 };
 

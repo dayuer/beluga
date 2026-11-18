@@ -124,3 +124,25 @@
 [data-fork-sidebar] [class*='_needsRow_']::after {
   display: none !important;
 }
+
+/* M8 (BLG-249): the current project's row is neutral like its neighbours; the selected row alone is the one that looks selected. */
+:root[data-calm] [data-fork-sidebar] [class*='_currentProject_']:not([class*='_selected_']) {
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-calm] [data-fork-sidebar] [class*='_currentProject_']:not([class*='_selected_']):hover {
+  background: var(--bg-hover);
+}
+:root[data-calm] [data-fork-sidebar] [class*='_currentProject_'] [class*='_rowIcon_'] {
+  color: var(--text-2);
+}
+
+/* M8 (BLG-243): a row's trailing area shows one mark (one-mark.ts settles which); the others wait for hover or keyboard focus on the row. */
+:root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {
+  display: none;
+}
+/* The earnings pill is the exception: upstream hides it on hover so the row's tools take its place and nothing slides
+   under the pointer (project-groups.module.css), and bringing it back would put it there again. */
+:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden]:not([data-earnings-pill]) {
+  display: revert;
+}
