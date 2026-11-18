@@ -64,6 +64,7 @@ describe('the Mac-native look’s upstream anchors', () => {
         ['layout', 'SidebarSearch.module.css'],
         ['views', 'overview', 'filter-bar.module.css'],
         ['components', 'form.module.css'],
+        ['components', 'select.module.css'],
       ].flatMap((parts) => [...classes(read(...parts))]),
     );
     expect(anchorsIn(glass).filter((name) => !upstream.has(name))).toEqual([]);
@@ -73,6 +74,14 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(prefs).toContain("root.dataset.glass = reduce ? 'off' : 'on';");
     expect(glass.replace(/\/\*[\s\S]*?\*\//g, '').match(/^[^@\s{}][^{]*\{/gm)?.every((rule) => rule.includes(":root[data-os='mac'][data-glass='on']"))).toBe(true);
     expect(read('layout', 'Sidebar.tsx')).toContain('<nav ref={drop.ref} className={cx(s.sidebar');
+    // The pop-up button and its web menu, by their roles.
+    const select = read('components', 'Select.tsx');
+    expect(select).toContain('role="combobox"');
+    expect(select).toContain('aria-haspopup="listbox"');
+    expect(select).toContain('<svg className={s.chevrons}');
+    const menu = read('components', 'SelectMenu.tsx');
+    expect(menu).toContain('role="option"');
+    expect(menu).toContain('<span className={s.check}>');
     // The floating sidebar is found by the attribute fork/sidebar puts on it (it sits in a wrapper).
     expect(read('fork', 'sidebar', 'one-selected.ts')).toContain("nav.setAttribute('data-fork-sidebar', '');");
   });
