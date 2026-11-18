@@ -5,7 +5,7 @@
  * background look (core/local-endpoints.ts) only asks for the model list and counts any answer, even
  * a 404 or a 401, as up: an OpenAI-style address or a wrong model name passed it and failed every
  * run. What doesn't pass isn't saved; saving the same thing again soon after saves it anyway
- * (ipc/fork-handlers.ts). The words are whole phrases the Mac's Chinese table has (zh-CN.fork.json).
+ * (ipc/fork-handlers.ts). The words are whole phrases the Mac's Chinese table has (zh-CN.json).
  */
 
 /** Why a model didn't answer. */
