@@ -104,8 +104,8 @@ describe('MARKS', () => {
 
 describe('the hiding and the hover that brings marks back (sidebar-look.css)', () => {
   const look = readFileSync(path.join('packages', 'mac', 'src', 'fork', 'sidebar', 'sidebar-look.css'), 'utf8');
-  it('hides the settled-out marks only with calm on, and shows them again on hover or keyboard focus', () => {
+  it('hides the settled-out marks only with calm on, and shows them again on hover or keyboard focus, except on a row whose tools open there', () => {
     expect(look).toContain(":root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {\n  display: none;");
-    expect(look).toContain(":root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden]:not([data-earnings-pill]) {\n  display: revert;");
+    expect(look).toContain(":root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)):not(:has([class*='_hoverTools_'] > button, [class*='_hoverTools_'] > [data-state])) [data-fork-mark-hidden]:not([data-earnings-pill]) {\n  display: revert;");
   });
 });

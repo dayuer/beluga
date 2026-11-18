@@ -142,8 +142,11 @@
   display: none;
 }
 /* The earnings pill is the exception: upstream hides it on hover so the row's tools take its place and nothing slides
-   under the pointer (project-groups.module.css), and bringing it back would put it there again. */
-:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden]:not([data-earnings-pill]) {
+   under the pointer (project-groups.module.css), and bringing it back would put it there again.
+   A row with tools (a project's New worktree, New chat, •••) keeps its one mark on hover too (M9): the three buttons
+   open up there, and the marks beside them left the name two letters ("bob-…"). Its other marks stay in its
+   detail; rows without tools still bring theirs back. */
+:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)):not(:has([class*='_hoverTools_'] > button, [class*='_hoverTools_'] > [data-state])) [data-fork-mark-hidden]:not([data-earnings-pill]) {
   display: revert;
 }
 

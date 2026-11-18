@@ -486,14 +486,14 @@ Playwright 在工作区、任务页、Sentinel、总览四个页面里，对所�
 | M8-4 | 字重「67 种」本树复现不了，实测 14 种（§3.4） | 口径问题，已记录 |
 | M8-5 | `sync-upstream --report` 显示 208 个「不在 docs/fork.md 里」的文件，另有 113 个「已不再改」的名字 | **已解决**（BLG-253）：208 个都不是 M8 改的，已在 docs/fork.md 逐个登记；「已不再改」的名字从清单里拿下来；报告 0 个 `!`、0 条「已不再改」，脚本没有改，见 §7 |
 | M8-6 | 文字大小 11 和 16 下的 workspace 对比图没有拍 | **已做**（BLG-255，§3.8） |
-| M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | 未做，另开任务 |
+| M8-7 | ••• 菜单里没有找回推广卡的入口（BLG-250） | **不做**（用户决定 2026-11-18：不要推广卡；沉稳开时它保持隐藏，沉稳关时与上游一致） |
 | M8-8 | 行尾收口的 200 行性能未测（BLG-243） | **已做**（BLG-254，§2.5） |
 | M8-9 | Sentinel 的 Merge、Resume 改中性是本任务的决定，设计未写 | 已记录，待确认 |
 | M8-10 | 沉稳开时顶栏铃铛的计数仍是强调色实底，「2 commits · no PR」chip 仍是蓝色（§1.2 要求中性） | **已解决**（§10） |
 | M8-11 | `project-home-narrow.spec.ts` 用 `waitForTimeout(300)` 等过渡 | **已解决**（§10）：改为等到没有 CSS 过渡在跑 |
 | M8-12 | 引导页 `onboarding.module.css` 的 6 层光晕被改写，而 `docs/calm-ui.md` §7.4 把 `onboarding/**` 整个列为 keep-decor | **已解决**（§10）：光晕扫描跳过整个 `onboarding/` |
-| M8-13 | 长分支名时 Create Worktree 超出盒子（#527，基线就有），e2e 标了 `test.fixme` | **未修**：上游布局问题，需另开任务 |
-| M8-14 | 悬停项目行时名字被挤成「bob-…」：展开的工具和标记占掉了名字的宽度 | **未修**：另开任务 |
+| M8-13 | 长分支名时 Create Worktree 超出盒子（#527，基线就有），e2e 标了 `test.fixme` | **已修**（M9，§11）：`test.fixme` 已去掉 |
+| M8-14 | 悬停项目行时名字被挤成「bob-…」：展开的工具和标记占掉了名字的宽度 | **已修**（M9，§11） |
 
 ## 6. 合并状态
 
@@ -799,4 +799,17 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 | §5.3、§6 过时 | 已更新 | 本页 |
 | 行尾几个标记之间的间隙不一（4、7.5、8.5px：各自的 2px 外边距、14px 槽、琥珀点的 5.5/3.5px 外边距） | `sidebar-look.css`：每个标记按自身宽度，任意两个之间 6px，最后一个贴右边；琥珀点不再带外边距 | `tests/fork-sidebar-anchors.test.ts`；实测点阵→琥珀点 6px、琥珀点→计数 6px；`m8-row-after-*`、`m8-row-hover-*` 已重拍 |
 
-仍未做：M8-7（••• 菜单里找回推广卡的入口）、M8-13（长分支名时 Create Worktree 超出盒子）、M8-14（悬停时名字被挤短）。
+M8-7、M8-13、M8-14 见 §11（M9）。
+
+## 11. M9：剩余项（2026-11-18，topic/native）
+
+| 问题 | 处理 | 证据 |
+| --- | --- | --- |
+| M8-7 推广卡的找回入口 | 不做：用户决定不要推广卡。沉稳开时保持隐藏（`calm-accent.css` 第 5 节），沉稳关时与上游一致 | — |
+| M8-13 长分支名时 Create Worktree 出框 | 原因在上游 `project-home.module.css`（#527）：名字缩到最短后只剩分支一项在让，它的收缩系数 0.25 小于 1，按 Flexbox §9.7 只分到剩余溢出的四分之一，按钮被挤出 29px。改为名字 4、分支 1：名字照旧先让，分支能让完。已登记 `docs/fork.md`，适合提回上游 | `e2e/project-home-narrow.spec.ts` 去掉 `test.fixme`，11 例全过 |
+| M8-14 悬停时名字被挤成「bob-…」 | 有悬停工具的行（项目的 New worktree、New chat、•••）悬停时只露工具和原来那一个标记，其余标记不再展开；没有工具的行照旧展开（`sidebar-look.css`） | `tests/fork-sidebar-one-mark.test.ts`；下图 |
+
+| 悬停 | 浅色 | 深色 |
+| --- | --- | --- |
+| M9 之后 | ![](img/m9-row-hover-light.png) | ![](img/m9-row-hover-dark.png) |
+| M9 之前 | ![](img/m8-row-hover-light.png) | ![](img/m8-row-hover-dark.png) |

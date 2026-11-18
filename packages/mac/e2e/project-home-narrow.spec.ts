@@ -52,8 +52,6 @@ const cases: Array<{ window: number; page?: number; text?: number; branch?: stri
 for (const c of cases) {
   const what = (c.page ? `a ${c.page}px page` : `a ${c.window}px window`) + (c.text ? ` at ${c.text}px text` : '') + (c.branch ? ` based on ${c.branch}` : '');
   test(`the home's controls keep their shape in ${what} (#527)`, async ({ page }) => {
-    // Fails the same way on the baseline (topic/native 350e15ea9, calm on or off): with a long branch name "Create Worktree" ends outside the box at 1900px. Not M8's; listed in docs/calm/finish.md §9.
-    test.fixme(!!c.branch, 'baseline failure: Create Worktree leaves the box with a long branch name');
     await page.setViewportSize({ width: c.window, height: 820 });
     if (c.text) await page.addInitScript((size) => localStorage.setItem('beluga.prefs.v1', JSON.stringify({ textSize: size })), c.text);
     await page.goto('/');

@@ -391,7 +391,8 @@ M8 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm
 | `packages/mac/e2e/network.spec.ts` | 8 | 推广卡在沉稳界面下被隐藏（BLG-250），第一条和最后一条用例测的就是那张卡，所以以沉稳关运行。 |
 | `packages/mac/e2e/network-chats.spec.ts` | 4 | 同上：测推广卡的用例以沉稳关运行。 |
 | `packages/mac/e2e/unread.spec.ts` | 4 | 指针停在侧栏里时沉稳冻结顺序（BLG-165），Unread 行要等；这条测行本身，所以以沉稳关运行。 |
-| `packages/mac/e2e/project-home-narrow.spec.ts` | 4 | 沉稳给布局变化 120–200ms 过渡，量宽度前等 300ms 让盒子停下；另外「长分支名」一例在基线上就失败（Create Worktree 超出盒子），标 `test.fixme` 并写明原因。 |
+| `packages/mac/e2e/project-home-narrow.spec.ts` | 2 | 沉稳给布局变化 120–200ms 过渡，量宽度前等到没有 CSS 过渡在跑（等条件，不等时间）。「长分支名」一例原来标 `test.fixme`，M9 修好后去掉了。 |
+| `packages/mac/src/views/project-home.module.css` | 2 | 上游 #527 的缺陷（适合提回上游）：名字缩到最短后只剩分支一项在让，它的收缩系数 0.25 小于 1，按 Flexbox §9.7 只分到剩余溢出的四分之一，长分支名时 Create Worktree 出框。改为名字 4、分支 1：名字照旧先让，分支能让完。 |
 | `packages/mac/e2e/pr-next-step.spec.ts` | 3 | 基线已有：同一行在侧栏里出现两次（项目与 Work），严格模式断言改取 `.first()`。 |
 | `packages/mac/e2e/live-preview.spec.ts` | 10 | 基线已有：对比度辅助函数把原生控件的渐变按钮当作透明底；改用渐变最后一个色标，并识别 `color(srgb …)` 的 0–1 取值。 |
 
