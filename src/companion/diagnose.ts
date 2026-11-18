@@ -71,7 +71,7 @@ export interface DiagnoseInput {
   readonly refusal?: PairRefusal;
 }
 
-const WAY: Record<DialAttempt['way'], string> = { p2p: 'Direct connection', relay: 'Relay', custom: 'Custom address' };
+const WAY: Record<DialAttempt['way'], string> = { p2p: 'Direct connection', relay: 'Relay' };
 const OUTCOME: Record<DialAttempt['outcome'], string> = {
   ok: 'connected',
   timeout: 'no answer in time',
@@ -93,7 +93,6 @@ export function attemptLine(a: DialAttempt): string {
 export function pathLabel(path: LinkPath): string {
   if (path === 'lan') return 'Connected directly · same network';
   if (path === 'direct') return 'Connected directly · over the internet';
-  if (path === 'custom') return 'Connected through the custom address (end-to-end encrypted)';
   return 'Connected through the relay (end-to-end encrypted)';
 }
 

@@ -316,8 +316,6 @@ export interface Prefs {
   readonly theme: ThemeName;
   readonly mouse: boolean;
   readonly tunnel: Settings['tunnel'];
-  /** A mesh network's address for the phone relay, `host:port` (Settings › Phone › Advanced; companion/reach.ts). */
-  readonly customAddress?: string;
   /** Keep the Mac awake while a phone is paired (companion/awake.ts). */
   readonly keepAwake: Settings['keepAwake'];
   /** Run New Work On (BLG-780): `here`, `best`, or one of your computers by id (src/machines/placement.ts). */
@@ -828,7 +826,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency', 'customAddress']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

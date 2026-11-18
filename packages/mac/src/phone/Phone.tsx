@@ -14,7 +14,6 @@ import { pathLabel } from '../../../../src/companion/diagnose.js';
 import { leftText, markOf, seenText } from './phone-model.js';
 import p from '../dialogs/native/person.module.css';
 import s from './phone.module.css';
-import { PhoneAdvanced } from '../fork/phone-advanced.js';
 import { computerWord, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
 
 /**
@@ -411,7 +410,6 @@ export function PhoneSettings() {
           <Reaching />
         </Group>
       ) : null}
-      <PhoneAdvanced />
       <Group title="Pair a phone">
         <Row label="The Beluga app" detail={`Your phone gets its own key, signed by ${yourComputer()}: it shows what your agent is doing and lets you answer, ask and chat. It never sees code. Up to 4 phones; Remove cuts one off at once.`}>
           <span />

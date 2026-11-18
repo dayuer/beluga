@@ -277,9 +277,9 @@ export default function Settings() {
                   <Row
                     first
                     Icon={Network}
-                    tone={link.path === 'relay' || link.path === 'custom' ? 'lavender' : 'mint'}
+                    tone={link.path === 'relay' ? 'lavender' : 'mint'}
                     label={link.phase === 'open' && link.path ? pathLabel(link.path) : link.diagnosis?.title ?? 'Not linked right now'}
-                    sub={link.phase === 'open' && link.path === 'relay' ? 'A direct connection didn’t work on this network; the relay carries only encrypted bytes.' : link.phase === 'open' && link.path === 'custom' ? 'Through the address your Mac set for your own network (GNB, ZeroTier, WireGuard, Nebula, Tailscale…); only encrypted bytes cross it.' : undefined}
+                    sub={link.phase === 'open' && link.path === 'relay' ? 'A direct connection didn’t work on this network; the relay carries only encrypted bytes.' : undefined}
                     chevron={false}
                   />
                 </Card>

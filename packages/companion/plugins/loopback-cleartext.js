@@ -1,16 +1,17 @@
 // Videos stream from the link worklet's own server on the phone's loopback (http://127.0.0.1,
-// src/companion/media-stream.ts). Android blocks plain http by default. The custom address
-// (Settings › Phone › Advanced on the Mac: GNB, ZeroTier, WireGuard, Nebula, Tailscale…) is a
-// ws:// URL to an address only the user knows, so it can't be listed here: cleartext is allowed
-// everywhere. Nothing is lost by it: the app's own calls are https URLs, and what crosses a
-// ws:// custom address is the Noise stream (same keys, same firewall), ciphertext only.
+// src/companion/media-stream.ts). Android blocks plain http by default, so this lets it through
+// for 127.0.0.1 and localhost only (a network security config); everything else stays https-only.
+// The bytes inside never leave the phone: the link to the Mac is the Noise stream.
 const fs = require('node:fs');
 const path = require('node:path');
 const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
 
 const XML = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-  <base-config cleartextTrafficPermitted="true" />
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="false">127.0.0.1</domain>
+    <domain includeSubdomains="false">localhost</domain>
+  </domain-config>
 </network-security-config>
 `;
 // Debug builds talk to Metro over the LAN in plain http (the manifest's usesCleartextTraffic,
