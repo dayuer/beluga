@@ -4,38 +4,41 @@
  * reuses an existing token (styles/tokens.css, components/ui.module.css), and the
  * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/calm and fork/sidebar do;
  * tests/fork-native-look.test.ts checks they still exist.
+ *
+ * Only on a Mac (`:root[data-os='mac']`, set by lib/prefs.ts): Windows and Linux keep upstream's look,
+ * not a Mac Settings window with traffic lights.
  */
 
 /*
  * The branch's next step in the toolbar (layout/BranchControl.tsx): a Mac toolbar has no accent-filled
  * buttons, so Create PR and its ▾ are drawn as any bordered toolbar button, in the text colour.
- * A failed step, a merged branch and Merge (green, its own variant) keep their colours. `:root` puts
+ * A failed step, a merged branch and Merge (green, its own variant) keep their colours. The `:root` prefix puts
  * these above calm-accent.css's rule that repaints every primary button in the accent.
  */
-:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
+:root[data-os='mac'] button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
   background: linear-gradient(var(--control-top), var(--control));
   color: var(--text);
   box-shadow: var(--control-bezel);
   font-weight: 400;
 }
-:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']):active:not(:disabled) {
+:root[data-os='mac'] button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']):active:not(:disabled) {
   background: linear-gradient(var(--control-press), var(--control-press));
 }
-:root button[data-branch-more][class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_'])::before {
+:root[data-os='mac'] button[data-branch-more][class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_'])::before {
   background: var(--hairline-strong);
 }
 
 /* The dock's tabs (layout/panel/panel.module.css): the one you're on is in bold text, not underlined. */
-[role='tablist'][class*='_dockTabs_'] > [class*='_tabOn_'][class*='_tabOn_'] {
+:root[data-os='mac'] [role='tablist'][class*='_dockTabs_'] > [class*='_tabOn_'][class*='_tabOn_'] {
   box-shadow: none;
   font-weight: 600;
 }
 
 /* The panel's views when there is only one (Overview: Info): a title, not a lone raised segment. */
-[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) {
+:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) {
   background: none;
 }
-[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) > [role='tab'] {
+:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) > [role='tab'] {
   background: none;
   box-shadow: none;
   font-weight: 600;
@@ -43,14 +46,14 @@
 }
 
 /* An empty chat's starters (views/ChatView.tsx): plain bordered buttons, words only. */
-[class*='_emptyActions_'] > button > svg {
+:root[data-os='mac'] [class*='_emptyActions_'] > button > svg {
   display: none;
 }
 
 /* ── 1a Overview ─────────────────────────────────────────────────────────────── */
 
 /* The rows of a Mac list: 28pt, as Finder's and Mail's at the default size (views/overview.module.css). */
-[role='list'][class*='_table_'] > [class*='_row_'] {
+:root[data-os='mac'] [role='list'][class*='_table_'] > [class*='_row_'] {
   height: 28px;
   border-radius: 5px;
 }
@@ -59,7 +62,7 @@
 
 /* Where the branch stands, beside the worktree's name (layout/BranchControl.module.css): a line of
    secondary text in its tone's colour, not a pill. */
-[data-branch-state][class*='_pill_'][class*='_pill_'] {
+:root[data-os='mac'] [data-branch-state][class*='_pill_'][class*='_pill_'] {
   height: auto;
   padding: 0;
   border-radius: 0;
@@ -67,29 +70,29 @@
   font-weight: 500;
   letter-spacing: 0;
 }
-[class*='_pillButton_']:hover > [data-branch-state][class*='_pill_'] {
+:root[data-os='mac'] [class*='_pillButton_']:hover > [data-branch-state][class*='_pill_'] {
   background: none;
   text-decoration: underline;
 }
 
 /* Changes' second view (Changes / History, layout/RightPanel.tsx): one segmented control in the
    inspector is the panel's own; this one is a row of words, the one you're on in bold. */
-[class*='_views_'] > [role='radiogroup'][class*='_segmented_'] {
+:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'][class*='_segmented_'] {
   gap: 12px;
   padding: 0;
   background: none;
   box-shadow: none;
 }
-[class*='_views_'] > [role='radiogroup'] > [class*='_segment_'] {
+:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segment_'] {
   padding: 0;
   background: none;
   box-shadow: none;
   color: var(--text-3);
 }
-[class*='_views_'] > [role='radiogroup'] > [class*='_segment_']::before {
+:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segment_']::before {
   display: none;
 }
-[class*='_views_'] > [role='radiogroup'] > [class*='_segmentOn_'][class*='_segmentOn_'] {
+:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segmentOn_'][class*='_segmentOn_'] {
   color: var(--text);
   font-weight: 600;
 }
@@ -99,31 +102,31 @@
 /* A window of its own, as a Mac app's Settings: nothing dims the window behind it, the close button
    is the red one at the top left (with minimise and zoom off, as Settings windows have them), and
    the pane's name is the title, centred (dialogs/Settings.tsx, settings.module.css). */
-[class*='_overlay_']:has(+ [data-settings-window]) {
+:root[data-os='mac'] [class*='_overlay_']:has(+ [data-settings-window]) {
   background: none;
 }
-[data-settings-window] {
+:root[data-os='mac'] [data-settings-window] {
   box-shadow: 0 0 0 0.5px var(--hairline-strong), 0 22px 70px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.1);
 }
-[data-settings-window] [class*='_nav_'] {
+:root[data-os='mac'] [data-settings-window] [class*='_nav_'] {
   padding-top: 44px;
 }
-[data-settings-window] [class*='_nav_'] > [class*='_title_'] {
+:root[data-os='mac'] [data-settings-window] [class*='_nav_'] > [class*='_title_'] {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
 }
-[data-settings-window] [class*='_bodyHead_'] {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] {
   justify-content: center;
 }
-[data-settings-window] [class*='_paneTitle_'] {
+:root[data-os='mac'] [data-settings-window] [class*='_paneTitle_'] {
   text-align: center;
   font-size: 13px;
   font-weight: 600;
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] {
   position: absolute;
   top: 18px;
   left: 18px;
@@ -134,16 +137,16 @@
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
   color: transparent;
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:hover,
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:focus-visible {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:hover,
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:focus-visible {
   color: rgba(0, 0, 0, 0.55);
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] svg {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] svg {
   width: 8px;
   height: 8px;
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before,
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before,
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
   content: '';
   position: absolute;
   top: -0.5px;
@@ -154,10 +157,10 @@
   box-shadow: inset 0 0 0 0.5px var(--hairline-strong);
   pointer-events: none;
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before {
   left: 20px;
 }
-[data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
+:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
   left: 40px;
 }
 
@@ -165,7 +168,7 @@
    segments, centred, as macOS draws one, instead of a strip stretched across the whole panel. Each
    segment is as wide as the widest name. A narrow panel that folds the names, and a tab being dragged
    over the strip (its drop mark), keep upstream's layout. */
-[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) {
+:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) {
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
@@ -173,7 +176,7 @@
   max-width: 100%;
   margin-inline: auto;
 }
-[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) > [class*='_tab_'] {
+:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) > [class*='_tab_'] {
   min-width: 76px;
   padding: 0 14px;
 }
@@ -181,8 +184,8 @@
 /* A project's chips (Active, Can merge, Archived, Environment, GitHub, Private, people, PRs, stars):
    capsules whose ring was a faint 0.5px inset shadow, which WebKit blurs round the ends. A real
    0.5px border, a step stronger, draws them whole. */
-[class*='_stats_'] > [class*='_stat_'],
-[class*='_ghRow_'] [class*='_ghPill_'] {
+:root[data-os='mac'] [class*='_stats_'] > [class*='_stat_'],
+:root[data-os='mac'] [class*='_ghRow_'] [class*='_ghPill_'] {
   border: 0.5px solid var(--hairline-strong);
   box-shadow: none;
 }

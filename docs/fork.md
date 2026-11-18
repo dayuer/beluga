@@ -386,7 +386,7 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 
 ### Mac 原生走查（2026-11-18）
 
-对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
+对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入，每条都只在 `:root[data-os='mac']` 下生效（Windows、Linux 保持上游的样子）；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
 
 - 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色；失败、已合并和 Merge 保留各自的颜色。规则前加了 `:root`，压过 `calm-accent.css` 把主按钮刷成强调色的那条。
 - 底部终端标签：当前标签用粗体，不加下划线。检查器只有一个标签时（总览的 Info）画成标题。
