@@ -327,6 +327,11 @@ export function launchCompanion(opts: CompanionLaunch): () => Promise<void> {
     // The relay through Cloudflare, unless Remote access is set to direct only (or the network only),
     // or it's the demo (nothing leaves the computer).
     relay: opts.demo || ['p2p', 'none'].includes(opts.store.getState().prefs.tunnel) ? 'off' : 'cloudflared',
+    // The custom address (a mesh network's): its own listener, off with Remote access none or in the demo.
+    customAddress: () => {
+      const prefs = opts.store.getState().prefs;
+      return opts.demo || prefs.tunnel === 'none' ? undefined : prefs.customAddress;
+    },
     ...(opts.log ? { log: opts.log } : {}),
     machines,
     // Your Always On runs your friends network: it tells your phones what comes in, not this Mac too (BLG-850).

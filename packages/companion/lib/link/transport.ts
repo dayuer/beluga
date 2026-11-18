@@ -14,6 +14,7 @@ export interface PathInfo {
   readonly way: Way;
   readonly tried: readonly Attempt[];
   readonly relay?: string;
+  readonly custom?: string;
   readonly network?: string;
 }
 

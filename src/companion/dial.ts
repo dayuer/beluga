@@ -107,18 +107,21 @@ export function noiseResponder(pipe: MessagePipe, keyPair: { publicKey: Bytes; s
 }
 
 /** The Mac's relay from its signed record on the DHT (its key, or an open pairing's), if it has one. */
-export async function lookupRelay(node: Partial<Pick<DHT, 'mutableGet'>> | undefined, key: Bytes, timeoutMs = 6_000): Promise<{ relay?: string; at?: number; phones?: readonly string[]; found: boolean }> {
+export async function lookupRelay(node: Partial<Pick<DHT, 'mutableGet'>> | undefined, key: Bytes, timeoutMs = 6_000): Promise<{ relay?: string; custom?: string; at?: number; phones?: readonly string[]; found: boolean }> {
   if (!node?.mutableGet) return { found: false };
   try {
     const got = await Promise.race([node.mutableGet(b4a.from(key) as never, { latest: true }), new Promise<null>((r) => setTimeout(() => r(null), timeoutMs))]);
     if (!got) return { found: false };
     const rec = RelayRecord.safeParse(JSON.parse(b4a.toString(got.value as Bytes, 'utf8')));
-    return rec.success ? { found: true, at: rec.data.at, ...(rec.data.relay ? { relay: rec.data.relay } : {}), ...(rec.data.phones ? { phones: rec.data.phones } : {}) } : { found: false };
+    return rec.success ? { found: true, at: rec.data.at, ...(rec.data.relay ? { relay: rec.data.relay } : {}), ...(rec.data.custom ? { custom: rec.data.custom } : {}), ...(rec.data.phones ? { phones: rec.data.phones } : {}) } : { found: false };
   } catch {
     return { found: false };
   }
 }
 
+/** The mesh address (Tailscale's 100.64.0.0/10 and the rest) is never `lan`: it's the custom way, named by what dialed it. */
+/** How long one custom address has to finish its handshake (it's on a mesh: answers fast or never). */
+const CUSTOM_MS = 8_000;
 const PRIVATE = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|127\.|fc|fd|fe80:)/i;
 
 export interface DialOptions {
@@ -128,10 +131,12 @@ export interface DialOptions {
   readonly keyPair: { readonly publicKey: Bytes; readonly secretKey: Bytes };
   /** Relay URLs already known (a pairing link's, the last welcome's), best first. */
   readonly relays?: readonly string[];
+  /** The Mac's custom addresses (`ws://host:port/companion`, from its welcome or record): a third way, started at once. */
+  readonly custom?: readonly string[];
   /** Opens WebSockets; without it, no relay. */
   readonly openRelay?: OpenRelay;
   /** The way that worked last time on this network: it starts first. */
-  readonly prefer?: 'p2p' | 'relay';
+  readonly prefer?: 'p2p' | 'relay' | 'custom';
   /** How long the second way waits before it starts too (unless the first fails sooner). */
   readonly staggerMs?: number;
   readonly timeoutMs?: number;
@@ -155,6 +160,8 @@ export interface Dialed {
   readonly tried: DialAttempt[];
   /** The relay that worked, or the one the DHT says the Mac has now. */
   readonly relay?: string;
+  /** The custom address that worked. */
+  readonly custom?: string;
 }
 
 /** Why nothing worked: every attempt, what the DHT said, and whether the Mac seems to exist. */
@@ -209,6 +216,9 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
   let recordAge: number | undefined;
   let removed = false;
   let relays = [...new Set(opts.relays ?? [])];
+  const customs = [...new Set(opts.custom ?? [])];
+  const customTried = new Set<string>();
+  let customRan = false;
   const live = new Set<NoiseStream>();
 
   return new Promise<Dialed>((resolve, reject) => {
@@ -230,21 +240,22 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
       fn();
     };
     const fail = (): void => {
-      if (pending > 0 || settled || !started.p2p || !started.relay) return;
+      if (pending > 0 || settled || !started.p2p || !started.relay || !started.custom) return;
       const r = report();
       finish(() => reject(new DialError('Couldn’t reach your Mac', r)));
     };
-    const win = (stream: NoiseStream, path: LinkPath, relay?: string): void => {
+    const win = (stream: NoiseStream, path: LinkPath, relay?: string, custom?: string): void => {
       if (settled) {
         stream.destroy();
         return;
       }
       // A way still trying when another connected: it's dropped (and said so).
       for (const w of order) if (started[w] && !tried.some((t) => t.way === w)) record({ way: w, outcome: 'lost' });
+      if (customRan && !tried.some((t) => t.way === 'custom')) record({ way: 'custom', outcome: 'lost' });
       for (const other of live) if (other !== stream) other.destroy();
-      finish(() => resolve({ stream, path, tried, ...(relay ? { relay } : {}) }));
+      finish(() => resolve({ stream, path, tried, ...(relay ? { relay } : {}), ...(custom ? { custom } : {}) }));
     };
-    const started = { p2p: false, relay: false };
+    const started = { p2p: false, relay: false, custom: false };
     // Each way starts when its turn comes, or as soon as the one before it has failed.
     const kick = (): void => {
       const next = order.find((w) => !started[w]);
@@ -305,6 +316,7 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
     const relay = async (): Promise<void> => {
       if (!opts.openRelay && !opts.node?.mutableGet) {
         record({ way: 'relay', outcome: 'skipped' });
+        void startCustom();
         return void (kick(), fail());
       }
       pending++;
@@ -318,10 +330,13 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
           // A record from the last half hour: the Mac was there recently.
           if (recordAge !== undefined && recordAge < 30 * 60_000 && found === 'unknown') found = 'yes';
           if (rec.relay && !relays.includes(rec.relay)) relays = [rec.relay, ...relays];
+          if (rec.custom && !customs.includes(rec.custom)) customs.unshift(rec.custom);
           // Named phones, and not this one: the Mac turns it away whatever way it tries.
           if (rec.phones && !rec.phones.includes(b4a.toString(opts.keyPair.publicKey, 'hex').slice(0, 16))) removed = true;
         }
       }
+      // What the record named is a way of its own (it runs beside this one).
+      void startCustom();
       if (settled) return void pending--;
       if (!opts.openRelay) {
         pending--;
@@ -368,6 +383,59 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
       fail();
     };
 
+    // The custom addresses: a way of their own, tried at once beside the others (a mesh address answers fast or not at all).
+    const startCustom = async (): Promise<void> => {
+      started.custom = true;
+      const bases = customs.filter((b) => !customTried.has(b));
+      if (settled || !bases.length) return void fail();
+      if (!opts.openRelay) {
+        if (!tried.some((t) => t.way === 'custom')) record({ way: 'custom', outcome: 'skipped' });
+        return void fail();
+      }
+      customRan = true;
+      pending++;
+      for (const base of bases) {
+        customTried.add(base);
+        if (settled) break;
+        const url = relayUrlFor(base, b4a.toString(target, 'hex'));
+        let timedOut = false;
+        const outcome = await new Promise<DialAttempt['outcome']>((done) => {
+          let pipe: MessagePipe;
+          try {
+            pipe = opts.openRelay!(url);
+          } catch {
+            return done('failed');
+          }
+          const s = noiseOverRelay(pipe, opts.keyPair, target);
+          live.add(s);
+          s.on('error', () => undefined);
+          const timer = setTimeout(() => {
+            timedOut = true;
+            s.destroy();
+          }, CUSTOM_MS);
+          void s.opened.then((ok) => {
+            clearTimeout(timer);
+            live.delete(s);
+            if (ok && s.remotePublicKey && b4a.equals(s.remotePublicKey, target)) {
+              found = 'yes';
+              record({ way: 'custom', outcome: 'ok' });
+              win(s, 'custom', undefined, base);
+              return done('ok');
+            }
+            s.destroy();
+            const out = timedOut ? 'timeout' : relayOutcome(s.raw.closeCode);
+            if (out === 'refused') found = 'yes';
+            record({ way: 'custom', outcome: out, ...(s.raw.closeCode !== undefined ? { code: String(s.raw.closeCode) } : {}) });
+            done(out);
+          });
+        });
+        if (outcome === 'ok') return void pending--;
+      }
+      pending--;
+      fail();
+    };
+
+    if (customs.length) void startCustom();
     launch(order[0]!);
     timers.push(setTimeout(() => launch(order[1]!), stagger));
     timers.push(
@@ -375,6 +443,7 @@ export function dialMac(opts: DialOptions): Promise<Dialed> {
         for (const s of live) s.destroy();
         for (const w of order) if (!started[w]) record({ way: w, outcome: 'skipped' });
         for (const w of order) if (started[w] && !tried.some((t) => t.way === w)) record({ way: w, outcome: 'timeout' });
+        if (customRan && !tried.some((t) => t.way === 'custom')) record({ way: 'custom', outcome: 'timeout' });
         const r = report();
         finish(() => reject(new DialError('Your Mac didn’t answer in time', r)));
       }, opts.timeoutMs ?? 20_000),

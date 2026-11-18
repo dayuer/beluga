@@ -24,7 +24,7 @@ export interface Pairing {
 }
 
 /** The way that worked: hyperdht (LAN, then hole-punching) or the relay. */
-export type Way = 'p2p' | 'relay';
+export type Way = 'p2p' | 'relay' | 'custom';
 
 /**
  * What the phone remembers about reaching its Mac (kv, not secret): the relay URLs it has seen,
@@ -32,6 +32,8 @@ export type Way = 'p2p' | 'relay';
  */
 export interface LinkHints {
   readonly relays: readonly string[];
+  /** The Mac's relay on its own mesh address (ws://host:port/companion): kept apart from the Cloudflare relays, so those never push it out. */
+  readonly custom?: string;
   readonly prefer: Readonly<Record<string, Way>>;
 }
 
@@ -48,7 +50,7 @@ export interface DialReportJson {
   readonly found: 'yes' | 'no' | 'unknown';
   readonly recordAge?: number;
 }
-export type LinkPathName = 'lan' | 'direct' | 'relay';
+export type LinkPathName = 'lan' | 'direct' | 'relay' | 'custom';
 
 /** The phone's own secret: the device key's seed (hex, 32 bytes). Lives in the secure store only. */
 export interface DeviceSecret {
@@ -85,7 +87,7 @@ export type WorkletToUi =
   /** The answer to `probe`: did the link answer in time. */
   | { readonly ev: 'probe'; readonly id: number; readonly ok: boolean }
   /** How the link (or pairing) got through, on which network: kept to try that way first next time. */
-  | { readonly ev: 'path'; readonly path: LinkPathName; readonly way: Way; readonly tried: readonly Attempt[]; readonly relay?: string; readonly network?: string }
+  | { readonly ev: 'path'; readonly path: LinkPathName; readonly way: Way; readonly tried: readonly Attempt[]; readonly relay?: string; readonly custom?: string; readonly network?: string }
   | { readonly ev: 'ws.open'; readonly id: number; readonly url: string }
   | { readonly ev: 'ws.send'; readonly id: number; readonly b64: string }
   | { readonly ev: 'ws.close'; readonly id: number }

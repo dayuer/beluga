@@ -3,6 +3,7 @@ import type { IconName } from '../components/Icon.js';
 import type { SelectEntry } from '../components/select-parts.js';
 import { isSection } from '../components/select-model.js';
 import { locale, t } from '../i18n/index.js';
+import { hexOf } from './hex-colour.js';
 import { nativeMenus, picture } from './native-menu.js';
 
 /**
@@ -120,16 +121,6 @@ export interface SheetPalette {
   readonly bg: string;
   /** `#rrggbb`: var(--bg-raised), the sheet itself. */
   readonly surface: string;
-}
-
-/** `rgb(…)`, `rgba(…)` or `color(srgb …)` as WebKit computes it → `#rrggbb` (undefined: not a colour it gave). */
-export function hexOf(computed: string): string | undefined {
-  const byte = (n: number): string => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
-  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(computed);
-  if (rgb) return `#${byte(+rgb[1]!)}${byte(+rgb[2]!)}${byte(+rgb[3]!)}`;
-  const srgb = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(computed);
-  if (srgb) return `#${byte(+srgb[1]! * 255)}${byte(+srgb[2]! * 255)}${byte(+srgb[3]! * 255)}`;
-  return undefined;
 }
 
 /** The page's colours now, read off a probe under :root (custom properties resolve only on an element). */

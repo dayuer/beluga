@@ -106,6 +106,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
+- `packages/mac/src/phone/Phone.tsx`：两行，一个 import 和设置 › 手机里的 `<PhoneAdvanced />`（`packages/mac/src/fork/phone-advanced.tsx`：高级 › 自定义地址输入框和状态行，格式不对只提示不保存；中继引擎在 `src/companion/relay.ts`、`reach.ts`，手机端在 `dial.ts`，见 `docs/companion.md` 的 Any network）
 - `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
 
 ### 侧边栏
