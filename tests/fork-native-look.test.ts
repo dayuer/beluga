@@ -88,6 +88,24 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(read('fork', 'sidebar', 'one-selected.ts')).toContain("nav.setAttribute('data-fork-sidebar', '');");
   });
 
+  it('touches only a Mac: every rule starts with the Mac flag', () => {
+    const look = read('fork', 'native', 'native-look.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const selectors = [...look.matchAll(/(?:^|\})\s*([^{}]+)\{/g)].flatMap((m) => {
+      const out: string[] = [];
+      let depth = 0;
+      let cur = '';
+      for (const c of m[1]!) {
+        if (c === '(') depth++;
+        if (c === ')') depth--;
+        if (c === ',' && depth === 0) (out.push(cur.trim()), (cur = ''));
+        else cur += c;
+      }
+      return [...out, cur.trim()];
+    });
+    expect(selectors.length).toBeGreaterThan(20);
+    expect(selectors.filter((s) => !s.startsWith(":root[data-os='mac'] "))).toEqual([]);
+  });
+
   it('is loaded by the fork’s overlay, not by an upstream file', () => {
     const index = read('fork', 'calm', 'index.ts');
     expect(index).toContain("import '../native/native-look.css';");
