@@ -112,6 +112,24 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - packages/mac/src/lib/sheets.ts：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
 - `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
 
+### 手机的自定义地址（BLG-259–261，2026-11-18）
+
+手机经组网（GNB、ZeroTier、WireGuard、Nebula、Tailscale）连 Mac 的通道。它就是手机链路本身的一部分：Noise 握手、防火墙、DHT 记录、拨号竞速都在上游文件里，没有能单独接一行的地方，所以只能改在原处，每处尽量是加字段、加分支。地址的解析和状态文字在 fork 文件 `src/shared/custom-address.ts`，Mac 的设置界面在 `packages/mac/src/fork/phone-advanced.tsx`。
+
+- `src/companion/relay.ts`：中继除 127.0.0.1 外再监听一个用户给的地址（`listenOn` / `closeExtra`），同样的路由和 4010 防火墙；端口被占或没有这个地址时报错，从不换端口
+- `src/companion/reach.ts`：`setCustom` 开关这个监听（一次只改一个，失败每 30 秒重试），把 `ws://host:port/companion` 写进 DHT 记录
+- `src/companion/host.ts`、`src/companion/launch.ts`：设置变了就调 `setCustom`，远程访问为「仅组网」时关掉；welcome 里带上 `custom`
+- `src/companion/protocol.ts`：`welcome.custom`、`RelayRecord.custom`、`LinkPath` / `DialAttempt` 的 `custom`、`SINCE.customRoute`（topic/native 上 1.59，topic/plans 上 1.64，见上面编号一节）
+- `src/companion/dial.ts`：手机拨号时把自定义地址作为第三条路，和直连、Cloudflare 中继一起竞速
+- `src/companion/client.ts`：hints 里的 `custom`；经自定义地址连上时 hello 报 `custom`
+- `src/companion/diagnose.ts`：路径名里加「自定义地址」
+- `src/core/store.ts`：`companion.custom` 状态（监听中、失败及原因、关）
+- `src/ipc/api.ts`、`src/shared/settings-schema.ts`：`customAddress` 设置（本机设置，不同步）
+- `src/machines/sync.ts`：`customAddress` 列为不同步的本机设置
+- `packages/companion/worklet/link.ts`、`packages/companion/lib/link/bare.ts`、`packages/companion/lib/link/transport.ts`、`packages/companion/lib/link/rpc.ts`、`packages/companion/lib/store.ts`：手机端记住 Mac 给的自定义地址、拨它、把用到的路传给界面
+- `packages/companion/app/settings.tsx`：手机设置 › 高级里一行只读的「通过自定义地址连接」
+- `packages/companion/plugins/loopback-cleartext.js`：Android 允许任意主机走明文（自定义地址是事先不知道的 `ws://`；取舍见 `docs/companion.md`）
+
 ### 侧边栏
 
 - `packages/mac/src/layout/Sidebar.tsx`：四行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、`useOneSelected(drop.ref)` 和 `useSidebarKeys(drop.ref)` 两个钩子、标题栏里隐藏侧栏按钮后一个 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，铅笔图标，侧栏唯一的主操作，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它），以及顶部入口后的 `<SidebarEdge />`。标题栏的三个图标（用量、隐藏侧栏、新建任务）包在 Sidebar.module.css 的 `.titleTools` 里。Mac 原生调性（Claude Design「Mac原生侧边栏设计稿」2a）：选中行是中性灰（`--sb-selected`，侧栏有焦点时 10%，点到别处后 5.5%），图标仍是强调色；没有图标的项目用同一种中性灰的字母块（`components/ProjectIcon.module.css`，自己给项目设了颜色才上色）；分组标题的 + 和折叠箭头只在悬停时出现；`fork/sidebar/keys.ts` 的 `useSidebarKeys`：焦点在某一行上时 ↑ ↓ 在行间移动，Home、End 到首尾，→ 展开 ← 收起带折叠按钮的行（项目），回车和空格仍是上游的打开；输入框里的方向键不受影响，用例 `tests/fork-sidebar-keys.test.ts`。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。同一行的 `<SidebarEdge />`（`fork/sidebar/resize.tsx`）是侧栏右边可拖的边：复用上游右侧面板的 `ResizeHandle`，平时看不见，指针移上去才亮、光标变 col-resize；拖动时只改 `--sidebar-w`，松手才存进上游已有的 `sidebarWidth` 偏好（和设置里的滑块同一项，所以范围也一样：200–360），双击回到默认 248，键盘焦点在上面时 →/← 每次加减 8。减弱动态效果或沉稳界面下不做高亮过渡。范围与保存的用例：`tests/fork-sidebar-resize.test.ts`。
