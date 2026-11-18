@@ -99,8 +99,7 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   (`git fetch upstream && git push origin upstream/main:main`); nothing of the fork is committed
   on it. What upstream has already merged gets no branch of its own here.
 - **The fork's work is a chain of branches, each on the one before** (`docs/fork.md`, "分支"):
-  `topic/chinese` (the fork's Chinese beside upstream's, checked against upstream's latest:
-  `docs/chinese.md`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
+  `topic/chinese` (the fork's Chinese, written into upstream's `zh-CN.json`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
   `topic/native` (the Mac's own controls, menus, sheets, sidebar, calm UI) → `topic/plans` (plan
   roles, auto route, models, Autopilot). `topic/fixes` stands apart on `upstream/main`: small
   fixes meant for upstream. Synon Studio (clients, federation, My Sharing) is no longer here: since
