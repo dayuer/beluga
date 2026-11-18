@@ -1,0 +1,48 @@
+/*
+ * Mac-native touches on the web view (fork; docs/fork.md, "Mac 原生"). Reviewed against macOS's own
+ * apps in Claude Design ("Beluga topic/native · Mac 原生走查", 1a–1c). Only the look: every rule
+ * reuses an existing token (styles/tokens.css, components/ui.module.css), and the
+ * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/calm and fork/sidebar do;
+ * tests/fork-native-look.test.ts checks they still exist.
+ */
+
+/*
+ * The branch's next step in the toolbar (layout/BranchControl.tsx): a Mac toolbar has no accent-filled
+ * buttons, so Create PR and its ▾ are drawn as any bordered toolbar button, in the text colour.
+ * A failed step, a merged branch and Merge (green, its own variant) keep their colours. `:root` puts
+ * these above calm-accent.css's rule that repaints every primary button in the accent.
+ */
+:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
+  background: linear-gradient(var(--control-top), var(--control));
+  color: var(--text);
+  box-shadow: var(--control-bezel);
+  font-weight: 400;
+}
+:root button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']):active:not(:disabled) {
+  background: linear-gradient(var(--control-press), var(--control-press));
+}
+:root button[data-branch-more][class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_'])::before {
+  background: var(--hairline-strong);
+}
+
+/* The dock's tabs (layout/panel/panel.module.css): the one you're on is in bold text, not underlined. */
+[role='tablist'][class*='_dockTabs_'] > [class*='_tabOn_'][class*='_tabOn_'] {
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* The panel's views when there is only one (Overview: Info): a title, not a lone raised segment. */
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) {
+  background: none;
+}
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) > [role='tab'] {
+  background: none;
+  box-shadow: none;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* An empty chat's starters (views/ChatView.tsx): plain bordered buttons, words only. */
+[class*='_emptyActions_'] > button > svg {
+  display: none;
+}
