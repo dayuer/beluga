@@ -390,6 +390,14 @@ M8 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm
 | 文件 | 改了几行 | 原因 |
 | --- | ---: | --- |
 | `packages/mac/vite.config.ts` | 2 | 接入构建时字号改写插件 `calmType()`（BLG-244）；沉稳关时变量未定义，改写后的值与原值一致 |
+| `packages/mac/e2e/chat-drag.spec.ts` | 2 | Unread 行的用例在点了「Your Mac」之后把指针移出侧栏：沉稳界面在指针停在侧栏里时不重排（BLG-165），Unread 行要等指针离开才出现。沉稳关时用例原样通过，是 fork 既定行为与上游用例的冲突，不是缺陷（BLG-255） |
+| `packages/mac/e2e/chat-paths.spec.ts` | 6 | 房间里点一个不在任何 worktree、也不在任何共享里的文件夹路径，上游自己的 `actions.ts`（BLG-958 的 `openLocalFolder`）现在交给 Finder，不再打开 Files；用例原来断言聊天消失、能看到 `notes.md`，改为断言聊天留在原处。这是上游的用例落后于上游的行为，与 fork 无关（BLG-255），可以提回上游 |
+| `packages/mac/e2e/network.spec.ts` | 8 | 推广卡在沉稳界面下被隐藏（BLG-250），第一条和最后一条用例测的就是那张卡，所以以沉稳关运行。 |
+| `packages/mac/e2e/network-chats.spec.ts` | 4 | 同上：测推广卡的用例以沉稳关运行。 |
+| `packages/mac/e2e/unread.spec.ts` | 4 | 指针停在侧栏里时沉稳冻结顺序（BLG-165），Unread 行要等；这条测行本身，所以以沉稳关运行。 |
+| `packages/mac/e2e/project-home-narrow.spec.ts` | 4 | 沉稳给布局变化 120–200ms 过渡，量宽度前等 300ms 让盒子停下；另外「长分支名」一例在基线上就失败（Create Worktree 超出盒子），标 `test.fixme` 并写明原因。 |
+| `packages/mac/e2e/pr-next-step.spec.ts` | 3 | 基线已有：同一行在侧栏里出现两次（项目与 Work），严格模式断言改取 `.first()`。 |
+| `packages/mac/e2e/live-preview.spec.ts` | 10 | 基线已有：对比度辅助函数把原生控件的渐变按钮当作透明底；改用渐变最后一个色标，并识别 `color(srgb …)` 的 0–1 取值。 |
 
 `fork/calm/calm-glow.css` 只定义令牌，且只在 `:root[data-calm]` 下；上游 CSS 里的光晕在构建时改写成带原值回退的令牌引用（`glow-scan.ts`），沉稳关时变量未定义，画面与上游一致，不动上游文件。`onboarding/scenes`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call`、`YourCard` 是 keep-decor，不做字号改写，也不动光晕（`type-scale.ts` 的 `skipFile`、`glow-scan.ts` 的 `skipGlowFile`）。
 

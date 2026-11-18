@@ -141,6 +141,8 @@
 :root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {
   display: none;
 }
-:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden] {
+/* The earnings pill is the exception: upstream hides it on hover so the row's tools take its place and nothing slides
+   under the pointer (project-groups.module.css), and bringing it back would put it there again. */
+:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)) [data-fork-mark-hidden]:not([data-earnings-pill]) {
   display: revert;
 }

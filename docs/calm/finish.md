@@ -759,3 +759,20 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 | 深色 | ![](img/m8-cpr-final-off-dark.png) | ![](img/m8-cpr-final-on-dark.png) |
 
 计算样式（Create PR 按钮及 6 层祖先）：沉稳开 `background` 是纯色 `rgb(0 117 255)`，`box-shadow: none`，`filter`、`outline` 无，祖先无任何阴影、滤镜或轮廓；沉稳关是渐变加三层阴影（见 §1.7）。图上可见：沉稳开是平的纯色，没有光晕。
+
+## 9. 全量 e2e（BLG-255）
+
+**基线已有的失败，逐条处理**（基线 = topic/native 350e15ea9，在临时 worktree 里同样复现）：
+
+| 用例 | 处理 |
+| --- | --- |
+| chat-drag:199、chat-paths:14 | 改 spec：前者在点「Your Mac」后把指针移出侧栏（沉稳在指针停在侧栏里时冻结顺序，BLG-165），后者按当前行为断言路径；登记在 docs/fork.md |
+| unread:144 | 同样把指针移出侧栏，且以沉稳关运行 |
+| live-preview:221 | 对比度辅助函数把渐变按钮当作透明底；改取渐变最后一个色标并识别 `color(srgb …)` 的 0–1 取值（修的是测试，不是界面） |
+| pr-next-step:44 | 同一行在侧栏出现两次，严格模式断言改取 `.first()` |
+| project-home-narrow「长分支名」 | 基线就失败：1900px 窗口里 Create Worktree 超出盒子。标 `test.fixme` 并写明原因，**未修**（不是 M8 的，布局在上游文件里） |
+| app:437、agent-term:152 | 单独重跑都通过，是负载造成的抖动，无需改动 |
+
+**M8 自己造成、已修的两处**：network 的两条推广卡用例（卡片在沉稳下被隐藏，用例以沉稳关运行）；subagents:82（悬停时把金额点阵一起翻出来，改成悬停不翻出金额，见 sidebar-look.css）。
+
+**整轮结果**：`E2E_WORKERS=3 npm run e2e`，636 个用例：606 通过、8 失败、15 跳过、7 未运行，用时 27.3 分钟。机器负载在 13–25 之间（同时有别的会话在跑），不算空闲；因此 8 个失败都单独重跑：background-fetch:12、render-calm:31、sentinel:358、sidebar-calm:12、calls:73、worktree-link:15 单独重跑全部通过（负载抖动）；network:249 单独重跑也失败，原因是漏了沉稳关，补上后通过；project-home-narrow 的长分支名一例见上，标 fixme。清零后：失败 0，fixme 1。
