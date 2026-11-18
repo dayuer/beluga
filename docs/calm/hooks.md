@@ -197,7 +197,7 @@ export function JumpLabel({ rows }: { rows: number }): JSX.Element;
 
 ### 2.6 证据（BLG-166）
 
-- `fork/calm/new-below.tsx`：按钮挂载即离开底部，行数差就是新消息数；calm 关渲染与上游相同的 `Icon + Latest`；`{0} new` 的词条加在 `i18n/zh-CN.fork.json`（上游文件不碰）。
+- `fork/calm/new-below.tsx`：按钮挂载即离开底部，行数差就是新消息数；calm 关渲染与上游相同的 `Icon + Latest`；`{0} new` 的词条加在 `i18n/zh-CN.json`。
 - `calm-check` 的 `chatrun` 已加 `anchor` 测量（`offsetPx`、`hint`、`newRows`，字段只增不改）；`plan`/`tasks` 等其它场景的 JSON 不变。按计划在里程碑最终步骤统一跑，calm-on/full 的 `offsetPx` 应为 0。若不为 0，先试 §2.2 的一行虚拟列表补偿（upstream-ok，PR 候选）。
 - 现有 `chat-*.spec.ts` 的 e2e 同样在最终步骤统一跑。
 
@@ -393,7 +393,7 @@ M0 已登记的 3 处（`main.tsx`、`Settings.tsx`、`tests/mac-settings-search
 | `packages/mac/src/lib/undo-toast.tsx` | +7 / -4 | import、`useOneToast`、`!one` 返回 null、⌘Z 只对可见的那条挂、`data-one-toast` | 撤销是模块级状态，两套要在同一判据下 | ✅ |
 | `packages/mac/src/lib/live-motion.ts` | +13 / -6 | import + `tick`/`wake`/`watch`/`joinLive` 的门 | 时钟的 `seen`/`marks` 是模块私有的 | ✅ |
 
-合计 **6 个上游文件、+35 / −16 行**。其余改动都在 fork 自己的文件里：`fork/calm/hold-order.ts`、`new-below.tsx`、`one-toast.ts`、`one-toast.css`、`live-gate.ts`、`i18n/zh-CN.fork.json`、`scripts/calm-check.mjs`、两个 e2e、三个单测、本文档与 `docs/fork.md`。M0 的 3 处上游接入（`main.tsx`、`dialogs/Settings.tsx`、`tests/mac-settings-search.test.ts`）在本分支起点就已登记，不在上面的 diff 里。
+合计 **6 个上游文件、+35 / −16 行**。其余改动都在 fork 自己的文件里：`fork/calm/hold-order.ts`、`new-below.tsx`、`one-toast.ts`、`one-toast.css`、`live-gate.ts`、`i18n/zh-CN.json` 的词条、`scripts/calm-check.mjs`、两个 e2e、三个单测、本文档与 `docs/fork.md`。M0 的 3 处上游接入（`main.tsx`、`dialogs/Settings.tsx`、`tests/mac-settings-search.test.ts`）在本分支起点就已登记，不在上面的 diff 里。
 
 ### 10.2 `sync-upstream.mjs --report`
 
