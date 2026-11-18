@@ -71,6 +71,7 @@ export const LOCAL_SETTINGS = [
   'computerIcon',
   'mouse',
   'tunnel',
+  'customAddress',
   'keepAwake',
   'lowPower',
   // Whether a background fetch is welcome depends on this computer's git keys (#479: a vault that asks each time).
