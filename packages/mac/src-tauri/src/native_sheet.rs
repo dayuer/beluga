@@ -181,6 +181,27 @@ pub struct AsideButton {
     pub label: String,
 }
 
+/// The colours the page draws in now (Settings › Appearance), each `#rrggbb`: the sheet follows them,
+/// not the Mac's own light/dark and accent, so it matches the window it slides out of.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetPalette {
+    pub dark: bool,
+    pub accent: String,
+    pub bg: String,
+    pub surface: String,
+}
+
+/// `#rrggbb` → its red, green and blue, 0–1.
+pub fn rgb_of(hex: &str) -> Option<(f64, f64, f64)> {
+    let h = hex.strip_prefix('#')?;
+    if h.len() != 6 || !h.is_ascii() {
+        return None;
+    }
+    let byte = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).ok().map(|b| f64::from(b) / 255.0);
+    Some((byte(0)?, byte(2)?, byte(4)?))
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSpec {
@@ -202,6 +223,8 @@ pub struct SheetSpec {
     pub error: Option<String>,
     #[serde(default)]
     pub width: Option<f64>,
+    #[serde(default)]
+    pub palette: Option<SheetPalette>,
 }
 
 /// What the sheet says back to the page.
@@ -227,17 +250,19 @@ pub fn filtered(text: &str, max_length: Option<usize>, upper: bool, keep: Option
 
 #[cfg(target_os = "macos")]
 mod mac {
-    use super::{SheetEvent, SheetOption, SheetRow, SheetSpec};
+    use super::{rgb_of, SheetEvent, SheetOption, SheetPalette, SheetRow, SheetSpec};
+    use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol, ProtocolObject, Sel};
     use objc2::{define_class, msg_send, sel, AllocAnyThread, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_app_kit::{
-        NSBackingStoreType, NSBezelStyle, NSBox, NSBoxType, NSImageView, NSTitlePosition, NSBorderType, NSButton, NSButtonType, NSColor, NSControl, NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSFont,
+        NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSBackingStoreType, NSBezelStyle, NSBox, NSBoxType, NSImageView, NSTitlePosition, NSBorderType, NSButton, NSButtonType, NSColor, NSControl, NSControlStateValueOff, NSControlStateValueOn, NSControlTextEditingDelegate, NSFont,
         NSForegroundColorAttributeName, NSImage, NSMenuItem, NSPanel, NSPopUpButton, NSScrollView, NSSegmentSwitchTracking, NSSegmentedControl, NSTextAlignment, NSTextDelegate, NSTextField,
         NSTextFieldDelegate, NSTextView, NSTextViewDelegate, NSView, NSWindow, NSWindowStyleMask,
     };
     use objc2_foundation::{NSArray, NSData, NSNotification, NSPoint, NSRange, NSRect, NSSize, NSString};
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
+    use std::ptr::NonNull;
 
     const MARGIN: f64 = 20.0;
     const GAP: f64 = 10.0;
@@ -300,6 +325,20 @@ mod mac {
     thread_local! {
         static SHEET: RefCell<Option<Sheet>> = const { RefCell::new(None) };
         static NEXT_ID: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+        /// The page's colours for the sheet being built or updated (none: the Mac's own).
+        static PALETTE: RefCell<Option<SheetPalette>> = const { RefCell::new(None) };
+    }
+
+    fn colour(pick: impl FnOnce(&SheetPalette) -> &str) -> Option<Retained<NSColor>> {
+        PALETTE.with(|p| p.borrow().as_ref().and_then(|p| rgb_of(pick(p))).map(|(r, g, b)| NSColor::colorWithSRGBRed_green_blue_alpha(r, g, b, 1.0)))
+    }
+    /// The accent the page uses (Settings › Accent), or the Mac's.
+    fn accent() -> Retained<NSColor> {
+        colour(|p| &p.accent).unwrap_or_else(NSColor::controlAccentColor)
+    }
+    /// Under the cards: the page's var(--bg), or the Mac's text background.
+    fn card_fill() -> Retained<NSColor> {
+        colour(|p| &p.bg).unwrap_or_else(NSColor::textBackgroundColor)
     }
 
     /// The sheet as it is, for a callback: none while it's being updated (`update` holds it, and
@@ -529,7 +568,7 @@ mod mac {
                 }
                 let from = text[..start].encode_utf16().count();
                 let len = text[start..end].encode_utf16().count();
-                unsafe { storage.addAttribute_value_range(NSForegroundColorAttributeName, &NSColor::controlAccentColor(), NSRange::new(from, len)) };
+                unsafe { storage.addAttribute_value_range(NSForegroundColorAttributeName, &accent(), NSRange::new(from, len)) };
                 break;
             }
         }
@@ -680,8 +719,24 @@ mod mac {
     }
 
     /// The accent mixed into the window's background, as color-mix(in srgb, var(--accent) N%, var(--bg)).
+    /// A dynamic colour, mixed again in the appearance it is drawn in: blending the two system colours
+    /// once resolves them in whatever appearance is current at that moment (the system's, not the
+    /// window's), so a light window on a dark Mac got a dark navy card and callout.
     fn tint(fraction: f64) -> Retained<NSColor> {
-        NSColor::textBackgroundColor().blendedColorWithFraction_ofColor(fraction, &NSColor::controlAccentColor()).unwrap_or_else(NSColor::textBackgroundColor)
+        if let (Some(bg), Some(accent)) = (colour(|p| &p.bg), colour(|p| &p.accent)) {
+            return bg.blendedColorWithFraction_ofColor(fraction, &accent).unwrap_or(bg);
+        }
+        let provider = RcBlock::new(move |appearance: NonNull<NSAppearance>| -> NonNull<NSColor> {
+            let mixed: Cell<Option<Retained<NSColor>>> = Cell::new(None);
+            let resolve = RcBlock::new(|| {
+                let bg = NSColor::textBackgroundColor();
+                mixed.set(Some(bg.blendedColorWithFraction_ofColor(fraction, &NSColor::controlAccentColor()).unwrap_or(bg)));
+            });
+            unsafe { appearance.as_ref() }.performAsCurrentDrawingAppearance(&resolve);
+            let color = mixed.take().unwrap_or_else(NSColor::textBackgroundColor);
+            NonNull::new(Retained::autorelease_return(color)).expect("a colour")
+        });
+        unsafe { NSColor::colorWithName_dynamicProvider(None, &provider) }
     }
 
     fn custom_box(mtm: MainThreadMarker) -> Retained<NSBox> {
@@ -697,15 +752,15 @@ mod mac {
     fn style_card(card: &Card, on: bool) {
         if on {
             card.boxed.setBorderWidth(1.5);
-            card.boxed.setBorderColor(&NSColor::controlAccentColor());
+            card.boxed.setBorderColor(&accent());
             card.boxed.setFillColor(&tint(0.08));
         } else {
             card.boxed.setBorderWidth(0.5);
             card.boxed.setBorderColor(&NSColor::separatorColor());
-            card.boxed.setFillColor(&NSColor::textBackgroundColor());
+            card.boxed.setFillColor(&card_fill());
         }
         if let Some(icon) = &card.icon {
-            let tint = if on { NSColor::controlAccentColor() } else { NSColor::tertiaryLabelColor() };
+            let tint = if on { accent() } else { NSColor::tertiaryLabelColor() };
             icon.setContentTintColor(Some(&tint));
         }
     }
@@ -854,7 +909,7 @@ mod mac {
                 SheetRow::Callout { text, detail } => {
                     let boxed = custom_box(mtm);
                     boxed.setBorderWidth(0.5);
-                    boxed.setBorderColor(&NSColor::controlAccentColor().colorWithAlphaComponent(0.4));
+                    boxed.setBorderColor(&accent().colorWithAlphaComponent(0.4));
                     boxed.setFillColor(&tint(0.07));
                     let inside: Retained<Flipped> = unsafe { msg_send![Flipped::alloc(mtm), initWithFrame: NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(100.0, 40.0))] };
                     boxed.setContentView(Some(&inside));
@@ -1189,6 +1244,15 @@ mod mac {
 
     fn apply_chrome(sheet: &Sheet) {
         let spec = &sheet.spec;
+        // Light or dark as the page is (its own setting may differ from the Mac's), on its sheet colour,
+        // the main button in its accent. No palette: the Mac's own, as before.
+        let look = spec.palette.as_ref().and_then(|p| NSAppearance::appearanceNamed(if p.dark { unsafe { NSAppearanceNameDarkAqua } } else { unsafe { NSAppearanceNameAqua } }));
+        sheet.panel.setAppearance(look.as_deref());
+        match colour(|p| &p.surface) {
+            Some(surface) => sheet.panel.setBackgroundColor(Some(&surface)),
+            None => sheet.panel.setBackgroundColor(Some(&NSColor::windowBackgroundColor())),
+        }
+        sheet.submit.setBezelColor(colour(|p| &p.accent).as_deref());
         sheet.title.setStringValue(&NSString::from_str(&spec.title));
         sheet.intro.setStringValue(&NSString::from_str(spec.intro.as_deref().unwrap_or("")));
         sheet.cancel.setTitle(&NSString::from_str(&spec.cancel));
@@ -1229,6 +1293,7 @@ mod mac {
     pub fn open(parent: *mut std::ffi::c_void, spec: SheetSpec, emit: Box<dyn Fn(SheetEvent)>) -> Option<u64> {
         let mtm = MainThreadMarker::new()?;
         close(None);
+        PALETTE.with(|p| *p.borrow_mut() = spec.palette.clone());
         // SAFETY: the app's own window, read on this thread just now; alive while it's open.
         let parent = unsafe { parent.cast::<NSWindow>().as_ref() }?;
         let parent: Retained<NSWindow> = unsafe { Retained::retain(parent as *const NSWindow as *mut NSWindow) }.expect("window");
@@ -1301,8 +1366,11 @@ mod mac {
         SHEET.with(|s| {
             let Ok(mut s) = s.try_borrow_mut() else { return };
             let Some(sheet) = s.as_mut().filter(|sheet| sheet.id == id) else { return };
+            let recoloured = spec.palette != sheet.spec.palette;
+            PALETTE.with(|p| *p.borrow_mut() = spec.palette.clone());
             let shape: Vec<String> = spec.rows.iter().map(SheetRow::shape).collect();
-            let rebuilt = shape != sheet.shape;
+            // New colours: build the rows again, so every card and callout takes them.
+            let rebuilt = shape != sheet.shape || recoloured;
             if rebuilt {
                 for row in sheet.rows.drain(..) {
                     if let Some(l) = row.label {
@@ -1414,6 +1482,23 @@ mod tests {
     use super::*;
 
     /// The form as lib/native-sheet.ts sends it (its `wire`): every kind of row, a footer, a picture.
+    #[test]
+    fn takes_the_page_s_colours_and_draws_in_the_mac_s_without_them() {
+        let json = r##"{ "title": "How It Runs", "rows": [], "cancel": "Cancel", "submit": "Switch", "canSubmit": false,
+            "palette": { "dark": false, "accent": "#3b82f6", "bg": "#ffffff", "surface": "#f8f9fb" } }"##;
+        let spec: SheetSpec = serde_json::from_str(json).expect("the page's form");
+        let p = spec.palette.expect("its colours");
+        assert!(!p.dark);
+        assert_eq!(rgb_of(&p.accent), Some((59.0 / 255.0, 130.0 / 255.0, 246.0 / 255.0)));
+        assert_eq!(rgb_of(&p.bg), Some((1.0, 1.0, 1.0)));
+        // An older page sends none: the sheet keeps the Mac's own light/dark and accent.
+        let old: SheetSpec = serde_json::from_str(r#"{ "title": "T", "rows": [], "cancel": "C", "submit": "S", "canSubmit": true }"#).expect("form");
+        assert!(old.palette.is_none());
+        for bad in ["", "3b82f6", "#3b82f", "#3b82f6ff", "#zzzzzz", "#é3b82f"] {
+            assert_eq!(rgb_of(bad), None, "{bad}");
+        }
+    }
+
     #[test]
     fn reads_the_form_the_page_sends() {
         let json = r#"{

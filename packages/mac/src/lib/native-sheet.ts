@@ -111,8 +111,48 @@ async function choices(options: readonly SheetChoice[]): Promise<unknown[]> {
   );
 }
 
+/** The colours the sheet draws in, as the page has them now (Settings › Appearance: light or dark, the theme, the accent). */
+export interface SheetPalette {
+  readonly dark: boolean;
+  /** `#rrggbb`: var(--accent), the cards' outline and tint, the main button. */
+  readonly accent: string;
+  /** `#rrggbb`: var(--bg), under the cards. */
+  readonly bg: string;
+  /** `#rrggbb`: var(--bg-raised), the sheet itself. */
+  readonly surface: string;
+}
+
+/** `rgb(…)`, `rgba(…)` or `color(srgb …)` as WebKit computes it → `#rrggbb` (undefined: not a colour it gave). */
+export function hexOf(computed: string): string | undefined {
+  const byte = (n: number): string => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
+  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(computed);
+  if (rgb) return `#${byte(+rgb[1]!)}${byte(+rgb[2]!)}${byte(+rgb[3]!)}`;
+  const srgb = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/.exec(computed);
+  if (srgb) return `#${byte(+srgb[1]! * 255)}${byte(+srgb[2]! * 255)}${byte(+srgb[3]! * 255)}`;
+  return undefined;
+}
+
+/** The page's colours now, read off a probe under :root (custom properties resolve only on an element). */
+function palette(): SheetPalette | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const probe = document.createElement('span');
+  probe.style.display = 'none';
+  document.documentElement.appendChild(probe);
+  const read = (v: string): string | undefined => {
+    probe.style.color = `var(${v})`;
+    return hexOf(getComputedStyle(probe).color);
+  };
+  const accent = read('--accent');
+  const bg = read('--bg');
+  const surface = read('--bg-raised') ?? bg;
+  probe.remove();
+  if (!accent || !bg || !surface) return undefined;
+  return { dark: document.documentElement.dataset.theme === 'dark', accent, bg, surface };
+}
+
 /** The form as the sheet takes it: words translated, labels with their colon, pictures drawn. */
 async function wire(spec: SheetSpec): Promise<unknown> {
+  const colours = palette();
   const rows = await Promise.all(
     spec.rows.map(async (row) => {
       switch (row.kind) {
@@ -152,6 +192,7 @@ async function wire(spec: SheetSpec): Promise<unknown> {
     busy: Boolean(spec.busy),
     ...(spec.error ? { error: spec.error } : {}),
     ...(spec.width ? { width: spec.width } : {}),
+    ...(colours ? { palette: colours } : {}),
   };
 }
 
@@ -174,7 +215,8 @@ export function useNativeSheet(on: boolean, spec: SheetSpec, handlers: SheetHand
   // A change the page didn't take as typed (clamped, refused, a checkbox that can't change) has
   // to go back to the control: each change sends the form again.
   const [, poke] = useState(0);
-  const key = JSON.stringify(spec, (_k, v: unknown) => (typeof v === 'object' && v !== null && '$$typeof' in v ? `mark:${String((v as { key?: unknown }).key ?? '')}` : v));
+  // The colours count too: switching the theme or accent with the sheet open draws it again.
+  const key = JSON.stringify(palette() ?? null) + JSON.stringify(spec, (_k, v: unknown) => (typeof v === 'object' && v !== null && '$$typeof' in v ? `mark:${String((v as { key?: unknown }).key ?? '')}` : v));
 
   useEffect(() => {
     if (!on) return;
