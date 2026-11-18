@@ -1,0 +1,19 @@
+/*
+ * Calm mode: the right panel's views (Changes, Files, Scratch, Info…) keep a fixed width. Upstream
+ * stretches the strip to the panel (`.tabs { width: 100% }`, each `.tab { flex: 1 1 0 }`), so the
+ * tabs grow and shrink as the panel is resized. Here each tab is as wide as its icon and name, and
+ * the strip sits centred in the panel's head, like the Work page's segmented control. A narrow
+ * panel still folds the names of the tabs you're not on (upstream's `.tabsFolded`), so nothing
+ * overflows. Calm off: upstream as it is. Anchors: layout/panel/panel.module.css
+ * (tests/fork-calm-tabs.test.ts).
+ */
+:root[data-calm] [role='tablist'][class*='_tabs_'] {
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+}
+:root[data-calm] [role='tablist'][class*='_tabs_'] > [class*='_tab_'],
+:root[data-calm] [role='tablist'][class*='_tabsFolded_'] > [class*='_tabOn_'] {
+  flex: 0 0 auto;
+  padding: 0 12px;
+}

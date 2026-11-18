@@ -58,6 +58,8 @@ for (const c of cases) {
     await expect(sidebar(page)).toBeVisible();
     await openHome(page);
     if (c.page) await page.addStyleTag({ content: `[aria-label="bob-api home"] { flex: 0 0 ${c.page}px !important; max-width: ${c.page}px; }` });
+    // Calm mode gives layout changes a 120–200ms transition: measure once no CSS transition is still running.
+    await page.waitForFunction(() => document.getAnimations().every((a) => !(a instanceof CSSTransition) || a.playState !== 'running'));
     const section = page.getByRole('region', { name: 'Start something' });
     // The demo's projects start from origin/main: the pop-up shows a longer name in its place.
     if (c.branch)
