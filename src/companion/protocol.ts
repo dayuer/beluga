@@ -150,8 +150,6 @@ export const COMPANION_PROTO = { major: 1, minor: 64 } as const;
  * neither ticked nor explained, and whether its work already merged. An older Mac sends none; an older phone shows none.
  * 1.57 (BLG-401): `ConvView.schedules`, `TurnView.origin.sentinel`, `queue[].origin.sentinel`: a chat's
  * schedules (Run and Pause only), and a message one of your sentinels sent says so.
- * 1.64 (BLG-259; 1.59 on topic/native, where 1.59–1.63 are free): a custom address (a mesh network's, GNB, ZeroTier, WireGuard, Nebula, Tailscale): `welcome.custom` and
- * `RelayRecord.custom` name the Mac's relay there (SINCE.customRoute); the phone races it with the others.
  * 1.58 (BLG-981, BLG-982): Full Autopilot, a stand-in agent answering for you: a chat's
  * (`ConvView.autopilot`, `session.setAutopilot`) and a plan's (`PlanView.fullAuto`, `plans.setFullAuto`);
  * and who plans, builds and checks a plan (`PlanView.planner` / `checker`, `plans.setRoleAgent`). An
@@ -162,6 +160,8 @@ export const COMPANION_PROTO = { major: 1, minor: 64 } as const;
  * 1.62 (was 1.61 until upstream took 1.57, BLG-74, fork; was 1.60, before that 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
+ * 1.64 (BLG-259; 1.59 on topic/native, where 1.59–1.63 are free): a custom address (a mesh network's, GNB, ZeroTier, WireGuard, Nebula, Tailscale): `welcome.custom` and
+ * `RelayRecord.custom` name the Mac's relay there (SINCE.customRoute); the phone races it with the others.
  */
 export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autopilot: 58, planRoles: 58, customRoute: 64 } as const;
 

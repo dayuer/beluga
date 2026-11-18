@@ -384,10 +384,14 @@ export class CompanionClient extends Emitter<ClientEvents> {
     this.topics = [...(opts.topics ?? ['home'])];
   }
 
-  /** What hello says of the way: an older Mac doesn't know `custom` (a path or an attempt), so it hears `relay`. */
+  /**
+   * What hello says of the way. A link that came over the custom address says `custom`: the Mac that
+   * answered there published it, so it knows the word. Otherwise the custom attempts are left out
+   * unless the hints say this Mac knows them (an older Mac doesn't).
+   */
   private via(path: import('./protocol.js').LinkPath, tried: import('./protocol.js').DialAttempt[]) {
-    const ok = this.opts.hints?.reportCustom === true;
-    return { path: !ok && path === 'custom' ? ('relay' as const) : path, tried: tried.filter((t) => ok || t.way !== 'custom').slice(-8) };
+    const ok = this.opts.hints?.reportCustom === true || path === 'custom';
+    return { path, tried: tried.filter((t) => ok || t.way !== 'custom').slice(-8) };
   }
 
   get connected(): boolean {

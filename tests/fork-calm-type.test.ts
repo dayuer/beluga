@@ -2,17 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { JUSTIFIED, REMAINING_LIMIT, planSize, planWeight, rewriteType, skipFile, summarize } from '../packages/mac/src/fork/calm/type-scale.js';
-import { readdirSync, statSync } from 'node:fs';
-
-/** Every .css under packages/mac/src, with its path relative to src (as fork-calm-glow.test.ts reads them). */
-function macCss(dir = path.join('packages', 'mac', 'src'), rel = ''): { rel: string; css: string }[] {
-  return readdirSync(dir).flatMap((f) => {
-    const abs = path.join(dir, f);
-    const r = rel ? `${rel}/${f}` : f;
-    if (statSync(abs).isDirectory()) return macCss(abs, r);
-    return f.endsWith('.css') ? [{ rel: r, css: readFileSync(abs, 'utf8') }] : [];
-  });
-}
+import { macCss } from './fork-calm-files.js';
 
 /**
  * The type scale (M8, BLG-252 and BLG-244; docs/calm/finish.md §3). The tokens are defined only

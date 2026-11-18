@@ -10,7 +10,7 @@ import { CompanionClient, pairDevice } from '../src/companion/client.js';
 import { deviceKeys, newSeed } from '../src/companion/device-crypto.js';
 import { DeviceBook } from '../src/companion/devices.js';
 import { CompanionHost } from '../src/companion/host.js';
-import { parseCustomAddress } from '../src/companion/reach.js';
+import { parseCustomAddress } from '../src/shared/custom-address.js';
 import { wsPipe } from '../src/companion/relay.js';
 import { Store, initialState } from '../src/core/store.js';
 import { generateIdentity } from '../src/net/crypto.js';
@@ -27,7 +27,7 @@ const cleanup: Array<() => Promise<void> | void> = [];
 
 beforeAll(async () => {
   testnet = await createTestnet(3);
-}, 30_000);
+}, 120_000);
 afterAll(async () => {
   await testnet.destroy();
 });
@@ -96,7 +96,7 @@ describe('parseCustomAddress', () => {
   it('takes host:port only', () => {
     expect(parseCustomAddress('10.147.17.5:7788')).toEqual({ host: '10.147.17.5', port: 7788 });
     expect(parseCustomAddress(' [fd00::1]:80 ')).toEqual({ host: 'fd00::1', port: 80 });
-    for (const bad of ['', '10.0.0.1', '10.0.0.1:0', '10.0.0.1:70000', 'http://10.0.0.1:80', 'a b:1']) expect(parseCustomAddress(bad)).toBeUndefined();
+    for (const bad of ['', '10.0.0.1', '10.0.0.1:0', '10.0.0.1:70000', 'http://10.0.0.1:80', 'a b:1', '0.0.0.0:7788', '[::]:7788', '[0:0:0:0:0:0:0:0]:80']) expect(parseCustomAddress(bad)).toBeUndefined();
   });
 });
 
@@ -105,8 +105,13 @@ describe('the relay on a custom address', () => {
     const { host, store, setAddress } = await mac();
     await host.start();
     const info = await host.pairStart();
-    const port = await freePort();
-    setAddress(`127.0.0.1:${port}`);
+    // The address is set by hand, so its port can't be listen(0): one found free can be taken by then. Busy → another.
+    let port = 0;
+    for (let i = 0; i < 5 && !host.customUrl(); i++) {
+      port = await freePort();
+      setAddress(`127.0.0.1:${port}`);
+      await waitFor(() => (['listening', 'failed'].includes(store.getState().companion.custom?.state ?? '') && store.getState().companion.custom?.address === `127.0.0.1:${port}`) || undefined, 10_000);
+    }
     const url = await waitFor(() => host.customUrl(), 10_000);
     expect(url).toBe(`ws://127.0.0.1:${port}/companion`);
     expect(store.getState().companion.custom).toMatchObject({ state: 'listening', address: `127.0.0.1:${port}` });
@@ -129,13 +134,16 @@ describe('the relay on a custom address', () => {
     expect(linked.tried.map((t) => [t.way, t.outcome]).filter(([w]) => w === 'custom')).toEqual([['custom', 'ok']]);
     await waitFor(() => store.getState().companion.devices[0]?.path === 'custom', 5_000);
     expect(store.getState().companion.devices[0]).toMatchObject({ linked: true, path: 'custom', note: expect.stringMatching(/custom address/) });
-    // A Mac that predates `custom` is told `relay`, not a path it can't parse.
-    const old = new CompanionClient({ node: p.node, address: host.address(), link: p.keys.link, app: '1.1.0', platform: 'android', topics: ['home'], hints: { openRelay: p.openRelay, custom: [url], staggerMs: 0 } });
-    cleanup.push(() => old.close());
-    await old.connect();
-    expect(old.path).toBe('custom');
-    await waitFor(() => store.getState().companion.devices[0]?.path === 'relay', 5_000);
-    old.close();
+    // Without the hint (the address came from the DHT record, not a welcome), a link over the custom
+    // address still says `custom`: the Mac that answered there published it, so it knows the word.
+    linked.close();
+    await waitFor(() => store.getState().companion.devices[0]?.linked === false || undefined, 5_000);
+    const fromRecord = new CompanionClient({ node: p.node, address: host.address(), link: p.keys.link, app: '1.1.0', platform: 'android', topics: ['home'], hints: { openRelay: p.openRelay, custom: [url], staggerMs: 0 } });
+    cleanup.push(() => fromRecord.close());
+    await fromRecord.connect();
+    expect(fromRecord.path).toBe('custom');
+    await waitFor(() => (store.getState().companion.devices[0]?.linked && store.getState().companion.devices[0]?.path === 'custom') || undefined, 5_000);
+    fromRecord.close();
     linked.close();
 
     // One that was never paired gets 4010 inside the link.

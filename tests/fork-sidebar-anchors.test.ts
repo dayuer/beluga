@@ -58,6 +58,11 @@ describe('the sidebar look’s upstream anchors', () => {
     expect(marks).toContain('<span className={m.edge} data-signal="needs"');
   });
 
+  it('finds the folded group\'s live dot and a plan row\'s inside dot (one-mark.ts ranks them working and quiet)', () => {
+    expect(read('layout', 'ProjectGroups.tsx')).toContain('<DotMark tone="claude" live signal="busy" />');
+    expect(read('layout', 'plan-row.tsx')).toContain('<DotMark tone="muted" signal="inside" />');
+  });
+
   it('finds the scroll area and the fold button the arrow keys (keys.ts) go by', () => {
     expect(anchorsIn(`${ROW} ${FOLD}`.replace('button[', '[')).filter((name) => !upstream.has(name) && !classes(read('layout', 'project-groups.module.css')).has(name))).toEqual([]);
     expect(read('layout', 'ProjectTree.tsx')).toContain('aria-expanded={foldable ? !fold.folded : undefined}');

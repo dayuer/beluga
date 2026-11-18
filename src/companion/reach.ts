@@ -17,6 +17,8 @@ export type RelayTunnel = 'cloudflared' | 'off' | ((localPort: number) => Promis
 
 /** How often the DHT record is put again (records fade from the DHT after a while). */
 const REPUBLISH_MS = 10 * 60_000;
+/** A custom address that failed tries again this often (its mesh network may not be up yet). */
+const CUSTOM_RETRY_MS = 30_000;
 /** A tunnel that died is opened again after this long (one whose name Cloudflare dropped: at once, it's known dead). */
 const RETRY_MS = 30_000;
 const RETRY_DEAD_MS = 2_000;
@@ -30,8 +32,6 @@ export interface CustomRelayState {
   readonly address?: string;
   readonly error?: string;
 }
-
-export { parseCustomAddress };
 
 export interface ReachOptions {
   readonly tunnel: RelayTunnel;
@@ -54,6 +54,10 @@ export class Reach {
   /** The custom address wanted now (`host:port`), and how it is. */
   private wantedCustom?: string;
   private custom: CustomRelayState = { state: 'off' };
+  /** One change of the custom listener at a time (closing one waits for its phones to go). */
+  private customChain: Promise<void> = Promise.resolve();
+  /** A failed address tries again (a mesh network can come up after Beluga does). */
+  private customRetry?: NodeJS.Timeout;
 
   constructor(private readonly opts: ReachOptions) {
     this.server = new RelayServer(opts.log);
@@ -80,31 +84,49 @@ export class Reach {
    */
   async setCustom(address: string | undefined): Promise<void> {
     const wanted = address?.trim() || undefined;
-    if (wanted === this.wantedCustom) return;
+    // The same address again still tries again when it failed (Save after fixing the network).
+    if (wanted === this.wantedCustom && this.custom.state !== 'failed') return;
     this.wantedCustom = wanted;
     await this.applyCustom();
   }
 
-  private async applyCustom(): Promise<void> {
-    const wanted = this.wantedCustom;
-    if (!wanted || !this.running) {
-      await this.server.closeExtra();
-      if (this.custom.state !== 'off') {
-        this.custom = { state: 'off' };
-        this.opts.onChange();
-        void this.publish();
-      }
+  private applyCustom(): Promise<void> {
+    this.customChain = this.customChain.then(() => this.applyCustomNow());
+    return this.customChain;
+  }
+
+  private async applyCustomNow(): Promise<void> {
+    clearTimeout(this.customRetry);
+    const wanted = this.running ? this.wantedCustom : undefined;
+    await this.server.closeExtra();
+    if (!wanted) {
+      this.setCustomState({ state: 'off' });
       return;
     }
-    await this.server.closeExtra();
     const a = parseCustomAddress(wanted);
     try {
       if (!a) throw new Error('not host:port');
       await this.server.listenOn(a.host, a.port);
-      this.custom = { state: 'listening', address: wanted };
     } catch (err) {
-      this.custom = { state: 'failed', address: wanted, error: err instanceof Error ? err.message : String(err) };
+      this.setCustomState({ state: 'failed', address: wanted, error: err instanceof Error ? err.message : String(err) });
+      if (a) {
+        this.customRetry = setTimeout(() => void this.applyCustom(), CUSTOM_RETRY_MS);
+        this.customRetry.unref();
+      }
+      return;
     }
+    // Stopped, or another address wanted, while it opened: that one runs next; this one closes.
+    if (!this.running || this.wantedCustom !== wanted) {
+      await this.server.closeExtra();
+      return;
+    }
+    this.setCustomState({ state: 'listening', address: wanted });
+  }
+
+  private setCustomState(next: CustomRelayState): void {
+    const same = next.state === this.custom.state && next.address === this.custom.address && next.error === this.custom.error;
+    this.custom = next;
+    if (same) return;
     this.opts.onChange();
     void this.publish();
   }
@@ -131,11 +153,14 @@ export class Reach {
     this.publishing = undefined;
     this.tunnel?.close();
     this.tunnel = undefined;
+    clearTimeout(this.customRetry);
     const had = this.url;
+    const hadCustom = this.custom.state !== 'off';
     this.url = undefined;
+    await this.customChain;
     await this.server.close();
-    if (this.custom.state !== 'off') this.custom = { state: 'off' };
-    if (had) this.opts.onChange();
+    this.custom = { state: 'off' };
+    if (had || hadCustom) this.opts.onChange();
   }
 
   /** Keep the record of where this Mac's relay is on the DHT, under each of these key pairs. */

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AgentRef, ClaudeAnswer, GuestCan, WsRole } from '../protocol.js';
 import { EmojiSchema } from '../shared/reactions.js';
+import { isCustomAddress } from '../shared/custom-address.js';
 import { ARCHIVE_SETTLED_DAYS_MAX, BRANCH_PREFIX_RE, EFFORTS, KEEP_AWAKE, LOW_POWER, NotifySettings, RUN_ON, SETTLE_IDLE_DAYS_MAX, THEMES, ThreadLimitsSchema, TRUST_LEVELS } from '../shared/settings-schema.js';
 import { AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from '../shared/context-usage.js';
 import { PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from '../shared/run-slots.js';
@@ -96,7 +97,7 @@ export const PrefsPatch = z
     tunnel: z.enum(['auto', 'p2p', 'cloudflared', 'ngrok', 'none']),
     keepAwake: z.enum(KEEP_AWAKE),
     // The phone relay's custom address, host:port (null: none; fork-free, BLG-259).
-    customAddress: z.string().trim().regex(/^(\[[0-9a-fA-F:.]+\]|[\w.-]+):\d{1,5}$/).max(200).nullable().optional(),
+    customAddress: z.string().trim().max(200).refine(isCustomAddress, 'not host:port').nullable().optional(),
     runOn: z.string().regex(RUN_ON),
     lowPower: z.enum(LOW_POWER),
     selfApproval: z.enum(['never', 'ask']),

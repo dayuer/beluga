@@ -13,7 +13,8 @@ import { REMAINING_LIMIT, type TypeReport, rewriteType, skipFile, summarize } fr
  * buildEnd prints the counts and the exceptions, and writes .context/calm/type-report.json.
  */
 
-const SRC = path.join('packages', 'mac', 'src') + path.sep;
+/** Vite's module ids use `/` on every platform (Windows too). */
+const SRC = '/packages/mac/src/';
 
 export function calmType(): Plugin {
   const seen = new Map<string, ReturnType<typeof rewriteType>>();
@@ -26,9 +27,9 @@ export function calmType(): Plugin {
       repoRoot = path.resolve(config.root, '../..');
     },
     transform(code, id) {
-      const clean = id.split('?')[0]!;
+      const clean = id.split('?')[0]!.replace(/\\/g, '/');
       if (!clean.endsWith('.css') || !clean.includes(SRC)) return null;
-      const rel = clean.slice(clean.indexOf(SRC) + SRC.length).split(path.sep).join('/');
+      const rel = clean.slice(clean.indexOf(SRC) + SRC.length);
       let next = code;
       try {
         if (!skipFile(rel)) {
