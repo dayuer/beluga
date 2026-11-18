@@ -12,7 +12,7 @@ export function agyModel(model: string | undefined): string | undefined {
 }
 
 /** Beluga's efforts as Antigravity's thinking levels (it has low, medium and high). */
-export function agyThought(effort: string | undefined): string | undefined {
+export function agyThought(effort: string | null | undefined): string | undefined {
   if (!effort) return undefined;
   if (effort === 'xhigh' || effort === 'max') return 'high';
   if (effort === 'minimal') return 'low';
