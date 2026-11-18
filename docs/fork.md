@@ -364,24 +364,7 @@ fork 的其他文件与测试：
 
 ### 沉稳收尾（M8）
 
-M8 只改 fork 自己的文件，上游文件只留接入点。每个接入点在这里登记。
-
-| 文件 | 改动 | 原因 |
-| --- | --- | --- |
-| `packages/mac/src/fork/sidebar/one-selected.ts`（fork 文件） | `useOneSelected` 内调用 `useOneMark(ref)`，沉稳关时属性仍写、样式不生效 | BLG-243：侧栏行尾只显示一个标记。挂在已有的侧栏接入点上，`Sidebar.tsx` 不用改 |
-| `packages/mac/src/fork/sidebar/one-mark.ts`（fork 文件） | 优先级纯函数 `pickMark`/`settleMarks`、锚点 `MARKS`、DOM 钩子 `useOneMark` | BLG-251 / BLG-243 |
-| `packages/mac/src/fork/sidebar/sidebar-look.css` | 落选标记 `display:none`；行悬停或焦点时 `display:revert`（沉稳开时） | BLG-243 |
-| `packages/mac/src/fork/calm/calm-accent.css`（新，fork 文件） | 强调色收口、推广卡移出导航（沉稳开时） | BLG-242 / BLG-249 / BLG-250 |
-| `packages/mac/src/fork/calm/calm-glow.css`、`glow-scan.ts`（新，fork 文件） | 三个令牌 `--calm-ring`、`--calm-ring-alpha`、`--calm-glow-off`；光晕的扫描与构建时改写（由 `type-plugin.ts` 调用，`vite.config.ts` 的接入点已登记） | BLG-245 / BLG-256 |
-| `packages/mac/src/fork/calm/calm-type.css`（新，fork 文件） | 字号字重令牌，只在 `:root[data-calm]` 下定义 | BLG-252 |
-| `packages/mac/vite.config.ts`（上游文件，2 行） | `import { calmType }`，plugins 数组加 `calmType()` | BLG-244：构建时把散字号字重改成带原值兜底的令牌引用（沉稳关时等价） |
-| `packages/mac/src/fork/calm/type-scale.ts`、`type-plugin.ts`（新，fork 文件） | 纯改写函数与 Vite 插件 | BLG-244 |
-
-锚点在 `tests/fork-sidebar-anchors.test.ts` 与 `tests/fork-calm-accent.test.ts` 里检查，同步上游后失效会失败并指出名字。
-
-### 沉稳收尾（M8）
-
-M8 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm-glow.css`、`calm-type.css`、`type-scale.ts`、`type-plugin.ts`；`fork/sidebar/one-mark.ts`、`sidebar-look.css`）。改上游文件只登记下面这些：
+M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm-glow.css`、`calm-type.css`、`calm-tabs.css`、`type-scale.ts`、`type-plugin.ts`；`fork/sidebar/one-mark.ts`、`sidebar-look.css`，由已有的 `useOneSelected` 调用 `useOneMark`）。锚点在 `tests/fork-sidebar-anchors.test.ts`、`tests/fork-sidebar-one-mark.test.ts`、`tests/fork-calm-accent.test.ts`、`tests/fork-calm-tabs.test.ts` 里检查，同步上游后失效会失败并指出名字。改上游文件只登记下面这些：
 
 | 文件 | 改了几行 | 原因 |
 | --- | ---: | --- |
