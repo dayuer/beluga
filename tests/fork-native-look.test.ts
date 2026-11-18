@@ -24,6 +24,8 @@ describe('the Mac-native look’s upstream anchors', () => {
         ['layout', 'panel', 'panel.module.css'],
         ['views', 'overview.module.css'],
         ['dialogs', 'settings.module.css'],
+        ['views', 'project-home.module.css'],
+        ['views', 'project', 'main-sync.module.css'],
       ].flatMap((parts) => [...classes(read(...parts))]),
     );
     expect(anchorsIn(look).filter((name) => !upstream.has(name))).toEqual([]);
@@ -61,6 +63,10 @@ describe('the Mac-native look’s upstream anchors', () => {
         ['layout', 'Toolbar.module.css'],
         ['layout', 'panel', 'panel.module.css'],
         ['components', 'ui.module.css'],
+        ['layout', 'SidebarSearch.module.css'],
+        ['views', 'overview', 'filter-bar.module.css'],
+        ['components', 'form.module.css'],
+        ['components', 'select.module.css'],
       ].flatMap((parts) => [...classes(read(...parts))]),
     );
     expect(anchorsIn(glass).filter((name) => !upstream.has(name))).toEqual([]);
@@ -70,8 +76,34 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(prefs).toContain("root.dataset.glass = reduce ? 'off' : 'on';");
     expect(glass.replace(/\/\*[\s\S]*?\*\//g, '').match(/^[^@\s{}][^{]*\{/gm)?.every((rule) => rule.includes(":root[data-os='mac'][data-glass='on']"))).toBe(true);
     expect(read('layout', 'Sidebar.tsx')).toContain('<nav ref={drop.ref} className={cx(s.sidebar');
+    // The pop-up button and its web menu, by their roles.
+    const select = read('components', 'Select.tsx');
+    expect(select).toContain('role="combobox"');
+    expect(select).toContain('aria-haspopup="listbox"');
+    expect(select).toContain('<svg className={s.chevrons}');
+    const menu = read('components', 'SelectMenu.tsx');
+    expect(menu).toContain('role="option"');
+    expect(menu).toContain('<span className={s.check}>');
     // The floating sidebar is found by the attribute fork/sidebar puts on it (it sits in a wrapper).
     expect(read('fork', 'sidebar', 'one-selected.ts')).toContain("nav.setAttribute('data-fork-sidebar', '');");
+  });
+
+  it('touches only a Mac: every rule starts with the Mac flag', () => {
+    const look = read('fork', 'native', 'native-look.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const selectors = [...look.matchAll(/(?:^|\})\s*([^{}]+)\{/g)].flatMap((m) => {
+      const out: string[] = [];
+      let depth = 0;
+      let cur = '';
+      for (const c of m[1]!) {
+        if (c === '(') depth++;
+        if (c === ')') depth--;
+        if (c === ',' && depth === 0) (out.push(cur.trim()), (cur = ''));
+        else cur += c;
+      }
+      return [...out, cur.trim()];
+    });
+    expect(selectors.length).toBeGreaterThan(20);
+    expect(selectors.filter((s) => !s.startsWith(":root[data-os='mac'] "))).toEqual([]);
   });
 
   it('is loaded by the fork’s overlay, not by an upstream file', () => {

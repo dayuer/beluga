@@ -381,7 +381,7 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 
 ### Mac 原生走查（2026-11-18）
 
-对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
+对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入，每条都只在 `:root[data-os='mac']` 下生效（Windows、Linux 保持上游的样子）；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
 
 - 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色；失败、已合并和 Merge 保留各自的颜色。规则前加了 `:root`，压过 `calm-accent.css` 把主按钮刷成强调色的那条。
 - 底部终端标签：当前标签用粗体，不加下划线。检查器只有一个标签时（总览的 Info）画成标题。
@@ -399,3 +399,7 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 #### Liquid Glass（macOS 26 的外观）
 
 `packages/mac/src/fork/native/liquid-glass.css`，同样由 `fork/calm/index.ts` 引入，只在 `:root[data-os='mac'][data-glass='on']` 下生效（`lib/prefs.ts` 设置这两个属性）：Windows、Linux，以及打开了系统或应用的「减少透明度」时，窗口保持原样。侧栏和检查器离开窗口边缘 8px，变成圆角 16px 的玻璃面板（半透明、模糊加饱和、一圈高光描边和投影）；按钮和分段控件变成胶囊形；工具栏的图标按钮放在玻璃胶囊上。参考过 `rdev/liquid-glass-react`（MIT），但它的折射靠 SVG 置换滤镜，Mac 应用的 WKWebView 画不出来，还会跟着指针形变，和沉稳模式冲突，所以只用 CSS、静止不动。不改上游文件；锚点在 `tests/fork-native-look.test.ts` 里检查。
+
+在打包的应用里看过之后补的三处：胶囊形的搜索框和输入框改用真正的 0.5px 边框（原来的 0.5px 内阴影在胶囊两端被 WebKit 画断）；多行文本框（规划风格、计划目标）不做胶囊，保持 8px 圆角；检查器的视图标签（改动 · 文件 · 草稿 · 信息）在 `native-look.css` 里改成居中、等宽的分段，宽度取最宽的名字，面板窄到折起名字或正在拖标签时照上游排。
+
+下拉框（`components/Select.tsx`）在 Liquid Glass 下照 macOS 26 设置页的样子：不画边框，只有值和一个 ⌄，悬停和打开时底下一块浅灰胶囊，宽度跟着当前值；原来的 0.5px 边框在胶囊两端发虚。网页菜单（选项多、带搜索框的那种）是 12px 圆角卡片，当前行浅灰底，勾选放在行尾；选项少的在应用里打开的是 macOS 自己的菜单，不归 CSS 管。
