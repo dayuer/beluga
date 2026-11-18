@@ -537,9 +537,17 @@ class Store {
     kv.set('link-hints', { ...h, relays: [relay, ...h.relays.filter((r) => r !== relay)].slice(0, RELAYS_KEPT) });
   }
 
+  /** The Mac's custom address, from its welcome: kept (and dropped when a Mac that knows of them stops naming one). */
+  private keepCustom(custom: string | undefined, known: boolean): void {
+    const h = this.hints();
+    if (!known || h.custom === custom) return;
+    const { custom: _old, ...rest } = h;
+    kv.set('link-hints', custom ? { ...rest, custom } : rest);
+  }
+
   private onPath(i: PathInfo): void {
     const h = this.hints();
-    kv.set('link-hints', { relays: i.relay ? [i.relay, ...h.relays.filter((r) => r !== i.relay)].slice(0, RELAYS_KEPT) : h.relays, prefer: i.network ? { ...h.prefer, [i.network]: i.way } : h.prefer });
+    kv.set('link-hints', { ...h, relays: i.relay ? [i.relay, ...h.relays.filter((r) => r !== i.relay)].slice(0, RELAYS_KEPT) : h.relays, ...(i.custom ? { custom: i.custom } : {}), prefer: i.network ? { ...h.prefer, [i.network]: i.way } : h.prefer });
     this.setState({ path: i.path, tried: i.tried });
   }
 
@@ -673,6 +681,7 @@ class Store {
         const older = this.state.proto?.minor !== f.v.minor;
         this.setState({ mac: f.mac, me: f.me, outdated, proto: f.v });
         this.keepRelay(f.relay);
+        this.keepCustom(f.custom, f.v.minor >= SINCE.customRoute);
         // What's on screen again, now that it's known what this Mac has (an older one drops a `sub` naming a topic it doesn't know).
         if (older) this.transport?.send({ t: 'sub', topics: this.topics() });
         this.welcomed = !outdated;

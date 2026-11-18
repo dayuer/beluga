@@ -95,6 +95,8 @@ export const PrefsPatch = z
     mouse: bool,
     tunnel: z.enum(['auto', 'p2p', 'cloudflared', 'ngrok', 'none']),
     keepAwake: z.enum(KEEP_AWAKE),
+    // The phone relay's custom address, host:port (null: none; fork-free, BLG-259).
+    customAddress: z.string().trim().regex(/^(\[[0-9a-fA-F:.]+\]|[\w.-]+):\d{1,5}$/).max(200).nullable().optional(),
     runOn: z.string().regex(RUN_ON),
     lowPower: z.enum(LOW_POWER),
     selfApproval: z.enum(['never', 'ask']),

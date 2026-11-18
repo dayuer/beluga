@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 58 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 59 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -150,12 +150,14 @@ export const COMPANION_PROTO = { major: 1, minor: 58 } as const;
  * neither ticked nor explained, and whether its work already merged. An older Mac sends none; an older phone shows none.
  * 1.57 (BLG-401): `ConvView.schedules`, `TurnView.origin.sentinel`, `queue[].origin.sentinel`: a chat's
  * schedules (Run and Pause only), and a message one of your sentinels sent says so.
+ * 1.59 (BLG-259): a custom address (a mesh network's, GNB, ZeroTier, WireGuard, Nebula, Tailscale): `welcome.custom` and
+ * `RelayRecord.custom` name the Mac's relay there (SINCE.customRoute); the phone races it with the others.
  * 1.58 (BLG-981, BLG-982): Full Autopilot, a stand-in agent answering for you: a chat's
  * (`ConvView.autopilot`, `session.setAutopilot`) and a plan's (`PlanView.fullAuto`, `plans.setFullAuto`);
  * and who plans, builds and checks a plan (`PlanView.planner` / `checker`, `plans.setRoleAgent`). An
  * older Mac sends none, and the phone offers neither.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autopilot: 58, planRoles: 58 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autopilot: 58, planRoles: 58, customRoute: 59 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -1455,14 +1457,15 @@ const tunB64 = z.string().max(Math.ceil(TUN_PIECE / 3) * 4 + 4);
 /**
  * How a link reached the Mac: `lan` (directly, on the same network), `direct` (directly over the
  * internet: hyperdht's hole-punch), or `relay` (through the Mac's Cloudflare tunnel, with the same
- * Noise handshake inside, so the relay sees only ciphertext).
+ * Noise handshake inside, so the relay sees only ciphertext), or `custom` (1.59: the Mac's relay on a mesh
+ * network's address, `SINCE.customRoute`; an older Mac is told `relay` instead).
  */
-export const LinkPath = z.enum(['lan', 'direct', 'relay']);
+export const LinkPath = z.enum(['lan', 'direct', 'relay', 'custom']);
 export type LinkPath = z.infer<typeof LinkPath>;
 
-/** One way the phone tried (`p2p`: hyperdht, LAN first then hole-punching; `relay`: the tunnel). */
+/** One way the phone tried (`p2p`: hyperdht, LAN first then hole-punching; `relay`: the tunnel; `custom`: the Mac's address in a mesh network, 1.59). */
 export const DialAttempt = z.object({
-  way: z.enum(['p2p', 'relay']),
+  way: z.enum(['p2p', 'relay', 'custom']),
   outcome: z.enum(['ok', 'timeout', 'refused', 'unreachable', 'not-found', 'failed', 'skipped', 'lost']),
   /** `lost`: still trying when another way connected (it was dropped). `code`: hyperdht's error code (HOLEPUNCH_ABORTED, PEER_NOT_FOUND…), or the relay's close code. */
   code: z.string().max(60).optional(),
@@ -1471,7 +1474,7 @@ export const DialAttempt = z.object({
 export type DialAttempt = z.infer<typeof DialAttempt>;
 
 /** A relay URL: wss:// (the tunnel), or ws:// (a local relay in tests). */
-export const RelayUrl = z.string().max(300).regex(/^wss?:\/\/[\w.:-]+(\/[\w./-]*)?$/);
+export const RelayUrl = z.string().max(300).regex(/^wss?:\/\/[\w.:\[\]-]+(\/[\w./-]*)?$/);
 /** Where a key's relay is: the URL path ends with the key it reaches (hex). */
 export const relayUrlFor = (base: string, keyHex: string): string => `${base.replace(/\/+$/, '')}/${keyHex}`;
 
@@ -1482,7 +1485,7 @@ export const relayUrlFor = (base: string, keyHex: string): string => `${base.rep
  */
 // `phones` (BLG-126, under the companion key only): the first 16 hex of each paired phone's link key, so
 // a phone the Mac no longer knows hears it (and is told to pair again) instead of "Mac offline" forever.
-export const RelayRecord = z.object({ v: z.literal(1), relay: RelayUrl.optional(), at: ts, phones: z.array(z.string().regex(/^[0-9a-f]{16}$/)).max(8).optional() });
+export const RelayRecord = z.object({ v: z.literal(1), relay: RelayUrl.optional(), /** 1.59: the relay on the Mac's custom address (ws://host:port/companion). */ custom: RelayUrl.optional(), at: ts, phones: z.array(z.string().regex(/^[0-9a-f]{16}$/)).max(8).optional() });
 export type RelayRecord = z.infer<typeof RelayRecord>;
 
 /**
@@ -1580,6 +1583,8 @@ export const MacFrame = z.discriminatedUnion('t', [
     me: z.object({ name: z.string().max(64), peerId: id }),
     /** The Mac's relay now (the phone keeps it for next time). */
     relay: RelayUrl.optional(),
+    /** 1.59: the Mac's relay on its custom address (SINCE.customRoute). */
+    custom: RelayUrl.optional(),
   }),
   z.object({ t: z.literal('view'), topic: Topic, rev: z.number().int().min(0), data: z.unknown() }),
   z.object({ t: z.literal('result'), id: z.number().int().min(0), ok: z.boolean(), value: z.unknown().optional(), error: z.string().max(2000).optional() }),
@@ -1838,5 +1843,5 @@ export interface CableView {
 
 export interface CompanionSlice {
   /** `relay`: how phones on other networks reach this Mac now (reach.ts), for Settings › Phone (BLG-126). */
-  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
+  readonly companion: { readonly devices: readonly DeviceView[]; readonly relay?: 'ready' | 'starting' | 'off'; readonly custom?: { readonly state: 'listening' | 'failed' | 'off'; readonly address?: string; readonly error?: string }; readonly pairing?: { readonly link: string; readonly code: string; readonly expiresAt: number; readonly waiting?: { readonly name: string; readonly fingerprint: string } }; readonly adb?: AdbView };
 }

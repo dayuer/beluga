@@ -47,8 +47,12 @@ export interface DialHints {
   readonly openRelay?: OpenRelay;
   /** Relay URLs already known, best first (the pairing link's, the last welcome's). */
   readonly relays?: readonly string[];
+  /** The Mac's custom addresses (a mesh network's, from its welcome or record), a third way (dial.ts). */
+  readonly custom?: readonly string[];
+  /** This Mac understands `custom` in hello (SINCE.customRoute); otherwise it's told `relay`. */
+  readonly reportCustom?: boolean;
   /** The way that worked last time on this network. */
-  readonly prefer?: 'p2p' | 'relay';
+  readonly prefer?: 'p2p' | 'relay' | 'custom';
   readonly staggerMs?: number;
   readonly dialTimeoutMs?: number;
   readonly probeDht?: () => DialReport['dht'];
@@ -57,6 +61,7 @@ export interface DialHints {
 }
 
 const dialOpts = (h: DialHints) => ({
+  ...(h.custom?.length ? { custom: h.custom } : {}),
   ...(h.openRelay ? { openRelay: h.openRelay } : {}),
   ...(h.prefer ? { prefer: h.prefer } : {}),
   ...(h.staggerMs !== undefined ? { staggerMs: h.staggerMs } : {}),
@@ -311,6 +316,8 @@ export interface Welcome {
   readonly v: { readonly major: number; readonly minor: number };
   /** The Mac's relay now (keep it for next time). */
   readonly relay?: string;
+  /** The Mac's relay on its custom address now (keep it for next time; 1.59). */
+  readonly custom?: string;
 }
 
 export interface Chunk {
@@ -362,6 +369,8 @@ export class CompanionClient extends Emitter<ClientEvents> {
   tried: import('./protocol.js').DialAttempt[] = [];
   /** The relay that worked, or the one the Mac's record named. */
   relay?: string;
+  /** The custom address that worked, or the one the Mac's welcome named. */
+  custom?: string;
   private sock?: Framed;
   private dialing = 0;
   private nextId = 1;
@@ -373,6 +382,12 @@ export class CompanionClient extends Emitter<ClientEvents> {
   constructor(private readonly opts: CompanionClientOptions) {
     super();
     this.topics = [...(opts.topics ?? ['home'])];
+  }
+
+  /** What hello says of the way: an older Mac doesn't know `custom` (a path or an attempt), so it hears `relay`. */
+  private via(path: import('./protocol.js').LinkPath, tried: import('./protocol.js').DialAttempt[]) {
+    const ok = this.opts.hints?.reportCustom === true;
+    return { path: !ok && path === 'custom' ? ('relay' as const) : path, tried: tried.filter((t) => ok || t.way !== 'custom').slice(-8) };
   }
 
   get connected(): boolean {
@@ -394,6 +409,7 @@ export class CompanionClient extends Emitter<ClientEvents> {
     this.path = dialed.path;
     this.tried = dialed.tried;
     if (dialed.relay) this.relay = dialed.relay;
+    if (dialed.custom) this.custom = dialed.custom;
     const stream = dialed.stream;
     const sock = new Framed(stream, MAX_COMPANION_FRAME + 1024, true);
     this.sock = sock;
@@ -412,7 +428,7 @@ export class CompanionClient extends Emitter<ClientEvents> {
           return reject(new Error('Reached something that isn’t your Mac'));
         }
         this.heard = Date.now();
-        this.send({ t: 'hello', v: { ...COMPANION_PROTO }, app: this.opts.app.slice(0, 40), platform: this.opts.platform, topics: this.topics, via: { path: dialed.path, tried: dialed.tried.slice(-8) } });
+        this.send({ t: 'hello', v: { ...COMPANION_PROTO }, app: this.opts.app.slice(0, 40), platform: this.opts.platform, topics: this.topics, via: this.via(dialed.path, dialed.tried) });
         this.beatEvery(this.opts.keepAliveMs ?? KEEPALIVE_MS);
       }
       sock.on('pong', () => (this.heard = Date.now()));
@@ -430,8 +446,9 @@ export class CompanionClient extends Emitter<ClientEvents> {
             }
             return;
           }
-          this.welcome = { mac: f.mac, me: f.me, v: f.v, ...(f.relay ? { relay: f.relay } : {}) };
+          this.welcome = { mac: f.mac, me: f.me, v: f.v, ...(f.relay ? { relay: f.relay } : {}), ...(f.custom ? { custom: f.custom } : {}) };
           if (f.relay) this.relay = f.relay;
+          if (f.custom) this.custom = f.custom;
           if (!settled) {
             settled = true;
             clearTimeout(timer);

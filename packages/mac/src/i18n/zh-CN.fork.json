@@ -325,5 +325,16 @@
  "{0} works again: {1} goes back to it": "{0} 恢复了：{1}切回它继续",
  "{0} works again: asked the agent doing {1} to end its turn, so its next task goes back to it": "{0} 恢复了：已请做{1}的智能体结束这一轮，下一个任务切回它",
  "It failed before Beluga restarted": "Beluga 重启前它就失败了",
- "No picture at {0}": "{0} 处没有图片"
+ "No picture at {0}": "{0} 处没有图片",
+ "Custom address": "自定义地址",
+ "Custom address status": "自定义地址状态",
+ "Enter this computer’s address in a GNB, ZeroTier, WireGuard, Nebula or Tailscale network your phone is in, then a port. The phone tries it beside the direct connection and the relay; whichever connects first is used. Same encryption and the same paired phones. Leave it empty to turn it off.": "填这台电脑在 GNB、ZeroTier、WireGuard、Nebula 或 Tailscale 等组网里的地址，再加一个端口，手机要在同一个组网里。手机会把它和直连、中继一起尝试，哪条先连上就用哪条。加密方式和已配对的手机都不变。留空就关闭。",
+ "Listening on {0}: phones in that network connect here, end-to-end encrypted.": "正在监听 {0}：组网里的手机从这里连接，端到端加密。",
+ "Not listening: {0}. Fix the address or the port, then save again.": "没有在监听：{0}。改一下地址或端口，再保存。",
+ "Off: Remote access is set to network only, so this address is not opened.": "已关闭：远程访问设为仅组网，所以不会打开这个地址。",
+ "Opens as soon as a phone is paired or a pairing is open.": "配对了手机或打开配对后，会马上开始监听。",
+ "Use the form address:port, for example 10.147.17.5:7788.": "请按“地址:端口”的格式填写，例如 10.147.17.5:7788。",
+ "Connected through the custom address (end-to-end encrypted)": "通过自定义地址连接（端到端加密）",
+ "that port is already in use": "这个端口已被占用",
+ "this Mac has no such address": "这台电脑没有这个地址"
 }
