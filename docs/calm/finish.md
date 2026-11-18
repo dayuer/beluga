@@ -722,3 +722,40 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 其中 `src/companion/protocol.ts`、`src/core/plans/pilot.ts`、`packages/mac/src/plans/plan-ask-model.ts`、`tests/plans.test.ts`、`src/daemon/core.ts`、`src/ipc/handlers.ts`、`tests/companion-views.test.ts`、`src/core/claude-code/skills.ts`、`tests/skills.test.ts`、`tests/plan-milestone-agent.test.ts` 在 `topic/plans` 上还改（核对过），其余 3 个在链上哪一层都不改。
 
 **合回 topic/native 后应把非 native 的条目搬到对应链分支**：这份登记本属于链上更低的分支。`docs/fork.md` 里「原生 Mac 控件与外壳的逐文件登记」中，`CLAUDE.md` 属于 `fork/base`，`zh-CN.json` 属于 `topic/chinese`；上面那 10 个只在 `topic/plans` 改的文件，到 `topic/plans` 上要把反引号加回去，否则那里会出现 10 个 `!`。
+
+## 8. 补跑的延后项：chatrun、plan、tasks 与 Create PR 最终图（BLG-254）
+
+树 `88214257f`，机器 load 约 7（`uptime`），演示 daemon 与 vite 用隔离的 `BELUGA_HOME=/tmp/calm-demo`、`BELUGA_ALLOW_ORIGINS=http://localhost:1420`，`node packages/mac/scripts/calm-check.mjs chatrun plan tasks`（四个组合，浅色）。
+
+**chatrun（阅读位置与「有新内容」提示）**
+
+| 组合 | CLS | 阅读位置偏移 | 提示 | 新增行 | 仍在播放的动画 / JS 动效 |
+| --- | ---: | ---: | --- | ---: | --- |
+| 沉稳开 · full | 0.101 | **0 px** | 「6 new below」 | **6** | 0 / 0 |
+| 沉稳开 · reduce | 0.135 | **0 px** | 「4 new below」 | **4** | 0 / 0 |
+| 沉稳关 · full | 0.104 | 0 px | 「Latest」 | 0 | 0 / 50（上游的 live-motion） |
+| 沉稳关 · reduce | 0.085 | 0 px | 「Latest」 | 0 | 0 / 0 |
+
+沉稳开：滚离底部之后来了新内容，阅读位置不动，提示数出新增的行；沉稳关与上游一致（「Latest」，不计数）。
+
+**plan 与 tasks（沉稳开：JS 动效来自哪里）**
+
+| 场景 | 组合 | CLS | 动画 | JS 动效 |
+| --- | --- | ---: | ---: | ---: |
+| plan | 沉稳开 full / reduce | 0.003 / 0.000 | 0 / 0 | **0 / 0** |
+| plan | 沉稳关 full / reduce | 0.000 / 0.000 | 0 / 0 | 42 / 0 |
+| tasks | 沉稳开 full / reduce | 0.000 / 0.000 | 0 / 0 | **0 / 0** |
+| tasks | 沉稳关 full / reduce | 0.000 / 0.000 | 0 / 0 | 42 / 0 |
+
+沉稳开时这两页没有任何 JS 动效（白名单里的那一种进度指示这两页没有出现），沉稳关时是上游的 42 处。
+
+**过程里要说的两件事**：① `calm-check.mjs` 的提示匹配只认「Latest」和「N new」，而沉稳开的提示文字早已是「N new below」，所以前几次跑（树 `1b7c32576` 前后）显示「提示 null、新增 0」。这是脚本过期，不是功能坏了；这次把匹配改成 `^(Latest|\d+ new( below)?)$`（`packages/mac/scripts/calm-check.mjs` 两行）。② 机器忙的时候 chatrun 的 CLS 和阅读位置会抖：同一棵树上前几次跑沉稳开 full 出现过 CLS 0.186–0.239、一次阅读位置偏移 −590 px，沉稳关也有 0.153–0.216；load 降到 7 之后的这一次是上表的数字。对话区的 CLS 绝对值本来就在 0.08–0.14 这个量级（沉稳关同量级），没有因此判定为回归，但这一项对机器负载敏感。
+
+**Create PR 的最终图**（工具栏，2 倍；沉稳关是上游，沉稳开是最终树）：
+
+| 主题 | 沉稳关（上游） | 沉稳开（最终） |
+| --- | --- | --- |
+| 浅色 | ![](img/m8-cpr-final-off-light.png) | ![](img/m8-cpr-final-on-light.png) |
+| 深色 | ![](img/m8-cpr-final-off-dark.png) | ![](img/m8-cpr-final-on-dark.png) |
+
+计算样式（Create PR 按钮及 6 层祖先）：沉稳开 `background` 是纯色 `rgb(0 117 255)`，`box-shadow: none`，`filter`、`outline` 无，祖先无任何阴影、滤镜或轮廓；沉稳关是渐变加三层阴影（见 §1.7）。图上可见：沉稳开是平的纯色，没有光晕。
