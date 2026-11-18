@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { parseCustomAddress } from '../../../../src/shared/custom-address.js';
+import { customStatus, parseCustomAddress } from '../../../../src/shared/custom-address.js';
 import { Group, Row } from '../dialogs/settings-controls.js';
 import s from '../dialogs/settings.module.css';
 import { useApp, useBeluga } from '../lib/beluga.js';
@@ -10,15 +10,6 @@ import { useApp, useBeluga } from '../lib/beluga.js';
  * phone tries it beside the direct connection and the Cloudflare relay. Hooked in by one line in
  * `phone/Phone.tsx` (docs/fork.md).
  */
-
-/** What the status line says: whether the relay listens on the address now, and why not. */
-export function customStatus(address: string | undefined, custom: { readonly state: 'listening' | 'failed' | 'off'; readonly error?: string } | undefined, remote: string): { readonly text: string; readonly ok: boolean } | undefined {
-  if (!address) return undefined;
-  if (custom?.state === 'listening') return { text: `Listening on ${address}: phones in that network connect here, end-to-end encrypted.`, ok: true };
-  if (custom?.state === 'failed') return { text: `Not listening: ${custom.error ?? 'it could not start'}. Fix the address or the port, then save again.`, ok: false };
-  if (remote === 'none') return { text: 'Off: Remote access is set to network only, so this address is not opened.', ok: false };
-  return { text: 'Opens as soon as a phone is paired or a pairing is open.', ok: false };
-}
 
 export function PhoneAdvanced() {
   const { client } = useBeluga();

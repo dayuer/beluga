@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customStatus } from '../packages/mac/src/fork/phone-advanced.js';
+import { customStatus } from '../src/shared/custom-address.js';
 
 describe('Settings › Phone › Advanced › Custom address', () => {
   it('says nothing without an address', () => {
