@@ -160,3 +160,20 @@
 [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
   left: 40px;
 }
+
+/* The inspector's views (Changes · Files · Scratch · Info): a segmented control of equal, fixed-width
+   segments, centred, as macOS draws one, instead of a strip stretched across the whole panel. Each
+   segment is as wide as the widest name. A narrow panel that folds the names, and a tab being dragged
+   over the strip (its drop mark), keep upstream's layout. */
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+}
+[role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) > [class*='_tab_'] {
+  min-width: 76px;
+  padding: 0 14px;
+}

@@ -71,3 +71,22 @@
   background: none;
   box-shadow: none;
 }
+
+/* Text and search fields as capsules: their ring was a 0.5px inset shadow, which WebKit breaks up
+   round a capsule's ends (the line fades at the top and the sides). A real 0.5px border draws whole. */
+:root[data-os='mac'][data-glass='on'] [class*='_field_']:has(> input),
+:root[data-os='mac'][data-glass='on'] input[class*='_input_']:not([class*='_field_'] > input) {
+  border: 0.5px solid var(--hairline-strong);
+  box-shadow: none;
+}
+:root[data-os='mac'][data-glass='on'] [class*='_field_']:has(> input):focus-within,
+:root[data-os='mac'][data-glass='on'] input[class*='_input_']:not([class*='_field_'] > input):focus {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--hairline-strong));
+  box-shadow: var(--focus-ring);
+}
+
+/* Capsules are for one line. A text area (Planning style, a plan's goal, a note) keeps the rounded
+   rectangle of macOS's own text views, or its corners would cut into the text. */
+:root[data-os='mac'][data-glass='on'] textarea {
+  border-radius: 8px;
+}

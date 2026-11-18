@@ -404,3 +404,5 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 #### Liquid Glass（macOS 26 的外观）
 
 `packages/mac/src/fork/native/liquid-glass.css`，同样由 `fork/calm/index.ts` 引入，只在 `:root[data-os='mac'][data-glass='on']` 下生效（`lib/prefs.ts` 设置这两个属性）：Windows、Linux，以及打开了系统或应用的「减少透明度」时，窗口保持原样。侧栏和检查器离开窗口边缘 8px，变成圆角 16px 的玻璃面板（半透明、模糊加饱和、一圈高光描边和投影）；按钮和分段控件变成胶囊形；工具栏的图标按钮放在玻璃胶囊上。参考过 `rdev/liquid-glass-react`（MIT），但它的折射靠 SVG 置换滤镜，Mac 应用的 WKWebView 画不出来，还会跟着指针形变，和沉稳模式冲突，所以只用 CSS、静止不动。不改上游文件；锚点在 `tests/fork-native-look.test.ts` 里检查。
+
+在打包的应用里看过之后补的三处：胶囊形的搜索框和输入框改用真正的 0.5px 边框（原来的 0.5px 内阴影在胶囊两端被 WebKit 画断）；多行文本框（规划风格、计划目标）不做胶囊，保持 8px 圆角；检查器的视图标签（改动 · 文件 · 草稿 · 信息）在 `native-look.css` 里改成居中、等宽的分段，宽度取最宽的名字，面板窄到折起名字或正在拖标签时照上游排。
