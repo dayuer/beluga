@@ -2,6 +2,7 @@ import type DHT from 'hyperdht';
 import type { KeyPair } from 'hyperdht';
 import { openTunnel, waitUntilReachable } from '../net/tunnel.js';
 import type { RelayRecord } from './protocol.js';
+import { parseCustomAddress } from '../shared/custom-address.js';
 import { RelayServer } from './relay.js';
 
 /**
@@ -23,6 +24,15 @@ const RETRY_DEAD_MS = 2_000;
 /** How the relay is, for Settings › Phone: ready (its URL answers), starting (or restarting), off (not used here). */
 export type RelayState = 'ready' | 'starting' | 'off';
 
+/** The custom address (a mesh network's, Settings › Phone › Advanced): listening, failed (`error` says why), or off. */
+export interface CustomRelayState {
+  readonly state: 'listening' | 'failed' | 'off';
+  readonly address?: string;
+  readonly error?: string;
+}
+
+export { parseCustomAddress };
+
 export interface ReachOptions {
   readonly tunnel: RelayTunnel;
   /** The relay's URL changed (it's in pairing links and welcomes). */
@@ -41,6 +51,9 @@ export class Reach {
   private republish?: NodeJS.Timeout;
   private publishing?: { node: DHT; keyPairs: () => readonly KeyPair[] };
   private seq = 0;
+  /** The custom address wanted now (`host:port`), and how it is. */
+  private wantedCustom?: string;
+  private custom: CustomRelayState = { state: 'off' };
 
   constructor(private readonly opts: ReachOptions) {
     this.server = new RelayServer(opts.log);
@@ -49,6 +62,51 @@ export class Reach {
   /** The relay's base URL (`wss://….trycloudflare.com/companion`), once its tunnel answers. */
   relayUrl(): string | undefined {
     return this.url;
+  }
+
+  /** The relay's URL on the custom address (`ws://host:port/companion`), while it listens. */
+  customUrl(): string | undefined {
+    const a = parseCustomAddress(this.custom.state === 'listening' ? this.custom.address : undefined);
+    return a ? `ws://${a.host.includes(':') ? `[${a.host}]` : a.host}:${a.port}/companion` : undefined;
+  }
+
+  customState(): CustomRelayState {
+    return this.custom;
+  }
+
+  /**
+   * Listen on this address too (or stop: undefined). It's the user's address, so a busy port or an
+   * address this Mac doesn't have is an error in `customState`, never another port.
+   */
+  async setCustom(address: string | undefined): Promise<void> {
+    const wanted = address?.trim() || undefined;
+    if (wanted === this.wantedCustom) return;
+    this.wantedCustom = wanted;
+    await this.applyCustom();
+  }
+
+  private async applyCustom(): Promise<void> {
+    const wanted = this.wantedCustom;
+    if (!wanted || !this.running) {
+      await this.server.closeExtra();
+      if (this.custom.state !== 'off') {
+        this.custom = { state: 'off' };
+        this.opts.onChange();
+        void this.publish();
+      }
+      return;
+    }
+    await this.server.closeExtra();
+    const a = parseCustomAddress(wanted);
+    try {
+      if (!a) throw new Error('not host:port');
+      await this.server.listenOn(a.host, a.port);
+      this.custom = { state: 'listening', address: wanted };
+    } catch (err) {
+      this.custom = { state: 'failed', address: wanted, error: err instanceof Error ? err.message : String(err) };
+    }
+    this.opts.onChange();
+    void this.publish();
   }
 
   state(): RelayState {
@@ -62,6 +120,7 @@ export class Reach {
     this.running = true;
     this.opts.onChange();
     await this.server.listen();
+    await this.applyCustom();
     void this.openTunnel();
   }
 
@@ -75,6 +134,7 @@ export class Reach {
     const had = this.url;
     this.url = undefined;
     await this.server.close();
+    if (this.custom.state !== 'off') this.custom = { state: 'off' };
     if (had) this.opts.onChange();
   }
 
@@ -91,7 +151,8 @@ export class Reach {
   async publish(): Promise<void> {
     const p = this.publishing;
     if (!p || !this.running) return;
-    const record: RelayRecord = { v: 1, at: Date.now(), ...(this.url ? { relay: this.url } : {}) };
+    const custom = this.customUrl();
+    const record: RelayRecord = { v: 1, at: Date.now(), ...(this.url ? { relay: this.url } : {}), ...(custom ? { custom } : {}) };
     // Each put must outnumber the last one stored: seconds since the epoch, and never the same twice
     // (a put in the same second as the last would be refused, and the older record would stay).
     const seq = Math.max(Math.floor(Date.now() / 1000), this.seq + 1);

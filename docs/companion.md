@@ -427,6 +427,7 @@ which one worked (`src/companion/dial.ts`):
 |---|---|---|
 | hyperdht | LAN address first when both share a public IP, then hole-punching | `lan` or `direct` |
 | Relay | A WebSocket to the Mac's Cloudflare quick tunnel, Noise inside | `relay` |
+| Custom address | A WebSocket to `ws://host:port/companion`, the address the Mac's relay also listens on in a mesh network (GNB, ZeroTier, WireGuard, Nebula, Tailscale) you set in Settings › Phone › Advanced. Same Noise, same firewall; named in `welcome.custom` and the DHT record's `custom` (1.59, `SINCE.customRoute`). A busy port or an address the Mac doesn't have is an error, never another port; clearing it, or Remote access none, closes it | `custom` (phone side, BLG-260) |
 
 - **Raced, not queued.** The way that worked last time on this network (kept per local subnet,
   `link-hints` in the app's storage) starts at once; the other starts 1.5 s later, or as soon as the

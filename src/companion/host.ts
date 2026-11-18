@@ -120,6 +120,8 @@ export interface CompanionHostOptions {
   readonly idleMs?: () => Promise<number | undefined>;
   /** Tests: a local testnet instead of the public DHT. */
   readonly dht?: { readonly bootstrap?: readonly BootstrapNode[]; readonly host?: string; /** Tests: turn away every direct connection (as a network with client isolation does). */ readonly refuseDirect?: boolean };
+  /** The custom address now (`host:port`), or none: Settings › Phone › Advanced, unless Remote access is none or it's the demo. */
+  readonly customAddress?: () => string | undefined;
   /** The relay's tunnel (reach.ts): 'cloudflared' (the daemon's), a function (tests), or 'off' (the default). */
   readonly relay?: RelayTunnel;
   /** Keeps the Mac awake while a phone is paired and Settings says so (awake.ts); tests pass their own. */
@@ -370,7 +372,7 @@ class PhoneLink implements PhoneLinkHandle {
       this.hello = frame;
       const state = this.host.state();
       const relay = this.host.relayUrl();
-      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}) });
+      this.send({ t: 'welcome', v: { ...COMPANION_PROTO }, min: { ...COMPANION_MIN }, mac: this.host.macInfo(), me: { name: (state.self?.name ?? state.network.self?.name ?? 'me').slice(0, 64), peerId: state.selfId || 'me' }, ...(relay ? { relay } : {}), ...(this.host.customUrl() ? { custom: this.host.customUrl()! } : {}) });
       this.host.helloed(this, frame.app, frame.via);
       this.subscribe(frame.topics);
       this.host.tellComputers(this);
@@ -573,6 +575,11 @@ export class CompanionHost {
     });
   }
 
+  /** The relay's URL on the custom address, while it listens. */
+  customUrl(): string | undefined {
+    return this.reach.customUrl();
+  }
+
   /** The relay's URL now, if its tunnel is up. */
   relayUrl(): string | undefined {
     return this.reach.relayUrl();
@@ -584,6 +591,7 @@ export class CompanionHost {
     this.offs.push(
       this.opts.store.subscribe(() => {
         this.keepAwake();
+        void this.reach.setCustom(this.opts.customAddress?.());
         this.changed();
       }),
       this.opts.devices.onChange(() => {
@@ -596,6 +604,7 @@ export class CompanionHost {
         for (const link of this.links) this.tellComputers(link);
       }) ?? (() => undefined),
     );
+    void this.reach.setCustom(this.opts.customAddress?.());
     this.publish();
     this.keepAwake();
     // What waits for you now is the baseline: phones hear about what comes after.
@@ -1200,7 +1209,7 @@ export class CompanionHost {
     const pairing = this.pairing.info();
     // Each phone carries how Claude can use it now (BLG-150); the adb line is for Settings › Phone.
     const devices = this.opts.devices.views(linked).map((d) => ({ ...d, control: this.control.controlView(d.id) }));
-    this.opts.store.dispatch({ type: 'companion', companion: { devices, relay: this.reach.state(), ...(pairing ? { pairing } : {}), adb: this.control.adbView() } });
+    this.opts.store.dispatch({ type: 'companion', companion: { devices, relay: this.reach.state(), ...(this.reach.customState().state !== 'off' ? { custom: this.reach.customState() } : {}), ...(pairing ? { pairing } : {}), adb: this.control.adbView() } });
   }
 
   /** Set how freely Claude may use a phone, and pair the Mac's adb with it (the Mac's Settings › Phone). */

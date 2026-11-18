@@ -119,6 +119,8 @@ export const Settings = z.object({
   policy: z.enum(['ask', 'auto', 'deny']).optional(),
   mouse: z.boolean().default(true),
   tunnel: z.enum(['auto', 'p2p', 'cloudflared', 'ngrok', 'none']).default('auto'),
+  /** The phone relay also listens on this `host:port` (an address in GNB, ZeroTier, WireGuard, Nebula or Tailscale); unset: not. */
+  customAddress: z.string().trim().regex(/^(\[[0-9a-fA-F:.]+\]|[\w.-]+):\d{1,5}$/).max(200).optional(),
   /** Keep the Mac from sleeping while a phone is paired, so it stays reachable (companion/awake.ts): never, on power only, or always. */
   keepAwake: z.enum(KEEP_AWAKE).default('off'),
   /** Low Power mode: Beluga does less and shows less to save the battery (core/power-saver.ts). */

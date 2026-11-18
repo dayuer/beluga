@@ -106,6 +106,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
+- `packages/mac/src/phone/Phone.tsx`：两行，一个 import 和设置 › 手机里的 `<PhoneAdvanced />`（`packages/mac/src/fork/phone-advanced.tsx`：高级 › 自定义地址输入框和状态行，格式不对只提示不保存；中继引擎在 `src/companion/relay.ts`、`reach.ts`，手机端在 `dial.ts`，见 `docs/companion.md` 的 Any network）
 - `packages/mac/src/dialogs/native/WorkSheets.tsx`：两行，`forkSheet`（`packages/mac/src/fork/sheets.tsx`）先接管 fork 的对话框（新建计划、计划设置）
 - `packages/mac/src/plans/PlanSheets.tsx`：末尾一行导出 `AutonomyCards`、`GoalBox`，给 fork 的 `packages/mac/src/fork/plans/NewPlanSheet.tsx` 用（上游的 `NewPlanSheet` 原样留着；上游改它时，把改动带进 fork 版）
 - packages/mac/src/lib/sheets.ts：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
