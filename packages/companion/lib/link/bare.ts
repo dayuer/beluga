@@ -95,7 +95,7 @@ export class BareTransport implements Transport {
         this.pairs.delete(msg.id);
         return;
       case 'path':
-        this.paths.emit({ path: msg.path, way: msg.way, tried: msg.tried, ...(msg.relay ? { relay: msg.relay } : {}), ...(msg.custom ? { custom: msg.custom } : {}), ...(msg.network ? { network: msg.network } : {}) });
+        this.paths.emit({ path: msg.path, way: msg.way, tried: msg.tried, ...(msg.relay ? { relay: msg.relay } : {}), ...(msg.network ? { network: msg.network } : {}) });
         return;
       case 'ws.open':
         return this.openSocket(msg.id, msg.url);

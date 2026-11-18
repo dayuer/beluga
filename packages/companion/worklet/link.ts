@@ -113,12 +113,10 @@ function network(n: DHT): string {
 function dialHints(n: DHT, hints: LinkHints | undefined, extraRelay?: string) {
   const net = network(n);
   const prefer = hints?.prefer[net];
-  // The custom address is a third way, beside hyperdht and the relays; an older Mac was never given one.
-  const custom = hints?.custom;
-  return { net, hints: { openRelay, relays: [...(extraRelay ? [extraRelay] : []), ...(hints?.relays ?? [])], ...(custom ? { custom: [custom], reportCustom: true } : {}), ...(prefer ? { prefer } : {}), probeDht: () => dhtHealth(n) } };
+  return { net, hints: { openRelay, relays: [...(extraRelay ? [extraRelay] : []), ...(hints?.relays ?? [])], ...(prefer ? { prefer } : {}), probeDht: () => dhtHealth(n) } };
 }
 
-const wayOf = (path: 'lan' | 'direct' | 'relay' | 'custom'): Way => (path === 'relay' ? 'relay' : path === 'custom' ? 'custom' : 'p2p');
+const wayOf = (path: 'lan' | 'direct' | 'relay'): Way => (path === 'relay' ? 'relay' : 'p2p');
 
 /** Nothing needs the network: the DHT node goes, and with it every socket and timer. */
 async function quiet(): Promise<void> {
@@ -161,9 +159,9 @@ function open(msg: Extract<UiToWorklet, { op: 'open' }>): void {
     (w) => {
       // A newer open replaced this one while it dialed: only the newest speaks.
       if (client !== c) return;
-      if (c.path) post({ ev: 'path', path: c.path, way: wayOf(c.path), tried: c.tried, ...(c.relay ? { relay: c.relay } : {}), ...(c.custom ? { custom: c.custom } : {}), network: net });
+      if (c.path) post({ ev: 'path', path: c.path, way: wayOf(c.path), tried: c.tried, ...(c.relay ? { relay: c.relay } : {}), network: net });
       post({ ev: 'phase', phase: 'open', ...tag });
-      frame({ t: 'welcome', v: { ...w.v }, min: { ...w.v }, mac: w.mac, me: w.me, ...(w.relay ? { relay: w.relay } : {}), ...(w.custom ? { custom: w.custom } : {}) });
+      frame({ t: 'welcome', v: { ...w.v }, min: { ...w.v }, mac: w.mac, me: w.me, ...(w.relay ? { relay: w.relay } : {}) });
     },
     (e: Error) => {
       if (client !== c) return;

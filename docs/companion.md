@@ -136,13 +136,9 @@ change: only what the player reads is fetched, two pieces ahead and no faster th
 and what came is kept in a 48 MB cache (seeking back costs nothing). Nothing autoplays or loops; a
 video plays only when tapped and pauses when you swipe away, leave or put the app away. MP4, M4V and
 MOV play on both platforms, WebM on Android (iPhone says so); a codec the player lacks shows why.
-Nothing is transcoded. The Mac makes a video's thumbnail from its first frame (Quick Look). iOS
-allows plain http only to local addresses (`NSAllowsLocalNetworking`). Android allows it to any host
-(`plugins/loopback-cleartext.js`): the custom address is a `ws://` URL to an address only the user
-knows, and a network security config can't name it ahead. The cost is that a stray `http://` image
-or link would load in plaintext rather than fail; the link itself is the Noise stream either way.
-Narrowing it back to 127.0.0.1 means dialing the custom address from the worklet (`bare-tcp`),
-which the config doesn't govern.
+Nothing is transcoded. The Mac makes a video's thumbnail from its first frame (Quick Look). Android
+allows plain http only to 127.0.0.1 (`plugins/loopback-cleartext.js`), iOS only to local addresses
+(`NSAllowsLocalNetworking`).
 
 **Views, not state.** The Mac's shared state is several MB and full of things the phone mustn't
 show. The phone never sees it: `src/companion/views.ts` turns it into small views per topic, each
@@ -431,7 +427,6 @@ which one worked (`src/companion/dial.ts`):
 |---|---|---|
 | hyperdht | LAN address first when both share a public IP, then hole-punching | `lan` or `direct` |
 | Relay | A WebSocket to the Mac's Cloudflare quick tunnel, Noise inside | `relay` |
-| Custom address | A WebSocket to `ws://host:port/companion`, the address the Mac's relay also listens on in a mesh network (GNB, ZeroTier, WireGuard, Nebula, Tailscale) you set in Settings › Phone › Advanced. Same Noise, same firewall; named in `welcome.custom` and the DHT record's `custom` (1.59, `SINCE.customRoute`). A busy port or an address the Mac doesn't have is an error, never another port; clearing it, or Remote access none, closes it | `custom` (phone side, BLG-260) |
 
 - **Raced, not queued.** The way that worked last time on this network (kept per local subnet,
   `link-hints` in the app's storage) starts at once; the other starts 1.5 s later, or as soon as the

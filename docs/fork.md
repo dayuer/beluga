@@ -106,29 +106,10 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - `packages/mac/src/dialogs/settings-index.ts`：外面包一层 `withForkSettings`
 - `packages/mac/src/i18n/index.ts`、`packages/mac/src-tauri/src/i18n.rs`、`scripts/i18n-extract.mjs`、`tests/i18n.test.ts`：同时读 `zh-CN.fork.json`
 - `tests/parity.test.ts`：同时读 `docs/parity.fork.md`
-- `packages/mac/src/phone/Phone.tsx`：两行，一个 import 和设置 › 手机里的 `<PhoneAdvanced />`（`packages/mac/src/fork/phone-advanced.tsx`：高级 › 自定义地址输入框和状态行，格式不对只提示不保存；中继引擎在 `src/companion/relay.ts`、`reach.ts`，手机端在 `dial.ts`，见 `docs/companion.md` 的 Any network）
 - `packages/mac/src/dialogs/native/WorkSheets.tsx`：两行，`forkSheet`（`packages/mac/src/fork/sheets.tsx`）先接管 fork 的对话框（新建计划、计划设置）
 - `packages/mac/src/plans/PlanSheets.tsx`：末尾一行导出 `AutonomyCards`、`GoalBox`，给 fork 的 `packages/mac/src/fork/plans/NewPlanSheet.tsx` 用（上游的 `NewPlanSheet` 原样留着；上游改它时，把改动带进 fork 版）
 - packages/mac/src/lib/sheets.ts：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
 - `docs/tasks-and-plans.md`：一行，指向 `docs/tasks-and-plans.fork.md`（fork 的计划说明都在那里）
-
-### 手机的自定义地址（BLG-259–261，2026-11-18）
-
-手机经组网（GNB、ZeroTier、WireGuard、Nebula、Tailscale）连 Mac 的通道。它就是手机链路本身的一部分：Noise 握手、防火墙、DHT 记录、拨号竞速都在上游文件里，没有能单独接一行的地方，所以只能改在原处，每处尽量是加字段、加分支。地址的解析和状态文字在 fork 文件 `src/shared/custom-address.ts`，Mac 的设置界面在 `packages/mac/src/fork/phone-advanced.tsx`。
-
-- `src/companion/relay.ts`：中继除 127.0.0.1 外再监听一个用户给的地址（`listenOn` / `closeExtra`），同样的路由和 4010 防火墙；端口被占或没有这个地址时报错，从不换端口
-- `src/companion/reach.ts`：`setCustom` 开关这个监听（一次只改一个，失败每 30 秒重试），把 `ws://host:port/companion` 写进 DHT 记录
-- `src/companion/host.ts`、`src/companion/launch.ts`：设置变了就调 `setCustom`，远程访问为「仅组网」时关掉；welcome 里带上 `custom`
-- `src/companion/protocol.ts`：`welcome.custom`、`RelayRecord.custom`、`LinkPath` / `DialAttempt` 的 `custom`、`SINCE.customRoute`（topic/native 上 1.59，topic/plans 上 1.64，见上面编号一节）
-- `src/companion/dial.ts`：手机拨号时把自定义地址作为第三条路，和直连、Cloudflare 中继一起竞速
-- `src/companion/client.ts`：hints 里的 `custom`；经自定义地址连上时 hello 报 `custom`
-- `src/companion/diagnose.ts`：路径名里加「自定义地址」
-- `src/core/store.ts`：`companion.custom` 状态（监听中、失败及原因、关）
-- `src/ipc/api.ts`、`src/shared/settings-schema.ts`：`customAddress` 设置（本机设置，不同步）
-- `src/machines/sync.ts`：`customAddress` 列为不同步的本机设置
-- `packages/companion/worklet/link.ts`、`packages/companion/lib/link/bare.ts`、`packages/companion/lib/link/transport.ts`、`packages/companion/lib/link/rpc.ts`、`packages/companion/lib/store.ts`：手机端记住 Mac 给的自定义地址、拨它、把用到的路传给界面
-- `packages/companion/app/settings.tsx`：手机设置 › 高级里一行只读的「通过自定义地址连接」
-- `packages/companion/plugins/loopback-cleartext.js`：Android 允许任意主机走明文（自定义地址是事先不知道的 `ws://`；取舍见 `docs/companion.md`）
 
 ### 侧边栏
 

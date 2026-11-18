@@ -64,26 +64,20 @@ export function wsPipe(ws: WebSocket, open: boolean): MessagePipe {
   };
 }
 
-/** One HTTP + WebSocket listener of the relay (the local one, or the one on a custom address). */
-interface Listener {
-  readonly http: HttpServer;
-  readonly wss: WebSocketServer;
-  readonly port: number;
-}
-
 export class RelayServer {
   private readonly routes = new Map<string, RelayRoute>();
-  private main?: Listener;
-  private extra?: Listener;
+  private http?: HttpServer;
+  private wss?: WebSocketServer;
+  private port = 0;
 
   constructor(private readonly log?: (line: string) => void) {}
 
   get listening(): boolean {
-    return this.main !== undefined;
+    return this.http !== undefined;
   }
 
   get localPort(): number {
-    return this.main?.port ?? 0;
+    return this.port;
   }
 
   add(route: RelayRoute): void {
@@ -95,43 +89,7 @@ export class RelayServer {
   }
 
   async listen(): Promise<number> {
-    if (this.main) return this.main.port;
-    this.main = await this.open('127.0.0.1', 0);
-    return this.main.port;
-  }
-
-  /**
-   * Also listen on `host:port` (a mesh network's address the user filled in), with the same routes.
-   * Never falls back to another port: the address is the user's, so a busy port is an error.
-   */
-  async listenOn(host: string, port: number): Promise<number> {
-    if (this.extra) return this.extra.port;
-    try {
-      this.extra = await this.open(host, port);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      const why = code === 'EADDRINUSE' ? 'that port is already in use' : code === 'EADDRNOTAVAIL' ? 'this Mac has no such address' : err instanceof Error ? err.message : String(err);
-      this.log?.(`relay: custom address ${host}:${port} is not listening: ${why}`);
-      throw new Error(why);
-    }
-    this.log?.(`relay: also listening on ${host}:${this.extra.port}`);
-    return this.extra.port;
-  }
-
-  async closeExtra(): Promise<void> {
-    const extra = this.extra;
-    this.extra = undefined;
-    if (extra) await this.shut(extra);
-  }
-
-  async close(): Promise<void> {
-    const { main, extra } = this;
-    this.main = undefined;
-    this.extra = undefined;
-    await Promise.all([main, extra].map((l) => (l ? this.shut(l) : Promise.resolve())));
-  }
-
-  private async open(host: string, port: number): Promise<Listener> {
+    if (this.http) return this.port;
     const http = createServer((_req, res) => {
       // Plain HTTP (cloudflared's reachability check, a browser): who this is, and nothing else.
       res.writeHead(200, { 'content-type': 'text/plain' });
@@ -140,31 +98,36 @@ export class RelayServer {
     const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE });
     http.on('upgrade', (req: IncomingMessage, socket, head) => {
       const key = /^\/companion\/([0-9a-f]{64})\/?$/.exec(req.url ?? '')?.[1];
-      wss.handleUpgrade(req, socket, head, (ws) => this.serve(ws, key, wss));
+      wss.handleUpgrade(req, socket, head, (ws) => this.serve(ws, key));
     });
     await new Promise<void>((resolve, reject) => {
       http.once('error', reject);
-      http.listen(port, host, () => resolve());
+      http.listen(0, '127.0.0.1', () => resolve());
     });
-    http.on('error', (err) => this.log?.(`relay: ${err.message}`));
-    return { http, wss, port: (http.address() as AddressInfo).port };
+    this.http = http;
+    this.wss = wss;
+    this.port = (http.address() as AddressInfo).port;
+    return this.port;
   }
 
-  private async shut({ http, wss }: Listener): Promise<void> {
+  async close(): Promise<void> {
+    const { http, wss } = this;
+    this.http = undefined;
+    this.wss = undefined;
     // Let what's queued go out (a removed phone's 4010), then cut whatever is left.
-    const open = [...wss.clients];
+    const open = [...(wss?.clients ?? [])];
     if (open.length) await new Promise((r) => setTimeout(r, 300));
     for (const ws of open) ws.close(1001);
     if (open.length) await new Promise((r) => setTimeout(r, 200));
     for (const ws of open) ws.terminate();
-    wss.close();
-    await new Promise<void>((resolve) => http.close(() => resolve()));
+    wss?.close();
+    await new Promise<void>((resolve) => (http ? http.close(() => resolve()) : resolve()));
   }
 
-  private serve(ws: WebSocket, key: string | undefined, wss: WebSocketServer): void {
+  private serve(ws: WebSocket, key: string | undefined): void {
     const route = key ? this.routes.get(key) : undefined;
     if (!route) return ws.close(RELAY_CLOSE.notFound, 'nothing here');
-    if (wss.clients.size > MAX_SOCKETS) return ws.close(1013, 'busy');
+    if ((this.wss?.clients.size ?? 0) > MAX_SOCKETS) return ws.close(1013, 'busy');
     const stream = noiseResponder(wsPipe(ws, true), route.keyPair);
     stream.on('error', () => undefined);
     const timer = setTimeout(() => stream.destroy(), HANDSHAKE_MS);
