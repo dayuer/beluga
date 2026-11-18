@@ -1,0 +1,42 @@
+/* The Overview's column headers (fork; OverviewHeader.tsx): the rows' grid (views/overview.module.css .row), on the pane's background. */
+.head {
+  position: sticky;
+  top: -6px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 22px minmax(10rem, 1.3fr) minmax(6rem, 1fr) minmax(12rem, 1.4fr) minmax(6rem, 1fr) 6rem;
+  align-items: center;
+  gap: 12px;
+  max-width: 72rem;
+  height: 26px;
+  margin: 0 auto 10px;
+  padding: 0 10px;
+  background: var(--bg);
+  border-bottom: 0.5px solid var(--hairline-strong);
+  font-size: 0.82rem;
+  color: var(--text-3);
+}
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+.sort:hover,
+.on {
+  color: var(--text);
+}
+.end {
+  justify-content: flex-end;
+}

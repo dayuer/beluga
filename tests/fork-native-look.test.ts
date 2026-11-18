@@ -17,7 +17,15 @@ describe('the Mac-native look’s upstream anchors', () => {
   const look = read('fork', 'native', 'native-look.css');
 
   it('finds every class the overlay anchors on', () => {
-    const upstream = new Set([...classes(read('components', 'ui.module.css')), ...classes(read('layout', 'BranchControl.module.css')), ...classes(read('layout', 'panel', 'panel.module.css'))]);
+    const upstream = new Set(
+      [
+        ['components', 'ui.module.css'],
+        ['layout', 'BranchControl.module.css'],
+        ['layout', 'panel', 'panel.module.css'],
+        ['views', 'overview.module.css'],
+        ['dialogs', 'settings.module.css'],
+      ].flatMap((parts) => [...classes(read(...parts))]),
+    );
     expect(anchorsIn(look).filter((name) => !upstream.has(name))).toEqual([]);
   });
 
@@ -29,6 +37,19 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(read('views', 'ChatView.tsx')).toContain('<EmptyActions>');
     expect(read('components', 'ui.tsx')).toContain('<div className={s.emptyActions}>{children}</div>');
     expect(read('components', 'ui.tsx')).toContain('{icon ? <Icon name={icon} size={ICON_SIZE[size]} /> : null}');
+  });
+
+  it('finds the pages’ markup the 1a–1c rules read', () => {
+    expect(read('views', 'Overview.tsx')).toContain('<OverviewHeader sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} />');
+    // The header's columns are the rows' own: the same grid as views/overview.module.css's .row.
+    const columns = (css: string): string | undefined => /grid-template-columns:\s*([^;]+);/.exec(css)?.[1];
+    const row = /\.row \{([^}]*)\}/.exec(read('views', 'overview.module.css'))?.[1] ?? '';
+    expect(columns(read('fork', 'native', 'overview-header.module.css'))).toBe(columns(row));
+    expect(read('layout', 'BranchControl.tsx')).toContain('data-branch-state={branch.kind}');
+    expect(read('layout', 'RightPanel.tsx')).toContain('<div className={s.views}>');
+    const settings = read('dialogs', 'Settings.tsx');
+    expect(settings).toContain('data-settings-window=""');
+    expect(settings).toContain('<Dialog.Close className={s.close} aria-label="Close">');
   });
 
   it('is loaded by the fork’s overlay, not by an upstream file', () => {
