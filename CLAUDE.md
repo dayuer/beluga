@@ -108,7 +108,8 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
 - **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
   into that branch; once merged, merge that branch forward into each one after it (merge, never
   rebase: they're pushed).
-- **Syncing upstream** goes in at the top: check the Chinese (`node scripts/zh-check.mjs`), merge `upstream/main` into `topic/chinese`
+- **Syncing upstream** goes in at the top: merge `upstream/main` into `topic/chinese` (the fork's Chinese is
+  in upstream's own `zh-CN.json`, nothing else differs there)
   (`node scripts/sync-upstream.mjs` on `topic/native` and after), then forward down the chain.
 - **Builds are composed when needed.** From a clean worktree on the chain branch that has what
   the build should carry (`topic/plans` has all of it), merge `topic/fixes` if wanted, then
