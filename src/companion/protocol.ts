@@ -1457,14 +1457,15 @@ const tunB64 = z.string().max(Math.ceil(TUN_PIECE / 3) * 4 + 4);
 /**
  * How a link reached the Mac: `lan` (directly, on the same network), `direct` (directly over the
  * internet: hyperdht's hole-punch), or `relay` (through the Mac's Cloudflare tunnel, with the same
- * Noise handshake inside, so the relay sees only ciphertext).
+ * Noise handshake inside, so the relay sees only ciphertext), or `custom` (1.59: the Mac's relay on a mesh
+ * network's address, `SINCE.customRoute`; an older Mac is told `relay` instead).
  */
-export const LinkPath = z.enum(['lan', 'direct', 'relay']);
+export const LinkPath = z.enum(['lan', 'direct', 'relay', 'custom']);
 export type LinkPath = z.infer<typeof LinkPath>;
 
-/** One way the phone tried (`p2p`: hyperdht, LAN first then hole-punching; `relay`: the tunnel). */
+/** One way the phone tried (`p2p`: hyperdht, LAN first then hole-punching; `relay`: the tunnel; `custom`: the Mac's address in a mesh network, 1.59). */
 export const DialAttempt = z.object({
-  way: z.enum(['p2p', 'relay']),
+  way: z.enum(['p2p', 'relay', 'custom']),
   outcome: z.enum(['ok', 'timeout', 'refused', 'unreachable', 'not-found', 'failed', 'skipped', 'lost']),
   /** `lost`: still trying when another way connected (it was dropped). `code`: hyperdht's error code (HOLEPUNCH_ABORTED, PEER_NOT_FOUND…), or the relay's close code. */
   code: z.string().max(60).optional(),

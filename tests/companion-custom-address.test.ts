@@ -117,7 +117,26 @@ describe('the relay on a custom address', () => {
     const paired = pairDevice(p.node, link, p.device, { timeoutMs: 20_000, openRelay: p.openRelay, staggerMs: 200 });
     await waitFor(() => store.getState().companion.pairing?.waiting, 15_000);
     host.pairApprove();
-    expect((await paired).path).toBe('relay');
+    // The pairing's own DHT record names the custom address too, so it can win the race.
+    expect(['relay', 'custom']).toContain((await paired).path);
+
+    // Only the custom address is reachable (direct refused, no relay, nothing on the DHT to read): the link still opens on it.
+    const linked = new CompanionClient({ node: p.node, address: host.address(), link: p.keys.link, app: '1.1.0', platform: 'android', topics: ['home'], hints: { openRelay: p.openRelay, custom: [url], reportCustom: true, staggerMs: 0 } });
+    cleanup.push(() => linked.close());
+    const welcome = await linked.connect();
+    expect(linked.path).toBe('custom');
+    expect(welcome.custom).toBe(url);
+    expect(linked.tried.map((t) => [t.way, t.outcome]).filter(([w]) => w === 'custom')).toEqual([['custom', 'ok']]);
+    await waitFor(() => store.getState().companion.devices[0]?.path === 'custom', 5_000);
+    expect(store.getState().companion.devices[0]).toMatchObject({ linked: true, path: 'custom', note: expect.stringMatching(/custom address/) });
+    // A Mac that predates `custom` is told `relay`, not a path it can't parse.
+    const old = new CompanionClient({ node: p.node, address: host.address(), link: p.keys.link, app: '1.1.0', platform: 'android', topics: ['home'], hints: { openRelay: p.openRelay, custom: [url], staggerMs: 0 } });
+    cleanup.push(() => old.close());
+    await old.connect();
+    expect(old.path).toBe('custom');
+    await waitFor(() => store.getState().companion.devices[0]?.path === 'relay', 5_000);
+    old.close();
+    linked.close();
 
     // One that was never paired gets 4010 inside the link.
     const stranger = phone();
