@@ -45,6 +45,7 @@ describe('calm-accent.css', () => {
       merge: read('components', 'ui.module.css'),
       mainError: read('layout', 'BranchControl.module.css'),
       mainMerged: read('layout', 'BranchControl.module.css'),
+      primaryError: read('layout', 'Toolbar.module.css'),
       chevrons: read('components', 'select.module.css'),
       footLink: read('tasks', 'tasks.module.css'),
       invite: read('layout', 'Sidebar.module.css'),
@@ -52,7 +53,7 @@ describe('calm-accent.css', () => {
       sidebarList: read('network', 'network.module.css'),
     };
     const names = anchorsIn(css);
-    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'iconBadge', 'invite', 'mainError', 'mainMerged', 'merge', 'pill_info', 'primary', 'sidebarList']);
+    expect(names.sort()).toEqual(['badgeUrgent', 'chevrons', 'footLink', 'footer', 'iconBadge', 'invite', 'mainError', 'mainMerged', 'merge', 'pill_info', 'primary', 'primaryError', 'sidebarList']);
     const missing = names.filter((name) => !classes(home[name]!).has(name));
     expect(missing).toEqual([]);
   });
@@ -82,7 +83,7 @@ describe('calm-accent.css', () => {
   it('draws the solid action flat: no gradient, no shadow, and leaves pressed, focused, disabled, the branch button’s error and merged looks, and idle-window states to upstream', () => {
     const rule = /:root\[data-calm\]:not\(\[data-window='idle'\]\) :where\(\[class\*='_primary_'\]\)([^{]*)\{([^}]*)\}/.exec(css);
     expect(rule).not.toBeNull();
-    expect(rule![1]).toContain(":not(:disabled, :active, :focus-visible, [class*='_mainError_'], [class*='_mainMerged_'])");
+    expect(rule![1]).toContain(":not(:disabled, :active, :focus-visible, [class*='_mainError_'], [class*='_mainMerged_'], [class*='_primaryError_'], [class*='_merge_'])");
     expect(rule![2]).toContain('background: var(--control-accent);');
     expect(rule![2]).toContain('box-shadow: none;');
   });

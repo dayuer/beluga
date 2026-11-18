@@ -1,6 +1,7 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { macCss } from './fork-calm-files.js';
 import { findGlows, rewriteGlow, skipGlowFile, withCalmValues, withoutCalm } from '../packages/mac/src/fork/calm/glow-scan.js';
 
 /**
@@ -15,16 +16,6 @@ import { findGlows, rewriteGlow, skipGlowFile, withCalmValues, withoutCalm } fro
  */
 
 const mac = path.join('packages', 'mac', 'src');
-
-/** Every .css under packages/mac/src, with its path relative to src. */
-export function macCss(dir = mac, rel = ''): { rel: string; css: string }[] {
-  return readdirSync(dir).flatMap((f) => {
-    const abs = path.join(dir, f);
-    const r = rel ? `${rel}/${f}` : f;
-    if (statSync(abs).isDirectory()) return macCss(abs, r);
-    return f.endsWith('.css') ? [{ rel: r, css: readFileSync(abs, 'utf8') }] : [];
-  });
-}
 
 /** Glows that stay with calm on, in files the rewrite processes: the file and the start of the layer, with the reason. */
 export const GLOW_EXCEPTIONS: ReadonlyArray<{ file: string; match: string; why: string }> = [

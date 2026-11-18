@@ -33,9 +33,11 @@ export const MARKS: ReadonlyArray<{ kind: MarkKind; selector: string }> = [
   { kind: 'count', selector: "[class*='_count_']" },
   { kind: 'working', selector: "[data-signal='working']" },
   { kind: 'working', selector: '[data-busy]' },
+  { kind: 'working', selector: "[data-signal='busy']" },
   { kind: 'money', selector: '[data-earnings-pill]' },
   { kind: 'team', selector: "button[aria-label^='Team on']" },
   { kind: 'quiet', selector: "[data-signal='later']" },
+  { kind: 'quiet', selector: "[data-signal='inside']" },
   { kind: 'quiet', selector: '[data-scheduled]' },
   { kind: 'quiet', selector: '[data-driven-by]' },
   { kind: 'quiet', selector: "[class*='_mark_']:not([data-signal])" },
@@ -66,7 +68,7 @@ export function pickMark(kinds: readonly MarkKind[]): number {
 
 /** The kind of one mark element, by the first anchor it matches (MARKS is in rank order); undefined when none does: such a mark is left alone. */
 export function kindOf(mark: MarkLike): MarkKind | undefined {
-  return [...MARKS].sort((a, b) => rankOf(a.kind) - rankOf(b.kind)).find((m) => mark.matches(m.selector))?.kind;
+  return MARKS.find((m) => mark.matches(m.selector))?.kind;
 }
 
 /**

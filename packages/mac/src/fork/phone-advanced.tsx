@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { customStatus, parseCustomAddress } from '../../../../src/shared/custom-address.js';
+import { cx } from '../components/ui.js';
 import { Group, Row } from '../dialogs/settings-controls.js';
 import s from '../dialogs/settings.module.css';
+import ph from '../phone/phone.module.css';
 import { useApp, useBeluga } from '../lib/beluga.js';
 
 /**
@@ -34,7 +36,7 @@ export function PhoneAdvanced() {
       </Row>
       {status ? (
         <Row label="Custom address status" detail={status.text}>
-          <span aria-label={status.ok ? 'Listening' : 'Not listening'} />
+          <span className={cx(ph.relayDot, status.ok && ph.relayOk)} aria-label={status.ok ? 'Listening' : 'Not listening'} />
         </Row>
       ) : null}
     </Group>

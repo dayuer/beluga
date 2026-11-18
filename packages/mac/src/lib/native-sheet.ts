@@ -3,7 +3,7 @@ import type { IconName } from '../components/Icon.js';
 import type { SelectEntry } from '../components/select-parts.js';
 import { isSection } from '../components/select-model.js';
 import { locale, t } from '../i18n/index.js';
-import { hexOf } from './hex-colour.js';
+import { hexOf } from '../fork/native/hex-colour.js';
 import { nativeMenus, picture } from './native-menu.js';
 
 /**
@@ -129,9 +129,11 @@ function palette(): SheetPalette | undefined {
   const probe = document.createElement('span');
   probe.style.display = 'none';
   document.documentElement.appendChild(probe);
+  // A property the theme lacks falls back to transparent, not to the inherited text colour (which hexOf would take).
   const read = (v: string): string | undefined => {
-    probe.style.color = `var(${v})`;
-    return hexOf(getComputedStyle(probe).color);
+    probe.style.color = `var(${v}, transparent)`;
+    const computed = getComputedStyle(probe).color;
+    return /^rgba\(.*,\s*0\)$|\/\s*0\)$|^transparent$/.test(computed) ? undefined : hexOf(computed);
   };
   const accent = read('--accent');
   const bg = read('--bg');
@@ -206,8 +208,16 @@ export function useNativeSheet(on: boolean, spec: SheetSpec, handlers: SheetHand
   // A change the page didn't take as typed (clamped, refused, a checkbox that can't change) has
   // to go back to the control: each change sends the form again.
   const [, poke] = useState(0);
-  // The colours count too: switching the theme or accent with the sheet open draws it again.
-  const key = JSON.stringify(palette() ?? null) + JSON.stringify(spec, (_k, v: unknown) => (typeof v === 'object' && v !== null && '$$typeof' in v ? `mark:${String((v as { key?: unknown }).key ?? '')}` : v));
+  // The colours count too: switching the theme or accent with the sheet open draws it again. Read
+  // only while it's open (a probe and three style reads each render), and `<html>`'s theme, accent
+  // or style changing (Match System when macOS flips) renders this again.
+  useEffect(() => {
+    if (!on || typeof MutationObserver === 'undefined') return;
+    const watch = new MutationObserver(() => poke((n) => n + 1));
+    watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return () => watch.disconnect();
+  }, [on]);
+  const key = !on ? '' : JSON.stringify(palette() ?? null) + JSON.stringify(spec, (_k, v: unknown) => (typeof v === 'object' && v !== null && '$$typeof' in v ? `mark:${String((v as { key?: unknown }).key ?? '')}` : v));
 
   useEffect(() => {
     if (!on) return;

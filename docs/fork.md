@@ -152,6 +152,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
   - 拖出文件也接在 `layout/panel/ScratchTab.tsx`（自己的草稿）和 `claude-code/AgentOutputs.tsx`（这台 Mac 上的输出）。
   - 审计（2026-11-15，PR 39 / 41 / 44）后的修正：原生 sheet 的回调在更新中被系统回调时不再 panic（`peek`/`try_borrow`），正在输入的文本框不被页面回传覆盖，每个 sheet 有编号（更新、关闭只作用于自己），输入规则（`maxLength`/`upper`/`keep`）在原生框里即时生效，复选框可禁用，单选行去掉（已由卡片取代）；原生菜单的标题、分隔线 tag 为 -1；窗口指针改在主线程里取；空路径不拖；警告框随页面卸载收起、内容变了重新弹出；`useNativeSheet` 卸载后不再打开或更新，每次改动后重发让控件显示页面认可的值。修复智能体只在仍在它身上、且最近一次交还之后又有交接时才交还。对比度规则压过自定义配色；几处图标按钮补成常规尺寸。留着的：Quick Look 没按面板控制者协议接入（能用，会打警告）。
   - `src-tauri/Cargo.toml`：直接依赖 `objc2-app-kit`、`objc2-foundation`（版本与依赖树里已有的一致）；`src-tauri/src/lib.rs` 注册这些命令。
+  - 原生 sheet 用页面的配色（2026-11-18，`6484483ed`）：`lib/native-sheet.ts` 打开时从 `:root` 读 `--accent`、`--bg`、`--bg-raised` 和深浅色，作为 `palette` 发给 sheet（主题缺某个变量时不发，sheet 用系统自己的颜色）；`<html>` 的主题、强调色变化时重发。颜色解析在 `fork/native/hex-colour.ts`（不带依赖，根目录测试 `tests/fork-native-sheet-palette.test.ts` 直接引它）。`src-tauri/src/native_sheet.rs` 的 `SheetPalette`、`apply_chrome` 按它设外观、卡片和主按钮的颜色；`src-tauri/Cargo.toml` 为此给 `objc2-app-kit` 加了 `NSAppearance`、`NSColorList` 两个 feature。
 
 ### 原生 Mac 控件与外壳的逐文件登记（BLG-257 补登记）
 

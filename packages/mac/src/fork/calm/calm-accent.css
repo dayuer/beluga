@@ -38,9 +38,9 @@
    is lighter than the fill there) read as a glow around the button (BLG-253: computed styles show no blurred or
    coloured halo on Create PR or its ancestors; these layers are what there is, ui.module.css `.primary`,
    tokens.css `--control-accent-edge` / `--control-accent-sheen`). A window that is not key keeps
-   upstream's plain look; pressed, focused, disabled states and the branch button's error and merged looks (BranchControl.module.css) keep their own rules. This rule sits before
+   upstream's plain look; pressed, focused, disabled states the branch button's error and merged looks (BranchControl.module.css), the toolbar's failed action (Toolbar.module.css `.primaryError`) and Merge's green (`variant='merge'`) keep their own rules. This rule sits before
    the needs-you and friends-card rules below, which are as specific and come later, so they win. */
-:root[data-calm]:not([data-window='idle']) :where([class*='_primary_']):not(:disabled, :active, :focus-visible, [class*='_mainError_'], [class*='_mainMerged_']) {
+:root[data-calm]:not([data-window='idle']) :where([class*='_primary_']):not(:disabled, :active, :focus-visible, [class*='_mainError_'], [class*='_mainMerged_'], [class*='_primaryError_'], [class*='_merge_']) {
   background: var(--control-accent);
   box-shadow: none;
 }

@@ -137,8 +137,11 @@
   color: var(--text-2);
 }
 
-/* M8 (BLG-243): a row's trailing area shows one mark (one-mark.ts settles which); the others wait for hover or keyboard focus on the row. */
-:root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden] {
+/* M8 (BLG-243): a row's trailing area shows one mark (one-mark.ts settles which); the others wait for hover or keyboard focus on the row
+   (the row itself, a role=button, or something in it). Hidden only while neither: bringing a mark back with `display: revert` would
+   drop upstream's own inline-grid / inline-flex (signal.module.css) and draw it off-line. */
+:root[data-calm] [data-fork-sidebar] [role='button']:not(:hover, :focus-visible, :has(:focus-visible)) [data-fork-mark-hidden],
+:root[data-calm] [data-fork-sidebar] [data-fork-mark-hidden][data-earnings-pill] {
   display: none;
 }
 /* The earnings pill is the exception: upstream hides it on hover so the row's tools take its place and nothing slides
@@ -146,8 +149,8 @@
    A row with tools (a project's New worktree, New chat, •••) keeps its one mark on hover too (M9): the three buttons
    open up there, and the marks beside them left the name two letters ("bob-…"). Its other marks stay in its
    detail; rows without tools still bring theirs back. */
-:root[data-calm] [data-fork-sidebar] [role='button']:is(:hover, :has(:focus-visible)):not(:has([class*='_hoverTools_'] > button, [class*='_hoverTools_'] > [data-state])) [data-fork-mark-hidden]:not([data-earnings-pill]) {
-  display: revert;
+:root[data-calm] [data-fork-sidebar] [role='button']:has([class*='_hoverTools_'] > button, [class*='_hoverTools_'] > [data-state]) [data-fork-mark-hidden] {
+  display: none;
 }
 
 /*

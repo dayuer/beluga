@@ -136,9 +136,13 @@ change: only what the player reads is fetched, two pieces ahead and no faster th
 and what came is kept in a 48 MB cache (seeking back costs nothing). Nothing autoplays or loops; a
 video plays only when tapped and pauses when you swipe away, leave or put the app away. MP4, M4V and
 MOV play on both platforms, WebM on Android (iPhone says so); a codec the player lacks shows why.
-Nothing is transcoded. The Mac makes a video's thumbnail from its first frame (Quick Look). Android
-allows plain http only to 127.0.0.1 (`plugins/loopback-cleartext.js`), iOS only to local addresses
-(`NSAllowsLocalNetworking`).
+Nothing is transcoded. The Mac makes a video's thumbnail from its first frame (Quick Look). iOS
+allows plain http only to local addresses (`NSAllowsLocalNetworking`). Android allows it to any host
+(`plugins/loopback-cleartext.js`): the custom address is a `ws://` URL to an address only the user
+knows, and a network security config can't name it ahead. The cost is that a stray `http://` image
+or link would load in plaintext rather than fail; the link itself is the Noise stream either way.
+Narrowing it back to 127.0.0.1 means dialing the custom address from the worklet (`bare-tcp`),
+which the config doesn't govern.
 
 **Views, not state.** The Mac's shared state is several MB and full of things the phone mustn't
 show. The phone never sees it: `src/companion/views.ts` turns it into small views per topic, each

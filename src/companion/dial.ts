@@ -119,9 +119,9 @@ export async function lookupRelay(node: Partial<Pick<DHT, 'mutableGet'>> | undef
   }
 }
 
-/** The mesh address (Tailscale's 100.64.0.0/10 and the rest) is never `lan`: it's the custom way, named by what dialed it. */
 /** How long one custom address has to finish its handshake (it's on a mesh: answers fast or never). */
 const CUSTOM_MS = 8_000;
+/** A p2p peer on these is `lan`, else `direct`. A mesh address over the custom way is `custom`, named by what dialed it, not by this. */
 const PRIVATE = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|127\.|fc|fd|fe80:)/i;
 
 export interface DialOptions {

@@ -86,11 +86,6 @@ export class RelayServer {
     return this.main?.port ?? 0;
   }
 
-  /** The port of the extra listener (a custom address), once it listens. */
-  get extraPort(): number | undefined {
-    return this.extra?.port;
-  }
-
   add(route: RelayRoute): void {
     this.routes.set(route.keyPair.publicKey.toString('hex'), route);
   }
