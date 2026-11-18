@@ -383,3 +383,24 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 
 `fork/calm/calm-glow.css` 只定义令牌，且只在 `:root[data-calm]` 下；上游 CSS 里的光晕在构建时改写成带原值回退的令牌引用（`glow-scan.ts`），沉稳关时变量未定义，画面与上游一致，不动上游文件。`onboarding/scenes`、`Wormhole`、`reactbits`、`PixelBurst`、`star-scene`、`call`、`YourCard` 是 keep-decor，不做字号改写，也不动光晕（`type-scale.ts` 的 `skipFile`、`glow-scan.ts` 的 `skipGlowFile`）。
 
+
+### Mac 原生走查（2026-11-18）
+
+对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
+
+- 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色；失败、已合并和 Merge 保留各自的颜色。规则前加了 `:root`，压过 `calm-accent.css` 把主按钮刷成强调色的那条。
+- 底部终端标签：当前标签用粗体，不加下划线。检查器只有一个标签时（总览的 Info）画成标题。
+- 空聊天的建议按钮只留文字。
+- 总览：在分组上方加一行列头（名称、分支、状态、详情、更新于/大小），名称和最后一列可以点击排序，和 Recent ▾ 菜单改的是同一个偏好；行高 28pt。
+- 工作树：名字旁的分支状态从胶囊改成一行彩色文字；Changes / History 这层视图切换改成一排文字，当前项加粗，检查器里只剩一层分段控件。
+- 设置：看起来像独立窗口：背后的窗口不变暗，左上角是红色关闭按钮（最小化和缩放画成灰色），窗格名居中作标题。真正拆成 Tauri 的独立窗口还没做。
+
+改上游文件只有一处：
+
+| 文件 | 改了几行 | 原因 |
+| --- | ---: | --- |
+| `packages/mac/src/views/Overview.tsx` | 2 | 引入并放置 `OverviewHeader`（列头），排序仍用总览自己的偏好 |
+
+#### Liquid Glass（macOS 26 的外观）
+
+`packages/mac/src/fork/native/liquid-glass.css`，同样由 `fork/calm/index.ts` 引入，只在 `:root[data-os='mac'][data-glass='on']` 下生效（`lib/prefs.ts` 设置这两个属性）：Windows、Linux，以及打开了系统或应用的「减少透明度」时，窗口保持原样。侧栏和检查器离开窗口边缘 8px，变成圆角 16px 的玻璃面板（半透明、模糊加饱和、一圈高光描边和投影）；按钮和分段控件变成胶囊形；工具栏的图标按钮放在玻璃胶囊上。参考过 `rdev/liquid-glass-react`（MIT），但它的折射靠 SVG 置换滤镜，Mac 应用的 WKWebView 画不出来，还会跟着指针形变，和沉稳模式冲突，所以只用 CSS、静止不动。不改上游文件；锚点在 `tests/fork-native-look.test.ts` 里检查。

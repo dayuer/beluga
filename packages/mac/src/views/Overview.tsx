@@ -8,6 +8,7 @@ import { useActions } from '../lib/actions.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { EarningsCard } from './EarningsCard.js';
+import { OverviewHeader } from '../fork/native/OverviewHeader.js';
 import { ConversationPeek, DeleteArchivedAlert } from './overview/ConversationPeek.js';
 import type { ThreadChildren } from '@beluga/shared/threads.js';
 import { FilterBar } from './overview/FilterBar.js';
@@ -228,6 +229,7 @@ export function OverviewView() {
         onProject={(id) => setPrefs({ project: id })}
       />
       {!searching && !project && (prefs.filter === 'all' || prefs.filter === 'active') ? <EarningsCard /> : null}
+      {groups.length ? <OverviewHeader sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} /> : null}
       <div ref={listRef} onKeyDown={onListKey}>
         {prefs.filter === 'needs' && there.length ? <RemoteList title="Needs you on your computers" rows={there} /> : null}
         {groups.length || (prefs.filter === 'needs' && there.length) ? (
