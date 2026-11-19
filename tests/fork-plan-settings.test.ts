@@ -191,16 +191,23 @@ describe('the header’s Agents menu', () => {
     expect(picked).toEqual(['claude:claude-opus-5-5', 'codex:']);
   });
 
-  it('an agent with no models listed is checked by its runtime, whatever model was picked', () => {
+  it('an agent with no models listed is checked by its runtime, and picking it again keeps its model', () => {
     const entries = [
       { section: 'Claude', options: [{ value: 'claude:', label: 'Claude' }, { value: 'claude:claude-opus-5-5', label: 'Claude · Opus 5.5' }] },
       { section: 'Codex', options: [{ value: 'codex:', label: 'Codex' }] },
     ];
-    const rows = agentModelItems(entries, { runtime: 'codex', label: 'Codex', model: 'gpt-5.5' }, () => undefined);
+    const picked: string[] = [];
+    const rows = agentModelItems(entries, { runtime: 'codex', label: 'Codex', model: 'gpt-5.5' }, (v) => void picked.push(v));
     expect(rows.map((r) => [r.label, Boolean(r.checked)])).toEqual([
       ['Claude', false],
       ['Codex', true],
     ]);
+    // Picked again, it keeps its model; an agent not in use is picked on its default.
+    rows[1]!.onSelect();
+    expect(picked).toEqual(['codex:gpt-5.5']);
+    const other = agentModelItems(entries, undefined, (v) => void picked.push(v));
+    other[1]!.onSelect();
+    expect(picked).toEqual(['codex:gpt-5.5', 'codex:']);
   });
 
   it('“Default Model” has its Chinese', () => {

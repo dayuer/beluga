@@ -52,7 +52,8 @@ export function agentModelItems<I extends string>(entries: readonly Entry<I>[], 
     const separate = i === 0 || !('section' in entries[i - 1]!) ? { separate: true } : {};
     // Checked by its runtime: a model it no longer lists (or one picked before it was set up) still marks it.
     const inUse = now !== undefined && runtimeOf(now) === runtimeOf(agent.value);
-    if (!models.length || agent.disabled) return [{ ...row(agent), ...separate, checked: inUse }];
+    // Picking it again keeps the model it has: one this agent doesn't list now isn't dropped.
+    if (!models.length || agent.disabled) return [{ ...row(agent), ...separate, checked: inUse, onSelect: () => pick(inUse ? now : agent.value) }];
     const prefix = `${agent.label} · `;
     return [
       {

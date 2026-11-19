@@ -94,7 +94,7 @@ export function PlanAgentsButton({ plan, pick }: { plan: Plan; pick: (role: Plan
   const mine = useMyAgent();
   const refs = PLAN_ROLES.map((r) => roleAgent(plan, r) ?? mine);
   const names = refs.map((ref) => agentChoiceLabel(ref, runtimes, models));
-  const one = new Set(refs.map(choiceForAgent)).size === 1;
+  const count = new Set(refs.map(choiceForAgent)).size;
   // Every agent and model, as the pickers list them; "your agent" is each part's own first row.
   const choices = entries.filter((e) => 'section' in e || e.value !== YOUR_AGENT);
   const items: ActionItem[] = PLAN_ROLES.map((role, i) => ({
@@ -112,7 +112,7 @@ export function PlanAgentsButton({ plan, pick }: { plan: Plan; pick: (role: Plan
   return (
     <ActionsDropdown items={items}>
       <Button size="small" variant="quiet" icon="people" title={tip} aria-label={`Agents: ${tip}`}>
-        {one ? names[0] : `${new Set(refs.map(choiceForAgent)).size} Agents`}
+        {count === 1 ? names[0] : `${count} Agents`}
       </Button>
     </ActionsDropdown>
   );
