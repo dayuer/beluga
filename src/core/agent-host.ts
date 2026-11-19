@@ -45,6 +45,7 @@ import { agentForAsk } from './gateway/serve.js';
 import { fromMachine } from './client-context.js';
 import { buildPreviewAppend } from '../agent/preview-prompt.js';
 import { experimentOn } from '../shared/experiments.js';
+import type { ReplyLanguage } from '../shared/reply-language.js';
 
 /** How an external agent's message goes in, and what happened to it. */
 export type ExternalSendMode = 'auto' | 'queue' | 'steer' | 'restart';
@@ -1633,6 +1634,8 @@ export class AgentHost {
         ...(plans?.brief ? { planBrief: plans.brief } : {}),
         ...(threads ? { threadTools: threads } : {}),
         ...(mac ? { macTools: mac.tools, macBrief: mac.brief } : {}),
+        // Your own runs answer you in your Mac's language; a friend's or a guest's in theirs.
+        ...(from === this.selfId && !external ? this.replyLanguage() : {}),
         ...(guest ? { sharedBrief: guest.brief } : {}),
         ...(phone ? { phoneTools: phone.tools, phoneBrief: phone.brief } : {}),
         ...(callNotes ? { callNotesTools: callNotes } : {}),
@@ -1757,6 +1760,12 @@ export class AgentHost {
    * would get (its folder and session, the task and its tools, your phone, your variables, the
    * worktree's tag), less what's only for a turn. Launched on the conversation's runtime.
    */
+  /** The language your own runs answer you in (Settings › General on the Mac), when not English. */
+  private replyLanguage(): { readonly replyLanguage?: ReplyLanguage } {
+    const language = this.store.getState().prefs.replyLanguage;
+    return language && language !== 'en' ? { replyLanguage: language } : {};
+  }
+
   async terminalLaunch(channel: string, sink: TerminalSink, prompt = ''): Promise<TerminalLaunch> {
     const agent = this.agent as AgentBackend;
     if (!agent.terminal) throw new Error('This agent has no terminal of its own in Beluga.');
@@ -1794,6 +1803,7 @@ export class AgentHost {
         ...(board?.brief ? { taskBrief: board.brief } : {}),
         ...(phone ? { phoneTools: phone.tools, phoneBrief: phone.brief } : {}),
         ...(setup ? { setup } : {}),
+        ...this.replyLanguage(),
         ...this.modelFor(place.model, place.agent, place.effort),
         ownerMcp: true,
         ...this.launchArgs(),

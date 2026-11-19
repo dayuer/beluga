@@ -93,6 +93,8 @@ export const LOCAL_SETTINGS = [
   'askMeFor',
   'askFreely',
   'capabilities',
+  // The language your agents answer in follows this Mac's own window (Settings › General keeps it per computer).
+  'replyLanguage',
 ] as const satisfies ReadonlyArray<keyof Settings>;
 
 /** What Settings calls each synced setting, for a conflict said in words. */
