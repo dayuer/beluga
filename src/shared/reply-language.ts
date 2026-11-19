@@ -1,6 +1,6 @@
 /**
  * The language your agents answer you in: the Mac's own language (Settings › General), which the
- * main window tells the daemon each time it opens (packages/mac/src/i18n/start.ts). Unset or `en`:
+ * main window tells the daemon when it opens (packages/mac/src/i18n/reply-language.ts). Unset or `en`:
  * no rule, and an agent answers in the language you wrote in. Browser-safe.
  */
 export const REPLY_LANGUAGES = ['en', 'zh-CN'] as const;

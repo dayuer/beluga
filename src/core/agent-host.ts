@@ -1635,7 +1635,8 @@ export class AgentHost {
         ...(threads ? { threadTools: threads } : {}),
         ...(mac ? { macTools: mac.tools, macBrief: mac.brief } : {}),
         // Your own runs answer you in your Mac's language; a friend's or a guest's in theirs.
-        ...(from === this.selfId && !external ? this.replyLanguage() : {}),
+        // Asked from your app on another computer (remote): that window's language isn't known here.
+        ...(from === this.selfId && !external && !remote ? this.replyLanguage() : {}),
         ...(guest ? { sharedBrief: guest.brief } : {}),
         ...(phone ? { phoneTools: phone.tools, phoneBrief: phone.brief } : {}),
         ...(callNotes ? { callNotesTools: callNotes } : {}),
@@ -1755,17 +1756,17 @@ export class AgentHost {
     }
   }
 
+  /** The language your own runs answer you in (Settings › General on the Mac; shared/reply-language.ts). */
+  private replyLanguage(): { readonly replyLanguage?: ReplyLanguage } {
+    const language = this.store.getState().prefs.replyLanguage;
+    return language ? { replyLanguage: language } : {};
+  }
+
   /**
    * What the agent's own terminal on a conversation is given (BLG-534): what your own run there
    * would get (its folder and session, the task and its tools, your phone, your variables, the
    * worktree's tag), less what's only for a turn. Launched on the conversation's runtime.
    */
-  /** The language your own runs answer you in (Settings › General on the Mac), when not English. */
-  private replyLanguage(): { readonly replyLanguage?: ReplyLanguage } {
-    const language = this.store.getState().prefs.replyLanguage;
-    return language && language !== 'en' ? { replyLanguage: language } : {};
-  }
-
   async terminalLaunch(channel: string, sink: TerminalSink, prompt = ''): Promise<TerminalLaunch> {
     const agent = this.agent as AgentBackend;
     if (!agent.terminal) throw new Error('This agent has no terminal of its own in Beluga.');
@@ -1828,6 +1829,8 @@ export class AgentHost {
       requesterName,
       viaAgent: false,
       context: [],
+      // Your own agents' dialogue, in your chat: in your Mac's language.
+      ...this.replyLanguage(),
       ...input,
       scope: input.scope ?? 'full',
       channel,
