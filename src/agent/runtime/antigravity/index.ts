@@ -24,8 +24,9 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
   // session/load; it can't branch a conversation.
   canResume: true,
   canFork: false,
-  // Its question form doesn't reach a client over ACP: it asks in its answer.
-  canAskUser: false,
+  // Its question form doesn't reach a client over ACP, but its ask_question call carries the
+  // question whole: Beluga asks it for Antigravity, and your answer is its next turn (questions.ts).
+  canAskUser: true,
   // Its own /compact.
   hasCompaction: true,
   hasModelList: true,

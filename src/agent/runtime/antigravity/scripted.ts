@@ -20,12 +20,16 @@ const LEVELS = ['low', 'medium', 'high'];
  * is answered `echo: P` after running `echo P` (asked first; declined, it ends the turn without a word, as
  * agy does, and answers `denied: P` once Beluga says why); `wait…` works
  * until cancelled; `read <file>` reads it (not asked); `edit <file>` writes it (asked); `room`
- * calls one of Beluga's tools (mcp_beluga_list_peers); `/compact` summarises; `quota` answers as a
+ * calls one of Beluga's tools (mcp_beluga_list_peers); `own <tool>` calls a tool of a server of
+ * your own by that name and `move <a> <b>` moves a file (both asked); `mode <m>` goes to that
+ * mode itself and answers once its mode is set again; `question` asks with its own ask_question (run at once, the
+ * question left in its answer) and answers `answered: <pick>` once told what the person picked (`question wait`: then works until stopped);
+ * `/compact` summarises; `quota` answers as a
  * plan that has run out does.
  */
 export class ScriptedAgy {
   /** `stepMs`: a pause before each step ends, so a screen sees it run (the demo); none in tests. */
-  constructor(private readonly opts: { readonly stepMs?: number; readonly models?: readonly string[] } = {}) {}
+  constructor(private readonly opts: { readonly stepMs?: number; readonly models?: readonly string[]; /** session/list a page of this many at a time. */ readonly listPage?: number } = {}) {}
 
   readonly requests: Array<{ method: string; params: Record<string, unknown> }> = [];
   /** Each connection's flags and folder. */
@@ -67,6 +71,8 @@ export class ScriptedAgy {
     let running: { sessionId: string; cancel: () => void } | undefined;
     /** What a session's declined step was for, so its answer after Beluga says why can name it. */
     const declinedWords = new Map<string, string>();
+    /** A `mode` turn waiting for its session's mode to be set again. */
+    const modeSet = new Map<string, () => void>();
     let used = 16_500;
 
     const optionsOf = (sid: string): ConfigOption[] => {
@@ -177,6 +183,29 @@ export class ScriptedAgy {
         say(sid, `edited: ${file}`);
         return done(sid, 6);
       }
+      // Told what the person answered to its ask_question: it answers with that.
+      const replied = /^The person (answered|skipped) your question \(ask_question\)[^\n]*(?:\n- [^\n]*\n {2}→ ([^\n]*))?/.exec(text);
+      if (replied) {
+        say(sid, replied[1] === 'skipped' ? 'skipped: going on' : `answered: ${replied[2] ?? ''}`);
+        return done(sid, 6);
+      }
+      if (/^question\b/.test(words)) {
+        // Its own question tool: run at once (nothing asked), the form never reaching the client;
+        // the question and its options written into its answer, and the turn ends.
+        const question = 'Deploy to the server now?';
+        const options = ['Yes, over SSH', 'Done (I did it)', 'Not now'];
+        const c = call(`call_${randomUUID().slice(0, 12)}`, 'ask_question', 'other', 'ask_question', { questions: [{ is_multi_select: false, options, question }] });
+        update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
+        update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed' });
+        // `question wait`: it goes on working after asking, until it's stopped.
+        if (/^question wait\b/.test(words)) {
+          await new Promise<void>((resolve) => (running = { sessionId: sid, cancel: resolve }));
+          running = undefined;
+          return { stopReason: 'cancelled' };
+        }
+        say(sid, `${question}\n${options.map((o, i) => `- [${i + 1}] ${o}`).join('\n')}`);
+        return done(sid, 20);
+      }
       if (/^room\b/.test(words)) {
         // One of Beluga's own tools: it asks too, by the tool's MCP name, with no arguments said.
         const c = call(`call_${randomUUID().slice(0, 12)}`, 'mcp_beluga_list_peers', 'other', 'Run mcp_beluga_list_peers', { toolSummary: 'List peers' });
@@ -185,6 +214,29 @@ export class ScriptedAgy {
         if (!ok) failed(sid, c);
         else update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'kay' } }] });
         say(sid, ok ? 'room: kay' : `denied: ${words}`);
+        return done(sid, 6);
+      }
+      const mode = /^mode (\S+)/.exec(words);
+      if (mode) {
+        // It goes to another mode itself (as its own /command does), and works on once its mode is set again.
+        state.get(sid)!.mode = mode[1]!;
+        const again = new Promise<void>((resolve) => modeSet.set(sid, resolve));
+        update(sid, { sessionUpdate: 'config_option_update', configOptions: optionsOf(sid) });
+        await again;
+        modeSet.delete(sid);
+        say(sid, `mode: ${state.get(sid)!.mode}`);
+        return done(sid, 4);
+      }
+      const own = /^own (\S+)/.exec(words);
+      const move = /^move (\S+) (\S+)/.exec(words);
+      if (own || move) {
+        // A tool of a server of your own (asked by its MCP name, no arguments said), or a file moved (asked, with where it lands).
+        const c = own ? call(`call_${randomUUID().slice(0, 12)}`, own[1]!, 'other', `Run ${own[1]}`, { toolSummary: own[1] }) : call(`call_${randomUUID().slice(0, 12)}`, 'move', 'move', `Move ${move![1]}`, { Path: move![1] }, [{ path: move![1] }, { path: move![2] }]);
+        update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
+        const ok = await allowed(sid, c);
+        if (!ok) failed(sid, c);
+        else update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'ok' } }] });
+        say(sid, ok ? `done: ${words}` : `denied: ${words}`);
         return done(sid, 6);
       }
       update(sid, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Running it.' } });
@@ -217,14 +269,20 @@ export class ScriptedAgy {
           for (const text of said) update(sid, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } });
           return open(sid, params._meta);
         }
-        case 'session/list':
-          return { sessions: [...this.sessions.keys()].map((sessionId) => ({ sessionId, cwd: this.folders.get(sessionId) ?? '' })) };
+        case 'session/list': {
+          const all = [...this.sessions.keys()].map((sessionId) => ({ sessionId, cwd: this.folders.get(sessionId) ?? '' }));
+          const size = this.opts.listPage;
+          if (!size) return { sessions: all };
+          const from = Number(params.cursor ?? 0);
+          return { sessions: all.slice(from, from + size), ...(from + size < all.length ? { nextCursor: String(from + size) } : {}) };
+        }
         case 'session/set_config_option': {
           const s = state.get(sid);
           if (!s) throw new Error(`Session not found: ${sid}`);
           const value = String(params.value);
           if (params.configId === 'mode') {
             s.mode = value;
+            modeSet.get(sid)?.();
             update(sid, { sessionUpdate: 'current_mode_update', currentModeId: value });
           } else if (params.configId === 'model') s.model = value;
           else if (params.configId === 'thought_level') s.level = value;

@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { accessSync, constants } from 'node:fs';
+import { accessSync, constants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { RunProcess } from '../../types.js';
@@ -26,6 +26,26 @@ export interface AgyConnectOptions {
   readonly bin?: string;
   /** Flags for this process (its extra folders). */
   readonly args?: readonly string[];
+  /**
+   * A look, not a run (a status check, a quota read, a side call): nothing of it is yours to keep,
+   * so its log (`acp-server-<time>-<pid>.log`) goes once it has stopped. A run's log stays.
+   */
+  readonly look?: boolean;
+}
+
+/** Where `agy acp` keeps its conversations: ~/.gemini/antigravity-cli. */
+export function agyDataDir(home: string = os.homedir()): string {
+  return path.join(home, '.gemini', 'antigravity-cli');
+}
+
+/** Where it writes a log per process, named by its pid. */
+export const agyLogDir = (dir: string = agyDataDir()): string => path.join(dir, 'log');
+
+/** Removes one process's own log (only one named for its pid). */
+export async function dropAgyLog(pid: number, dir: string = agyLogDir()): Promise<number> {
+  const mine = (await fs.readdir(dir).catch(() => [] as string[])).filter((n) => n.startsWith('acp-server-') && n.endsWith(`-${pid}.log`));
+  await Promise.all(mine.map((n) => fs.rm(path.join(dir, n), { force: true }).catch(() => undefined)));
+  return mine.length;
 }
 
 /** How a run reaches Antigravity: spawn it (tests hand a scripted one instead). */
@@ -65,7 +85,7 @@ export function agyArgs(opts: { readonly addDirs?: readonly string[] } = {}): st
 }
 
 /** Spawn `agy acp` and shake hands. It signs in with what Antigravity already has (its keyring): never here. */
-export const spawnAgy: AgyConnect = async ({ cwd, env, bin, args = [] }) => {
+export const spawnAgy: AgyConnect = async ({ cwd, env, bin, args = [], look = false }) => {
   const command = bin ?? findAgy(env ?? process.env);
   if (!command) throw new Error(AGY_MISSING_WORDS());
   const how = codexCommand(command, ['acp', ...args]);
@@ -81,7 +101,8 @@ export const spawnAgy: AgyConnect = async ({ cwd, env, bin, args = [] }) => {
   niceForWorktree(child.pid, env);
   const running = (c: ChildProcess): boolean => c.exitCode === null && c.signalCode === null;
   const exited = running(child) ? new Promise<void>((resolve) => child.once('exit', () => resolve())) : Promise.resolve();
-  const proc: RunProcess = { pid: child.pid, alive: () => running(child), kill: () => endProcess(child), exited };
+  const pid = child.pid;
+  const proc: RunProcess = { pid, alive: () => running(child), kill: () => endProcess(child).then(() => void (look && dropAgyLog(pid))), exited };
   const rpc = new CodexRpc(child.stdout, child.stdin, { name: 'Antigravity', jsonrpc: true });
   try {
     const init = await acpHandshake(rpc);

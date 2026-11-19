@@ -5,8 +5,8 @@ import type { NamedUsageWindow } from '../../../protocol.js';
 import type { UsageUpdate } from '../../usage.js';
 import { toMs } from '../claude/usage.js';
 import type { SessionResponse } from '../opencode/acp.js';
-import { type AgyConnect, spawnAgy } from './connection.js';
-import { agyDataDir, dropAgySession } from './sessions.js';
+import { type AgyConnect, agyLogDir, spawnAgy } from './connection.js';
+import { dropAgySession } from './sessions.js';
 
 /** One model as Antigravity's language server lists it (GetUserStatus › cascadeModelConfigData). */
 interface AgyModelConfig {
@@ -101,13 +101,14 @@ async function waitForPort(dir: string, pid: number): Promise<number | undefined
  */
 export async function readAgyQuota(deps: QuotaDeps = {}): Promise<UsageUpdate | undefined> {
   const cwd = os.tmpdir();
-  const conn = await (deps.connect ?? spawnAgy)({ cwd, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
+  // A look: its log (where the port was read) goes once it has stopped.
+  const conn = await (deps.connect ?? spawnAgy)({ cwd, look: true, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
   if (!conn) return undefined;
   let opened: string | undefined;
   try {
     const s = await conn.rpc.request<SessionResponse>('session/new', { cwd, mcpServers: [] }, SESSION_TIMEOUT_MS);
     opened = s.sessionId;
-    const port = await waitForPort(deps.logDir ?? path.join(agyDataDir(), 'log'), conn.proc.pid);
+    const port = await waitForPort(deps.logDir ?? agyLogDir(), conn.proc.pid);
     if (!port) return undefined;
     const res = await (deps.fetch ?? fetch)(`http://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/GetUserStatus`, {
       method: 'POST',

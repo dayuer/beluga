@@ -72,17 +72,25 @@ export function providerCards(self: Pick<Profile, 'usage' | 'usages' | 'agents'>
 const ON_CLAUDES_CARD = new Set(['antigravity']);
 
 /**
- * One card for Claude and Antigravity: Antigravity's windows (once it has said them) go under
- * Claude's own, each marked with where it's from, and its card goes.
+ * A guest's reading this much older than Claude's is no longer read with it: it keeps its own card,
+ * with its own "Updated", so old numbers never pass for new (three of the usage tab's refreshes).
+ */
+export const GUEST_STALE_MS = 30 * 60_000;
+
+/**
+ * One card for Claude and Antigravity: Antigravity's windows (once it has said them, and while
+ * they're as fresh as Claude's) go under Claude's own, each marked with where it's from, and its
+ * card goes. The card is your default when either of them is, so the default is never lost.
  */
 function foldIntoClaude(cards: ProviderCard[]): ProviderCard[] {
   const claude = cards.find((c) => c.key === CLAUDE_AGENT.runtime);
-  const guests = cards.filter((c) => ON_CLAUDES_CARD.has(c.key) && c.shape === 'quota');
+  const guests = cards.filter((c) => ON_CLAUDES_CARD.has(c.key) && c.shape === 'quota' && (claude?.updatedAt ?? 0) - (c.updatedAt ?? 0) <= GUEST_STALE_MS);
   // Claude signed out says so on its card: Antigravity's windows keep their own then.
   if (!claude?.signedIn || !guests.length) return cards;
   const windows = [...claude.windows, ...guests.flatMap((g) => g.windows.map((w) => ({ ...w, source: g.agent.label })))];
-  const updatedAt = Math.max(claude.updatedAt ?? 0, ...guests.map((g) => g.updatedAt ?? 0));
-  const merged: ProviderCard = { ...claude, shape: 'quota', windows, ...(updatedAt ? { updatedAt } : {}) };
+  // The card is as old as its oldest reading.
+  const updatedAt = Math.min(...[claude, ...guests].map((c) => c.updatedAt ?? 0).filter(Boolean));
+  const merged: ProviderCard = { ...claude, shape: 'quota', windows, isDefault: claude.isDefault || guests.some((g) => g.isDefault), ...(Number.isFinite(updatedAt) ? { updatedAt } : {}) };
   return cards.filter((c) => !guests.includes(c)).map((c) => (c === claude ? merged : c));
 }
 

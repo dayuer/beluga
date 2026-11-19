@@ -27,7 +27,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **Compact**, picking up a conversation later, and handing a conversation to another agent.
 - Pictures in a message.
 - Beluga's instructions go into Antigravity's own system prompt, so your rules and its own stay as they are.
-- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota shows on Claude's card on the Usage tab, one line per model family (Gemini, Claude, GPT-OSS), each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes.
+- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota shows on Claude's card on the Usage tab, one line per model family (Gemini, Claude, GPT-OSS), each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes. When those numbers are older than Claude's by more than half an hour, they show on a card of their own, with their own time. Each of those looks leaves nothing behind: its conversation and its log go once it has stopped, and Beluga clears what earlier ones left (journals of gone conversations, its `acp-server` logs older than a week). Antigravity's own CLI logs stay.
 
 ## What's different
 
@@ -36,7 +36,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **No guests.** A guest you invite into a project can't prompt Antigravity: switch that conversation to Claude for them.
 - **No Fork, no /btw.** Antigravity can't branch a conversation, so a fork starts a fresh one (the files come along), and editing a sent message starts afresh from your edited message.
 - **No Terminal view.** Antigravity conversations stay in the chat.
-- **Questions mid-run**: Antigravity asks in its answer, and you reply in the box.
+- **Questions mid-run**: Antigravity's own question form doesn't reach Beluga, so when it asks (its `ask_question`), Beluga asks you for it: the same card Claude's questions get, on your phone too. Your answer goes back to Antigravity as its next turn (the question also stays written in its answer).
 - **A declined step.** Antigravity ends its turn without a word when a step is turned down, so Beluga tells it why, once, and it answers.
 - **Gemini looks around a lot.** On Gemini 3.8 Flash, Antigravity often reads and searches well past what you asked (other folders, your home folder) before it answers. Its commands still come to you, but a Claude model on your plan keeps closer to the request.
 - **Your plan's quota.** Every message uses some of your Antigravity quota, and so do Beluga's small asks when Antigravity is your agent (naming a worktree, drafting a task). When it runs out, the card says so; the Usage tab shows what's left, per model family.
