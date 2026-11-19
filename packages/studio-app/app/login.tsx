@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { ActionDock } from '../components/ActionDock';
@@ -12,6 +14,33 @@ import { detectLang, t } from '../lib/strings';
 import { color, radius, space, type } from '../lib/theme';
 
 type Phase = 'idle' | 'sending' | 'sent' | 'error';
+type VerifyResult = Awaited<ReturnType<typeof hub.verify>>;
+
+// Module-level deduplication so a deep-link remount never redeems a one-time token twice or drops
+// the session if the first LoginScreen instance unmounts before hub.verify resolves.
+const verifications = new Map<string, Promise<VerifyResult>>();
+
+function verifyOnce(token: string): Promise<VerifyResult> {
+  const existing = verifications.get(token);
+  if (existing) return existing;
+  const pending = hub.verify(token).then((r) => {
+    if (r.ok) {
+      session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
+    }
+    return r;
+  });
+  verifications.set(token, pending);
+  return pending;
+}
+
+function parseUrlToken(url: string | null | undefined): string {
+  if (!url) return '';
+  const hashIdx = url.indexOf('#token=');
+  if (hashIdx !== -1) return decodeURIComponent(url.slice(hashIdx + '#token='.length).split('&')[0] ?? '');
+  const queryIdx = url.indexOf('?token=');
+  if (queryIdx !== -1) return decodeURIComponent((url.slice(queryIdx + '?token='.length).split('&')[0] ?? '').split('#')[0] ?? '');
+  return '';
+}
 
 /**
  * The magic-link screen (M5 design §1). One email, one button. The hub always answers 202, so
@@ -23,6 +52,8 @@ type Phase = 'idle' | 'sending' | 'sent' | 'error';
  */
 export default function LoginScreen() {
   const lang = detectLang();
+  const params = useLocalSearchParams<{ token?: string | string[]; next?: string | string[] }>();
+  const routeToken = Array.isArray(params.token) ? params.token[0] : params.token;
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
   const online = useOnline();
@@ -33,30 +64,23 @@ export default function LoginScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const emailRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const verified = useRef<string | null>(null);
+  const aliveRef = useRef(true);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let alive = true;
-    const handle = () => {
-      const hash = window.location.hash;
-      if (!hash.startsWith('#token=')) return;
-      const token = decodeURIComponent(hash.slice('#token='.length));
-      if (!token || verified.current === token) return;
-      verified.current = token;
-      try {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      } catch {
-        /* file:// and old browsers */
-      }
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const runVerify = useCallback(
+    (token: string) => {
+      if (!token) return;
       setVerifying(true);
-      void hub.verify(token).then((r) => {
-        if (!alive) return;
+      void verifyOnce(token).then((r) => {
+        if (!aliveRef.current) return;
         setVerifying(false);
-        if (r.ok) {
-          session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
-          return; // the guard in _layout.tsx sends us to ?next= or /
-        }
+        if (r.ok) return; // verifyOnce already called session.set(); Guard redirects to ?next= or /
         setPhase('error');
         setMessage(
           r.error.kind === 'denied' && r.error.error === 'bad-link'
@@ -66,17 +90,50 @@ export default function LoginScreen() {
               : t(lang, 'login.serviceDown'),
         );
       });
-    };
-    handle();
-    // A second magic link opened in the same tab only changes the hash; treat it like a load.
-    window.addEventListener('hashchange', handle);
-    return () => {
-      alive = false;
-      window.removeEventListener('hashchange', handle);
-    };
-    // One verification per token; lang only affects the error sentence.
+    },
+    // lang only affects the error sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    [],
+  );
+
+  useEffect(() => {
+    if (routeToken) runVerify(routeToken);
+  }, [routeToken, runVerify]);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null | undefined) => {
+      const token = parseUrlToken(url);
+      if (token) runVerify(token);
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+
+    const canWindowListen =
+      typeof window !== 'undefined' && Boolean(window.location) && typeof window.addEventListener === 'function';
+    const handleHash = () => {
+      if (!canWindowListen) return;
+      const hash = window.location.hash;
+      if (!hash.startsWith('#token=')) return;
+      const token = decodeURIComponent(hash.slice('#token='.length));
+      if (!token) return;
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch {
+        /* file:// and old browsers */
+      }
+      runVerify(token);
+    };
+    if (canWindowListen) {
+      handleHash();
+      // A second magic link opened in the same tab only changes the hash; treat it like a load.
+      window.addEventListener('hashchange', handleHash);
+    }
+    return () => {
+      sub.remove();
+      if (canWindowListen) window.removeEventListener('hashchange', handleHash);
+    };
+  }, [runVerify]);
 
   const submit = async () => {
     if (phase === 'sending' || verifying) return;

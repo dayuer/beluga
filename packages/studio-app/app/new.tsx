@@ -131,6 +131,14 @@ export default function NewRequestScreen() {
 
   useEffect(() => {
     if (!pid) return;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function' ||
+      typeof document === 'undefined' ||
+      typeof document.addEventListener !== 'function'
+    ) {
+      return;
+    }
     const flush = () => {
       if (lockedRef.current) return;
       if (!goal.trim() && platforms.length === 0) {

@@ -141,7 +141,16 @@ export function PlanChat({ pid, planRef, turns, typing, moreTurns, lang, docked 
 
   // The draft is written 300ms after the last keystroke and again when the page goes away.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function' ||
+      typeof document === 'undefined' ||
+      typeof document.addEventListener !== 'function'
+    ) {
+      return () => {
+        if (draftTimer.current) clearTimeout(draftTimer.current);
+      };
+    }
     const flush = () => kv.set(draftStorage(pid, planRef), { text: textRef.current, updatedAt: Date.now() });
     const hidden = () => {
       if (document.visibilityState === 'hidden') flush();

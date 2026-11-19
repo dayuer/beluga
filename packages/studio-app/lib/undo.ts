@@ -64,13 +64,13 @@ export function useUndoSend(ms = 10_000): Undo {
   }, [fire]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const canListen = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
     const hide = () => {
       if (activeRef.current) fire();
     };
-    window.addEventListener('pagehide', hide);
+    if (canListen) window.addEventListener('pagehide', hide);
     return () => {
-      window.removeEventListener('pagehide', hide);
+      if (canListen) window.removeEventListener('pagehide', hide);
       if (activeRef.current) fire();
       clearTimers();
     };
