@@ -57,12 +57,12 @@ function toPkcs8Pem(pkcs8: ArrayBuffer): string {
 
 describe('SS-81 waiting card push dedup', () => {
   it('notifies once per (customer, cardId) across repeated plan updates and carries path', async () => {
-    const ecPair = await crypto.subtle.generateKey(
+    const ecPair = (await crypto.subtle.generateKey(
       { name: 'ECDSA', namedCurve: 'P-256' },
       true,
       ['sign', 'verify'],
-    );
-    const apnsPem = toPkcs8Pem(await crypto.subtle.exportKey('pkcs8', ecPair.privateKey));
+    )) as CryptoKeyPair;
+    const apnsPem = toPkcs8Pem((await crypto.subtle.exportKey('pkcs8', ecPair.privateKey)) as ArrayBuffer);
 
     const { db } = createDedupMockDb();
     const sentPayloads: Array<{ path?: string; body?: string; cardId?: string }> = [];

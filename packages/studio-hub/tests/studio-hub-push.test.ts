@@ -52,22 +52,25 @@ function toPkcs8Pem(pkcs8: ArrayBuffer): string {
   return `-----BEGIN PRIVATE KEY-----\n${lines}\n-----END PRIVATE KEY-----`;
 }
 
-function base64UrlToBytes(str: string): Uint8Array {
+function base64UrlToBytes(str: string): Uint8Array<ArrayBuffer> {
   const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/') + pad;
-  return new Uint8Array(Buffer.from(b64, 'base64'));
+  const buf = Buffer.from(b64, 'base64');
+  const out = new Uint8Array(buf.length);
+  out.set(buf);
+  return out;
 }
 
 describe('SS-80 push sender (APNs + FCM)', () => {
   it('signs ES256/RS256 JWTs, sends to APNs/FCM, and removes unregistered tokens', async () => {
-    const ecPair = await crypto.subtle.generateKey(
+    const ecPair = (await crypto.subtle.generateKey(
       { name: 'ECDSA', namedCurve: 'P-256' },
       true,
       ['sign', 'verify'],
-    );
-    const apnsPem = toPkcs8Pem(await crypto.subtle.exportKey('pkcs8', ecPair.privateKey));
+    )) as CryptoKeyPair;
+    const apnsPem = toPkcs8Pem((await crypto.subtle.exportKey('pkcs8', ecPair.privateKey)) as ArrayBuffer);
 
-    const rsaPair = await crypto.subtle.generateKey(
+    const rsaPair = (await crypto.subtle.generateKey(
       {
         name: 'RSASSA-PKCS1-v1_5',
         modulusLength: 2048,
@@ -76,8 +79,8 @@ describe('SS-80 push sender (APNs + FCM)', () => {
       },
       true,
       ['sign', 'verify'],
-    );
-    const fcmPem = toPkcs8Pem(await crypto.subtle.exportKey('pkcs8', rsaPair.privateKey));
+    )) as CryptoKeyPair;
+    const fcmPem = toPkcs8Pem((await crypto.subtle.exportKey('pkcs8', rsaPair.privateKey)) as ArrayBuffer);
 
     const { db, rows } = createPushMockDb([
       { customer_id: 'c1', device: 'iphone-ok', platform: 'ios', token: 'apns-good', updated_at: 100 },

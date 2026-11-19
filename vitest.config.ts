@@ -11,7 +11,7 @@ export default defineConfig({
   // The Mac app's alias for the core (packages/mac/vite.config.ts), so a test can load its models.
   resolve: { alias: [{ find: /^@beluga\//, replacement: `${fileURLToPath(new URL('./src/', import.meta.url))}` }] },
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'packages/studio-hub/tests/**/*.test.ts'],
     setupFiles: ['tests/setup.ts'],
     // Ten worktrees testing at once leave the Mac usable: half the cores per run (KLAUD_TEST_WORKERS
     // overrides it), and a few runs at a time machine-wide (scripts/test-lock.mjs, KLAUD_TEST_SLOTS).

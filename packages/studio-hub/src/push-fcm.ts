@@ -33,7 +33,7 @@ function base64UrlJson(value: unknown): string {
   return base64UrlEncode(textEncoder.encode(JSON.stringify(value)));
 }
 
-function pemToPkcs8Bytes(pem: string): Uint8Array {
+function pemToPkcs8Bytes(pem: string): Uint8Array<ArrayBuffer> {
   const normalized = pem.replace(/\\n/g, '\n');
   const body = normalized
     .replace(/-----BEGIN [A-Z0-9 ]+-----/g, '')
