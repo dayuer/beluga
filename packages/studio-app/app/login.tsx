@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -36,19 +37,10 @@ export default function LoginScreen() {
   const verified = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.location || typeof window.addEventListener !== 'function') return;
     let alive = true;
-    const handle = () => {
-      const hash = window.location.hash;
-      if (!hash.startsWith('#token=')) return;
-      const token = decodeURIComponent(hash.slice('#token='.length));
+    const verifyToken = (token: string) => {
       if (!token || verified.current === token) return;
       verified.current = token;
-      try {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      } catch {
-        /* file:// and old browsers */
-      }
       setVerifying(true);
       void hub.verify(token).then((r) => {
         if (!alive) return;
@@ -67,12 +59,48 @@ export default function LoginScreen() {
         );
       });
     };
-    handle();
-    // A second magic link opened in the same tab only changes the hash; treat it like a load.
-    window.addEventListener('hashchange', handle);
+
+    const parseUrlToken = (url: string | null | undefined): string => {
+      if (!url) return '';
+      const hashIdx = url.indexOf('#token=');
+      if (hashIdx !== -1) return decodeURIComponent(url.slice(hashIdx + '#token='.length).split('&')[0] ?? '');
+      const queryIdx = url.indexOf('?token=');
+      if (queryIdx !== -1) return decodeURIComponent((url.slice(queryIdx + '?token='.length).split('&')[0] ?? '').split('#')[0] ?? '');
+      return '';
+    };
+
+    const handleUrl = (url: string | null | undefined) => {
+      const token = parseUrlToken(url);
+      if (token) verifyToken(token);
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+
+    const canWindowListen =
+      typeof window !== 'undefined' && Boolean(window.location) && typeof window.addEventListener === 'function';
+    const handleHash = () => {
+      if (!canWindowListen) return;
+      const hash = window.location.hash;
+      if (!hash.startsWith('#token=')) return;
+      const token = decodeURIComponent(hash.slice('#token='.length));
+      if (!token || verified.current === token) return;
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch {
+        /* file:// and old browsers */
+      }
+      verifyToken(token);
+    };
+    if (canWindowListen) {
+      handleHash();
+      // A second magic link opened in the same tab only changes the hash; treat it like a load.
+      window.addEventListener('hashchange', handleHash);
+    }
     return () => {
       alive = false;
-      window.removeEventListener('hashchange', handle);
+      sub.remove();
+      if (canWindowListen) window.removeEventListener('hashchange', handleHash);
     };
     // One verification per token; lang only affects the error sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
