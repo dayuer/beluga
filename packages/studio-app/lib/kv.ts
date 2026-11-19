@@ -8,22 +8,34 @@ import { registerBoot } from './boot';
  */
 const file = (): File => new File(Paths.document, 'synon-studio.json');
 let memo: Record<string, unknown> | undefined;
+let hydrated = false;
+let clearedBeforeHydrate = false;
+const removedBeforeHydrate = new Set<string>();
 let dirty = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 async function hydrate(): Promise<void> {
-  if (memo) return;
+  if (hydrated) return;
+  let loaded: Record<string, unknown> = {};
   try {
     const f = file();
-    if (!f.exists) {
-      memo = {};
-      return;
+    if (f.exists) {
+      const raw = await f.text();
+      loaded = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     }
-    const raw = await f.text();
-    memo = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
   } catch {
-    memo = {};
+    loaded = {};
   }
+  if (clearedBeforeHydrate) {
+    memo = { ...(memo ?? {}) };
+  } else {
+    const merged: Record<string, unknown> = { ...loaded, ...(memo ?? {}) };
+    for (const key of removedBeforeHydrate) {
+      delete merged[key];
+    }
+    memo = merged;
+  }
+  hydrated = true;
 }
 
 registerBoot(hydrate);
@@ -71,14 +83,20 @@ export const kv = {
     return all()[key] as T | undefined;
   },
   set(key: string, value: unknown): void {
+    if (!hydrated) removedBeforeHydrate.delete(key);
     all()[key] = value;
     scheduleFlush();
   },
   remove(key: string): void {
+    if (!hydrated) removedBeforeHydrate.add(key);
     delete all()[key];
     scheduleFlush();
   },
   clear(): void {
+    if (!hydrated) {
+      clearedBeforeHydrate = true;
+      removedBeforeHydrate.clear();
+    }
     memo = {};
     scheduleFlush();
   },

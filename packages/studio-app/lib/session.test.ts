@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, unknown>();
+let pendingGet: ((v: unknown) => void) | null = null;
 
 vi.mock('./secure', () => ({
   secure: {
-    get: vi.fn(async (k: string) => store.get(k)),
+    get: vi.fn((k: string) => {
+      if (pendingGet) {
+        return new Promise((resolve) => {
+          pendingGet = resolve;
+        });
+      }
+      return Promise.resolve(store.get(k));
+    }),
     set: vi.fn(async (k: string, v: unknown) => {
       store.set(k, v);
     }),
@@ -17,6 +25,7 @@ vi.mock('./secure', () => ({
 describe('session', () => {
   beforeEach(() => {
     store.clear();
+    pendingGet = null;
     vi.resetModules();
   });
 
@@ -25,7 +34,6 @@ describe('session', () => {
     store.set('session', { session: 'tok-123', expiresAt: future, customerId: 'cust-1' });
 
     const { session } = await import('./session');
-    // 等待 registerBoot 触发的 hydrate 完成
     await Promise.resolve();
     await Promise.resolve();
 
@@ -47,5 +55,31 @@ describe('session', () => {
     expect(listener).toHaveBeenCalledTimes(2);
 
     unsub();
+  });
+
+  it('does not overwrite a session set during hydration with stale SecureStore data', async () => {
+    let finishGet!: (v: unknown) => void;
+    pendingGet = () => {};
+    const { secure } = await import('./secure');
+    vi.mocked(secure.get).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishGet = resolve;
+        }),
+    );
+
+    const future = Date.now() + 60_000;
+    const { session } = await import('./session');
+
+    // 补水期间写入新会话
+    session.set({ session: 'new-tok', expiresAt: future, customerId: 'cust-new' });
+
+    // 旧的 SecureStore 读取晚到返回
+    finishGet({ session: 'old-tok', expiresAt: future, customerId: 'cust-old' });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(session.token()).toBe('new-tok');
+    expect(session.get()?.customerId).toBe('cust-new');
   });
 });

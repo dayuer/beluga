@@ -11,6 +11,7 @@ export interface StoredSession {
 const KEY = 'session';
 const listeners = new Set<() => void>();
 let cached: StoredSession | undefined;
+let generation = 0;
 
 const isSession = (v: unknown): v is StoredSession => {
   if (!v || typeof v !== 'object') return false;
@@ -29,7 +30,10 @@ const notify = (): void => {
 };
 
 async function hydrate(): Promise<void> {
+  const startGen = generation;
   const s = await secure.get<unknown>(KEY);
+  // 补水期间如果已经有过 set() 或 clear()，绝不用磁盘旧值覆盖新状态。
+  if (generation !== startGen) return;
   if (!isSession(s)) {
     if (s !== undefined) await secure.remove(KEY);
     cached = undefined;
@@ -78,11 +82,13 @@ export const session = {
     };
   },
   set(value: StoredSession): void {
+    generation += 1;
     cached = value;
     notify();
     void secure.set(KEY, value);
   },
   clear(): void {
+    generation += 1;
     cached = undefined;
     notify();
     void secure.remove(KEY);

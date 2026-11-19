@@ -15,7 +15,9 @@ const notify = (): void => {
  * 若没有任何模块注册，useBooted() 直接返回 true，不拖慢首屏。
  */
 export function registerBoot(fn: BootTask): void {
+  const wasBooted = booted;
   booted = false;
+  if (wasBooted) notify();
   let task: Promise<void>;
   try {
     task = Promise.resolve(fn()).catch(() => {
