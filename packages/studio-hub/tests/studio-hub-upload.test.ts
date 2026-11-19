@@ -10,57 +10,18 @@ import {
 } from '../src/upload.js';
 
 function createMockR2() {
-  const uploads = new Map<string, { key: string; parts: Map<number, { etag: string; data: Uint8Array }> }>();
   const objects = new Map<string, Uint8Array>();
-  let seq = 0;
 
   const bucket = {
-    async createMultipartUpload(key: string) {
-      const uploadId = `up-${++seq}`;
-      uploads.set(uploadId, { key, parts: new Map() });
-      return bucket.resumeMultipartUpload(key, uploadId);
-    },
-    resumeMultipartUpload(key: string, uploadId: string) {
-      return {
-        key,
-        uploadId,
-        async uploadPart(partNumber: number, value: ArrayBuffer | ArrayBufferView) {
-          const entry = uploads.get(uploadId);
-          if (!entry) throw new Error('upload-not-found');
-          const bytes =
-            value instanceof ArrayBuffer
-              ? new Uint8Array(value.slice(0))
-              : new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
-          const etag = `etag-${partNumber}-${bytes.byteLength}`;
-          entry.parts.set(partNumber, { etag, data: bytes });
-          return { partNumber, etag };
-        },
-        async complete(parts: Array<{ partNumber: number; etag: string }>) {
-          const entry = uploads.get(uploadId);
-          if (!entry) throw new Error('upload-not-found');
-          const sorted = [...parts].sort((a, b) => a.partNumber - b.partNumber);
-          const chunks: Uint8Array[] = [];
-          let total = 0;
-          for (const p of sorted) {
-            const saved = entry.parts.get(p.partNumber);
-            if (!saved || saved.etag !== p.etag) throw new Error('part-mismatch');
-            chunks.push(saved.data);
-            total += saved.data.byteLength;
-          }
-          const merged = new Uint8Array(total);
-          let offset = 0;
-          for (const c of chunks) {
-            merged.set(c, offset);
-            offset += c.byteLength;
-          }
-          objects.set(key, merged);
-          uploads.delete(uploadId);
-          return { key, size: total };
-        },
-        async abort() {
-          uploads.delete(uploadId);
-        },
-      };
+    async put(key: string, value: ArrayBuffer | ArrayBufferView | string) {
+      const bytes =
+        typeof value === 'string'
+          ? new TextEncoder().encode(value)
+          : value instanceof ArrayBuffer
+            ? new Uint8Array(value.slice(0))
+            : new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+      objects.set(key, bytes);
+      return { key, size: bytes.byteLength, httpEtag: `"etag-${key}-${bytes.byteLength}"` };
     },
     async get(key: string) {
       const data = objects.get(key);
@@ -79,7 +40,10 @@ function createMockR2() {
     },
   };
 
-  return { bucket: bucket as unknown as R2Bucket, objects, uploads };
+  const partKeys = () => [...objects.keys()].filter((k) => k.startsWith('upload-parts/'));
+  const assetKeys = () => [...objects.keys()].filter((k) => k.startsWith('assets/'));
+
+  return { bucket: bucket as unknown as R2Bucket, objects, partKeys, assetKeys };
 }
 
 function createUploadMockDb(seed: {
@@ -280,10 +244,10 @@ async function setup() {
     sessionHash,
     now,
   });
-  const { bucket, objects, uploads } = createMockR2();
+  const { bucket, objects, partKeys, assetKeys } = createMockR2();
   const hub = new D1HubStore(db);
   const env = { DB: db, ASSETS: bucket } as unknown as UploadEnv;
-  return { db, sessions, files, parts, bucket, objects, uploads, hub, env, now, token };
+  return { db, sessions, files, parts, bucket, objects, partKeys, assetKeys, hub, env, now, token };
 }
 
 describe('SS-82 design package upload', () => {
@@ -368,7 +332,7 @@ describe('SS-82 design package upload', () => {
   });
 
   it('rejects completion when received data does not match the manifest', async () => {
-    const { env, hub, now, token } = await setup();
+    const { env, hub, now, token, partKeys, assetKeys } = await setup();
     const content = new TextEncoder().encode('hello design');
     const realSha = createHash('sha256').update(content).digest('hex');
 
@@ -401,6 +365,7 @@ describe('SS-82 design package upload', () => {
       hub,
       now + 50,
     );
+    expect(partKeys()).toHaveLength(1);
 
     const completeRes = await handleUploadRequest(
       new Request(`https://hub.example/v1/app/uploads/${sessionId}/complete`, {
@@ -415,6 +380,9 @@ describe('SS-82 design package upload', () => {
     const err = (await completeRes!.json()) as { error: string; detail?: string };
     expect(err.error).toBe('manifest-mismatch');
     expect(err.detail).toContain('checksum-mismatch');
+    // 校验失败时临时对象和最终对象均被清理
+    expect(partKeys()).toEqual([]);
+    expect(assetKeys()).toEqual([]);
   });
 
   it('rejects disallowed paths, extensions, and oversized packages', async () => {
@@ -632,7 +600,7 @@ describe('SS-83 resume query and 24h expiration', () => {
   });
 
   it('expires and prunes sessions after 24 hours', async () => {
-    const { env, hub, now, token, uploads } = await setup();
+    const { env, hub, now, token, partKeys } = await setup();
     const data = new Uint8Array(1024);
     const sha = createHash('sha256').update(data).digest('hex');
 
@@ -651,11 +619,21 @@ describe('SS-83 resume query and 24h expiration', () => {
       now,
     );
     const { sessionId } = (await beginRes!.json()) as { sessionId: string };
-    expect(uploads.size).toBe(1);
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}` },
+        body: data,
+      }),
+      env,
+      hub,
+      now + 10,
+    );
+    expect(partKeys()).toHaveLength(1);
 
     const pruned = await pruneExpiredUploadSessions(env, now + UPLOAD_LIMITS.sessionTtlMs + 1);
     expect(pruned).toBe(1);
-    expect(uploads.size).toBe(0);
+    expect(partKeys()).toHaveLength(0);
 
     const statusRes = await handleUploadRequest(
       new Request(`https://hub.example/v1/app/uploads/${sessionId}`, {

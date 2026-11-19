@@ -106,6 +106,24 @@ async function readManifestBody(req: Request): Promise<unknown> {
   }
 }
 
+function partObjectKey(sessionId: string, fileIndex: number, partNumber: number): string {
+  return `upload-parts/${sessionId}/${fileIndex}/${partNumber}`;
+}
+
+async function deletePartObjects(
+  bucket: R2Bucket,
+  sessionId: string,
+  parts: ReadonlyArray<{ readonly file_index: number; readonly part_number: number }>,
+): Promise<void> {
+  if (parts.length === 0) return;
+  const keys = parts.map((p) => partObjectKey(sessionId, p.file_index, p.part_number));
+  try {
+    await bucket.delete(keys);
+  } catch {
+    // 尽力清理临时分块对象
+  }
+}
+
 export async function beginUploadSession(
   env: UploadEnv,
   hub: D1HubStore,
@@ -157,12 +175,11 @@ export async function beginUploadSession(
 
   for (const file of normalizedFiles) {
     const r2Key = `assets/${input.projectId}/${sessionId}/${file.path}`;
-    const multipart = await env.ASSETS.createMultipartUpload(r2Key);
     await env.DB.prepare(
       `INSERT INTO upload_files (session_id, file_index, path, size, sha256, r2_key, r2_upload_id)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(sessionId, file.index, file.path, file.size, file.sha256, r2Key, multipart.uploadId)
+      .bind(sessionId, file.index, file.path, file.size, file.sha256, r2Key, '')
       .run();
   }
 
@@ -218,8 +235,9 @@ export async function putUploadPart(
     return { ok: false, status: 400, error: 'part-checksum-mismatch' };
   }
 
-  const multipart = env.ASSETS.resumeMultipartUpload(file.r2_key, file.r2_upload_id);
-  const uploaded = await multipart.uploadPart(input.partNumber, input.data);
+  const partKey = partObjectKey(input.sessionId, input.fileIndex, input.partNumber);
+  const putResult = await env.ASSETS.put(partKey, input.data);
+  const etag = putResult?.httpEtag ?? actualSha;
 
   await env.DB.prepare(
     `INSERT INTO upload_parts (session_id, file_index, part_number, etag, size, sha256, created_at)
@@ -230,7 +248,7 @@ export async function putUploadPart(
        sha256 = excluded.sha256,
        created_at = excluded.created_at`,
   )
-    .bind(input.sessionId, input.fileIndex, input.partNumber, uploaded.etag, input.data.byteLength, actualSha, now)
+    .bind(input.sessionId, input.fileIndex, input.partNumber, etag, input.data.byteLength, actualSha, now)
     .run();
 
   await env.DB.prepare('UPDATE upload_sessions SET updated_at = ? WHERE id = ?').bind(now, input.sessionId).run();
@@ -242,7 +260,7 @@ export async function putUploadPart(
       sessionId: input.sessionId,
       fileIndex: input.fileIndex,
       partNumber: input.partNumber,
-      etag: uploaded.etag,
+      etag,
       size: input.data.byteLength,
       sha256: actualSha,
     },
@@ -309,26 +327,60 @@ export async function completeUploadSession(
     }
   }
 
-  // 合并 R2 multipart 并校验最终对象 sha256 与清单一致。
+  // 按顺序读取临时分块对象并拼接，核对总长度与整文件 sha256 一致后再写入最终 r2_key，最后删除临时对象。
   const completedKeys: string[] = [];
-  for (const file of files) {
-    const parts = partsByFile.get(file.file_index) ?? [];
-    const multipart = env.ASSETS.resumeMultipartUpload(file.r2_key, file.r2_upload_id);
-    await multipart.complete(parts.map((p) => ({ partNumber: p.part_number, etag: p.etag })));
-    completedKeys.push(file.r2_key);
+  const cleanup = async () => {
+    for (const k of completedKeys) {
+      try {
+        await env.ASSETS!.delete(k);
+      } catch {
+        // 忽略清理错误
+      }
+    }
+    await deletePartObjects(env.ASSETS!, sessionId, allParts);
+  };
 
-    const obj = await env.ASSETS.get(file.r2_key);
-    if (!obj) {
-      for (const k of completedKeys) await env.ASSETS.delete(k);
-      return { ok: false, status: 500, error: 'object-missing-after-complete', detail: file.path };
+  try {
+    for (const file of files) {
+      const parts = partsByFile.get(file.file_index) ?? [];
+      const merged = new Uint8Array(file.size);
+      let offset = 0;
+
+      for (const p of parts) {
+        const obj = await env.ASSETS.get(partObjectKey(sessionId, file.file_index, p.part_number));
+        if (!obj) {
+          await cleanup();
+          return { ok: false, status: 400, error: 'manifest-mismatch', detail: `missing-part-object:${file.path}:${p.part_number}` };
+        }
+        const chunkBuf = await obj.arrayBuffer();
+        if (offset + chunkBuf.byteLength > file.size) {
+          await cleanup();
+          return { ok: false, status: 400, error: 'manifest-mismatch', detail: `size-mismatch:${file.path}` };
+        }
+        merged.set(new Uint8Array(chunkBuf), offset);
+        offset += chunkBuf.byteLength;
+      }
+
+      if (offset !== file.size) {
+        await cleanup();
+        return { ok: false, status: 400, error: 'manifest-mismatch', detail: `size-mismatch:${file.path}` };
+      }
+
+      const actualSha = await sha256BytesHex(merged);
+      if (actualSha !== file.sha256) {
+        await cleanup();
+        return { ok: false, status: 400, error: 'manifest-mismatch', detail: `checksum-mismatch:${file.path}` };
+      }
+
+      await env.ASSETS.put(file.r2_key, merged);
+      completedKeys.push(file.r2_key);
     }
-    const buf = await obj.arrayBuffer();
-    const actualSha = await sha256BytesHex(buf);
-    if (buf.byteLength !== file.size || actualSha !== file.sha256) {
-      for (const k of completedKeys) await env.ASSETS.delete(k);
-      return { ok: false, status: 400, error: 'manifest-mismatch', detail: `checksum-mismatch:${file.path}` };
-    }
+  } catch {
+    await cleanup();
+    return { ok: false, status: 502, error: 'storage-error', detail: 'r2-assemble-failed' };
   }
+
+  await deletePartObjects(env.ASSETS, sessionId, allParts);
 
   await env.DB.prepare(`UPDATE upload_sessions SET status = 'ready', updated_at = ? WHERE id = ?`)
     .bind(now, sessionId)
@@ -419,16 +471,10 @@ export async function pruneExpiredUploadSessions(env: UploadEnv, now: number): P
   let count = 0;
   for (const session of expired) {
     if (env.ASSETS) {
-      const { results: files } = await env.DB.prepare('SELECT * FROM upload_files WHERE session_id = ?')
+      const { results: parts } = await env.DB.prepare('SELECT file_index, part_number FROM upload_parts WHERE session_id = ?')
         .bind(session.id)
-        .all<FileRow>();
-      for (const file of files) {
-        try {
-          await env.ASSETS.resumeMultipartUpload(file.r2_key, file.r2_upload_id).abort();
-        } catch {
-          // R2 分片上传可能已自动过期或不存在，忽略错误继续清理数据库。
-        }
-      }
+        .all<{ readonly file_index: number; readonly part_number: number }>();
+      await deletePartObjects(env.ASSETS, session.id, parts);
     }
     await env.DB.prepare('DELETE FROM upload_parts WHERE session_id = ?').bind(session.id).run();
     await env.DB.prepare('DELETE FROM upload_files WHERE session_id = ?').bind(session.id).run();
