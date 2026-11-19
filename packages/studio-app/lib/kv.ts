@@ -1,46 +1,85 @@
-/** The app's browser storage: localStorage, namespaced `synon:`. Same shape as the companion's
- * kv.web.ts. A missing or full storage is never fatal: the cache and drafts are a nicety. */
-const PREFIX = 'synon:';
-const memory = new Map<string, string>();
+import { File, Paths } from 'expo-file-system';
+import { AppState } from 'react-native';
+import { registerBoot } from './boot';
 
-const store = (): Storage | undefined => (typeof localStorage === 'undefined' ? undefined : localStorage);
+/**
+ * 原生本地键值存储：将非敏感草稿与接口缓存保存在单个 JSON 文件（synon-studio.json）中，
+ * 启动时通过 registerBoot 异步补水到内存，对外保持同步 get/set/remove/clear 接口，写入防抖落盘。
+ */
+const file = (): File => new File(Paths.document, 'synon-studio.json');
+let memo: Record<string, unknown> | undefined;
+let dirty = false;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+async function hydrate(): Promise<void> {
+  if (memo) return;
+  try {
+    const f = file();
+    if (!f.exists) {
+      memo = {};
+      return;
+    }
+    const raw = await f.text();
+    memo = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {
+    memo = {};
+  }
+}
+
+registerBoot(hydrate);
+
+function all(): Record<string, unknown> {
+  if (!memo) memo = {};
+  return memo;
+}
+
+function writeNow(): void {
+  if (!dirty) return;
+  dirty = false;
+  try {
+    const f = file();
+    if (!f.exists) f.create();
+    f.write(JSON.stringify(memo ?? {}));
+  } catch {
+    // 磁盘满等异常只影响缓存持久化，不崩溃。
+  }
+}
+
+function scheduleFlush(): void {
+  dirty = true;
+  if (timer) return;
+  timer = setTimeout(() => {
+    timer = undefined;
+    writeNow();
+  }, 1500);
+}
+
+if (typeof AppState?.addEventListener === 'function') {
+  AppState.addEventListener('change', (next) => {
+    if (next === 'background') {
+      if (timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      writeNow();
+    }
+  });
+}
 
 export const kv = {
   get<T>(key: string): T | undefined {
-    try {
-      const s = store();
-      const raw = s ? s.getItem(PREFIX + key) : memory.get(PREFIX + key);
-      return raw == null ? undefined : (JSON.parse(raw) as T);
-    } catch {
-      return undefined;
-    }
+    return all()[key] as T | undefined;
   },
   set(key: string, value: unknown): void {
-    try {
-      const serialized = JSON.stringify(value);
-      const s = store();
-      if (s) s.setItem(PREFIX + key, serialized);
-      else memory.set(PREFIX + key, serialized);
-    } catch (e) {
-      const dev = (globalThis as { __DEV__?: boolean }).__DEV__;
-      if (dev) console.warn('[kv]', key, (e as Error).message);
-    }
+    all()[key] = value;
+    scheduleFlush();
   },
   remove(key: string): void {
-    try {
-      const s = store();
-      if (s) s.removeItem(PREFIX + key);
-      else memory.delete(PREFIX + key);
-    } catch {
-      /* private mode */
-    }
+    delete all()[key];
+    scheduleFlush();
   },
   clear(): void {
-    const s = store();
-    if (s) {
-      for (const k of Object.keys(s)) if (k.startsWith(PREFIX)) s.removeItem(k);
-      return;
-    }
-    for (const k of [...memory.keys()]) if (k.startsWith(PREFIX)) memory.delete(k);
+    memo = {};
+    scheduleFlush();
   },
 };
