@@ -12495,6 +12495,7 @@
  "Runs opencode auth login in Terminal: pick DeepSeek, Moonshot AI (Kimi), OpenRouter or any other provider": "在终端中运行 opencode auth login：选择 DeepSeek、Moonshot AI（Kimi）、OpenRouter 或其他任何提供商",
  "Same as Project ({0})": "与项目相同（{0}）",
  "Same as the Builder": "与构建者相同",
+ "Default Model": "默认模型",
  "Same as {0} value, kept in Beluga too": "与{0}的值相同，也保存在 Beluga 里",
  "Schedule a Message": "定时发送消息",
  "Schedule a message in this chat (/schedule)": "在这个聊天里定时发送消息（/schedule）",
