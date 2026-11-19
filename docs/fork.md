@@ -12,8 +12,8 @@ fork 自己的改动是一条链，后一个建在前一个上面：
 |---|---|---|
 | `topic/chinese` | 中文对照：fork 的中文接在上游的中文表上，对上游文案的改译，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
 | `fork/base` | fork 结构、登记表、fork 功能的中文、输入法 Enter、git 英文输出、构建号、新旧版本混用的容错 | `topic/chinese` |
-| `topic/native` | Mac 原生的控件、菜单、sheet、警告框，侧栏，沉稳界面 | `fork/base` |
-| `topic/plans` | Antigravity、本地模型端点保存前校验、计划里“Decide…”直接打开那张卡片、技能包、用量统计（计划的规划者 / 建造者 / 检查者以上游为准） | `topic/native` |
+| `topic/native` | 只放 Mac 应用的原生改动：控件、菜单、sheet、警告框、Liquid Glass、侧栏、沉稳界面、Mac 外壳的原生代码。不放功能 | `fork/base` |
+| `topic/plans` | fork 的功能，连同它们自己的界面（入口、菜单项、窗口）：计划设置、Antigravity、本地模型端点保存前校验、计划里“Decide…”直接打开那张卡片、技能包、用量统计（计划的规划者 / 建造者 / 检查者以上游为准） | `topic/native` |
 | `topic/fixes` | 准备提回上游的小修复 | `upstream/main` |
 
 为什么是链而不是并列：上层的界面建在下层的原生控件和中文上，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/plans`；需要时再合进 `topic/fixes`。
@@ -22,6 +22,8 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 
 **作废：手机的自定义地址通道**（`plan/custom-route`，BLG-259–261、BLG-264，Beluga 计划 `pl_06cbeaec655c`）。让手机经 GNB、ZeroTier、WireGuard、Nebula、Tailscale 等组网连 Mac：中继另外监听一个用户给的 `host:port`，手机把它当第三条路竞速。2026-11-18 放弃，代码已从 `topic/native`、`topic/plans` 撤出（`revert:` 提交），分支归档为 `archive/abandoned-custom-route-2026-11-18`，不再合进链上任何分支。没有发出去的版本带过它用的协议号（native 上 1.59、plans 上 1.64）。
 
+- **native 和 plans 怎么分**：只改 Mac 外观和原生行为的（控件长什么样、菜单和 sheet 换成原生的），放 `topic/native`，哪怕是在 `topic/plans` 上做事时发现的；跟某个功能绑在一起的（这个功能的入口、菜单项、窗口），放 `topic/plans`，哪怕它全是界面。要把已经在 `topic/native` 上的功能挪下去：在 `topic/native` 上 revert，把 `topic/native` 合进 `topic/plans` 之后，在 `topic/plans` 上再 revert 那次 revert，功能就只留在 `topic/plans`。
+- **上游合并了 native 的改动之后**（比如 beluga-labs/beluga#584）：照常从链头同步上游，然后把 `topic/native` 里同一份改动拿掉，以上游 `main` 的写法为准，不留两份。
 - **新改动**放在它所属的、链上最靠前的那个分支：从它开 worktree 和 PR，合进去之后，再把这个分支依次合进链上后面的每个分支（merge，不 rebase，分支都已推送）。
 - **同步上游**从链头进：把 `upstream/main` 合进 `topic/chinese`（它和上游只差 `zh-CN.json`：fork 的中文直接写在上游的文件里），再顺着链往下合。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，在 `topic/native` 及之后）照旧用。
 - **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/plans`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
@@ -112,15 +114,6 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 ### 侧边栏
 
 - `packages/mac/src/layout/Sidebar.tsx`：四行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、`useOneSelected(drop.ref)` 和 `useSidebarKeys(drop.ref)` 两个钩子、标题栏里隐藏侧栏按钮后一个 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，铅笔图标，侧栏唯一的主操作，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它），以及顶部入口后的 `<SidebarEdge />`。标题栏的三个图标（用量、隐藏侧栏、新建任务）包在 Sidebar.module.css 的 `.titleTools` 里。Mac 原生调性（Claude Design「Mac原生侧边栏设计稿」2a）：选中行是中性灰（`--sb-selected`，侧栏有焦点时 10%，点到别处后 5.5%），图标仍是强调色；没有图标的项目用同一种中性灰的字母块（`components/ProjectIcon.module.css`，自己给项目设了颜色才上色）；分组标题的 + 和折叠箭头只在悬停时出现；`fork/sidebar/keys.ts` 的 `useSidebarKeys`：焦点在某一行上时 ↑ ↓ 在行间移动，Home、End 到首尾，→ 展开 ← 收起带折叠按钮的行（项目），回车和空格仍是上游的打开；输入框里的方向键不受影响，用例 `tests/fork-sidebar-keys.test.ts`。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。同一行的 `<SidebarEdge />`（`fork/sidebar/resize.tsx`）是侧栏右边可拖的边：复用上游右侧面板的 `ResizeHandle`，平时看不见，指针移上去才亮、光标变 col-resize；拖动时只改 `--sidebar-w`，松手才存进上游已有的 `sidebarWidth` 偏好（和设置里的滑块同一项，所以范围也一样：200–360），双击回到默认 248，键盘焦点在上面时 →/← 每次加减 8。减弱动态效果或沉稳界面下不做高亮过渡。范围与保存的用例：`tests/fork-sidebar-resize.test.ts`。
-
-### 计划设置（建好的计划改“混用智能体”）
-
-计划页 ••• › 计划设置…（`packages/mac/src/fork/plans/PlanSettingsSheet.tsx`，模型 `packages/mac/src/fork/plans/plan-settings-model.ts`，测试 `tests/fork-plan-settings.test.ts`）。2026-11-18 换回上游的规划者/构建者/检查者时，旧的“计划设置”连同 fork 的角色一起删了；这一版只用上游的东西：新建计划里的那一行智能体（`AgentRoles`，含“混用智能体”，每个角色可选任意运行时和模型）、三张运行方式卡片，保存走上游已有的 `plans.setAutonomy`、`plans.setRoleAgent`、`plans.setTestsAt`，守护进程没有改动。接入点：
-
-- `packages/mac/src/plans/PlanPage.tsx`：一行，••• 菜单里的“计划设置…”
-- `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
-- `packages/mac/src/dialogs/native/WorkSheets.tsx`：三行，一个 import 和一个 `case`
-- `packages/mac/src/plans/PlanSheets.tsx`：一行，导出 `AutonomyCards`
 
 ### 原生控件（待提回上游）
 

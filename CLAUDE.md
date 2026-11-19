@@ -100,10 +100,15 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   on it. What upstream has already merged gets no branch of its own here.
 - **The fork's work is a chain of branches, each on the one before** (`docs/fork.md`, "分支"):
   `topic/chinese` (the fork's Chinese, written into upstream's `zh-CN.json`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
-  `topic/native` (the Mac's own controls, menus, sheets, sidebar, calm UI) → `topic/plans` (plan
-  roles, auto route, models, Autopilot). `topic/fixes` stands apart on `upstream/main`: small
+  `topic/native` (only the Mac app's native changes: controls, menus, sheets, alerts, Liquid
+  Glass, the sidebar, the calm UI; no features) → `topic/plans` (the fork's features, with their
+  own UI: Plan Settings and the like). `topic/fixes` stands apart on `upstream/main`: small
   fixes meant for upstream. Synon Studio (clients, federation, My Sharing) is no longer here: since
   2026-11-18 it is its own repository, `~/sproot/synon-studio`, built on `topic/plans`.
+- **Native or a feature?** A change to how the Mac app looks or behaves natively goes on
+  `topic/native`, even when found while working from `topic/plans`; anything tied to a feature
+  (its entry, menu item, window) goes on `topic/plans`, even when it's all UI. Once upstream merges
+  some of the native work, take that out of `topic/native` and follow upstream `main`'s version.
 - **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
   into that branch; once merged, merge that branch forward into each one after it (merge, never
   rebase: they're pushed).

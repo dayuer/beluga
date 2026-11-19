@@ -10,6 +10,9 @@
 //! rows changed is built again. "@" in a text view completes a teammate's handle (the system's own
 //! completion list) and the handles it knows are drawn in the accent colour.
 
+// Only a Mac shows these: elsewhere each command says no, and the types it would read go unused.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -448,7 +451,7 @@ mod mac {
                 let Some(object) = note.object() else { return };
                 let id = peek(|s| {
                     s.rows.iter().find_map(|r| match &r.control {
-                        Control::Text { field } if std::ptr::eq(Retained::as_ptr(field) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => {
+                        Control::Text { field } if std::ptr::eq(Retained::as_ptr(field) as *const AnyObject, Retained::as_ptr(&object)) => {
                             let rule = s.spec.rows.iter().find_map(|row| match row {
                                 SheetRow::Text { id, max_length, upper, keep, .. } if *id == r.id => Some((*max_length, *upper, keep.clone())),
                                 _ => None,
@@ -482,7 +485,7 @@ mod mac {
                 let Some(object) = note.object() else { return };
                 let found = peek(|s| {
                     s.rows.iter().find_map(|r| match &r.control {
-                        Control::TextArea { view, handles, .. } if std::ptr::eq(Retained::as_ptr(view) as *const AnyObject, Retained::as_ptr(&object) as *const AnyObject) => {
+                        Control::TextArea { view, handles, .. } if std::ptr::eq(Retained::as_ptr(view) as *const AnyObject, Retained::as_ptr(&object)) => {
                             Some((r.id.clone(), view.clone(), handles.clone()))
                         }
                         _ => None,
