@@ -99,3 +99,10 @@ CREATE TABLE IF NOT EXISTS push_tokens (
   PRIMARY KEY (customer_id, device)
 );
 CREATE INDEX IF NOT EXISTS push_tokens_by_token ON push_tokens (token);
+
+CREATE TABLE IF NOT EXISTS push_dedup (
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  card_id     TEXT NOT NULL,
+  sent_at     INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, card_id)
+);
