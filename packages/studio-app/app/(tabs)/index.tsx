@@ -1,24 +1,24 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { EmptyState } from '../components/EmptyState';
-import { Header } from '../components/Header';
-import { ProjectCard } from '../components/ProjectCard';
-import { Skeleton } from '../components/Skeleton';
-import { SyncBanner } from '../components/SyncBanner';
-import { TabBar } from '../components/TabBar';
-import { TextButton } from '../components/TextButton';
-import { cache } from '../lib/cache';
-import { cardFor, type ProjectCardData } from '../lib/cards';
-import { hub } from '../lib/client';
-import type { PlansRes, ProjectSummary } from '../lib/hub-schema';
-import { useOnline } from '../lib/net';
-import { useOnResume } from '../lib/resume';
-import { session } from '../lib/session';
-import { detectLang, t } from '../lib/strings';
-import { ago } from '../lib/time';
-import { color, space } from '../lib/theme';
-import { useTodos } from '../lib/todo-store';
+import { EmptyState } from '../../components/EmptyState';
+import { Header } from '../../components/Header';
+import { ProjectCard } from '../../components/ProjectCard';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
+import { TabBar } from '../../components/TabBar';
+import { TextButton } from '../../components/TextButton';
+import { cache } from '../../lib/cache';
+import { cardFor, type ProjectCardData } from '../../lib/cards';
+import { hub } from '../../lib/client';
+import type { PlansRes, ProjectSummary } from '../../lib/hub-schema';
+import { useOnline } from '../../lib/net';
+import { useOnResume } from '../../lib/resume';
+import { session } from '../../lib/session';
+import { detectLang, t } from '../../lib/strings';
+import { ago } from '../../lib/time';
+import { color, space } from '../../lib/theme';
+import { useTodos } from '../../lib/todo-store';
 
 type LoadError = 'offline' | 'error' | null;
 
@@ -170,7 +170,6 @@ export default function ProjectsScreen() {
           )}
         </View>
       </ScrollView>
-      {!desktop ? <TabBar todoCount={todoCount} /> : null}
     </View>
   );
 }

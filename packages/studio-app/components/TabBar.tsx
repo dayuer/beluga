@@ -1,25 +1,44 @@
 import { usePathname, useRouter } from 'expo-router';
-import { Folder, ListChecks } from 'lucide-react-native';
+import { ListChecks, MessageSquare, User } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { detectLang, t } from '../lib/strings';
+import { select } from '../lib/haptics';
 import { color, space, stroke, type } from '../lib/theme';
+import { useDrawerOpen } from '../lib/ui-state';
 
-/** The two roots: Projects and To-dos. A bottom bar on the phone; a 44pt segmented row on desktop. */
-export function TabBar({ todoCount }: { readonly todoCount: number }) {
+export interface TabBarProps {
+  readonly todoCount?: number;
+}
+
+/**
+ * 手机底部三个页签（SS-24）：需求 · 待办 · 我。
+ * 抽屉打开时自动隐藏让位；切换页签时触发选择触感（`haptics.select`）。
+ */
+export function TabBar({ todoCount = 0 }: TabBarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const lang = detectLang();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const drawerOpen = useDrawerOpen();
   const desktop = width >= 900;
-  const todoActive = pathname === '/todo';
+
+  if (drawerOpen) return null;
+
+  const isTodo = pathname === '/todo';
+  const isMe = pathname === '/me';
+  const isRequests = !isTodo && !isMe;
+
   const items = [
-    { to: '/', label: t(lang, 'todo.projects'), Icon: Folder, testID: 'tab-projects', active: !todoActive, badge: 0 },
-    { to: '/todo', label: t(lang, 'todo.tab'), Icon: ListChecks, testID: 'tab-todo', active: todoActive, badge: todoCount },
+    { to: '/', label: '需求', Icon: MessageSquare, testID: 'tab-requests', active: isRequests, badge: 0 },
+    { to: '/todo', label: '待办', Icon: ListChecks, testID: 'tab-todo', active: isTodo, badge: todoCount },
+    { to: '/me', label: '我', Icon: User, testID: 'tab-me', active: isMe, badge: 0 },
   ] as const;
+
   const go = (to: string): void => {
-    if (pathname !== to) router.replace(to);
+    if (pathname !== to) {
+      select();
+      router.replace(to);
+    }
   };
 
   if (desktop) {
@@ -54,12 +73,15 @@ export function TabBar({ todoCount }: { readonly todoCount: number }) {
           key={item.to}
           accessibilityRole="tab"
           accessibilityState={{ selected: item.active }}
+          accessibilityLabel={item.label}
           testID={item.testID}
           onPress={() => go(item.to)}
           style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
         >
           <item.Icon size={21} color={item.active ? color.text : color.text2} strokeWidth={stroke} />
-          <Text style={[styles.tabLabel, item.active && styles.tabOn]}>{item.label}</Text>
+          <Text style={[styles.tabLabel, item.active && styles.tabOn]} numberOfLines={1}>
+            {item.label}
+          </Text>
           {item.badge > 0 ? (
             <Text style={styles.badge} testID={item.testID === 'tab-todo' ? 'tab-todo-count' : undefined}>
               {item.badge > 99 ? '99+' : item.badge}
@@ -73,7 +95,7 @@ export function TabBar({ todoCount }: { readonly todoCount: number }) {
 
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', backgroundColor: color.bar, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
-  tab: { flex: 1, height: 56, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tab: { flex: 1, minWidth: 0, height: 56, alignItems: 'center', justifyContent: 'center', gap: 2 },
   tabLabel: { ...type.caption, color: color.text2 },
   tabOn: { color: color.text, fontWeight: '600' },
   badge: { position: 'absolute', top: 8, marginLeft: 22, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: color.text, color: color.onPrimary, ...type.caption, fontSize: 11, lineHeight: 18, textAlign: 'center', overflow: 'hidden' },
