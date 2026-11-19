@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sendPushToCustomer, type PushEnv } from '../src/push.js';
+import { clearFcmTokenCache } from '../src/push-fcm.js';
 import type { PushPlatform } from '../src/push-tokens.js';
 
 interface TokenRow {
@@ -162,6 +163,7 @@ describe('SS-80 push sender (APNs + FCM)', () => {
       FCM_ENDPOINT: 'https://fcm.fake',
     };
 
+    clearFcmTokenCache();
     const result = await sendPushToCustomer(
       db,
       env,
@@ -176,7 +178,19 @@ describe('SS-80 push sender (APNs + FCM)', () => {
 
     expect(result).toEqual({ sent: 2, failed: 2, removed: 2 });
     expect(rows.map((r) => r.token)).toEqual(['apns-good', 'fcm-good']);
-    // OAuth 只换取一次 token，复用到两个 android 设备
+    // 10 分钟后再次发送：FCM access token 在有效期内被复用，不重复请求 OAuth
+    const second = await sendPushToCustomer(
+      db,
+      env,
+      'c1',
+      {
+        title: '再次提醒',
+        body: '仍有事项等待确认',
+        path: '/project/p1/plan/pl1',
+      },
+      { fetch: fakeFetch, now: 1_700_000_600_000 },
+    );
+    expect(second).toEqual({ sent: 2, failed: 0, removed: 0 });
     expect(calls.filter((c) => c.url === 'https://oauth.fake/token')).toHaveLength(1);
   });
 });

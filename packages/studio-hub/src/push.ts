@@ -3,6 +3,7 @@
  * 密钥从 Worker secrets 读取；遇到失效令牌（Unregistered / BadDeviceToken）时自动从 push_tokens 删除。
  */
 
+import { sendFcmNotification } from './push-fcm.js';
 import { deletePushTokenByValue, listPushTokensForCustomer, type PushTokenRecord } from './push-tokens.js';
 
 export interface PushEnv {
@@ -37,13 +38,6 @@ export interface PushSendResult {
 export interface PushOptions {
   readonly fetch?: typeof fetch;
   readonly now?: number;
-}
-
-interface FcmServiceAccount {
-  readonly projectId: string;
-  readonly clientEmail: string;
-  readonly privateKey: string;
-  readonly tokenUri: string;
 }
 
 const textEncoder = new TextEncoder();
@@ -96,97 +90,6 @@ export async function signApnsJwt(input: {
   return `${signingInput}.${base64UrlEncode(new Uint8Array(sig))}`;
 }
 
-/** 使用 WebCrypto RS256 签发 Google OAuth2 JWT 断言。 */
-export async function signServiceAccountJwt(input: {
-  readonly clientEmail: string;
-  readonly privateKeyPem: string;
-  readonly tokenUri: string;
-  readonly nowMs: number;
-}): Promise<string> {
-  const iat = Math.floor(input.nowMs / 1000);
-  const header = base64UrlJson({ alg: 'RS256', typ: 'JWT' });
-  const payload = base64UrlJson({
-    iss: input.clientEmail,
-    scope: 'https://www.googleapis.com/auth/firebase.messaging',
-    aud: input.tokenUri,
-    iat,
-    exp: iat + 3600,
-  });
-  const signingInput = `${header}.${payload}`;
-
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToPkcs8Bytes(input.privateKeyPem),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    textEncoder.encode(signingInput),
-  );
-  return `${signingInput}.${base64UrlEncode(new Uint8Array(sig))}`;
-}
-
-function parseFcmAccount(env: PushEnv): FcmServiceAccount | undefined {
-  if (env.FCM_SERVICE_ACCOUNT_JSON) {
-    try {
-      const parsed = JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON) as Record<string, unknown>;
-      const projectId = typeof parsed.project_id === 'string' ? parsed.project_id : env.FCM_PROJECT_ID;
-      const clientEmail = typeof parsed.client_email === 'string' ? parsed.client_email : env.FCM_CLIENT_EMAIL;
-      const privateKey = typeof parsed.private_key === 'string' ? parsed.private_key : env.FCM_PRIVATE_KEY;
-      const tokenUri =
-        env.FCM_TOKEN_URI ??
-        (typeof parsed.token_uri === 'string' ? parsed.token_uri : 'https://oauth2.googleapis.com/token');
-      if (projectId && clientEmail && privateKey) {
-        return { projectId, clientEmail, privateKey, tokenUri };
-      }
-    } catch {
-      return undefined;
-    }
-  }
-  if (env.FCM_PROJECT_ID && env.FCM_CLIENT_EMAIL && env.FCM_PRIVATE_KEY) {
-    return {
-      projectId: env.FCM_PROJECT_ID,
-      clientEmail: env.FCM_CLIENT_EMAIL,
-      privateKey: env.FCM_PRIVATE_KEY,
-      tokenUri: env.FCM_TOKEN_URI ?? 'https://oauth2.googleapis.com/token',
-    };
-  }
-  return undefined;
-}
-
-async function fetchFcmAccessToken(
-  account: FcmServiceAccount,
-  nowMs: number,
-  fetchFn: typeof fetch,
-): Promise<string> {
-  const assertion = await signServiceAccountJwt({
-    clientEmail: account.clientEmail,
-    privateKeyPem: account.privateKey,
-    tokenUri: account.tokenUri,
-    nowMs,
-  });
-  const body = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    assertion,
-  });
-  const res = await fetchFn(account.tokenUri, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) {
-    throw new Error(`fcm-oauth-failed:${res.status}`);
-  }
-  const data = (await res.json()) as { access_token?: unknown };
-  if (typeof data.access_token !== 'string' || data.access_token.length === 0) {
-    throw new Error('fcm-oauth-missing-token');
-  }
-  return data.access_token;
-}
-
 function isApnsInvalidToken(status: number, bodyText: string): boolean {
   if (status === 410) return true;
   if (status !== 400) return false;
@@ -199,25 +102,6 @@ function isApnsInvalidToken(status: number, bodyText: string): boolean {
     );
   } catch {
     return false;
-  }
-}
-
-function isFcmInvalidToken(status: number, bodyText: string): boolean {
-  if (status === 404) return true;
-  if (status !== 400 && status !== 403) return false;
-  try {
-    const parsed = JSON.parse(bodyText) as {
-      error?: { status?: unknown; details?: Array<{ errorCode?: unknown }> };
-    };
-    const errStatus = parsed.error?.status;
-    if (errStatus === 'NOT_FOUND' || errStatus === 'UNREGISTERED') return true;
-    const details = parsed.error?.details;
-    if (Array.isArray(details)) {
-      return details.some((d) => d.errorCode === 'UNREGISTERED' || d.errorCode === 'INVALID_ARGUMENT');
-    }
-    return false;
-  } catch {
-    return bodyText.includes('UNREGISTERED');
   }
 }
 
@@ -269,42 +153,6 @@ async function sendApns(
   return isApnsInvalidToken(res.status, text) ? 'invalid' : 'failed';
 }
 
-async function sendFcm(
-  record: PushTokenRecord,
-  payload: PushPayload,
-  account: FcmServiceAccount,
-  accessToken: string,
-  env: PushEnv,
-  fetchFn: typeof fetch,
-): Promise<'ok' | 'invalid' | 'failed'> {
-  const base = (env.FCM_ENDPOINT ?? 'https://fcm.googleapis.com').replace(/\/+$/, '');
-  const url = `${base}/v1/projects/${encodeURIComponent(account.projectId)}/messages:send`;
-
-  const data: Record<string, string> = {
-    ...(payload.data ?? {}),
-    ...(payload.path !== undefined ? { path: payload.path } : {}),
-  };
-
-  const res = await fetchFn(url, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      message: {
-        token: record.token,
-        notification: { title: payload.title, body: payload.body },
-        ...(Object.keys(data).length > 0 ? { data } : {}),
-      },
-    }),
-  });
-
-  if (res.ok) return 'ok';
-  const text = await res.text();
-  return isFcmInvalidToken(res.status, text) ? 'invalid' : 'failed';
-}
-
 /** 向指定客户的所有已登记设备发送推送，并在收到失效令牌响应时清理数据库记录。 */
 export async function sendPushToCustomer(
   db: D1Database,
@@ -318,8 +166,6 @@ export async function sendPushToCustomer(
 
   const fetchFn = opts.fetch ?? fetch;
   const nowMs = opts.now ?? Date.now();
-  const fcmAccount = parseFcmAccount(env);
-  let fcmAccessToken: string | undefined;
 
   let sent = 0;
   let failed = 0;
@@ -330,13 +176,8 @@ export async function sendPushToCustomer(
     try {
       if (record.platform === 'ios') {
         outcome = await sendApns(record, payload, env, nowMs, fetchFn);
-      } else if (fcmAccount) {
-        if (!fcmAccessToken) {
-          fcmAccessToken = await fetchFcmAccessToken(fcmAccount, nowMs, fetchFn);
-        }
-        outcome = await sendFcm(record, payload, fcmAccount, fcmAccessToken, env, fetchFn);
       } else {
-        outcome = 'unconfigured';
+        outcome = await sendFcmNotification(record, payload, env, nowMs, fetchFn);
       }
     } catch {
       outcome = 'failed';
