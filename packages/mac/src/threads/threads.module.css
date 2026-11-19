@@ -30,7 +30,7 @@
   color: var(--text);
   font: inherit;
   text-align: left;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .still {
   color: var(--text-2);
@@ -101,7 +101,7 @@
   color: var(--text-2);
   font: inherit;
   font-size: 0.86em;
-  cursor: var(--press-cursor);
+  cursor: pointer;
   opacity: 0;
 }
 .stop:hover {
@@ -142,7 +142,7 @@
   font: inherit;
   font-size: 0.9em;
   text-align: left;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .earlier:hover {
   background: var(--bg-hover);

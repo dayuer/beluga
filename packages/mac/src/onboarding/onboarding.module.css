@@ -832,7 +832,7 @@
   width: auto;
   font-weight: 500;
   color: var(--text);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .rowButton:disabled {
   color: var(--text-3);
@@ -1215,7 +1215,7 @@
   padding: 4px 0;
   text-align: left;
   color: var(--text);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .agentPick:disabled {
   cursor: default;
@@ -1273,7 +1273,7 @@
   color: var(--text-2);
   background: var(--bg-hover);
   box-shadow: inset 0 0 0 0.5px var(--hairline);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .agentCommand code {
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -1306,7 +1306,7 @@
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-2);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .agentsCheck:hover:not(:disabled) {
   color: var(--text);
@@ -1315,12 +1315,4 @@
 .agentsCheck:disabled {
   cursor: default;
   opacity: 0.6;
-}
-
-/* Reduce motion stops the hero's sheen and the button's beam too (M3 · RE-01; BLG-174). */
-@media (prefers-reduced-motion: reduce) {
-  .heroSoft,
-  .beam {
-    animation: none;
-  }
 }

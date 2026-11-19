@@ -3,12 +3,11 @@ import type { Project } from '@beluga/workspaces/types.js';
 import { Icon } from '../components/Icon.js';
 import { ProjectIcon } from '../components/ProjectIcon.js';
 import { SpecContext } from '../components/SpecMenu.js';
-import { Button, Empty, EmptyActions, EmptyChoices } from '../components/ui.js';
+import { Button, Empty, EmptyActions } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { toast, useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { EarningsCard } from './EarningsCard.js';
-import { OverviewHeader } from '../fork/native/OverviewHeader.js';
 import { ConversationPeek, DeleteArchivedAlert } from './overview/ConversationPeek.js';
 import type { ThreadChildren } from '@beluga/shared/threads.js';
 import { FilterBar } from './overview/FilterBar.js';
@@ -229,7 +228,6 @@ export function OverviewView() {
         onProject={(id) => setPrefs({ project: id })}
       />
       {!searching && !project && (prefs.filter === 'all' || prefs.filter === 'active') ? <EarningsCard /> : null}
-      {groups.length ? <OverviewHeader sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} /> : null}
       <div ref={listRef} onKeyDown={onListKey}>
         {prefs.filter === 'needs' && there.length ? <RemoteList title="Needs you on your computers" rows={there} /> : null}
         {groups.length || (prefs.filter === 'needs' && there.length) ? (
@@ -326,9 +324,9 @@ function NothingHere({ search, filter, project, othersHere, onClearSearch, onAll
         detail={`Nothing${project ? ` in ${projectName(project)}` : ''} has that in its name, branch or last message${filter === 'all' ? '' : ' here'}.`}
         action={
           <EmptyActions>
-            <Button size="regular" onClick={onClearSearch}>Clear Search</Button>
-            {filter !== 'all' && othersHere ? <Button size="regular" variant="quiet" onClick={onShowAll}>Show All</Button> : null}
-            {project ? <Button size="regular" variant="quiet" onClick={onAllProjects}>All Projects</Button> : null}
+            <Button size="small" onClick={onClearSearch}>Clear Search</Button>
+            {filter !== 'all' && othersHere ? <Button size="small" variant="quiet" onClick={onShowAll}>Show All</Button> : null}
+            {project ? <Button size="small" variant="quiet" onClick={onAllProjects}>All Projects</Button> : null}
           </EmptyActions>
         }
       />
@@ -341,7 +339,7 @@ function NothingHere({ search, filter, project, othersHere, onClearSearch, onAll
       icon={icon}
       title={text.title}
       detail={text.detail}
-      action={project ? <EmptyActions><Button size="regular" onClick={onAllProjects}>Show All Projects</Button></EmptyActions> : undefined}
+      action={project ? <EmptyActions><Button size="small" onClick={onAllProjects}>Show All Projects</Button></EmptyActions> : undefined}
     />
   );
 }
@@ -356,23 +354,20 @@ function NothingYet() {
       title="No workspaces yet"
       detail={project ? `Start a worktree in ${project.name}: its own branch, with your agent on your task.` : 'Add your projects, then give your agent a task in a worktree of its own.'}
       action={
-        <EmptyChoices
-          main={
-            project ? (
-              <Button size="large" variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
-                New Worktree
-              </Button>
-            ) : (
-              <Button size="large" variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-                Add Projects…
-              </Button>
-            )
-          }
-        >
-          <Button size="regular" variant="quiet" icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
+        <EmptyActions>
+          {project ? (
+            <Button size="small" variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
+              New Worktree
+            </Button>
+          ) : (
+            <Button size="small" variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
+              Add Projects…
+            </Button>
+          )}
+          <Button size="small" icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
             New Chat
           </Button>
-        </EmptyChoices>
+        </EmptyActions>
       }
     />
   );

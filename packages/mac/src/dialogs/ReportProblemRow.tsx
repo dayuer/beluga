@@ -30,7 +30,7 @@ export function ReportProblemRow() {
   };
   return (
     <Row label="Report a Problem" detail={error ?? ABOUT}>
-      <Button icon="bug" disabled={busy} onClick={() => void report()}>
+      <Button size="small" icon="bug" disabled={busy} onClick={() => void report()}>
         {busy ? 'Making…' : 'Make a Report…'}
       </Button>
     </Row>

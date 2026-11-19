@@ -6,7 +6,6 @@ import { type ActionItem, ActionsContext } from '../components/SpecMenu.js';
 import { Lifted, useLean } from '../components/Lifted.js';
 import { Icon } from '../components/Icon.js';
 import { IconButton, cx } from '../components/ui.js';
-import { useCalm } from '../fork/calm/index.js';
 import { useApp } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { openExternal } from '../lib/system.js';
@@ -89,9 +88,7 @@ const order = (a: Issue, b: Issue): number => byRank(a, b) || PRIORITY_INFO[a.pr
 /** `projectId`: the board shown; `repo`: the one repo you're looking at on a board of several (new tasks run there). */
 export function TaskBoard({ issues, statuses, projectId, repo }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string }) {
   const { api, act } = useTaskActions();
-  // Calm mode treats the board's own layout motion as still: cards take their new places at once.
-  const calm = useCalm();
-  const reduce = (useReducedMotion() ?? false) || calm;
+  const reduce = useReducedMotion() ?? false;
   const [lift, setLift] = useState<Lift>();
   const [over, setOver] = useState<Spot>();
   const [pending, setPending] = useState<Pending>();
@@ -454,11 +451,7 @@ function Fold({ side, count, reduce, board, scroller, onMove, children }: { side
     kept.current = { width: w, carry: Math.max(-1, Math.min(1, want - s.scrollLeft)) };
   }, [side, board, scroller]);
   // Opening at once (reduced motion) has no frames: hold the board before it paints.
-  // The drag reads the columns again for a moment after one opens (foldMoved): opening at once is that moment too.
-  useLayoutEffect(() => {
-    hold();
-    onMove();
-  }, [hold, onMove]);
+  useLayoutEffect(hold, [hold]);
   useEffect(() => () => void (side === 'before' && board()?.style.removeProperty('min-width')), [side, board]);
   return (
     <motion.div

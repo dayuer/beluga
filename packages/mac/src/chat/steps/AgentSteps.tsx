@@ -9,7 +9,6 @@ import { formatDuration } from '@beluga/shared/text.js';
 import { DONE_STEPS, HIDDEN_STEPS } from '@beluga/ui/format.js';
 import { Icon } from '../../components/Icon.js';
 import { Avatar, Button, Dot, cx } from '../../components/ui.js';
-import { useCalm } from '../../fork/calm/index.js';
 import { toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { usePrefs } from '../../lib/prefs.js';
 import { useDisclosure } from './step-memory.js';
@@ -286,12 +285,11 @@ function Slot({ still, id, children }: { still: boolean; id?: string; children: 
   );
 }
 
-/** Reduced motion, from the Mac's setting or Settings › Appearance › Reduce motion; calm mode too. */
+/** Reduced motion, from the Mac's setting or Settings › Appearance › Reduce motion. */
 function useStill(): boolean {
   const os = useReducedMotion() ?? false;
   const reduce = usePrefs().reduceMotion;
-  const calm = useCalm();
-  return os || reduce || calm;
+  return os || reduce;
 }
 
 /**

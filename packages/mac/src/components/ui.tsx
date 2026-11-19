@@ -176,19 +176,6 @@ export function EmptyActions({ children }: { children: ReactNode }) {
   return <div className={s.emptyActions}>{children}</div>;
 }
 
-/**
- * An empty state's choices as docs/mac-controls.md has them: its main action Large, alone on its
- * row (one row never mixes sizes), and the other ways on, regular and quiet, on the row under it.
- */
-export function EmptyChoices({ main, children }: { main: ReactNode; children?: ReactNode }) {
-  return (
-    <div className={s.emptyChoices}>
-      {main}
-      {children ? <div className={s.emptyActions}>{children}</div> : null}
-    </div>
-  );
-}
-
 /** Claude is thinking: three soft dots. */
 export function Working() {
   return (

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import type { Presence, PresenceState } from '@beluga/net/mesh/views.js';
 import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
-import { useCalm } from '../fork/calm/index.js';
 import { useBeluga } from '../lib/beluga.js';
 import { PersonAvatar, PresenceDot } from './Avatars.js';
 import { CHOICE_LABEL, DURATIONS, type Duration, presenceFor, rememberIdleAway, selfLine } from './net-model.js';
@@ -82,7 +81,6 @@ export function useSetPresence(): (p: Presence) => void {
 export function StatusPanel({ onDone }: { onDone?: () => void }) {
   const net = useNetwork();
   const set = useSetPresence();
-  const calm = useCalm();
   const self = net.self;
   const presence = self?.presence ?? { state: 'online' as const };
   const [note, setNote] = useState(presence.note ?? '');
@@ -145,9 +143,6 @@ export function StatusPanel({ onDone }: { onDone?: () => void }) {
             role="radio"
             aria-checked={presence.state === state}
             className={s.option}
-            // Calm mode hides the right-hand hints (rows stay one height); the hover title keeps
-            // their words. With calm off nothing changes.
-            title={calm && hint ? hint : undefined}
             onClick={() => {
               apply(state);
               onDone?.();

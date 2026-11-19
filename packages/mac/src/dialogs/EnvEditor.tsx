@@ -270,11 +270,11 @@ export function EnvEditor({ projectId, worktreeId }: EnvPlaceProps) {
       {importing ? <ImportBox onImport={addAll} onClose={() => setImporting(false)} /> : null}
       {projectId && !worktreeId && scope.example && scope.exampleSync === false ? <ExampleNote projectId={projectId} example={scope.example} onDone={(n) => (setStatus(n ? { kind: 'saved' } : { kind: 'error', text: 'Nothing to add' }), setReload((x) => x + 1))} onError={(text) => setStatus({ kind: 'error', text })} /> : null}
       <div className={e.foot}>
-        <Button size="regular" variant="quiet" icon="plus" onClick={add}>
+        <Button size="small" variant="quiet" icon="plus" onClick={add}>
           Add variable
         </Button>
         {importing ? null : (
-          <Button size="regular" variant="quiet" icon="clip" onClick={() => setImporting(true)}>
+          <Button size="small" variant="quiet" icon="clip" onClick={() => setImporting(true)}>
             Paste lines…
           </Button>
         )}
@@ -354,7 +354,7 @@ function KeepCopy({ projectId, notCopied, onStatus }: { projectId: string; notCo
   };
   return (
     <Tip label="Copies the .env values into Beluga, so they stay even if the file changes or goes">
-      <Button size="regular" variant="quiet" icon="download" disabled={copying} onClick={copyIn}>
+      <Button size="small" variant="quiet" icon="download" disabled={copying} onClick={copyIn}>
         {copying ? 'Copying…' : 'Keep a Copy in Beluga'}
       </Button>
     </Tip>

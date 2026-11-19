@@ -113,7 +113,7 @@ export function KeysGroup() {
       </div>
       {prefs.termKeys?.keys.length ? (
         <Row label={`${prefs.termKeys.keys.length} keys from ${prefs.termKeys.from || 'your terminal'}`} detail="Brought with Import from…, over Beluga’s.">
-          <Button onClick={() => setPrefs({ termKeys: null })}>
+          <Button size="small" onClick={() => setPrefs({ termKeys: null })}>
             Use Beluga’s Keys
           </Button>
         </Row>

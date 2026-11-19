@@ -98,8 +98,7 @@ test('the toolbar names the PR’s real next step: conflicts, running, failed, n
     await expect(toolbar(page).locator('[data-branch-step="fix_checks"]')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('04-not-pushed.png') });
     // The sidebar row says it too (BLG-840), and the PR sheet won't merge without it: Push and Merge.
-    // The row is listed twice in the sidebar here (its project and Work), so the first one speaks for both.
-    await expect(sidebar(page).locator('[data-not-on-pr="1"]').first()).toHaveAttribute('aria-label', '1 commit not on PR #7');
+    await expect(sidebar(page).locator('[data-not-on-pr="1"]')).toHaveAttribute('aria-label', '1 commit not on PR #7');
     // The pill (first; the step's "Push 1 Commit to PR #7" ends in #7 too).
     await toolbar(page).getByRole('button', { name: /#7$/ }).first().click();
     const sheet = page.getByRole('dialog', { name: /Pull Request/ });

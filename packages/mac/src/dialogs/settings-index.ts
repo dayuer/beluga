@@ -5,7 +5,6 @@ import type { PaneInfo, SettingEntry, SettingsPane } from '../lib/settings-searc
 // Relative, not @beluga/ui: the root's tests and typecheck read this file too.
 import { HIDEABLE_BUTTONS } from '../../../../src/ui/settings-menus.js';
 import { EXPERIMENTS, EXPERIMENT_INFO } from '../../../../src/shared/experiments.js';
-import { withForkSettings } from '../fork/settings-index.js';
 
 /** Settings' panes, in sidebar order, with other words people use for them. */
 export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; keywords?: string }> = [
@@ -47,7 +46,7 @@ const group = (pane: SettingsPane, label: string, detail?: string, keywords?: st
  * here, or loses one listed here. Labels are the panes' own words, so the jump finds the row
  * (Row and Group carry data-setting anchors made from them).
  */
-const UPSTREAM_SETTINGS: readonly Entry[] = [
+export const SETTINGS: readonly Entry[] = [
   // General
   ...rows('general', undefined, [
     ['Your name', 'What friends see in the room.', 'profile display name'],
@@ -343,6 +342,3 @@ const UPSTREAM_SETTINGS: readonly Entry[] = [
   ]),
   ...rows('about', 'Support Beluga', [['Beluga is free, and a passion project', 'Star it on GitHub.', 'star github support sponsor']]),
 ];
-
-// Upstream's list with this fork's own rows in place (packages/mac/src/fork/settings-index.ts, docs/fork.md).
-export const SETTINGS: readonly Entry[] = withForkSettings(UPSTREAM_SETTINGS);

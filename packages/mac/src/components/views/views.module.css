@@ -1048,7 +1048,7 @@ th[style*='right'] .th {
   width: 100%;
   height: 100%;
   opacity: 0;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .pickMark {
   position: absolute;

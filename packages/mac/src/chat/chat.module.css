@@ -365,7 +365,7 @@
   color: var(--text-3);
   font: inherit;
   font-size: 12px;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .failureToggle:hover {
   color: var(--text-2);
@@ -645,7 +645,7 @@
   font-size: 0.86rem;
   font-weight: 500;
   color: var(--accent);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .showAll:hover {
   text-decoration: underline;
@@ -678,7 +678,7 @@
   color: var(--text-2);
   font: inherit;
   font-size: 0.82rem;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .steerNow:hover {
   background: color-mix(in srgb, var(--claude) 15%, transparent);

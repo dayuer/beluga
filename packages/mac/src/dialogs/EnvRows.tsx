@@ -16,10 +16,10 @@ export function ImportBox({ onImport, onClose }: { onImport: (vars: EnvVar[]) =>
       <div className={e.importBar}>
         <span className={e.muted}>{text.trim() ? `${parsed.vars.length} variable${parsed.vars.length === 1 ? '' : 's'}${parsed.skipped.length ? ` · ${parsed.skipped.length} line${parsed.skipped.length === 1 ? '' : 's'} skipped` : ''}` : 'Lines like KEY=value. # comments and export are fine.'}</span>
         <span className={e.flex} />
-        <Button size="regular" variant="quiet" onClick={onClose}>
+        <Button size="small" variant="quiet" onClick={onClose}>
           Cancel
         </Button>
-        <Button size="regular" variant="primary" disabled={!parsed.vars.length} onClick={() => onImport(parsed.vars)}>
+        <Button size="small" variant="primary" disabled={!parsed.vars.length} onClick={() => onImport(parsed.vars)}>
           Add {parsed.vars.length || ''}
         </Button>
       </div>
@@ -116,7 +116,7 @@ export function ExampleNote({ projectId, example, onDone, onError }: { projectId
         )}
       </span>
       <Tip label={`Adds each name with a placeholder that says what goes there (sk_live_…, a URL’s host), never the value. In the main folder: commit it.`}>
-        <Button size="regular" variant="quiet" disabled={busy} onClick={go}>
+        <Button size="small" variant="quiet" disabled={busy} onClick={go}>
           {example.file ? `Add to ${file}` : 'Create .env.example'}
         </Button>
       </Tip>

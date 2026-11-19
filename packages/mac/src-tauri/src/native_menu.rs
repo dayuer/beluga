@@ -290,23 +290,3 @@ pub async fn native_menu(window: tauri::Window, items: Vec<NativeItem>, x: Optio
         Err("native menus are the Mac's".into())
     }
 }
-
-/// macOS's own Accessibility › Display settings the page follows (lib/prefs.ts): a solid window
-/// with no blur when Reduce transparency is on, firmer lines when Increase contrast is.
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DisplayOptions {
-    reduce_transparency: bool,
-    increase_contrast: bool,
-}
-
-#[tauri::command]
-pub fn display_options() -> DisplayOptions {
-    #[cfg(target_os = "macos")]
-    {
-        let ws = objc2_app_kit::NSWorkspace::sharedWorkspace();
-        DisplayOptions { reduce_transparency: ws.accessibilityDisplayShouldReduceTransparency(), increase_contrast: ws.accessibilityDisplayShouldIncreaseContrast() }
-    }
-    #[cfg(not(target_os = "macos"))]
-    DisplayOptions { reduce_transparency: false, increase_contrast: false }
-}

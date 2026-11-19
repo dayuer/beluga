@@ -23,7 +23,6 @@ import { PartBoundary } from './lib/part-boundary.js';
 import s from './layout/Shell.module.css';
 import './styles/tokens.css';
 import './styles/base.css';
-import './fork/calm/index.js';
 
 apply();
 if (inApp()) document.documentElement.dataset.app = 'tauri';

@@ -142,7 +142,7 @@
   transition: background var(--dur-fast);
 }
 .button:active:not(:disabled) {
-  background: linear-gradient(var(--control-press), var(--control-press));
+  background: var(--control-press);
 }
 .button:disabled {
   opacity: var(--control-disabled);
@@ -158,7 +158,7 @@
   box-shadow: 0 0 0 0.5px var(--control-accent-edge), var(--control-drop), var(--control-accent-sheen);
 }
 .default:active:not(:disabled) {
-  background: linear-gradient(color-mix(in srgb, var(--control-accent) 86%, var(--text)), color-mix(in srgb, var(--control-accent) 86%, var(--text)));
+  background: color-mix(in srgb, var(--control-accent) 86%, var(--text));
 }
 /* While the window isn't key the default button is drawn as any other, as AppKit's is. */
 :global(:root[data-window='idle']) .default:not(.destructive) {
@@ -171,7 +171,7 @@
   box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--error) 70%, var(--text)), var(--control-drop), var(--control-accent-sheen);
 }
 .destructive:active:not(:disabled) {
-  background: linear-gradient(color-mix(in srgb, var(--error) 86%, var(--text)), color-mix(in srgb, var(--error) 86%, var(--text)));
+  background: color-mix(in srgb, var(--error) 86%, var(--text));
 }
 .destructiveText {
   color: var(--error);
@@ -239,4 +239,21 @@
 .message code {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* Liquid Glass: the buttons are capsules, so their 0.5px ring is a real border (see ui.module.css). */
+:global(:root[data-os='mac'][data-transparency='full']) .button {
+  border: 0.5px solid var(--control-edge);
+}
+:global(:root[data-os='mac'][data-transparency='full']) .default {
+  border-color: var(--control-accent-edge);
+  box-shadow: var(--control-drop), var(--control-accent-sheen);
+}
+:global(:root[data-os='mac'][data-transparency='full'][data-window='idle']) .default:not(.destructive) {
+  border-color: var(--control-edge);
+  box-shadow: var(--control-bezel);
+}
+:global(:root[data-os='mac'][data-transparency='full']) .destructive {
+  border-color: color-mix(in srgb, var(--error) 70%, var(--text));
+  box-shadow: var(--control-drop), var(--control-accent-sheen);
 }

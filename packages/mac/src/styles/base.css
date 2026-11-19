@@ -29,17 +29,6 @@ body {
   overflow: hidden;
 }
 
-/*
- * What a press on a control shows. In the app it's the arrow, as on every desktop's own buttons,
- * rows and tabs; the hand is for links (they keep `cursor: pointer`). A browser keeps the web's hand.
- */
-:root {
-  --press-cursor: pointer;
-}
-:root[data-app='tauri'] {
-  --press-cursor: default;
-}
-
 button,
 input,
 textarea,
@@ -140,17 +129,6 @@ html[data-power='save'] *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   animation-iteration-count: 1 !important;
-}
-
-/*
- * Reduce transparency, the app's (Settings › Appearance) or macOS's own (Accessibility › Display,
- * lib/prefs.ts): no blur inside the window either. What blurs is nearly opaque already.
- */
-html[data-glass='off'] *,
-html[data-glass='off'] *::before,
-html[data-glass='off'] *::after {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 /* Find in this conversation (⌘F): every match, and the one you're on. */

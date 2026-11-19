@@ -1,10 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { nativeSheets, parts, useNativeSheet } from '../lib/native-sheet.js';
-import { useRunsOn } from '../chat/RunsOn.js';
-import { myRuntime } from '../chat/ModelPicker.js';
-import { HERE, type RunsOn, runsOnRows } from '../machines/runs-on-model.js';
-import { MachineMark } from '../machines/MachineMark.js';
-import { thisComputer, upFirst } from '../lib/os-words.js';
 import type { Recipe, SentinelDraft } from '@beluga/core/sentinel/model.js';
 import { Field, FormSheet, Popup, TextArea, TextInput } from '../components/FormSheet.js';
 import { Segmented } from '../components/ui.js';
@@ -95,97 +89,6 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
   };
 
   const projectName = project === MAC_SCOPE ? ASSISTANT_TITLE : projects.find((p) => p.id === project)?.name;
-  const submit = (): Promise<string | void> | undefined => (way === 'build' ? make({ name: name.trim(), trigger: { kind: 'manual' }, steps: [] }) : way === 'describe' ? describe() : undefined);
-
-  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts): the recipes in a pop-up, Use This Recipe makes it.
-  const runs = useRunsOn(project === MAC_SCOPE ? undefined : project);
-  const runtime = useApp((st) => myRuntime(st.prefs));
-  const [recipe, setRecipe] = useState<string>();
-  const chosenRecipe = recipes?.find((r) => r.id === (recipe ?? recipes[0]?.id));
-  const [problem, setProblem] = useState<string>();
-  const native = useNativeSheet(
-    nativeSheets(),
-    {
-      title: 'New Sentinel',
-      intro: 'A sentinel runs on a schedule or when you press Run, does its steps in order, and leaves a report. It starts paused: you look it over, then Turn It On.',
-      width: 640,
-      rows: [
-        { kind: 'segmented', id: 'way', label: 'How to make it', value: way, options: WAYS.map((w) => ({ value: w.value, label: w.label, icon: w.icon })), hint: WAYS.find((w) => w.value === way)?.hint ?? '' },
-        {
-          kind: 'popup',
-          id: 'where',
-          label: 'Where',
-          value: project,
-          options: [{ value: MAC_SCOPE, label: ASSISTANT_TITLE, hint: `Not tied to a project: things about ${THIS_COMPUTER} itself` }, ...projects.map((p) => ({ value: p.id, label: p.name }))],
-        },
-        ...(runs.machines.length
-          ? [
-              {
-                kind: 'popup' as const,
-                id: 'runs',
-                label: 'Runs on',
-                value: runs.value,
-                options: runsOnRows(runs.machines, runtime, upFirst(thisComputer())).map((row) => ({
-                  value: row.value,
-                  label: row.label,
-                  hint: row.line,
-                  ...(row.machine ? { mark: <MachineMark machine={row.machine} size={13} /> } : { icon: row.value === HERE ? ('laptop' as const) : ('gauge' as const) }),
-                  ...(row.disabled ? { disabled: true } : {}),
-                })),
-              },
-            ]
-          : []),
-        ...(way === 'describe'
-          ? [
-              { kind: 'textarea' as const, id: 'words', value: words, lines: 4, focus: true, maxLength: 8000, placeholder: 'Every weekday morning, read yesterday’s commits and open issues, write me a brief, and create tasks for anything that looks urgent' },
-              { kind: 'note' as const, text: `Your agent sets it up in ${projectName ?? ASSISTANT_TITLE}, looking at the project first when that helps. It starts paused: look it over, then Turn On.` },
-            ]
-          : way === 'recipe'
-            ? !recipes
-              ? [{ kind: 'note' as const, text: 'Reading the recipes…' }]
-              : [
-                  {
-                    kind: 'popup' as const,
-                    id: 'recipe',
-                    label: 'Recipe',
-                    value: chosenRecipe?.id ?? '',
-                    options: recipes.map((r) => ({ value: r.id, label: r.name, icon: iconOf(r.icon), hint: parts(recipeWhen(r), r.line), section: r.group === 'numbers' ? 'Keep the numbers' : 'Recipes' })),
-                    hint: chosenRecipe?.group === 'numbers' ? 'Numbers: they show on the sentinel’s page and your Dashboard' : '',
-                  },
-                ]
-            : [{ kind: 'text' as const, id: 'name', label: 'Name', value: name, placeholder: 'Morning brief', focus: true, maxLength: 80, hint: `In ${projectName ?? ASSISTANT_TITLE}; it runs when you press Run until you give it a schedule.` }]),
-      ],
-      submit: way === 'build' ? 'Make Sentinel' : way === 'describe' ? 'Write It' : 'Use This Recipe',
-      canSubmit: (way === 'build' && Boolean(name.trim())) || (way === 'describe' && Boolean(words.trim())) || (way === 'recipe' && Boolean(chosenRecipe)),
-      busy: Boolean(busy),
-      ...(problem ? { error: problem } : {}),
-    },
-    {
-      change: (id, value) => {
-        if (id === 'way') setWay(value as Way);
-        else if (id === 'where') setProject(value);
-        else if (id === 'runs') runs.set(value as RunsOn);
-        else if (id === 'words') setWords(value.slice(0, 8000));
-        else if (id === 'name') setName(value.slice(0, 80));
-        else if (id === 'recipe') setRecipe(value);
-      },
-      submit: () => {
-        setProblem(undefined);
-        if (way === 'recipe') return void (chosenRecipe && pick(chosenRecipe));
-        // Busy until it's made: Return pressed twice doesn't make two (as the web sheet's Create holds).
-        if (busy) return;
-        const going = submit();
-        if (!going) return;
-        setBusy('make');
-        void going
-          .then((said) => said && setProblem(said))
-          .catch((err: unknown) => setProblem(err instanceof Error ? err.message : String(err)))
-          .finally(() => setBusy(undefined));
-      },
-      cancel: close,
-    },
-  );
-  if (native) return null;
   return (
     <FormSheet
       title="New Sentinel"
@@ -195,7 +98,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
       canSubmit={(way === 'build' && Boolean(name.trim())) || (way === 'describe' && Boolean(words.trim()))}
       width={640}
       onCancel={close}
-      onSubmit={submit}
+      onSubmit={() => (way === 'build' ? make({ name: name.trim(), trigger: { kind: 'manual' }, steps: [] }) : way === 'describe' ? describe() : undefined)}
     >
       <div className={s.sheetBody}>
         <div className={s.ways}>

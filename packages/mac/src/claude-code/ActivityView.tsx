@@ -130,7 +130,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
   return (
     <div className={s.sessionPage}>
       <header className={s.focusHead}>
-        <Button variant="quiet" icon="back" onClick={() => openActivity(client)}>
+        <Button size="small" variant="quiet" icon="back" onClick={() => openActivity(client)}>
           Activity
         </Button>
         <div className={s.focusTitles}>
@@ -142,7 +142,7 @@ export function SessionPage({ session, agentId }: { session: CcSession; agentId?
           </div>
         </div>
         {chat ? (
-          <Button icon="chat" onClick={() => actions.run({ type: 'open_ws', id: chat })}>
+          <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: chat })}>
             Open Chat
           </Button>
         ) : (

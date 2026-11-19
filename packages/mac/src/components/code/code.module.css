@@ -27,7 +27,7 @@
   opacity: 0.7;
 }
 .numButton {
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .numButton:hover {
   color: var(--text);

@@ -208,19 +208,13 @@ test('A component file in Files has a Preview beside its Source', async ({ page 
 /** How far a button's words stand out from its fill (WCAG's contrast ratio; colours as computed, sRGB). */
 function contrast(el: Element): number {
   const lum = (css: string): number => {
-    // `color(srgb 0.2 0.5 1)` (what a gradient's stops compute to) is 0–1; `rgb(…)` is 0–255.
-    const unit = css.startsWith('color(') ? 1 : 255;
     const [r, g, b] = (css.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
-      const c = Number(v) / unit;
+      const c = Number(v) / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     });
     return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
   };
-  // A native-controls button is a gradient on a transparent background colour: its fill is the gradient's last stop.
-  const style = getComputedStyle(el);
-  const stop = style.backgroundImage.match(/(?:rgba?|color)\([^)]*\)/g)?.at(-1);
-  const fill = style.backgroundColor === 'rgba(0, 0, 0, 0)' && stop ? stop : style.backgroundColor;
-  const [a, b] = [lum(style.color), lum(fill)];
+  const [a, b] = [lum(getComputedStyle(el).color), lum(getComputedStyle(el).backgroundColor)];
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 

@@ -202,7 +202,7 @@
   cursor: grabbing;
 }
 .canvas :global(.react-flow__node) {
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .canvas :global(.react-flow__attribution) {
   padding: 1px 6px;
@@ -1049,7 +1049,7 @@
   border: 0;
   border-radius: 2px;
   background: color-mix(in srgb, var(--text) 11%, transparent);
-  cursor: var(--press-cursor);
+  cursor: pointer;
   transition: background var(--dur) var(--ease-out);
 }
 .walkDot:hover {
@@ -1111,7 +1111,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 1px 2px color-mix(in srgb, var(--accent) 40%, transparent);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .walkNext:hover,
 .walkDone:hover {
@@ -1198,7 +1198,7 @@
   color: #fff;
   background: var(--accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .inspectorOpen:hover {
   filter: brightness(1.08);
@@ -1306,7 +1306,7 @@
   font: inherit;
   text-align: left;
   color: inherit;
-  cursor: var(--press-cursor);
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out);
 }
 .connection:hover {

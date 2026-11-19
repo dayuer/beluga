@@ -98,14 +98,14 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
             ))}
           </ul>
           {blocked.length ? null : (
-            <Button onClick={install} disabled={installing}>
+            <Button size="small" onClick={install} disabled={installing}>
               {installing ? 'Installing…' : 'Install Them'}
             </Button>
           )}
         </div>
       ) : null}
       {run.state === 'failed' && onRetry ? (
-        <Button onClick={onRetry}>
+        <Button size="small" onClick={onRetry}>
           Try Again
         </Button>
       ) : null}

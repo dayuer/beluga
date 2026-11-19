@@ -1,5 +1,3 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { keyEquivalentOf, nativeItems } from '../packages/mac/src/lib/native-menu-model.js';
 
@@ -55,28 +53,5 @@ describe('native menus (Mac)', () => {
     ]);
     for (const pick of picks) pick();
     expect(ran).toEqual(['rename', 'private', 'work', 'blue', 'delete']);
-  });
-});
-
-describe('the press cursor', () => {
-  const root = path.join(import.meta.dirname, '../packages/mac/src');
-  const css = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? css(path.join(dir, e.name)) : e.name.endsWith('.css') ? [path.join(dir, e.name)] : []));
-
-  it('is the arrow on the app’s controls; only links show the hand', () => {
-    // A link reads as one by its name, or is one of these (a mention, a task's chip, a file path).
-    const linkish = /link|Link|href/;
-    const links = new Set(['chat/mention.module.css .pill', 'tasks/task-ref.module.css .chip', 'components/code/code.module.css .refPath']);
-    const hands: string[] = [];
-    for (const file of css(root)) {
-      const text = readFileSync(file, 'utf8');
-      for (const rule of text.matchAll(/([^{}]+)\{[^{}]*(?<![-\w])cursor:\s*pointer/g)) {
-        const selector = rule[1]!.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-        const where = `${path.relative(root, file).split(path.sep).join('/')} ${selector}`;
-        if (!linkish.test(selector) && !links.has(where)) hands.push(where);
-      }
-    }
-    expect(hands).toEqual([]);
-    const base = readFileSync(path.join(root, 'styles/base.css'), 'utf8');
-    expect(base).toMatch(/:root\[data-app='tauri'\]\s*\{\s*--press-cursor:\s*default;/);
   });
 });

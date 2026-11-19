@@ -42,8 +42,6 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
-import { useSidebarHold } from '../fork/calm/hold-order.js';
-import { NewTaskButton, SidebarEdge, useOneSelected, useSidebarKeys } from '../fork/sidebar/index.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -98,9 +96,6 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 export function Sidebar() {
   const actions = useActions();
   const drop = useFolderDrop();
-  useSidebarHold(drop.ref);
-  useOneSelected(drop.ref);
-  useSidebarKeys(drop.ref);
   // A chat's row picked up: what's carried, and the chat that would take it.
   const chatDrag = useChatDrag();
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
@@ -137,11 +132,8 @@ export function Sidebar() {
             <AppMenu />
           </span>
         )}
-        <span className={s.titleTools}>
-          <UsageButton />
-          <IconButton size="large" icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
-          <NewTaskButton />
-        </span>
+        <UsageButton />
+        <IconButton size="large" icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
       </div>
       <SidebarSearch>
       <div className={s.scroll}>
@@ -170,7 +162,6 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
-        <SidebarEdge />
 
         {categories ? (
           <CategorySections />

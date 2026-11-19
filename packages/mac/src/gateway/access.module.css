@@ -293,7 +293,7 @@
   overflow: hidden;
   background: var(--bg-sunken);
   box-shadow: 0 0 0 0.5px var(--hairline-strong);
-  cursor: var(--press-cursor);
+  cursor: pointer;
   width: 220px;
   aspect-ratio: 16 / 10;
 }

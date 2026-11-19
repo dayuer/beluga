@@ -1632,7 +1632,7 @@
   background: none;
   color: var(--text);
   text-align: left;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .bannerOpen:hover {
   background: var(--bg-hover);
@@ -1666,7 +1666,7 @@
   border-radius: 6px;
   background: none;
   color: var(--text-3);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .bannerClose:hover {
   background: var(--bg-hover);
@@ -1841,7 +1841,7 @@
   background: none;
   padding: 0;
   color: var(--text-2);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 
 .editHint .editSave {

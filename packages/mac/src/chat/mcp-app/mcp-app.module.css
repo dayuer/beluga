@@ -53,7 +53,7 @@
   border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
   background: var(--surface, transparent);
   color: inherit;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 
 /* The chat's rows are moved with transforms (virtual list), and a transform traps position: fixed

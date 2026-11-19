@@ -19,10 +19,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('the Friends card turns the network on, and friends show with their status', async ({ page }) => {
-  // The friends card is hidden while calm mode is on (M8, BLG-250); this test is about the card, so it runs with calm off.
-  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
-  await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Sidebar' })).toBeVisible();
   // The run's demo starts with the network on (its friends are on it): off first, from Settings.
   await page.keyboard.press('ControlOrMeta+,');
   await page.getByRole('button', { name: 'People & access' }).click();
@@ -247,10 +243,6 @@ test('a friend’s right-click menu: Message, Add to Channel, Copy Name, Remove�
 });
 
 test('Settings › People & access turns it off again: the Friends card comes back', async ({ page }) => {
-  // The card is hidden while calm mode is on (M8, BLG-250); this test is about it coming back, so it runs with calm off.
-  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
-  await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Sidebar' })).toBeVisible();
   await page.keyboard.press('Meta+,');
   await page.getByRole('button', { name: 'People & access' }).click();
   const on = page.getByRole('switch', { name: 'Talk with friends directly' });
