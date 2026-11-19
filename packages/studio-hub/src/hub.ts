@@ -48,43 +48,92 @@ export interface WaitingCard {
 
 interface PlanFrameView {
   readonly planRef: string;
+  readonly draftRev?: number;
   readonly title: string;
+  readonly stage?: string;
+  readonly typing?: boolean;
   readonly decisions: ReadonlyArray<{ readonly decisionId: string; readonly question: string; readonly open: boolean }>;
   readonly milestones: ReadonlyArray<{ readonly ref: string; readonly title: string; readonly status: string }>;
+  readonly draftDiff?: { readonly draftRev: number };
   readonly gate?: { readonly kind: string; readonly state: string; readonly draftRev: number };
+}
+
+const CUSTOMER_GATE_KINDS = new Set(['start', 'changes', 'release', 'deliver']);
+
+function gateTitleAndBody(kind: string): { title: string; body: string } {
+  switch (kind) {
+    case 'start':
+      return { title: '方案待启动确认', body: '方案已就绪，请签名确认启动' };
+    case 'changes':
+      return { title: '方案变更待确认', body: '有新的方案变更等待签名确认' };
+    case 'release':
+      return { title: '发布待确认', body: '交付物已就绪，请签名确认发布' };
+    case 'deliver':
+      return { title: '交付待确认', body: '代码交付等待你的签名确认' };
+    default:
+      return { title: '需要你确认', body: '有一个待确认事项' };
+  }
+}
+
+function cardPath(planRef: string, cardId: string): string {
+  return `/request/${encodeURIComponent(planRef)}?card=${encodeURIComponent(cardId)}`;
 }
 
 /** 从计划视图中提取所有正在等待客户处理的卡片。 */
 export function extractWaitingCards(projectId: string, view: PlanFrameView): WaitingCard[] {
-  const path = `/project/${projectId}/plan/${view.planRef}`;
   const cards: WaitingCard[] = [];
 
   for (const d of view.decisions) {
     if (!d.open) continue;
+    const cardId = `${projectId}:${view.planRef}:decision:${d.decisionId}`;
     cards.push({
-      cardId: `${view.planRef}:decision:${d.decisionId}`,
+      cardId,
       title: view.title || '需要你做决定',
       body: d.question,
-      path,
+      path: cardPath(view.planRef, cardId),
     });
   }
 
   for (const m of view.milestones) {
     if (m.status !== 'review') continue;
+    const cardId = `${projectId}:${view.planRef}:review:${m.ref}`;
     cards.push({
-      cardId: `${view.planRef}:review:${m.ref}`,
+      cardId,
       title: view.title || '里程碑待验收',
       body: `请验收：${m.title}`,
-      path,
+      path: cardPath(view.planRef, cardId),
     });
   }
 
-  if (view.gate?.state === 'pending' && view.gate.kind === 'changes') {
+  const gatePending = view.gate?.state === 'pending';
+  if (gatePending && view.gate && CUSTOMER_GATE_KINDS.has(view.gate.kind)) {
+    const cardId = `${projectId}:${view.planRef}:gate:${view.gate.kind}:${view.gate.draftRev}`;
+    const copy = gateTitleAndBody(view.gate.kind);
     cards.push({
-      cardId: `${view.planRef}:gate:changes:${view.gate.draftRev}`,
-      title: view.title || '方案变更待确认',
-      body: '有新的方案变更等待确认',
-      path,
+      cardId,
+      title: view.title || copy.title,
+      body: copy.body,
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  if (view.draftDiff && !(gatePending && view.gate?.kind === 'changes')) {
+    const cardId = `${projectId}:${view.planRef}:draftDiff:${view.draftDiff.draftRev}`;
+    cards.push({
+      cardId,
+      title: view.title || '方案有调整',
+      body: '请查看并应用或放弃方案变更',
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  if (view.stage === 'drafting' && view.milestones.length > 0 && !view.typing && !gatePending) {
+    const cardId = `${projectId}:${view.planRef}:confirm:${view.draftRev ?? 0}`;
+    cards.push({
+      cardId,
+      title: view.title || '请确认方案理解',
+      body: '规划草案已生成，请确认是否开始执行',
+      path: cardPath(view.planRef, cardId),
     });
   }
 
