@@ -19,3 +19,10 @@ class_name = "StudioHub"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["StudioHub"]
+
+# Universal Links / App Links 校验文件变量（部署时填入真实值；留空时返回 404）。
+[vars]
+APPLE_TEAM_ID = ""
+APPLE_BUNDLE_ID = ""
+ANDROID_PACKAGE_NAME = ""
+ANDROID_SHA256_FINGERPRINTS = ""

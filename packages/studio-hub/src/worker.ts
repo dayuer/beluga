@@ -28,6 +28,7 @@ import { StudioHub, type Env } from './hub.js';
 import { handlePushTokenRequest } from './push-tokens.js';
 import { jsonOf, responseOf } from './reply.js';
 import { handleUploadRequest, type UploadEnv } from './upload.js';
+import { handleWellKnownRequest, type WellKnownEnv } from './well-known.js';
 
 export { StudioHub };
 
@@ -119,6 +120,9 @@ function sessionToken(req: Request): string | undefined {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const wellKnownReply = handleWellKnownRequest(req, env as WellKnownEnv);
+    if (wellKnownReply) return wellKnownReply;
+
     const url = new URL(req.url);
     const hub = new D1HubStore(env.DB);
     const now = Date.now();
