@@ -210,6 +210,8 @@ The Antigravity CLI (`agy acp`) asks before its commands, its writes and its MCP
 - Friends' tasks and guests don't run on Antigravity. A friend's task goes to Claude (or Codex) instead, and their card says why. Guests are turned away, with the reason on the Invite People sheet.
 - A project's main folder stays read only, and a plan while it's being made edits nothing (Antigravity's own Plan mode, and Beluga turns its writes down too).
 - Beluga's own tools (the room, the board) reach Antigravity over HTTP on 127.0.0.1, each run with its own token, and check each call where they run.
+- A tool counts as Beluga's only when it is one Beluga mounted for that run. An MCP server of your own whose name starts like one of Beluga's (`beluga_helper`) is asked about like any other.
+- A file it moves is checked twice: the file it takes and where it lands. A move that doesn't say where it lands is turned down.
 - Beluga always answers "Allow" or "Deny" once, never "always", so nothing it allows is kept in Antigravity.
 - It signs in with what the Antigravity CLI already has (your Google account, in the system keychain). Beluga never sees or stores that sign-in.
 - Its own notes for a conversation (`~/.gemini/antigravity-cli/brain/<conversation>`) are written without asking you. Nothing else outside the run's folders is.

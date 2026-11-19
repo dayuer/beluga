@@ -20,7 +20,8 @@ const LEVELS = ['low', 'medium', 'high'];
  * is answered `echo: P` after running `echo P` (asked first; declined, it ends the turn without a word, as
  * agy does, and answers `denied: P` once Beluga says why); `wait…` works
  * until cancelled; `read <file>` reads it (not asked); `edit <file>` writes it (asked); `room`
- * calls one of Beluga's tools (mcp_beluga_list_peers); `/compact` summarises; `quota` answers as a
+ * calls one of Beluga's tools (mcp_beluga_list_peers); `own <tool>` calls a tool of a server of
+ * your own by that name and `move <a> <b>` moves a file (both asked); `/compact` summarises; `quota` answers as a
  * plan that has run out does.
  */
 export class ScriptedAgy {
@@ -185,6 +186,18 @@ export class ScriptedAgy {
         if (!ok) failed(sid, c);
         else update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'kay' } }] });
         say(sid, ok ? 'room: kay' : `denied: ${words}`);
+        return done(sid, 6);
+      }
+      const own = /^own (\S+)/.exec(words);
+      const move = /^move (\S+) (\S+)/.exec(words);
+      if (own || move) {
+        // A tool of a server of your own (asked by its MCP name, no arguments said), or a file moved (asked, with where it lands).
+        const c = own ? call(`call_${randomUUID().slice(0, 12)}`, own[1]!, 'other', `Run ${own[1]}`, { toolSummary: own[1] }) : call(`call_${randomUUID().slice(0, 12)}`, 'move', 'move', `Move ${move![1]}`, { Path: move![1], Destination: move![2] }, [{ path: move![1] }]);
+        update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
+        const ok = await allowed(sid, c);
+        if (!ok) failed(sid, c);
+        else update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'ok' } }] });
+        say(sid, ok ? `done: ${words}` : `denied: ${words}`);
         return done(sid, 6);
       }
       update(sid, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Running it.' } });

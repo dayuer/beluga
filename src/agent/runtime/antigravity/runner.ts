@@ -8,6 +8,7 @@ import { sideCalls } from '../../side-calls.js';
 import { syncProbes } from '../../sync-main.js';
 import { gateTool } from '../../tool-gate.js';
 import { ToolHost } from '../../tool-host.js';
+import { toolName } from '../../tool-kit.js';
 import type { AgentBackend, AgentRunInput, FollowUp, LiveStatus, RoomBridge, Steer } from '../../types.js';
 import { ViewShelf } from '../../view-tools.js';
 import { INTERRUPT_TIMEOUT_MS } from '../types.js';
@@ -21,7 +22,7 @@ import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from 
 import { agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir } from './sessions.js';
 import { agyStatus } from './status.js';
-import { AGY_DIALECT, agyCalls, belugaToolOf } from './tools.js';
+import { agyCalls, agyDialect, belugaToolOf } from './tools.js';
 
 export interface AgyBackendOptions {
   readonly cwd: string;
@@ -92,8 +93,11 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
       const shelf = new ViewShelf();
 
       // Beluga's tools, served for this run alone and gated per call (vetTool, policy, you).
-      const mounted = await host().mount(runToolSuites(input, bridge, shelf, cwd), (name, args) => gateTool(name, args, input, policy));
+      const served = runToolSuites(input, bridge, shelf, cwd);
+      const mounted = await host().mount(served, (name, args) => gateTool(name, args, input, policy));
       const suites = Object.keys(mounted.http);
+      /** Beluga's tools this run has, by name: only these are Beluga's (judged where they run), whatever a server of yours is called. */
+      const ours = new Set(Object.values(served).flatMap((suite) => suite.tools.map((t) => toolName(suite.name, t.name))));
       const env = { ...process.env, ...input.env };
       const instructions = systemMeta(runInstructions(input, opts.bridge.selfName(), AGY_AGENT));
 
@@ -115,7 +119,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           if (ev && ev !== lastContext && !compacting) input.onEvent('context', (lastContext = ev));
         },
         quiet: () => compacting,
-        dialect: AGY_DIALECT,
+        dialect: agyDialect(ours),
       });
       let conn: AgyConnection | undefined;
       let failed = true;
@@ -163,9 +167,9 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const call = await events.callOf(req.toolCall);
           if (!call) return 'Antigravity didn’t say which tool this is.';
           // Beluga's own tools are judged where they run (the tool host's gate), not twice.
-          if (belugaToolOf(call.tool, suites)) return undefined;
-          const calls = agyCalls(call.tool, call.raw, cwd, suites);
-          if (calls.every((c) => WRITES.has(c.name) && ownNote(c.input.file_path))) return undefined;
+          if (belugaToolOf(call.tool, suites, ours)) return undefined;
+          // Its own notes aren't judged; anything else a step touches is (a note moved out of its folder, where it lands).
+          const calls = agyCalls(call.tool, call.raw, cwd, suites, ours).filter((c) => !(WRITES.has(c.name) && ownNote(c.input.file_path)));
           if ((planning || readOnly) && calls.some((c) => WRITES.has(c.name))) return planning ? 'Planning only looks: nothing changes until you approve the plan.' : 'This conversation only looks: nothing may change here.';
           for (const c of calls) {
             if (PATHED.has(c.name) && !c.input.file_path) return 'Antigravity didn’t say which file, so Beluga turned it down.';
@@ -285,8 +289,11 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         const steer = Object.assign((_f: FollowUp) => false, { status, interrupt }) satisfies Steer;
         input.onSteer?.(steer);
 
+        /** The last turn was stopped for a message (Steer Now): what it left is no plan to approve. */
+        let cut = false;
         /** A turn's end as its answer: an interrupted one ends with the note it was stopped with. */
         const answerOf = (r: { text: string; res: PromptResponse }, sink: TurnSink): string => {
+          cut = r.res.stopReason === 'cancelled' && interrupting !== undefined;
           if (r.res.stopReason === 'cancelled') {
             if (interrupting === undefined) throw new Error('aborted');
             const note = interrupting;
@@ -326,26 +333,36 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
 
         const original: TurnSink = { onEvent: input.onEvent, ...(input.onStep ? { onStep: input.onStep } : {}) };
         const answers: string[] = [];
-        let answer = await turnFor(original, input.prompt, (p) => (planning ? `${buildPrompt({ ...input, prompt: p })}\n\n${PLAN_NOTE}` : buildPrompt({ ...input, prompt: p })));
-        // Plan mode, Antigravity's own: the plan comes to you, and once you approve it the session goes
-        // back to its default mode and does the work.
+        /** While it plans, a message is asked for a plan (Plan mode, Antigravity's own). */
+        const built = (from: Parameters<typeof buildPrompt>[0]) => (p: string): string => (planning ? `${buildPrompt({ ...from, prompt: p })}\n\n${PLAN_NOTE}` : buildPrompt({ ...from, prompt: p }));
         let askedToDefine = false;
-        for (let round = 0; planning && input.askUser && round < PLAN_ROUNDS; round++) {
-          if (input.planTask?.needsDefinition() && !askedToDefine) {
-            askedToDefine = true;
-            answer = answerOf(await runTurn(original, [{ type: 'text', text: DEFINE_NOTE }]), original);
+        /**
+         * A planning turn's answer is its plan: it comes to you, and once you approve it the session
+         * goes back to its default mode and does the work. A turn stopped for a message left no plan:
+         * that message's own turn brings the next one.
+         */
+        const approved = async (plan: string, sink: TurnSink): Promise<string> => {
+          let answer = plan;
+          for (let round = 0; planning && input.askUser && !cut && round < PLAN_ROUNDS; round++) {
+            if (input.planTask?.needsDefinition() && !askedToDefine) {
+              askedToDefine = true;
+              answer = answerOf(await runTurn(sink, [{ type: 'text', text: DEFINE_NOTE }]), sink);
+              if (cut) break;
+            }
+            const verdict = await input.askUser({ kind: 'plan', plan: (answer || '(Antigravity proposed a plan)').slice(0, 60_000) });
+            if (verdict.kind !== 'plan') break;
+            if (verdict.approve) {
+              input.planTask?.approved();
+              planning = false;
+              await choose('mode', modeValue(options, 'default'));
+            }
+            const next = verdict.approve ? 'The plan is approved. Do the work now.' : verdict.feedback ? `Change the plan: ${verdict.feedback}\n\n${PLAN_NOTE}` : NOT_YET_NOTE;
+            answer = answerOf(await runTurn(sink, [{ type: 'text', text: next }]), sink);
+            if (verdict.approve || next === NOT_YET_NOTE) break;
           }
-          const verdict = await input.askUser({ kind: 'plan', plan: (answer || '(Antigravity proposed a plan)').slice(0, 60_000) });
-          if (verdict.kind !== 'plan') break;
-          if (verdict.approve) {
-            input.planTask?.approved();
-            planning = false;
-            await choose('mode', modeValue(options, 'default'));
-          }
-          const next = verdict.approve ? 'The plan is approved. Do the work now.' : verdict.feedback ? `Change the plan: ${verdict.feedback}\n\n${PLAN_NOTE}` : NOT_YET_NOTE;
-          answer = answerOf(await runTurn(original, [{ type: 'text', text: next }]), original);
-          if (verdict.approve || next === NOT_YET_NOTE) break;
-        }
+          return answer;
+        };
+        const answer = await approved(await turnFor(original, input.prompt, built(input)), original);
         answers.push(answer);
         input.onAnswered?.(answer);
 
@@ -357,7 +374,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           followUp.onStart?.();
           try {
             if (followUp.model !== undefined && agyModel(followUp.model) !== wanted) await switchModel(agyModel(followUp.model), sink);
-            followUp.onDone(await turnFor(sink, followUp.prompt, (p) => buildPrompt({ ...followUp, prompt: p })));
+            followUp.onDone(await approved(await turnFor(sink, followUp.prompt, built(followUp)), sink));
           } catch (err) {
             if (aborted) throw err;
             followUp.onError(err instanceof Error ? err.message : String(err));

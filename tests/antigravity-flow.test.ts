@@ -13,12 +13,13 @@ import { agyBrainDir, dropAgyFolder, dropAgySession } from '../src/agent/runtime
 import { AGY_SIGN_IN, agyStatus, modelRows } from '../src/agent/runtime/antigravity/status.js';
 import { agyCalls, agyInput, agyTool, belugaToolOf } from '../src/agent/runtime/antigravity/tools.js';
 import { runtimeFor, signInCommand } from '../src/agent/runtime/registry.js';
-import type { AgentPlace, AgentRunInput } from '../src/agent/types.js';
+import type { AgentPlace, AgentRunInput, FollowUp, Steer } from '../src/agent/types.js';
 import { agentForFriend } from '../src/core/gateway/serve.js';
 import { agentMark, modelMark } from '../src/shared/agent-marks.js';
 import { RunFailedError } from '../src/shared/run-failure.js';
 import { fallbackFor, runtimeHas } from '../src/shared/runtime-fallbacks.js';
 import type { StepRecord } from '../src/shared/steps.js';
+import { waitFor } from './helpers.js';
 import { room } from './runtime-conformance.js';
 
 /**
@@ -69,6 +70,25 @@ describe('Antigravity’s tools as Beluga’s', () => {
     expect(belugaToolOf('mcp_beluga_list_peers', ['beluga', 'beluga_board'])).toBe('mcp__beluga__list_peers');
     expect(belugaToolOf('mcp_context7_resolve', ['beluga'])).toBeUndefined();
     expect(agyCalls('mcp_context7_resolve', {}, '/w', ['beluga'])[0]!.name).toBe('mcp__antigravity__mcp_context7_resolve');
+  });
+
+  it('takes a tool for Beluga’s only when it is one mounted for the run, whatever its server is called', () => {
+    const ours = new Set(['mcp__beluga__list_peers', 'mcp__beluga_board__task_get']);
+    expect(belugaToolOf('mcp_beluga_list_peers', ['beluga', 'beluga_board'], ours)).toBe('mcp__beluga__list_peers');
+    expect(belugaToolOf('mcp_beluga_board_task_get', ['beluga', 'beluga_board'], ours)).toBe('mcp__beluga_board__task_get');
+    // A server of your own named `beluga_helper`, or `beluga_board_x`: its tools only start like Beluga's.
+    expect(belugaToolOf('mcp_beluga_helper_wipe', ['beluga', 'beluga_board'], ours)).toBeUndefined();
+    expect(belugaToolOf('mcp_beluga_board_x_wipe', ['beluga', 'beluga_board'], ours)).toBeUndefined();
+    expect(agyCalls('mcp_beluga_helper_wipe', {}, '/w', ['beluga'], ours)[0]!.name).toBe('mcp__antigravity__mcp_beluga_helper_wipe');
+  });
+
+  it('judges a move on both files: the one it takes and where it lands', () => {
+    expect(agyCalls('move', { Path: 'a.ts', Destination: '../out/b.ts' }, '/w')).toEqual([
+      { name: 'Edit', input: { file_path: inW('a.ts') } },
+      { name: 'Write', input: { file_path: path.resolve('/w', '../out/b.ts') } },
+    ]);
+    // No landing place said: judged with none, so it's turned down.
+    expect(agyCalls('rename_file', { Path: 'a.ts' }, '/w')[1]).toEqual({ name: 'Write', input: { file_path: '' } });
   });
 });
 
@@ -189,6 +209,51 @@ describe('a run on Antigravity', () => {
     expect(modes).toEqual(['plan', 'default']);
     // While planning, its write was turned down.
     expect(agy.answers[0]).toEqual({ outcome: { outcome: 'selected', optionId: 'deny' } });
+  });
+
+  it('asks you about a tool of your own server whose name starts like Beluga’s', async () => {
+    const agy = new ScriptedAgy();
+    const canUseTool = vi.fn(async () => false);
+    const r = input('own mcp_beluga_helper_wipe', { place: place(), canUseTool });
+    expect(await backend(agy).run(r)).toBe('denied: own mcp_beluga_helper_wipe');
+    expect(canUseTool).toHaveBeenCalledWith('mcp__antigravity__mcp_beluga_helper_wipe', expect.anything());
+    expect(agy.answers.at(-1)).toEqual({ outcome: { outcome: 'selected', optionId: 'deny' } });
+  });
+
+  it('judges where a moved file lands, one of its own notes too', async () => {
+    const agy = new ScriptedAgy();
+    const data = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-data-'));
+    const canUseTool = vi.fn(async () => true);
+    const p = place();
+    await backend(agy, data).run(input('hello', { place: p }));
+    const note = path.join(agyBrainDir(p.sessions[0]!, data), 'plan.md');
+    const outside = path.join(mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-out-')), 'hook.sh');
+    // Out of the run's folders: turned down without asking, though it comes from its own notes.
+    const r = input(`move ${note} ${outside}`, { place: place({ resume: p.sessions[0]! }), canUseTool });
+    expect(await backend(agy, data).run(r)).toBe(`denied: move ${note} ${outside}`);
+    expect(canUseTool).not.toHaveBeenCalled();
+    // Inside its folder: the move runs.
+    const inside = path.join(cwd, 'plan.md');
+    expect(await backend(agy, data).run(input(`move ${note} ${inside}`, { place: place({ resume: p.sessions[0]! }), canUseTool }))).toBe(`done: move ${note} ${inside}`);
+  });
+
+  it('shows no plan to approve for a planning turn stopped by Steer Now: the message’s own turn brings the plan', async () => {
+    const agy = new ScriptedAgy();
+    const plans: string[] = [];
+    const askUser = vi.fn(async (q: { kind: string; plan?: string }) => (plans.push(q.plan ?? ''), { kind: 'plan' as const, approve: true, feedback: '' }));
+    let steer: Steer | undefined;
+    const r = input('wait here', { place: place(), plan: true, askUser: askUser as unknown as AgentRunInput['askUser'], onSteer: (s) => void (s && (steer = s)) });
+    const run = backend(agy).run(r);
+    await waitFor(() => steer && !steer.status!().between && agy.sent('session/prompt').length === 1);
+    const done: string[] = [];
+    const followUp: FollowUp = { prompt: 'plan this', requesterName: 'kay', viaAgent: false, context: [], onEvent: () => undefined, onDone: (a) => void done.push(a), onError: (e) => void done.push(`error: ${e}`) };
+    expect(await steer!.interrupt!(followUp, 'Stopped for your message.')).toBe(true);
+    expect(await run).toBe('Stopped for your message.');
+    // The stopped turn's note was never a plan; the message's answer was, and approving it did the work.
+    expect(plans).toEqual(['echo: plan this']);
+    expect(done).toEqual(['echo: The plan is approved. Do the work now.']);
+    const modes = agy.sent('session/set_config_option').filter((o) => o.configId === 'mode').map((o) => o.value);
+    expect(modes).toEqual(['plan', 'default']);
   });
 
   it('goes on with the same conversation (session/load), its replay kept out of the chat', async () => {
