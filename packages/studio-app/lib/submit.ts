@@ -1,71 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RefusalCode, StudioAction, StudioPlatform, StudioReceipt } from '../../../src/studio/protocol';
-import { hub } from './client';
+import { AppState } from 'react-native';
+import type { StudioAction, StudioPlatform, StudioReceipt } from '../../../src/studio/protocol';
+import { hub, live } from './client';
 import { clearDraft, clearPending, readPending, writePending } from './drafts';
-import { live } from './live';
-import { isOnline } from './net';
+import { isOnline, subscribeOnline } from './net';
 import { session } from './session';
-import type { StringKey } from './strings';
+import {
+  randomOpId,
+  refusalKey,
+  submitNext,
+  type SubmitEvent,
+  type SubmitPhase,
+  type SubmitState,
+} from './submit-machine';
 
-/**
- * The submit state machine shared by the request screen and, in M6, chat / decisions / review.
- * A pure reducer (`submitNext`) so the transitions are testable without a browser; `useNewRequest`
- * is the thin part that talks to the hub, keeps the opId across retries and watches receipts.
- */
-export type SubmitPhase = 'idle' | 'sending' | 'queued' | 'done' | 'refused' | 'failed';
-
-export interface SubmitState {
-  readonly phase: SubmitPhase;
-  readonly opId?: string;
-  readonly code?: RefusalCode;
-  readonly failure?: 'offline' | 'http' | 'expired';
-}
-
-export type SubmitEvent =
-  | { readonly type: 'start'; readonly opId: string }
-  | { readonly type: 'queued' }
-  | { readonly type: 'done' }
-  | { readonly type: 'refused'; readonly code: RefusalCode }
-  | { readonly type: 'failed'; readonly failure: 'offline' | 'http' | 'expired' }
-  | { readonly type: 'reset' };
-
-export function submitNext(state: SubmitState, event: SubmitEvent): SubmitState {
-  switch (event.type) {
-    case 'start':
-      return { phase: 'sending', opId: event.opId };
-    case 'queued':
-      return state.phase === 'sending' || state.phase === 'queued' ? { phase: 'queued', opId: state.opId } : state;
-    case 'done':
-      return state.phase === 'sending' || state.phase === 'queued' ? { phase: 'done', opId: state.opId } : state;
-    case 'refused':
-      return state.phase === 'sending' || state.phase === 'queued'
-        ? { phase: 'refused', opId: state.opId, code: event.code }
-        : state;
-    case 'failed':
-      return state.phase === 'sending' ? { phase: 'failed', opId: state.opId, failure: event.failure } : state;
-    case 'reset':
-      return { phase: 'idle' };
-  }
-}
-
-/** The customer-language sentence for a refusal code lives in strings.ts. */
-export const refusalKey = (code: RefusalCode): StringKey => `refusal.${code}` as StringKey;
+export { randomOpId, refusalKey, submitNext, type SubmitEvent, type SubmitPhase, type SubmitState };
 
 const samePlatforms = (a: readonly StudioPlatform[], b: readonly StudioPlatform[]): boolean => {
   if (a.length !== b.length) return false;
   const left = [...a].sort();
   const right = [...b].sort();
   return left.every((v, i) => v === right[i]);
-};
-
-export const randomOpId = (): string => {
-  const c = (globalThis as { crypto?: Crypto }).crypto;
-  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
-    const r = Math.floor(Math.random() * 16);
-    const v = ch === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 };
 
 export interface NewRequest {
@@ -216,31 +171,27 @@ export function useNewRequest(pid: string, onDone: () => void): NewRequest {
     return () => clearTimeout(id);
   }, [state.phase, query]);
 
-  // A failed send retries once by itself when the network or the page comes back; after that the
-  // customer taps Retry. Same opId, so the hub still only has one action.
+  // A failed send retries once by itself when the network or the app comes back to foreground;
+  // after that the customer taps Retry. Same opId, so the hub still only has one action.
   useEffect(() => {
     if (state.phase !== 'failed' || state.failure === 'expired' || retried.current) return;
-    if (
-      typeof window === 'undefined' ||
-      typeof window.addEventListener !== 'function' ||
-      typeof document === 'undefined' ||
-      typeof document.addEventListener !== 'function'
-    ) {
-      return;
-    }
     const again = () => {
       if (retried.current || !last.current || !isOnline()) return;
       retried.current = true;
       void submit(last.current.goal, last.current.platforms);
     };
-    const visible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') again();
-    };
-    window.addEventListener('online', again);
-    document.addEventListener('visibilitychange', visible);
+    const unsubOnline = subscribeOnline((online) => {
+      if (online) again();
+    });
+    const appSub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'active') again();
+          })
+        : null;
     return () => {
-      window.removeEventListener('online', again);
-      document.removeEventListener('visibilitychange', visible);
+      unsubOnline();
+      appSub?.remove();
     };
   }, [state.phase, state.failure, submit]);
 

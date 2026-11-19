@@ -13,6 +13,7 @@ import { cardFor, type ProjectCardData } from '../lib/cards';
 import { hub } from '../lib/client';
 import type { PlansRes, ProjectSummary } from '../lib/hub-schema';
 import { useOnline } from '../lib/net';
+import { useOnResume } from '../lib/resume';
 import { session } from '../lib/session';
 import { detectLang, t } from '../lib/strings';
 import { ago } from '../lib/time';
@@ -104,6 +105,11 @@ export default function ProjectsScreen() {
       void refreshTodos();
     }, [load, refreshTodos]),
   );
+
+  useOnResume(() => {
+    void load();
+    void refreshTodos();
+  });
 
   // "刷新失败" is a 3-second line, not a state the customer has to dismiss.
   useEffect(() => {

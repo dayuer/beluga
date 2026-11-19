@@ -1,6 +1,7 @@
-import { kv } from './kv';
+import { registerBoot } from './boot';
+import { secure } from './secure';
 
-/** What `POST /v1/login/verify` returned; the session plaintext lives only in this browser. */
+/** What `POST /v1/login/verify` returned; persisted in SecureStore and mirrored in memory. */
 export interface StoredSession {
   readonly session: string;
   readonly expiresAt: number;
@@ -9,28 +10,54 @@ export interface StoredSession {
 
 const KEY = 'session';
 const listeners = new Set<() => void>();
+let cached: StoredSession | undefined;
+let generation = 0;
 
 const isSession = (v: unknown): v is StoredSession => {
   if (!v || typeof v !== 'object') return false;
   const s = v as Partial<StoredSession>;
-  return typeof s.session === 'string' && s.session.length > 0 && typeof s.expiresAt === 'number' && Number.isFinite(s.expiresAt) && typeof s.customerId === 'string';
-};
-
-const read = (): StoredSession | undefined => {
-  const s = kv.get<unknown>(KEY);
-  if (!isSession(s)) {
-    if (s !== undefined) kv.remove(KEY);
-    return undefined;
-  }
-  if (s.expiresAt <= Date.now()) {
-    kv.remove(KEY);
-    return undefined;
-  }
-  return s;
+  return (
+    typeof s.session === 'string' &&
+    s.session.length > 0 &&
+    typeof s.expiresAt === 'number' &&
+    Number.isFinite(s.expiresAt) &&
+    typeof s.customerId === 'string'
+  );
 };
 
 const notify = (): void => {
   for (const l of listeners) l();
+};
+
+async function hydrate(): Promise<void> {
+  const startGen = generation;
+  const s = await secure.get<unknown>(KEY);
+  // 补水期间如果已经有过 set() 或 clear()，绝不用磁盘旧值覆盖新状态。
+  if (generation !== startGen) return;
+  if (!isSession(s)) {
+    if (s !== undefined) await secure.remove(KEY);
+    cached = undefined;
+    return;
+  }
+  if (s.expiresAt <= Date.now()) {
+    await secure.remove(KEY);
+    cached = undefined;
+    return;
+  }
+  cached = s;
+  notify();
+}
+
+registerBoot(hydrate);
+
+const read = (): StoredSession | undefined => {
+  if (!cached) return undefined;
+  if (cached.expiresAt <= Date.now()) {
+    cached = undefined;
+    void secure.remove(KEY);
+    return undefined;
+  }
+  return cached;
 };
 
 /**
@@ -55,11 +82,15 @@ export const session = {
     };
   },
   set(value: StoredSession): void {
-    kv.set(KEY, value);
+    generation += 1;
+    cached = value;
     notify();
+    void secure.set(KEY, value);
   },
   clear(): void {
-    kv.remove(KEY);
+    generation += 1;
+    cached = undefined;
     notify();
+    void secure.remove(KEY);
   },
 };

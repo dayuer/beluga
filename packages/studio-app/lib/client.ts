@@ -1,4 +1,7 @@
 import { createHub } from './hub';
+import { createLive } from './live';
+import { isOnline } from './net';
+import { onResume } from './resume';
 import { session } from './session';
 
 /**
@@ -10,4 +13,8 @@ export const hub = createHub({
   base: process.env.EXPO_PUBLIC_HUB_URL || undefined,
   session: () => session.token(),
   onSignedOut: () => session.clear(),
+  isOnline,
 });
+
+/** The app's one live link table. */
+export const live = createLive(hub, (cb) => onResume(cb));

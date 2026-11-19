@@ -1,6 +1,6 @@
-import type { StudioPlanView } from '../../../src/studio/protocol';
-import { pagePhase } from './plan-phase';
-import { t, type Lang } from './strings';
+import type { StudioPlanView } from '../../../src/studio/protocol.js';
+import { pagePhase } from './plan-phase.js';
+import { t, type Lang } from './strings/table.js';
 
 export type TodoKind = 'decision' | 'review' | 'changes' | 'confirm';
 

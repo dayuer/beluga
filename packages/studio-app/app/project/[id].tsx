@@ -10,10 +10,10 @@ import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
 import { TextButton } from '../../components/TextButton';
 import { cache } from '../../lib/cache';
-import { hub } from '../../lib/client';
+import { hub, live } from '../../lib/client';
 import type { PlansRes, ProjectSummary, StudioStatus } from '../../lib/hub-schema';
-import { live } from '../../lib/live';
 import { useOnline } from '../../lib/net';
+import { useOnResume } from '../../lib/resume';
 import { rowFromView, type PlanRowData } from '../../lib/plan-rows';
 import { session } from '../../lib/session';
 import { detectLang, t } from '../../lib/strings';
@@ -99,6 +99,10 @@ export default function ProjectHomeScreen() {
       void load();
     }, [load]),
   );
+
+  useOnResume(() => {
+    void load();
+  });
 
   // Live plans: a frame replaces the row with the same planRef, plan-gone removes it. On a
   // reconnect, refresh the list and say so for two seconds.

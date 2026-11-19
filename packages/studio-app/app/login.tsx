@@ -108,30 +108,8 @@ export default function LoginScreen() {
 
     void Linking.getInitialURL().then(handleUrl);
     const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
-
-    const canWindowListen =
-      typeof window !== 'undefined' && Boolean(window.location) && typeof window.addEventListener === 'function';
-    const handleHash = () => {
-      if (!canWindowListen) return;
-      const hash = window.location.hash;
-      if (!hash.startsWith('#token=')) return;
-      const token = decodeURIComponent(hash.slice('#token='.length));
-      if (!token) return;
-      try {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      } catch {
-        /* file:// and old browsers */
-      }
-      runVerify(token);
-    };
-    if (canWindowListen) {
-      handleHash();
-      // A second magic link opened in the same tab only changes the hash; treat it like a load.
-      window.addEventListener('hashchange', handleHash);
-    }
     return () => {
       sub.remove();
-      if (canWindowListen) window.removeEventListener('hashchange', handleHash);
     };
   }, [runVerify]);
 

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import type { RefusalCode, StudioAction, StudioReceipt } from '../../../src/studio/protocol';
-import { hub } from './client';
+import { hub, live } from './client';
 import { kv } from './kv';
-import { live } from './live';
-import { isOnline } from './net';
+import { isOnline, subscribeOnline } from './net';
 import { session } from './session';
 import { randomOpId, submitNext, type SubmitState } from './submit';
 
@@ -170,30 +170,26 @@ export function useSend(pid: string, key: string): Sender {
     return close;
   }, [pid, state.phase, state.opId, settle]);
 
-  // One automatic retry when the network or the page comes back; after that, the button says retry.
+  // One automatic retry when the network or the app comes back to foreground; after that, the button says retry.
   useEffect(() => {
     if (state.phase !== 'failed' || state.failure === 'expired' || autoRetried.current) return;
-    if (
-      typeof window === 'undefined' ||
-      typeof window.addEventListener !== 'function' ||
-      typeof document === 'undefined' ||
-      typeof document.addEventListener !== 'function'
-    ) {
-      return;
-    }
     const again = () => {
       if (autoRetried.current || !buildRef.current || !isOnline()) return;
       autoRetried.current = true;
       void run(true);
     };
-    const visible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') again();
-    };
-    window.addEventListener('online', again);
-    document.addEventListener('visibilitychange', visible);
+    const unsubOnline = subscribeOnline((online) => {
+      if (online) again();
+    });
+    const appSub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'active') again();
+          })
+        : null;
     return () => {
-      window.removeEventListener('online', again);
-      document.removeEventListener('visibilitychange', visible);
+      unsubOnline();
+      appSub?.remove();
     };
   }, [run, state.phase, state.failure]);
 
