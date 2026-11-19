@@ -7,8 +7,10 @@ vi.mock('cloudflare:workers', () => ({
 import { extractWaitingCards, notifyWaitingCards } from '../src/hub.js';
 import type { PushEnv } from '../src/push.js';
 
-function createDedupMockDb(members = [{ project_id: 'p1', customer_id: 'c1' }]) {
-  const pushTokens = [{ customer_id: 'c1', device: 'dev1', platform: 'ios', token: 'apns-tok-1', updated_at: 1 }];
+function createDedupMockDb(
+  members = [{ project_id: 'p1', customer_id: 'c1' }],
+  pushTokens = [{ customer_id: 'c1', device: 'dev1', platform: 'ios', token: 'apns-tok-1', updated_at: 1 }],
+) {
   const pushDedup = new Set<string>();
 
   const db = {
@@ -38,6 +40,11 @@ function createDedupMockDb(members = [{ project_id: 'p1', customer_id: 'c1' }]) 
             pushDedup.add(key);
             return { meta: { changes: 1 } };
           }
+          if (sql.includes('DELETE FROM push_dedup WHERE customer_id = ? AND card_id = ?')) {
+            const [cid, cardId] = args as [string, string];
+            const existed = pushDedup.delete(`${cid}::${cardId}`);
+            return { meta: { changes: existed ? 1 : 0 } };
+          }
           return { meta: { changes: 0 } };
         },
       };
@@ -45,7 +52,7 @@ function createDedupMockDb(members = [{ project_id: 'p1', customer_id: 'c1' }]) 
     },
   };
 
-  return { db: db as unknown as D1Database, pushDedup };
+  return { db: db as unknown as D1Database, pushDedup, pushTokens };
 }
 
 function toPkcs8Pem(pkcs8: ArrayBuffer): string {
@@ -157,5 +164,59 @@ describe('SS-81 / SS-125 waiting card push dedup & deep links', () => {
         cardId: 'p2:pl1:decision:d1',
       },
     ]);
+  });
+
+  it('SS-126: rolls back push_dedup when no token exists or all deliveries fail, and keeps when sent', async () => {
+    const ecPair = (await crypto.subtle.generateKey(
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign', 'verify'],
+    )) as CryptoKeyPair;
+    const apnsPem = toPkcs8Pem((await crypto.subtle.exportKey('pkcs8', ecPair.privateKey)) as ArrayBuffer);
+
+    // 1. 初始没有令牌
+    const { db, pushDedup, pushTokens } = createDedupMockDb([{ project_id: 'p1', customer_id: 'c1' }], []);
+    const env: PushEnv = {
+      DB: db,
+      APNS_KEY_ID: 'K126',
+      APNS_TEAM_ID: 'T126',
+      APNS_PRIVATE_KEY: apnsPem,
+      APNS_BUNDLE_ID: 'studio.synon.app',
+      APNS_ENDPOINT: 'https://apns.fake',
+    };
+    const view = {
+      planRef: 'pl1',
+      title: '测试',
+      decisions: [{ decisionId: 'd1', question: '确认吗？', open: true }],
+      milestones: [],
+    };
+
+    let shouldFail = true;
+    let sendCount = 0;
+    const fakeFetch: typeof fetch = async () => {
+      sendCount++;
+      if (shouldFail) return new Response('err', { status: 500 });
+      return new Response('{}', { status: 200 });
+    };
+
+    // 没有令牌时，不记成已通知
+    expect(await notifyWaitingCards(db, env, 'p1', view, { fetch: fakeFetch, now: 1000 })).toBe(0);
+    expect(pushDedup.size).toBe(0);
+
+    // 之后登记了令牌，但所有设备发送失败 -> 仍不记成已通知
+    pushTokens.push({ customer_id: 'c1', device: 'dev1', platform: 'ios', token: 'apns-1', updated_at: 2 });
+    expect(await notifyWaitingCards(db, env, 'p1', view, { fetch: fakeFetch, now: 2000 })).toBe(0);
+    expect(sendCount).toBe(1);
+    expect(pushDedup.size).toBe(0);
+
+    // 推送服务恢复 -> 这次发出 1 次，并保留 push_dedup
+    shouldFail = false;
+    expect(await notifyWaitingCards(db, env, 'p1', view, { fetch: fakeFetch, now: 3000 })).toBe(1);
+    expect(sendCount).toBe(2);
+    expect(pushDedup.size).toBe(1);
+
+    // 成功发过的卡再到达不会重发
+    expect(await notifyWaitingCards(db, env, 'p1', view, { fetch: fakeFetch, now: 4000 })).toBe(0);
+    expect(sendCount).toBe(2);
   });
 });

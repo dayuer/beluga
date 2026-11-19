@@ -168,19 +168,30 @@ export async function notifyWaitingCards(
         .run();
       if (Number(inserted.meta.changes ?? 0) === 0) continue;
 
-      const res = await sendPushToCustomer(
-        db,
-        env,
-        member.customer_id,
-        {
-          title: card.title,
-          body: card.body,
-          path: card.path,
-          data: { projectId, planRef: view.planRef, cardId: card.cardId },
-        },
-        opts,
-      );
-      if (res.sent > 0) notified++;
+      let sent = 0;
+      try {
+        const res = await sendPushToCustomer(
+          db,
+          env,
+          member.customer_id,
+          {
+            title: card.title,
+            body: card.body,
+            path: card.path,
+            data: { projectId, planRef: view.planRef, cardId: card.cardId, path: card.path },
+          },
+          opts,
+        );
+        sent = res.sent;
+      } finally {
+        if (sent === 0) {
+          await db
+            .prepare('DELETE FROM push_dedup WHERE customer_id = ? AND card_id = ?')
+            .bind(member.customer_id, card.cardId)
+            .run();
+        }
+      }
+      if (sent > 0) notified++;
     }
   }
 
