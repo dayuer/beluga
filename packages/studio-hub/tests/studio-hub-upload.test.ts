@@ -453,6 +453,82 @@ describe('SS-82 design package upload', () => {
     );
     expect(tooBig?.status).toBe(400);
   });
+
+  it('SS-120: is idempotent when putting the same chunk twice and rejects bad chunk sha256', async () => {
+    const { env, hub, now, token, objects } = await setup();
+    const content = new TextEncoder().encode('chunk-payload-123456');
+    const sha = createHash('sha256').update(content).digest('hex');
+
+    const beginRes = await handleUploadRequest(
+      new Request('https://hub.example/v1/app/uploads', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'p1',
+          name: 'chunk-check',
+          files: [{ path: 'card.png', size: content.byteLength, sha256: sha }],
+        }),
+      }),
+      env,
+      hub,
+      now,
+    );
+    const { sessionId } = (await beginRes!.json()) as { sessionId: string };
+
+    // 1. 传错的 x-part-sha256 头 -> 400 part-checksum-mismatch
+    const badChunk = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'x-part-sha256': '0'.repeat(64) },
+        body: content,
+      }),
+      env,
+      hub,
+      now + 10,
+    );
+    expect(badChunk?.status).toBe(400);
+    expect((await badChunk!.json()) as { error: string }).toEqual({ error: 'part-checksum-mismatch' });
+
+    // 2. 同一块传两次（带正确 sha256），结果幂等不变
+    const put1 = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'x-part-sha256': sha },
+        body: content,
+      }),
+      env,
+      hub,
+      now + 20,
+    );
+    expect(put1?.status).toBe(200);
+    const body1 = await put1!.json();
+
+    const put2 = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'x-part-sha256': sha },
+        body: content,
+      }),
+      env,
+      hub,
+      now + 30,
+    );
+    expect(put2?.status).toBe(200);
+    const body2 = await put2!.json();
+    expect(body2).toEqual(body1);
+
+    const completeRes = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/complete`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      env,
+      hub,
+      now + 40,
+    );
+    expect(completeRes?.status).toBe(200);
+    expect(objects.size).toBe(1);
+  });
 });
 
 describe('SS-83 resume query and 24h expiration', () => {
