@@ -25,6 +25,7 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 - **native 和 plans 怎么分**：只改 Mac 外观和原生行为的（控件长什么样、菜单和 sheet 换成原生的），放 `topic/native`，哪怕是在 `topic/plans` 上做事时发现的；跟某个功能绑在一起的（这个功能的入口、菜单项、窗口），放 `topic/plans`，哪怕它全是界面。要把已经在 `topic/native` 上的功能挪下去：在 `topic/native` 上 revert，把 `topic/native` 合进 `topic/plans` 之后，在 `topic/plans` 上再 revert 那次 revert，功能就只留在 `topic/plans`。
 - **上游合并了 native 的改动之后**（比如 beluga-labs/beluga#584）：照常从链头同步上游，然后把 `topic/native` 里同一份改动拿掉，以上游 `main` 的写法为准，不留两份。
 - **新改动**放在它所属的、链上最靠前的那个分支：从它开 worktree 和 PR，合进去之后，再把这个分支依次合进链上后面的每个分支（merge，不 rebase，分支都已推送）。
+- **目录只在仓库里面**（2026-11-19 起）：Beluga 的所有文件都在 `~/sproot/beluga` 之下。不管为了什么开 worktree，都在主检出里用 `git worktree add .worktrees/<名字> <分支>`，不在旁边开 `../beluga-<名字>`，也不开在临时目录。`/.worktrees/` 写在 `.git/info/exclude` 里忽略（不写 `.gitignore`，`main` 是上游的）；新克隆的仓库要自己补上这一行。临时文件、笔记、构建产物同样放在仓库内已忽略的路径，不放在仓库旁边。用完的 worktree 合并后用 `git worktree remove` 删掉。
 - **同步上游**从链头进：把 `upstream/main` 合进 `topic/chinese`（它和上游只差 `zh-CN.json`：fork 的中文直接写在上游的文件里），再顺着链往下合。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，在 `topic/native` 及之后）照旧用。
 - **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/plans`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
