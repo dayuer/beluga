@@ -12,7 +12,7 @@ export function useKeyboardInset(): number {
   const [inset, setInset] = useState(0);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
     const vv = window.visualViewport;
     if (!vv) return;
 

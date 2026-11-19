@@ -7,7 +7,7 @@ export const isOnline = (): boolean => typeof navigator === 'undefined' || navig
 export function useOnline(): boolean {
   const [online, setOnline] = useState(isOnline);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
     const up = () => setOnline(true);
     const down = () => setOnline(false);
     window.addEventListener('online', up);

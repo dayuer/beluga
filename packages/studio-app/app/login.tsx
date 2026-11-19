@@ -36,7 +36,7 @@ export default function LoginScreen() {
   const verified = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.location || typeof window.addEventListener !== 'function') return;
     let alive = true;
     const handle = () => {
       const hash = window.location.hash;

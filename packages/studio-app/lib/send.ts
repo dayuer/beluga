@@ -173,7 +173,14 @@ export function useSend(pid: string, key: string): Sender {
   // One automatic retry when the network or the page comes back; after that, the button says retry.
   useEffect(() => {
     if (state.phase !== 'failed' || state.failure === 'expired' || autoRetried.current) return;
-    if (typeof window === 'undefined') return;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function' ||
+      typeof document === 'undefined' ||
+      typeof document.addEventListener !== 'function'
+    ) {
+      return;
+    }
     const again = () => {
       if (autoRetried.current || !buildRef.current || !isOnline()) return;
       autoRetried.current = true;

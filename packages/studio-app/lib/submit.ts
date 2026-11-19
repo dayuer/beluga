@@ -220,7 +220,14 @@ export function useNewRequest(pid: string, onDone: () => void): NewRequest {
   // customer taps Retry. Same opId, so the hub still only has one action.
   useEffect(() => {
     if (state.phase !== 'failed' || state.failure === 'expired' || retried.current) return;
-    if (typeof window === 'undefined') return;
+    if (
+      typeof window === 'undefined' ||
+      typeof window.addEventListener !== 'function' ||
+      typeof document === 'undefined' ||
+      typeof document.addEventListener !== 'function'
+    ) {
+      return;
+    }
     const again = () => {
       if (retried.current || !last.current || !isOnline()) return;
       retried.current = true;
