@@ -1,0 +1,11 @@
+appId: com.synon.studio
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- assertVisible:
+    id: "primary"
+- takeScreenshot: smoke-login

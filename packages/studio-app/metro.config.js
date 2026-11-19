@@ -19,9 +19,12 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   const from = context.originModulePath;
   const outside = from && !from.startsWith(project + path.sep);
   // The repo's TypeScript imports its siblings as './x.js' (Node's ESM): that's './x.ts' here.
-  if (outside && moduleName.startsWith('.') && moduleName.endsWith('.js')) {
-    const ts = path.resolve(path.dirname(from), moduleName.replace(/\.js$/, '.ts'));
-    if (fs.existsSync(ts)) return { type: 'sourceFile', filePath: ts };
+  if (from && moduleName.startsWith('.') && moduleName.endsWith('.js')) {
+    const resolved = path.resolve(path.dirname(from), moduleName);
+    if (!fs.existsSync(resolved)) {
+      const ts = resolved.replace(/\.js$/, '.ts');
+      if (fs.existsSync(ts)) return { type: 'sourceFile', filePath: ts };
+    }
   }
   const ctx = outside && !moduleName.startsWith('.') && !path.isAbsolute(moduleName) ? { ...context, originModulePath: path.join(project, 'package.json') } : context;
   return upstream ? upstream(ctx, moduleName, platform) : ctx.resolveRequest(ctx, moduleName, platform);
