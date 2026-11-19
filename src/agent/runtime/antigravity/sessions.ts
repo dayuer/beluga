@@ -25,7 +25,9 @@ export function agyBrainDir(sessionId: string, dir: string = agyDataDir()): stri
  */
 export async function dropAgySession(sessionId: string, dir: string = agyDataDir()): Promise<boolean> {
   if (!SESSION_ID.test(sessionId)) return false;
-  const files = [path.join(dir, 'conversations', `${sessionId}.db`), path.join(dir, 'conversations', `${sessionId}.pb`), path.join(dir, 'annotations', `${sessionId}.pbtxt`), agyBrainDir(sessionId, dir)];
+  // Its SQLite file's journal and shared memory too (`.db-wal`, `.db-shm`), or they stay behind it.
+  const db = path.join(dir, 'conversations', `${sessionId}.db`);
+  const files = [db, `${db}-wal`, `${db}-shm`, path.join(dir, 'conversations', `${sessionId}.pb`), path.join(dir, 'annotations', `${sessionId}.pbtxt`), agyBrainDir(sessionId, dir)];
   const gone = await Promise.all(files.map((f) => fs.rm(f, { recursive: true, force: true }).then(() => true, () => false)));
   return gone.some(Boolean);
 }

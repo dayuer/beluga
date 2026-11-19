@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
 import type { AppState } from '@beluga/core/store.js';
 import { type CardWindow, type FriendRoom, type ProviderCard, friendRooms, providerCards, shortTokens } from '@beluga/ui/usage-cards.js';
@@ -21,7 +21,7 @@ function WindowMeter({ w, now }: { w: CardWindow; now: number }) {
           <small>%</small>
         </span>
       </div>
-      <Meter pct={w.pct} label={`${w.label}: ${w.pct}% used`} />
+      <Meter pct={w.pct} label={`${w.source ? `${w.source} ${w.label}` : w.label}: ${w.pct}% used`} />
       <div className={s.windowFoot}>{w.resetsAt && w.resetsAt > now ? `Resets ${resetsAt(w.resetsAt, now)}` : `${100 - w.pct}% left`}</div>
     </div>
   );
@@ -100,8 +100,11 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
         <p className={s.quiet}>Not signed in. Sign in to {card.agent.label} on {thisComputer()} to use it.</p>
       ) : card.shape === 'quota' ? (
         <div className={s.windows}>
-          {card.windows.map((w) => (
-            <WindowMeter key={w.label} w={w} now={now} />
+          {card.windows.map((w, i) => (
+            <Fragment key={`${w.source ?? ''}:${w.label}`}>
+              {w.source && w.source !== card.windows[i - 1]?.source ? <div className={s.windowSource}>{w.source}</div> : null}
+              <WindowMeter w={w} now={now} />
+            </Fragment>
           ))}
         </div>
       ) : card.shape === 'tokens' ? (

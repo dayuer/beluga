@@ -18,7 +18,8 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
   hasPlanMode: true,
   hasSubagents: false,
   hasBackgroundAgents: false,
-  // Tokens per turn and the context meter; no plan windows (it doesn't say what's left of your quota over ACP).
+  // Tokens per turn and the context meter; its quota per model family, asked of its own language
+  // server (quota.ts: ACP doesn't say it), shown on Claude's usage card.
   hasUsage: true,
   // session/load; it can't branch a conversation.
   canResume: true,
