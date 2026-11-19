@@ -17,8 +17,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
-      },
-      "appleTeamId": "L9YRXEKYN2"
+      }
     },
     "android": {
       "package": "com.synon.studio"
