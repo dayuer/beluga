@@ -9,7 +9,7 @@ import { MILESTONE_STATE, TASK_STATE, changeMarks, milestoneLabel, milestoneRows
 import { TaskChatMark, TaskStateIcon } from './marks.js';
 import { TaskAgentChip } from '../fork/plans/TaskAgentChip.js';
 import { openDecision } from './plan-ask-model.js';
-import { useCheckerChat, useClock, usePlanActions } from './use-plans.js';
+import { useCardClock, useCheckerChat, usePlanActions } from './use-plans.js';
 import { useStartWith } from '../components/agent-options.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import type { AgentRef } from '@beluga/protocol.js';
@@ -102,7 +102,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
   const { api, act, openTask, openWorktree } = usePlanActions();
   const body = plan.draft ?? plan.body;
   const edit = (ops: PlanOp[]): void => void act(() => api.edit(plan.id, ops));
-  const now = useClock(t.pulse?.kind === 'working' || t.pulse?.kind === 'command');
+  const now = useCardClock(t.pulse?.kind === 'working' || t.pulse?.kind === 'command');
   const info = taskWords(t, now);
   const others = (body?.milestones ?? []).filter((m) => m.id !== t.milestoneId);
   const startWith = useStartWith();
@@ -137,7 +137,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
           <TaskChatMark {...(t.worktree ? { worktree: t.worktree } : {})} />
         </div>
         <span className={p.oTaskMeta}>
-          {info.sub && (t.pulse || t.state === 'running') ? <span className={p.oStep}>{info.sub}</span> : t.state === 'blocked' ? <span className={p.muted}>{t.why}</span> : null}
+          {info.sub && (t.pulse || t.state === 'running') ? <span className={p.oStep}>{info.sub}</span> : info.sub && t.state !== 'later' ? <span className={p.muted}>{info.sub}</span> : null}
           <TaskAgentChip plan={plan} t={t} />
           {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
           {t.forYou ? <Icon name="person" size={12} className={p.forYou} /> : null}
