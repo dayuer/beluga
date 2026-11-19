@@ -6,28 +6,27 @@
 
 `main` 只跟上游：永远等于 `upstream/main`，只快进（`git fetch upstream && git push origin upstream/main:main`），不在上面提交任何 fork 的东西。上游已经合并的改动不单独建分支。
 
-fork 自己的改动是一条链，后一个建在前一个上面：
+2026-11-19 起分两类：**提上游的准备分支**和 **fork 的完整版本**。
 
 | 分支 | 内容 | 基于 |
 |---|---|---|
-| `topic/chinese` | 中文对照：fork 的中文接在上游的中文表上，对上游文案的改译，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
-| `fork/base` | fork 结构、登记表、fork 功能的中文、输入法 Enter、git 英文输出、构建号、新旧版本混用的容错 | `topic/chinese` |
-| `topic/native` | 只放 Mac 应用的原生改动：控件、菜单、sheet、警告框、Liquid Glass、侧栏、沉稳界面、Mac 外壳的原生代码。不放功能 | `fork/base` |
-| `topic/plans` | fork 的功能，连同它们自己的界面（入口、菜单项、窗口）：计划设置、Antigravity、本地模型端点保存前校验、计划里“Decide…”直接打开那张卡片、技能包、用量统计（计划的规划者 / 建造者 / 检查者以上游为准） | `topic/native` |
-| `topic/fixes` | 准备提回上游的小修复 | `upstream/main` |
-
-为什么是链而不是并列：上层的界面建在下层的原生控件和中文上，这些依赖是真实的，硬拆只会多出一份份手写的“没有对方时”的版本。所以取用时取链上的一段前缀：只要中文就用 `topic/chinese`，加上基础就用 `fork/base`，要原生界面就用 `topic/native`，全部就是 `topic/plans`；需要时再合进 `topic/fixes`。
+| `topic/chinese` | 准备提上游：fork 的中文，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
+| `topic/native` | 准备提上游：Mac 原生的改动，按上游能直接收的写法（现在 = beluga-labs/beluga#584：原生控件、Liquid Glass、原生菜单） | `upstream/main` |
+| `topic/fixes` | 准备提上游：小修复 | `upstream/main` |
+| `topic/plans` | fork 的完整版本：合入上面三个，再加上所有和上游 `main` 不同、还不提上游的东西（fork 结构与登记表、构建号、同步脚本、沉稳界面和 `fork/` 覆盖层、原生 sheet 与提示框、计划设置等 fork 功能、fork 的文档）。构建只从这里出 | 三个准备分支 |
+| `fork/base` | 停用：内容已经都在 `topic/plans` 里，不再往里加东西 | — |
 
 Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）原来是链上最后的 `topic/studio`，2026-11-18 起迁成独立的仓库 `~/sproot/synon-studio`（带着完整历史，建在 `topic/plans` 上，远端 `beluga` 指回这个 fork，用来合进链上的更新）。下面讲 Studio 的几节是迁出前的记录。
 
 **作废：手机的自定义地址通道**（`plan/custom-route`，BLG-259–261、BLG-264，Beluga 计划 `pl_06cbeaec655c`）。让手机经 GNB、ZeroTier、WireGuard、Nebula、Tailscale 等组网连 Mac：中继另外监听一个用户给的 `host:port`，手机把它当第三条路竞速。2026-11-18 放弃，代码已从 `topic/native`、`topic/plans` 撤出（`revert:` 提交），分支归档为 `archive/abandoned-custom-route-2026-11-18`，不再合进链上任何分支。没有发出去的版本带过它用的协议号（native 上 1.59、plans 上 1.64）。
 
-- **native 和 plans 怎么分**：只改 Mac 外观和原生行为的（控件长什么样、菜单和 sheet 换成原生的），放 `topic/native`，哪怕是在 `topic/plans` 上做事时发现的；跟某个功能绑在一起的（这个功能的入口、菜单项、窗口），放 `topic/plans`，哪怕它全是界面。要把已经在 `topic/native` 上的功能挪下去：在 `topic/native` 上 revert，把 `topic/native` 合进 `topic/plans` 之后，在 `topic/plans` 上再 revert 那次 revert，功能就只留在 `topic/plans`。
-- **上游合并了 native 的改动之后**（比如 beluga-labs/beluga#584）：照常从链头同步上游，然后把 `topic/native` 里同一份改动拿掉，以上游 `main` 的写法为准，不留两份。
-- **新改动**放在它所属的、链上最靠前的那个分支：从它开 worktree 和 PR，合进去之后，再把这个分支依次合进链上后面的每个分支（merge，不 rebase，分支都已推送）。
+- **放哪个分支**：要提回上游、而且已经写成上游能收的样子的，放对应的准备分支（中文放 `topic/chinese`，Mac 原生放 `topic/native`，其他小修复放 `topic/fixes`），合并后再合进 `topic/plans`。其余所有和上游 `main` 不同的代码，直接放 `topic/plans`：fork 专用的结构、覆盖层、功能，以及还没整理成上游写法的原生改动。
+- **准备分支只放上游写法**：`topic/chinese`、`topic/native`、`topic/fixes` 都基于 `upstream/main`，相对上游的差异就是要提的 PR 内容。fork 里同一件事如果有自己的写法（比如 `fork/native` 覆盖层版的 Liquid Glass），留在 `topic/plans`；把准备分支合进 `topic/plans` 时保留 plans 的版本（`git merge -s ours` 或手动解决），不让 plans 出现两份。
+- **上游合并之后**（比如 beluga-labs/beluga#584）：同步上游进准备分支，它们回到和 `upstream/main` 一致；再把 `upstream/main` 合进 `topic/plans`，fork 自己那份重复的写法拿掉，以上游的为准。
+- **新改动**从它所属的分支开 worktree 和 PR，合进去之后，准备分支再合进 `topic/plans`（merge，不 rebase，分支都已推送）。
 - **目录只在仓库里面**（2026-11-19 起）：Beluga 的所有文件都在 `~/sproot/beluga` 之下。不管为了什么开 worktree，都在主检出里用 `git worktree add .worktrees/<名字> <分支>`，不在旁边开 `../beluga-<名字>`，也不开在临时目录。`/.worktrees/` 写在 `.git/info/exclude` 里忽略（不写 `.gitignore`，`main` 是上游的）；新克隆的仓库要自己补上这一行。临时文件、笔记、构建产物同样放在仓库内已忽略的路径，不放在仓库旁边。用完的 worktree 合并后用 `git worktree remove` 删掉。
-- **同步上游**从链头进：把 `upstream/main` 合进 `topic/chinese`（它和上游只差 `zh-CN.json`：fork 的中文直接写在上游的文件里），再顺着链往下合。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，在 `topic/native` 及之后）照旧用。
-- **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/plans`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
+- **同步上游**：把 `upstream/main` 分别合进 `topic/chinese`、`topic/native`、`topic/fixes`，再合进 `topic/plans`。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，现在在 `topic/plans` 上）照旧用在 `topic/plans`。
+- **构建**只从 `topic/plans` 出（它已经合入三个准备分支）：在干净的 worktree 里 `npm run app:build`。`packages/mac/build-number.json` 记的是上一次用过的号，构建脚本自动加 1；编完把新的号提交到 `topic/plans`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
 
 ## 原则：加自己的文件，不改上游的文件

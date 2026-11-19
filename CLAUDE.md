@@ -98,26 +98,27 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
 - **`main` is upstream's, exactly.** It only ever fast-forwards to `upstream/main`
   (`git fetch upstream && git push origin upstream/main:main`); nothing of the fork is committed
   on it. What upstream has already merged gets no branch of its own here.
-- **The fork's work is a chain of branches, each on the one before** (`docs/fork.md`, "分支"):
-  `topic/chinese` (the fork's Chinese, written into upstream's `zh-CN.json`) → `fork/base` (fork structure, registries, IME, git in English, build numbers) →
-  `topic/native` (only the Mac app's native changes: controls, menus, sheets, alerts, Liquid
-  Glass, the sidebar, the calm UI; no features) → `topic/plans` (the fork's features, with their
-  own UI: Plan Settings and the like). `topic/fixes` stands apart on `upstream/main`: small
-  fixes meant for upstream. Synon Studio (clients, federation, My Sharing) is no longer here: since
-  2026-11-18 it is its own repository, `~/sproot/synon-studio`, built on `topic/plans`.
-- **Native or a feature?** A change to how the Mac app looks or behaves natively goes on
-  `topic/native`, even when found while working from `topic/plans`; anything tied to a feature
-  (its entry, menu item, window) goes on `topic/plans`, even when it's all UI. Once upstream merges
-  some of the native work, take that out of `topic/native` and follow upstream `main`'s version.
-- **New work goes on the lowest branch of the chain it belongs to**, in its own worktree and PR
-  into that branch; once merged, merge that branch forward into each one after it (merge, never
-  rebase: they're pushed).
-- **Syncing upstream** goes in at the top: merge `upstream/main` into `topic/chinese` (the fork's Chinese is
-  in upstream's own `zh-CN.json`, nothing else differs there)
-  (`node scripts/sync-upstream.mjs` on `topic/native` and after), then forward down the chain.
-- **Builds are composed when needed.** From a clean worktree on the chain branch that has what
-  the build should carry (`topic/plans` has all of it), merge `topic/fixes` if wanted, then
-  `npm run app:build`. One build number per distinct code: don't build the same tree twice.
+- **Two kinds of branches** (`docs/fork.md`, "分支"). Three prepare work for upstream, each on
+  `upstream/main` and written the way upstream would take it: `topic/chinese` (the Chinese, in
+  upstream's `zh-CN.json`), `topic/native` (the Mac's native work; now beluga-labs/beluga#584) and
+  `topic/fixes` (small fixes). `topic/plans` is the whole fork: it merges those three and holds
+  everything else that differs from upstream `main` (fork structure and registries, build numbers,
+  the sync script, the calm UI and `fork/` overlays, native sheets and alerts, Plan Settings and the
+  fork's other features, the fork's docs). `fork/base` is retired: its content is on `topic/plans`.
+  Synon Studio (clients, federation, My Sharing) is its own repository since 2026-11-18,
+  `~/sproot/synon-studio`, built on `topic/plans`.
+- **Which branch?** Work going upstream, already in upstream's form, goes on its prepare branch,
+  then that branch is merged into `topic/plans`. Everything else that differs from upstream goes
+  straight on `topic/plans`. When a prepare branch and `topic/plans` hold the same thing in two
+  forms (the fork's overlay and upstream's), `topic/plans` keeps its own until upstream merges
+  the PR; then upstream `main` wins and the fork's copy goes.
+- **New work** goes in its own worktree and PR into the branch it belongs on; merge, never
+  rebase: they're pushed.
+- **Syncing upstream**: merge `upstream/main` into `topic/chinese`, `topic/native` and
+  `topic/fixes`, then into `topic/plans` (`node scripts/sync-upstream.mjs` there).
+- **Builds come from `topic/plans` only** (it has the three prepare branches): a clean worktree,
+  `npm run app:build`. `build-number.json` holds the last number used; the build takes the next
+  and the new number is committed to `topic/plans`. One build number per distinct code.
 - **One session writes in a checkout at a time.** Parallel work goes in its own worktree, and every
   worktree ends merged or removed. Never leave uncommitted changes behind for another session.
 - **Everything of Beluga stays inside the repository's folder** (`~/sproot/beluga`). A worktree,
