@@ -117,12 +117,12 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 计划设置（建好的计划改“混用智能体”）
 
-计划页 ••• › 计划设置…（`packages/mac/src/fork/plans/PlanSettingsSheet.tsx`，模型 `packages/mac/src/fork/plans/plan-settings-model.ts`，测试 `tests/fork-plan-settings.test.ts`）。2026-11-18 换回上游的规划者/构建者/检查者时，旧的“计划设置”连同 fork 的角色一起删了；这一版只用上游的东西：新建计划里的那一行智能体（`AgentRoles`，含“混用智能体”，每个角色可选任意运行时和模型）、三张运行方式卡片，保存走上游已有的 `plans.setAutonomy`、`plans.setRoleAgent`、`plans.setTestsAt`，守护进程没有改动。接入点：
+计划页 ••• › 计划设置…（`packages/mac/src/fork/plans/PlanSettingsSheet.tsx`，模型 `packages/mac/src/fork/plans/plan-settings-model.ts`，测试 `tests/fork-plan-settings.test.ts`）。2026-11-18 换回上游的规划者/构建者/检查者时，旧的“计划设置”连同 fork 的角色一起删了；这一版只用上游的东西：新建计划里的那一行智能体（`AgentRoles`，含“混用智能体”，每个角色可选任意运行时和模型）、三张运行方式卡片和选了自动驾驶时下面的“永远不等我”（和“如何运行”、新建计划一样），保存走上游已有的 `plans.setAutonomy`、`plans.setFullAuto`、`plans.setRoleAgent`、`plans.setTestsAt`，守护进程没有改动。接入点：
 
 - `packages/mac/src/plans/PlanPage.tsx`：一行，••• 菜单里的“计划设置…”
 - `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
 - `packages/mac/src/dialogs/native/WorkSheets.tsx`：三行，一个 import 和一个 `case`
-- `packages/mac/src/plans/PlanSheets.tsx`：一行，导出 `AutonomyCards`
+- `packages/mac/src/plans/PlanSheets.tsx`：导出 `AutonomyCards`（一行），并把 `FullAutoBox`、`fullAutoChange` 改成 `export`（两处各加一个词）
 
 ### 原生控件（待提回上游）
 
