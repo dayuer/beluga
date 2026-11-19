@@ -2,7 +2,10 @@ import { Redirect, Stack, useGlobalSearchParams, usePathname } from 'expo-router
 import { StatusBar } from 'expo-status-bar';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useBooted } from '../lib/boot';
 import { session } from '../lib/session';
 import { color } from '../lib/theme';
 
@@ -12,9 +15,13 @@ import { color } from '../lib/theme';
  * session. BLG-84 fills in the screens; the shell is here so the rule has one home.
  */
 function Guard({ children }: { children: ReactNode }) {
+  const booted = useBooted();
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ next?: string | string[] }>();
   const token = useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
+  if (!booted) {
+    return <View style={{ flex: 1, backgroundColor: color.bg }} />;
+  }
   if (!token && pathname !== '/login') {
     return <Redirect href={`/login?next=${encodeURIComponent(pathname)}`} />;
   }
@@ -29,13 +36,17 @@ function Guard({ children }: { children: ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <View style={{ flex: 1, backgroundColor: color.bg }}>
-        <Guard>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
-        </Guard>
-      </View>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: color.bg }}>
+      <SafeAreaProvider>
+        <KeyboardProvider>
+          <StatusBar style="dark" />
+          <View style={{ flex: 1, backgroundColor: color.bg }}>
+            <Guard>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+            </Guard>
+          </View>
+        </KeyboardProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
