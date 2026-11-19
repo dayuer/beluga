@@ -166,6 +166,9 @@ export async function beginUploadSession(
   const sessionId = randomToken(16);
   const expiresAt = now + UPLOAD_LIMITS.sessionTtlMs;
 
+  // 开新会话时顺手清理该客户已过期的旧会话与临时分块
+  await pruneExpiredUploadSessions(env, now, customerId);
+
   await env.DB.prepare(
     `INSERT INTO upload_sessions (id, customer_id, project_id, name, total_files, total_bytes, status, created_at, expires_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 'uploading', ?, ?, ?)`,
@@ -460,13 +463,21 @@ export async function getUploadSessionStatus(
   };
 }
 
-/** 清理超过 24 小时未完成的上传会话：中止 R2 multipart 并清理分块记录。 */
-export async function pruneExpiredUploadSessions(env: UploadEnv, now: number): Promise<number> {
-  const { results: expired } = await env.DB.prepare(
-    `SELECT * FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ?`,
-  )
-    .bind(now)
-    .all<SessionRow>();
+/** 清理超过 24 小时未完成的上传会话：删除 R2 临时分块对象并清理 D1 行。 */
+export async function pruneExpiredUploadSessions(
+  env: UploadEnv,
+  now: number,
+  customerId?: string,
+): Promise<number> {
+  const query =
+    customerId !== undefined
+      ? `SELECT * FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ? AND customer_id = ?`
+      : `SELECT * FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ?`;
+  const stmt = env.DB.prepare(query);
+  const { results: expired } =
+    customerId !== undefined
+      ? await stmt.bind(now, customerId).all<SessionRow>()
+      : await stmt.bind(now).all<SessionRow>();
 
   let count = 0;
   for (const session of expired) {
@@ -478,9 +489,7 @@ export async function pruneExpiredUploadSessions(env: UploadEnv, now: number): P
     }
     await env.DB.prepare('DELETE FROM upload_parts WHERE session_id = ?').bind(session.id).run();
     await env.DB.prepare('DELETE FROM upload_files WHERE session_id = ?').bind(session.id).run();
-    await env.DB.prepare(`UPDATE upload_sessions SET status = 'expired', updated_at = ? WHERE id = ?`)
-      .bind(now, session.id)
-      .run();
+    await env.DB.prepare('DELETE FROM upload_sessions WHERE id = ?').bind(session.id).run();
     count++;
   }
   return count;

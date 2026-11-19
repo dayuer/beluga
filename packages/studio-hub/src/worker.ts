@@ -27,7 +27,7 @@ import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
 import { handlePushTokenRequest } from './push-tokens.js';
 import { jsonOf, responseOf } from './reply.js';
-import { handleUploadRequest, type UploadEnv } from './upload.js';
+import { handleUploadRequest, pruneExpiredUploadSessions, type UploadEnv } from './upload.js';
 import { handleWellKnownRequest, type WellKnownEnv } from './well-known.js';
 
 export { StudioHub };
@@ -224,5 +224,9 @@ export default {
     }
 
     return responseOf(reply);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(pruneExpiredUploadSessions(env as UploadEnv, Date.now()));
   },
 };

@@ -30,3 +30,6 @@ APPLE_TEAM_ID = ""
 APPLE_BUNDLE_ID = ""
 ANDROID_PACKAGE_NAME = ""
 ANDROID_SHA256_FINGERPRINTS = ""
+
+[triggers]
+crons = ["17 * * * *"]

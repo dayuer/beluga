@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class {},
+}));
+
 import { sha256Hex } from '../../../src/net/studio/store.js';
 import { D1HubStore } from '../src/d1.js';
 import {
@@ -8,6 +13,7 @@ import {
   UPLOAD_LIMITS,
   type UploadEnv,
 } from '../src/upload.js';
+import worker from '../src/worker.js';
 
 function createMockR2() {
   const objects = new Map<string, Uint8Array>();
@@ -95,10 +101,14 @@ function createUploadMockDb(seed: {
           return null;
         },
         async all<T>() {
-          if (sql.includes("FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ?")) {
+          if (sql.includes('FROM upload_sessions WHERE status = \'uploading\' AND expires_at <= ?')) {
             const cutoff = Number(args[0]);
+            const cid = args.length > 1 ? String(args[1]) : undefined;
             const rows = [...sessions.values()].filter(
-              (s) => s.status === 'uploading' && Number(s.expires_at) <= cutoff,
+              (s) =>
+                s.status === 'uploading' &&
+                Number(s.expires_at) <= cutoff &&
+                (cid === undefined || s.customer_id === cid),
             );
             return { results: rows as T[] };
           }
@@ -201,6 +211,10 @@ function createUploadMockDb(seed: {
               row.updated_at = args[0];
             }
             return { meta: { changes: row ? 1 : 0 } };
+          }
+          if (sql.includes('DELETE FROM upload_sessions WHERE id = ?')) {
+            const sid = String(args[0]);
+            return { meta: { changes: sessions.delete(sid) ? 1 : 0 } };
           }
           if (sql.includes('DELETE FROM upload_parts WHERE session_id = ?')) {
             const sid = String(args[0]);
@@ -644,6 +658,118 @@ describe('SS-83 resume query and 24h expiration', () => {
       hub,
       now + UPLOAD_LIMITS.sessionTtlMs + 2,
     );
-    expect(statusRes?.status).toBe(410);
+    expect(statusRes?.status).toBe(404);
+  });
+
+  it('SS-130: scheduled prunes sessions older than 24h while keeping non-expired sessions intact', async () => {
+    const realNow = Date.now();
+    const expiredCreatedAt = realNow - UPLOAD_LIMITS.sessionTtlMs - 60_000;
+    const activeCreatedAt = realNow - 60_000;
+    const { db, sessions, files, parts } = createUploadMockDb({
+      customerId: 'c1',
+      projectId: 'p1',
+      sessionHash: await sha256Hex('tok'),
+      now: realNow,
+    });
+    const { bucket, partKeys } = createMockR2();
+    const hub = new D1HubStore(db);
+    const env = { DB: db, ASSETS: bucket } as unknown as UploadEnv;
+
+    const data = new Uint8Array(512);
+    const sha = createHash('sha256').update(data).digest('hex');
+
+    // 创建 1 个已过期的会话
+    const oldRes = await handleUploadRequest(
+      new Request('https://hub.example/v1/app/uploads', {
+        method: 'POST',
+        headers: { authorization: 'Bearer tok', 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId: 'p1', name: 'old', files: [{ path: 'old.png', size: 512, sha256: sha }] }),
+      }),
+      env,
+      hub,
+      expiredCreatedAt,
+    );
+    const oldId = ((await oldRes!.json()) as { sessionId: string }).sessionId;
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${oldId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: 'Bearer tok' },
+        body: data,
+      }),
+      env,
+      hub,
+      expiredCreatedAt + 100,
+    );
+
+    // 创建 1 个未过期的会话（注意：beginUploadSession 在 activeCreatedAt 跑时，oldId 可能已过期，
+    // 所以我们用更早的时间点创建 activeId 再调 scheduled，或者直接把 oldId 的 expires_at 调成过期）
+    const activeRes = await handleUploadRequest(
+      new Request('https://hub.example/v1/app/uploads', {
+        method: 'POST',
+        headers: { authorization: 'Bearer tok', 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId: 'p1', name: 'fresh', files: [{ path: 'fresh.png', size: 512, sha256: sha }] }),
+      }),
+      env,
+      hub,
+      activeCreatedAt,
+    );
+    const activeId = ((await activeRes!.json()) as { sessionId: string }).sessionId;
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${activeId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: 'Bearer tok' },
+        body: data,
+      }),
+      env,
+      hub,
+      activeCreatedAt + 100,
+    );
+
+    // 重新插入一个 24h 前的过期会话，模拟在 scheduled 运行前已存在的过期数据
+    sessions.set(oldId, {
+      id: oldId,
+      customer_id: 'c1',
+      project_id: 'p1',
+      name: 'old',
+      total_files: 1,
+      total_bytes: 512,
+      status: 'uploading',
+      created_at: expiredCreatedAt,
+      expires_at: expiredCreatedAt + UPLOAD_LIMITS.sessionTtlMs,
+      updated_at: expiredCreatedAt,
+    });
+    files.set(`${oldId}:0`, {
+      session_id: oldId,
+      file_index: 0,
+      path: 'old.png',
+      size: 512,
+      sha256: sha,
+      r2_key: `assets/p1/${oldId}/old.png`,
+      r2_upload_id: '',
+    });
+    parts.set(`${oldId}:0:1`, {
+      session_id: oldId,
+      file_index: 0,
+      part_number: 1,
+      etag: 'e1',
+      size: 512,
+      sha256: sha,
+      created_at: expiredCreatedAt,
+    });
+    await bucket.put(`upload-parts/${oldId}/0/1`, data);
+
+    const pending: Promise<unknown>[] = [];
+    await worker.scheduled(
+      {} as ScheduledController,
+      env,
+      { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext,
+    );
+    await Promise.all(pending);
+
+    expect(sessions.has(oldId)).toBe(false);
+    expect(files.has(`${oldId}:0`)).toBe(false);
+    expect(parts.has(`${oldId}:0:1`)).toBe(false);
+    expect(partKeys()).toEqual([`upload-parts/${activeId}/0/1`]);
+    expect(sessions.has(activeId)).toBe(true);
   });
 });
