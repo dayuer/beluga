@@ -27,6 +27,7 @@ import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
 import { handlePushTokenRequest } from './push-tokens.js';
 import { jsonOf, responseOf } from './reply.js';
+import { handleUploadRequest, type UploadEnv } from './upload.js';
 
 export { StudioHub };
 
@@ -126,6 +127,9 @@ export default {
 
     const pushReply = await handlePushTokenRequest(req, env, hub, now);
     if (pushReply) return pushReply;
+
+    const uploadReply = await handleUploadRequest(req, env as UploadEnv, hub, now);
+    if (uploadReply) return uploadReply;
 
     const route = routeOf(req.method, url.pathname);
 

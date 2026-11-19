@@ -106,3 +106,39 @@ CREATE TABLE IF NOT EXISTS push_dedup (
   sent_at     INTEGER NOT NULL,
   PRIMARY KEY (customer_id, card_id)
 );
+
+CREATE TABLE IF NOT EXISTS upload_sessions (
+  id          TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  project_id  TEXT NOT NULL REFERENCES projects(id),
+  name        TEXT NOT NULL,
+  total_files INTEGER NOT NULL,
+  total_bytes INTEGER NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('uploading', 'ready', 'failed', 'expired')),
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS upload_sessions_by_expires ON upload_sessions (status, expires_at);
+
+CREATE TABLE IF NOT EXISTS upload_files (
+  session_id   TEXT NOT NULL,
+  file_index   INTEGER NOT NULL,
+  path         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  sha256       TEXT NOT NULL,
+  r2_key       TEXT NOT NULL,
+  r2_upload_id TEXT NOT NULL,
+  PRIMARY KEY (session_id, file_index)
+);
+
+CREATE TABLE IF NOT EXISTS upload_parts (
+  session_id  TEXT NOT NULL,
+  file_index  INTEGER NOT NULL,
+  part_number INTEGER NOT NULL,
+  etag        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  sha256      TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (session_id, file_index, part_number)
+);
