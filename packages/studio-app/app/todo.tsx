@@ -9,6 +9,7 @@ import { TabBar } from '../components/TabBar';
 import { TodoCard } from '../components/TodoCard';
 import { TextButton } from '../components/TextButton';
 import { useOnline } from '../lib/net';
+import { useOnResume } from '../lib/resume';
 import { detectLang, t } from '../lib/strings';
 import { color, space } from '../lib/theme';
 import { ago } from '../lib/time';
@@ -32,6 +33,10 @@ export default function TodoScreen() {
       void refresh();
     }, [refresh]),
   );
+
+  useOnResume(() => {
+    void refresh();
+  });
 
   const todos = (result?.todos ?? []).filter((todo) => !hidden.has(todo.key));
   const offline = !online;

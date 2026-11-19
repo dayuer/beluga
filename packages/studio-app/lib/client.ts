@@ -1,7 +1,7 @@
-import { AppState } from 'react-native';
 import { createHub } from './hub';
-import { createLive, type SubscribeResume } from './live';
+import { createLive } from './live';
 import { isOnline } from './net';
+import { onResume } from './resume';
 import { session } from './session';
 
 /**
@@ -16,16 +16,5 @@ export const hub = createHub({
   isOnline,
 });
 
-const subscribeAppResume: SubscribeResume = (onResume) => {
-  if (typeof AppState?.addEventListener !== 'function') return () => {};
-  let last: string = AppState.currentState ?? 'active';
-  const sub = AppState.addEventListener('change', (next) => {
-    const wasActive = last === 'active';
-    last = next;
-    if (!wasActive && next === 'active') onResume();
-  });
-  return () => sub.remove();
-};
-
 /** The app's one live link table. */
-export const live = createLive(hub, subscribeAppResume);
+export const live = createLive(hub, (cb) => onResume(cb));

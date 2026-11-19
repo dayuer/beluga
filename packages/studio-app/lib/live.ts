@@ -42,7 +42,10 @@ export function createLive(watch: Pick<Hub, 'watch'>, subscribeResume?: Subscrib
     stopResume = subscribeResume(() => {
       for (const [pid, entry] of entries) {
         entry.close();
-        entry.state = 'closed';
+        if (entry.state !== 'closed') {
+          entry.state = 'closed';
+          for (const handler of [...entry.handlers]) handler.state('closed');
+        }
         entry.close = dial(pid, entry);
       }
     });

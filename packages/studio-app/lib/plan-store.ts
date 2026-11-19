@@ -4,6 +4,7 @@ import { hub, live } from './client';
 import type { HubError } from './hub';
 import type { PlanRes } from './hub-schema';
 import { useOnline } from './net';
+import { useOnResume } from './resume';
 
 export type PlanView = PlanRes['view'];
 
@@ -71,6 +72,10 @@ export function usePlanView(pid: string | undefined, ref: string | undefined): P
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useOnResume(() => {
+    void refresh();
+  });
 
   // A new pid/ref in the same mounted screen starts from that plan's cache, not the old view.
   useEffect(() => {

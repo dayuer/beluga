@@ -33,7 +33,7 @@ describe('live', () => {
 
     expect(closes).toEqual([1]);
     expect(watch).toHaveBeenCalledTimes(2);
-    expect(states).toEqual(['open', 'open']);
+    expect(states).toEqual(['open', 'closed', 'open']);
 
     unsub();
     expect(closes).toEqual([1, 2]);
