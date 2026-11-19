@@ -20,7 +20,7 @@ import { httpServers } from '../copilot/run-parts.js';
 import { agyComplete } from './complete.js';
 import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from './connection.js';
 import { agyEnd, agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
-import { agyBrainDir, agyDataDir } from './sessions.js';
+import { agyBrainDir, agyDataDir, tidyAgyData } from './sessions.js';
 import { readAgyQuota } from './quota.js';
 import { agyStatus } from './status.js';
 import { AGY_ASK_TOOL, agyAnswerPrompt, agyQuestion } from './questions.js';
@@ -54,6 +54,8 @@ const PATHED = new Set(['Read', 'Write', 'Edit']);
 const WRITES = new Set(['Write', 'Edit']);
 
 let sharedHost: ToolHost | undefined;
+/** Antigravity's folder tidied once a daemon (tidyAgyData). */
+let tidied: Promise<unknown> | undefined;
 const toolHost = (): ToolHost => (sharedHost ??= new ToolHost());
 
 const deferred = <T>() => {
@@ -434,6 +436,8 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
     // What's left of your Antigravity quota, per model family, without a run (the usage tab):
     // reported for Antigravity, so nothing is filed as Claude's.
     async refreshUsage() {
+      // Once a daemon: what earlier looks left behind in Antigravity's folder (sessions.ts).
+      if (!opts.connect && !tidied) tidied = tidyAgyData(data).catch(() => undefined);
       const read = opts.readQuota ?? (opts.connect ? undefined : () => (bin() ? readAgyQuota({ bin: bin()! }) : Promise.resolve(undefined)));
       const update = await read?.().catch(() => undefined);
       if (update) opts.bridge.reportUsage({ ...update, signedIn: true }, AGY_AGENT);

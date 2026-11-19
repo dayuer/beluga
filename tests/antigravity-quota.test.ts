@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgyConnection } from '../src/agent/runtime/antigravity/connection.js';
 import { type AgyUserStatus, fromUserStatus, portFromLog, readAgyQuota } from '../src/agent/runtime/antigravity/quota.js';
 import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
+import { dropAgyLog } from '../src/agent/runtime/antigravity/connection.js';
+import { AGY_LOG_DAYS, tidyAgyData } from '../src/agent/runtime/antigravity/sessions.js';
 import type { RoomBridge } from '../src/agent/types.js';
 import { room } from './runtime-conformance.js';
 
@@ -81,5 +83,48 @@ describe('Antigravity quota', () => {
     const backend = createAgyBackend({ cwd: os.tmpdir(), autoEdit: false, additionalDirectories: [], bridge, readQuota: async () => fromUserStatus(status) });
     expect(await backend.refreshUsage?.()).toBeUndefined();
     expect(reportUsage).toHaveBeenCalledWith(expect.objectContaining({ plan: 'Google AI Ultra', signedIn: true }), { runtime: 'antigravity', label: 'Antigravity' });
+  });
+
+  it('removes a look’s own log once it has stopped, and only that one', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'agy-log-'));
+    try {
+      for (const n of ['acp-server-20261120_004854-4242.log', 'acp-server-20261120_004855-14242.log', 'cli-20261120_004854-4242.log']) writeFileSync(path.join(dir, n), 'x');
+      expect(await dropAgyLog(4242, dir)).toBe(1);
+      expect(existsSync(path.join(dir, 'acp-server-20261120_004854-4242.log'))).toBe(false);
+      expect(existsSync(path.join(dir, 'acp-server-20261120_004855-14242.log'))).toBe(true);
+      expect(existsSync(path.join(dir, 'cli-20261120_004854-4242.log'))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tidies what earlier looks left: journals of gone conversations, and old acp logs', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'agy-data-'));
+    try {
+      const now = Date.parse('2026-11-20T00:00:00Z');
+      const conv = path.join(dir, 'conversations');
+      const logs = path.join(dir, 'log');
+      mkdirSync(conv);
+      mkdirSync(logs);
+      const gone = '6e15d96b-cb2c-48c8-adb0-e718b9ab1dde';
+      const kept = '7f26ea7c-dc3d-49d9-bec1-f829cabc2eef';
+      for (const n of [`${gone}.db-wal`, `${gone}.db-shm`, `${kept}.db`, `${kept}.db-wal`, 'notes.db-wal']) writeFileSync(path.join(conv, n), 'x');
+      const old = (AGY_LOG_DAYS + 1) * 24 * 60 * 60_000;
+      for (const [n, age] of [['acp-server-a-1.log', old], ['acp-server-b-2.log', 60_000], ['cli-c-3.log', old]] as const) {
+        writeFileSync(path.join(logs, n), 'x');
+        utimesSync(path.join(logs, n), (now - age) / 1000, (now - age) / 1000);
+      }
+      expect(await tidyAgyData(dir, now)).toEqual({ journals: 2, logs: 1 });
+      expect(existsSync(path.join(conv, `${gone}.db-wal`))).toBe(false);
+      // A conversation that's still there keeps its journal; a file not named for a conversation is left.
+      expect(existsSync(path.join(conv, `${kept}.db-wal`))).toBe(true);
+      expect(existsSync(path.join(conv, 'notes.db-wal'))).toBe(true);
+      expect(existsSync(path.join(logs, 'acp-server-a-1.log'))).toBe(false);
+      expect(existsSync(path.join(logs, 'acp-server-b-2.log'))).toBe(true);
+      // Its own CLI's logs are Antigravity's, never Beluga's to tidy.
+      expect(existsSync(path.join(logs, 'cli-c-3.log'))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

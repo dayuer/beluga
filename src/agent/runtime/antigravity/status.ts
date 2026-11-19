@@ -55,7 +55,7 @@ async function check(deps: StatusDeps): Promise<RuntimeStatus> {
   const bin = deps.bin ?? (deps.connect ? undefined : findAgy());
   if (!bin && !deps.connect) return { state: 'missing', fix: AGY_MISSING, models: [] };
   const cwd = os.tmpdir();
-  const conn = await (deps.connect ?? spawnAgy)({ cwd, ...(bin ? { bin } : {}) }).catch(() => undefined);
+  const conn = await (deps.connect ?? spawnAgy)({ cwd, look: true, ...(bin ? { bin } : {}) }).catch(() => undefined);
   if (!conn) return { state: 'missing', fix: AGY_MISSING, models: [] };
   /** The session it opened to look: dropped once Antigravity has stopped, or it would write it back as it exits. */
   let opened: string | undefined;

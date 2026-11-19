@@ -2,15 +2,12 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { samePath } from '../claude/claude-sessions.js';
-import { type AgyConnect, spawnAgy } from './connection.js';
+import { type AgyConnect, agyDataDir, agyLogDir, spawnAgy } from './connection.js';
+
+export { agyDataDir };
 
 /** An Antigravity conversation id (a UUID): only those name its files. */
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Where `agy acp` keeps its conversations: ~/.gemini/antigravity-cli. */
-export function agyDataDir(home: string = os.homedir()): string {
-  return path.join(home, '.gemini', 'antigravity-cli');
-}
 
 /** A conversation's own folder of notes (its plan, its task list): written there without being yours. */
 export function agyBrainDir(sessionId: string, dir: string = agyDataDir()): string {
@@ -41,7 +38,7 @@ const LIST_PAGES = 200;
  * the folder they were about is gone.
  */
 export async function dropAgyFolder(folder: string, deps: { readonly connect?: AgyConnect; readonly dir?: string } = {}): Promise<number> {
-  const conn = await (deps.connect ?? spawnAgy)({ cwd: os.tmpdir() }).catch(() => undefined);
+  const conn = await (deps.connect ?? spawnAgy)({ cwd: os.tmpdir(), look: true }).catch(() => undefined);
   if (!conn) return 0;
   try {
     const there: string[] = [];
@@ -58,4 +55,34 @@ export async function dropAgyFolder(folder: string, deps: { readonly connect?: A
   } finally {
     await conn.proc.kill();
   }
+}
+
+/** A run's log is kept this long, then goes (a look's goes when it stops). */
+export const AGY_LOG_DAYS = 7;
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * What Beluga's own `agy acp` processes left behind before they cleaned up after themselves: a
+ * conversation's SQLite journal and shared memory (`<id>.db-wal`, `<id>.db-shm`) whose conversation
+ * is gone, and their logs older than AGY_LOG_DAYS. Only those: a conversation that's still there,
+ * and every other file of Antigravity's (its own CLI's logs too), stay.
+ */
+export async function tidyAgyData(dir: string = agyDataDir(), now: number = Date.now()): Promise<{ readonly journals: number; readonly logs: number }> {
+  const conversations = path.join(dir, 'conversations');
+  const names = new Set(await fs.readdir(conversations).catch(() => [] as string[]));
+  const orphans = [...names].filter((n) => {
+    const m = /^(.+)\.db-(wal|shm)$/.exec(n);
+    return Boolean(m && SESSION_ID.test(m[1]!) && !names.has(`${m[1]}.db`));
+  });
+  await Promise.all(orphans.map((n) => fs.rm(path.join(conversations, n), { force: true }).catch(() => undefined)));
+  const logs = agyLogDir(dir);
+  const old = (
+    await Promise.all(
+      (await fs.readdir(logs).catch(() => [] as string[]))
+        .filter((n) => /^acp-server-.*-\d+\.log$/.test(n))
+        .map(async (n) => ((await fs.stat(path.join(logs, n)).catch(() => undefined))?.mtimeMs ?? now) < now - AGY_LOG_DAYS * DAY_MS ? n : undefined),
+    )
+  ).filter((n): n is string => Boolean(n));
+  await Promise.all(old.map((n) => fs.rm(path.join(logs, n), { force: true }).catch(() => undefined)));
+  return { journals: orphans.length, logs: old.length };
 }

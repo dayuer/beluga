@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { usageFor, usagesOf, withUsage } from '../src/agent/usage.js';
 import { CLAUDE_AGENT, PeerInfo, Profile } from '../src/protocol.js';
-import { friendRooms, providerCards, shortTokens } from '../src/ui/usage-cards.js';
+import { friendRooms, providerCards, shortTokens, GUEST_STALE_MS } from '../src/ui/usage-cards.js';
 
 /** The Profile an older Mac (before per-provider usage) parses frames with. */
 const OldWindow = z.object({ pct: z.number().min(0).max(100), resetsAt: z.number().optional() });
@@ -87,11 +87,28 @@ describe('usage per provider', () => {
     p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ label: 'Gemini', pct: 2 }, { label: 'Claude', pct: 0 }] }, 2) };
     const cards = providerCards(p, undefined);
     expect(cards.map((c) => c.key)).toEqual(['claude']);
-    expect(cards[0]).toMatchObject({ plan: 'max', shape: 'quota', isDefault: true, updatedAt: 2 });
+    // As old as its oldest reading (Claude's, here).
+    expect(cards[0]).toMatchObject({ plan: 'max', shape: 'quota', isDefault: true, updatedAt: 1 });
     expect(cards[0]?.windows.map((w) => `${w.source ?? ''}/${w.label} ${w.pct}`)).toEqual(['/Weekly 26', 'Antigravity/Gemini 2', 'Antigravity/Claude 0']);
     // Claude signed out says so on its own card, and Antigravity's stays apart.
     const out = { ...p, ...withUsage(p, CLAUDE_AGENT, { signedIn: false }, 3) };
     expect(providerCards(out, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
+  });
+
+  it('keeps the default on the folded card when Antigravity is yours, and leaves old Antigravity numbers on their own card', () => {
+    const agy = { runtime: 'antigravity', label: 'Antigravity' };
+    let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, agy] };
+    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 26 } }, 1_000) };
+    p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ label: 'Gemini', pct: 2 }] }, 2_000) };
+    // Antigravity is your default: the one card it's on says so.
+    expect(providerCards(p, agy).map((c) => [c.key, c.isDefault])).toEqual([['claude', true]]);
+    // The card is as old as its oldest reading.
+    expect(providerCards(p, undefined)[0]?.updatedAt).toBe(1_000);
+    // Claude read again much later, Antigravity not: its numbers aren't shown as Claude's fresh ones.
+    const later = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 27 } }, 2_000 + GUEST_STALE_MS + 1) };
+    const cards = providerCards(later, undefined);
+    expect(cards.map((c) => c.key)).toEqual(['claude', 'antigravity']);
+    expect(cards[1]?.updatedAt).toBe(2_000);
   });
 
   it('shows whose agent has room left, across providers', () => {

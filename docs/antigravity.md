@@ -27,7 +27,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **Compact**, picking up a conversation later, and handing a conversation to another agent.
 - Pictures in a message.
 - Beluga's instructions go into Antigravity's own system prompt, so your rules and its own stay as they are.
-- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota shows on Claude's card on the Usage tab, one line per model family (Gemini, Claude, GPT-OSS), each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes.
+- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota shows on Claude's card on the Usage tab, one line per model family (Gemini, Claude, GPT-OSS), each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes. When those numbers are older than Claude's by more than half an hour, they show on a card of their own, with their own time. Each of those looks leaves nothing behind: its conversation and its log go once it has stopped, and Beluga clears what earlier ones left (journals of gone conversations, its `acp-server` logs older than a week). Antigravity's own CLI logs stay.
 
 ## What's different
 

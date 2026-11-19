@@ -35,7 +35,7 @@ export async function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}
     : undefined;
   const suites = Object.keys(mounted?.http ?? {});
   const ours = mounted?.tools ?? new Set<string>();
-  const conn = await (deps.connect ?? spawnAgy)({ cwd: req.cwd, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
+  const conn = await (deps.connect ?? spawnAgy)({ cwd: req.cwd, look: true, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
   if (!conn) {
     mounted?.close();
     throw new CompletionError('failed');
