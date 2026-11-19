@@ -23,10 +23,11 @@ import { expire, prune } from '../../../src/net/studio/queue.js';
 import { DAY_MS, sha256Hex } from '../../../src/net/studio/store.js';
 import { D1HubStore } from './d1.js';
 import { DoStudioStore } from './do-store.js';
+import { sendPushToCustomer, type PushEnv, type PushOptions } from './push.js';
 import { jsonOf, responseOf } from './reply.js';
 import { type AppAttachment, type DaemonAttachment, appTags, attachmentOf, daemonTags } from './ws.js';
 
-export interface Env {
+export interface Env extends PushEnv {
   readonly DB: D1Database;
   readonly STUDIO: DurableObjectNamespace<StudioHub>;
   readonly OPERATOR_TOKEN?: string;
@@ -36,6 +37,165 @@ export interface Env {
   readonly MAIL_FROM?: string;
   readonly HUB_ORIGIN?: string;
   readonly PREVIEW_SECRET?: string;
+}
+
+export interface WaitingCard {
+  readonly cardId: string;
+  readonly title: string;
+  readonly body: string;
+  readonly path: string;
+}
+
+interface PlanFrameView {
+  readonly planRef: string;
+  readonly draftRev?: number;
+  readonly title: string;
+  readonly stage?: string;
+  readonly typing?: boolean;
+  readonly decisions: ReadonlyArray<{ readonly decisionId: string; readonly question: string; readonly open: boolean }>;
+  readonly milestones: ReadonlyArray<{ readonly ref: string; readonly title: string; readonly status: string }>;
+  readonly draftDiff?: { readonly draftRev: number };
+  readonly gate?: { readonly kind: string; readonly state: string; readonly draftRev: number };
+}
+
+const CUSTOMER_GATE_KINDS = new Set(['start', 'changes', 'release', 'deliver']);
+
+function gateTitleAndBody(kind: string): { title: string; body: string } {
+  switch (kind) {
+    case 'start':
+      return { title: '方案待启动确认', body: '方案已就绪，请签名确认启动' };
+    case 'changes':
+      return { title: '方案变更待确认', body: '有新的方案变更等待签名确认' };
+    case 'release':
+      return { title: '发布待确认', body: '交付物已就绪，请签名确认发布' };
+    case 'deliver':
+      return { title: '交付待确认', body: '代码交付等待你的签名确认' };
+    default:
+      return { title: '需要你确认', body: '有一个待确认事项' };
+  }
+}
+
+function cardPath(planRef: string, cardId: string): string {
+  return `/request/${encodeURIComponent(planRef)}?card=${encodeURIComponent(cardId)}`;
+}
+
+/** 从计划视图中提取所有正在等待客户处理的卡片。 */
+export function extractWaitingCards(projectId: string, view: PlanFrameView): WaitingCard[] {
+  const cards: WaitingCard[] = [];
+
+  for (const d of view.decisions) {
+    if (!d.open) continue;
+    const cardId = `${projectId}:${view.planRef}:decision:${d.decisionId}`;
+    cards.push({
+      cardId,
+      title: view.title || '需要你做决定',
+      body: d.question,
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  for (const m of view.milestones) {
+    if (m.status !== 'review') continue;
+    const cardId = `${projectId}:${view.planRef}:review:${m.ref}`;
+    cards.push({
+      cardId,
+      title: view.title || '里程碑待验收',
+      body: `请验收：${m.title}`,
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  const gatePending = view.gate?.state === 'pending';
+  if (gatePending && view.gate && CUSTOMER_GATE_KINDS.has(view.gate.kind)) {
+    const cardId = `${projectId}:${view.planRef}:gate:${view.gate.kind}:${view.gate.draftRev}`;
+    const copy = gateTitleAndBody(view.gate.kind);
+    cards.push({
+      cardId,
+      title: view.title || copy.title,
+      body: copy.body,
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  if (view.draftDiff && !(gatePending && view.gate?.kind === 'changes')) {
+    const cardId = `${projectId}:${view.planRef}:draftDiff:${view.draftDiff.draftRev}`;
+    cards.push({
+      cardId,
+      title: view.title || '方案有调整',
+      body: '请查看并应用或放弃方案变更',
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  if (view.stage === 'drafting' && view.milestones.length > 0 && !view.typing && !gatePending) {
+    const cardId = `${projectId}:${view.planRef}:confirm:${view.draftRev ?? 0}`;
+    cards.push({
+      cardId,
+      title: view.title || '请确认方案理解',
+      body: '规划草案已生成，请确认是否开始执行',
+      path: cardPath(view.planRef, cardId),
+    });
+  }
+
+  return cards;
+}
+
+/** 对项目成员按 (customer_id, card_id) 去重，仅对首次出现的「等你」卡片发送推送。 */
+export async function notifyWaitingCards(
+  db: D1Database,
+  env: PushEnv,
+  projectId: string,
+  view: PlanFrameView,
+  opts: PushOptions = {},
+): Promise<number> {
+  const cards = extractWaitingCards(projectId, view);
+  if (cards.length === 0) return 0;
+
+  const { results: memberRows } = await db
+    .prepare('SELECT customer_id FROM members WHERE project_id = ?')
+    .bind(projectId)
+    .all<{ readonly customer_id: string }>();
+  if (memberRows.length === 0) return 0;
+
+  const now = opts.now ?? Date.now();
+  let notified = 0;
+
+  for (const member of memberRows) {
+    for (const card of cards) {
+      const inserted = await db
+        .prepare('INSERT OR IGNORE INTO push_dedup (customer_id, card_id, sent_at) VALUES (?, ?, ?)')
+        .bind(member.customer_id, card.cardId, now)
+        .run();
+      if (Number(inserted.meta.changes ?? 0) === 0) continue;
+
+      let sent = 0;
+      try {
+        const res = await sendPushToCustomer(
+          db,
+          env,
+          member.customer_id,
+          {
+            title: card.title,
+            body: card.body,
+            path: card.path,
+            data: { projectId, planRef: view.planRef, cardId: card.cardId, path: card.path },
+          },
+          opts,
+        );
+        sent = res.sent;
+      } finally {
+        if (sent === 0) {
+          await db
+            .prepare('DELETE FROM push_dedup WHERE customer_id = ? AND card_id = ?')
+            .bind(member.customer_id, card.cardId)
+            .run();
+        }
+      }
+      if (sent > 0) notified++;
+    }
+  }
+
+  return notified;
 }
 
 const NOOP_MAILER = { send: async (): Promise<void> => {} };
@@ -241,6 +401,13 @@ export class StudioHub extends DurableObject<Env> {
           }
         }
       } else if (effect.to === 'app') {
+        if (effect.frame.t === 'plan') {
+          try {
+            await notifyWaitingCards(this.env.DB, this.env, effect.projectId, effect.frame.view);
+          } catch {
+            // 推送失败不影响 WebSocket 视图广播。
+          }
+        }
         const deps = await this.deps();
         for (const ws of this.ctx.getWebSockets(`app:${effect.projectId}`)) {
           const att = attachmentOf(ws);
