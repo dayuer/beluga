@@ -37,6 +37,9 @@ describe('times in words', () => {
     // Another computer's clock a little ahead: never "-1 min ago".
     expect(agoWords(NOW + 5 * MIN, NOW)).toBe('just now');
     expect(whenWords(NOW - 12 * MIN, NOW)).toBe('2026-11-19T11:48Z (12 min ago)');
+    // A time that isn't one (an old record) reads as unknown instead of failing plan_get.
+    expect(whenWords(Number.NaN, NOW)).toBe('unknown');
+    expect(isoMinute(Number.NaN)).toBe('unknown');
   });
 });
 
@@ -143,6 +146,14 @@ describe('the Mac’s task cards say when each last changed', () => {
     const card = (id: string) => taskWords(v.milestones.flatMap((m) => m.tasks).find((t) => t.task.id === id)!, NOW);
     expect(card('readme').sub).toBe('Updated 2 h ago');
     expect(card('tag').sub).toBe('Updated Yesterday');
+    // Blocked: what it waits on, then when it last changed.
+    expect(card('vm').sub).toBe('Waits on “Guide” · Updated 6 h ago');
+  });
+
+  it('with no clock (now 0, a label only) it says no time, never a wrong "just now"', () => {
+    const v = planView(plan(), board(issues()), NOBODY_LIVE);
+    const readme = v.milestones[0]!.tasks.find((t) => t.task.id === 'readme')!;
+    expect(taskWords(readme, 0).sub).toBeUndefined();
   });
 });
 

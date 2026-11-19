@@ -10,7 +10,7 @@ import type { TaskPulse } from './watchdog.js';
  */
 
 /** "2026-11-19T10:42Z": an absolute time an agent reads, to the minute, in UTC. */
-export const isoMinute = (at: number): string => `${new Date(at).toISOString().slice(0, 16)}Z`;
+export const isoMinute = (at: number): string => (Number.isFinite(at) ? `${new Date(at).toISOString().slice(0, 16)}Z` : 'unknown');
 
 /** "12 min ago", "3h ago", "2d ago"; a time ahead of `now` (another computer's clock) is "just now". */
 export function agoWords(at: number, now: number): string {
@@ -23,7 +23,7 @@ export function agoWords(at: number, now: number): string {
 }
 
 /** "2026-11-19T10:42Z (12 min ago)". */
-export const whenWords = (at: number, now: number): string => `${isoMinute(at)} (${agoWords(at, now)})`;
+export const whenWords = (at: number, now: number): string => (Number.isFinite(at) ? `${isoMinute(at)} (${agoWords(at, now)})` : 'unknown');
 
 /** A task's times: since it reached the status it's in, its last change (or its agent's step now), and when it closed. */
 export interface TaskTimes {

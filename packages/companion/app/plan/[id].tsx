@@ -390,7 +390,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                           ))}
                         </View>
                       ) : null}
-                      {t.updatedAt ? (
+                      {t.updatedAt && t.state !== 'later' ? (
                         <T v="caption" c={color.text3} numberOfLines={1}>
                           Updated {ago(t.updatedAt) === 'now' ? 'just now' : `${ago(t.updatedAt)} ago`}
                         </T>

@@ -93,7 +93,8 @@ export function taskWords(t: TaskView, now: number): { readonly label: string; r
   if (!t.pulse || t.combining) {
     const said = t.state === 'running' && t.step ? t.step : t.state === 'blocked' || t.state === 'later' ? t.why : undefined;
     // Every task on the board says when it last changed, not only the ones at work now.
-    const at = t.issue && t.state !== 'later' ? taskTimes(t.issue) : undefined;
+    // `now` 0: the caller has no clock (a label only): no time rather than a wrong "just now".
+    const at = t.issue && t.state !== 'later' && now > 0 ? taskTimes(t.issue) : undefined;
     const when = at ? `Updated ${ago(at.updated, now)}` : undefined;
     const sub = [said, when].filter(Boolean).join(' · ');
     return { ...base, ...(sub ? { sub } : {}) };
