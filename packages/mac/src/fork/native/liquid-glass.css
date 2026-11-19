@@ -161,3 +161,70 @@
 :root[data-os='mac'][data-glass='on'] button[role='combobox'][aria-haspopup='listbox'][class*='_trigger_'] [class*='_ghost_'] {
   display: none;
 }
+
+/* A capsule's ring is a real 0.5px border: WebKit breaks a 0.5px shadow up round a capsule's ends.
+   Here for the shared buttons, the segmented control and its chosen segment: each draws its border,
+   and its shadow keeps only the drop and sheen (the bezel token stays as it is for everything else). */
+:root[data-os='mac'][data-glass='on'] button[class*='_button_'][class*='_plain_'],
+:root[data-os='mac'][data-glass='on'] button[class*='_button_'][class*='_danger_'] {
+  border: 0.5px solid var(--control-edge);
+  box-shadow: var(--control-drop), var(--control-sheen);
+}
+:root[data-os='mac'][data-glass='on'] button[class*='_button_'][class*='_primary_'] {
+  border: 0.5px solid var(--control-accent-edge);
+  box-shadow: var(--control-drop), var(--control-accent-sheen);
+}
+:root[data-os='mac'][data-glass='on'] button[class*='_button_'][class*='_merge_'] {
+  border: 0.5px solid color-mix(in srgb, var(--merge) 70%, var(--text));
+  box-shadow: var(--control-drop), var(--control-accent-sheen);
+}
+/* The track's ring is drawn on its own layer, so it takes no room: the segments sit the same 1px from
+   its top and its bottom, whatever the ring rounds to (Chromium makes a 0.5px border 1px, and a
+   track at a fractional position then put more room above a segment than below it). */
+:root[data-os='mac'][data-glass='on'] [class*='_segmented_'] {
+  position: relative;
+  padding: 1px;
+  box-shadow: none;
+}
+:root[data-os='mac'][data-glass='on'] [class*='_segmented_']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 0.5px solid var(--hairline);
+  border-radius: inherit;
+  pointer-events: none;
+}
+:root[data-os='mac'][data-glass='on'] [class*='_segmented_'] > [class*='_segment_'] {
+  border: 0.5px solid transparent;
+}
+/* The chosen segment: even all round, or a drop below would fill the track's gap under it and the
+   segment would look pushed up. */
+:root[data-os='mac'][data-glass='on'] [class*='_segmented_'] > [class*='_segmentOn_'] {
+  border-color: var(--control-edge);
+  box-shadow: 0 0 1.5px rgba(0, 0, 0, 0.14), var(--control-sheen);
+}
+
+/* New Task's scales (Priority, Who sees it): its steps are capsules, so the scale is one too; the
+   chosen step's ring is a real border and its shadow even all round. */
+:root[data-os='mac'][data-glass='on'] [role='radiogroup'][class*='_scale_'] {
+  position: relative;
+  padding: 2px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+/* Its ring on its own layer, taking no room, so a step sits as far from the top as from the bottom. */
+:root[data-os='mac'][data-glass='on'] [role='radiogroup'][class*='_scale_']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 0.5px solid var(--hairline-strong);
+  border-radius: inherit;
+  pointer-events: none;
+}
+:root[data-os='mac'][data-glass='on'] [role='radiogroup'][class*='_scale_'] > [class*='_step_'] {
+  border: 0.5px solid transparent;
+}
+:root[data-os='mac'][data-glass='on'] [role='radiogroup'][class*='_scale_'] > [class*='_stepOn_'] {
+  border-color: var(--hairline-strong);
+  box-shadow: 0 0 1.5px rgba(0, 0, 0, 0.14);
+}

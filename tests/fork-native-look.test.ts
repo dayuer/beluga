@@ -67,6 +67,7 @@ describe('the Mac-native look’s upstream anchors', () => {
         ['views', 'overview', 'filter-bar.module.css'],
         ['components', 'form.module.css'],
         ['components', 'select.module.css'],
+        ['tasks', 'NewTaskSheet.module.css'],
       ].flatMap((parts) => [...classes(read(...parts))]),
     );
     expect(anchorsIn(glass).filter((name) => !upstream.has(name))).toEqual([]);

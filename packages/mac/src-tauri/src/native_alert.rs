@@ -3,6 +3,9 @@
 //! happens, and the buttons laid out and keyed as macOS does (the first is the default, Return;
 //! Cancel is Esc; a third goes on the left, like "Don't Save"; a destructive one is red).
 
+// Only a Mac shows these: elsewhere each command says no, and the types it would read go unused.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -28,9 +31,11 @@ mod mac {
     use std::cell::RefCell;
     use std::sync::Mutex;
 
+    /// The alert up now: its token (the page's), the alert and the window it's a sheet on.
+    type Shown = (u64, Retained<NSAlert>, Retained<NSWindow>);
+
     thread_local! {
-        /// The alert up now: its token (the page's), the alert and the window it's a sheet on.
-        static SHOWN: RefCell<Option<(u64, Retained<NSAlert>, Retained<NSWindow>)>> = const { RefCell::new(None) };
+        static SHOWN: RefCell<Option<Shown>> = const { RefCell::new(None) };
     }
 
     /// Takes the alert `token` down (its page went: Esc, another sheet), as if cancelled.

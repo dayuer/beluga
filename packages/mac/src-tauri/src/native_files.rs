@@ -1,6 +1,9 @@
 //! A file of yours the Mac's way (packages/mac/src/lib/files.ts): Quick Look (Space, as in
 //! Finder), the Share menu (Messages, Mail, AirDrop…), and dragging it out of the window.
 
+// Only a Mac shows these: elsewhere each command says no, and the types it would read go unused.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
+
 #[cfg(target_os = "macos")]
 mod mac {
     use objc2::rc::Retained;
