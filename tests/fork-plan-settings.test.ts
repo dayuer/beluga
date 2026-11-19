@@ -191,9 +191,19 @@ describe('the header’s Agents menu', () => {
     expect(picked).toEqual(['claude:claude-opus-5-5', 'codex:']);
   });
 
-  it('says each part with its model, as Plan Settings does', () => {
-    const src = readFileSync(join('packages', 'mac', 'src', 'plans', 'AgentRoles.tsx'), 'utf8');
-    expect(src).toContain('agentChoiceLabel(ref, runtimes, models)');
+  it('an agent with no models listed is checked by its runtime, whatever model was picked', () => {
+    const entries = [
+      { section: 'Claude', options: [{ value: 'claude:', label: 'Claude' }, { value: 'claude:claude-opus-5-5', label: 'Claude · Opus 5.5' }] },
+      { section: 'Codex', options: [{ value: 'codex:', label: 'Codex' }] },
+    ];
+    const rows = agentModelItems(entries, { runtime: 'codex', label: 'Codex', model: 'gpt-5.5' }, () => undefined);
+    expect(rows.map((r) => [r.label, Boolean(r.checked)])).toEqual([
+      ['Claude', false],
+      ['Codex', true],
+    ]);
+  });
+
+  it('“Default Model” has its Chinese', () => {
     const zh = JSON.parse(readFileSync(join('packages', 'mac', 'src', 'i18n', 'zh-CN.json'), 'utf8')) as Record<string, string>;
     expect(zh['Default Model']).toBe('默认模型');
   });

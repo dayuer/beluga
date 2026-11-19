@@ -50,13 +50,15 @@ export function agentModelItems<I extends string>(entries: readonly Entry<I>[], 
     const [agent, ...models] = e.options;
     if (!agent) return [];
     const separate = i === 0 || !('section' in entries[i - 1]!) ? { separate: true } : {};
-    if (!models.length || agent.disabled) return [{ ...row(agent), ...separate }];
+    // Checked by its runtime: a model it no longer lists (or one picked before it was set up) still marks it.
+    const inUse = now !== undefined && runtimeOf(now) === runtimeOf(agent.value);
+    if (!models.length || agent.disabled) return [{ ...row(agent), ...separate, checked: inUse }];
     const prefix = `${agent.label} · `;
     return [
       {
         ...row(agent, e.section),
         ...separate,
-        checked: now !== undefined && runtimeOf(now) === runtimeOf(agent.value),
+        checked: inUse,
         submenu: [row(agent, 'Default Model'), ...models.map((m, j) => ({ ...row(m, m.label.startsWith(prefix) ? m.label.slice(prefix.length) : m.label), ...(j === 0 ? { separate: true } : {}) }))],
         onSelect: () => undefined,
       },
