@@ -176,8 +176,6 @@ function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange
   );
 }
 
-export { AutonomyCards }; // fork: fork/plans/PlanSettingsSheet.tsx uses it
-
 /**
  * How a running plan runs: the same three cards as a new plan. Picking another one says, in plain
  * words, what changes from now on (and what happens at once); Switch applies it and it's in the feed.
