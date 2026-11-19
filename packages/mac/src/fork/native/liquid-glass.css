@@ -178,6 +178,11 @@
   border: 0.5px solid color-mix(in srgb, var(--merge) 70%, var(--text));
   box-shadow: var(--control-drop), var(--control-accent-sheen);
 }
+/* One that can't be pressed is drawn as a plain one (ui.module.css): its ring goes grey too. */
+:root[data-os='mac'][data-glass='on'] button[class*='_button_']:is([class*='_primary_'], [class*='_merge_']):disabled {
+  border-color: var(--control-edge);
+  box-shadow: var(--control-drop), var(--control-sheen);
+}
 /* The track's ring is drawn on its own layer, so it takes no room: the segments sit the same 1px from
    its top and its bottom, whatever the ring rounds to (Chromium makes a 0.5px border 1px, and a
    track at a fractional position then put more room above a segment than below it). */
