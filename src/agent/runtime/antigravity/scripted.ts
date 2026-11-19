@@ -23,7 +23,7 @@ const LEVELS = ['low', 'medium', 'high'];
  * calls one of Beluga's tools (mcp_beluga_list_peers); `own <tool>` calls a tool of a server of
  * your own by that name and `move <a> <b>` moves a file (both asked); `mode <m>` goes to that
  * mode itself and answers once its mode is set again; `question` asks with its own ask_question (run at once, the
- * question left in its answer) and answers `answered: <pick>` once told what the person picked (`question wait`: then works until stopped);
+ * question left in its answer) and answers `answered: <pick>` once told what the person picked (`question wait`: then works until stopped; `question zh`: in Chinese);
  * `/compact` summarises; `quota` answers as a
  * plan that has run out does.
  */
@@ -192,8 +192,10 @@ export class ScriptedAgy {
       if (/^question\b/.test(words)) {
         // Its own question tool: run at once (nothing asked), the form never reaching the client;
         // the question and its options written into its answer, and the turn ends.
-        const question = 'Deploy to the server now?';
-        const options = ['Yes, over SSH', 'Done (I did it)', 'Not now'];
+        // `question zh`: the same question in Chinese, as agy asks in the language you write in.
+        const zh = /^question zh\b/.test(words);
+        const question = zh ? '现在部署到服务器吗？' : 'Deploy to the server now?';
+        const options = zh ? ['是，通过 SSH', '已完成（我自己做了）', '暂不'] : ['Yes, over SSH', 'Done (I did it)', 'Not now'];
         const c = call(`call_${randomUUID().slice(0, 12)}`, 'ask_question', 'other', 'ask_question', { questions: [{ is_multi_select: false, options, question }] });
         update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
         update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed' });
