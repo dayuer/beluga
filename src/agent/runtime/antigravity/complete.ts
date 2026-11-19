@@ -34,6 +34,7 @@ export async function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}
       })
     : undefined;
   const suites = Object.keys(mounted?.http ?? {});
+  const ours = mounted?.tools ?? new Set<string>();
   const conn = await (deps.connect ?? spawnAgy)({ cwd: req.cwd, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
   if (!conn) {
     mounted?.close();
@@ -66,8 +67,8 @@ export async function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}
       const p = params as unknown as PermissionRequest;
       const known = calls.get(p.toolCall.toolCallId) ?? { tool: agyTool(p.toolCall), raw: {} };
       const raw = { ...known.raw, ...agyInput(p.toolCall) };
-      if (belugaToolOf(known.tool, suites)) return permissionAnswer(p, true);
-      for (const c of agyCalls(known.tool, raw, req.cwd, suites)) {
+      if (belugaToolOf(known.tool, suites, ours)) return permissionAnswer(p, true);
+      for (const c of agyCalls(known.tool, raw, req.cwd, suites, ours)) {
         if (!req.tools?.includes(c.name)) return (declined.push(`${c.name} isn’t one of this request’s tools.`), permissionAnswer(p, false));
         const verdict = req.vetTool?.(c.name, c.input);
         if (verdict && !verdict.allow) return (declined.push(verdict.reason || `${c.name} isn’t allowed here.`), permissionAnswer(p, false));

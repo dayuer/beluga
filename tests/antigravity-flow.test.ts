@@ -14,12 +14,14 @@ import { agyBrainDir, dropAgyFolder, dropAgySession } from '../src/agent/runtime
 import { AGY_SIGN_IN, agyStatus, modelRows } from '../src/agent/runtime/antigravity/status.js';
 import { agyCalls, agyInput, agyTool, belugaToolOf } from '../src/agent/runtime/antigravity/tools.js';
 import { runtimeFor, signInCommand } from '../src/agent/runtime/registry.js';
-import type { AgentPlace, AgentRunInput } from '../src/agent/types.js';
+import type { AgentPlace, AgentRunInput, FollowUp, Steer } from '../src/agent/types.js';
 import { agentForFriend } from '../src/core/gateway/serve.js';
 import { agentMark, modelMark } from '../src/shared/agent-marks.js';
 import { RunFailedError } from '../src/shared/run-failure.js';
+import { CodexRpcError } from '../src/agent/runtime/codex/rpc.js';
 import { fallbackFor, runtimeHas } from '../src/shared/runtime-fallbacks.js';
 import type { StepRecord } from '../src/shared/steps.js';
+import { waitFor } from './helpers.js';
 import { room } from './runtime-conformance.js';
 
 /**
@@ -71,6 +73,26 @@ describe('Antigravity’s tools as Beluga’s', () => {
     expect(belugaToolOf('mcp_context7_resolve', ['beluga'])).toBeUndefined();
     expect(agyCalls('mcp_context7_resolve', {}, '/w', ['beluga'])[0]!.name).toBe('mcp__antigravity__mcp_context7_resolve');
   });
+
+  it('takes a tool for Beluga’s only when it is one mounted for the run, whatever its server is called', () => {
+    const ours = new Set(['mcp__beluga__list_peers', 'mcp__beluga_board__task_get']);
+    expect(belugaToolOf('mcp_beluga_list_peers', ['beluga', 'beluga_board'], ours)).toBe('mcp__beluga__list_peers');
+    expect(belugaToolOf('mcp_beluga_board_task_get', ['beluga', 'beluga_board'], ours)).toBe('mcp__beluga_board__task_get');
+    // A server of your own named `beluga_helper`, or `beluga_board_x`: its tools only start like Beluga's.
+    expect(belugaToolOf('mcp_beluga_helper_wipe', ['beluga', 'beluga_board'], ours)).toBeUndefined();
+    expect(belugaToolOf('mcp_beluga_board_x_wipe', ['beluga', 'beluga_board'], ours)).toBeUndefined();
+    expect(agyCalls('mcp_beluga_helper_wipe', {}, '/w', ['beluga'], ours)[0]!.name).toBe('mcp__antigravity__mcp_beluga_helper_wipe');
+  });
+
+  it('judges a move on both files: the one it takes and where it lands, as its ACP locations say', () => {
+    const raw = agyInput({ rawInput: { toolSummary: 'Move it' }, locations: [{ path: inW('a.ts') }, { path: inW('../out/b.ts') }] });
+    expect(agyCalls('move', raw, '/w')).toEqual([
+      { name: 'Edit', input: { file_path: inW('a.ts') } },
+      { name: 'Write', input: { file_path: inW('../out/b.ts') } },
+    ]);
+    // No landing place said: judged on no file, so it's turned down.
+    expect(agyCalls('rename_file', { Path: 'a.ts' }, '/w')[1]).toEqual({ name: 'Write', input: { file_path: '' } });
+  });
 });
 
 describe('the parts of a run', () => {
@@ -110,6 +132,16 @@ describe('the parts of a run', () => {
     expect(limit).toBeInstanceOf(RunFailedError);
     expect((limit as RunFailedError).failure).toMatchObject({ kind: 'usage_limit', runtime: 'antigravity' });
     expect((agyFailure({ error: 'Authentication required' }) as RunFailedError).failure).toMatchObject({ kind: 'signed_out', runtime: 'antigravity' });
+  });
+
+  it('tells a sign-in by ACP’s own code, and takes no deadline, context window or stderr line for a used-up quota', () => {
+    const kind = (error: string, extra: Parameters<typeof agyFailure>[0] = {}): string => (agyFailure({ error, ...extra }) as RunFailedError).failure.kind;
+    for (const words of ['RESOURCE_EXHAUSTED: quota exceeded', 'Weekly limit reached', 'You have reached your Five Hour Limit', '429 Too Many Requests', 'rate limit exceeded']) expect(kind(words)).toBe('usage_limit');
+    for (const words of ['rpc error: code = DeadlineExceeded desc = context deadline exceeded', 'maximum context length exceeded']) expect(kind(words)).not.toBe('usage_limit');
+    expect(kind('Antigravity didn’t start', { cause: new CodexRpcError('Sign in first', -32000) })).toBe('signed_out');
+    expect(kind('ENOENT: keyring.json')).not.toBe('signed_out');
+    // A line of its log that mentions a quota is no failure of your plan's.
+    expect(kind('Antigravity exited before the turn ended', { stderr: ['debug: quota check ok'] })).not.toBe('usage_limit');
   });
 
   it('lists the session’s models, the current one with its thinking levels', () => {
@@ -203,6 +235,24 @@ describe('a run on Antigravity', () => {
     // Your pick went back as its next turn, and that turn's answer is the run's.
     expect(agy.sent('session/prompt').length).toBe(2);
     expect(answer).toBe('answered: Not now');
+    // The question shows once, as the card: its answer with the question written out stays out of the chat.
+    const said = r.events.filter(([k]) => k === 'text').map(([, t]) => t);
+    expect(said).toEqual(['answered: Not now']);
+  });
+
+  it('drops a question its turn asked before Steer Now stopped it: the message’s own turn goes on', async () => {
+    const agy = new ScriptedAgy();
+    const askUser = vi.fn(async () => ({ kind: 'skip' as const }));
+    let steer: Steer | undefined;
+    const r = input('question wait', { place: place(), askUser, onSteer: (s) => void (s && (steer = s)) });
+    const run = backend(agy).run(r);
+    await waitFor(() => steer && !steer.status!().between && agy.sent('session/prompt').length === 1);
+    const done: string[] = [];
+    const followUp: FollowUp = { prompt: 'hello', requesterName: 'kay', viaAgent: false, context: [], onEvent: () => undefined, onDone: (a) => void done.push(a), onError: (e) => void done.push(`error: ${e}`) };
+    expect(await steer!.interrupt!(followUp, 'Stopped for your message.')).toBe(true);
+    expect(await run).toBe('Stopped for your message.');
+    expect(done).toEqual(['echo: hello']);
+    expect(askUser).not.toHaveBeenCalled();
   });
 
   it('tells it you skipped its question, and leaves it as it was with nobody to ask', async () => {
@@ -222,6 +272,61 @@ describe('a run on Antigravity', () => {
     expect(agyQuestion(undefined)).toBeUndefined();
     const asked = agyQuestion({ question: 'Go on?' })!;
     expect(agyAnswerPrompt(asked, { kind: 'answers', answers: { 'Go on?': 'yes' } })).toContain('- Go on?\n  → yes');
+  });
+
+  it('asks you about a tool of your own server whose name starts like Beluga’s', async () => {
+    const agy = new ScriptedAgy();
+    const canUseTool = vi.fn(async () => false);
+    const r = input('own mcp_beluga_helper_wipe', { place: place(), canUseTool });
+    expect(await backend(agy).run(r)).toBe('denied: own mcp_beluga_helper_wipe');
+    expect(canUseTool).toHaveBeenCalledWith('mcp__antigravity__mcp_beluga_helper_wipe', expect.anything());
+    expect(agy.answers.at(-1)).toEqual({ outcome: { outcome: 'selected', optionId: 'deny' } });
+  });
+
+  it('judges where a moved file lands, one of its own notes too', async () => {
+    const agy = new ScriptedAgy();
+    const data = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-data-'));
+    const canUseTool = vi.fn(async () => true);
+    const p = place();
+    await backend(agy, data).run(input('hello', { place: p }));
+    const note = path.join(agyBrainDir(p.sessions[0]!, data), 'plan.md');
+    const outside = path.join(mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-out-')), 'hook.sh');
+    // Out of the run's folders: turned down without asking, though it comes from its own notes.
+    const r = input(`move ${note} ${outside}`, { place: place({ resume: p.sessions[0]! }), canUseTool });
+    expect(await backend(agy, data).run(r)).toBe(`denied: move ${note} ${outside}`);
+    expect(canUseTool).not.toHaveBeenCalled();
+    // Inside its folder: the move runs.
+    const inside = path.join(cwd, 'plan.md');
+    expect(await backend(agy, data).run(input(`move ${note} ${inside}`, { place: place({ resume: p.sessions[0]! }), canUseTool }))).toBe(`done: move ${note} ${inside}`);
+  });
+
+  it('shows no plan to approve for a planning turn stopped by Steer Now: the message’s own turn brings the plan', async () => {
+    const agy = new ScriptedAgy();
+    const plans: string[] = [];
+    const askUser = vi.fn(async (q: { kind: string; plan?: string }) => (plans.push(q.plan ?? ''), { kind: 'plan' as const, approve: true, feedback: '' }));
+    let steer: Steer | undefined;
+    const r = input('wait here', { place: place(), plan: true, askUser: askUser as unknown as AgentRunInput['askUser'], onSteer: (s) => void (s && (steer = s)) });
+    const run = backend(agy).run(r);
+    await waitFor(() => steer && !steer.status!().between && agy.sent('session/prompt').length === 1);
+    const done: string[] = [];
+    const followUp: FollowUp = { prompt: 'plan this', requesterName: 'kay', viaAgent: false, context: [], onEvent: () => undefined, onDone: (a) => void done.push(a), onError: (e) => void done.push(`error: ${e}`) };
+    expect(await steer!.interrupt!(followUp, 'Stopped for your message.')).toBe(true);
+    expect(await run).toBe('Stopped for your message.');
+    // The stopped turn's note was never a plan; the message's answer was, and approving it did the work.
+    expect(plans).toEqual(['echo: plan this']);
+    expect(done).toEqual(['echo: The plan is approved. Do the work now.']);
+    const modes = agy.sent('session/set_config_option').filter((o) => o.configId === 'mode').map((o) => o.value);
+    expect(modes).toEqual(['plan', 'default']);
+  });
+
+  it('puts the session back on a mode that asks when it goes to one that doesn’t', async () => {
+    const agy = new ScriptedAgy();
+    const r = input('mode auto', { place: place() });
+    // The scripted turn only ends once its mode is set again.
+    expect(await backend(agy).run(r)).toBe('mode: default');
+    expect(agy.sent('session/set_config_option').filter((o) => o.configId === 'mode').map((o) => o.value)).toEqual(['default']);
+    const other = input('mode accept-edits', { place: place() });
+    expect(await backend(new ScriptedAgy()).run(other)).toBe('mode: default');
   });
 
   it('goes on with the same conversation (session/load), its replay kept out of the chat', async () => {
@@ -297,6 +402,20 @@ describe('around a run', () => {
     expect(signedOut).toEqual({ state: 'signed_out', fix: AGY_SIGN_IN, models: [] });
   });
 
+  it('drops the session it opened to look only once Antigravity has stopped', async () => {
+    const agy = new ScriptedAgy();
+    const order: string[] = [];
+    const status = await agyStatus({
+      connect: async (o) => {
+        const conn = await agy.connect(o);
+        return { ...conn, proc: { ...conn.proc, kill: async () => (order.push('stopped'), conn.proc.kill()) } };
+      },
+      drop: async (id) => void order.push(`dropped ${id}`),
+    });
+    expect(status.state).toBe('ready');
+    expect(order).toEqual(['stopped', `dropped ${[...agy.sessions.keys()][0]}`]);
+  });
+
   it('forgets a deleted chat’s conversation: its file, annotations and notes', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-home-'));
     const id = '6e15d96b-cb2c-48c8-adb0-e718b9ab1dde';
@@ -320,6 +439,22 @@ describe('around a run', () => {
     mkdirSync(path.join(dir, 'conversations'), { recursive: true });
     writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
     expect(await dropAgyFolder(folder, { connect: agy.connect, dir })).toBe(1);
+  });
+
+  it('reads every page of session/list for a folder being deleted', async () => {
+    const agy = new ScriptedAgy({ listPage: 2 });
+    const folder = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-ws-'));
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-home-'));
+    mkdirSync(path.join(dir, 'conversations'), { recursive: true });
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const p = place({ cwd: folder });
+      await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect }).run(input('hello', { place: p }));
+      ids.push(p.sessions[0]!);
+      writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
+    }
+    expect(await dropAgyFolder(folder, { connect: agy.connect, dir })).toBe(5);
+    expect(ids.some((id) => existsSync(path.join(dir, 'conversations', `${id}.db`)))).toBe(false);
   });
 
   it('is registered, signs in by starting agy, and wears its own mark', () => {

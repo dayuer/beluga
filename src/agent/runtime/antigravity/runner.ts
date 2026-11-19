@@ -18,11 +18,11 @@ import { mapOpenCodeSlash as mapSlash } from '../opencode/skills.js';
 import { httpServers } from '../copilot/run-parts.js';
 import { agyComplete } from './complete.js';
 import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from './connection.js';
-import { agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
+import { agyEnd, agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir } from './sessions.js';
 import { agyStatus } from './status.js';
 import { AGY_ASK_TOOL, agyAnswerPrompt, agyQuestion } from './questions.js';
-import { AGY_DIALECT, agyCalls, agyTool, belugaToolOf } from './tools.js';
+import { agyCalls, agyDialect, agyTool, belugaToolOf } from './tools.js';
 
 export interface AgyBackendOptions {
   readonly cwd: string;
@@ -107,6 +107,8 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
       let lastContext: string | undefined;
       /** A /compact turn is running: its summary and meter stay out of the chat. */
       let compacting = false;
+      /** The question this turn asked with Antigravity's own ask_question (its form doesn't reach a client: Beluga asks it). */
+      let asking: ReturnType<typeof agyQuestion>;
       /** Antigravity's own commands here (its built-ins and the skills it loaded). */
       let commands = new Set<string>();
       const events = new AcpEvents(cwd, { onEvent: input.onEvent, ...(input.onStep ? { onStep: input.onStep } : {}) }, {
@@ -117,8 +119,9 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const ev = contextEvent(used, size, model || undefined);
           if (ev && ev !== lastContext && !compacting) input.onEvent('context', (lastContext = ev));
         },
-        quiet: () => compacting,
-        dialect: AGY_DIALECT,
+        // A /compact's summary, and the question its own ask_question left in its answer when Beluga asks it as a card instead.
+        quiet: () => compacting || Boolean(asking && input.askUser),
+        dialect: agyDialect(mounted.tools),
       });
       let conn: AgyConnection | undefined;
       let failed = true;
@@ -136,16 +139,18 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         // Updates count from the session's own id on: a loaded session's replay (its history) comes before.
         let sid = '';
         let options: readonly ConfigOption[] = [];
+        /** Holds the session on Beluga's mode (set once the session is open). */
+        let holdMode: (() => Promise<unknown>) | undefined;
         /** Why Beluga turned this turn's steps down. */
         const declined: string[] = [];
-        /** The question this turn asked with Antigravity's own ask_question (its form doesn't reach a client: Beluga asks it). */
-        let asking: ReturnType<typeof agyQuestion>;
         rpc.onNotification((method, params) => {
           if (method !== 'session/update' || !sid || params.sessionId !== sid) return;
           const update = params.update as SessionUpdate;
           if ((update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') && agyTool(update) === AGY_ASK_TOOL) asking = agyQuestion(update.rawInput) ?? asking;
           if (update.sessionUpdate === 'available_commands_update') commands = new Set(update.availableCommands.map((c) => c.name));
           if (update.sessionUpdate === 'config_option_update') options = update.configOptions;
+          if (update.sessionUpdate === 'current_mode_update') options = options.map((o) => (o.id === 'mode' ? { ...o, currentValue: update.currentModeId } : o));
+          if (update.sessionUpdate === 'config_option_update' || update.sessionUpdate === 'current_mode_update') void holdMode?.().catch(() => undefined);
           events.handle(update);
         });
         rpc.onRequest(async (method, params) => {
@@ -169,9 +174,9 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const call = await events.callOf(req.toolCall);
           if (!call) return 'Antigravity didn’t say which tool this is.';
           // Beluga's own tools are judged where they run (the tool host's gate), not twice.
-          if (belugaToolOf(call.tool, suites)) return undefined;
-          const calls = agyCalls(call.tool, call.raw, cwd, suites);
-          if (calls.every((c) => WRITES.has(c.name) && ownNote(c.input.file_path))) return undefined;
+          if (belugaToolOf(call.tool, suites, mounted.tools)) return undefined;
+          // Its own notes aren't judged; anything else a step touches is (a note moved out of its folder, where it lands).
+          const calls = agyCalls(call.tool, call.raw, cwd, suites, mounted.tools).filter((c) => !(WRITES.has(c.name) && ownNote(c.input.file_path)));
           if ((planning || readOnly) && calls.some((c) => WRITES.has(c.name))) return planning ? 'Planning only looks: nothing changes until you approve the plan.' : 'This conversation only looks: nothing may change here.';
           for (const c of calls) {
             if (PATHED.has(c.name) && !c.input.file_path) return 'Antigravity didn’t say which file, so Beluga turned it down.';
@@ -192,7 +197,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         try {
           opened ??= await rpc.request<SessionResponse>('session/new', { cwd, mcpServers: servers, _meta: instructions });
         } catch (err) {
-          throw agyFailure({ error: err instanceof Error ? err.message : String(err), stderr: link.stderr() });
+          throw agyFailure(agyEnd(err, link.stderr()));
         }
         sid = opened.sessionId!;
         options = opened.configOptions ?? [];
@@ -218,7 +223,14 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         if (wanted && !(await choose('model', wanted)) && wanted !== current()) input.onEvent('progress', `Antigravity has no ${wanted} on your plan: it runs on ${current() || 'its own model'}`);
         model = current() || model;
         await choose('thought_level', agyThought(input.effort ?? place?.effort));
-        await choose('mode', modeValue(options, planning ? 'plan' : 'default'));
+        /**
+         * The session's mode is Beluga's, as Codex's approval policy is (set on each of its turns): Plan
+         * while it plans, else its default, which asks before each command and write. Its other modes
+         * (accept-edits, auto) don't ask, so Beluga would judge nothing: whatever moved it to one (a
+         * /command, Antigravity itself), it's put back, before each turn and when it says its mode changed.
+         */
+        holdMode = () => choose('mode', modeValue(options, planning ? 'plan' : 'default'));
+        await holdMode();
 
         // Stop: cancel the turn (same contract as Claude), then the process for sure.
         let aborted = false;
@@ -247,11 +259,12 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         const runTurn = async (sink: TurnSink, blocks: ContentBlock[], again = true): Promise<{ text: string; res: PromptResponse }> => {
           declined.length = 0;
           asking = undefined;
+          await holdMode();
           events.beginTurn(sink);
           const done = deferred<PromptResponse>();
           active = { done };
           try {
-            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(agyFailure({ error: err instanceof Error ? err.message : String(err), stderr: link.stderr() })));
+            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(agyFailure(agyEnd(err, link.stderr()))));
             const res = await Promise.race([done.promise, stopped.promise, abort.promise]);
             const text = events.endTurn(res.stopReason !== 'cancelled');
             const used = usageEvent(res.usage, sid);
@@ -292,8 +305,11 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         const steer = Object.assign((_f: FollowUp) => false, { status, interrupt }) satisfies Steer;
         input.onSteer?.(steer);
 
+        /** The last turn was stopped for a message (Steer Now): what it left is no plan to approve. */
+        let cut = false;
         /** A turn's end as its answer: an interrupted one ends with the note it was stopped with. */
         const answerOf = (r: { text: string; res: PromptResponse }, sink: TurnSink): string => {
+          cut = r.res.stopReason === 'cancelled' && interrupting !== undefined;
           if (r.res.stopReason === 'cancelled') {
             if (interrupting === undefined) throw new Error('aborted');
             const note = interrupting;
@@ -332,10 +348,12 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         };
         /**
          * A turn that ended on Antigravity's own ask_question: Beluga asks you (the card, and the phone),
-         * and your answer is its next turn; again while it asks. Undefined askUser (nobody to ask): its answer as it was.
+         * and your answer is its next turn; again while it asks. Its answer then (the question written
+         * out) stayed out of the chat. Nobody to ask: its answer as it was. A turn stopped for a message
+         * (Steer Now): its question is dropped, the message's own turn goes on.
          */
         const answered = async (sink: TurnSink, answer: string): Promise<string> => {
-          for (let round = 0; asking && input.askUser && !aborted && round < QUESTION_ROUNDS; round++) {
+          for (let round = 0; asking && input.askUser && !aborted && !cut && round < QUESTION_ROUNDS; round++) {
             const asked = asking;
             const reply = await input.askUser(asked);
             if (aborted) break;
@@ -346,26 +364,36 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
 
         const original: TurnSink = { onEvent: input.onEvent, ...(input.onStep ? { onStep: input.onStep } : {}) };
         const answers: string[] = [];
-        let answer = await turnFor(original, input.prompt, (p) => (planning ? `${buildPrompt({ ...input, prompt: p })}\n\n${PLAN_NOTE}` : buildPrompt({ ...input, prompt: p })));
-        // Plan mode, Antigravity's own: the plan comes to you, and once you approve it the session goes
-        // back to its default mode and does the work.
+        /** While it plans, a message is asked for a plan (Plan mode, Antigravity's own). */
+        const built = (from: Parameters<typeof buildPrompt>[0]) => (p: string): string => (planning ? `${buildPrompt({ ...from, prompt: p })}\n\n${PLAN_NOTE}` : buildPrompt({ ...from, prompt: p }));
         let askedToDefine = false;
-        for (let round = 0; planning && input.askUser && round < PLAN_ROUNDS; round++) {
-          if (input.planTask?.needsDefinition() && !askedToDefine) {
-            askedToDefine = true;
-            answer = answerOf(await runTurn(original, [{ type: 'text', text: DEFINE_NOTE }]), original);
+        /**
+         * A planning turn's answer is its plan: it comes to you, and once you approve it the session
+         * goes back to its default mode and does the work. A turn stopped for a message left no plan:
+         * that message's own turn brings the next one.
+         */
+        const approved = async (plan: string, sink: TurnSink): Promise<string> => {
+          let answer = plan;
+          for (let round = 0; planning && input.askUser && !cut && round < PLAN_ROUNDS; round++) {
+            if (input.planTask?.needsDefinition() && !askedToDefine) {
+              askedToDefine = true;
+              answer = await answered(sink, answerOf(await runTurn(sink, [{ type: 'text', text: DEFINE_NOTE }]), sink));
+              if (cut) break;
+            }
+            const verdict = await input.askUser({ kind: 'plan', plan: (answer || '(Antigravity proposed a plan)').slice(0, 60_000) });
+            if (verdict.kind !== 'plan') break;
+            if (verdict.approve) {
+              input.planTask?.approved();
+              planning = false;
+              await choose('mode', modeValue(options, 'default'));
+            }
+            const next = verdict.approve ? 'The plan is approved. Do the work now.' : verdict.feedback ? `Change the plan: ${verdict.feedback}\n\n${PLAN_NOTE}` : NOT_YET_NOTE;
+            answer = await answered(sink, answerOf(await runTurn(sink, [{ type: 'text', text: next }]), sink));
+            if (verdict.approve || next === NOT_YET_NOTE) break;
           }
-          const verdict = await input.askUser({ kind: 'plan', plan: (answer || '(Antigravity proposed a plan)').slice(0, 60_000) });
-          if (verdict.kind !== 'plan') break;
-          if (verdict.approve) {
-            input.planTask?.approved();
-            planning = false;
-            await choose('mode', modeValue(options, 'default'));
-          }
-          const next = verdict.approve ? 'The plan is approved. Do the work now.' : verdict.feedback ? `Change the plan: ${verdict.feedback}\n\n${PLAN_NOTE}` : NOT_YET_NOTE;
-          answer = answerOf(await runTurn(original, [{ type: 'text', text: next }]), original);
-          if (verdict.approve || next === NOT_YET_NOTE) break;
-        }
+          return answer;
+        };
+        const answer = await approved(await turnFor(original, input.prompt, built(input)), original);
         answers.push(answer);
         input.onAnswered?.(answer);
 
@@ -377,7 +405,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           followUp.onStart?.();
           try {
             if (followUp.model !== undefined && agyModel(followUp.model) !== wanted) await switchModel(agyModel(followUp.model), sink);
-            followUp.onDone(await turnFor(sink, followUp.prompt, (p) => buildPrompt({ ...followUp, prompt: p })));
+            followUp.onDone(await approved(await turnFor(sink, followUp.prompt, built(followUp)), sink));
           } catch (err) {
             if (aborted) throw err;
             followUp.onError(err instanceof Error ? err.message : String(err));
