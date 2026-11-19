@@ -27,7 +27,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **Compact**, picking up a conversation later, and handing a conversation to another agent.
 - Pictures in a message.
 - Beluga's instructions go into Antigravity's own system prompt, so your rules and its own stay as they are.
-- Usage: tokens for each turn, and the context meter.
+- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota shows on Claude's card on the Usage tab, one line per model family (Gemini, Claude, GPT-OSS), each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes.
 
 ## What's different
 
@@ -39,7 +39,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **Questions mid-run**: Antigravity asks in its answer, and you reply in the box.
 - **A declined step.** Antigravity ends its turn without a word when a step is turned down, so Beluga tells it why, once, and it answers.
 - **Gemini looks around a lot.** On Gemini 3.8 Flash, Antigravity often reads and searches well past what you asked (other folders, your home folder) before it answers. Its commands still come to you, but a Claude model on your plan keeps closer to the request.
-- **Your plan's quota.** Every message uses some of your Antigravity quota, and so do Beluga's small asks when Antigravity is your agent (naming a worktree, drafting a task). When it runs out, the card says so; `agy` then `/usage` in Terminal shows what's left.
+- **Your plan's quota.** Every message uses some of your Antigravity quota, and so do Beluga's small asks when Antigravity is your agent (naming a worktree, drafting a task). When it runs out, the card says so; the Usage tab shows what's left, per model family.
 - **Your MCP servers**: the ones in your Antigravity config run in its conversations, as they do in Antigravity. Settings › MCP lists Claude Code's and Codex's.
 - **Deleting a chat** deletes Antigravity's own record of it too (its conversation file and notes in `~/.gemini/antigravity-cli`).
 

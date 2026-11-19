@@ -78,6 +78,22 @@ describe('usage per provider', () => {
     expect(shortTokens(1_234_567)).toBe('1.2M');
   });
 
+  it('shows Antigravity’s quota on Claude’s card, under its own name', () => {
+    const agy = { runtime: 'antigravity', label: 'Antigravity' };
+    let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, agy] };
+    // Before it has said its quota, it keeps its own card.
+    expect(providerCards(p, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
+    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 26 } }, 1) };
+    p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ label: 'Gemini', pct: 2 }, { label: 'Claude', pct: 0 }] }, 2) };
+    const cards = providerCards(p, undefined);
+    expect(cards.map((c) => c.key)).toEqual(['claude']);
+    expect(cards[0]).toMatchObject({ plan: 'max', shape: 'quota', isDefault: true, updatedAt: 2 });
+    expect(cards[0]?.windows.map((w) => `${w.source ?? ''}/${w.label} ${w.pct}`)).toEqual(['/Weekly 26', 'Antigravity/Gemini 2', 'Antigravity/Claude 0']);
+    // Claude signed out says so on its own card, and Antigravity's stays apart.
+    const out = { ...p, ...withUsage(p, CLAUDE_AGENT, { signedIn: false }, 3) };
+    expect(providerCards(out, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
+  });
+
   it('shows whose agent has room left, across providers', () => {
     const mia = { ...base, name: 'mia', peerId: 'm', defaultAgent: codex, ...withUsage(withUsage({}, CLAUDE_AGENT, { fiveHour: { pct: 10 } }), codex, { fiveHour: { pct: 71 }, week: { pct: 46 } }) };
     const old = { ...base, name: 'bob', peerId: 'b', usage: { week: { pct: 80 }, updatedAt: 1 } };

@@ -8,6 +8,8 @@ export interface CardWindow {
   readonly short: string;
   readonly pct: number;
   readonly resetsAt?: number;
+  /** Another provider's window shown on this card ("Antigravity"), under that name. */
+  readonly source?: string;
 }
 
 /**
@@ -63,7 +65,25 @@ function cardOf(agent: AgentRef, u: ProviderUsage | undefined, isDefault: boolea
 export function providerCards(self: Pick<Profile, 'usage' | 'usages' | 'agents'> | undefined, defaultAgent: AgentRef | undefined): ProviderCard[] {
   const usages = usagesOf(self);
   const def = (defaultAgent ?? CLAUDE_AGENT).runtime;
-  return providersOf(self).map((a) => cardOf(a, usages.find((u) => u.agent.runtime === a.runtime), a.runtime === def));
+  return foldIntoClaude(providersOf(self).map((a) => cardOf(a, usages.find((u) => u.agent.runtime === a.runtime), a.runtime === def)));
+}
+
+/** Providers whose quota shows on Claude's card instead of a card of its own (Antigravity's: Gemini, Claude, GPT-OSS). */
+const ON_CLAUDES_CARD = new Set(['antigravity']);
+
+/**
+ * One card for Claude and Antigravity: Antigravity's windows (once it has said them) go under
+ * Claude's own, each marked with where it's from, and its card goes.
+ */
+function foldIntoClaude(cards: ProviderCard[]): ProviderCard[] {
+  const claude = cards.find((c) => c.key === CLAUDE_AGENT.runtime);
+  const guests = cards.filter((c) => ON_CLAUDES_CARD.has(c.key) && c.shape === 'quota');
+  // Claude signed out says so on its card: Antigravity's windows keep their own then.
+  if (!claude?.signedIn || !guests.length) return cards;
+  const windows = [...claude.windows, ...guests.flatMap((g) => g.windows.map((w) => ({ ...w, source: g.agent.label })))];
+  const updatedAt = Math.max(claude.updatedAt ?? 0, ...guests.map((g) => g.updatedAt ?? 0));
+  const merged: ProviderCard = { ...claude, shape: 'quota', windows, ...(updatedAt ? { updatedAt } : {}) };
+  return cards.filter((c) => !guests.includes(c)).map((c) => (c === claude ? merged : c));
 }
 
 /** One friend's provider with quota windows: whose agent has room left. */

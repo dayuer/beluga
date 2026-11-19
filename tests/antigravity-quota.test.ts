@@ -1,0 +1,85 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
+import type { AgyConnection } from '../src/agent/runtime/antigravity/connection.js';
+import { type AgyUserStatus, fromUserStatus, portFromLog, readAgyQuota } from '../src/agent/runtime/antigravity/quota.js';
+import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
+import type { RoomBridge } from '../src/agent/types.js';
+import { room } from './runtime-conformance.js';
+
+const RESET = '2026-11-19T22:26:56Z';
+const LATER = '2026-11-19T22:44:42Z';
+
+/** The shapes GetUserStatus answered with (Antigravity 2.33, CLI 1.5.12), trimmed. */
+const status: AgyUserStatus = {
+  userTier: { name: 'Google AI Ultra' },
+  planStatus: { planInfo: { planName: 'Pro' } },
+  cascadeModelConfigData: {
+    clientModelConfigs: [
+      { label: 'Gemini 4 Neon (High)', modelId: 'gemini-4-neon-high', quotaInfo: { remainingFraction: 0.9786179, resetTime: RESET } },
+      { label: 'Orchestrator (Carbon)', modelId: 'gemini-pro-orchestrator', quotaInfo: { remainingFraction: 0.9786179, resetTime: RESET } },
+      { label: 'Gemini 3.8 Flash (Low)', modelId: 'gemini-3.8-flash-low', quotaInfo: { remainingFraction: 0.5, resetTime: RESET } },
+      { label: 'Claude Opus 5.5 (High)', modelId: 'claude-opus-5-5-high', quotaInfo: { remainingFraction: 1, resetTime: LATER } },
+      // Used up: protobuf's JSON leaves a 0 out.
+      { label: 'GPT-OSS 120B (Medium)', modelId: 'gpt-oss-120b-medium', quotaInfo: { resetTime: LATER } },
+      { label: 'Some Model', modelId: 'other-thing' },
+    ],
+  },
+};
+
+describe('Antigravity quota', () => {
+  it('one window per model family, its tightest model’s, and the tier as the plan', () => {
+    expect(fromUserStatus(status)).toEqual({
+      plan: 'Google AI Ultra',
+      windows: [
+        { label: 'Gemini', pct: 50, resetsAt: Date.parse(RESET) },
+        { label: 'Claude', pct: 0, resetsAt: Date.parse(LATER) },
+        { label: 'GPT-OSS', pct: 100, resetsAt: Date.parse(LATER) },
+      ],
+    });
+  });
+
+  it('says nothing without a model that has a quota', () => {
+    expect(fromUserStatus(undefined)).toBeUndefined();
+    expect(fromUserStatus({ cascadeModelConfigData: { clientModelConfigs: [{ label: 'X', modelId: 'x' }] } })).toBeUndefined();
+  });
+
+  it('keeps at most six families', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ label: `Fam${i} (Low)`, modelId: `fam${i}-low`, quotaInfo: { remainingFraction: 1 } }));
+    expect(fromUserStatus({ cascadeModelConfigData: { clientModelConfigs: many } })?.windows).toHaveLength(6);
+  });
+
+  it('reads the HTTP port from its log, never the HTTPS one', () => {
+    const log = ['I1120 server.go:1274] Language server listening on random port at 50007 for HTTPS (gRPC)', 'I1120 server.go:1282] Language server listening on random port at 50008 for HTTP', ''].join('\n');
+    expect(portFromLog(log)).toBe(50008);
+    expect(portFromLog('Language server listening on random port at 50007 for HTTPS (gRPC)\n')).toBeUndefined();
+  });
+
+  it('opens a conversation, asks its language server, then stops it and drops the conversation', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'agy-log-'));
+    try {
+      const pid = 4242;
+      writeFileSync(path.join(dir, `acp-server-20261120_004854-${pid}.log`), 'Language server listening on random port at 52377 for HTTP\n');
+      const kill = vi.fn(async () => undefined);
+      const conn = { rpc: { request: async () => ({ sessionId: 'abc' }) }, proc: { pid, alive: () => true, kill, exited: Promise.resolve() } } as unknown as AgyConnection;
+      const fetch = vi.fn(async (_url: string) => new Response(JSON.stringify({ userStatus: status })));
+      const drop = vi.fn(async () => true);
+      const update = await readAgyQuota({ connect: async () => conn, logDir: dir, fetch: fetch as unknown as typeof globalThis.fetch, drop });
+      expect(update?.windows?.map((w) => w.label)).toEqual(['Gemini', 'Claude', 'GPT-OSS']);
+      expect(fetch.mock.calls[0]?.[0]).toBe('http://127.0.0.1:52377/exa.language_server_pb.LanguageServerService/GetUserStatus');
+      expect(kill).toHaveBeenCalled();
+      expect(drop).toHaveBeenCalledWith('abc');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a refresh files it under Antigravity, never Claude', async () => {
+    const reportUsage = vi.fn();
+    const bridge = Object.assign(Object.create(room) as RoomBridge, { reportUsage });
+    const backend = createAgyBackend({ cwd: os.tmpdir(), autoEdit: false, additionalDirectories: [], bridge, readQuota: async () => fromUserStatus(status) });
+    expect(await backend.refreshUsage?.()).toBeUndefined();
+    expect(reportUsage).toHaveBeenCalledWith(expect.objectContaining({ plan: 'Google AI Ultra', signedIn: true }), { runtime: 'antigravity', label: 'Antigravity' });
+  });
+});

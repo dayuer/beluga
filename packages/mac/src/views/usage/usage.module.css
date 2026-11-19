@@ -289,6 +289,15 @@
 .window {
   min-width: 0;
 }
+/* Another provider's windows on this card (Antigravity's on Claude's): a quiet heading over them. */
+.windowSource {
+  grid-column: 1 / -1;
+  margin-bottom: -8px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--card-line);
+  font-size: 0.85em;
+  color: var(--text-3);
+}
 .windowHead {
   display: flex;
   align-items: baseline;

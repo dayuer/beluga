@@ -9,6 +9,7 @@ import { syncProbes } from '../../sync-main.js';
 import { gateTool } from '../../tool-gate.js';
 import { ToolHost } from '../../tool-host.js';
 import type { AgentBackend, AgentRunInput, FollowUp, LiveStatus, RoomBridge, Steer } from '../../types.js';
+import type { UsageUpdate } from '../../usage.js';
 import { ViewShelf } from '../../view-tools.js';
 import { INTERRUPT_TIMEOUT_MS } from '../types.js';
 import { type ConfigOption, type ContentBlock, type PermissionRequest, type PromptResponse, type SessionResponse, type SessionUpdate, permissionAnswer } from '../opencode/acp.js';
@@ -20,6 +21,7 @@ import { agyComplete } from './complete.js';
 import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from './connection.js';
 import { agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir } from './sessions.js';
+import { readAgyQuota } from './quota.js';
 import { agyStatus } from './status.js';
 import { AGY_DIALECT, agyCalls, belugaToolOf } from './tools.js';
 
@@ -37,6 +39,8 @@ export interface AgyBackendOptions {
   readonly toolHost?: ToolHost;
   /** Where Antigravity keeps its conversations (its own notes, a plan or a task list, are written there). */
   readonly dataDir?: string;
+  /** Reads your quota now (tests: a fake; none with a scripted `connect`, where it's readAgyQuota). */
+  readonly readQuota?: () => Promise<UsageUpdate | undefined>;
 }
 
 const AGY_AGENT = { runtime: 'antigravity', label: 'Antigravity' } as const;
@@ -378,6 +382,15 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
 
     // Side calls (naming, drafting, chat answers…) through a one-off Antigravity conversation each.
     ...sideCalls((req) => agyComplete(req, side), opts.cwd, opts.model),
+
+    // What's left of your Antigravity quota, per model family, without a run (the usage tab):
+    // reported for Antigravity, so nothing is filed as Claude's.
+    async refreshUsage() {
+      const read = opts.readQuota ?? (opts.connect ? undefined : () => (bin() ? readAgyQuota({ bin: bin()! }) : Promise.resolve(undefined)));
+      const update = await read?.().catch(() => undefined);
+      if (update) opts.bridge.reportUsage({ ...update, signedIn: true }, AGY_AGENT);
+      return undefined;
+    },
 
     // Its models: what a session offers (the ones your plan has).
     listModels: async () => {
