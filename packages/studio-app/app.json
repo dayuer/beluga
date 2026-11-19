@@ -7,7 +7,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F6F6F7",
-    "platforms": ["web"],
+    "platforms": ["ios", "android"],
+    "ios": {
+      "bundleIdentifier": "com.synon.studio",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.synon.studio"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",
