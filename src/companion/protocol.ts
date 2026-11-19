@@ -156,13 +156,15 @@ export const COMPANION_PROTO = { major: 1, minor: 64 } as const;
  * older Mac sends none, and the phone offers neither.
  * 1.59–1.61 and 1.63 (fork): auto route's pick on a task, a plan's architect and fix agent, and who did each
  * part of a milestone. Taken out on 2026-11-18, when the fork went back to upstream's planner, builder and
- * checker (1.58); their numbers aren't used again.
+ * checker (1.58). Upstream has since taken 1.59 for its own (below); the fork's 1.60, 1.61 and 1.63 aren't used again.
  * 1.62 (was 1.61 until upstream took 1.57, BLG-74, fork; was 1.60, before that 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
  * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
  * never sends one; an older phone draws it as a plain card (no Approve here).
- * 1.64 (fork): when a plan's task reached the state it's in and when it last changed
+ * 1.59 (upstream, beluga-labs/beluga#589): when a plan's task reached the state it's in and when it last changed
  * (`PlanTaskView.since` / `updatedAt`), so every task says how fresh it is, not only those at work.
  * An older Mac sends neither; an older phone shows neither.
+ * 1.64 (fork): carried the same task times before upstream took them as 1.59; it adds nothing of its own now,
+ * but stays the fork's number since phones already speak it.
  */
 export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, chatLinks: 51, chatOrigin: 52, queuedOrigin: 53, telemetry: 54, sharedMark: 55, chatSchedules: 57, autopilot: 58, planRoles: 58 } as const;
 
@@ -775,7 +777,7 @@ export const PlanTaskView = z.object({
   acceptance: z.array(z.string().max(400)).max(20).optional(),
   blockedBy: z.array(id).max(20).optional(),
   why: z.string().max(300).optional(),
-  /** 1.64: when it reached the state it's in, and when it last changed (ms); none until it's on the board. */
+  /** 1.59: when it reached the state it's in, and when it last changed (ms); none until it's on the board. */
   since: z.number().optional(),
   updatedAt: z.number().optional(),
 });

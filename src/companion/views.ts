@@ -1012,7 +1012,7 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
   };
 }
 
-/** 1.64: a plan task's times (on the board only): since it reached its state, and its last change. */
+/** 1.59: a plan task's times (on the board only): since it reached its state, and its last change. */
 function timesOf(t: TaskView): Pick<PlanTaskView, 'since' | 'updatedAt'> {
   const at = t.issue && taskTimes(t.issue, t.pulse);
   if (!at) return {};

@@ -157,7 +157,7 @@ describe('the Mac’s task cards say when each last changed', () => {
   });
 });
 
-describe('the phone’s plan says when each task last changed (1.64)', () => {
+describe('the phone’s plan says when each task last changed (1.59)', () => {
   const ws = (id: string, name: string): Workspace => ({ id, projectId: 'api', name, path: `/tmp/${name}`, kind: 'chat', projectRoot: '/tmp/p', branch: `beluga/${name}`, createdAt: 0, external: false }) as unknown as Workspace;
   const BODY: BodyInput = { title: 'Parser', goal: 'A faster parser.', milestones: [{ id: 'm1', title: 'Fast', criteria: ['fast'], tasks: [{ id: 'a', title: 'Lexer' }] }] };
 
@@ -178,7 +178,7 @@ describe('the phone’s plan says when each task last changed (1.64)', () => {
     const made = store.getState().board.issues.find((i) => i.plan?.id === p.id)!;
     expect(task.since).toBe(taskTimes(made)!.since);
     expect(task.updatedAt).toBe(made.updatedAt);
-    // Additive: a phone from before 1.64 parses the same view with the fields dropped.
+    // Additive: a phone from before 1.59 parses the same view with the fields dropped.
     const older = PlanView.shape.milestones.element.shape.tasks.element.omit({ since: true, updatedAt: true }).strip();
     expect(older.parse(task)).not.toHaveProperty('updatedAt');
   });
