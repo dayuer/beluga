@@ -269,10 +269,13 @@ describe('around a run', () => {
     const id = '6e15d96b-cb2c-48c8-adb0-e718b9ab1dde';
     for (const sub of ['conversations', 'annotations', path.join('brain', id)]) mkdirSync(path.join(dir, sub), { recursive: true });
     writeFileSync(path.join(dir, 'conversations', `${id}.db`), 'x');
+    for (const end of ['-wal', '-shm']) writeFileSync(path.join(dir, 'conversations', `${id}.db${end}`), 'x');
     writeFileSync(path.join(dir, 'annotations', `${id}.pbtxt`), 'x');
     writeFileSync(path.join(dir, 'conversations', 'other.db'), 'kept');
     expect(await dropAgySession(id, dir)).toBe(true);
     expect(existsSync(path.join(dir, 'conversations', `${id}.db`))).toBe(false);
+    // Its SQLite journal and shared memory go with it, not left behind.
+    for (const end of ['-wal', '-shm']) expect(existsSync(path.join(dir, 'conversations', `${id}.db${end}`))).toBe(false);
     expect(existsSync(agyBrainDir(id, dir))).toBe(false);
     expect(readFileSync(path.join(dir, 'conversations', 'other.db'), 'utf8')).toBe('kept');
     expect(await dropAgySession('../escape', dir)).toBe(false);
