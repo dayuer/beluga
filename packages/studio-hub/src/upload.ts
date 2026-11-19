@@ -346,6 +346,100 @@ export async function completeUploadSession(
   };
 }
 
+/** 查询上传会话及各文件已收到的分块（SS-83 断点续传）。 */
+export async function getUploadSessionStatus(
+  env: UploadEnv,
+  customerId: string,
+  sessionId: string,
+  now: number,
+): Promise<{ ok: true; status: 200; body: unknown } | { ok: false; status: number; error: string }> {
+  const session = await env.DB.prepare('SELECT * FROM upload_sessions WHERE id = ?').bind(sessionId).first<SessionRow>();
+  if (!session) return { ok: false, status: 404, error: 'session-not-found' };
+  if (session.customer_id !== customerId) return { ok: false, status: 403, error: 'not-yours' };
+  if (session.status === 'expired' || (session.status === 'uploading' && now >= session.expires_at)) {
+    return { ok: false, status: 410, error: 'session-expired' };
+  }
+
+  const { results: files } = await env.DB.prepare('SELECT * FROM upload_files WHERE session_id = ? ORDER BY file_index ASC')
+    .bind(sessionId)
+    .all<FileRow>();
+  const { results: parts } = await env.DB.prepare(
+    'SELECT * FROM upload_parts WHERE session_id = ? ORDER BY file_index ASC, part_number ASC',
+  )
+    .bind(sessionId)
+    .all<PartRow>();
+
+  const partsByFile = new Map<number, PartRow[]>();
+  for (const p of parts) {
+    const list = partsByFile.get(p.file_index) ?? [];
+    list.push(p);
+    partsByFile.set(p.file_index, list);
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    body: {
+      sessionId: session.id,
+      projectId: session.project_id,
+      name: session.name,
+      status: session.status,
+      totalFiles: session.total_files,
+      totalBytes: session.total_bytes,
+      expiresAt: session.expires_at,
+      files: files.map((f) => {
+        const fileParts = partsByFile.get(f.file_index) ?? [];
+        const receivedBytes = fileParts.reduce((acc, p) => acc + p.size, 0);
+        return {
+          fileIndex: f.file_index,
+          path: f.path,
+          size: f.size,
+          sha256: f.sha256,
+          receivedBytes,
+          parts: fileParts.map((p) => ({
+            partNumber: p.part_number,
+            size: p.size,
+            etag: p.etag,
+            sha256: p.sha256,
+          })),
+        };
+      }),
+    },
+  };
+}
+
+/** 清理超过 24 小时未完成的上传会话：中止 R2 multipart 并清理分块记录。 */
+export async function pruneExpiredUploadSessions(env: UploadEnv, now: number): Promise<number> {
+  const { results: expired } = await env.DB.prepare(
+    `SELECT * FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ?`,
+  )
+    .bind(now)
+    .all<SessionRow>();
+
+  let count = 0;
+  for (const session of expired) {
+    if (env.ASSETS) {
+      const { results: files } = await env.DB.prepare('SELECT * FROM upload_files WHERE session_id = ?')
+        .bind(session.id)
+        .all<FileRow>();
+      for (const file of files) {
+        try {
+          await env.ASSETS.resumeMultipartUpload(file.r2_key, file.r2_upload_id).abort();
+        } catch {
+          // R2 分片上传可能已自动过期或不存在，忽略错误继续清理数据库。
+        }
+      }
+    }
+    await env.DB.prepare('DELETE FROM upload_parts WHERE session_id = ?').bind(session.id).run();
+    await env.DB.prepare('DELETE FROM upload_files WHERE session_id = ?').bind(session.id).run();
+    await env.DB.prepare(`UPDATE upload_sessions SET status = 'expired', updated_at = ? WHERE id = ?`)
+      .bind(now, session.id)
+      .run();
+    count++;
+  }
+  return count;
+}
+
 /**
  * 处理 `/v1/app/uploads*` 请求，不匹配时返回 `undefined`。
  */
@@ -405,6 +499,13 @@ export async function handleUploadRequest(
       { sessionId, fileIndex, partNumber, data, expectedSha256 },
       now,
     );
+    return result.ok ? jsonOf(result.body, result.status) : jsonOf({ error: result.error }, result.status);
+  }
+
+  // GET /v1/app/uploads/:sessionId
+  if (segments.length === 1 && req.method === 'GET') {
+    const sessionId = segments[0]!;
+    const result = await getUploadSessionStatus(env, auth.customer.id, sessionId, now);
     return result.ok ? jsonOf(result.body, result.status) : jsonOf({ error: result.error }, result.status);
   }
 

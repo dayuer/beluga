@@ -4,8 +4,8 @@ vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
 }));
 
-import { notifyWaitingCards } from '../packages/studio-hub/src/hub.js';
-import type { PushEnv } from '../packages/studio-hub/src/push.js';
+import { notifyWaitingCards } from '../src/hub.js';
+import type { PushEnv } from '../src/push.js';
 
 function createDedupMockDb() {
   const members = [{ project_id: 'p1', customer_id: 'c1' }];

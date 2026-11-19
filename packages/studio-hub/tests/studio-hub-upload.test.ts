@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { sha256Hex } from '../src/net/studio/store.js';
-import { D1HubStore } from '../packages/studio-hub/src/d1.js';
-import { handleUploadRequest, type UploadEnv } from '../packages/studio-hub/src/upload.js';
+import { sha256Hex } from '../../../src/net/studio/store.js';
+import { D1HubStore } from '../src/d1.js';
+import {
+  handleUploadRequest,
+  pruneExpiredUploadSessions,
+  UPLOAD_LIMITS,
+  type UploadEnv,
+} from '../src/upload.js';
 
 function createMockR2() {
   const uploads = new Map<string, { key: string; parts: Map<number, { etag: string; data: Uint8Array }> }>();
@@ -102,7 +107,7 @@ function createUploadMockDb(seed: {
                   token_hash: seed.sessionHash,
                   customer_id: seed.customerId,
                   created_at: seed.now - 1000,
-                  expires_at: seed.now + 100_000,
+                  expires_at: seed.now + 30 * 24 * 60 * 60 * 1000,
                   revoked_at: null,
                 }
               : null) as T | null;
@@ -126,6 +131,13 @@ function createUploadMockDb(seed: {
           return null;
         },
         async all<T>() {
+          if (sql.includes("FROM upload_sessions WHERE status = 'uploading' AND expires_at <= ?")) {
+            const cutoff = Number(args[0]);
+            const rows = [...sessions.values()].filter(
+              (s) => s.status === 'uploading' && Number(s.expires_at) <= cutoff,
+            );
+            return { results: rows as T[] };
+          }
           if (sql.includes('FROM upload_files WHERE session_id = ?')) {
             const sid = String(args[0]);
             const rows = [...files.values()]
@@ -217,6 +229,36 @@ function createUploadMockDb(seed: {
               row.updated_at = args[0];
             }
             return { meta: { changes: row ? 1 : 0 } };
+          }
+          if (sql.includes("UPDATE upload_sessions SET status = 'expired'")) {
+            const row = sessions.get(String(args[1]));
+            if (row) {
+              row.status = 'expired';
+              row.updated_at = args[0];
+            }
+            return { meta: { changes: row ? 1 : 0 } };
+          }
+          if (sql.includes('DELETE FROM upload_parts WHERE session_id = ?')) {
+            const sid = String(args[0]);
+            let removed = 0;
+            for (const [k, v] of parts.entries()) {
+              if (v.session_id === sid) {
+                parts.delete(k);
+                removed++;
+              }
+            }
+            return { meta: { changes: removed } };
+          }
+          if (sql.includes('DELETE FROM upload_files WHERE session_id = ?')) {
+            const sid = String(args[0]);
+            let removed = 0;
+            for (const [k, v] of files.entries()) {
+              if (v.session_id === sid) {
+                files.delete(k);
+                removed++;
+              }
+            }
+            return { meta: { changes: removed } };
           }
           return { meta: { changes: 0 } };
         },
@@ -410,5 +452,144 @@ describe('SS-82 design package upload', () => {
       now,
     );
     expect(tooBig?.status).toBe(400);
+  });
+});
+
+describe('SS-83 resume query and 24h expiration', () => {
+  it('queries received chunks after disconnect and completes after resuming', async () => {
+    const { env, hub, now, token, objects } = await setup();
+
+    const f0 = new Uint8Array(1024 * 1024);
+    f0.fill(1);
+    const f1 = new Uint8Array(512 * 1024);
+    f1.fill(2);
+
+    const sha0 = createHash('sha256').update(f0).digest('hex');
+    const sha1 = createHash('sha256').update(f1).digest('hex');
+
+    const beginRes = await handleUploadRequest(
+      new Request('https://hub.example/v1/app/uploads', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'p1',
+          name: 'resume-pkg',
+          files: [
+            { path: 'a.png', size: f0.byteLength, sha256: sha0 },
+            { path: 'b.json', size: f1.byteLength, sha256: sha1 },
+          ],
+        }),
+      }),
+      env,
+      hub,
+      now,
+    );
+    const { sessionId } = (await beginRes!.json()) as { sessionId: string };
+
+    // 断线前只传了 file 0 的 part 1（前 512 KB）
+    const half = 512 * 1024;
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}` },
+        body: f0.slice(0, half),
+      }),
+      env,
+      hub,
+      now + 100,
+    );
+
+    // 断线重连后查询已收到哪些块
+    const statusRes = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      env,
+      hub,
+      now + 200,
+    );
+    expect(statusRes?.status).toBe(200);
+    const statusBody = (await statusRes!.json()) as {
+      status: string;
+      files: Array<{ fileIndex: number; receivedBytes: number; parts: Array<{ partNumber: number; size: number }> }>;
+    };
+    expect(statusBody.status).toBe('uploading');
+    expect(statusBody.files[0]?.receivedBytes).toBe(half);
+    expect(statusBody.files[0]?.parts.map((p) => p.partNumber)).toEqual([1]);
+    expect(statusBody.files[1]?.receivedBytes).toBe(0);
+    expect(statusBody.files[1]?.parts).toEqual([]);
+
+    // 续传剩余块：file 0 part 2 和 file 1 part 1
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/0/parts/2`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}` },
+        body: f0.slice(half),
+      }),
+      env,
+      hub,
+      now + 300,
+    );
+    await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/files/1/parts/1`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}` },
+        body: f1,
+      }),
+      env,
+      hub,
+      now + 400,
+    );
+
+    const completeRes = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}/complete`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      env,
+      hub,
+      now + 500,
+    );
+    expect(completeRes?.status).toBe(200);
+    expect(objects.size).toBe(2);
+  });
+
+  it('expires and prunes sessions after 24 hours', async () => {
+    const { env, hub, now, token, uploads } = await setup();
+    const data = new Uint8Array(1024);
+    const sha = createHash('sha256').update(data).digest('hex');
+
+    const beginRes = await handleUploadRequest(
+      new Request('https://hub.example/v1/app/uploads', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'p1',
+          name: 'stale-pkg',
+          files: [{ path: 'stale.png', size: data.byteLength, sha256: sha }],
+        }),
+      }),
+      env,
+      hub,
+      now,
+    );
+    const { sessionId } = (await beginRes!.json()) as { sessionId: string };
+    expect(uploads.size).toBe(1);
+
+    const pruned = await pruneExpiredUploadSessions(env, now + UPLOAD_LIMITS.sessionTtlMs + 1);
+    expect(pruned).toBe(1);
+    expect(uploads.size).toBe(0);
+
+    const statusRes = await handleUploadRequest(
+      new Request(`https://hub.example/v1/app/uploads/${sessionId}`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      env,
+      hub,
+      now + UPLOAD_LIMITS.sessionTtlMs + 2,
+    );
+    expect(statusRes?.status).toBe(410);
   });
 });

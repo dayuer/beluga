@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { sha256Hex } from '../src/net/studio/store.js';
-import { D1HubStore } from '../packages/studio-hub/src/d1.js';
+import { sha256Hex } from '../../../src/net/studio/store.js';
+import { D1HubStore } from '../src/d1.js';
 import {
   handlePushTokenRequest,
   listPushTokensForCustomer,
   type PushPlatform,
-} from '../packages/studio-hub/src/push-tokens.js';
-import type { Env } from '../packages/studio-hub/src/hub.js';
+} from '../src/push-tokens.js';
+import type { Env } from '../src/hub.js';
 
 interface MockTokenRow {
   customer_id: string;

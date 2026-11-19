@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { sendPushToCustomer, type PushEnv } from '../packages/studio-hub/src/push.js';
-import type { PushPlatform } from '../packages/studio-hub/src/push-tokens.js';
+import { sendPushToCustomer, type PushEnv } from '../src/push.js';
+import type { PushPlatform } from '../src/push-tokens.js';
 
 interface TokenRow {
   customer_id: string;
