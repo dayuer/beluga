@@ -19,7 +19,7 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
   hasSubagents: false,
   hasBackgroundAgents: false,
   // Tokens per turn and the context meter; its quota per model family, asked of its own language
-  // server (quota.ts: ACP doesn't say it), shown on Claude's usage card.
+  // server (quota.ts: ACP doesn't say it), on its own usage card.
   hasUsage: true,
   // session/load; it can't branch a conversation.
   canResume: true,

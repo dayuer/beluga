@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
 import type { AppState } from '@beluga/core/store.js';
-import { type CardWindow, type FriendRoom, type ProviderCard, friendRooms, providerCards, shortTokens } from '@beluga/ui/usage-cards.js';
+import { type CardWindow, type FriendRoom, type ProviderCard, friendRooms, providerCards, shortTokens, windowHeading } from '@beluga/ui/usage-cards.js';
 import { agentMark } from '@beluga/shared/agent-marks.js';
 import { Icon } from '../../components/Icon.js';
 import { Avatar, IconButton, cx } from '../../components/ui.js';
@@ -21,7 +21,7 @@ function WindowMeter({ w, now }: { w: CardWindow; now: number }) {
           <small>%</small>
         </span>
       </div>
-      <Meter pct={w.pct} label={`${w.source ? `${w.source} ${w.label}` : w.label}: ${w.pct}% used`} />
+      <Meter pct={w.pct} label={`${[windowHeading(w), w.label].filter(Boolean).join(' ')}: ${w.pct}% used`} />
       <div className={s.windowFoot}>{w.resetsAt && w.resetsAt > now ? `Resets ${resetsAt(w.resetsAt, now)}` : `${100 - w.pct}% left`}</div>
     </div>
   );
@@ -101,8 +101,8 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
       ) : card.shape === 'quota' ? (
         <div className={s.windows}>
           {card.windows.map((w, i) => (
-            <Fragment key={`${w.source ?? ''}:${w.label}`}>
-              {w.source && w.source !== card.windows[i - 1]?.source ? <div className={s.windowSource}>{w.source}</div> : null}
+            <Fragment key={`${windowHeading(w) ?? ''}:${w.label}`}>
+              {windowHeading(w) && windowHeading(w) !== (i > 0 ? windowHeading(card.windows[i - 1]!) : undefined) ? <div className={s.windowGroup}>{windowHeading(w)}</div> : null}
               <WindowMeter w={w} now={now} />
             </Fragment>
           ))}
@@ -179,8 +179,8 @@ function FriendsCard({ rooms }: { rooms: FriendRoom[] }) {
 export function PlanCard({ state, now }: { state: AppState; now: number }) {
   const selfId = state.self?.peerId ?? state.selfId;
   const me = state.peers.find((p) => p.peerId === selfId) ?? state.self;
-  // Your setting (unset: Claude) answers at once; the peer card friends see follows it.
-  const cards = providerCards(me, state.prefs.defaultAgent);
+  // Your setting (unset: Claude) answers at once; the peer card friends see follows it. Only agents ready here have a card.
+  const cards = providerCards(me, state.prefs.defaultAgent, state.runtimes);
   const rooms = friendRooms(state.peers, selfId);
   return (
     <>

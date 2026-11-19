@@ -13039,5 +13039,6 @@
  "The Antigravity CLI isn’t installed on this {0}. Install it (curl -fsSL https://antigravity.google/cli/install.sh | bash), then try again.": "这台 {0} 上没有安装 Antigravity CLI。请安装它（curl -fsSL https://antigravity.google/cli/install.sh | bash），然后再试一次。",
  "Beluga runs Claude Code, Codex, OpenCode, GitHub Copilot, Antigravity or a model of your own on each of your tasks, each in its own copy of the repository. You watch them work, answer when they ask, and merge what’s done.": "Beluga 让 Claude Code、Codex、OpenCode、GitHub Copilot、Antigravity 或你自己的模型分别处理你的每个任务，每个都在仓库的独立副本里。你看着它们工作，在它们提问时回答，然后合并完成的工作。",
  "At work on it: {0}": "正在做它的：{0}",
- "Will work on it: {0}": "将来做它的：{0}"
+ "Will work on it: {0}": "将来做它的：{0}",
+ "{who} asks": "{who} 提问"
 }

@@ -255,6 +255,16 @@ describe('a run on Antigravity', () => {
     expect(askUser).not.toHaveBeenCalled();
   });
 
+  it('asks a question in Chinese the same way: the card, then your answer as its next turn', async () => {
+    const agy = new ScriptedAgy();
+    const askUser = vi.fn(async (q: Parameters<NonNullable<AgentRunInput['askUser']>>[0]) => ({ kind: 'answers' as const, answers: { [q.kind === 'question' ? q.questions[0]!.question : '']: '暂不' } }));
+    const r = input('question zh', { place: place(), askUser });
+    expect(await backend(agy).run(r)).toBe('answered: 暂不');
+    expect(askUser).toHaveBeenCalledWith({ kind: 'question', questions: [{ question: '现在部署到服务器吗？', header: '', options: ['是，通过 SSH', '已完成（我自己做了）', '暂不'].map((label) => ({ label, description: '' })), multiSelect: false }] });
+    // Shown once, as the card.
+    expect(r.events.filter(([k]) => k === 'text').map(([, t]) => t)).toEqual(['answered: 暂不']);
+  });
+
   it('tells it you skipped its question, and leaves it as it was with nobody to ask', async () => {
     const agy = new ScriptedAgy();
     const askUser = vi.fn(async () => ({ kind: 'skip' as const }));

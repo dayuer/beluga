@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { usageFor, usagesOf, withUsage } from '../src/agent/usage.js';
 import { CLAUDE_AGENT, PeerInfo, Profile } from '../src/protocol.js';
-import { friendRooms, providerCards, shortTokens, GUEST_STALE_MS } from '../src/ui/usage-cards.js';
+import { friendRooms, providerCards, shortTokens, windowHeading } from '../src/ui/usage-cards.js';
+import { usageViews } from '../src/companion/views.js';
 
 /** The Profile an older Mac (before per-provider usage) parses frames with. */
 const OldWindow = z.object({ pct: z.number().min(0).max(100), resetsAt: z.number().optional() });
@@ -78,37 +79,48 @@ describe('usage per provider', () => {
     expect(shortTokens(1_234_567)).toBe('1.2M');
   });
 
-  it('shows Antigravity’s quota on Claude’s card, under its own name', () => {
+  it('gives Antigravity a card of its own, its windows headed by their group of models', () => {
     const agy = { runtime: 'antigravity', label: 'Antigravity' };
     let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, agy] };
-    // Before it has said its quota, it keeps its own card.
-    expect(providerCards(p, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
-    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 26 } }, 1) };
-    p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ label: 'Gemini', pct: 2 }, { label: 'Claude', pct: 0 }] }, 2) };
-    const cards = providerCards(p, undefined);
-    expect(cards.map((c) => c.key)).toEqual(['claude']);
-    // As old as its oldest reading (Claude's, here).
-    expect(cards[0]).toMatchObject({ plan: 'max', shape: 'quota', isDefault: true, updatedAt: 1 });
-    expect(cards[0]?.windows.map((w) => `${w.source ?? ''}/${w.label} ${w.pct}`)).toEqual(['/Weekly 26', 'Antigravity/Gemini 2', 'Antigravity/Claude 0']);
-    // Claude signed out says so on its own card, and Antigravity's stays apart.
-    const out = { ...p, ...withUsage(p, CLAUDE_AGENT, { signedIn: false }, 3) };
-    expect(providerCards(out, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
+    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 31 } }, 1) };
+    p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ group: 'Gemini Models', label: '5-hour', pct: 25 }, { group: 'Gemini Models', label: 'Weekly', pct: 8 }, { group: 'Claude and GPT models', label: '5-hour', pct: 0 }] }, 2) };
+    const cards = providerCards(p, agy);
+    expect(cards.map((c) => [c.key, c.isDefault, c.windows.length])).toEqual([
+      ['claude', false, 1],
+      ['antigravity', true, 3],
+    ]);
+    expect(cards[1]).toMatchObject({ plan: 'Google AI Ultra', shape: 'quota', updatedAt: 2 });
+    expect(cards[1]?.windows.map((w) => [windowHeading(w), w.label, w.short])).toEqual([
+      ['Gemini Models', '5-hour', '5h'],
+      ['Gemini Models', 'Weekly', 'wk'],
+      ['Claude and GPT models', '5-hour', '5h'],
+    ]);
+    // Claude's own windows have no group: no heading over them.
+    expect(windowHeading(cards[0]!.windows[0]!)).toBeUndefined();
+    // A group's name rides through the profile a friend's Mac parses.
+    expect(Profile.parse({ ...base, ...p }).usages?.[1]?.windows?.[0]?.group).toBe('Gemini Models');
   });
 
-  it('keeps the default on the folded card when Antigravity is yours, and leaves old Antigravity numbers on their own card', () => {
+  it('shows a card only while its agent is ready here, keeping one not asked about yet', () => {
     const agy = { runtime: 'antigravity', label: 'Antigravity' };
-    let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, agy] };
-    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 26 } }, 1_000) };
-    p = { ...p, ...withUsage(p, agy, { plan: 'Google AI Ultra', windows: [{ label: 'Gemini', pct: 2 }] }, 2_000) };
-    // Antigravity is your default: the one card it's on says so.
-    expect(providerCards(p, agy).map((c) => [c.key, c.isDefault])).toEqual([['claude', true]]);
-    // The card is as old as its oldest reading.
-    expect(providerCards(p, undefined)[0]?.updatedAt).toBe(1_000);
-    // Claude read again much later, Antigravity not: its numbers aren't shown as Claude's fresh ones.
-    const later = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 27 } }, 2_000 + GUEST_STALE_MS + 1) };
-    const cards = providerCards(later, undefined);
-    expect(cards.map((c) => c.key)).toEqual(['claude', 'antigravity']);
-    expect(cards[1]?.updatedAt).toBe(2_000);
+    const codexRef = { runtime: 'codex', label: 'Codex' };
+    let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, codexRef, agy] };
+    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 31 } }, 1) };
+    p = { ...p, ...withUsage(p, codexRef, { plan: 'plus', windows: [{ label: 'Weekly', pct: 24 }] }, 1) };
+    p = { ...p, ...withUsage(p, agy, { windows: [{ group: 'Gemini Models', label: '5-hour', pct: 25 }] }, 1) };
+    const keys = (runtimes?: Parameters<typeof providerCards>[2]) => providerCards(p, undefined, runtimes).map((c) => c.key);
+    // Nothing asked yet: every card, as before.
+    expect(keys()).toEqual(['claude', 'codex', 'antigravity']);
+    expect(keys([{ id: 'claude' }, { id: 'codex' }, { id: 'antigravity' }])).toEqual(['claude', 'codex', 'antigravity']);
+    // Codex signed out, Antigravity not installed: no cards for them.
+    expect(keys([{ id: 'claude', state: 'ready' }, { id: 'codex', state: 'signed_out' }, { id: 'antigravity', state: 'missing' }])).toEqual(['claude']);
+    // Claude signed out here: its card goes too, and Antigravity's ready one stays.
+    expect(keys([{ id: 'claude', state: 'signed_out' }, { id: 'codex', state: 'signed_out' }, { id: 'antigravity', state: 'ready' }])).toEqual(['antigravity']);
+    // The phone's cards follow the same rule, and a group's window says its group there.
+    expect(usageViews(p, undefined, [{ id: 'codex', state: 'missing' }]).map((u) => [u.runtime, u.windows.map((w) => w.label)])).toEqual([
+      ['claude', ['Week']],
+      ['antigravity', ['Gemini Models · 5 hours']],
+    ]);
   });
 
   it('shows whose agent has room left, across providers', () => {
