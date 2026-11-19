@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import type { RefusalCode, StudioAction, StudioPlatform, StudioReceipt } from '../../../src/studio/protocol';
 import { hub } from './client';
 import { clearDraft, clearPending, readPending, writePending } from './drafts';
 import { live } from './live';
-import { isOnline } from './net';
+import { isOnline, subscribeOnline } from './net';
 import { session } from './session';
 import type { StringKey } from './strings';
 
@@ -216,31 +217,27 @@ export function useNewRequest(pid: string, onDone: () => void): NewRequest {
     return () => clearTimeout(id);
   }, [state.phase, query]);
 
-  // A failed send retries once by itself when the network or the page comes back; after that the
-  // customer taps Retry. Same opId, so the hub still only has one action.
+  // A failed send retries once by itself when the network or the app comes back to foreground;
+  // after that the customer taps Retry. Same opId, so the hub still only has one action.
   useEffect(() => {
     if (state.phase !== 'failed' || state.failure === 'expired' || retried.current) return;
-    if (
-      typeof window === 'undefined' ||
-      typeof window.addEventListener !== 'function' ||
-      typeof document === 'undefined' ||
-      typeof document.addEventListener !== 'function'
-    ) {
-      return;
-    }
     const again = () => {
       if (retried.current || !last.current || !isOnline()) return;
       retried.current = true;
       void submit(last.current.goal, last.current.platforms);
     };
-    const visible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') again();
-    };
-    window.addEventListener('online', again);
-    document.addEventListener('visibilitychange', visible);
+    const unsubOnline = subscribeOnline((online) => {
+      if (online) again();
+    });
+    const appSub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'active') again();
+          })
+        : null;
     return () => {
-      window.removeEventListener('online', again);
-      document.removeEventListener('visibilitychange', visible);
+      unsubOnline();
+      appSub?.remove();
     };
   }, [state.phase, state.failure, submit]);
 

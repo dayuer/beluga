@@ -1,6 +1,6 @@
 import { Send } from 'lucide-react-native';
 import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StudioTurn } from '../../../src/studio/protocol';
 import { hub } from '../lib/client';
@@ -139,27 +139,17 @@ export function PlanChat({ pid, planRef, turns, typing, moreTurns, lang, docked 
     lastCount.current = merged.length;
   }, [merged.length, atBottom]);
 
-  // The draft is written 300ms after the last keystroke and again when the page goes away.
+  // The draft is written 300ms after the last keystroke and again when the app goes to background.
   useEffect(() => {
-    if (
-      typeof window === 'undefined' ||
-      typeof window.addEventListener !== 'function' ||
-      typeof document === 'undefined' ||
-      typeof document.addEventListener !== 'function'
-    ) {
-      return () => {
-        if (draftTimer.current) clearTimeout(draftTimer.current);
-      };
-    }
     const flush = () => kv.set(draftStorage(pid, planRef), { text: textRef.current, updatedAt: Date.now() });
-    const hidden = () => {
-      if (document.visibilityState === 'hidden') flush();
-    };
-    document.addEventListener('visibilitychange', hidden);
-    window.addEventListener('pagehide', flush);
+    const sub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'background') flush();
+          })
+        : null;
     return () => {
-      document.removeEventListener('visibilitychange', hidden);
-      window.removeEventListener('pagehide', flush);
+      sub?.remove();
       if (draftTimer.current) clearTimeout(draftTimer.current);
     };
   }, [pid, planRef]);

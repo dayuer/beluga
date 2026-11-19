@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 const listeners = new Set<(state: string) => void>();
 
+vi.mock('./client', () => ({
+  hub: {
+    watch: vi.fn(() => () => {}),
+  },
+}));
+
 vi.mock('react-native', () => ({
   AppState: {
     currentState: 'active',

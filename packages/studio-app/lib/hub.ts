@@ -1,3 +1,4 @@
+import { isOnline } from './net';
 import { AppFrame, StudioAction, type StudioReceipt } from '../../../src/studio/protocol';
 import {
   PlanRes,
@@ -75,7 +76,7 @@ export function createHub(options: HubOptions): Hub {
   const WS = options.WebSocket ?? (typeof WebSocket === 'undefined' ? undefined : WebSocket);
 
   const request = async <T>(path: string, init: RequestInit, decode: (json: unknown) => R<T>): Promise<R<T>> => {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return offline;
+    if (!isOnline()) return offline;
     if (!doFetch) return offline;
     const token = options.session();
     const headers = new Headers(init.headers);

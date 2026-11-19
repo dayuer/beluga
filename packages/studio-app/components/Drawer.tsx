@@ -42,15 +42,6 @@ export function Drawer({ open, onClose, title, children, footer, testID = 'drawe
     }
   }, [open, initialSnap]);
 
-  useEffect(() => {
-    if (!open || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
   const pan = useMemo(
     () =>
       PanResponder.create({

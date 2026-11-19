@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
 import { GoalInput } from '../components/GoalInput';
 import { Header } from '../components/Header';
@@ -131,14 +131,6 @@ export default function NewRequestScreen() {
 
   useEffect(() => {
     if (!pid) return;
-    if (
-      typeof window === 'undefined' ||
-      typeof window.addEventListener !== 'function' ||
-      typeof document === 'undefined' ||
-      typeof document.addEventListener !== 'function'
-    ) {
-      return;
-    }
     const flush = () => {
       if (lockedRef.current) return;
       if (!goal.trim() && platforms.length === 0) {
@@ -147,14 +139,14 @@ export default function NewRequestScreen() {
       }
       writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
     };
-    const hidden = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush();
-    };
-    window.addEventListener('pagehide', flush);
-    document.addEventListener('visibilitychange', hidden);
+    const sub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'background') flush();
+          })
+        : null;
     return () => {
-      window.removeEventListener('pagehide', flush);
-      document.removeEventListener('visibilitychange', hidden);
+      sub?.remove();
     };
   }, [pid, goal, platforms]);
 

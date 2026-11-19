@@ -33,12 +33,6 @@
         "android.permission.READ_EXTERNAL_STORAGE"
       ]
     },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "lang": "zh-CN",
-      "themeColor": "#FFFFFF"
-    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
