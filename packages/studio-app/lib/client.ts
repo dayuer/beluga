@@ -7,6 +7,7 @@ import { session } from './session';
  * `app/_layout.tsx` takes the customer back to /login.
  */
 export const hub = createHub({
+  base: process.env.EXPO_PUBLIC_HUB_URL || undefined,
   session: () => session.token(),
   onSignedOut: () => session.clear(),
 });
