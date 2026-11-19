@@ -16,11 +16,22 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "NSCameraUsageDescription": "Synon Studio 需要使用相机来扫描配对二维码或拍摄图片附件。",
+        "NSMicrophoneUsageDescription": "Synon Studio 需要使用麦克风来录制语音需求说明。",
+        "NSPhotoLibraryUsageDescription": "Synon Studio 需要访问相册以选择并发送图片附件。",
+        "NSPhotoLibraryAddUsageDescription": "Synon Studio 需要访问相册以保存图片附件或交付预览。"
       }
     },
     "android": {
-      "package": "com.synon.studio"
+      "package": "com.synon.studio",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,7 +40,25 @@
       "themeColor": "#FFFFFF"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Synon Studio 需要使用相机来扫描配对二维码或拍摄图片附件。",
+          "microphonePermission": "Synon Studio 需要使用麦克风来录制语音需求说明。",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Synon Studio 需要访问相册以选择并发送图片附件。"
+        }
+      ],
+      "expo-notifications",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": false
