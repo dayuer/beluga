@@ -21,7 +21,8 @@ import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from 
 import { agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir } from './sessions.js';
 import { agyStatus } from './status.js';
-import { AGY_DIALECT, agyCalls, belugaToolOf } from './tools.js';
+import { AGY_ASK_TOOL, agyAnswerPrompt, agyQuestion } from './questions.js';
+import { AGY_DIALECT, agyCalls, agyTool, belugaToolOf } from './tools.js';
 
 export interface AgyBackendOptions {
   readonly cwd: string;
@@ -42,6 +43,8 @@ export interface AgyBackendOptions {
 const AGY_AGENT = { runtime: 'antigravity', label: 'Antigravity' } as const;
 /** A plan sent back for changes this many times: the run ends with the last plan as its answer. */
 const PLAN_ROUNDS = 5;
+/** Questions Antigravity asks (ask_question) in one message, one after another: past this many, its answer ends the message. */
+const QUESTION_ROUNDS = 5;
 /** Beluga's tools whose target is a path: one Antigravity didn't name is turned down, never judged as the folder. */
 const PATHED = new Set(['Read', 'Write', 'Edit']);
 const WRITES = new Set(['Write', 'Edit']);
@@ -135,9 +138,12 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         let options: readonly ConfigOption[] = [];
         /** Why Beluga turned this turn's steps down. */
         const declined: string[] = [];
+        /** The question this turn asked with Antigravity's own ask_question (its form doesn't reach a client: Beluga asks it). */
+        let asking: ReturnType<typeof agyQuestion>;
         rpc.onNotification((method, params) => {
           if (method !== 'session/update' || !sid || params.sessionId !== sid) return;
           const update = params.update as SessionUpdate;
+          if ((update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') && agyTool(update) === AGY_ASK_TOOL) asking = agyQuestion(update.rawInput) ?? asking;
           if (update.sessionUpdate === 'available_commands_update') commands = new Set(update.availableCommands.map((c) => c.name));
           if (update.sessionUpdate === 'config_option_update') options = update.configOptions;
           events.handle(update);
@@ -240,6 +246,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         /** One turn: what it said last, and how it ended. Antigravity ends a turn silently when a step is declined: then it's told why, once, and answers. */
         const runTurn = async (sink: TurnSink, blocks: ContentBlock[], again = true): Promise<{ text: string; res: PromptResponse }> => {
           declined.length = 0;
+          asking = undefined;
           events.beginTurn(sink);
           const done = deferred<PromptResponse>();
           active = { done };
@@ -321,7 +328,20 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const mapped = await mapSlash(prompt, cwd, claudeHome(), commands, 'Antigravity');
           const said = noted(mapped.notes, sink);
           const text = mapped.prompt.startsWith('/') ? mapped.prompt : built(mapped.prompt);
-          return said(answerOf(await runTurn(sink, promptBlocks(text, prompt, Boolean(link.init.agentCapabilities?.promptCapabilities?.image))), sink));
+          return said(await answered(sink, answerOf(await runTurn(sink, promptBlocks(text, prompt, Boolean(link.init.agentCapabilities?.promptCapabilities?.image))), sink)));
+        };
+        /**
+         * A turn that ended on Antigravity's own ask_question: Beluga asks you (the card, and the phone),
+         * and your answer is its next turn; again while it asks. Undefined askUser (nobody to ask): its answer as it was.
+         */
+        const answered = async (sink: TurnSink, answer: string): Promise<string> => {
+          for (let round = 0; asking && input.askUser && !aborted && round < QUESTION_ROUNDS; round++) {
+            const asked = asking;
+            const reply = await input.askUser(asked);
+            if (aborted) break;
+            answer = answerOf(await runTurn(sink, [{ type: 'text', text: agyAnswerPrompt(asked, reply) }]), sink);
+          }
+          return answer;
         };
 
         const original: TurnSink = { onEvent: input.onEvent, ...(input.onStep ? { onStep: input.onStep } : {}) };

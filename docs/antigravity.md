@@ -36,7 +36,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **No guests.** A guest you invite into a project can't prompt Antigravity: switch that conversation to Claude for them.
 - **No Fork, no /btw.** Antigravity can't branch a conversation, so a fork starts a fresh one (the files come along), and editing a sent message starts afresh from your edited message.
 - **No Terminal view.** Antigravity conversations stay in the chat.
-- **Questions mid-run**: Antigravity asks in its answer, and you reply in the box.
+- **Questions mid-run**: Antigravity's own question form doesn't reach Beluga, so when it asks (its `ask_question`), Beluga asks you for it: the same card Claude's questions get, on your phone too. Your answer goes back to Antigravity as its next turn (the question also stays written in its answer).
 - **A declined step.** Antigravity ends its turn without a word when a step is turned down, so Beluga tells it why, once, and it answers.
 - **Gemini looks around a lot.** On Gemini 3.8 Flash, Antigravity often reads and searches well past what you asked (other folders, your home folder) before it answers. Its commands still come to you, but a Claude model on your plan keeps closer to the request.
 - **Your plan's quota.** Every message uses some of your Antigravity quota, and so do Beluga's small asks when Antigravity is your agent (naming a worktree, drafting a task). When it runs out, the card says so; `agy` then `/usage` in Terminal shows what's left.

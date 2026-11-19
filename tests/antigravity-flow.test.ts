@@ -9,6 +9,7 @@ import { ANTIGRAVITY_CAPABILITIES, createAntigravityRuntime } from '../src/agent
 import { agyFailure, agyModel, agyThought, modeValue, systemMeta } from '../src/agent/runtime/antigravity/run-parts.js';
 import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
 import { ScriptedAgy } from '../src/agent/runtime/antigravity/scripted.js';
+import { agyAnswerPrompt, agyQuestion } from '../src/agent/runtime/antigravity/questions.js';
 import { agyBrainDir, dropAgyFolder, dropAgySession } from '../src/agent/runtime/antigravity/sessions.js';
 import { AGY_SIGN_IN, agyStatus, modelRows } from '../src/agent/runtime/antigravity/status.js';
 import { agyCalls, agyInput, agyTool, belugaToolOf } from '../src/agent/runtime/antigravity/tools.js';
@@ -189,6 +190,38 @@ describe('a run on Antigravity', () => {
     expect(modes).toEqual(['plan', 'default']);
     // While planning, its write was turned down.
     expect(agy.answers[0]).toEqual({ outcome: { outcome: 'selected', optionId: 'deny' } });
+  });
+
+  it('asks you its own ask_question as a card, and gives Antigravity your answer as its next turn', async () => {
+    const agy = new ScriptedAgy();
+    const askUser = vi.fn(async (q: Parameters<NonNullable<AgentRunInput['askUser']>>[0]) => ({ kind: 'answers' as const, answers: { [q.kind === 'question' ? q.questions[0]!.question : '']: 'Not now' } }));
+    const r = input('question', { place: place(), askUser });
+    const answer = await backend(agy).run(r);
+    // The question and its options, as agy sent them in its call (its form never reached Beluga).
+    expect(askUser).toHaveBeenCalledWith({ kind: 'question', questions: [{ question: 'Deploy to the server now?', header: '', options: ['Yes, over SSH', 'Done (I did it)', 'Not now'].map((label) => ({ label, description: '' })), multiSelect: false }] });
+    expect(askUser).toHaveBeenCalledTimes(1);
+    // Your pick went back as its next turn, and that turn's answer is the run's.
+    expect(agy.sent('session/prompt').length).toBe(2);
+    expect(answer).toBe('answered: Not now');
+  });
+
+  it('tells it you skipped its question, and leaves it as it was with nobody to ask', async () => {
+    const agy = new ScriptedAgy();
+    const askUser = vi.fn(async () => ({ kind: 'skip' as const }));
+    expect(await backend(agy).run(input('question', { place: place(), askUser }))).toBe('skipped: going on');
+    // A side call or a run with nobody to ask: its answer stays, the question in it.
+    const alone = new ScriptedAgy();
+    expect(await backend(alone).run(input('question', { place: place() }))).toContain('- [3] Not now');
+    expect(alone.sent('session/prompt').length).toBe(1);
+  });
+
+  it('reads the question from the shapes ask_question may take', () => {
+    expect(agyQuestion({ questions: [{ question: 'Which?', options: [{ label: 'A', description: 'the first' }, 'B', ''], multiSelect: true }] })).toEqual({ kind: 'question', questions: [{ question: 'Which?', header: '', options: [{ label: 'A', description: 'the first' }, { label: 'B', description: '' }], multiSelect: true }] });
+    expect(agyQuestion({ question: 'Go on?' })?.questions[0]).toMatchObject({ question: 'Go on?', options: [] });
+    expect(agyQuestion({ questions: [] })).toBeUndefined();
+    expect(agyQuestion(undefined)).toBeUndefined();
+    const asked = agyQuestion({ question: 'Go on?' })!;
+    expect(agyAnswerPrompt(asked, { kind: 'answers', answers: { 'Go on?': 'yes' } })).toContain('- Go on?\n  → yes');
   });
 
   it('goes on with the same conversation (session/load), its replay kept out of the chat', async () => {

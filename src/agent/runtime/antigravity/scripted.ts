@@ -20,7 +20,8 @@ const LEVELS = ['low', 'medium', 'high'];
  * is answered `echo: P` after running `echo P` (asked first; declined, it ends the turn without a word, as
  * agy does, and answers `denied: P` once Beluga says why); `wait…` works
  * until cancelled; `read <file>` reads it (not asked); `edit <file>` writes it (asked); `room`
- * calls one of Beluga's tools (mcp_beluga_list_peers); `/compact` summarises; `quota` answers as a
+ * calls one of Beluga's tools (mcp_beluga_list_peers); `question` asks with its own ask_question (run at once, the
+ * question left in its answer) and answers `answered: <pick>` once told what the person picked; `/compact` summarises; `quota` answers as a
  * plan that has run out does.
  */
 export class ScriptedAgy {
@@ -176,6 +177,23 @@ export class ScriptedAgy {
         update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', rawOutput: {}, content: [{ type: 'diff', path: file, oldText: null, newText: 'hi\n' }] });
         say(sid, `edited: ${file}`);
         return done(sid, 6);
+      }
+      // Told what the person answered to its ask_question: it answers with that.
+      const replied = /^The person (answered|skipped) your question \(ask_question\)[^\n]*(?:\n- [^\n]*\n {2}→ ([^\n]*))?/.exec(text);
+      if (replied) {
+        say(sid, replied[1] === 'skipped' ? 'skipped: going on' : `answered: ${replied[2] ?? ''}`);
+        return done(sid, 6);
+      }
+      if (/^question\b/.test(words)) {
+        // Its own question tool: run at once (nothing asked), the form never reaching the client;
+        // the question and its options written into its answer, and the turn ends.
+        const question = 'Deploy to the server now?';
+        const options = ['Yes, over SSH', 'Done (I did it)', 'Not now'];
+        const c = call(`call_${randomUUID().slice(0, 12)}`, 'ask_question', 'other', 'ask_question', { questions: [{ is_multi_select: false, options, question }] });
+        update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
+        update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed' });
+        say(sid, `${question}\n${options.map((o, i) => `- [${i + 1}] ${o}`).join('\n')}`);
+        return done(sid, 20);
       }
       if (/^room\b/.test(words)) {
         // One of Beluga's own tools: it asks too, by the tool's MCP name, with no arguments said.
