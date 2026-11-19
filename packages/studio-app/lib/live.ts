@@ -1,7 +1,5 @@
-import { AppState } from 'react-native';
-import type { AppFrame } from '../../../src/studio/protocol';
-import { hub } from './client';
-import type { Hub } from './hub';
+import type { AppFrame } from '../../../src/studio/protocol.js';
+import type { Hub } from './hub.js';
 
 export interface LiveHandlers {
   readonly frame: (frame: AppFrame) => void;
@@ -14,18 +12,19 @@ interface Entry {
   close: () => void;
 }
 
+export type SubscribeResume = (onResume: () => void) => () => void;
+
 /**
  * One WebSocket per project, shared by every screen that needs it. The hub's link is expensive and
  * the app used to open one socket per screen and one more per queued action; here the first
  * subscriber dials and each later one joins, and the last to leave closes it.
  *
- * 回到前台（AppState 变为 active）时重建活跃连接，触发订阅方重新拉取一次最新状态。
- * `createLive` takes the watch function so the ref counting can be tested without a native shell.
+ * 回到前台时通过可选的 `subscribeResume` 重建活跃连接，触发订阅方重新拉取一次最新状态。
+ * 纯逻辑模块：不在顶层引用 react-native 或 ./client，默认单例在 lib/client.ts 组装。
  */
-export function createLive(watch: Pick<Hub, 'watch'>) {
+export function createLive(watch: Pick<Hub, 'watch'>, subscribeResume?: SubscribeResume) {
   const entries = new Map<string, Entry>();
-  let appSub: { remove: () => void } | null = null;
-  let lastAppState: string = AppState?.currentState ?? 'active';
+  let stopResume: (() => void) | null = null;
 
   const dial = (pid: string, entry: Entry): (() => void) =>
     watch.watch(pid, {
@@ -38,26 +37,21 @@ export function createLive(watch: Pick<Hub, 'watch'>) {
       },
     });
 
-  const ensureAppListener = (): void => {
-    if (appSub || typeof AppState?.addEventListener !== 'function') return;
-    lastAppState = AppState.currentState ?? 'active';
-    appSub = AppState.addEventListener('change', (next) => {
-      const wasActive = lastAppState === 'active';
-      lastAppState = next;
-      if (!wasActive && next === 'active') {
-        for (const [pid, entry] of entries) {
-          entry.close();
-          entry.state = 'closed';
-          entry.close = dial(pid, entry);
-        }
+  const ensureResumeListener = (): void => {
+    if (stopResume || !subscribeResume) return;
+    stopResume = subscribeResume(() => {
+      for (const [pid, entry] of entries) {
+        entry.close();
+        entry.state = 'closed';
+        entry.close = dial(pid, entry);
       }
     });
   };
 
-  const dropAppListenerIfIdle = (): void => {
-    if (entries.size > 0 || !appSub) return;
-    appSub.remove();
-    appSub = null;
+  const dropResumeListenerIfIdle = (): void => {
+    if (entries.size > 0 || !stopResume) return;
+    stopResume();
+    stopResume = null;
   };
 
   return {
@@ -66,7 +60,7 @@ export function createLive(watch: Pick<Hub, 'watch'>) {
       if (!existing) {
         const created: Entry = { handlers: new Set([handlers]), state: 'closed', close: () => {} };
         entries.set(pid, created);
-        ensureAppListener();
+        ensureResumeListener();
         // `watch` may answer `closed` synchronously (no session); the entry is already in the map.
         created.close = dial(pid, created);
       } else {
@@ -88,12 +82,9 @@ export function createLive(watch: Pick<Hub, 'watch'>) {
         if (current.handlers.size === 0) {
           entries.delete(pid);
           current.close();
-          dropAppListenerIfIdle();
+          dropResumeListenerIfIdle();
         }
       };
     },
   };
 }
-
-/** The app's one live link table. */
-export const live = createLive(hub);

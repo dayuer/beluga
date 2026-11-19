@@ -1,5 +1,4 @@
-import { isOnline } from './net';
-import { AppFrame, StudioAction, type StudioReceipt } from '../../../src/studio/protocol';
+import { AppFrame, StudioAction, type StudioReceipt } from '../../../src/studio/protocol.js';
 import {
   PlanRes,
   PlansRes,
@@ -52,6 +51,8 @@ export interface HubOptions {
   readonly base?: string;
   readonly session: () => string | undefined;
   readonly onSignedOut?: () => void;
+  /** Injected by client.ts; defaults to always online in pure Node tests. */
+  readonly isOnline?: () => boolean;
   /** Injected in tests; defaults to the platform's fetch/WebSocket. */
   readonly fetch?: typeof fetch;
   readonly WebSocket?: typeof WebSocket;
@@ -74,9 +75,10 @@ export function createHub(options: HubOptions): Hub {
   const base = (options.base ?? envBase() ?? '').replace(/\/+$/, '');
   const doFetch = options.fetch ?? (typeof fetch === 'undefined' ? undefined : fetch);
   const WS = options.WebSocket ?? (typeof WebSocket === 'undefined' ? undefined : WebSocket);
+  const checkOnline = options.isOnline ?? (() => true);
 
   const request = async <T>(path: string, init: RequestInit, decode: (json: unknown) => R<T>): Promise<R<T>> => {
-    if (!isOnline()) return offline;
+    if (!checkOnline()) return offline;
     if (!doFetch) return offline;
     const token = options.session();
     const headers = new Headers(init.headers);

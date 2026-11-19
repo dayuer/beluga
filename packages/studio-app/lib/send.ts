@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { RefusalCode, StudioAction, StudioReceipt } from '../../../src/studio/protocol';
-import { hub } from './client';
+import { hub, live } from './client';
 import { kv } from './kv';
-import { live } from './live';
 import { isOnline, subscribeOnline } from './net';
 import { session } from './session';
 import { randomOpId, submitNext, type SubmitState } from './submit';

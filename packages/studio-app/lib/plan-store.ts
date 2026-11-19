@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cache } from './cache';
-import { hub } from './client';
+import { hub, live } from './client';
 import type { HubError } from './hub';
 import type { PlanRes } from './hub-schema';
-import { live } from './live';
 import { useOnline } from './net';
 
 export type PlanView = PlanRes['view'];
