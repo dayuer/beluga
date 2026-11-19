@@ -322,7 +322,7 @@ export function DiffView() {
           <span className={s.path}>{file?.path}</span>
           <span className={s.flex} />
           {file && onlyAsFile(file.path) ? null : (
-            <Segmented
+            <Segmented size="small"
               label="Layout"
               value={mode}
               onChange={setMode}

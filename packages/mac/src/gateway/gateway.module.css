@@ -205,7 +205,7 @@
 }
 .file button {
   all: unset;
-  cursor: var(--press-cursor);
+  cursor: pointer;
   color: var(--text);
 }
 .file button:hover {
@@ -279,7 +279,7 @@
   gap: 10px;
   padding: 7px 10px;
   border-radius: var(--radius);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .row:hover {
   background: var(--bg-hover);
@@ -331,7 +331,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--accent);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .reveal .via {
   margin-left: 4px;

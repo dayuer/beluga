@@ -48,13 +48,13 @@ export function DataSheet({ sentinelId, metric, close }: { sentinelId: string; m
       onCancel={close}
       footer={
         <span className={d.sheetBar}>
-          <Button icon="download" onClick={() => out('csv')} disabled={!got?.lines.length}>
+          <Button size="small" icon="download" onClick={() => out('csv')} disabled={!got?.lines.length}>
             Export CSV
           </Button>
-          <Button icon="download" onClick={() => out('json')} disabled={!got?.lines.length}>
+          <Button size="small" icon="download" onClick={() => out('json')} disabled={!got?.lines.length}>
             Export JSON
           </Button>
-          <Button icon="folder" onClick={() => void a.act(() => a.api.dataReveal(sentinelId))}>
+          <Button size="small" icon="folder" onClick={() => void a.act(() => a.api.dataReveal(sentinelId))}>
             {revealLabel()}
           </Button>
         </span>

@@ -32,7 +32,7 @@
   background: none;
   font: inherit;
   font-size: 0.86rem;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .statusButton:hover {
   background: var(--warn-soft, color-mix(in srgb, var(--warn) 12%, transparent));

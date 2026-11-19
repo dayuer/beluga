@@ -437,7 +437,7 @@ button.btnPrimary:disabled {
 }
 /* Ada's Allow, waiting for you to press it: a ring that keeps reaching out. */
 .btnPrimary[data-waiting] {
-  cursor: var(--press-cursor);
+  cursor: pointer;
   animation: nudge 1.4s var(--ease-out) infinite;
 }
 @keyframes nudge {

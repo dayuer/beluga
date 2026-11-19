@@ -174,7 +174,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
   return (
     <div className={s.page}>
       <header className={s.head}>
-        <IconButton size="regular" icon="back" label="All Plans" onClick={back} />
+        <IconButton size="small" icon="back" label="All Plans" onClick={back} />
         <div className={s.headMain}>
           <h1 className={s.title}>{plan.title}</h1>
           <div className={s.meta}>
@@ -182,7 +182,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
             {plan.ownerName}’s plan · {plan.status === 'draft' ? 'a draft' : plan.status === 'active' ? 'approved and running' : 'done'} · read-only
           </div>
         </div>
-        <Button variant="primary" icon="check" disabled={approved} onClick={() => void say(api.team.reviewPlan(owner, id, { kind: 'approve' }), `Told ${plan.ownerName} you approve`)}>
+        <Button variant="primary" size="small" icon="check" disabled={approved} onClick={() => void say(api.team.reviewPlan(owner, id, { kind: 'approve' }), `Told ${plan.ownerName} you approve`)}>
           {approved ? 'Approved' : 'Approve'}
         </Button>
       </header>
@@ -247,7 +247,7 @@ export function SharedPlanPage({ owner, id }: { owner: string; id: string }) {
               }
             }}
           />
-          <Button disabled={!comment.trim()} onClick={send}>
+          <Button size="small" disabled={!comment.trim()} onClick={send}>
             Comment
           </Button>
         </div>
@@ -274,10 +274,10 @@ function Suggest({ plan, task, onDone }: { plan: SharedPlan; task: SharedPlan['b
       <textarea className={s.input} value={goal} rows={3} onChange={(e) => setGoal(e.target.value)} aria-label="Goal" placeholder="What it’s for" />
       <input className={s.input} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why (optional)" aria-label="Why" />
       <div className={s.suggestBar}>
-        <Button variant="quiet" onClick={onDone}>
+        <Button size="small" variant="quiet" onClick={onDone}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={!changed || !title.trim()} onClick={go}>
+        <Button size="small" variant="primary" disabled={!changed || !title.trim()} onClick={go}>
           Suggest
         </Button>
       </div>

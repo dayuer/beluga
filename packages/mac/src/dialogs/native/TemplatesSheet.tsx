@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
 import type { Template } from '@beluga/core/work-store.js';
 import { Alert } from '../../components/Alert.js';
 import { Checkbox, Field, FormSheet, TextArea, TextInput, formStyles as f } from '../../components/FormSheet.js';
@@ -107,31 +106,6 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
   const [plan, setPlan] = useState(false);
   const taken = names.find((t) => t.name.toLowerCase() === name.trim().toLowerCase());
   const builtIn = taken?.builtIn === true;
-  const save = (): void => {
-    if (!name.trim() || !prompt.trim() || builtIn) return;
-    // The core reads "name: prompt"; a colon in the name would end it early.
-    void api.workbench.saveTemplate(`${name.trim().replace(/:/g, ' ')}: ${prompt.trim()}`, plan);
-    close();
-  };
-  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts).
-  const native = useNativeSheet(
-    nativeSheets(),
-    {
-      title: 'New Template',
-      intro: 'A way to start a task you do often. It shows up when you start a worktree or a chat.',
-      width: 560,
-      rows: [
-        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'Fix a flaky test', focus: true, maxLength: 60, ...(builtIn ? { hint: 'A built-in template has this name. Pick another one.' } : taken ? { hint: 'You have a template with this name: saving replaces it.' } : {}) },
-        { kind: 'textarea', id: 'prompt', value: prompt, lines: 5, placeholder: 'Find out why this test fails now and then, make it reliable, and run it 20 times to be sure.' },
-        { kind: 'note', text: 'What your agent should do. Leave two spaces where the details go: the cursor starts there.' },
-        { kind: 'checkbox', id: 'plan', text: 'Plan first', checked: plan, hint: 'Your agent shows you a plan and waits for your OK before changing anything' },
-      ],
-      submit: taken && !builtIn ? 'Replace' : 'Save Template',
-      canSubmit: Boolean(name.trim() && prompt.trim()) && !builtIn,
-    },
-    { change: (id, value) => (id === 'name' ? setName(value) : id === 'prompt' ? setPrompt(value) : setPlan(value === 'true')), submit: save, cancel: close },
-  );
-  if (native) return null;
   return (
     <FormSheet
       title="New Template"
@@ -139,7 +113,11 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
       intro="A way to start a task you do often. It shows up when you start a worktree or a chat."
       submitLabel={taken && !builtIn ? 'Replace' : 'Save Template'}
       canSubmit={Boolean(name.trim() && prompt.trim()) && !builtIn}
-      onSubmit={save}
+      onSubmit={() => {
+        // The core reads "name: prompt"; a colon in the name would end it early.
+        void api.workbench.saveTemplate(`${name.trim().replace(/:/g, ' ')}: ${prompt.trim()}`, plan);
+        close();
+      }}
       onCancel={close}
       width={560}
     >

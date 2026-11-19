@@ -179,7 +179,7 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
             <p className={s.origin}>{origin ? `Sub-agent · started by “${origin.sessionTitle ?? 'a Claude Code session'}”${origin.sessionCwd ? ` in ${baseName(origin.sessionCwd)}` : ''}` : (info?.origin.label ?? MADE_OUTSIDE)}</p>
           </div>
           {hasChat ? (
-            <Button variant="quiet" icon="back" onClick={() => setWorktreeFlag('about', ws.id, false)}>
+            <Button size="small" variant="quiet" icon="back" onClick={() => setWorktreeFlag('about', ws.id, false)}>
               Back to Conversation
             </Button>
           ) : null}
@@ -199,22 +199,22 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
 
         <div className={s.actions}>
           {!info?.missing && !agent ? (
-            <Button variant="primary" icon="chat" onClick={start}>
+            <Button size="small" variant="primary" icon="chat" onClick={start}>
               Start a Conversation Here
             </Button>
           ) : null}
           {!info?.missing ? (
-            <Button icon="folder" onClick={() => void showWorktreeFolder(client, ws.id)}>
+            <Button size="small" icon="folder" onClick={() => void showWorktreeFolder(client, ws.id)}>
               {machine ? revealThereLabel('folder') : openFolderLabel()}
             </Button>
           ) : null}
           {!info?.missing ? (
-            <Button icon="terminal" onClick={() => actions.run({ type: 'open_ws', id: ws.id, tab: 'terminal' })}>
+            <Button size="small" icon="terminal" onClick={() => actions.run({ type: 'open_ws', id: ws.id, tab: 'terminal' })}>
               Open in Terminal
             </Button>
           ) : null}
           <span className={s.flex} />
-          <Button variant="danger" icon="archive" onClick={() => setRemoving(true)}>
+          <Button size="small" variant="danger" icon="archive" onClick={() => setRemoving(true)}>
             Remove Worktree…
           </Button>
         </div>

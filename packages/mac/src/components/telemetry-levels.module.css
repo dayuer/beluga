@@ -14,7 +14,7 @@
   border-radius: 12px;
   background: var(--bg-raised);
   box-shadow: inset 0 0 0 1px var(--hairline);
-  cursor: var(--press-cursor);
+  cursor: pointer;
   text-align: left;
   transition:
     background var(--dur-fast),
@@ -35,7 +35,7 @@
   height: 100%;
   margin: 0;
   opacity: 0;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .level:has(.radio:focus-visible) {
   box-shadow:

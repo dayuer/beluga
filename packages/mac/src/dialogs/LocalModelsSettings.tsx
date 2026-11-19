@@ -101,7 +101,7 @@ export function LocalModelsSettings() {
           onChange={(ev) => setDraft({ ...draft, key: ev.target.value })}
         />
         {draft.hasKey && !draft.key ? (
-          <Button variant="quiet" onClick={() => setDraft({ ...draft, clearKey: !draft.clearKey })}>
+          <Button size="small" variant="quiet" onClick={() => setDraft({ ...draft, clearKey: !draft.clearKey })}>
             {draft.clearKey ? 'Keep Key' : 'Remove Key'}
           </Button>
         ) : null}
@@ -112,10 +112,10 @@ export function LocalModelsSettings() {
       </label>
       {error ? <div className={s.endpointError}>{error}</div> : null}
       <div className={s.endpointBar}>
-        <Button variant="quiet" onClick={() => setDraft(undefined)}>
+        <Button size="small" variant="quiet" onClick={() => setDraft(undefined)}>
           Cancel
         </Button>
-        <Button variant="primary" type="submit" disabled={busy || !draft.label.trim() || !draft.baseUrl.trim()}>
+        <Button size="small" variant="primary" type="submit" disabled={busy || !draft.label.trim() || !draft.baseUrl.trim()}>
           {busy ? 'Saving…' : 'Save'}
         </Button>
       </div>
@@ -149,11 +149,11 @@ export function LocalModelsSettings() {
           return (
             <Row key={e.id} label={e.builtIn ? `Ollama on ${thisComputer()}` : e.label} detail={e.builtIn && !e.reachable ? 'Install it from ollama.com, start it with OLLAMA_CONTEXT_LENGTH=32768 ollama serve, and pull a model (ollama pull qwen3-coder).' : `${e.baseUrl}${e.hasKey ? ' · key saved' : ''} · ${status.words}`}>
               <Dot tone={status.tone} />
-              <Button variant="quiet" disabled={busy} onClick={() => edit(e)}>
+              <Button size="small" variant="quiet" disabled={busy} onClick={() => edit(e)}>
                 {e.builtIn ? 'Set Up…' : 'Edit…'}
               </Button>
               {e.builtIn ? null : (
-                <Button variant="quiet" disabled={busy} onClick={() => void run(() => api.env.removeEndpoint(e.id))}>
+                <Button size="small" variant="quiet" disabled={busy} onClick={() => void run(() => api.env.removeEndpoint(e.id))}>
                   Remove
                 </Button>
               )}

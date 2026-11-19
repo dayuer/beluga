@@ -201,15 +201,12 @@ button.stat:disabled {
 }
 /* Only the name (it's optional) gives way, down to a short box; the branch, the chips and the button keep their shape. */
 .bar > label:has(.nameInput) {
-  flex-shrink: 4;
+  flex-shrink: 1;
   min-width: 88px;
 }
-/* A long branch ("feat/live-topic-graph") gives way too, after the name, to the width of a short one, its name cut with an ellipsis.
-   Its factor is 1, not less: once the name is at its shortest the branch is the only one giving way, and a flex
-   factor under 1 there takes only that share of what's left over (CSS Flexbox §9.7), so Create Worktree ended
-   outside the box. The name's 4 still has it give way first. */
+/* A long branch ("feat/live-topic-graph") gives way too, after the name, to the width of a short one, its name cut with an ellipsis. */
 .bar > label:first-child:has([role='combobox']) {
-  flex-shrink: 1;
+  flex-shrink: 0.25;
   min-width: 7.5rem;
 }
 .bar > label:first-child [role='combobox'] {

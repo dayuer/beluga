@@ -156,6 +156,7 @@ export function WebAccessSettings() {
                 {live.url}
               </code>
               <Button
+                size="small"
                 icon={copied ? 'check' : 'copy'}
                 onClick={() =>
                   void copyText(live.url).then(

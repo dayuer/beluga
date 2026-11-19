@@ -353,7 +353,7 @@
   color: inherit;
   font: inherit;
   text-align: inherit;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .personButton:hover {
   text-decoration: underline;

@@ -47,7 +47,7 @@ function MachinePane({ machine }: { machine: string }) {
           {...(pane.error
             ? {
                 action: (
-                  <Button onClick={() => retryMachine(machine, home, windowUi)}>
+                  <Button size="small" onClick={() => retryMachine(machine, home, windowUi)}>
                     Try Again
                   </Button>
                 ),

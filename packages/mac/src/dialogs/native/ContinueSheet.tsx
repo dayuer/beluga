@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { choicesOf, nativeSheets, useNativeSheet } from '../../lib/native-sheet.js';
 import { findWorkspace } from '@beluga/ui/workspace-models.js';
 import { Field, FormSheet, Popup, TextArea, TextInput } from '../../components/FormSheet.js';
 import { useApi, useApp } from '../../lib/beluga.js';
@@ -45,48 +44,23 @@ export function ContinueSheet({ wsId, close }: { wsId: string; close: () => void
       alive = false;
     };
   }, [project?.id]);
-  const chosen = base || project?.base || '';
+  if (!ws || !project) return null;
+  const chosen = base || project.base;
   const options = (branches?.branches.length ? branches.branches : [chosen]).map((b) => ({ value: b, label: b === branches?.base ? `${b} (default)` : b }));
   // Picked another agent: sent only when it changed. Another runtime than the session's starts fresh (resumeFor).
   const picked = agent === YOUR_AGENT ? mine : agentForChoice(agent, runtimes);
-  const fresh = agent !== own && Boolean(ws?.sessionId) && picked.runtime !== (ws?.sessionRuntime ?? 'claude');
-  const go = (): void => {
-    if (!ws || !project) return;
-    // Git fetches and makes the worktree behind the chat ("Making this chat a worktree…"); a failure comes back as a toast.
-    void api.workspaces.continueInWorktree(ws.id, { ...(task.trim() ? { task: task.trim() } : {}), ...(chosen !== project.base ? { base: chosen } : {}), ...(name.trim() ? { name: name.trim() } : {}), ...(agent !== own ? { agent: picked } : {}) }).catch(() => undefined);
-    close();
-  };
-  // In the app on a Mac, the Mac's own sheet (lib/native-sheet.ts).
-  const native = useNativeSheet(
-    nativeSheets() && Boolean(ws && project),
-    {
-      title: 'Continue in a New Worktree',
-      intro: 'This chat becomes a worktree: your agent gets its own branch and folder, keeps the conversation and starts on the task.',
-      width: 540,
-      rows: [
-        { kind: 'textarea', id: 'task', value: task, lines: 4, placeholder: 'What should your agent change?', focus: true },
-        { kind: 'note', text: `Empty: your agent goes ahead with what you discussed. ${cmdReturn()} continues.` },
-        { kind: 'popup', id: 'base', label: 'Based on', value: chosen, options, hint: 'Origin branches are fetched first, so it starts from the latest.' },
-        { kind: 'popup', id: 'agent', label: 'Agent', value: agent, options: choicesOf(agents), hint: fresh ? `${agentName(picked)} can’t pick up this conversation, so it starts fresh there, handed the conversation so far.` : 'Who goes on there. It keeps the conversation.' },
-        { kind: 'text', id: 'name', label: 'Name', value: name, placeholder: 'from the task', hint: 'Empty: named after the task.', maxLength: 60 },
-      ],
-      submit: 'Continue',
-      canSubmit: true,
-    },
-    {
-      change: (id, value) => (id === 'task' ? setTask(value) : id === 'base' ? setBase(value) : id === 'agent' ? setAgent(value) : setName(value.slice(0, 60))),
-      submit: go,
-      cancel: close,
-    },
-  );
-  if (!ws || !project || native) return null;
+  const fresh = agent !== own && Boolean(ws.sessionId) && picked.runtime !== (ws.sessionRuntime ?? 'claude');
   return (
     <FormSheet
       title="Continue in a New Worktree"
       icon="branch"
       intro="This chat becomes a worktree: your agent gets its own branch and folder, keeps the conversation and starts on the task."
       submitLabel="Continue"
-      onSubmit={go}
+      onSubmit={() => {
+        // Git fetches and makes the worktree behind the chat ("Making this chat a worktree…"); a failure comes back as a toast.
+        void api.workspaces.continueInWorktree(ws.id, { ...(task.trim() ? { task: task.trim() } : {}), ...(chosen !== project.base ? { base: chosen } : {}), ...(name.trim() ? { name: name.trim() } : {}), ...(agent !== own ? { agent: picked } : {}) }).catch(() => undefined);
+        close();
+      }}
       onCancel={close}
       width={540}
     >

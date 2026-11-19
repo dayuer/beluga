@@ -41,11 +41,11 @@ test('paths in a message open the file or the folder', async ({ page }) => {
   await expect(page.getByText('Hello from the scratch folder.')).toBeVisible();
   await page.screenshot({ path: '../../.beluga/scratch/03-chat-path-opened.png' });
 
-  // A folder that is in no worktree and in no share opens in Finder, not in Files (BLG-958, actions.ts openLocalFolder):
-  // the chat stays where it is.
+  // The folder opens in Files, at that folder.
   await sidebar(page).getByRole('button', { name: 'Group chat' }).click();
   await page.getByRole('link', { name: `${dir}/scratch/` }).last().click();
-  await expect(page.getByText('stays words.')).toBeVisible();
+  await expect(page.getByText('stays words.')).toBeHidden();
+  await expect(page.getByText('notes.md', { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: '../../.beluga/scratch/04-chat-path-folder.png' });
 });
 

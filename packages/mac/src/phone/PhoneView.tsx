@@ -369,13 +369,13 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
       {compact ? null : (
         <footer className={s.controls}>
           <div className={s.keys}>
-            <Button variant="quiet" onClick={press('back')} title="Back">
+            <Button size="small" variant="quiet" onClick={press('back')} title="Back">
               <Icon name="back" size={16} />
             </Button>
-            <Button variant="quiet" onClick={press('home')} title="Home">
+            <Button size="small" variant="quiet" onClick={press('home')} title="Home">
               Home
             </Button>
-            <Button variant="quiet" onClick={press('recents')} title="Recent apps">
+            <Button size="small" variant="quiet" onClick={press('recents')} title="Recent apps">
               Recents
             </Button>
           </div>
@@ -390,11 +390,11 @@ function Mirror({ phone, compact = false }: { phone: DeviceView; compact?: boole
           />
           {compact ? null : (
             <>
-              <Button onClick={() => sendText(false)} disabled={!typing.trim()}>
+              <Button size="small" onClick={() => sendText(false)} disabled={!typing.trim()}>
                 Send
               </Button>
               <span className={s.spacer} />
-              <Button variant="quiet" onClick={askClaude} title={`Ask your ${agent}, with the phone beside the chat`}>
+              <Button size="small" variant="quiet" onClick={askClaude} title={`Ask your ${agent}, with the phone beside the chat`}>
                 <Icon name="claude" size={14} /> Ask {agent}
               </Button>
             </>

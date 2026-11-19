@@ -6,7 +6,7 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { VideoPlayer, useBlobUrl } from '../components/VideoPlayer.js';
 import { Button, Empty, EmptyActions, IconButton, Segmented, cx } from '../components/ui.js';
 import { useApi, useBeluga } from '../lib/beluga.js';
-import { dragFiles, nativeFiles, openWithDefaultApp, revealInFinder } from '../lib/files.js';
+import { openWithDefaultApp, revealInFinder } from '../lib/files.js';
 import { followed, isFresh, timeAgo } from '../layout/panel/scratch-model.js';
 import { type Places, howLabel, outputsKey, placeOf } from './outputs-model.js';
 import s from './agent-outputs.module.css';
@@ -250,21 +250,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
             const { name, dir } = placeOf(f.path, places);
             const sel = f.path === shown;
             return (
-              <div
-                key={f.path}
-                role="option"
-                aria-selected={sel}
-                className={cx(s.row, sel && s.rowOn)}
-                title={`${f.path}\n${howLabel(f.how)}`}
-                // On this Mac: dragged out of the window, as from Finder (the Mac's own drag).
-                draggable={!machine && nativeFiles()}
-                onDragStart={(e) => {
-                  if (machine || !nativeFiles()) return;
-                  e.preventDefault();
-                  void dragFiles([f.path]);
-                }}
-                onClick={() => pick(f.path)}
-              >
+              <div key={f.path} role="option" aria-selected={sel} className={cx(s.row, sel && s.rowOn)} title={`${f.path}\n${howLabel(f.how)}`} onClick={() => pick(f.path)}>
                 <Icon name={ICONS[f.kind]} size={13} className={s.icon} />
                 <span className={s.rowName}>
                   {name}

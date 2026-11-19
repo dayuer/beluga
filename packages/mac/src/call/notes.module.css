@@ -18,7 +18,7 @@
   background: color-mix(in srgb, var(--call) 9%, var(--bg));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--call) 22%, transparent);
   font-size: 12.5px;
-  cursor: var(--press-cursor);
+  cursor: pointer;
   animation: arrive 260ms var(--ease-out);
   transition:
     background var(--dur-fast),
@@ -216,7 +216,7 @@
   bottom: 9px;
   border-radius: 2px;
   opacity: 0.55;
-  cursor: var(--press-cursor);
+  cursor: pointer;
   transition: opacity var(--dur-fast);
 }
 .stripe:hover {
@@ -368,7 +368,7 @@
   color: var(--call-ink);
   background: color-mix(in srgb, var(--call) 14%, var(--bg));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--call) 26%, transparent);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .inlineChip:hover {
   background: color-mix(in srgb, var(--call) 22%, var(--bg));

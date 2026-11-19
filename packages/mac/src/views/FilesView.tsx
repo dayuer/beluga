@@ -59,7 +59,7 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
         {viewer.by ? <span className={s.following}>following {viewer.by}</span> : null}
         <span className={s.flex} />
         {markdown ? (
-          <Segmented
+          <Segmented size="small"
             label="Show as"
             value={mode}
             onChange={setMode}
@@ -69,8 +69,8 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
             ]}
           />
         ) : null}
-        <IconButton size="regular" icon="download" label="Save a copy…" onClick={() => void saveFile(client, viewer)} />
-        <IconButton size="regular" icon="x" label="Close" onClick={() => void api.files.closeViewer()} />
+        <IconButton size="small" icon="download" label="Save a copy…" onClick={() => void saveFile(client, viewer)} />
+        <IconButton size="small" icon="x" label="Close" onClick={() => void api.files.closeViewer()} />
       </div>
       <div ref={body} className={cx(s.viewerBody, 'selectable')} tabIndex={0} {...{ [SCROLL_ROOT]: '' }}>
         <Suspense fallback={<div className={s.loading}>Opening…</div>}>

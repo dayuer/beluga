@@ -3,7 +3,7 @@ import { planForHome } from '@beluga/core/plans/model.js';
 import { Attention } from '../chat/Attention.js';
 import { ChatLog } from '../chat/ChatLog.js';
 import { Composer } from '../chat/Composer.js';
-import { Button, Empty, EmptyActions, EmptyChoices } from '../components/ui.js';
+import { Button, Empty, EmptyActions } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
 import s from './views.module.css';
@@ -32,30 +32,26 @@ function Starters() {
   const view = useApp((st) => st.view);
   const project = useApp((st) => st.projects.find((p) => p.root && (view.kind !== 'workspace' || p.workspaces.some((w) => w.id === view.id))));
   if (view.kind === 'room') {
-    // The main action Large on its own row, the other ways regular and quiet under it (docs/mac-controls.md).
     return (
-      <EmptyChoices
-        main={
-          project ? (
-            <Button size="large" variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
-              New Worktree
-            </Button>
-          ) : (
-            <Button size="large" variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-              Add Projects…
-            </Button>
-          )
-        }
-      >
-        <Button variant="quiet" icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
+      <EmptyActions>
+        {project ? (
+          <Button size="small" variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
+            New Worktree
+          </Button>
+        ) : (
+          <Button size="small" variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
+            Add Projects…
+          </Button>
+        )}
+        <Button size="small" icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
           New Chat
         </Button>
         {project ? (
-          <Button variant="quiet" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
+          <Button size="small" variant="quiet" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
             Add Projects…
           </Button>
         ) : null}
-      </EmptyChoices>
+      </EmptyActions>
     );
   }
   if (view.kind !== 'workspace') return null;

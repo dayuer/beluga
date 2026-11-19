@@ -236,7 +236,7 @@
   text-align: left;
   font: inherit;
   color: var(--text);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .recipe + .recipe {
   box-shadow: inset 0 1px 0 var(--hairline);
@@ -437,7 +437,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .day[aria-pressed='true'] {
   color: color-mix(in srgb, var(--accent) 85%, var(--text));
@@ -539,7 +539,7 @@
   font: inherit;
   font-size: 11.5px;
   color: color-mix(in srgb, var(--claude) 80%, var(--text));
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .preset:hover {
   background: color-mix(in srgb, var(--claude) 15%, var(--bg));
@@ -584,7 +584,7 @@
   border-radius: 50%;
   --tint: var(--text-3);
   background: color-mix(in srgb, var(--tint) 55%, var(--bg));
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .stripDot:hover {
   background: var(--tint);
@@ -622,7 +622,7 @@
   font: inherit;
   font-size: 12px;
   color: var(--text-2);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .run:first-child {
   border-top: 0;
@@ -764,7 +764,7 @@
   font: inherit;
   font-size: 11.5px;
   color: var(--text-2);
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .disclosure:hover {
   background: var(--bg-hover);

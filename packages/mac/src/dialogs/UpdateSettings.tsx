@@ -20,11 +20,11 @@ function CheckRow({ label }: { label: string }) {
   return (
     <Row label={label} detail={`${status ? `${status} · ` : ''}Last checked: ${lastCheckedLabel(state.lastCheck)}`}>
       {state.available ? (
-        <Button onClick={openUpdateSheet}>
+        <Button size="small" onClick={openUpdateSheet}>
           Show Update…
         </Button>
       ) : null}
-      <Button onClick={() => void checkForUpdates()} disabled={busy}>
+      <Button size="small" onClick={() => void checkForUpdates()} disabled={busy}>
         Check Now
       </Button>
     </Row>

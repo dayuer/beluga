@@ -181,7 +181,7 @@
 }
 .clickable:hover {
   text-decoration: underline;
-  cursor: var(--press-cursor);
+  cursor: pointer;
 }
 .shellInput {
   display: flex;
