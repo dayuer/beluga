@@ -1255,7 +1255,11 @@ mod mac {
             Some(surface) => sheet.panel.setBackgroundColor(Some(&surface)),
             None => sheet.panel.setBackgroundColor(Some(&NSColor::windowBackgroundColor())),
         }
-        sheet.submit.setBezelColor(colour(|p| &p.accent).as_deref());
+        // Only while it can be pressed: a tinted button the system greys out keeps its pale accent
+        // under faded white words that can't be read. Off, it's the Mac's own, like Cancel beside it.
+        let can_press = spec.can_submit && !spec.busy;
+        let tint = if can_press { colour(|p| &p.accent) } else { None };
+        sheet.submit.setBezelColor(tint.as_deref());
         sheet.title.setStringValue(&NSString::from_str(&spec.title));
         sheet.intro.setStringValue(&NSString::from_str(spec.intro.as_deref().unwrap_or("")));
         sheet.cancel.setTitle(&NSString::from_str(&spec.cancel));
