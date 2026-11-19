@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { usageFor, usagesOf, withUsage } from '../src/agent/usage.js';
 import { CLAUDE_AGENT, PeerInfo, Profile } from '../src/protocol.js';
-import { friendRooms, providerCards, shortTokens, GUEST_STALE_MS } from '../src/ui/usage-cards.js';
+import { friendRooms, providerCards, shortTokens, GUEST_STALE_MS, windowHeading } from '../src/ui/usage-cards.js';
 
 /** The Profile an older Mac (before per-provider usage) parses frames with. */
 const OldWindow = z.object({ pct: z.number().min(0).max(100), resetsAt: z.number().optional() });
@@ -93,6 +93,22 @@ describe('usage per provider', () => {
     // Claude signed out says so on its own card, and Antigravity's stays apart.
     const out = { ...p, ...withUsage(p, CLAUDE_AGENT, { signedIn: false }, 3) };
     expect(providerCards(out, undefined).map((c) => c.key)).toEqual(['claude', 'antigravity']);
+  });
+
+  it('heads Antigravity’s windows by their group of models, each with its 5-hour and weekly limits', () => {
+    const agy = { runtime: 'antigravity', label: 'Antigravity' };
+    let p: Pick<Profile, 'usage' | 'usages' | 'agents'> = { agents: [CLAUDE_AGENT, agy] };
+    p = { ...p, ...withUsage(p, CLAUDE_AGENT, { plan: 'max', week: { pct: 31 } }, 1) };
+    p = { ...p, ...withUsage(p, agy, { windows: [{ group: 'Gemini Models', label: '5-hour', pct: 25 }, { group: 'Gemini Models', label: 'Weekly', pct: 8 }, { group: 'Claude and GPT models', label: '5-hour', pct: 0 }] }, 1) };
+    const card = providerCards(p, undefined)[0]!;
+    expect(card.windows.map((w) => [windowHeading(w) ?? '', w.label, w.short])).toEqual([
+      ['', 'Weekly', 'wk'],
+      ['Antigravity · Gemini Models', '5-hour', '5h'],
+      ['Antigravity · Gemini Models', 'Weekly', 'wk'],
+      ['Antigravity · Claude and GPT models', '5-hour', '5h'],
+    ]);
+    // A group's name rides through the profile a friend's Mac parses.
+    expect(Profile.parse({ ...base, ...p }).usages?.[1]?.windows?.[0]?.group).toBe('Gemini Models');
   });
 
   it('keeps the default on the folded card when Antigravity is yours, and leaves old Antigravity numbers on their own card', () => {

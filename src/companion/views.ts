@@ -185,8 +185,8 @@ export function usageViews(p: Pick<Profile, 'usage' | 'usages' | 'agents'> | und
   return cards.slice(0, 8).map((c) => ({
     provider: c.key === CLAUDE_AGENT.runtime ? 'Claude Code' : clip(c.agent.label, 40),
     ...(c.plan ? { plan: clip(c.plan, 40) } : {}),
-    // Another provider's window on this card (Antigravity's on Claude's) says whose it is.
-    windows: c.windows.slice(0, 8).map((w) => ({ label: clip(w.source ? `${w.source} · ${w.label}` : (PHONE_WINDOW[w.label] ?? w.label), 40), pct: Math.max(0, Math.min(100, w.pct)), ...(w.resetsAt !== undefined ? { resetsAt: Math.round(w.resetsAt) } : {}) })),
+    // Another provider's window on this card (Antigravity's on Claude's) says whose it is: its group of models when it has one ("Gemini Models · 5 hours").
+    windows: c.windows.slice(0, 8).map((w) => ({ label: clip([w.group ?? w.source, PHONE_WINDOW[w.label] ?? w.label].filter(Boolean).join(' · '), 40), pct: Math.max(0, Math.min(100, w.pct)), ...(w.resetsAt !== undefined ? { resetsAt: Math.round(w.resetsAt) } : {}) })),
     updatedAt: Math.round(c.updatedAt ?? 0),
     runtime: c.key,
     isDefault: c.isDefault,

@@ -10,6 +10,8 @@ export interface CardWindow {
   readonly resetsAt?: number;
   /** Another provider's window shown on this card ("Antigravity"), under that name. */
   readonly source?: string;
+  /** The models it's for, when its provider keeps a limit per group of models ("Gemini Models"). */
+  readonly group?: string;
 }
 
 /**
@@ -32,12 +34,18 @@ export interface ProviderCard {
 }
 
 /** A provider's quota windows in order: 5-hour, weekly, then its own. */
+/** The short names Claude's own windows have, for a provider's windows of the same length. */
+const SHORT: Readonly<Record<string, string>> = { '5-hour': '5h', Weekly: 'wk' };
+
+/** Who a window is for, as the heading over it: its provider (another's on this card), then its group of models. */
+export const windowHeading = (w: Pick<CardWindow, 'source' | 'group'>): string | undefined => [w.source, w.group].filter(Boolean).join(' · ') || undefined;
+
 export function windowsOf(u: Pick<ProviderUsage, 'fiveHour' | 'week' | 'windows'> | undefined): CardWindow[] {
   if (!u) return [];
   const out: CardWindow[] = [];
   if (u.fiveHour) out.push({ label: '5-hour', short: '5h', ...u.fiveHour });
   if (u.week) out.push({ label: 'Weekly', short: 'wk', ...u.week });
-  for (const w of u.windows ?? []) out.push({ label: w.label, short: w.label.slice(0, 3).toLowerCase(), pct: w.pct, ...(w.resetsAt ? { resetsAt: w.resetsAt } : {}) });
+  for (const w of u.windows ?? []) out.push({ label: w.label, short: SHORT[w.label] ?? w.label.slice(0, 3).toLowerCase(), pct: w.pct, ...(w.resetsAt ? { resetsAt: w.resetsAt } : {}), ...(w.group ? { group: w.group } : {}) });
   return out;
 }
 

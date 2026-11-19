@@ -61,6 +61,55 @@ export function fromUserStatus(status: AgyUserStatus | undefined): UsageUpdate |
   return { windows, ...(plan ? { plan: plan.slice(0, 32) } : {}) };
 }
 
+/** One of a group's limits, as `RetrieveUserQuotaSummary` says it. */
+interface AgyQuotaBucket {
+  readonly bucketId?: string;
+  /** `5h` or `weekly`. */
+  readonly window?: string;
+  /** Left out when it's 0 (protobuf's JSON): used up. */
+  readonly remainingFraction?: number;
+  readonly resetTime?: string;
+}
+
+/** What `RetrieveUserQuotaSummary` says: each group of models (Gemini's; Claude's and GPT's), with its own 5-hour and weekly limits. */
+export interface AgyQuotaSummary {
+  readonly groups?: ReadonlyArray<{ readonly displayName?: string; readonly buckets?: readonly AgyQuotaBucket[] }>;
+}
+
+/** Its windows by the names Claude's have, so they read (and translate) the same: 5-hour first, then the week. */
+const WINDOWS: ReadonlyArray<readonly [string, string]> = [
+  ['5h', '5-hour'],
+  ['weekly', 'Weekly'],
+];
+
+/** At most this many groups: two windows each, within a provider's six. */
+const MAX_GROUPS = 3;
+
+const usedPct = (remaining: number | undefined): number => Math.round((1 - (typeof remaining === 'number' && Number.isFinite(remaining) ? Math.max(0, Math.min(1, remaining)) : 0)) * 100);
+
+/**
+ * Antigravity's quota as its own quota panel shows it: per group of models (its own names, "Gemini
+ * Models", "Claude and GPT models"), the 5-hour limit and the weekly one, each with when it refills;
+ * the tier ("Google AI Ultra") as the plan. Undefined when it names no limit (an older CLI: then
+ * `fromUserStatus` reads one per model family).
+ */
+export function fromQuotaSummary(summary: AgyQuotaSummary | undefined, status?: AgyUserStatus): UsageUpdate | undefined {
+  const windows: NamedUsageWindow[] = [];
+  for (const g of (summary?.groups ?? []).slice(0, MAX_GROUPS)) {
+    const group = g.displayName?.trim().slice(0, 40);
+    if (!group) continue;
+    for (const [id, label] of WINDOWS) {
+      const b = g.buckets?.find((x) => x.window === id);
+      if (!b) continue;
+      const resetsAt = toMs(b.resetTime);
+      windows.push({ label, group, pct: usedPct(b.remainingFraction), ...(resetsAt ? { resetsAt } : {}) });
+    }
+  }
+  if (!windows.length) return undefined;
+  const plan = status?.userTier?.name ?? status?.planStatus?.planInfo?.planName;
+  return { windows, ...(plan ? { plan: plan.slice(0, 32) } : {}) };
+}
+
 /** The HTTP port an `agy acp` process's language server listens on, from its log's words. */
 export function portFromLog(log: string): number | undefined {
   const m = /listening on random port at (\d+) for HTTP\b/.exec(log);
@@ -96,7 +145,8 @@ async function waitForPort(dir: string, pid: number): Promise<number | undefined
 /**
  * What's left of your Antigravity quota now. ACP doesn't say it, so this starts `agy acp`, opens a
  * conversation (no message is sent: nothing of your quota is used), and asks its own language
- * server on localhost (`GetUserStatus`), as Antigravity's own quota panel does. The conversation
+ * server on localhost (`RetrieveUserQuotaSummary` for the limits, `GetUserStatus` for the tier),
+ * as Antigravity's own quota panel does. The conversation
  * is dropped after. Undefined when it can't say (not installed, signed out, an older CLI).
  */
 export async function readAgyQuota(deps: QuotaDeps = {}): Promise<UsageUpdate | undefined> {
@@ -110,15 +160,18 @@ export async function readAgyQuota(deps: QuotaDeps = {}): Promise<UsageUpdate | 
     opened = s.sessionId;
     const port = await waitForPort(deps.logDir ?? agyLogDir(), conn.proc.pid);
     if (!port) return undefined;
-    const res = await (deps.fetch ?? fetch)(`http://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/GetUserStatus`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1' },
-      body: '{}',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) return undefined;
-    const body = (await res.json()) as { userStatus?: AgyUserStatus };
-    return fromUserStatus(body.userStatus);
+    const ask = async <T>(method: string): Promise<T | undefined> => {
+      const res = await (deps.fetch ?? fetch)(`http://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1' },
+        body: '{}',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      return res.ok ? ((await res.json()) as T) : undefined;
+    };
+    // Its tier, and its limits as its own quota panel shows them; an older CLI has only one per model.
+    const [status, summary] = await Promise.all([ask<{ userStatus?: AgyUserStatus }>('GetUserStatus').catch(() => undefined), ask<{ response?: AgyQuotaSummary }>('RetrieveUserQuotaSummary').catch(() => undefined)]);
+    return fromQuotaSummary(summary?.response, status?.userStatus) ?? fromUserStatus(status?.userStatus);
   } catch {
     return undefined;
   } finally {

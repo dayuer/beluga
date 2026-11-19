@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgyConnection } from '../src/agent/runtime/antigravity/connection.js';
-import { type AgyUserStatus, fromUserStatus, portFromLog, readAgyQuota } from '../src/agent/runtime/antigravity/quota.js';
+import { type AgyQuotaSummary, type AgyUserStatus, fromQuotaSummary, fromUserStatus, portFromLog, readAgyQuota } from '../src/agent/runtime/antigravity/quota.js';
 import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
 import { dropAgyLog } from '../src/agent/runtime/antigravity/connection.js';
 import { AGY_LOG_DAYS, tidyAgyData } from '../src/agent/runtime/antigravity/sessions.js';
@@ -30,7 +30,63 @@ const status: AgyUserStatus = {
   },
 };
 
+const WEEK = '2026-11-26T17:26:56Z';
+
+/** What RetrieveUserQuotaSummary answered (Antigravity CLI 1.5.12), trimmed: each group of models with its 5-hour and weekly limits. */
+const summary: AgyQuotaSummary = {
+  groups: [
+    {
+      displayName: 'Gemini Models',
+      buckets: [
+        { bucketId: 'gemini-weekly', window: 'weekly', remainingFraction: 0.92214495, resetTime: WEEK },
+        { bucketId: 'gemini-5h', window: '5h', remainingFraction: 0.73432255, resetTime: RESET },
+      ],
+    },
+    {
+      displayName: 'Claude and GPT models',
+      // Used up this week: protobuf's JSON leaves the 0 out.
+      buckets: [
+        { bucketId: '3p-weekly', window: 'weekly', resetTime: WEEK },
+        { bucketId: '3p-5h', window: '5h', remainingFraction: 1, resetTime: LATER },
+      ],
+    },
+  ],
+};
+
 describe('Antigravity quota', () => {
+  it('reads each group’s 5-hour and weekly limits, as its own quota panel shows them', () => {
+    expect(fromQuotaSummary(summary, status)).toEqual({
+      plan: 'Google AI Ultra',
+      windows: [
+        { group: 'Gemini Models', label: '5-hour', pct: 27, resetsAt: Date.parse(RESET) },
+        { group: 'Gemini Models', label: 'Weekly', pct: 8, resetsAt: Date.parse(WEEK) },
+        { group: 'Claude and GPT models', label: '5-hour', pct: 0, resetsAt: Date.parse(LATER) },
+        { group: 'Claude and GPT models', label: 'Weekly', pct: 100, resetsAt: Date.parse(WEEK) },
+      ],
+    });
+    // Nothing it names: an older CLI, read per model family instead.
+    expect(fromQuotaSummary({ groups: [] }, status)).toBeUndefined();
+    expect(fromQuotaSummary(undefined)).toBeUndefined();
+  });
+
+  it('asks for the summary, and falls back to one window per family when the CLI has none', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'agy-log-'));
+    try {
+      const pid = 4343;
+      writeFileSync(path.join(dir, `acp-server-20261120_004854-${pid}.log`), 'Language server listening on random port at 52378 for HTTP\n');
+      const conn = () => ({ rpc: { request: async () => ({ sessionId: 'abc' }) }, proc: { pid, alive: () => true, kill: async () => undefined, exited: Promise.resolve() } }) as unknown as AgyConnection;
+      const answer = (withSummary: boolean) => async (url: string) =>
+        url.endsWith('/RetrieveUserQuotaSummary') ? (withSummary ? new Response(JSON.stringify({ response: summary })) : new Response('{}', { status: 404 })) : new Response(JSON.stringify({ userStatus: status }));
+      const both = await readAgyQuota({ connect: async () => conn(), logDir: dir, fetch: answer(true) as unknown as typeof globalThis.fetch, drop: async () => true });
+      expect(both?.windows?.map((w) => `${w.group} ${w.label}`)).toEqual(['Gemini Models 5-hour', 'Gemini Models Weekly', 'Claude and GPT models 5-hour', 'Claude and GPT models Weekly']);
+      expect(both?.plan).toBe('Google AI Ultra');
+      const older = await readAgyQuota({ connect: async () => conn(), logDir: dir, fetch: answer(false) as unknown as typeof globalThis.fetch, drop: async () => true });
+      expect(older?.windows?.map((w) => w.label)).toEqual(['Gemini', 'Claude', 'GPT-OSS']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('one window per model family, its tightest model’s, and the tier as the plan', () => {
     expect(fromUserStatus(status)).toEqual({
       plan: 'Google AI Ultra',
