@@ -1,0 +1,220 @@
+appId: com.synon.studio
+---
+# 1. Sign in via magic link, see projects, open a plan, and send one request (double-tap dedup)
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+    timeout: 10000
+- takeScreenshot: flow-login
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "project-card-${E2E_PROJECT_ID}"
+    timeout: 25000
+- takeScreenshot: flow-projects
+
+- tapOn:
+    id: "project-card-${E2E_PROJECT_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "project-home"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "plan-row-plan1"
+    timeout: 20000
+- takeScreenshot: flow-home
+
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
+- tapOn:
+    id: "goal-input"
+- inputText: "做一个能记录每天喝水提醒的 App"
+- hideKeyboard
+- tapOn:
+    id: "platform-ios"
+- tapOn:
+    id: "platform-web"
+- takeScreenshot: flow-new
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: plan.create
+- doubleTapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "project-home"
+    timeout: 25000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: plan.create
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 2. Keep draft across back navigation, app restart, and keyboard open
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
+- tapOn:
+    id: "goal-input"
+- inputText: "草稿要留住"
+- hideKeyboard
+- tapOn:
+    id: "platform-ios"
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "project-home"
+    timeout: 15000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible: ".*草稿要留住.*"
+    timeout: 15000
+
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "project-card-${E2E_PROJECT_ID}"
+    timeout: 20000
+- tapOn:
+    id: "project-card-${E2E_PROJECT_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "plan-row-plan1"
+    timeout: 20000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible: ".*草稿要留住.*"
+    timeout: 15000
+- tapOn:
+    id: "goal-input"
+- assertVisible:
+    id: "primary"
+- hideKeyboard
+
+# 3. Offline send keeps text and lands once after reconnect
+- tapOn:
+    id: "goal-input"
+- eraseText: 20
+- inputText: "断网时不能丢字"
+- hideKeyboard
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: plan.create
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible: ".*没发出去.*"
+    timeout: 15000
+- assertVisible: ".*断网时不能丢字.*"
+- assertVisible: ".*重试.*"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- tapOn:
+    id: "primary"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "project-home"
+    timeout: 25000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: plan.create
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 4. Request waits while daemon is down and lands once daemon is back
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStop
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
+- tapOn:
+    id: "goal-input"
+- inputText: "工作室离线也要收下"
+- hideKeyboard
+- tapOn:
+    id: "platform-ios"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: plan.create
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible: ".*已排队.*"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: plan.create
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "0"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStart
+- extendedWaitUntil:
+    visible:
+      id: "project-home"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: plan.create
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
