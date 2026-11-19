@@ -23,6 +23,7 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 **作废：手机的自定义地址通道**（`plan/custom-route`，BLG-259–261、BLG-264，Beluga 计划 `pl_06cbeaec655c`）。让手机经 GNB、ZeroTier、WireGuard、Nebula、Tailscale 等组网连 Mac：中继另外监听一个用户给的 `host:port`，手机把它当第三条路竞速。2026-11-18 放弃，代码已从 `topic/native`、`topic/plans` 撤出（`revert:` 提交），分支归档为 `archive/abandoned-custom-route-2026-11-18`，不再合进链上任何分支。没有发出去的版本带过它用的协议号（native 上 1.59、plans 上 1.64）。
 
 - **新改动**放在它所属的、链上最靠前的那个分支：从它开 worktree 和 PR，合进去之后，再把这个分支依次合进链上后面的每个分支（merge，不 rebase，分支都已推送）。
+- **目录只在仓库里面**（2026-11-19 起）：Beluga 的所有文件都在 `~/sproot/beluga` 之下。不管为了什么开 worktree，都在主检出里用 `git worktree add .worktrees/<名字> <分支>`，不在旁边开 `../beluga-<名字>`，也不开在临时目录。`/.worktrees/` 写在 `.git/info/exclude` 里忽略（不写 `.gitignore`，`main` 是上游的）；新克隆的仓库要自己补上这一行。临时文件、笔记、构建产物同样放在仓库内已忽略的路径，不放在仓库旁边。用完的 worktree 合并后用 `git worktree remove` 删掉。
 - **同步上游**从链头进：把 `upstream/main` 合进 `topic/chinese`（它和上游只差 `zh-CN.json`：fork 的中文直接写在上游的文件里），再顺着链往下合。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，在 `topic/native` 及之后）照旧用。
 - **构建**临时拼：在干净的 worktree 里切到要的那个链上分支（全部就是 `topic/plans`），需要时 `git merge topic/fixes`，再 `npm run app:build`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。

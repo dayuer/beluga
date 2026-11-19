@@ -115,6 +115,11 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   `npm run app:build`. One build number per distinct code: don't build the same tree twice.
 - **One session writes in a checkout at a time.** Parallel work goes in its own worktree, and every
   worktree ends merged or removed. Never leave uncommitted changes behind for another session.
+- **Everything of Beluga stays inside the repository's folder** (`~/sproot/beluga`). A worktree,
+  whatever it is for, is `git worktree add .worktrees/<name> <branch>` from the main checkout:
+  never a sibling folder (`../beluga-<name>`), never a temp or scratch directory. `/.worktrees/`
+  is ignored in `.git/info/exclude` (not `.gitignore`: `main` is upstream's). Scratch files, notes
+  and build outputs go in the repository's ignored paths too, not beside it.
 - **One PR per piece of work.** Fold small fixes into the open PR instead of opening another; the
   build-number change goes in the same PR as the code it ships.
 - **Merges and pushes follow the owner's word.** When the request already says to merge or push
