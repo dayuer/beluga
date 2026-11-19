@@ -102,7 +102,7 @@ function ProviderBox({ card, now }: { card: ProviderCard; now: number }) {
         <div className={s.windows}>
           {card.windows.map((w, i) => (
             <Fragment key={`${windowHeading(w) ?? ''}:${w.label}`}>
-              {windowHeading(w) && windowHeading(w) !== (i > 0 ? windowHeading(card.windows[i - 1]!) : undefined) ? <div className={s.windowSource}>{windowHeading(w)}</div> : null}
+              {windowHeading(w) && windowHeading(w) !== (i > 0 ? windowHeading(card.windows[i - 1]!) : undefined) ? <div className={s.windowGroup}>{windowHeading(w)}</div> : null}
               <WindowMeter w={w} now={now} />
             </Fragment>
           ))}
@@ -179,8 +179,8 @@ function FriendsCard({ rooms }: { rooms: FriendRoom[] }) {
 export function PlanCard({ state, now }: { state: AppState; now: number }) {
   const selfId = state.self?.peerId ?? state.selfId;
   const me = state.peers.find((p) => p.peerId === selfId) ?? state.self;
-  // Your setting (unset: Claude) answers at once; the peer card friends see follows it.
-  const cards = providerCards(me, state.prefs.defaultAgent);
+  // Your setting (unset: Claude) answers at once; the peer card friends see follows it. Only agents ready here have a card.
+  const cards = providerCards(me, state.prefs.defaultAgent, state.runtimes);
   const rooms = friendRooms(state.peers, selfId);
   return (
     <>

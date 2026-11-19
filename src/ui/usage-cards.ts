@@ -8,8 +8,6 @@ export interface CardWindow {
   readonly short: string;
   readonly pct: number;
   readonly resetsAt?: number;
-  /** Another provider's window shown on this card ("Antigravity"), under that name. */
-  readonly source?: string;
   /** The models it's for, when its provider keeps a limit per group of models ("Gemini Models"). */
   readonly group?: string;
 }
@@ -37,8 +35,8 @@ export interface ProviderCard {
 /** The short names Claude's own windows have, for a provider's windows of the same length. */
 const SHORT: Readonly<Record<string, string>> = { '5-hour': '5h', Weekly: 'wk' };
 
-/** Who a window is for, as the heading over it: its provider (another's on this card), then its group of models. */
-export const windowHeading = (w: Pick<CardWindow, 'source' | 'group'>): string | undefined => [w.source, w.group].filter(Boolean).join(' · ') || undefined;
+/** The heading over a window: its group of models, when its provider keeps a limit per group ("Gemini Models"). */
+export const windowHeading = (w: Pick<CardWindow, 'group'>): string | undefined => w.group;
 
 export function windowsOf(u: Pick<ProviderUsage, 'fiveHour' | 'week' | 'windows'> | undefined): CardWindow[] {
   if (!u) return [];
@@ -66,40 +64,25 @@ function cardOf(agent: AgentRef, u: ProviderUsage | undefined, isDefault: boolea
   };
 }
 
+/** Where a runtime stands here, as the agent pickers have it (shared/agent-runtimes.ts): unknown until asked. */
+export type RuntimeReadiness = ReadonlyArray<{ readonly id: string; readonly state?: string }>;
+
 /**
  * Your providers as cards: Claude always, then every other one you run or that reported usage, in a
- * stable order (tapping make-default never moves them). `defaultAgent` is your setting's.
+ * stable order (tapping make-default never moves them). `defaultAgent` is your setting's. With
+ * `runtimes` (yours, as the pickers have them), a card shows only while its agent is ready here:
+ * one that isn't installed or signed in has no card. One not asked about yet keeps its card.
  */
-export function providerCards(self: Pick<Profile, 'usage' | 'usages' | 'agents'> | undefined, defaultAgent: AgentRef | undefined): ProviderCard[] {
+export function providerCards(self: Pick<Profile, 'usage' | 'usages' | 'agents'> | undefined, defaultAgent: AgentRef | undefined, runtimes?: RuntimeReadiness): ProviderCard[] {
   const usages = usagesOf(self);
   const def = (defaultAgent ?? CLAUDE_AGENT).runtime;
-  return foldIntoClaude(providersOf(self).map((a) => cardOf(a, usages.find((u) => u.agent.runtime === a.runtime), a.runtime === def)));
-}
-
-/** Providers whose quota shows on Claude's card instead of a card of its own (Antigravity's: Gemini, Claude, GPT-OSS). */
-const ON_CLAUDES_CARD = new Set(['antigravity']);
-
-/**
- * A guest's reading this much older than Claude's is no longer read with it: it keeps its own card,
- * with its own "Updated", so old numbers never pass for new (three of the usage tab's refreshes).
- */
-export const GUEST_STALE_MS = 30 * 60_000;
-
-/**
- * One card for Claude and Antigravity: Antigravity's windows (once it has said them, and while
- * they're as fresh as Claude's) go under Claude's own, each marked with where it's from, and its
- * card goes. The card is your default when either of them is, so the default is never lost.
- */
-function foldIntoClaude(cards: ProviderCard[]): ProviderCard[] {
-  const claude = cards.find((c) => c.key === CLAUDE_AGENT.runtime);
-  const guests = cards.filter((c) => ON_CLAUDES_CARD.has(c.key) && c.shape === 'quota' && (claude?.updatedAt ?? 0) - (c.updatedAt ?? 0) <= GUEST_STALE_MS);
-  // Claude signed out says so on its card: Antigravity's windows keep their own then.
-  if (!claude?.signedIn || !guests.length) return cards;
-  const windows = [...claude.windows, ...guests.flatMap((g) => g.windows.map((w) => ({ ...w, source: g.agent.label })))];
-  // The card is as old as its oldest reading.
-  const updatedAt = Math.min(...[claude, ...guests].map((c) => c.updatedAt ?? 0).filter(Boolean));
-  const merged: ProviderCard = { ...claude, shape: 'quota', windows, isDefault: claude.isDefault || guests.some((g) => g.isDefault), ...(Number.isFinite(updatedAt) ? { updatedAt } : {}) };
-  return cards.filter((c) => !guests.includes(c)).map((c) => (c === claude ? merged : c));
+  const ready = (runtime: string): boolean => {
+    const state = runtimes?.find((r) => r.id === runtime)?.state;
+    return state === undefined || state === 'ready';
+  };
+  return providersOf(self)
+    .filter((a) => ready(a.runtime))
+    .map((a) => cardOf(a, usages.find((u) => u.agent.runtime === a.runtime), a.runtime === def));
 }
 
 /** One friend's provider with quota windows: whose agent has room left. */

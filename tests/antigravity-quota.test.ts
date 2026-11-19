@@ -56,7 +56,7 @@ const summary: AgyQuotaSummary = {
 describe('Antigravity quota', () => {
   it('reads each group’s 5-hour and weekly limits, as its own quota panel shows them', () => {
     expect(fromQuotaSummary(summary, status)).toEqual({
-      plan: 'Google AI Ultra',
+      plan: 'AI Ultra',
       windows: [
         { group: 'Gemini Models', label: '5-hour', pct: 27, resetsAt: Date.parse(RESET) },
         { group: 'Gemini Models', label: 'Weekly', pct: 8, resetsAt: Date.parse(WEEK) },
@@ -79,7 +79,7 @@ describe('Antigravity quota', () => {
         url.endsWith('/RetrieveUserQuotaSummary') ? (withSummary ? new Response(JSON.stringify({ response: summary })) : new Response('{}', { status: 404 })) : new Response(JSON.stringify({ userStatus: status }));
       const both = await readAgyQuota({ connect: async () => conn(), logDir: dir, fetch: answer(true) as unknown as typeof globalThis.fetch, drop: async () => true });
       expect(both?.windows?.map((w) => `${w.group} ${w.label}`)).toEqual(['Gemini Models 5-hour', 'Gemini Models Weekly', 'Claude and GPT models 5-hour', 'Claude and GPT models Weekly']);
-      expect(both?.plan).toBe('Google AI Ultra');
+      expect(both?.plan).toBe('AI Ultra');
       const older = await readAgyQuota({ connect: async () => conn(), logDir: dir, fetch: answer(false) as unknown as typeof globalThis.fetch, drop: async () => true });
       expect(older?.windows?.map((w) => w.label)).toEqual(['Gemini', 'Claude', 'GPT-OSS']);
     } finally {
@@ -89,7 +89,7 @@ describe('Antigravity quota', () => {
 
   it('one window per model family, its tightest model’s, and the tier as the plan', () => {
     expect(fromUserStatus(status)).toEqual({
-      plan: 'Google AI Ultra',
+      plan: 'AI Ultra',
       windows: [
         { label: 'Gemini', pct: 50, resetsAt: Date.parse(RESET) },
         { label: 'Claude', pct: 0, resetsAt: Date.parse(LATER) },
@@ -138,7 +138,7 @@ describe('Antigravity quota', () => {
     const bridge = Object.assign(Object.create(room) as RoomBridge, { reportUsage });
     const backend = createAgyBackend({ cwd: os.tmpdir(), autoEdit: false, additionalDirectories: [], bridge, readQuota: async () => fromUserStatus(status) });
     expect(await backend.refreshUsage?.()).toBeUndefined();
-    expect(reportUsage).toHaveBeenCalledWith(expect.objectContaining({ plan: 'Google AI Ultra', signedIn: true }), { runtime: 'antigravity', label: 'Antigravity' });
+    expect(reportUsage).toHaveBeenCalledWith(expect.objectContaining({ plan: 'AI Ultra', signedIn: true }), { runtime: 'antigravity', label: 'Antigravity' });
   });
 
   it('removes a look’s own log once it has stopped, and only that one', async () => {

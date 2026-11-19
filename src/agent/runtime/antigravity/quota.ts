@@ -57,7 +57,7 @@ export function fromUserStatus(status: AgyUserStatus | undefined): UsageUpdate |
   }
   if (!families.size) return undefined;
   const windows: NamedUsageWindow[] = [...families].map(([label, f]) => ({ label, pct: Math.round((1 - f.remaining) * 100), ...(f.resetsAt ? { resetsAt: f.resetsAt } : {}) }));
-  const plan = status?.userTier?.name ?? status?.planStatus?.planInfo?.planName;
+  const plan = planOf(status);
   return { windows, ...(plan ? { plan: plan.slice(0, 32) } : {}) };
 }
 
@@ -106,8 +106,14 @@ export function fromQuotaSummary(summary: AgyQuotaSummary | undefined, status?: 
     }
   }
   if (!windows.length) return undefined;
-  const plan = status?.userTier?.name ?? status?.planStatus?.planInfo?.planName;
+  const plan = planOf(status);
   return { windows, ...(plan ? { plan: plan.slice(0, 32) } : {}) };
+}
+
+/** Its tier as the card's plan, without the maker's name the card already implies ("Google AI Ultra" → "AI Ultra"). */
+export function planOf(status: AgyUserStatus | undefined): string | undefined {
+  const name = (status?.userTier?.name ?? status?.planStatus?.planInfo?.planName)?.trim().replace(/^Google\s+/i, '');
+  return name || undefined;
 }
 
 /** The HTTP port an `agy acp` process's language server listens on, from its log's words. */

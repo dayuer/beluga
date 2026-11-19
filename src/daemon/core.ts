@@ -495,12 +495,12 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
       // A second and a third provider, so the Usage tab shows a card for each shape (BLG-458).
       session.updateUsage({ plan: 'plus', windows: [{ label: 'Weekly', pct: 24 }] }, { runtime: 'codex', model: 'gpt-5', label: 'Codex' });
       session.updateUsage({ tokens: { input: 182_000, output: 41_500 }, tokensPerSec: 38 }, { runtime: 'local', model: 'qwen3', label: 'Local' });
-      // Antigravity's quota per group of models, its 5-hour and weekly limits: shown on Claude's card, not one of its own.
+      // Antigravity's quota per group of models, its 5-hour and weekly limits, on a card of its own.
       const refill = Date.now() + 3 * 60 * 60_000;
       const week = Date.now() + 6 * 24 * 60 * 60_000;
       session.updateUsage(
         {
-          plan: 'Google AI Ultra',
+          plan: 'AI Ultra',
           windows: [
             { group: 'Gemini Models', label: '5-hour', pct: 25, resetsAt: refill },
             { group: 'Gemini Models', label: 'Weekly', pct: 8, resetsAt: week },
