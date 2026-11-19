@@ -25,6 +25,7 @@ import { resendMailer } from '../../../src/net/studio/mail.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
+import { handlePushTokenRequest } from './push-tokens.js';
 import { jsonOf, responseOf } from './reply.js';
 
 export { StudioHub };
@@ -118,11 +119,15 @@ function sessionToken(req: Request): string | undefined {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    const route = routeOf(req.method, url.pathname);
     const hub = new D1HubStore(env.DB);
     const now = Date.now();
     // Never fall back to the request's Host: a magic link built from it could point at an attacker.
     const origin = env.HUB_ORIGIN ?? '';
+
+    const pushReply = await handlePushTokenRequest(req, env, hub, now);
+    if (pushReply) return pushReply;
+
+    const route = routeOf(req.method, url.pathname);
 
     if (route.name === 'not-found') return jsonOf({ error: 'not-found' }, 404);
     // The admin page is static; the data behind it needs the operator token.

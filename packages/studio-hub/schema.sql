@@ -89,3 +89,13 @@ CREATE TABLE IF NOT EXISTS outbox (
   expires_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS outbox_by_time ON outbox (expires_at);
+
+CREATE TABLE IF NOT EXISTS push_tokens (
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  device      TEXT NOT NULL,
+  platform    TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+  token       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, device)
+);
+CREATE INDEX IF NOT EXISTS push_tokens_by_token ON push_tokens (token);
