@@ -17,6 +17,7 @@ import type { AgentPlace, AgentRunInput, FollowUp, Steer } from '../src/agent/ty
 import { agentForFriend } from '../src/core/gateway/serve.js';
 import { agentMark, modelMark } from '../src/shared/agent-marks.js';
 import { RunFailedError } from '../src/shared/run-failure.js';
+import { CodexRpcError } from '../src/agent/runtime/codex/rpc.js';
 import { fallbackFor, runtimeHas } from '../src/shared/runtime-fallbacks.js';
 import type { StepRecord } from '../src/shared/steps.js';
 import { waitFor } from './helpers.js';
@@ -82,12 +83,13 @@ describe('Antigravity’s tools as Beluga’s', () => {
     expect(agyCalls('mcp_beluga_helper_wipe', {}, '/w', ['beluga'], ours)[0]!.name).toBe('mcp__antigravity__mcp_beluga_helper_wipe');
   });
 
-  it('judges a move on both files: the one it takes and where it lands', () => {
-    expect(agyCalls('move', { Path: 'a.ts', Destination: '../out/b.ts' }, '/w')).toEqual([
+  it('judges a move on both files: the one it takes and where it lands, as its ACP locations say', () => {
+    const raw = agyInput({ rawInput: { toolSummary: 'Move it' }, locations: [{ path: inW('a.ts') }, { path: inW('../out/b.ts') }] });
+    expect(agyCalls('move', raw, '/w')).toEqual([
       { name: 'Edit', input: { file_path: inW('a.ts') } },
-      { name: 'Write', input: { file_path: path.resolve('/w', '../out/b.ts') } },
+      { name: 'Write', input: { file_path: inW('../out/b.ts') } },
     ]);
-    // No landing place said: judged with none, so it's turned down.
+    // No landing place said: judged on no file, so it's turned down.
     expect(agyCalls('rename_file', { Path: 'a.ts' }, '/w')[1]).toEqual({ name: 'Write', input: { file_path: '' } });
   });
 });
@@ -129,6 +131,16 @@ describe('the parts of a run', () => {
     expect(limit).toBeInstanceOf(RunFailedError);
     expect((limit as RunFailedError).failure).toMatchObject({ kind: 'usage_limit', runtime: 'antigravity' });
     expect((agyFailure({ error: 'Authentication required' }) as RunFailedError).failure).toMatchObject({ kind: 'signed_out', runtime: 'antigravity' });
+  });
+
+  it('tells a sign-in by ACP’s own code, and takes no deadline, context window or stderr line for a used-up quota', () => {
+    const kind = (error: string, extra: Parameters<typeof agyFailure>[0] = {}): string => (agyFailure({ error, ...extra }) as RunFailedError).failure.kind;
+    for (const words of ['RESOURCE_EXHAUSTED: quota exceeded', 'Weekly limit reached', 'You have reached your Five Hour Limit', '429 Too Many Requests', 'rate limit exceeded']) expect(kind(words)).toBe('usage_limit');
+    for (const words of ['rpc error: code = DeadlineExceeded desc = context deadline exceeded', 'maximum context length exceeded']) expect(kind(words)).not.toBe('usage_limit');
+    expect(kind('Antigravity didn’t start', { cause: new CodexRpcError('Sign in first', -32000) })).toBe('signed_out');
+    expect(kind('ENOENT: keyring.json')).not.toBe('signed_out');
+    // A line of its log that mentions a quota is no failure of your plan's.
+    expect(kind('Antigravity exited before the turn ended', { stderr: ['debug: quota check ok'] })).not.toBe('usage_limit');
   });
 
   it('lists the session’s models, the current one with its thinking levels', () => {
@@ -256,6 +268,16 @@ describe('a run on Antigravity', () => {
     expect(modes).toEqual(['plan', 'default']);
   });
 
+  it('puts the session back on a mode that asks when it goes to one that doesn’t', async () => {
+    const agy = new ScriptedAgy();
+    const r = input('mode auto', { place: place() });
+    // The scripted turn only ends once its mode is set again.
+    expect(await backend(agy).run(r)).toBe('mode: default');
+    expect(agy.sent('session/set_config_option').filter((o) => o.configId === 'mode').map((o) => o.value)).toEqual(['default']);
+    const other = input('mode accept-edits', { place: place() });
+    expect(await backend(new ScriptedAgy()).run(other)).toBe('mode: default');
+  });
+
   it('goes on with the same conversation (session/load), its replay kept out of the chat', async () => {
     const agy = new ScriptedAgy();
     const first = place();
@@ -329,6 +351,20 @@ describe('around a run', () => {
     expect(signedOut).toEqual({ state: 'signed_out', fix: AGY_SIGN_IN, models: [] });
   });
 
+  it('drops the session it opened to look only once Antigravity has stopped', async () => {
+    const agy = new ScriptedAgy();
+    const order: string[] = [];
+    const status = await agyStatus({
+      connect: async (o) => {
+        const conn = await agy.connect(o);
+        return { ...conn, proc: { ...conn.proc, kill: async () => (order.push('stopped'), conn.proc.kill()) } };
+      },
+      drop: async (id) => void order.push(`dropped ${id}`),
+    });
+    expect(status.state).toBe('ready');
+    expect(order).toEqual(['stopped', `dropped ${[...agy.sessions.keys()][0]}`]);
+  });
+
   it('forgets a deleted chat’s conversation: its file, annotations and notes', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-home-'));
     const id = '6e15d96b-cb2c-48c8-adb0-e718b9ab1dde';
@@ -352,6 +388,22 @@ describe('around a run', () => {
     mkdirSync(path.join(dir, 'conversations'), { recursive: true });
     writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
     expect(await dropAgyFolder(folder, { connect: agy.connect, dir })).toBe(1);
+  });
+
+  it('reads every page of session/list for a folder being deleted', async () => {
+    const agy = new ScriptedAgy({ listPage: 2 });
+    const folder = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-ws-'));
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-home-'));
+    mkdirSync(path.join(dir, 'conversations'), { recursive: true });
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const p = place({ cwd: folder });
+      await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect }).run(input('hello', { place: p }));
+      ids.push(p.sessions[0]!);
+      writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
+    }
+    expect(await dropAgyFolder(folder, { connect: agy.connect, dir })).toBe(5);
+    expect(ids.some((id) => existsSync(path.join(dir, 'conversations', `${id}.db`)))).toBe(false);
   });
 
   it('is registered, signs in by starting agy, and wears its own mark', () => {

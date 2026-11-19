@@ -211,7 +211,8 @@ The Antigravity CLI (`agy acp`) asks before its commands, its writes and its MCP
 - A project's main folder stays read only, and a plan while it's being made edits nothing (Antigravity's own Plan mode, and Beluga turns its writes down too).
 - Beluga's own tools (the room, the board) reach Antigravity over HTTP on 127.0.0.1, each run with its own token, and check each call where they run.
 - A tool counts as Beluga's only when it is one Beluga mounted for that run. An MCP server of your own whose name starts like one of Beluga's (`beluga_helper`) is asked about like any other.
-- A file it moves is checked twice: the file it takes and where it lands. A move that doesn't say where it lands is turned down.
+- Its mode is Beluga's, as Codex's approval policy is: Plan while it plans, else its default, which asks before each command and write. A session that goes to a mode that doesn't ask (accept-edits, auto), by a /command or on its own, is put back, before each turn and when it says its mode changed.
+- A file it moves is checked twice: the file it takes and where it lands (the call's ACP locations). A move that doesn't say where it lands is turned down.
 - Beluga always answers "Allow" or "Deny" once, never "always", so nothing it allows is kept in Antigravity.
 - It signs in with what the Antigravity CLI already has (your Google account, in the system keychain). Beluga never sees or stores that sign-in.
 - Its own notes for a conversation (`~/.gemini/antigravity-cli/brain/<conversation>`) are written without asking you. Nothing else outside the run's folders is.

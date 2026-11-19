@@ -21,12 +21,13 @@ const LEVELS = ['low', 'medium', 'high'];
  * agy does, and answers `denied: P` once Beluga says why); `wait…` works
  * until cancelled; `read <file>` reads it (not asked); `edit <file>` writes it (asked); `room`
  * calls one of Beluga's tools (mcp_beluga_list_peers); `own <tool>` calls a tool of a server of
- * your own by that name and `move <a> <b>` moves a file (both asked); `/compact` summarises; `quota` answers as a
+ * your own by that name and `move <a> <b>` moves a file (both asked); `mode <m>` goes to that
+ * mode itself and answers once its mode is set again; `/compact` summarises; `quota` answers as a
  * plan that has run out does.
  */
 export class ScriptedAgy {
   /** `stepMs`: a pause before each step ends, so a screen sees it run (the demo); none in tests. */
-  constructor(private readonly opts: { readonly stepMs?: number; readonly models?: readonly string[] } = {}) {}
+  constructor(private readonly opts: { readonly stepMs?: number; readonly models?: readonly string[]; /** session/list a page of this many at a time. */ readonly listPage?: number } = {}) {}
 
   readonly requests: Array<{ method: string; params: Record<string, unknown> }> = [];
   /** Each connection's flags and folder. */
@@ -68,6 +69,8 @@ export class ScriptedAgy {
     let running: { sessionId: string; cancel: () => void } | undefined;
     /** What a session's declined step was for, so its answer after Beluga says why can name it. */
     const declinedWords = new Map<string, string>();
+    /** A `mode` turn waiting for its session's mode to be set again. */
+    const modeSet = new Map<string, () => void>();
     let used = 16_500;
 
     const optionsOf = (sid: string): ConfigOption[] => {
@@ -188,11 +191,22 @@ export class ScriptedAgy {
         say(sid, ok ? 'room: kay' : `denied: ${words}`);
         return done(sid, 6);
       }
+      const mode = /^mode (\S+)/.exec(words);
+      if (mode) {
+        // It goes to another mode itself (as its own /command does), and works on once its mode is set again.
+        state.get(sid)!.mode = mode[1]!;
+        const again = new Promise<void>((resolve) => modeSet.set(sid, resolve));
+        update(sid, { sessionUpdate: 'config_option_update', configOptions: optionsOf(sid) });
+        await again;
+        modeSet.delete(sid);
+        say(sid, `mode: ${state.get(sid)!.mode}`);
+        return done(sid, 4);
+      }
       const own = /^own (\S+)/.exec(words);
       const move = /^move (\S+) (\S+)/.exec(words);
       if (own || move) {
         // A tool of a server of your own (asked by its MCP name, no arguments said), or a file moved (asked, with where it lands).
-        const c = own ? call(`call_${randomUUID().slice(0, 12)}`, own[1]!, 'other', `Run ${own[1]}`, { toolSummary: own[1] }) : call(`call_${randomUUID().slice(0, 12)}`, 'move', 'move', `Move ${move![1]}`, { Path: move![1], Destination: move![2] }, [{ path: move![1] }]);
+        const c = own ? call(`call_${randomUUID().slice(0, 12)}`, own[1]!, 'other', `Run ${own[1]}`, { toolSummary: own[1] }) : call(`call_${randomUUID().slice(0, 12)}`, 'move', 'move', `Move ${move![1]}`, { Path: move![1] }, [{ path: move![1] }, { path: move![2] }]);
         update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
         const ok = await allowed(sid, c);
         if (!ok) failed(sid, c);
@@ -230,14 +244,20 @@ export class ScriptedAgy {
           for (const text of said) update(sid, { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } });
           return open(sid, params._meta);
         }
-        case 'session/list':
-          return { sessions: [...this.sessions.keys()].map((sessionId) => ({ sessionId, cwd: this.folders.get(sessionId) ?? '' })) };
+        case 'session/list': {
+          const all = [...this.sessions.keys()].map((sessionId) => ({ sessionId, cwd: this.folders.get(sessionId) ?? '' }));
+          const size = this.opts.listPage;
+          if (!size) return { sessions: all };
+          const from = Number(params.cursor ?? 0);
+          return { sessions: all.slice(from, from + size), ...(from + size < all.length ? { nextCursor: String(from + size) } : {}) };
+        }
         case 'session/set_config_option': {
           const s = state.get(sid);
           if (!s) throw new Error(`Session not found: ${sid}`);
           const value = String(params.value);
           if (params.configId === 'mode') {
             s.mode = value;
+            modeSet.get(sid)?.();
             update(sid, { sessionUpdate: 'current_mode_update', currentModeId: value });
           } else if (params.configId === 'model') s.model = value;
           else if (params.configId === 'thought_level') s.level = value;

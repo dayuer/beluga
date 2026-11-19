@@ -1,5 +1,4 @@
 import { ToolHost } from '../../tool-host.js';
-import { toolName } from '../../tool-kit.js';
 import { CompletionError, type CompletionRequest } from '../types.js';
 import { type ConfigOption, type PermissionRequest, type PromptResponse, type SessionResponse, type SessionUpdate, permissionAnswer } from '../opencode/acp.js';
 import { sidePrompt } from '../opencode/complete.js';
@@ -35,8 +34,7 @@ export async function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}
       })
     : undefined;
   const suites = Object.keys(mounted?.http ?? {});
-  /** The tools mounted for this call, by name: only these are Beluga's. */
-  const ours = new Set(Object.values(req.suites ?? {}).flatMap((suite) => suite.tools.map((t) => toolName(suite.name, t.name))));
+  const ours = mounted?.tools ?? new Set<string>();
   const conn = await (deps.connect ?? spawnAgy)({ cwd: req.cwd, ...(deps.bin ? { bin: deps.bin } : {}) }).catch(() => undefined);
   if (!conn) {
     mounted?.close();

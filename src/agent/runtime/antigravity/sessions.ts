@@ -30,14 +30,28 @@ export async function dropAgySession(sessionId: string, dir: string = agyDataDir
   return gone.some(Boolean);
 }
 
-/** Every Antigravity conversation that ran in a folder being deleted for good (as `session/list` says), each dropped. */
+/** `session/list` comes a page at a time: this many at most, so a list that never ends does. */
+const LIST_PAGES = 200;
+
+/**
+ * Every Antigravity conversation that ran in a folder being deleted for good (as `session/list`
+ * says, every page of it), each dropped: Beluga's and any you had there in Antigravity itself, as
+ * the folder they were about is gone.
+ */
 export async function dropAgyFolder(folder: string, deps: { readonly connect?: AgyConnect; readonly dir?: string } = {}): Promise<number> {
   const conn = await (deps.connect ?? spawnAgy)({ cwd: os.tmpdir() }).catch(() => undefined);
   if (!conn) return 0;
   try {
-    const listed = await conn.rpc.request<{ sessions?: Array<{ sessionId?: string; cwd?: string }> }>('session/list', {}, 30_000).catch(() => ({ sessions: [] }));
+    const there: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < LIST_PAGES; page++) {
+      const listed = await conn.rpc.request<{ sessions?: Array<{ sessionId?: string; cwd?: string }>; nextCursor?: string | null }>('session/list', cursor ? { cursor } : {}, 30_000).catch(() => undefined);
+      for (const s of listed?.sessions ?? []) if (s.sessionId && s.cwd && samePath(s.cwd, folder)) there.push(s.sessionId);
+      if (!listed?.nextCursor || listed.nextCursor === cursor) break;
+      cursor = listed.nextCursor;
+    }
     let dropped = 0;
-    for (const s of listed.sessions ?? []) if (s.sessionId && s.cwd && samePath(s.cwd, folder) && (await dropAgySession(s.sessionId, deps.dir))) dropped++;
+    for (const id of new Set(there)) if (await dropAgySession(id, deps.dir)) dropped++;
     return dropped;
   } finally {
     await conn.proc.kill();

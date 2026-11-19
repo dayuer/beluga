@@ -40,19 +40,28 @@ export function agyTool(call: Pick<ToolCall, 'name' | 'kind' | 'title'>): string
   return call.name ?? (call.kind && call.kind !== 'other' ? call.kind : (call.title ?? 'tool'));
 }
 
-/** A call's input as fields, without its words for people (`toolSummary`); where it is, from its locations when the input doesn't say. */
+/**
+ * A call's input as fields, without its words for people (`toolSummary`); where it is, from its
+ * locations (ACP's own list of the files a call touches) when the input doesn't say. Every one of
+ * them is kept too (`Locations`), so a step on several files is judged on each.
+ */
 export function agyInput(call: Pick<ToolCall, 'rawInput' | 'locations'>): Record<string, unknown> {
   const raw: unknown = call.rawInput;
   const { toolSummary: _summary, ...fields } = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const at = call.locations?.[0]?.path;
-  return at && !field(fields, 'Path', 'AbsolutePath', 'TargetFile', 'FilePath') ? { ...fields, Path: at } : fields;
+  const paths = (call.locations ?? []).map((l) => l.path).filter(Boolean);
+  const at = paths[0];
+  return { ...fields, ...(at && !field(fields, 'Path', 'AbsolutePath', 'TargetFile', 'FilePath') ? { Path: at } : {}), ...(paths.length > 1 ? { Locations: paths } : {}) };
 }
+
+/** The other files a call says it touches (its locations past the first), as full paths. */
+const otherLocations = (raw: Record<string, unknown>, cwd: string, file: string | undefined): string[] =>
+  (Array.isArray(raw.Locations) ? raw.Locations : []).filter((p): p is string => typeof p === 'string' && Boolean(p)).map((p) => path.resolve(cwd, p)).filter((p) => p !== file);
 
 const READS = new Set(['read_file', 'view_file', 'view_file_outline', 'view_code_item', 'read']);
 const WRITES_NEW = new Set(['write_file', 'write_to_file', 'create_file']);
 const EDITS = new Set(['edit_file', 'replace_file_content', 'multi_replace_file_content', 'delete_file', 'edit', 'delete']);
 /** A file that goes somewhere else: where it lands is written too. */
-const MOVES = new Set(['move', 'move_file', 'rename_file', 'rename']);
+const MOVES = new Set(['move', 'move_file', 'rename_file']);
 const COMMANDS = new Set(['run_command', 'send_command_input', 'execute']);
 const LISTS = new Set(['list_dir', 'list_directory', 'find_by_name', 'glob']);
 const GREPS = new Set(['grep_search', 'grep', 'codebase_search', 'search']);
@@ -69,8 +78,11 @@ export function agyCalls(tool: string, raw: Record<string, unknown>, cwd: string
     const replacement = typeof raw.Replacement === 'string' ? raw.Replacement : typeof raw.ReplacementContent === 'string' ? raw.ReplacementContent : undefined;
     return [{ name: 'Edit', input: { file_path: file ?? '', ...(target ? { old_string: target } : {}), ...(replacement !== undefined ? { new_string: replacement } : {}) } }];
   }
-  // A move changes two files: the one it takes and the one it lands on. One with no landing place named is judged with none (and turned down).
-  if (MOVES.has(tool)) return [{ name: 'Edit', input: { file_path: file ?? '' } }, { name: 'Write', input: { file_path: abs(cwd, field(raw, 'Destination', 'DestinationPath', 'DestinationFile', 'NewPath', 'NewFilePath', 'To')) ?? '' } }];
+  // A move changes two files: the one it takes, and where it lands (its other location, as ACP says it). One that doesn't say where is judged on no file (and turned down).
+  if (MOVES.has(tool)) {
+    const lands = otherLocations(raw, cwd, file);
+    return [{ name: 'Edit', input: { file_path: file ?? '' } }, ...(lands.length ? lands : ['']).map((to) => ({ name: 'Write', input: { file_path: to } }))];
+  }
   if (COMMANDS.has(tool)) return [{ name: 'Bash', input: { command: field(raw, 'CommandLine', 'Command', 'Input') ?? '' } }];
   if (LISTS.has(tool)) return [{ name: 'Glob', input: { pattern: field(raw, 'Pattern', 'Glob') ?? '*', path: abs(cwd, field(raw, 'DirectoryPath', 'SearchDirectory', 'SearchPath', 'Path')) ?? cwd } }];
   if (GREPS.has(tool)) return [{ name: 'Grep', input: { pattern: field(raw, 'Query', 'Pattern') ?? '', path: abs(cwd, field(raw, 'SearchPath', 'SearchDirectory', 'DirectoryPath', 'Path')) ?? cwd } }];

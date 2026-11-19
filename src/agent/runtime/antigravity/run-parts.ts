@@ -1,6 +1,6 @@
-import { type RunEnd, RunFailedError, classifyRun } from '../../../shared/run-failure.js';
+import { type RunEnd, RunFailedError, classifyRun, resetFromText } from '../../../shared/run-failure.js';
 import type { ConfigOption } from '../opencode/acp.js';
-import { AGY_LIMIT, AGY_SIGNED_OUT } from './status.js';
+import { AGY_LIMIT, signedOut } from './status.js';
 
 /** Claude's aliases and a Beluga default mean nothing to Antigravity: those run on its own choice. */
 const CLAUDE_ALIASES = /^(default|opus|sonnet|haiku|best|opusplan)(\[1m\])?$/i;
@@ -29,12 +29,22 @@ export function systemMeta(text: string): { readonly antigravity: { readonly sys
   return { antigravity: { systemPrompt: { append: text } } };
 }
 
-/** A failed Antigravity run, told as Antigravity's (not Claude Code's): a limit, a sign-in, or what it said. */
-export function agyFailure(end: RunEnd): Error {
-  const said = [end.error, end.result, ...(end.stderr ?? [])].filter(Boolean).join('\n');
-  if (AGY_LIMIT.test(said)) return new RunFailedError({ kind: 'usage_limit', detail: said.slice(0, 8000), runtime: 'antigravity' });
-  if (AGY_SIGNED_OUT.test(said)) return new RunFailedError({ kind: 'signed_out', detail: said.slice(0, 8000), runtime: 'antigravity' });
-  return new RunFailedError({ ...classifyRun(end), runtime: 'antigravity' });
+/** A run's end from what failed: an ACP error (its code kept), or a message. */
+export const agyEnd = (err: unknown, stderr: readonly string[]): RunEnd & { readonly cause: unknown } => ({ error: err instanceof Error ? err.message : String(err), stderr, cause: err });
+
+/**
+ * A failed Antigravity run, told as Antigravity's (not Claude Code's): a sign-in (ACP's own code), your
+ * plan's limit (its own words, never a stderr line's), else as every runtime's is (classifyRun).
+ */
+export function agyFailure(end: RunEnd & { readonly cause?: unknown }): Error {
+  const failure = classifyRun(end);
+  const said = [end.error, end.result].filter(Boolean).join('\n');
+  if (signedOut(end.cause ?? said)) return new RunFailedError({ kind: 'signed_out', detail: failure.detail, runtime: 'antigravity' });
+  if (AGY_LIMIT.test(said)) {
+    const resetsAt = resetFromText(said);
+    return new RunFailedError({ kind: 'usage_limit', ...(resetsAt ? { resetsAt } : {}), detail: failure.detail, runtime: 'antigravity' });
+  }
+  return new RunFailedError({ ...failure, runtime: 'antigravity' });
 }
 
 /** What Antigravity is told after a turn it ended silently on a declined step: why, and to answer. */

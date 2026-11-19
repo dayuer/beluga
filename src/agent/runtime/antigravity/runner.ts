@@ -8,7 +8,6 @@ import { sideCalls } from '../../side-calls.js';
 import { syncProbes } from '../../sync-main.js';
 import { gateTool } from '../../tool-gate.js';
 import { ToolHost } from '../../tool-host.js';
-import { toolName } from '../../tool-kit.js';
 import type { AgentBackend, AgentRunInput, FollowUp, LiveStatus, RoomBridge, Steer } from '../../types.js';
 import { ViewShelf } from '../../view-tools.js';
 import { INTERRUPT_TIMEOUT_MS } from '../types.js';
@@ -19,7 +18,7 @@ import { mapOpenCodeSlash as mapSlash } from '../opencode/skills.js';
 import { httpServers } from '../copilot/run-parts.js';
 import { agyComplete } from './complete.js';
 import { type AgyConnect, type AgyConnection, agyArgs, findAgy, spawnAgy } from './connection.js';
-import { agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
+import { agyEnd, agyFailure, agyModel, agyThought, declinedNote, modeValue, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir } from './sessions.js';
 import { agyStatus } from './status.js';
 import { agyCalls, agyDialect, belugaToolOf } from './tools.js';
@@ -93,11 +92,8 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
       const shelf = new ViewShelf();
 
       // Beluga's tools, served for this run alone and gated per call (vetTool, policy, you).
-      const served = runToolSuites(input, bridge, shelf, cwd);
-      const mounted = await host().mount(served, (name, args) => gateTool(name, args, input, policy));
+      const mounted = await host().mount(runToolSuites(input, bridge, shelf, cwd), (name, args) => gateTool(name, args, input, policy));
       const suites = Object.keys(mounted.http);
-      /** Beluga's tools this run has, by name: only these are Beluga's (judged where they run), whatever a server of yours is called. */
-      const ours = new Set(Object.values(served).flatMap((suite) => suite.tools.map((t) => toolName(suite.name, t.name))));
       const env = { ...process.env, ...input.env };
       const instructions = systemMeta(runInstructions(input, opts.bridge.selfName(), AGY_AGENT));
 
@@ -119,7 +115,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           if (ev && ev !== lastContext && !compacting) input.onEvent('context', (lastContext = ev));
         },
         quiet: () => compacting,
-        dialect: agyDialect(ours),
+        dialect: agyDialect(mounted.tools),
       });
       let conn: AgyConnection | undefined;
       let failed = true;
@@ -137,6 +133,8 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         // Updates count from the session's own id on: a loaded session's replay (its history) comes before.
         let sid = '';
         let options: readonly ConfigOption[] = [];
+        /** Holds the session on Beluga's mode (set once the session is open). */
+        let holdMode: (() => Promise<unknown>) | undefined;
         /** Why Beluga turned this turn's steps down. */
         const declined: string[] = [];
         rpc.onNotification((method, params) => {
@@ -144,6 +142,8 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const update = params.update as SessionUpdate;
           if (update.sessionUpdate === 'available_commands_update') commands = new Set(update.availableCommands.map((c) => c.name));
           if (update.sessionUpdate === 'config_option_update') options = update.configOptions;
+          if (update.sessionUpdate === 'current_mode_update') options = options.map((o) => (o.id === 'mode' ? { ...o, currentValue: update.currentModeId } : o));
+          if (update.sessionUpdate === 'config_option_update' || update.sessionUpdate === 'current_mode_update') void holdMode?.().catch(() => undefined);
           events.handle(update);
         });
         rpc.onRequest(async (method, params) => {
@@ -167,9 +167,9 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
           const call = await events.callOf(req.toolCall);
           if (!call) return 'Antigravity didn’t say which tool this is.';
           // Beluga's own tools are judged where they run (the tool host's gate), not twice.
-          if (belugaToolOf(call.tool, suites, ours)) return undefined;
+          if (belugaToolOf(call.tool, suites, mounted.tools)) return undefined;
           // Its own notes aren't judged; anything else a step touches is (a note moved out of its folder, where it lands).
-          const calls = agyCalls(call.tool, call.raw, cwd, suites, ours).filter((c) => !(WRITES.has(c.name) && ownNote(c.input.file_path)));
+          const calls = agyCalls(call.tool, call.raw, cwd, suites, mounted.tools).filter((c) => !(WRITES.has(c.name) && ownNote(c.input.file_path)));
           if ((planning || readOnly) && calls.some((c) => WRITES.has(c.name))) return planning ? 'Planning only looks: nothing changes until you approve the plan.' : 'This conversation only looks: nothing may change here.';
           for (const c of calls) {
             if (PATHED.has(c.name) && !c.input.file_path) return 'Antigravity didn’t say which file, so Beluga turned it down.';
@@ -190,7 +190,7 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         try {
           opened ??= await rpc.request<SessionResponse>('session/new', { cwd, mcpServers: servers, _meta: instructions });
         } catch (err) {
-          throw agyFailure({ error: err instanceof Error ? err.message : String(err), stderr: link.stderr() });
+          throw agyFailure(agyEnd(err, link.stderr()));
         }
         sid = opened.sessionId!;
         options = opened.configOptions ?? [];
@@ -216,7 +216,14 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         if (wanted && !(await choose('model', wanted)) && wanted !== current()) input.onEvent('progress', `Antigravity has no ${wanted} on your plan: it runs on ${current() || 'its own model'}`);
         model = current() || model;
         await choose('thought_level', agyThought(input.effort ?? place?.effort));
-        await choose('mode', modeValue(options, planning ? 'plan' : 'default'));
+        /**
+         * The session's mode is Beluga's, as Codex's approval policy is (set on each of its turns): Plan
+         * while it plans, else its default, which asks before each command and write. Its other modes
+         * (accept-edits, auto) don't ask, so Beluga would judge nothing: whatever moved it to one (a
+         * /command, Antigravity itself), it's put back, before each turn and when it says its mode changed.
+         */
+        holdMode = () => choose('mode', modeValue(options, planning ? 'plan' : 'default'));
+        await holdMode();
 
         // Stop: cancel the turn (same contract as Claude), then the process for sure.
         let aborted = false;
@@ -244,11 +251,12 @@ export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
         /** One turn: what it said last, and how it ended. Antigravity ends a turn silently when a step is declined: then it's told why, once, and answers. */
         const runTurn = async (sink: TurnSink, blocks: ContentBlock[], again = true): Promise<{ text: string; res: PromptResponse }> => {
           declined.length = 0;
+          await holdMode();
           events.beginTurn(sink);
           const done = deferred<PromptResponse>();
           active = { done };
           try {
-            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(agyFailure({ error: err instanceof Error ? err.message : String(err), stderr: link.stderr() })));
+            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(agyFailure(agyEnd(err, link.stderr()))));
             const res = await Promise.race([done.promise, stopped.promise, abort.promise]);
             const text = events.endTurn(res.stopReason !== 'cancelled');
             const used = usageEvent(res.usage, sid);
