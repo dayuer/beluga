@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 export interface Undo {
   readonly active: boolean;
@@ -64,13 +65,14 @@ export function useUndoSend(ms = 10_000): Undo {
   }, [fire]);
 
   useEffect(() => {
-    const canListen = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
-    const hide = () => {
-      if (activeRef.current) fire();
-    };
-    if (canListen) window.addEventListener('pagehide', hide);
+    const sub =
+      typeof AppState?.addEventListener === 'function'
+        ? AppState.addEventListener('change', (next) => {
+            if (next === 'background' && activeRef.current) fire();
+          })
+        : null;
     return () => {
-      if (canListen) window.removeEventListener('pagehide', hide);
+      sub?.remove();
       if (activeRef.current) fire();
       clearTimers();
     };
