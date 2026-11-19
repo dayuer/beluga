@@ -41,6 +41,13 @@ export interface PushOptions {
 }
 
 const textEncoder = new TextEncoder();
+const APNS_TOKEN_TTL_MS = 50 * 60 * 1000;
+const apnsTokenCache = new Map<string, { readonly jwt: string; readonly issuedAtMs: number }>();
+
+/** 仅用于测试清理模块级 APNs JWT 缓存。 */
+export function clearApnsTokenCache(): void {
+  apnsTokenCache.clear();
+}
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
@@ -105,6 +112,22 @@ function isApnsInvalidToken(status: number, bodyText: string): boolean {
   }
 }
 
+async function getApnsJwt(input: {
+  readonly keyId: string;
+  readonly teamId: string;
+  readonly privateKeyPem: string;
+  readonly nowMs: number;
+}): Promise<string> {
+  const cacheKey = `${input.teamId}:${input.keyId}`;
+  const cached = apnsTokenCache.get(cacheKey);
+  if (cached && input.nowMs - cached.issuedAtMs < APNS_TOKEN_TTL_MS) {
+    return cached.jwt;
+  }
+  const jwt = await signApnsJwt(input);
+  apnsTokenCache.set(cacheKey, { jwt, issuedAtMs: input.nowMs });
+  return jwt;
+}
+
 async function sendApns(
   record: PushTokenRecord,
   payload: PushPayload,
@@ -115,7 +138,7 @@ async function sendApns(
   if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_PRIVATE_KEY || !env.APNS_BUNDLE_ID) {
     return 'unconfigured';
   }
-  const jwt = await signApnsJwt({
+  const jwt = await getApnsJwt({
     keyId: env.APNS_KEY_ID,
     teamId: env.APNS_TEAM_ID,
     privateKeyPem: env.APNS_PRIVATE_KEY,

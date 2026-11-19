@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sendPushToCustomer, type PushEnv } from '../src/push.js';
+import { clearApnsTokenCache, sendPushToCustomer, type PushEnv } from '../src/push.js';
 import { clearFcmTokenCache } from '../src/push-fcm.js';
 import type { PushPlatform } from '../src/push-tokens.js';
 
@@ -166,6 +166,7 @@ describe('SS-80 push sender (APNs + FCM)', () => {
       FCM_ENDPOINT: 'https://fcm.fake',
     };
 
+    clearApnsTokenCache();
     clearFcmTokenCache();
     const result = await sendPushToCustomer(
       db,
@@ -195,5 +196,57 @@ describe('SS-80 push sender (APNs + FCM)', () => {
     );
     expect(second).toEqual({ sent: 2, failed: 0, removed: 0 });
     expect(calls.filter((c) => c.url === 'https://oauth.fake/token')).toHaveLength(1);
+  });
+
+  it('SS-127: reuses cached APNs JWT within 50 minutes and refreshes after 50 minutes', async () => {
+    const ecPair = (await crypto.subtle.generateKey(
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign', 'verify'],
+    )) as CryptoKeyPair;
+    const apnsPem = toPkcs8Pem((await crypto.subtle.exportKey('pkcs8', ecPair.privateKey)) as ArrayBuffer);
+
+    const { db } = createPushMockDb([
+      { customer_id: 'c1', device: 'iphone-1', platform: 'ios', token: 'apns-1', updated_at: 100 },
+    ]);
+
+    const seenJwts: string[] = [];
+    const fakeFetch: typeof fetch = async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      const auth = headers.get('authorization') ?? '';
+      seenJwts.push(auth.slice('bearer '.length));
+      return new Response('{}', { status: 200 });
+    };
+
+    const env: PushEnv = {
+      DB: db,
+      APNS_KEY_ID: 'KEY127',
+      APNS_TEAM_ID: 'TEAM127',
+      APNS_PRIVATE_KEY: apnsPem,
+      APNS_BUNDLE_ID: 'studio.synon.app',
+      APNS_ENDPOINT: 'https://apns.fake',
+    };
+
+    clearApnsTokenCache();
+    const t0 = 1_700_000_000_000;
+    await sendPushToCustomer(db, env, 'c1', { title: 't1', body: 'b1' }, { fetch: fakeFetch, now: t0 });
+    await sendPushToCustomer(
+      db,
+      env,
+      'c1',
+      { title: 't2', body: 'b2' },
+      { fetch: fakeFetch, now: t0 + 10 * 60_000 },
+    );
+    await sendPushToCustomer(
+      db,
+      env,
+      'c1',
+      { title: 't3', body: 'b3' },
+      { fetch: fakeFetch, now: t0 + 50 * 60_000 },
+    );
+
+    expect(seenJwts).toHaveLength(3);
+    expect(seenJwts[0]).toBe(seenJwts[1]);
+    expect(seenJwts[2]).not.toBe(seenJwts[0]);
   });
 });
