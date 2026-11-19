@@ -1,33 +1,29 @@
 import { useEffect, useState } from 'react';
+import { KeyboardEvents } from 'react-native-keyboard-controller';
 
 /**
- * How much of the layout viewport the on-screen keyboard covers. iOS Safari ignores
- * `interactive-widget=resizes-content`, so this is the fallback both platforms use:
- *
- *   inset = innerHeight − visualViewport.height − visualViewport.offsetTop
- *
- * 0 when there is no visualViewport (desktop browsers that don't expose it, tests).
+ * 原生键盘高度（pt）：基于 react-native-keyboard-controller 的 KeyboardEvents，
+ * 在键盘弹出/收起时同步更新底部占位高度，取整到整数 pt（docs/studio-mobile-ux.md §5）。
  */
 export function useKeyboardInset(): number {
   const [inset, setInset] = useState(0);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const update = () => {
-      const next = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-      setInset(next);
+    if (typeof KeyboardEvents?.addListener !== 'function') return;
+    const onShow = (e: { height: number }) => {
+      setInset(Math.max(0, Math.round(e.height)));
     };
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('resize', update);
-    update();
+    const onHide = () => {
+      setInset(0);
+    };
+    const subs = [
+      KeyboardEvents.addListener('keyboardWillShow', onShow),
+      KeyboardEvents.addListener('keyboardDidShow', onShow),
+      KeyboardEvents.addListener('keyboardWillHide', onHide),
+      KeyboardEvents.addListener('keyboardDidHide', onHide),
+    ];
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
+      for (const sub of subs) sub.remove();
     };
   }, []);
 
