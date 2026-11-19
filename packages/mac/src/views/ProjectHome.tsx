@@ -200,7 +200,7 @@ function Header({ model }: { model: HomeModel }) {
       </div>
       {/* Its settings (General, Environment, Worktrees), in one sheet (BLG-926). */}
       {project.root ? (
-        <IconButton
+        <IconButton size="small"
           icon="gear"
           label="Project Settings…"
           className={s.settingsButton}

@@ -51,7 +51,7 @@ function Starters() {
           New Chat
         </Button>
         {project ? (
-          <Button variant="quiet" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
+          <Button size="small" variant="quiet" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
             Add Projects…
           </Button>
         ) : null}

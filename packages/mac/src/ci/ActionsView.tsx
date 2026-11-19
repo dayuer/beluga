@@ -83,7 +83,7 @@ export function ActionsView() {
                 <Icon name="chevronDown" size={11} />
               </button>
             </PickMenu>
-            <Segmented<Page> label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
+            <Segmented<Page> size="small" label="Show" value={page} onChange={(p) => openList(projectId, p === 'workflows' ? 'workflows' : undefined)} options={PAGES} />
             {page === 'runs' && known.length + (workflow ? 1 : 0) > 1 ? (
               <PickMenu<string>
                 label="Workflow"
@@ -118,7 +118,7 @@ export function ActionsView() {
         </div>
         <div className={t.body}>
           {error && !list ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={error} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
           ) : !list ? (
             <Empty icon="pulse" title="Asking GitHub…" detail={`For ${here.name}’s workflow runs`} />
           ) : list.kind === 'none' ? (
@@ -137,7 +137,7 @@ export function ActionsView() {
               }
             />
           ) : list.kind === 'error' ? (
-            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button onClick={refresh}>Try Again</Button>} />
+            <Empty icon="alert" title="Couldn’t read the runs" detail={list.message} action={<Button size="small" onClick={refresh}>Try Again</Button>} />
           ) : page === 'workflows' ? (
             <Workflows projectId={projectId} flows={flows} runs={runs} />
           ) : !runs.length ? (

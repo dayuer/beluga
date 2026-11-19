@@ -59,7 +59,7 @@ export function Viewer({ viewer }: { viewer: ViewerState }) {
         {viewer.by ? <span className={s.following}>following {viewer.by}</span> : null}
         <span className={s.flex} />
         {markdown ? (
-          <Segmented
+          <Segmented size="small"
             label="Show as"
             value={mode}
             onChange={setMode}

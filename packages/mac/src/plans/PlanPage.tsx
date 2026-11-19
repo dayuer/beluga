@@ -357,7 +357,8 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
     ...(moveTo ? [moveTo] : []),
     { label: 'Copy as Markdown', separate: true, onSelect: () => void copyText(markdownOf(view)) },
     { label: 'Planning Style…', onSelect: () => openSheet({ kind: 'plan_style' }) },
-    ...(plan.status !== 'done' ? [{ label: 'Plan Settings…', onSelect: () => openSheet({ kind: 'plan_settings', planId: plan.id }) }] : []), // fork: how it runs, its agents, its tests (fork/plans/PlanSettingsSheet.tsx)
+    // How it runs and when its tests run, in one sheet (plans/PlanSettingsSheet.tsx).
+    ...(plan.status !== 'done' ? [{ label: 'Plan Settings…', onSelect: () => openSheet({ kind: 'plan_settings', planId: plan.id }) }] : []),
     ...(plan.draft ? [{ label: plan.body ? 'Discard Changes' : 'Discard Draft', danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: plan.body ? 'Discard the proposed changes?' : 'Discard this draft?', message: plan.body ? 'The plan stays as you approved it.' : 'Nothing was put on the board, so nothing else changes.', confirm: 'Discard', destructive: true, run: () => void act(() => api.discard(plan.id)) }) }] : []),
     ...(plan.body ? [{ label: 'Delete Plan…', danger: true, separate: !plan.draft, onSelect: () => openSheet({ kind: 'confirm', title: `Delete “${titleOf(plan)}”?`, message: 'Its tasks stay on the board; only the plan goes.', confirm: 'Delete', destructive: true, run: () => void act(() => api.remove(plan.id)).then(() => openList(plan.projectId)) }) }] : []),
   ];
@@ -457,7 +458,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
         <div className={p.stage}>
           <div className={p.stageTools}>
             {drafting ? null : (
-              <Segmented<Display>
+              <Segmented<Display> size="small"
                 label="Show"
                 value={prefs.display}
                 onChange={(display) => setPrefs((l) => ({ ...l, display }))}

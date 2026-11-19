@@ -85,6 +85,49 @@ Never more than one large button in a view outside the toolbar. One row never mi
 Keyboard focus is the same everywhere: a 3px accent ring outside the control (`--focus-ring`).
 
 ## Chinese and English
+## Liquid Glass
+
+On a Mac whose window blurs what's behind it (`data-transparency='full'`: not with macOS's or the
+app's Reduce transparency, not on a solid theme), the window is drawn as macOS 26 draws its own apps:
+
+- The sidebar and the right panel are panes of glass, 8px in from the window's edges, with 16px
+  corners, a light rim and a soft drop; the window behind them is the content's colour.
+- Controls are capsules: `--control-radius-*` are 999px. A text area keeps 8px corners, or its
+  corners would cut into the text. A capsule's ring is a real 0.5px border, since WebKit breaks a
+  0.5px shadow up round the ends.
+- The window toolbar's icon buttons sit on glass capsules.
+- A pop-up button is its value and one chevron, with no bezel, as macOS 26's settings draw it; a soft
+  capsule shows under it on hover and while its menu is open. Its menu is a rounded card, the row
+  under the pointer on a soft grey and the checkmark at the row's end.
+
+It is CSS only and still: nothing follows the pointer, and there is no refraction (the web versions
+draw it with an SVG displacement filter, which WebKit doesn't). The tokens are `--glass-*` in
+`styles/tokens.css`; each rule sits in its component's own stylesheet under
+`:root[data-os='mac'][data-transparency='full']`. Windows, Linux and the flat window keep the look
+above.
+
+## Menus
+
+In the app on a Mac, the app's menus are the Mac's own: an `NSMenu` built in
+`src-tauri/src/native_menu.rs`, fed by `lib/native-menu.ts`. That covers a pop-up button's choices
+(`Select`, its chosen row over the button as an `NSPopUpButton` opens), a button's pull-down
+(`ActionsDropdown`, the ••• menus, and the pickers built like them: Runs On, the Overview's
+project filter, a task's pickers, a person's card) and right-click menus (`SpecContext`, a
+terminal tab, a person in the room). A row keeps what the web menu shows: its name through `t()`,
+a hint as the line under it (macOS 14.4's subtitle), its shortcut on the right, a checkmark,
+section headers, submenus, and its icon as a template image the system tints.
+
+- A menu never opens squeezed into a scrolling one while the screen has room: one that wouldn't
+  fit where it opens moves (above its button, or up over the pointer) first.
+- A pop-up whose list is long enough for a search field keeps the web menu and its field, as does
+  a picker you type in or tick several things in.
+- If the menu can't be shown (an older shell), the web menu opens instead, so a press never does
+  nothing.
+
+Browsers, Windows and Linux keep the web menus. Those open on the side they fit on
+(`FitContent` in `components/SpecMenu.tsx`: below the button, else above, else beside it) and
+scroll without a bar only when the window is too short for them.
+
 
 The same control has to read well with either language in it (`<html lang>` is `en` or `zh-CN`).
 

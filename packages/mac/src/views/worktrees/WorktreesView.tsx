@@ -134,7 +134,7 @@ export function WorktreesView({ projectId }: { projectId?: string | undefined })
           </p>
         </div>
         <div className={s.tools}>
-          <Segmented label="Show" value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.id, label: `${f.label} ${filterRows(rows, f.id, projectId).length}`, hint: f.hint }))} />
+          <Segmented size="small" label="Show" value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.id, label: `${f.label} ${filterRows(rows, f.id, projectId).length}`, hint: f.hint }))} />
           <ActionsDropdown items={projectItems}>
             <Button variant="plain">
               {project?.name ?? 'All Projects'} <Icon name="chevronDown" size={10} />

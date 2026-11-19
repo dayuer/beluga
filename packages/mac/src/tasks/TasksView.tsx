@@ -164,7 +164,7 @@ export function TasksView() {
             </button>
           </PickMenu>
         ) : null}
-        <Segmented<Scope>
+        <Segmented<Scope> size="small"
           label="Show"
           value={prefs.scope}
           onChange={(scope) => setTasksPrefs({ scope })}
@@ -221,7 +221,7 @@ export function TasksView() {
             </Button>
           ) : null
         ) : (
-          <Segmented<Display>
+          <Segmented<Display> size="small"
             label="Display"
             iconOnly
             value={prefs.display}

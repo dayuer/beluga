@@ -11,7 +11,7 @@
 | 分支 | 内容 | 基于 |
 |---|---|---|
 | `topic/chinese` | 准备提上游：fork 的中文，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
-| `topic/native` | 准备提上游：Mac 原生的改动，按上游能直接收的写法（现在 = beluga-labs/beluga#584：原生控件、Liquid Glass、原生菜单） | `upstream/main` |
+| `topic/native` | 准备提上游：Mac 原生的改动，按上游能直接收的写法（beluga-labs/beluga#584 原生控件、Liquid Glass、原生菜单已于 2026-11-19 被上游合并，现在和 `upstream/main` 相同；下一轮原生改动再从这里开） | `upstream/main` |
 | `topic/fixes` | 准备提上游：小修复 | `upstream/main` |
 | `topic/plans` | fork 的完整版本：合入上面三个，再加上所有和上游 `main` 不同、还不提上游的东西（fork 结构与登记表、构建号、同步脚本、沉稳界面和 `fork/` 覆盖层、原生 sheet 与提示框、计划设置等 fork 功能、fork 的文档）。构建只从这里出 | 三个准备分支 |
 | `fork/base` | 停用：内容已经都在 `topic/plans` 里，不再往里加东西 | — |
@@ -115,14 +115,9 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 - `packages/mac/src/layout/Sidebar.tsx`：四行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、`useOneSelected(drop.ref)` 和 `useSidebarKeys(drop.ref)` 两个钩子、标题栏里隐藏侧栏按钮后一个 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，铅笔图标，侧栏唯一的主操作，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它），以及顶部入口后的 `<SidebarEdge />`。标题栏的三个图标（用量、隐藏侧栏、新建任务）包在 Sidebar.module.css 的 `.titleTools` 里。Mac 原生调性（Claude Design「Mac原生侧边栏设计稿」2a）：选中行是中性灰（`--sb-selected`，侧栏有焦点时 10%，点到别处后 5.5%），图标仍是强调色；没有图标的项目用同一种中性灰的字母块（`components/ProjectIcon.module.css`，自己给项目设了颜色才上色）；分组标题的 + 和折叠箭头只在悬停时出现；`fork/sidebar/keys.ts` 的 `useSidebarKeys`：焦点在某一行上时 ↑ ↓ 在行间移动，Home、End 到首尾，→ 展开 ← 收起带折叠按钮的行（项目），回车和空格仍是上游的打开；输入框里的方向键不受影响，用例 `tests/fork-sidebar-keys.test.ts`。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。同一行的 `<SidebarEdge />`（`fork/sidebar/resize.tsx`）是侧栏右边可拖的边：复用上游右侧面板的 `ResizeHandle`，平时看不见，指针移上去才亮、光标变 col-resize；拖动时只改 `--sidebar-w`，松手才存进上游已有的 `sidebarWidth` 偏好（和设置里的滑块同一项，所以范围也一样：200–360），双击回到默认 248，键盘焦点在上面时 →/← 每次加减 8。减弱动态效果或沉稳界面下不做高亮过渡。范围与保存的用例：`tests/fork-sidebar-resize.test.ts`。
 
-### 计划设置（建好的计划改“混用智能体”）
+### 计划设置（已由上游合并）
 
-计划页 ••• › 计划设置…（`packages/mac/src/fork/plans/PlanSettingsSheet.tsx`，模型 `packages/mac/src/fork/plans/plan-settings-model.ts`，测试 `tests/fork-plan-settings.test.ts`）。2026-11-18 换回上游的规划者/构建者/检查者时，旧的“计划设置”连同 fork 的角色一起删了；这一版只用上游的东西：新建计划里的那一行智能体（`AgentRoles`，含“混用智能体”，每个角色可选任意运行时和模型）、三张运行方式卡片和选了自动驾驶时下面的“永远不等我”（和“如何运行”、新建计划一样），保存走上游已有的 `plans.setAutonomy`、`plans.setFullAuto`、`plans.setRoleAgent`、`plans.setTestsAt`，守护进程没有改动。接入点：
-
-- `packages/mac/src/plans/PlanPage.tsx`：一行，••• 菜单里的“计划设置…”
-- `packages/mac/src/lib/sheets.ts`：一行，`plan_settings` 对话框的类型（联合类型只能在原处加）
-- `packages/mac/src/dialogs/native/WorkSheets.tsx`：三行，一个 import 和一个 `case`
-- `packages/mac/src/plans/PlanSheets.tsx`：导出 `AutonomyCards`（一行），并把 `FullAutoBox`、`fullAutoChange` 改成 `export`（两处各加一个词）
+计划页 ••• › 计划设置… 由上游 beluga-labs/beluga#587、#588 收下（`packages/mac/src/plans/PlanSettingsSheet.tsx`、`plan-settings-model.ts`）。2026-11-19 同步时删掉了 fork 自己的那份（`fork/plans/PlanSettingsSheet.tsx`、`fork/plans/plan-settings-model.ts`、`tests/fork-plan-settings.test.ts`、`e2e/fork-plan-settings.spec.ts`）。还没合并的后续 PR（#589 计划回读的时间、#590 智能体菜单写出模型、#591 永不等我、#592 sheet 按钮）以上游写法合在 `topic/plans` 里，上游合并后同步时自然消失。
 
 ### 原生控件（待提回上游）
 
@@ -409,8 +404,7 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 
 #### Liquid Glass（macOS 26 的外观）
 
-`packages/mac/src/fork/native/liquid-glass.css`，同样由 `fork/calm/index.ts` 引入，只在 `:root[data-os='mac'][data-glass='on']` 下生效（`lib/prefs.ts` 设置这两个属性）：Windows、Linux，以及打开了系统或应用的「减少透明度」时，窗口保持原样。侧栏和检查器离开窗口边缘 8px，变成圆角 16px 的玻璃面板（半透明、模糊加饱和、一圈高光描边和投影）；按钮和分段控件变成胶囊形；工具栏的图标按钮放在玻璃胶囊上。参考过 `rdev/liquid-glass-react`（MIT），但它的折射靠 SVG 置换滤镜，Mac 应用的 WKWebView 画不出来，还会跟着指针形变，和沉稳模式冲突，所以只用 CSS、静止不动。不改上游文件；锚点在 `tests/fork-native-look.test.ts` 里检查。
+由上游 beluga-labs/beluga#584 收下：规则写在各组件自己的样式里，开关是 `:root[data-os='mac'][data-transparency='full']`（`docs/mac-controls.md`「Liquid Glass」）。fork 原来的覆盖层 `fork/native/liquid-glass.css` 已在 2026-11-19 同步时删掉。`lib/prefs.ts` 的 `data-glass` 仍保留，它只管跟随系统「减少透明度」时关掉窗口内的模糊（`styles/base.css`）。
 
-在打包的应用里看过之后补的三处：胶囊形的搜索框和输入框改用真正的 0.5px 边框（原来的 0.5px 内阴影在胶囊两端被 WebKit 画断）；多行文本框（规划风格、计划目标）不做胶囊，保持 8px 圆角；检查器的视图标签（改动 · 文件 · 草稿 · 信息）在 `native-look.css` 里改成居中、等宽的分段，宽度取最宽的名字，面板窄到折起名字或正在拖标签时照上游排。
+检查器的视图标签（改动 · 文件 · 草稿 · 信息）居中、等宽的分段仍是 fork 自己的，在 `native-look.css` 里。
 
-下拉框（`components/Select.tsx`）在 Liquid Glass 下照 macOS 26 设置页的样子：不画边框，只有值和一个 ⌄，悬停和打开时底下一块浅灰胶囊，宽度跟着当前值；原来的 0.5px 边框在胶囊两端发虚。网页菜单（选项多、带搜索框的那种）是 12px 圆角卡片，当前行浅灰底，勾选放在行尾；选项少的在应用里打开的是 macOS 自己的菜单，不归 CSS 管。

@@ -3,7 +3,7 @@ import { expect, test, type Page } from './fixtures.js';
 import { openWork } from './helpers.js';
 
 /**
- * Plan Settings (fork): a plan's ••• › Plan Settings… changes what New Plan asked once the plan
+ * Plan Settings: a plan's ••• › Plan Settings… changes what New Plan asked once the plan
  * exists, with New Plan's own Agents row: Mix Agents gives the checker another agent and model,
  * Save keeps it (and when its tests run), and it's there when the sheet opens again.
  */
@@ -54,7 +54,7 @@ test('Plan Settings: mix the agents of a plan already made, and when its tests r
   await expect(agents.getByRole('combobox', { name: 'Checker' })).toContainText('Claude · Opus');
   await tests.click();
   await page.getByRole('option', { name: /Only at the End/ }).click();
-  await sheet.screenshot({ path: path.join(SHOTS, 'fork-plan-settings-en.png') });
+  await sheet.screenshot({ path: path.join(SHOTS, 'plan-settings-en.png') });
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(page.getByRole('status').filter({ hasText: 'Plan settings saved' })).toBeVisible();
