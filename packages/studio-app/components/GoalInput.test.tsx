@@ -8,6 +8,12 @@ vi.mock('expo-file-system', () => ({
   File: class {},
 }));
 
+vi.mock('lucide-react-native', () => ({
+  Mic: () => null,
+  X: () => null,
+  Check: () => null,
+}));
+
 describe('GoalInput IME and submit behavior', () => {
   it('never submits while composing (composition state, isComposing, or Android keyCode 229)', () => {
     expect(shouldSubmitOnKeyPress({ key: 'Enter' }, true, true)).toBe(false);

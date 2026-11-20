@@ -53,12 +53,14 @@ export function createVoiceController({
   onPhaseChange,
   onHintChange,
 }: {
-  readonly lang: Lang;
+  /** 语言；可以传一个 getter，用户切语言后下一次录音就用新的（不用重建 controller）。 */
+  readonly lang: Lang | (() => Lang);
   readonly onTranscript: (text: string) => void;
   readonly recognizer?: VoiceRecognizer;
   readonly onPhaseChange?: (phase: VoicePhase) => void;
   readonly onHintChange?: (hint: string | null) => void;
 }) {
+  const langNow = (): Lang => (typeof lang === 'function' ? lang() : lang);
   let phase: VoicePhase = 'idle';
   let cancelled = false;
 
@@ -76,11 +78,11 @@ export function createVoiceController({
     async start() {
       setHint(null);
       cancelled = false;
-      const perm = await recognizer.requestPermission(lang);
+      const perm = await recognizer.requestPermission(langNow());
       if (cancelled) return;
       if (!perm.granted) {
         setPhase('idle');
-        setHint(perm.message ?? tVoice(lang, 'voice.micDenied'));
+        setHint(perm.message ?? tVoice(langNow(), 'voice.micDenied'));
         return;
       }
       try {
@@ -88,7 +90,7 @@ export function createVoiceController({
         await recognizer.start(() => {});
       } catch {
         setPhase('idle');
-        setHint(tVoice(lang, 'voice.unavailable'));
+        setHint(tVoice(langNow(), 'voice.unavailable'));
       }
     },
     async stop() {
@@ -102,7 +104,7 @@ export function createVoiceController({
         if (cleaned) onTranscript(cleaned);
       } catch {
         setPhase('idle');
-        setHint(tVoice(lang, 'voice.unavailable'));
+        setHint(tVoice(langNow(), 'voice.unavailable'));
       }
     },
     cancel() {
@@ -132,11 +134,16 @@ export function useVoiceDictation({
   const [phase, setPhase] = useState<VoicePhase>('idle');
   const [hint, setHint] = useState<string | null>(null);
   const ctrlRef = useRef<ReturnType<typeof createVoiceController> | null>(null);
+  // controller 只建一次；语言和「写到哪」每次渲染都更新，切到别的档后语音就写进那一档。
+  const langRef = useRef(lang);
+  langRef.current = lang;
+  const transcriptRef = useRef(onTranscript);
+  transcriptRef.current = onTranscript;
 
   if (!ctrlRef.current) {
     ctrlRef.current = createVoiceController({
-      lang,
-      onTranscript,
+      lang: () => langRef.current,
+      onTranscript: (text) => transcriptRef.current(text),
       recognizer,
       onPhaseChange: setPhase,
       onHintChange: setHint,

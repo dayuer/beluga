@@ -1,5 +1,17 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const voiceFake = vi.hoisted(() => ({ text: '语音说的需求' }));
+
+// 真的 useVoiceDictation + 控制器，只把录音和识别换成一句固定的文字。
+vi.mock('../lib/voice-recognizer', () => ({
+  createVoiceRecognizer: () => ({
+    requestPermission: async () => ({ granted: true }),
+    start: async () => {},
+    stop: async () => voiceFake.text,
+    cancel: async () => {},
+  }),
+}));
 
 const mockRouter = { push: vi.fn(), replace: vi.fn(), back: vi.fn() };
 const mockNewSubmit = vi.fn();
@@ -46,6 +58,7 @@ vi.mock('./PrimaryButton', () => ({
 vi.mock('lucide-react-native', () => ({
   Mic: () => null,
   X: () => null,
+  Check: () => null,
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => mockRouter,
@@ -148,5 +161,48 @@ describe('NewRequestScreen (SS-197)', () => {
     expect(mockNewSubmit).not.toHaveBeenCalled();
     expect(mockFeedbackSend).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).toHaveBeenCalledWith('/request/req-home');
+  });
+
+  it('records 完成/取消 in the new-request tab and appends the words to the goal field', async () => {
+    const { getByTestId } = await render(<NewRequestScreen />);
+
+    await fireEvent.changeText(getByTestId('goal-input'), '登录页改版');
+    await fireEvent.press(getByTestId('voice-mic-btn'));
+    await waitFor(() => expect(getByTestId('voice-stop-btn')).toBeTruthy());
+    expect(getByTestId('voice-cancel-btn')).toBeTruthy();
+
+    await fireEvent.press(getByTestId('voice-stop-btn'));
+    await waitFor(() =>
+      expect(getByTestId('goal-input').props.value).toBe('登录页改版 语音说的需求'),
+    );
+  });
+
+  it('cancel in the new-request tab leaves the goal field alone', async () => {
+    const { getByTestId } = await render(<NewRequestScreen />);
+
+    await fireEvent.press(getByTestId('voice-mic-btn'));
+    await waitFor(() => expect(getByTestId('voice-cancel-btn')).toBeTruthy());
+    await fireEvent.press(getByTestId('voice-cancel-btn'));
+
+    await waitFor(() => expect(getByTestId('voice-mic-btn')).toBeTruthy());
+    expect(getByTestId('goal-input').props.value).toBe('');
+  });
+
+  it('writes the spoken words into the feedback draft after switching to 对做好的提意见', async () => {
+    const { getByTestId } = await render(<NewRequestScreen />);
+
+    await fireEvent.press(getByTestId('seg-feedback'));
+    await fireEvent.changeText(getByTestId('goal-input'), '圆角再大一点');
+    await fireEvent.press(getByTestId('voice-mic-btn'));
+    await waitFor(() => expect(getByTestId('voice-stop-btn')).toBeTruthy());
+    await fireEvent.press(getByTestId('voice-stop-btn'));
+
+    await waitFor(() =>
+      expect(getByTestId('goal-input').props.value).toBe('圆角再大一点 语音说的需求'),
+    );
+
+    // 切回「新需求」，那一档没有被语音改过。
+    await fireEvent.press(getByTestId('seg-new'));
+    expect(getByTestId('goal-input').props.value).toBe('');
   });
 });

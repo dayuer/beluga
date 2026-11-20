@@ -473,6 +473,7 @@ export default function NewRequestScreen() {
                     voice={{
                       listening: voice.phase !== 'idle',
                       onStart: () => void voice.start(),
+                      onStop: () => void voice.stop(),
                       onCancel: voice.cancel,
                       hint: voice.hint,
                       disabled: locked,
@@ -487,6 +488,7 @@ export default function NewRequestScreen() {
                       });
                     }}
                     maxHeight={maxGoal}
+                    lang={lang}
                     placeholder={t(lang, 'new.goalPlaceholder')}
                     accessibilityLabel={t(lang, 'new.goalLabel')}
                   />
@@ -561,10 +563,12 @@ export default function NewRequestScreen() {
                 voice={{
                   listening: voice.phase !== 'idle',
                   onStart: () => void voice.start(),
+                  onStop: () => void voice.stop(),
                   onCancel: voice.cancel,
                   hint: voice.hint,
                   disabled: locked,
                 }}
+                lang={lang}
                 maxHeight={maxGoal}
                 placeholder={t(lang, 'new.feedbackPlaceholder')}
                 accessibilityLabel={t(lang, 'new.feedbackLabel')}

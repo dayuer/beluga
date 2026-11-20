@@ -1,4 +1,4 @@
-import { Mic, X } from 'lucide-react-native';
+import { Check, Mic, X } from 'lucide-react-native';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
   Pressable,
@@ -46,6 +46,8 @@ export function shouldSubmitOnKeyPress(
 export interface GoalVoiceProps {
   readonly listening: boolean;
   readonly onStart: () => void;
+  /** 完成录音：把这段识别成文字写进输入框。 */
+  readonly onStop: () => void;
   readonly onCancel: () => void;
   readonly hint?: string | null;
   readonly disabled?: boolean;
@@ -157,15 +159,27 @@ export function GoalInput({
       <View style={styles.inputRow}>
         {inputEl}
         {voice.listening ? (
-          <Pressable
-            onPress={voice.onCancel}
-            accessibilityRole="button"
-            accessibilityLabel={tVoice(lang, 'voice.cancelLabel')}
-            testID="voice-cancel-btn"
-            style={({ pressed }) => [styles.micBtn, styles.micBtnActive, pressed && styles.micPressed]}
-          >
-            <X size={18} color={color.card} />
-          </Pressable>
+          <>
+            {/* 录音时两个 44pt 的按钮：完成（识别并写进输入框）和取消（丢掉这段）。 */}
+            <Pressable
+              onPress={voice.onStop}
+              accessibilityRole="button"
+              accessibilityLabel={tVoice(lang, 'voice.stopLabel')}
+              testID="voice-stop-btn"
+              style={({ pressed }) => [styles.micBtn, styles.stopBtn, pressed && styles.micPressed]}
+            >
+              <Check size={18} color={color.onPrimary} />
+            </Pressable>
+            <Pressable
+              onPress={voice.onCancel}
+              accessibilityRole="button"
+              accessibilityLabel={tVoice(lang, 'voice.cancelLabel')}
+              testID="voice-cancel-btn"
+              style={({ pressed }) => [styles.micBtn, pressed && styles.micPressed]}
+            >
+              <X size={18} color={color.text2} />
+            </Pressable>
+          </>
         ) : (
           <Pressable
             onPress={voice.onStart}
@@ -222,9 +236,9 @@ const createStyles = () => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  micBtnActive: {
-    backgroundColor: color.error,
-    borderColor: color.error,
+  stopBtn: {
+    backgroundColor: color.primary,
+    borderColor: color.primary,
   },
   micDisabled: { opacity: 0.45 },
   micPressed: { opacity: 0.8 },
