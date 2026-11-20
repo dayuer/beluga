@@ -3,13 +3,14 @@ import { cleanup, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
+const hapticsWarning = vi.fn();
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../../lib/haptics', () => ({
   haptics: {
     select: vi.fn(),
     success: (...args: unknown[]) => hapticsSuccess(...args),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => hapticsWarning(...args),
   },
 }));
 
@@ -33,6 +34,7 @@ describe('ChangeCard', () => {
     vi.useFakeTimers();
     undoStore.cancel();
     hapticsSuccess.mockClear();
+    hapticsWarning.mockClear();
   });
 
   afterEach(async () => {
@@ -110,5 +112,45 @@ describe('ChangeCard', () => {
     expect(screen.getByTestId('change-before-after-0')).toBeTruthy();
     expect(screen.getByText('禁用 500ms')).toBeTruthy();
     expect(screen.getByText('请求完成前保持禁用')).toBeTruthy();
+  });
+
+  it('shows working while onApprove is pending and completes only after resolve without calling haptics.success', async () => {
+    let resolveFn!: () => void;
+    const onApprove = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res;
+        }),
+    );
+    const screen = await render(
+      <ChangeCard card={sampleCard} onDecline={() => {}} onApprove={onApprove} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('change-approve'));
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await vi.waitFor(() => expect(screen.getByTestId('change-approve').props.accessibilityState.busy).toBe(true));
+    expect(screen.queryByTestId('change-approved-hint')).toBeNull();
+
+    resolveFn();
+    await vi.waitFor(() => expect(screen.getByTestId('change-approved-hint')).toBeTruthy());
+    expect(hapticsSuccess).not.toHaveBeenCalled();
+  });
+
+  it('returns to idle with error and calls haptics.warning when onApprove rejects', async () => {
+    const onApprove = vi.fn().mockRejectedValue(new Error('计划版本已过期'));
+    const screen = await render(
+      <ChangeCard card={sampleCard} onDecline={() => {}} onApprove={onApprove} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('change-approve'));
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await vi.waitFor(() => expect(screen.getByText('计划版本已过期')).toBeTruthy());
+    expect(screen.getByTestId('change-approve').props.accessibilityState.busy).toBe(false);
+    expect(screen.getByTestId('change-approve').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('change-approved-hint')).toBeNull();
+    expect(hapticsWarning).toHaveBeenCalledTimes(1);
+    expect(hapticsSuccess).not.toHaveBeenCalled();
   });
 });

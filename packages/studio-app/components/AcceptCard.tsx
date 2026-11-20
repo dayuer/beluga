@@ -52,10 +52,14 @@ export function AcceptCard({
   const lang = langProp ?? detectLang();
   const c = signedCardStrings(lang);
   const [pendingUndo, setPendingUndo] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
 
   useEffect(() => {
     setPendingUndo(false);
+    setWorking(false);
+    setError(null);
     setApproved(card?.status === 'done');
   }, [card?.id, card?.status]);
 
@@ -99,23 +103,29 @@ export function AcceptCard({
   };
 
   const handleApprove = () => {
-    if (pendingUndo || isDone) return;
+    if (pendingUndo || working || isDone) return;
+    setError(null);
     setPendingUndo(true);
     undoStore.show({
       text: c['accept.undoText'](round),
       ms: 10_000,
       fire: () => {
         setPendingUndo(false);
-        setApproved(true);
-        const result = onSigned?.();
-        if (result && typeof (result as Promise<void>).then === 'function') {
-          void (result as Promise<void>).then(
-            () => haptics.success(),
-            () => {},
+        setWorking(true);
+        void Promise.resolve()
+          .then(() => onSigned?.())
+          .then(
+            () => {
+              setWorking(false);
+              setApproved(true);
+              haptics.success();
+            },
+            (err: unknown) => {
+              setWorking(false);
+              setError(err instanceof Error ? err.message : c['signed.failed']);
+              haptics.warning();
+            },
           );
-        } else {
-          haptics.success();
-        }
       },
       onUndo: () => {
         setPendingUndo(false);
@@ -147,6 +157,8 @@ export function AcceptCard({
               <SignedButton
                 label={c['accept.approve']}
                 onPress={handleApprove}
+                state={working ? 'working' : 'idle'}
+                error={error}
                 hasKeyOverride={hasKeyOverride}
                 testID="accept-approve"
               />

@@ -74,7 +74,9 @@ export function ReleaseCard({
       setConfirmOpen(false);
       haptics.success();
     } catch (err) {
-      setError(err instanceof Error ? err.message : c['release.unknown']);
+      setError(err instanceof Error ? err.message : c['signed.failed']);
+      setConfirmOpen(false);
+      haptics.warning();
     } finally {
       setBusy(false);
     }
@@ -100,7 +102,12 @@ export function ReleaseCard({
               primary={
                 <SignedButton
                   label={c['release.release']}
-                  onPress={() => setConfirmOpen(true)}
+                  onPress={() => {
+                    setError(null);
+                    setConfirmOpen(true);
+                  }}
+                  state={busy ? 'working' : 'idle'}
+                  error={error}
                   hasKeyOverride={hasKeyOverride}
                   testID="release-approve"
                 />

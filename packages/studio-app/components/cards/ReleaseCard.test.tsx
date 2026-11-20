@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
+const hapticsWarning = vi.fn();
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../../lib/viewport', () => ({ useKeyboardInset: () => 0 }));
@@ -13,7 +14,7 @@ vi.mock('../../lib/haptics', () => ({
   haptics: {
     select: vi.fn(),
     success: (...args: unknown[]) => hapticsSuccess(...args),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => hapticsWarning(...args),
   },
 }));
 
@@ -36,6 +37,7 @@ const sampleCard: ReleaseCardModel = {
 describe('ReleaseCard (P11)', () => {
   beforeEach(() => {
     hapticsSuccess.mockClear();
+    hapticsWarning.mockClear();
   });
 
   afterEach(async () => {
@@ -80,5 +82,46 @@ describe('ReleaseCard (P11)', () => {
     await vi.waitFor(() => expect(onRelease).toHaveBeenCalledTimes(1));
     expect(hapticsSuccess).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('release-done-hint').props.children).toBe('已上线 1.8.3');
+  });
+
+  it('shows working while onRelease is pending and completes only after resolve', async () => {
+    let resolveFn!: () => void;
+    const onRelease = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res;
+        }),
+    );
+    const screen = await render(
+      <ReleaseCard card={sampleCard} lastReleaseBy="张工" onDecline={() => {}} onRelease={onRelease} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('release-approve'));
+    await fireEvent.press(screen.getByTestId('release-confirm-sheet-confirm'));
+
+    expect(screen.getByTestId('release-approve').props.accessibilityState.busy).toBe(true);
+    expect(screen.queryByTestId('release-done-hint')).toBeNull();
+    expect(hapticsSuccess).not.toHaveBeenCalled();
+
+    resolveFn();
+    await vi.waitFor(() => expect(screen.getByTestId('release-done-hint')).toBeTruthy());
+    expect(hapticsSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to idle with error and calls haptics.warning when onRelease rejects', async () => {
+    const onRelease = vi.fn().mockRejectedValue(new Error('发布令牌已过期'));
+    const screen = await render(
+      <ReleaseCard card={sampleCard} lastReleaseBy="张工" onDecline={() => {}} onRelease={onRelease} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('release-approve'));
+    await fireEvent.press(screen.getByTestId('release-confirm-sheet-confirm'));
+
+    await vi.waitFor(() => expect(screen.getByText('发布令牌已过期')).toBeTruthy());
+    expect(screen.getByTestId('release-approve').props.accessibilityState.busy).toBe(false);
+    expect(screen.getByTestId('release-approve').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('release-done-hint')).toBeNull();
+    expect(hapticsWarning).toHaveBeenCalledTimes(1);
+    expect(hapticsSuccess).not.toHaveBeenCalled();
   });
 });

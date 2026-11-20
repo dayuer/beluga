@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
+const hapticsWarning = vi.fn();
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -17,7 +18,7 @@ vi.mock('../lib/haptics', () => ({
   haptics: {
     select: vi.fn(),
     success: (...args: unknown[]) => hapticsSuccess(...args),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => hapticsWarning(...args),
   },
 }));
 
@@ -43,6 +44,7 @@ describe('AcceptCard (P5)', () => {
     vi.useFakeTimers();
     undoStore.cancel();
     hapticsSuccess.mockClear();
+    hapticsWarning.mockClear();
   });
 
   afterEach(async () => {
@@ -141,5 +143,46 @@ describe('AcceptCard (P5)', () => {
     );
     expect(screen.queryByTestId('accept-pending-undo')).toBeNull();
     expect(screen.getByTestId('accept-approve')).toBeTruthy();
+  });
+
+  it('shows working while onSigned is pending and only completes after resolve', async () => {
+    let resolveFn!: () => void;
+    const onSigned = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res;
+        }),
+    );
+    const screen = await render(
+      <AcceptCard card={sampleCard} onNotYet={() => {}} onSigned={onSigned} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('accept-approve'));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await vi.waitFor(() => expect(screen.getByTestId('accept-approve').props.accessibilityState.busy).toBe(true));
+    expect(screen.queryByTestId('accept-approved-hint')).toBeNull();
+    expect(hapticsSuccess).not.toHaveBeenCalled();
+
+    resolveFn();
+    await vi.waitFor(() => expect(screen.getByTestId('accept-approved-hint')).toBeTruthy());
+    expect(hapticsSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to idle with error and calls haptics.warning when onSigned rejects', async () => {
+    const onSigned = vi.fn().mockRejectedValue(new Error('签名服务暂不可用'));
+    const screen = await render(
+      <AcceptCard card={sampleCard} onNotYet={() => {}} onSigned={onSigned} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('accept-approve'));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await vi.waitFor(() => expect(screen.getByText('签名服务暂不可用')).toBeTruthy());
+    expect(screen.getByTestId('accept-approve').props.accessibilityState.busy).toBe(false);
+    expect(screen.getByTestId('accept-approve').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('accept-approved-hint')).toBeNull();
+    expect(hapticsWarning).toHaveBeenCalledTimes(1);
+    expect(hapticsSuccess).not.toHaveBeenCalled();
   });
 });

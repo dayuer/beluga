@@ -53,33 +53,40 @@ export function StartCard({
   const c = signedCardStrings(lang);
   const [started, setStarted] = useState(card.status === 'done');
   const [pendingUndo, setPendingUndo] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setStarted(card.status === 'done');
     setPendingUndo(false);
+    setWorking(false);
+    setError(null);
   }, [card.id, card.status]);
 
   const handleStart = () => {
-    if (started || pendingUndo) return;
+    if (started || pendingUndo || working) return;
+    setError(null);
     setPendingUndo(true);
     undoStore.show({
       text: c['start.undoText'](card.planTitle),
       ms: 4000,
       fire: () => {
         setPendingUndo(false);
-        const res = onStart?.();
-        if (res && typeof (res as Promise<void>).then === 'function') {
-          void (res as Promise<void>).then(
+        setWorking(true);
+        void Promise.resolve()
+          .then(() => onStart?.())
+          .then(
             () => {
+              setWorking(false);
               setStarted(true);
               haptics.success();
             },
-            () => {},
+            (err: unknown) => {
+              setWorking(false);
+              setError(err instanceof Error ? err.message : c['signed.failed']);
+              haptics.warning();
+            },
           );
-        } else {
-          setStarted(true);
-          haptics.success();
-        }
       },
       onUndo: () => {
         setPendingUndo(false);
@@ -111,6 +118,8 @@ export function StartCard({
               <SignedButton
                 label={c['start.start']}
                 onPress={handleStart}
+                state={working ? 'working' : 'idle'}
+                error={error}
                 hasKeyOverride={hasKeyOverride}
                 testID="start-approve"
               />

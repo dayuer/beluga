@@ -73,6 +73,7 @@ export const zh = {
   'delivery.merged': '已合并',
   'delivery.previewLabel': '预览地址',
   'delivery.openPreview': '去看看',
+  'signed.failed': '确认失败，请重试',
 } as const;
 
 export type SignedCardStrings = {
@@ -148,6 +149,7 @@ export const en: SignedCardStrings = {
   'delivery.merged': 'Merged',
   'delivery.previewLabel': 'Preview URL',
   'delivery.openPreview': 'Take a look',
+  'signed.failed': 'Confirmation failed, please try again',
 };
 
 export function signedCardStrings(lang: Lang): SignedCardStrings {

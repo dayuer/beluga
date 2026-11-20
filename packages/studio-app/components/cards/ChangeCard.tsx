@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { StudioDraftDiff } from '../../../../src/studio/protocol';
+import { haptics } from '../../lib/haptics';
 import { detectLang, t, type Lang } from '../../lib/strings';
 import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
@@ -42,10 +43,14 @@ export function ChangeCard({
   const c = signedCardStrings(lang);
   const [approved, setApproved] = useState(card.status === 'done');
   const [pendingUndo, setPendingUndo] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setApproved(card.status === 'done');
     setPendingUndo(false);
+    setWorking(false);
+    setError(null);
   }, [card.id, card.status]);
 
   const addedItems = diff ? diff.added.map((x) => x.title) : card.added;
@@ -55,22 +60,28 @@ export function ChangeCard({
   const removedItems = diff ? diff.removed.map((x) => x.title) : card.removed;
 
   const handleApprove = () => {
-    if (approved || pendingUndo) return;
+    if (approved || pendingUndo || working) return;
+    setError(null);
     setPendingUndo(true);
     undoStore.show({
       text: c['change.undoText'],
       ms: 4000,
       fire: () => {
         setPendingUndo(false);
-        const res = onApprove?.();
-        if (res && typeof (res as Promise<void>).then === 'function') {
-          void (res as Promise<void>).then(
-            () => setApproved(true),
-            () => {},
+        setWorking(true);
+        void Promise.resolve()
+          .then(() => onApprove?.())
+          .then(
+            () => {
+              setWorking(false);
+              setApproved(true);
+            },
+            (err: unknown) => {
+              setWorking(false);
+              setError(err instanceof Error ? err.message : c['signed.failed']);
+              haptics.warning();
+            },
           );
-        } else {
-          setApproved(true);
-        }
       },
       onUndo: () => {
         setPendingUndo(false);
@@ -102,6 +113,8 @@ export function ChangeCard({
               <SignedButton
                 label={c['change.approve']}
                 onPress={handleApprove}
+                state={working ? 'working' : 'idle'}
+                error={error}
                 hasKeyOverride={hasKeyOverride}
                 testID="change-approve"
               />

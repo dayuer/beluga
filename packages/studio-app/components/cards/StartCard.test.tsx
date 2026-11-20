@@ -3,13 +3,14 @@ import { cleanup, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
+const hapticsWarning = vi.fn();
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../../lib/haptics', () => ({
   haptics: {
     select: vi.fn(),
     success: (...args: unknown[]) => hapticsSuccess(...args),
-    warning: vi.fn(),
+    warning: (...args: unknown[]) => hapticsWarning(...args),
   },
 }));
 
@@ -32,6 +33,7 @@ describe('StartCard (P10)', () => {
     vi.useFakeTimers();
     undoStore.cancel();
     hapticsSuccess.mockClear();
+    hapticsWarning.mockClear();
   });
 
   afterEach(async () => {
@@ -105,5 +107,46 @@ describe('StartCard (P10)', () => {
     expect(screen.getByText('在结果区看计划')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('start-open-plan'));
     expect(onOpenPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows working while onStart is pending and completes only after resolve', async () => {
+    let resolveFn!: () => void;
+    const onStart = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveFn = res;
+        }),
+    );
+    const screen = await render(
+      <StartCard card={sampleCard} onDecline={() => {}} onStart={onStart} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('start-approve'));
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await vi.waitFor(() => expect(screen.getByTestId('start-approve').props.accessibilityState.busy).toBe(true));
+    expect(screen.queryByTestId('start-confirmed-hint')).toBeNull();
+    expect(hapticsSuccess).not.toHaveBeenCalled();
+
+    resolveFn();
+    await vi.waitFor(() => expect(screen.getByTestId('start-confirmed-hint')).toBeTruthy());
+    expect(hapticsSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns to idle with error and calls haptics.warning when onStart rejects', async () => {
+    const onStart = vi.fn().mockRejectedValue(new Error('机器暂未在线'));
+    const screen = await render(
+      <StartCard card={sampleCard} onDecline={() => {}} onStart={onStart} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('start-approve'));
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await vi.waitFor(() => expect(screen.getByText('机器暂未在线')).toBeTruthy());
+    expect(screen.getByTestId('start-approve').props.accessibilityState.busy).toBe(false);
+    expect(screen.getByTestId('start-approve').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('start-confirmed-hint')).toBeNull();
+    expect(hapticsWarning).toHaveBeenCalledTimes(1);
+    expect(hapticsSuccess).not.toHaveBeenCalled();
   });
 });
