@@ -49,10 +49,10 @@ export const DesignCardSchema = z
   })
   .passthrough();
 
-export const QuestionCardSchema = z
+export const QuestionItemSchema = z
   .object({
-    ...CardBase,
-    kind: z.literal('question'),
+    id: z.string(),
+    index: z.number().int().min(1).default(1),
     prompt: z.string(),
     options: z
       .array(
@@ -67,6 +67,30 @@ export const QuestionCardSchema = z
       .optional(),
     allowFreeText: z.boolean().default(true),
     answer: z.string().optional(),
+  })
+  .passthrough();
+
+export const QuestionCardSchema = z
+  .object({
+    ...CardBase,
+    kind: z.literal('question'),
+    index: z.number().int().min(1).optional(),
+    total: z.number().int().min(1).optional(),
+    prompt: z.string(),
+    options: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            label: z.string(),
+            description: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    allowFreeText: z.boolean().default(true),
+    answer: z.string().optional(),
+    questions: z.array(QuestionItemSchema).optional(),
   })
   .passthrough();
 
@@ -140,9 +164,7 @@ export const CodeCardSchema = z
     ...CardBase,
     kind: z.literal('code'),
     repoUrl: z.string(),
-    branch: z.string().optional(),
     prUrl: z.string().optional(),
-    commitSha: z.string().optional(),
     pushState: z.enum(['ready', 'pushed', 'failed']).default('ready'),
   })
   .passthrough();
@@ -265,25 +287,87 @@ export const RequestArtifactSchema = z
   })
   .passthrough();
 
+export const ResultDrawerViewSchema = z
+  .object({
+    artifacts: z.array(RequestArtifactSchema).default([]),
+    attachments: z
+      .array(z.object({ id: z.string(), name: z.string(), kind: z.string(), url: z.string().optional() }).passthrough())
+      .default([]),
+    plan: z
+      .object({
+        milestones: z.array(RequestStepSchema).default([]),
+        activity: z.array(z.object({ id: z.string(), text: z.string(), at: z.number() }).passthrough()).default([]),
+      })
+      .passthrough()
+      .default({ milestones: [], activity: [] }),
+    changes: z
+      .object({
+        added: z.array(z.string()).default([]),
+        modified: z.array(z.string()).default([]),
+        removed: z.array(z.string()).default([]),
+        pendingApproval: z.boolean().default(false),
+      })
+      .passthrough()
+      .default({ added: [], modified: [], removed: [], pendingApproval: false }),
+    previewUrl: z.string().optional(),
+  })
+  .passthrough();
+export type ResultDrawerView = z.infer<typeof ResultDrawerViewSchema>;
+
 export const RequestViewSchema = z
   .object({
     summary: RequestSummarySchema,
     messages: z.array(RequestMessageSchema).default([]),
     cards: z.array(StudioCardSchema).default([]),
     activeCardId: z.string().optional(),
-    results: z
-      .object({
-        artifacts: z.array(RequestArtifactSchema).default([]),
-        attachments: z
-          .array(z.object({ id: z.string(), name: z.string(), kind: z.string(), url: z.string().optional() }).passthrough())
-          .default([]),
-        previewUrl: z.string().optional(),
-      })
-      .passthrough()
-      .default({ artifacts: [], attachments: [] }),
+    results: ResultDrawerViewSchema.default({
+      artifacts: [],
+      attachments: [],
+      plan: { milestones: [], activity: [] },
+      changes: { added: [], modified: [], removed: [], pendingApproval: false },
+    }),
   })
   .passthrough();
 export type RequestView = z.infer<typeof RequestViewSchema>;
+
+// --- P1 / P2 / P7 / P8 屏视图（SS-147） ---
+
+export const LoginViewSchema = z
+  .object({
+    email: z.string().default(''),
+    inviteId: z.string().nullable().default(null),
+    sent: z.boolean().default(false),
+  })
+  .passthrough();
+export type LoginView = z.infer<typeof LoginViewSchema>;
+
+export const NewRequestViewSchema = z
+  .object({
+    mode: z.enum(['new', 'feedback']).default('new'),
+    projects: z.array(z.object({ id: z.string(), name: z.string(), platform: z.string() }).passthrough()).default([]),
+    completedRequests: z.array(RequestSummarySchema).default([]),
+    examples: z.array(z.string()).default([]),
+  })
+  .passthrough();
+export type NewRequestView = z.infer<typeof NewRequestViewSchema>;
+
+export const ReasonSheetViewSchema = z
+  .object({
+    requestId: z.string(),
+    title: z.string(),
+    quickTags: z.array(z.string()).default([]),
+    draft: z.string().default(''),
+  })
+  .passthrough();
+export type ReasonSheetView = z.infer<typeof ReasonSheetViewSchema>;
+
+export const TodoScreenViewSchema = z
+  .object({
+    needsYou: z.array(StudioCardSchema).default([]),
+    waiting: z.array(StudioCardSchema).default([]),
+  })
+  .passthrough();
+export type TodoScreenView = z.infer<typeof TodoScreenViewSchema>;
 
 // --- 设置各页的只读视图（studio-ui.md §3 & studio-env.md §1） ---
 
@@ -419,5 +503,30 @@ export function parseRequestView(raw: unknown): RequestView | null {
 
 export function parseSettingsView(raw: unknown): SettingsView | null {
   const res = SettingsViewSchema.safeParse(raw);
+  return res.success ? res.data : null;
+}
+
+export function parseLoginView(raw: unknown): LoginView | null {
+  const res = LoginViewSchema.safeParse(raw);
+  return res.success ? res.data : null;
+}
+
+export function parseNewRequestView(raw: unknown): NewRequestView | null {
+  const res = NewRequestViewSchema.safeParse(raw);
+  return res.success ? res.data : null;
+}
+
+export function parseReasonSheetView(raw: unknown): ReasonSheetView | null {
+  const res = ReasonSheetViewSchema.safeParse(raw);
+  return res.success ? res.data : null;
+}
+
+export function parseTodoScreenView(raw: unknown): TodoScreenView | null {
+  const res = TodoScreenViewSchema.safeParse(raw);
+  return res.success ? res.data : null;
+}
+
+export function parseResultDrawerView(raw: unknown): ResultDrawerView | null {
+  const res = ResultDrawerViewSchema.safeParse(raw);
   return res.success ? res.data : null;
 }

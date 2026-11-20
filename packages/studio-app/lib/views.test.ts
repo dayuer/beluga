@@ -27,7 +27,7 @@ describe('parseCard', () => {
       { id: 'c6', kind: 'steps', steps: [{ id: 's1', title: '搭建页面', status: 'active' }] },
       { id: 'c7', kind: 'wait', reason: 'offline', message: '执行机器暂时离线' },
       { id: 'c8', kind: 'delivery', round: 1, summary: '第一轮交付已完成', previewUrl: 'https://p.example.com' },
-      { id: 'c9', kind: 'code', repoUrl: 'https://git.example.com/app', branch: 'main', pushState: 'pushed' },
+      { id: 'c9', kind: 'code', repoUrl: 'https://git.example.com/app', pushState: 'pushed' },
       { id: 'c10', kind: 'release', envId: 'prod', envTitle: '正式', version: '1.2.0' },
     ];
 

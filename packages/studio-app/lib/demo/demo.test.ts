@@ -11,8 +11,19 @@ vi.mock('expo-secure-store', () => ({
   deleteItemAsync: vi.fn(async () => {}),
 }));
 
-import { parseCard, parseRequestSummary, parseRequestView, parseSettingsView } from '../views';
-import { DEMO_SCREENS } from './screens';
+import {
+  CodeCardSchema,
+  parseCard,
+  parseLoginView,
+  parseNewRequestView,
+  parseReasonSheetView,
+  parseRequestSummary,
+  parseRequestView,
+  parseResultDrawerView,
+  parseSettingsView,
+  parseTodoScreenView,
+} from '../views';
+import { DEMO_CARDS, DEMO_SCREENS } from './screens';
 
 describe('demo fixtures (P1–P12)', () => {
   afterEach(() => {
@@ -31,32 +42,58 @@ describe('demo fixtures (P1–P12)', () => {
       }
     }
 
-    // P2: RequestSummary[]
+    // P1: 登录
     for (const s of stateKeys) {
-      for (const item of DEMO_SCREENS.P2[s].data) {
-        expect(parseRequestSummary(item)).not.toBeNull();
-      }
+      expect(parseLoginView(DEMO_SCREENS.P1[s].data)).not.toBeNull();
     }
 
-    // P4–P8: RequestView
-    for (const screen of ['P4', 'P5', 'P6', 'P7', 'P8'] as const) {
+    // P2: 提需求
+    for (const s of stateKeys) {
+      expect(parseNewRequestView(DEMO_SCREENS.P2[s].data)).not.toBeNull();
+    }
+
+    // P3, P4, P5, P6, P10, P11: RequestView
+    for (const screen of ['P3', 'P4', 'P5', 'P6', 'P10', 'P11'] as const) {
       for (const s of stateKeys) {
         const parsed = parseRequestView(DEMO_SCREENS[screen][s].data);
         expect(parsed).not.toBeNull();
       }
     }
 
-    // P10: Todo cards
+    // P7: 原因抽屉
     for (const s of stateKeys) {
-      for (const c of [...DEMO_SCREENS.P10[s].data.needsYou, ...DEMO_SCREENS.P10[s].data.waiting]) {
+      expect(parseReasonSheetView(DEMO_SCREENS.P7[s].data)).not.toBeNull();
+    }
+
+    // P8: 待办
+    for (const s of stateKeys) {
+      const parsed = parseTodoScreenView(DEMO_SCREENS.P8[s].data);
+      expect(parsed).not.toBeNull();
+      for (const c of [...(parsed?.needsYou ?? []), ...(parsed?.waiting ?? [])]) {
         expect(parseCard(c).kind).not.toBe('unknown');
       }
     }
 
-    // P11: SettingsView
+    // P9: 「我」和子页
     for (const s of stateKeys) {
-      expect(parseSettingsView(DEMO_SCREENS.P11[s].data)).not.toBeNull();
+      expect(parseSettingsView(DEMO_SCREENS.P9[s].data)).not.toBeNull();
     }
+
+    // P12: 结果抽屉
+    for (const s of stateKeys) {
+      expect(parseResultDrawerView(DEMO_SCREENS.P12[s].data)).not.toBeNull();
+    }
+
+    // requestsList: 跨项目需求列表
+    for (const s of stateKeys) {
+      for (const item of DEMO_SCREENS.requestsList[s].data) {
+        expect(parseRequestSummary(item)).not.toBeNull();
+      }
+    }
+
+    // CodeCardSchema 和代码卡假数据不包含分支名
+    expect('branch' in CodeCardSchema.shape).toBe(false);
+    expect('branch' in (DEMO_CARDS.code ?? {})).toBe(false);
   });
 
   it('issues zero network requests when EXPO_PUBLIC_DEMO=1', async () => {

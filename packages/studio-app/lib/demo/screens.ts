@@ -1,14 +1,31 @@
 import type {
+  LoginView,
+  NewRequestView,
+  ReasonSheetView,
   RequestSummary,
   RequestView,
+  ResultDrawerView,
   SettingsView,
   StudioCard,
+  TodoScreenView,
 } from '../views';
 
 /**
- * P1–P12 每屏假数据（SS-115），类型全部来自 `lib/views.ts`。
- * 每屏均覆盖 normal / empty / loading / offline / runnerOffline 等状态，
- * 供后续 P1–P12 屏任务在 `EXPO_PUBLIC_DEMO=1` 下并行开发，不再改此文件。
+ * P1–P12 与跨项目需求列表假数据（SS-115 / SS-147），类型全部来自 `lib/views.ts`。
+ * P1–P12 一一对应计划里的屏：
+ * - P1 登录
+ * - P2 提需求（新需求 / 对做好的提意见）
+ * - P3 回答问题（多题编号 + 选项 + 自己写）
+ * - P4 需求详情（对话 + 步骤条 + 等待卡 + 卡片流）
+ * - P5 交付验收卡
+ * - P6 交付流转与预览
+ * - P7 原因抽屉（「还不行…」）
+ * - P8 待办（「要你做的」+「在等待」）
+ * - P9 「我」和它的各个子页
+ * - P10 批准开工卡与批准改动卡
+ * - P11 批准上线卡
+ * - P12 结果抽屉（计划 / 成果 / 改动 / 预览四个页签）
+ * - requestsList 跨项目需求列表
  */
 
 export type ScreenStateKind = 'normal' | 'empty' | 'loading' | 'offline' | 'runnerOffline';
@@ -106,12 +123,36 @@ export const DEMO_CARDS: Record<string, StudioCard> = {
     kind: 'question',
     createdAt: NOW - 3000_000,
     status: 'pending',
+    index: 1,
+    total: 2,
     prompt: '登录失败超过 5 次时，需要图形验证码还是短信验证码？',
     options: [
       { id: 'opt-sms', label: '短信验证码', description: '与现有注册流程一致' },
       { id: 'opt-captcha', label: '图形验证码' },
     ],
     allowFreeText: true,
+    questions: [
+      {
+        id: 'q1',
+        index: 1,
+        prompt: '登录失败超过 5 次时，需要图形验证码还是短信验证码？',
+        options: [
+          { id: 'opt-sms', label: '短信验证码', description: '与现有注册流程一致' },
+          { id: 'opt-captcha', label: '图形验证码' },
+        ],
+        allowFreeText: true,
+      },
+      {
+        id: 'q2',
+        index: 2,
+        prompt: '未注册手机号一键登录时是否自动创建账号？',
+        options: [
+          { id: 'opt-auto', label: '自动创建并登录' },
+          { id: 'opt-bind', label: '先引导绑定已有账号' },
+        ],
+        allowFreeText: true,
+      },
+    ],
   },
   understanding: {
     id: 'card-understanding-1',
@@ -186,9 +227,7 @@ export const DEMO_CARDS: Record<string, StudioCard> = {
     createdAt: NOW - 180_000,
     status: 'done',
     repoUrl: 'https://git.synon.invalid/shop/ios-app',
-    branch: 'studio/req-login',
     prUrl: 'https://git.synon.invalid/shop/ios-app/pull/42',
-    commitSha: 'a1b2c3d',
     pushState: 'pushed',
   },
   release: {
@@ -205,6 +244,32 @@ export const DEMO_CARDS: Record<string, StudioCard> = {
   },
 };
 
+export const DEMO_RESULT_DRAWER: ResultDrawerView = {
+  artifacts: [
+    { id: 'a1', round: 2, kind: 'preview', title: '测试环境在线预览', url: 'https://demo-preview.synon.invalid/req-export', createdAt: NOW - 300_000 },
+    { id: 'a2', round: 2, kind: 'build', title: 'iOS 测试安装包 1.8.3', url: 'https://demo-preview.synon.invalid/req-export.ipa', createdAt: NOW - 300_000 },
+  ],
+  attachments: [{ id: 'att1', name: '登录页设计稿.zip', kind: 'design' }],
+  plan: {
+    milestones: [
+      { id: 'm1', title: '核对设计稿与登录接口', status: 'done' },
+      { id: 'm2', title: '实现登录表单与一键登录按钮', status: 'active' },
+      { id: 'm3', title: '真机截图与预览部署', status: 'todo' },
+    ],
+    activity: [
+      { id: 'act1', text: 'AI 完成设计稿清单解析（18 个文件）', at: NOW - 3500_000 },
+      { id: 'act2', text: '客户确认需求理解', at: NOW - 2000_000 },
+    ],
+  },
+  changes: {
+    added: ['密码明文切换按钮'],
+    modified: ['登录按钮防连点逻辑'],
+    removed: [],
+    pendingApproval: true,
+  },
+  previewUrl: 'https://demo-preview.synon.invalid/req-export',
+};
+
 export const DEMO_REQUEST_VIEW: RequestView = {
   summary: DEMO_REQUEST_SUMMARIES[0]!,
   messages: [
@@ -217,20 +282,14 @@ export const DEMO_REQUEST_VIEW: RequestView = {
     DEMO_CARDS.understanding!,
     DEMO_CARDS.start!,
     DEMO_CARDS.steps!,
+    DEMO_CARDS.waitOffline!,
     DEMO_CARDS.changes!,
     DEMO_CARDS.delivery!,
     DEMO_CARDS.code!,
     DEMO_CARDS.release!,
   ],
   activeCardId: DEMO_CARDS.start!.id,
-  results: {
-    artifacts: [
-      { id: 'a1', round: 2, kind: 'preview', title: '测试环境在线预览', url: 'https://demo-preview.synon.invalid/req-export', createdAt: NOW - 300_000 },
-      { id: 'a2', round: 2, kind: 'build', title: 'iOS 测试安装包 1.8.3', url: 'https://demo-preview.synon.invalid/req-export.ipa', createdAt: NOW - 300_000 },
-    ],
-    attachments: [{ id: 'att1', name: '登录页设计稿.zip', kind: 'design' }],
-    previewUrl: 'https://demo-preview.synon.invalid/req-export',
-  },
+  results: DEMO_RESULT_DRAWER,
 };
 
 export const DEMO_SETTINGS_VIEW: SettingsView = {
@@ -290,7 +349,12 @@ const EMPTY_REQUEST_VIEW: RequestView = {
   },
   messages: [],
   cards: [],
-  results: { artifacts: [], attachments: [] },
+  results: {
+    artifacts: [],
+    attachments: [],
+    plan: { milestones: [], activity: [] },
+    changes: { added: [], modified: [], removed: [], pendingApproval: false },
+  },
 };
 
 const RUNNER_OFFLINE_VIEW: RequestView = {
@@ -299,81 +363,130 @@ const RUNNER_OFFLINE_VIEW: RequestView = {
   cards: [DEMO_CARDS.steps!, DEMO_CARDS.waitOffline!],
 };
 
-/** P1–P12 每屏的多状态假数据索引（normal / empty / loading / offline / runnerOffline）。 */
+/** P1–P12 与跨项目需求列表的多状态假数据（normal / empty / loading / offline / runnerOffline）。 */
 export const DEMO_SCREENS = {
+  // P1: 登录
   P1: {
-    normal: { state: 'normal', data: { inviteId: 'inv-demo', email: 'customer@shop.invalid', paired: true } },
-    empty: { state: 'empty', data: { inviteId: null, email: '', paired: false } },
-    loading: { state: 'loading', loading: true, data: { inviteId: 'inv-demo', email: 'customer@shop.invalid', paired: false } },
-    offline: { state: 'offline', offline: true, data: { inviteId: null, email: '', paired: false } },
-    runnerOffline: { state: 'runnerOffline', data: { inviteId: 'inv-demo', email: 'customer@shop.invalid', paired: true } },
+    normal: { state: 'normal', data: { email: 'customer@shop.invalid', inviteId: 'inv-demo', sent: false } satisfies LoginView },
+    empty: { state: 'empty', data: { email: '', inviteId: null, sent: false } satisfies LoginView },
+    loading: { state: 'loading', loading: true, data: { email: 'customer@shop.invalid', inviteId: 'inv-demo', sent: true } satisfies LoginView },
+    offline: { state: 'offline', offline: true, data: { email: 'customer@shop.invalid', inviteId: null, sent: false } satisfies LoginView },
+    runnerOffline: { state: 'runnerOffline', data: { email: 'customer@shop.invalid', inviteId: 'inv-demo', sent: true } satisfies LoginView },
   },
+  // P2: 提需求（新需求 / 对做好的提意见）
   P2: {
-    normal: { state: 'normal', data: DEMO_REQUEST_SUMMARIES },
-    empty: { state: 'empty', data: [] as readonly RequestSummary[] },
-    loading: { state: 'loading', loading: true, data: [] as readonly RequestSummary[] },
-    offline: { state: 'offline', offline: true, data: DEMO_REQUEST_SUMMARIES },
-    runnerOffline: { state: 'runnerOffline', data: DEMO_REQUEST_SUMMARIES.filter((r) => r.waitReason === 'offline') },
+    normal: {
+      state: 'normal',
+      data: {
+        mode: 'new',
+        projects: DEMO_SETTINGS_VIEW.projects.map((p) => ({ id: p.id, name: p.name, platform: p.platform })),
+        completedRequests: DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'done'),
+        examples: ['登录页增加微信一键登录', '导出订单支持按时间筛选'],
+      } satisfies NewRequestView,
+    },
+    empty: {
+      state: 'empty',
+      data: { mode: 'new', projects: [], completedRequests: [], examples: [] } satisfies NewRequestView,
+    },
+    loading: {
+      state: 'loading',
+      loading: true,
+      data: { mode: 'new', projects: [], completedRequests: [], examples: [] } satisfies NewRequestView,
+    },
+    offline: {
+      state: 'offline',
+      offline: true,
+      data: {
+        mode: 'feedback',
+        projects: DEMO_SETTINGS_VIEW.projects.map((p) => ({ id: p.id, name: p.name, platform: p.platform })),
+        completedRequests: DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'done'),
+        examples: [],
+      } satisfies NewRequestView,
+    },
+    runnerOffline: {
+      state: 'runnerOffline',
+      data: {
+        mode: 'new',
+        projects: DEMO_SETTINGS_VIEW.projects.map((p) => ({ id: p.id, name: p.name, platform: p.platform })),
+        completedRequests: DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'done'),
+        examples: ['登录页增加微信一键登录'],
+      } satisfies NewRequestView,
+    },
   },
+  // P3: 回答问题（多题编号 + 选项 + 自己写）
   P3: {
-    normal: { state: 'normal', data: { projects: DEMO_SETTINGS_VIEW.projects, examples: ['登录页增加微信一键登录', '导出订单支持按时间筛选'] } },
-    empty: { state: 'empty', data: { projects: [], examples: [] } },
-    loading: { state: 'loading', loading: true, data: { projects: [], examples: [] } },
-    offline: { state: 'offline', offline: true, data: { projects: DEMO_SETTINGS_VIEW.projects, examples: [] } },
-    runnerOffline: { state: 'runnerOffline', data: { projects: DEMO_SETTINGS_VIEW.projects, examples: ['登录页增加微信一键登录'] } },
+    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.question!] } satisfies RequestView },
+    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
+    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
+    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.question!] } satisfies RequestView },
+    runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
   },
+  // P4: 需求详情（对话 + 步骤条 + 等待卡 + 卡片流）
   P4: {
-    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.design!, DEMO_CARDS.question!] } satisfies RequestView },
+    normal: { state: 'normal', data: DEMO_REQUEST_VIEW },
     empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
     loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
-    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.design!, DEMO_CARDS.question!] } satisfies RequestView },
+    offline: { state: 'offline', offline: true, data: DEMO_REQUEST_VIEW },
     runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
   },
+  // P5: 交付验收卡
   P5: {
-    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.understanding!, DEMO_CARDS.start!] } satisfies RequestView },
+    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.delivery!] } satisfies RequestView },
     empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
     loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
-    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.understanding!, DEMO_CARDS.start!] } satisfies RequestView },
+    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.delivery!] } satisfies RequestView },
     runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
   },
+  // P6: 交付流转与预览
   P6: {
-    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.steps!] } satisfies RequestView },
+    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.delivery!, DEMO_CARDS.code!] } satisfies RequestView },
     empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
     loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
-    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.steps!, DEMO_CARDS.waitOffline!] } satisfies RequestView },
+    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.delivery!, DEMO_CARDS.code!] } satisfies RequestView },
     runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
   },
+  // P7: 原因抽屉（「还不行…」）
   P7: {
-    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.changes!, DEMO_CARDS.delivery!] } satisfies RequestView },
-    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
-    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
-    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.changes!, DEMO_CARDS.delivery!] } satisfies RequestView },
-    runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
+    normal: {
+      state: 'normal',
+      data: {
+        requestId: 'req-export',
+        title: '哪里还不行？',
+        quickTags: ['样式不对', '点不了', '漏了一项'],
+        draft: '',
+      } satisfies ReasonSheetView,
+    },
+    empty: {
+      state: 'empty',
+      data: { requestId: 'req-export', title: '哪里还不行？', quickTags: [], draft: '' } satisfies ReasonSheetView,
+    },
+    loading: {
+      state: 'loading',
+      loading: true,
+      data: { requestId: 'req-export', title: '哪里还不行？', quickTags: ['样式不对'], draft: '导出按钮位置偏左' } satisfies ReasonSheetView,
+    },
+    offline: {
+      state: 'offline',
+      offline: true,
+      data: { requestId: 'req-export', title: '哪里还不行？', quickTags: ['样式不对'], draft: '离线草稿已保留' } satisfies ReasonSheetView,
+    },
+    runnerOffline: {
+      state: 'runnerOffline',
+      data: { requestId: 'req-export', title: '哪里还不行？', quickTags: ['样式不对'], draft: '' } satisfies ReasonSheetView,
+    },
   },
+  // P8: 待办（「要你做的」+「在等待」）
   P8: {
-    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.code!, DEMO_CARDS.release!] } satisfies RequestView },
-    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
-    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
-    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.code!, DEMO_CARDS.release!] } satisfies RequestView },
-    runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
+    normal: { state: 'normal', data: { needsYou: [DEMO_CARDS.start!, DEMO_CARDS.delivery!], waiting: [DEMO_CARDS.waitOffline!] } satisfies TodoScreenView },
+    empty: { state: 'empty', data: { needsYou: [], waiting: [] } satisfies TodoScreenView },
+    loading: { state: 'loading', loading: true, data: { needsYou: [], waiting: [] } satisfies TodoScreenView },
+    offline: { state: 'offline', offline: true, data: { needsYou: [DEMO_CARDS.start!], waiting: [DEMO_CARDS.waitOffline!] } satisfies TodoScreenView },
+    runnerOffline: { state: 'runnerOffline', data: { needsYou: [], waiting: [DEMO_CARDS.waitOffline!] } satisfies TodoScreenView },
   },
+  // P9: 「我」和它的各个子页
   P9: {
-    normal: { state: 'normal', data: DEMO_REQUEST_VIEW.results },
-    empty: { state: 'empty', data: { artifacts: [], attachments: [] } },
-    loading: { state: 'loading', loading: true, data: { artifacts: [], attachments: [] } },
-    offline: { state: 'offline', offline: true, data: DEMO_REQUEST_VIEW.results },
-    runnerOffline: { state: 'runnerOffline', data: { artifacts: [], attachments: DEMO_REQUEST_VIEW.results.attachments } },
-  },
-  P10: {
-    normal: { state: 'normal', data: { needsYou: [DEMO_CARDS.start!, DEMO_CARDS.delivery!], waiting: [DEMO_CARDS.waitOffline!] } },
-    empty: { state: 'empty', data: { needsYou: [] as StudioCard[], waiting: [] as StudioCard[] } },
-    loading: { state: 'loading', loading: true, data: { needsYou: [] as StudioCard[], waiting: [] as StudioCard[] } },
-    offline: { state: 'offline', offline: true, data: { needsYou: [DEMO_CARDS.start!], waiting: [DEMO_CARDS.waitOffline!] } },
-    runnerOffline: { state: 'runnerOffline', data: { needsYou: [] as StudioCard[], waiting: [DEMO_CARDS.waitOffline!] } },
-  },
-  P11: {
     normal: { state: 'normal', data: DEMO_SETTINGS_VIEW },
-    empty: { state: 'empty', data: { ...DEMO_SETTINGS_VIEW, projects: [], envs: {}, forges: [], runners: [] } satisfies SettingsView },
+    empty: { state: 'empty', data: { ...DEMO_SETTINGS_VIEW, projects: [], envs: {}, forges: [], runners: [], devices: [] } satisfies SettingsView },
     loading: { state: 'loading', loading: true, data: DEMO_SETTINGS_VIEW },
     offline: { state: 'offline', offline: true, data: DEMO_SETTINGS_VIEW },
     runnerOffline: {
@@ -384,11 +497,39 @@ export const DEMO_SCREENS = {
       } satisfies SettingsView,
     },
   },
+  // P10: 批准开工卡与批准改动卡
+  P10: {
+    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.start!, DEMO_CARDS.changes!] } satisfies RequestView },
+    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
+    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
+    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.start!, DEMO_CARDS.changes!] } satisfies RequestView },
+    runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
+  },
+  // P11: 批准上线卡
+  P11: {
+    normal: { state: 'normal', data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.release!] } satisfies RequestView },
+    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW },
+    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW },
+    offline: { state: 'offline', offline: true, data: { ...DEMO_REQUEST_VIEW, cards: [DEMO_CARDS.release!] } satisfies RequestView },
+    runnerOffline: { state: 'runnerOffline', data: RUNNER_OFFLINE_VIEW },
+  },
+  // P12: 结果抽屉（计划 / 成果 / 改动 / 预览四个页签）
   P12: {
-    normal: { state: 'normal', data: { devices: DEMO_SETTINGS_VIEW.devices, account: DEMO_SETTINGS_VIEW.account } },
-    empty: { state: 'empty', data: { devices: [], account: DEMO_SETTINGS_VIEW.account } },
-    loading: { state: 'loading', loading: true, data: { devices: [], account: DEMO_SETTINGS_VIEW.account } },
-    offline: { state: 'offline', offline: true, data: { devices: DEMO_SETTINGS_VIEW.devices, account: DEMO_SETTINGS_VIEW.account } },
-    runnerOffline: { state: 'runnerOffline', data: { devices: DEMO_SETTINGS_VIEW.devices, account: DEMO_SETTINGS_VIEW.account } },
+    normal: { state: 'normal', data: DEMO_RESULT_DRAWER },
+    empty: { state: 'empty', data: EMPTY_REQUEST_VIEW.results },
+    loading: { state: 'loading', loading: true, data: EMPTY_REQUEST_VIEW.results },
+    offline: { state: 'offline', offline: true, data: DEMO_RESULT_DRAWER },
+    runnerOffline: {
+      state: 'runnerOffline',
+      data: { ...DEMO_RESULT_DRAWER, artifacts: [], previewUrl: undefined } satisfies ResultDrawerView,
+    },
+  },
+  // 跨项目需求列表（供 requests-list 使用）
+  requestsList: {
+    normal: { state: 'normal', data: DEMO_REQUEST_SUMMARIES },
+    empty: { state: 'empty', data: [] as readonly RequestSummary[] },
+    loading: { state: 'loading', loading: true, data: [] as readonly RequestSummary[] },
+    offline: { state: 'offline', offline: true, data: DEMO_REQUEST_SUMMARIES },
+    runnerOffline: { state: 'runnerOffline', data: DEMO_REQUEST_SUMMARIES.filter((r) => r.waitReason === 'offline') },
   },
 } as const;
