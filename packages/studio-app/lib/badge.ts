@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { onResume } from './resume';
 import { session } from './session';
-import { fetchTodos, type TodosResult } from './todo-store';
+import { fetchTodos, subscribeTodos, type TodosResult } from './todo-store';
 
 export interface BadgeNotificationsApi {
   setBadgeCountAsync: (count: number) => Promise<boolean | void>;
@@ -12,6 +12,7 @@ export interface BadgeNotificationsApi {
 export interface BadgeDeps {
   readonly notifications?: BadgeNotificationsApi;
   readonly fetchTodos?: (force?: boolean) => Promise<TodosResult>;
+  readonly subscribeTodos?: (listener: (result: TodosResult) => void) => () => void;
   readonly getToken?: () => string | null;
   readonly subscribeSession?: (listener: () => void) => () => void;
   readonly subscribeResume?: (fn: () => void) => () => void;
@@ -79,6 +80,7 @@ export function initBadgeSync(deps: BadgeDeps = {}): () => void {
   const getToken = deps.getToken ?? (() => session.snapshot());
   const subscribeSession = deps.subscribeSession ?? session.subscribe;
   const subscribeResume = deps.subscribeResume ?? ((fn: () => void) => onResume(fn));
+  const listenTodos = deps.subscribeTodos ?? subscribeTodos;
 
   let disposed = false;
   let lastToken = getToken();
@@ -87,6 +89,11 @@ export function initBadgeSync(deps: BadgeDeps = {}): () => void {
     if (disposed) return;
     void syncBadge(force, deps);
   };
+
+  const unsubTodos = listenTodos((result) => {
+    if (disposed || !getToken()) return;
+    void setBadgeCount(result.todos.length, deps);
+  });
 
   runSync(false);
 
@@ -108,6 +115,7 @@ export function initBadgeSync(deps: BadgeDeps = {}): () => void {
 
   return () => {
     disposed = true;
+    unsubTodos();
     unsubResume();
     unsubSession();
   };

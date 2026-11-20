@@ -18,6 +18,7 @@ vi.mock('./session', () => ({
 
 vi.mock('./todo-store', () => ({
   fetchTodos: vi.fn(async () => ({ todos: [], byProject: {}, fetchedAt: 0, failed: 0 })),
+  subscribeTodos: () => () => {},
 }));
 
 import {
