@@ -16,6 +16,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 import { PACKAGE_LIMITS, classifyEntryIssue, type PickedPackage } from '../lib/package-pick';
+import { en, packageT, zh } from '../lib/strings/package';
 import { color } from '../lib/theme';
 import { resetDrawerCount } from '../lib/ui-state';
 import { PackageManifest } from './PackageManifest';
@@ -136,5 +137,12 @@ describe('PackageManifest', () => {
     expect(onConfirm.mock.calls[0]?.[0].map((e: { path: string }) => e.path)).toEqual([
       'screens/app.png',
     ]);
+  });
+
+  it('has matching zh and en keys in lib/strings/package.ts', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort());
+    expect(packageT('en', 'package.confirm')).toBe('Upload');
+    expect(packageT('zh', 'package.confirm')).toBe('开始上传');
+    expect(packageT('en', 'package.issue.secretFile')).toContain('secret');
   });
 });

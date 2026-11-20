@@ -7,6 +7,8 @@ import {
   type PackageEntryIssue,
   type PickedPackage,
 } from '../lib/package-pick';
+import { detectLang, type Lang } from '../lib/strings';
+import { packageT } from '../lib/strings/package';
 import { color, space, type } from '../lib/theme';
 import { ActionRow } from './card/ActionRow';
 import { Drawer } from './Drawer';
@@ -17,7 +19,7 @@ export interface PackageManifestProps {
   readonly open: boolean;
   readonly pkg: PickedPackage | null;
   readonly onClose: () => void;
-  /** 仅在用户点击确认后触发，且只包含已勾选的合法文件。 */
+  /** Called only after confirmation, with checked valid entries only. */
   readonly onConfirm: (selectedEntries: readonly PackageEntry[]) => void;
   readonly confirmLabel?: string;
   readonly testID?: string;
@@ -32,46 +34,51 @@ export function formatBytes(bytes: number): string {
   return `${mb.toFixed(1)} MB`;
 }
 
-export function describeEntryIssue(issue: PackageEntryIssue): string {
+export function describeEntryIssue(issue: PackageEntryIssue, lang: Lang = detectLang()): string {
   switch (issue) {
     case 'file-too-large':
-      return '超过单文件 25 MB 上限';
+      return packageT(lang, 'package.issue.fileTooLarge');
     case 'unsupported-type':
-      return '不支持的文件类型';
+      return packageT(lang, 'package.issue.unsupportedType');
     case 'empty-file':
-      return '空文件无法上传';
+      return packageT(lang, 'package.issue.emptyFile');
     case 'encrypted-entry':
-      return '已加密条目，已跳过';
+      return packageT(lang, 'package.issue.encryptedEntry');
     case 'unsupported-compression':
-      return '不支持的压缩方式，已跳过';
+      return packageT(lang, 'package.issue.unsupportedCompression');
     case 'secret-file':
-      return '疑似密钥或凭证，已跳过';
+      return packageT(lang, 'package.issue.secretFile');
   }
 }
 
-export function computePackageWarning(selectedCount: number, selectedBytes: number): string | null {
+export function computePackageWarning(
+  selectedCount: number,
+  selectedBytes: number,
+  lang: Lang = detectLang(),
+): string | null {
   if (selectedCount > PACKAGE_LIMITS.maxFiles) {
-    return `已选文件数超过 ${PACKAGE_LIMITS.maxFiles} 个上限`;
+    return packageT(lang, 'package.warnTooManyFiles', { max: PACKAGE_LIMITS.maxFiles });
   }
   if (selectedBytes > PACKAGE_LIMITS.maxPackageBytes) {
-    return `已选总大小超过 ${formatBytes(PACKAGE_LIMITS.maxPackageBytes)} 上限`;
+    return packageT(lang, 'package.warnTooLarge', {
+      max: formatBytes(PACKAGE_LIMITS.maxPackageBytes),
+    });
   }
   return null;
 }
 
 /**
- * 设计稿包清单确认抽屉（SS-85）：
- * 展示文件数、总大小与逐个文件，支持取消勾选；超限或不支持的文件标出原因；
- * 确认前绝不触发上传，确认后仅回传已勾选的合法文件。
+ * Design package manifest confirmation drawer (SS-85 / SS-159 / SS-160).
  */
 export function PackageManifest({
   open,
   pkg,
   onClose,
   onConfirm,
-  confirmLabel = '开始上传',
+  confirmLabel,
   testID = 'package-manifest',
 }: PackageManifestProps) {
+  const lang = detectLang();
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
@@ -96,8 +103,14 @@ export function PackageManifest({
     [selectedEntries],
   );
 
-  const packageWarning = computePackageWarning(selectedEntries.length, selectedBytes);
+  const packageWarning = computePackageWarning(selectedEntries.length, selectedBytes, lang);
   const canConfirm = selectedEntries.length > 0 && packageWarning === null;
+
+  const resolvedConfirmLabel = confirmLabel ?? packageT(lang, 'package.confirm');
+  const resolvedCancelLabel = packageT(lang, 'package.cancel');
+  const resolvedTitle = pkg
+    ? packageT(lang, 'package.titleWithName', { name: pkg.name })
+    : packageT(lang, 'package.title');
 
   const togglePath = (entry: PackageEntry) => {
     if (entry.issue) return;
@@ -116,15 +129,15 @@ export function PackageManifest({
     <Drawer
       open={open && pkg !== null}
       onClose={onClose}
-      title={pkg ? `确认清单 · ${pkg.name}` : '确认清单'}
+      title={resolvedTitle}
       initialSnap={0.8}
       testID={testID}
       footer={
         <ActionRow
-          negative={<TextButton label="取消" onPress={onClose} testID={`${testID}-cancel`} />}
+          negative={<TextButton label={resolvedCancelLabel} onPress={onClose} testID={`${testID}-cancel`} />}
           primary={
             <PrimaryButton
-              label={confirmLabel}
+              label={resolvedConfirmLabel}
               onPress={() => onConfirm(selectedEntries)}
               disabled={!canConfirm}
               testID={`${testID}-confirm`}
@@ -140,7 +153,11 @@ export function PackageManifest({
             testID={`${testID}-summary`}
           >
             <Text style={[styles.summaryText, { color: color.text }]}>
-              {`已选 ${selectedEntries.length} / ${pkg.entries.length} 个文件 · ${formatBytes(selectedBytes)}`}
+              {packageT(lang, 'package.summary', {
+                selected: selectedEntries.length,
+                total: pkg.entries.length,
+                size: formatBytes(selectedBytes),
+              })}
             </Text>
             {packageWarning ? (
               <Text style={[styles.warningText, { color: color.error }]} testID={`${testID}-warning`}>
@@ -192,7 +209,7 @@ export function PackageManifest({
                           style={[styles.issueText, { color: color.text3 }]}
                           testID={`${testID}-issue-${idx}`}
                         >
-                          {describeEntryIssue(entry.issue)}
+                          {describeEntryIssue(entry.issue, lang)}
                         </Text>
                       ) : null}
                     </View>
