@@ -86,4 +86,32 @@ describe('demo fixtures (P1–P12)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(wsSpy).not.toHaveBeenCalled();
   });
+
+  it('does not call fetch on subscribeOnline and supports switching offline in DEMO mode', async () => {
+    const fetchSpy = vi.fn(() => {
+      throw new Error('fetch should not be called by net.ts in DEMO mode');
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubEnv('EXPO_PUBLIC_DEMO', '1');
+    vi.resetModules();
+
+    const { isOnline, refreshOnline, setDemoOnline, subscribeOnline } = await import('../net');
+    const seen: boolean[] = [];
+    const unsub = subscribeOnline((online) => seen.push(online));
+
+    expect(isOnline()).toBe(true);
+    await expect(refreshOnline()).resolves.toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    setDemoOnline(false);
+    expect(isOnline()).toBe(false);
+    expect(seen).toEqual([false]);
+
+    setDemoOnline(true);
+    expect(isOnline()).toBe(true);
+    expect(seen).toEqual([false, true]);
+
+    unsub();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
