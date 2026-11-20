@@ -12,7 +12,7 @@ export const zh = {
 
   'codeCard.title': '代码交付',
   'codeCard.repo': '仓库',
-  'codeCard.pr': '变更记录',
+  'codeCard.pr': '合并请求',
   'codeCard.state.ready': '待推送',
   'codeCard.state.pushed': '已推送',
   'codeCard.state.failed': '推送失败',

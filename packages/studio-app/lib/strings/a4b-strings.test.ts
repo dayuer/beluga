@@ -27,6 +27,15 @@ describe('A4b regional strings (SS-182)', () => {
     }
   });
 
+  it.each(modules)('$name contains no retired terms (工作室/产物/变更) in zh values', ({ mod }) => {
+    const retired = ['工作室', '产物', '变更'] as const;
+    for (const [key, value] of Object.entries(mod.zh)) {
+      for (const word of retired) {
+        expect(value, `${key} should not contain "${word}"`).not.toContain(word);
+      }
+    }
+  });
+
   it('interpolates slot variables in regional translation helpers', () => {
     expect(questions.tQuestions('zh', 'questions.remaining', { n: 2 })).toBe('还差 2 题');
     expect(questions.tQuestions('en', 'questions.remaining', { n: 2 })).toBe('2 left');
