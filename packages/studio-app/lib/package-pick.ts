@@ -31,7 +31,12 @@ export const ALLOWED_PACKAGE_EXTENSIONS = new Set([
 ]);
 
 export type PackageSourceKind = 'zip' | 'directory';
-export type PackageEntryIssue = 'file-too-large' | 'unsupported-type' | 'empty-file';
+export type PackageEntryIssue =
+  | 'file-too-large'
+  | 'unsupported-type'
+  | 'empty-file'
+  | 'encrypted-entry'
+  | 'unsupported-compression';
 
 export interface ZipEntrySource {
   readonly kind: 'zip';
@@ -73,6 +78,7 @@ export interface ZipDirectoryEntry {
   readonly compressionMethod: number;
   readonly localHeaderOffset: number;
   readonly crc32: number;
+  readonly encrypted: boolean;
 }
 
 const EOCD_SIG = 0x06054b50;
@@ -106,7 +112,19 @@ function normalizeEntryPath(raw: string): string | undefined {
   return segments.join('/');
 }
 
-export function classifyEntryIssue(path: string, size: number): PackageEntryIssue | undefined {
+export function classifyEntryIssue(
+  path: string,
+  size: number,
+  meta?: { readonly encrypted?: boolean; readonly compressionMethod?: number },
+): PackageEntryIssue | undefined {
+  if (meta?.encrypted) return 'encrypted-entry';
+  if (
+    meta?.compressionMethod !== undefined &&
+    meta.compressionMethod !== 0 &&
+    meta.compressionMethod !== 8
+  ) {
+    return 'unsupported-compression';
+  }
   if (!Number.isFinite(size) || size <= 0) return 'empty-file';
   if (size > PACKAGE_LIMITS.maxFileBytes) return 'file-too-large';
   const last = path.split('/').pop() ?? '';
@@ -165,6 +183,8 @@ export function parseZipCentralDirectory(cdBytes: Uint8Array): readonly ZipDirec
     const sig = readUint32LE(cdBytes, pos);
     if (sig !== CDH_SIG) break;
 
+    const flags = readUint16LE(cdBytes, pos + 8);
+    const encrypted = (flags & 0x0001) !== 0;
     const compressionMethod = readUint16LE(cdBytes, pos + 10);
     const crc32 = readUint32LE(cdBytes, pos + 16);
     const compressedSize = readUint32LE(cdBytes, pos + 20);
@@ -189,6 +209,7 @@ export function parseZipCentralDirectory(cdBytes: Uint8Array): readonly ZipDirec
         compressionMethod,
         localHeaderOffset,
         crc32,
+        encrypted,
       });
     }
 
@@ -266,7 +287,10 @@ export async function readZipManifestFromReader(
       localHeaderOffset: item.localHeaderOffset,
       crc32: item.crc32,
     },
-    issue: classifyEntryIssue(item.path, item.size),
+    issue: classifyEntryIssue(item.path, item.size, {
+      encrypted: item.encrypted,
+      compressionMethod: item.compressionMethod,
+    }),
   }));
 }
 

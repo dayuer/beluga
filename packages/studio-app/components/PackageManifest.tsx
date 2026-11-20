@@ -40,6 +40,10 @@ export function describeEntryIssue(issue: PackageEntryIssue): string {
       return '不支持的文件类型';
     case 'empty-file':
       return '空文件无法上传';
+    case 'encrypted-entry':
+      return '已加密条目，已跳过';
+    case 'unsupported-compression':
+      return '不支持的压缩方式，已跳过';
   }
 }
 

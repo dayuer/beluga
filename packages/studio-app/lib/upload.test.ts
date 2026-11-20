@@ -4,15 +4,29 @@ const mockFiles = new Map<string, Uint8Array>();
 const readLengths: number[] = [];
 
 vi.mock('expo-file-system', () => ({
-  FileMode: { ReadOnly: 'r' },
+  FileMode: { ReadOnly: 'r', ReadWrite: 'rw' },
+  Paths: { document: '', cache: 'file:///cache' },
   File: class {
     uri: string;
-    constructor(uri: string) {
-      this.uri = uri;
+    constructor(...parts: unknown[]) {
+      const segs = parts
+        .map((p) => (typeof p === 'string' ? p : ((p as { uri?: string }).uri ?? '')))
+        .filter(Boolean);
+      this.uri = segs
+        .map((s, idx) => (idx === 0 ? s.replace(/\/+$/, '') : s.replace(/^\/+|\/+$/g, '')))
+        .join('/');
+    }
+    get exists() {
+      return mockFiles.has(this.uri);
+    }
+    create() {
+      mockFiles.set(this.uri, new Uint8Array(0));
+    }
+    delete() {
+      mockFiles.delete(this.uri);
     }
     open(mode?: string) {
-      expect(mode).toBe('r');
-      const data = mockFiles.get(this.uri) ?? new Uint8Array();
+      const uri = this.uri;
       let closed = false;
       return {
         offset: 0,
@@ -20,7 +34,17 @@ vi.mock('expo-file-system', () => ({
           readLengths.push(length);
           await new Promise((r) => setTimeout(r, 1));
           if (closed) throw new Error('file handle is closed');
+          const data = mockFiles.get(uri) ?? new Uint8Array();
           return data.subarray(this.offset, this.offset + length);
+        },
+        async writeBytes(bytes: Uint8Array) {
+          if (mode !== 'rw') throw new Error('not writable');
+          if (closed) throw new Error('file handle is closed');
+          const prev = mockFiles.get(uri) ?? new Uint8Array(0);
+          const merged = new Uint8Array(prev.byteLength + bytes.byteLength);
+          merged.set(prev, 0);
+          merged.set(bytes, prev.byteLength);
+          mockFiles.set(uri, merged);
         },
         close() {
           closed = true;
@@ -28,7 +52,6 @@ vi.mock('expo-file-system', () => ({
       };
     }
   },
-  Paths: { document: '' },
 }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
@@ -353,5 +376,97 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
     expect(got).toBe(expected);
     expect(readLengths.length).toBe(6);
     expect(Math.max(...readLengths)).toBeLessThanOrEqual(512 * 1024);
+  });
+
+  it('inflates deflate-compressed zip entry, uploads to fake hub, and cleans temp file', async () => {
+    const zlib = (await import(/* @vite-ignore */ 'node:zlib' as string)) as {
+      deflateRawSync(buf: Uint8Array): Uint8Array;
+    };
+    const { crc32 } = await import('./zip-inflate');
+
+    const raw = new TextEncoder().encode('{"theme":"light"}\n'.repeat(30));
+    const compressed = zlib.deflateRawSync(raw);
+    const entryCrc = crc32(raw);
+
+    // 构造只含该 Deflate 条目的最小 zip
+    const nameBytes = new TextEncoder().encode('tokens.json');
+    const lfh = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(lfh.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(8, 8, true); // method 8 (Deflate)
+    view.setUint32(14, entryCrc, true);
+    view.setUint32(18, compressed.byteLength, true);
+    view.setUint32(22, raw.byteLength, true);
+    view.setUint16(26, nameBytes.length, true);
+    lfh.set(nameBytes, 30);
+
+    const zipBytes = new Uint8Array(lfh.byteLength + compressed.byteLength);
+    zipBytes.set(lfh, 0);
+    zipBytes.set(compressed, lfh.byteLength);
+    mockFiles.set('file:///mock/deflate.zip', zipBytes);
+
+    const receivedParts: Uint8Array[] = [];
+    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/v1/app/uploads') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_def' }), { status: 201 });
+      }
+      if (url.includes('/parts/') && method === 'PUT') {
+        receivedParts.push(new Uint8Array(init?.body as Uint8Array));
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (url.endsWith('/complete') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_def', status: 'ready' }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    const uploader = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: fakeFetch as unknown as typeof fetch,
+      getToken: () => 'tok_def',
+      isOnline: () => true,
+      subscribeOnline: () => () => {},
+      onResume: () => () => {},
+      stateMachine: createUploadStateMachine({ storage: createMemoryKv() }),
+      reader: createExpoChunkReader(),
+      chunkSize: 200,
+    });
+
+    await uploader.start({
+      projectId: 'proj_1',
+      name: 'deflate.zip',
+      entries: [
+        {
+          path: 'tokens.json',
+          size: raw.byteLength,
+          source: {
+            kind: 'zip',
+            zipUri: 'file:///mock/deflate.zip',
+            compressionMethod: 8,
+            compressedSize: compressed.byteLength,
+            localHeaderOffset: 0,
+            crc32: entryCrc,
+          },
+        },
+      ],
+    });
+
+    await waitUntil(() => uploader.getProgress().status === 'done');
+
+    const totalLen = receivedParts.reduce((s, p) => s + p.byteLength, 0);
+    const assembled = new Uint8Array(totalLen);
+    let cursor = 0;
+    for (const p of receivedParts) {
+      assembled.set(p, cursor);
+      cursor += p.byteLength;
+    }
+    expect(assembled).toEqual(raw);
+    // 临时文件在完成后已被清理
+    const remainingTmp = Array.from(mockFiles.keys()).filter((k) => k.includes('upload-tmp'));
+    expect(remainingTmp).toEqual([]);
+
+    uploader.dispose();
   });
 });

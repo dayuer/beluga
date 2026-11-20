@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { File, FileMode } from 'expo-file-system';
+import { File, FileMode, Paths } from 'expo-file-system';
 import type { PackageEntry } from './package-pick';
 import { isOnline, subscribeOnline } from './net';
 import { onResume } from './resume';
@@ -15,6 +15,7 @@ import {
   type UploadProgressListener,
   type UploadStateMachine,
 } from './upload-state';
+import { inflateRawStream } from './zip-inflate';
 
 /**
  * 设计稿包分块上传与断网/回前台续传（SS-86）：
@@ -34,6 +35,8 @@ export interface UploadSessionStatusResponse {
 export interface ChunkReader {
   readChunk(entry: PackageEntry, offset: number, size: number): Promise<Uint8Array>;
   computeSha256(entry: PackageEntry): Promise<string>;
+  prepareEntry?(entry: PackageEntry, key: string): Promise<PackageEntry>;
+  cleanupTemp?(): void;
 }
 
 export interface UploaderDeps {
@@ -90,7 +93,73 @@ async function resolveZipDataOffset(file: File, localHeaderOffset: number): Prom
 }
 
 export function createExpoChunkReader(): ChunkReader {
+  const tempFiles: File[] = [];
+
   return {
+    async prepareEntry(entry, key) {
+      if (entry.source.kind !== 'zip') return entry;
+      if (entry.source.compressionMethod === 0) return entry;
+      if (entry.source.compressionMethod !== 8) {
+        throw new Error(`unsupported-zip-compression:${entry.path}`);
+      }
+
+      const zipSource = entry.source;
+      const zipFile = new File(zipSource.zipUri);
+      const dataOffset = await resolveZipDataOffset(zipFile, zipSource.localHeaderOffset);
+      const tmpFile = new File(Paths.cache, 'upload-tmp', `${key}.bin`);
+      if (!tmpFile.exists) {
+        tmpFile.create({ intermediates: true, overwrite: true });
+      }
+      tempFiles.push(tmpFile);
+
+      const writeHandle = tmpFile.open(FileMode?.ReadWrite);
+      let compressedRead = 0;
+      const SLICE = 256 * 1024;
+
+      try {
+        await inflateRawStream({
+          expectedSize: entry.size,
+          expectedCrc32: zipSource.crc32,
+          pullChunk: async () => {
+            if (compressedRead >= zipSource.compressedSize) return null;
+            const len = Math.min(SLICE, zipSource.compressedSize - compressedRead);
+            const readHandle = zipFile.open(FileMode?.ReadOnly);
+            let slice: Uint8Array;
+            try {
+              readHandle.offset = dataOffset + compressedRead;
+              slice = await readHandle.readBytes(len);
+            } finally {
+              readHandle.close();
+            }
+            compressedRead += slice.byteLength;
+            return slice;
+          },
+          onOutput: async (chunk) => {
+            await writeHandle.writeBytes(chunk);
+          },
+        });
+      } finally {
+        writeHandle.close();
+      }
+
+      return {
+        path: entry.path,
+        size: entry.size,
+        source: { kind: 'file', uri: tmpFile.uri },
+        issue: entry.issue,
+      };
+    },
+
+    cleanupTemp() {
+      for (const f of tempFiles.splice(0, tempFiles.length)) {
+        try {
+          if (f.exists) f.delete();
+        } catch {
+          // 清理临时文件失败不影响主流程
+        }
+      }
+    },
+
     async readChunk(entry, offset, size) {
       if (entry.source.kind === 'zip') {
         if (entry.source.compressionMethod !== 0) {
@@ -248,6 +317,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
         await completeSession(doneState.sessionId);
         if (runId !== activeRunId) return;
         machine.complete();
+        reader.cleanupTemp?.();
       } catch (err) {
         if (runId !== activeRunId) return;
         if (!checkOnline() || err instanceof TypeError) {
@@ -256,6 +326,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
           return;
         }
         machine.fail(err instanceof Error ? err.message : 'upload-complete-error');
+        reader.cleanupTemp?.();
       }
     })();
 
@@ -335,8 +406,12 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
     async start(input) {
       entryMap.clear();
       const manifestFiles: Array<{ path: string; size: number; sha256: string }> = [];
+      const batchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       for (let i = 0; i < input.entries.length; i++) {
-        const entry = input.entries[i]!;
+        const rawEntry = input.entries[i]!;
+        const entry = reader.prepareEntry
+          ? await reader.prepareEntry(rawEntry, `${batchId}-${i}`)
+          : rawEntry;
         entryMap.set(i, entry);
         const sha256 = await reader.computeSha256(entry);
         manifestFiles.push({ path: entry.path, size: entry.size, sha256 });
@@ -394,6 +469,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
       activeRunId += 1;
       unsubOnline();
       unsubResume();
+      reader.cleanupTemp?.();
     },
   };
 }

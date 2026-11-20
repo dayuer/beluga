@@ -52,7 +52,13 @@ import {
 const encoder = new TextEncoder();
 
 function buildMinimalZip(
-  items: ReadonlyArray<{ readonly name: string; readonly size: number; readonly crc?: number }>,
+  items: ReadonlyArray<{
+    readonly name: string;
+    readonly size: number;
+    readonly crc?: number;
+    readonly method?: number;
+    readonly flags?: number;
+  }>,
 ): Uint8Array {
   const localChunks: Uint8Array[] = [];
   const cdChunks: Uint8Array[] = [];
@@ -60,13 +66,15 @@ function buildMinimalZip(
 
   for (const item of items) {
     const nameBytes = encoder.encode(item.name);
+    const flags = (item.flags ?? 0) | 0x0800; // UTF-8
+    const method = item.method ?? 0;
     // Local file header (30 bytes + name) — 数据区留空占位以模拟大文件而不占内存
     const lfh = new Uint8Array(30 + nameBytes.length);
     const lfhView = new DataView(lfh.buffer);
     lfhView.setUint32(0, 0x04034b50, true);
     lfhView.setUint16(4, 20, true);
-    lfhView.setUint16(6, 0x0800, true); // UTF-8
-    lfhView.setUint16(8, 0, true); // stored
+    lfhView.setUint16(6, flags, true);
+    lfhView.setUint16(8, method, true);
     lfhView.setUint32(14, item.crc ?? 0x12345678, true);
     lfhView.setUint32(18, 4, true); // compressed size in test buffer
     lfhView.setUint32(22, item.size, true); // uncompressed size
@@ -81,8 +89,8 @@ function buildMinimalZip(
     cdView.setUint32(0, 0x02014b50, true);
     cdView.setUint16(4, 20, true);
     cdView.setUint16(6, 20, true);
-    cdView.setUint16(8, 0x0800, true);
-    cdView.setUint16(10, 0, true);
+    cdView.setUint16(8, flags, true);
+    cdView.setUint16(10, method, true);
     cdView.setUint32(16, item.crc ?? 0x12345678, true);
     cdView.setUint32(20, 4, true);
     cdView.setUint32(24, item.size, true);
@@ -204,6 +212,37 @@ describe('package-pick', () => {
       pickDocument: async () => ({ canceled: true, assets: null }),
     });
     expect(res).toEqual({ canceled: true });
+  });
+
+  it('flags encrypted entries and unsupported compression methods (e.g. method 12) in manifest', async () => {
+    const zipBytes = buildMinimalZip([
+      { name: 'screens/ok.png', size: 1024, method: 8 },
+      { name: 'screens/secret.png', size: 1024, method: 8, flags: 0x0001 },
+      { name: 'screens/bzip.png', size: 1024, method: 12 },
+    ]);
+
+    const reader: RandomAccessReader = {
+      size: zipBytes.length,
+      async readRange(off, len) {
+        return zipBytes.subarray(off, off + len);
+      },
+    };
+
+    const result = await pickZipPackage({
+      pickDocument: async () => ({
+        canceled: false,
+        assets: [{ uri: 'file:///tmp/mixed.zip', name: 'mixed.zip', lastModified: 0 }],
+      }),
+      openReader: async () => reader,
+    });
+
+    expect(result.canceled).toBe(false);
+    if (result.canceled) return;
+    expect(result.pkg.entries.map((e) => [e.path, e.issue])).toEqual([
+      ['screens/ok.png', undefined],
+      ['screens/secret.png', 'encrypted-entry'],
+      ['screens/bzip.png', 'unsupported-compression'],
+    ]);
   });
 
   it('awaits handle.readBytes before closing file handle in createExpoFileReader', async () => {
