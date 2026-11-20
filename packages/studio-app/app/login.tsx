@@ -1,12 +1,13 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { ActionDock } from '../components/ActionDock';
 import { Header } from '../components/Header';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SyncBanner } from '../components/SyncBanner';
+import { TextButton } from '../components/TextButton';
 import { hub } from '../lib/client';
 import { useOnline } from '../lib/net';
 import { session } from '../lib/session';
@@ -62,6 +63,7 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [mailHint, setMailHint] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const emailRef = useRef<ComponentRef<typeof TextInput>>(null);
   const aliveRef = useRef(true);
@@ -122,6 +124,7 @@ export default function LoginScreen() {
     }
     setPhase('sending');
     setMessage(null);
+    setMailHint(null);
     const r = await hub.requestLink(address);
     if (r.ok) {
       setPhase('sent');
@@ -130,6 +133,35 @@ export default function LoginScreen() {
     }
     setPhase('error');
     setMessage(r.error.kind === 'offline' ? t(lang, 'login.offline') : t(lang, 'login.serviceDown'));
+  };
+
+  const openMailApp = async () => {
+    setMailHint(null);
+    try {
+      if (Platform.OS === 'ios') {
+        const supported = await Linking.canOpenURL('message://');
+        if (!supported) {
+          setMailHint(t(lang, 'login.openMailFailed'));
+          return;
+        }
+        await Linking.openURL('message://');
+        return;
+      }
+      if (Platform.OS === 'android') {
+        try {
+          await Linking.openURL(
+            'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.APP_EMAIL;end',
+          );
+          return;
+        } catch {
+          await Linking.openURL('mailto:');
+          return;
+        }
+      }
+      setMailHint(t(lang, 'login.openMailFailed'));
+    } catch {
+      if (aliveRef.current) setMailHint(t(lang, 'login.openMailFailed'));
+    }
   };
 
   return (
@@ -183,7 +215,19 @@ export default function LoginScreen() {
               style={[styles.input, focused && styles.inputFocused]}
             />
             {verifying ? <Text style={styles.note}>{t(lang, 'login.verifying')}</Text> : null}
-            {message ? (
+            {phase === 'sent' ? (
+              <View style={styles.panel} testID="login-sent">
+                <Text style={styles.panelTitle}>{t(lang, 'login.sentTitle')}</Text>
+                <Text style={styles.panelText}>
+                  {email.trim() ? t(lang, 'login.sentTo', { email: email.trim() }) : t(lang, 'login.sent')}
+                </Text>
+                {mailHint ? (
+                  <Text style={styles.mailHint} testID="login-mail-hint">
+                    {mailHint}
+                  </Text>
+                ) : null}
+              </View>
+            ) : message ? (
               <View style={[styles.panel, phase === 'error' && styles.panelError]} testID="login-message">
                 <Text style={[styles.panelText, phase === 'error' && styles.panelTextError]}>{message}</Text>
               </View>
@@ -192,12 +236,19 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
       <ActionDock maxWidth={400}>
-        <PrimaryButton
-          label={phase === 'sent' ? t(lang, 'login.sendAnother') : t(lang, 'login.continue')}
-          onPress={() => void submit()}
-          loading={phase === 'sending' || verifying}
-          testID="primary"
-        />
+        {phase === 'sent' ? (
+          <View style={styles.sentActions}>
+            <PrimaryButton label={t(lang, 'login.openMail')} onPress={() => void openMailApp()} testID="open-mail" />
+            <TextButton label={t(lang, 'login.sendAnother')} onPress={() => void submit()} testID="send-another" />
+          </View>
+        ) : (
+          <PrimaryButton
+            label={t(lang, 'login.continue')}
+            onPress={() => void submit()}
+            loading={phase === 'sending' || verifying}
+            testID="primary"
+          />
+        )}
       </ActionDock>
     </View>
   );
@@ -245,6 +296,9 @@ const styles = StyleSheet.create({
     backgroundColor: color.sunken,
   },
   panelError: { backgroundColor: 'rgba(196,55,48,0.085)' },
+  panelTitle: { ...type.callout, fontWeight: '600', color: color.text, marginBottom: space[1] },
   panelText: { ...type.callout, color: color.text2 },
   panelTextError: { color: color.error },
+  mailHint: { ...type.caption, color: color.text3, marginTop: space[2] },
+  sentActions: { gap: space[2] },
 });
