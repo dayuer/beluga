@@ -17,6 +17,7 @@ import {
   createApi,
   createProcessManager,
   initHubDb,
+  killProcessGroup,
   needFree,
   seedStudio,
   sleep,
@@ -49,6 +50,33 @@ const log = (...args) => console.log('[e2e]', ...args);
 const pm = createProcessManager(appDir);
 const api = createApi(hubUrl, operator);
 
+const cleanupStack = [];
+function pushCleanup(description, fn) {
+  cleanupStack.push({ description, fn });
+}
+
+let cleanupPromise = null;
+function runAllCleanups() {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+    log('running cleanups in reverse order...');
+    while (cleanupStack.length > 0) {
+      const item = cleanupStack.pop();
+      try {
+        log(`cleaning up: ${item.description}`);
+        await item.fn();
+      } catch (err) {
+        log(`cleanup failed for ${item.description}:`, err?.message || err);
+      }
+    }
+    try {
+      await pm.stopAll();
+    } catch {}
+    log('all cleanups finished');
+  })();
+  return cleanupPromise;
+}
+
 let daemon;
 function startDaemon(code) {
   daemon = startFakeDaemon({
@@ -61,10 +89,11 @@ function startDaemon(code) {
     start: pm.start,
   });
 }
-function stopDaemon() {
+async function stopDaemon() {
   if (daemon) {
-    pm.stop(daemon);
+    const d = daemon;
     daemon = undefined;
+    await pm.stop(d);
   }
 }
 
@@ -151,7 +180,7 @@ function resolveJavaHome() {
 }
 
 function selectSimulatorUdid() {
-  if (process.env.E2E_IOS_UDID) return process.env.E2E_IOS_UDID;
+  const targetUdid = process.env.E2E_IOS_UDID;
   const raw = execFileSync('xcrun', ['simctl', 'list', 'devices', 'available', '-j'], {
     encoding: 'utf8',
   });
@@ -159,10 +188,20 @@ function selectSimulatorUdid() {
   const devices = Object.entries(parsed.devices ?? {})
     .filter(([runtime]) => runtime.includes('iOS'))
     .flatMap(([, list]) => list ?? []);
+
+  if (targetUdid) {
+    const target = devices.find((d) => d.udid === targetUdid);
+    if (!target) throw new Error(`simulator ${targetUdid} not found or not available`);
+    if (target.state === 'Booted') return { udid: targetUdid, bootedByUs: false };
+    log(`booting iOS simulator ${target.name} (${target.udid})`);
+    execFileSync('xcrun', ['simctl', 'boot', target.udid], { stdio: 'inherit' });
+    return { udid: target.udid, bootedByUs: true };
+  }
+
   const booted =
     devices.find((d) => d.state === 'Booted' && d.name.includes('iPhone')) ??
     devices.find((d) => d.state === 'Booted');
-  if (booted) return booted.udid;
+  if (booted) return { udid: booted.udid, bootedByUs: false };
 
   const fallback =
     devices.find((d) => d.isAvailable && d.name.includes('iPhone')) ??
@@ -170,7 +209,7 @@ function selectSimulatorUdid() {
   if (!fallback) throw new Error('no available iOS simulator found');
   log(`booting iOS simulator ${fallback.name} (${fallback.udid})`);
   execFileSync('xcrun', ['simctl', 'boot', fallback.udid], { stdio: 'inherit' });
-  return fallback.udid;
+  return { udid: fallback.udid, bootedByUs: true };
 }
 
 function runCommand(cmd, args, opts = {}) {
@@ -179,15 +218,31 @@ function runCommand(cmd, args, opts = {}) {
       cwd: opts.cwd ?? appDir,
       env: opts.env ?? process.env,
       stdio: 'inherit',
+      detached: true,
     });
-    pm.children.add(child);
+
+    let settled = false;
+    const cleanupTask = {
+      description: `command: ${cmd} ${args[0] ?? ''}`,
+      fn: async () => {
+        if (settled) return;
+        settled = true;
+        await killProcessGroup(child);
+      },
+    };
+    cleanupStack.push(cleanupTask);
+
     child.on('exit', (code, signal) => {
-      pm.children.delete(child);
+      const idx = cleanupStack.indexOf(cleanupTask);
+      if (idx !== -1) cleanupStack.splice(idx, 1);
+      settled = true;
       if (code === 0) resolve();
       else reject(new Error(`${cmd} ${args.join(' ')} exited with ${code ?? signal}`));
     });
     child.on('error', (err) => {
-      pm.children.delete(child);
+      const idx = cleanupStack.indexOf(cleanupTask);
+      if (idx !== -1) cleanupStack.splice(idx, 1);
+      settled = true;
       reject(err);
     });
   });
@@ -205,7 +260,7 @@ async function setup() {
   initHubDb({ hubDir, stateDir });
 
   log('starting wrangler dev');
-  await startWrangler({
+  const wranglerChild = await startWrangler({
     hubDir,
     stateDir,
     operator,
@@ -215,10 +270,12 @@ async function setup() {
     start: pm.start,
     healthUrl: `${hubUrl}/healthz`,
   });
+  pushCleanup('wrangler dev', () => pm.stop(wranglerChild));
 
   log('starting controllable hub proxy');
   const proxy = createHubProxy(hubPort);
   await proxy.listen(proxyPort);
+  pushCleanup('hub proxy', () => proxy.close());
 
   log('creating the studio, projects, daemon, and customer');
   const seeded = await seedStudio({
@@ -227,8 +284,23 @@ async function setup() {
     startDaemon,
     daemonLogLabel: '.beluga/scratch/e2e/daemon.log',
   });
+  pushCleanup('fake daemon', () => stopDaemon());
 
-  const udid = selectSimulatorUdid();
+  const sim = selectSimulatorUdid();
+  const udid = sim.udid;
+  if (sim.bootedByUs) {
+    pushCleanup(`simulator shutdown (${udid})`, async () => {
+      log(`shutting down simulator ${udid}`);
+      try {
+        execFileSync('xcrun', ['simctl', 'shutdown', udid], { stdio: 'ignore' });
+      } catch {}
+    });
+  }
+
+  if (process.env.TEST_ERROR_BEFORE_BUILD === '1') {
+    throw new Error('intentional error before build for self-test');
+  }
+
   const buildDir = path.join(scratch, 'ios-build');
   if (process.env.E2E_SKIP_BUILD !== '1') {
     fs.mkdirSync(buildDir, { recursive: true });
@@ -294,39 +366,29 @@ function expandFlowPaths(targets) {
   return flows;
 }
 
-let cleaningUp = false;
-async function cleanup(control, proxy) {
-  if (cleaningUp) return;
-  cleaningUp = true;
-  if (control) {
-    control.closeAllConnections?.();
-    await new Promise((resolve) => control.close(resolve));
-  }
-  if (proxy) {
-    await proxy.close();
-  }
-  stopDaemon();
-  pm.stopAll('SIGTERM');
-  await sleep(600);
-  pm.stopAll('SIGKILL');
-}
-
 async function main() {
-  let control;
-  let proxy;
-  let failed = false;
+  let exitCode = 0;
+  let signaled = false;
 
-  const onSignal = () => {
-    void cleanup(control, proxy).finally(() => process.exit(1));
+  const onSignal = async (sig) => {
+    if (signaled) return;
+    signaled = true;
+    exitCode = 1;
+    log(`received ${sig}, stopping all processes and cleaning up...`);
+    await runAllCleanups();
+    process.exit(exitCode);
   };
-  process.once('SIGINT', onSignal);
-  process.once('SIGTERM', onSignal);
+  process.once('SIGINT', () => void onSignal('SIGINT'));
+  process.once('SIGTERM', () => void onSignal('SIGTERM'));
 
   try {
-    const env = await setup();
-    proxy = env.proxy;
+    const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+    const flowPaths = expandFlowPaths(targets);
 
-    control = http.createServer(async (req, res) => {
+    const env = await setup();
+    const proxy = env.proxy;
+
+    const control = http.createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', `http://127.0.0.1:${controlPort}`);
       console.log('[e2e] control', req.method, url.pathname);
       const send = (status, body) => {
@@ -389,7 +451,7 @@ async function main() {
         return send(200, { ok: true, kind, actual });
       }
       if (req.method === 'POST' && url.pathname === '/daemon/stop') {
-        stopDaemon();
+        await stopDaemon();
         return send(200, { ok: true });
       }
       if (req.method === 'POST' && url.pathname === '/daemon/start') {
@@ -422,6 +484,10 @@ async function main() {
       control.once('error', reject);
       control.listen(controlPort, '127.0.0.1', resolve);
     });
+    pushCleanup('control server', async () => {
+      control.closeAllConnections?.();
+      await new Promise((resolve) => control.close(resolve));
+    });
 
     const javaHome = resolveJavaHome();
     const maestroEnv = {
@@ -432,8 +498,6 @@ async function main() {
       MAESTRO_E2E_PROJECT2_ID: env.project2Id,
     };
 
-    const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
-    const flowPaths = expandFlowPaths(targets);
     const maestroArgs = [
       '--udid',
       env.udid,
@@ -460,15 +524,15 @@ async function main() {
     }
     log(`screenshots and reports in ${outDir}`);
   } catch (error) {
-    failed = true;
+    exitCode = 1;
     console.error('[e2e] failed:', error instanceof Error ? error.message : error);
     console.error('[e2e] logs: .beluga/scratch/e2e/{wrangler,daemon}.log');
   } finally {
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
-    await cleanup(control, proxy);
+    await runAllCleanups();
+    process.exit(exitCode);
   }
-  if (failed) process.exitCode = 1;
 }
 
 await main();

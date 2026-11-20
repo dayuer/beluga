@@ -13,6 +13,56 @@ export const tail = (file) => {
   }
 };
 
+function isGroupAlive(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (err) {
+    if (err.code === 'EPERM') return true;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (e2) {
+      return e2.code === 'EPERM';
+    }
+  }
+}
+
+export async function killProcessGroup(childOrPid, timeoutMs = 3000) {
+  const pid = typeof childOrPid === 'number' ? childOrPid : childOrPid?.pid;
+  if (!pid) return;
+
+  if (!isGroupAlive(pid)) return;
+
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {}
+  }
+
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!isGroupAlive(pid)) return;
+    await sleep(50);
+  }
+
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {}
+  }
+
+  const killStart = Date.now();
+  while (Date.now() - killStart < 1000) {
+    if (!isGroupAlive(pid)) return;
+    await sleep(50);
+  }
+}
+
 export function createProcessManager(defaultCwd) {
   const children = new Set();
 
@@ -38,21 +88,16 @@ export function createProcessManager(defaultCwd) {
     return child;
   }
 
-  function stop(child, signal = 'SIGTERM') {
-    if (!child || child.exitCode !== null) return;
-    try {
-      process.kill(-child.pid, signal);
-    } catch {
-      try {
-        child.kill(signal);
-      } catch {
-        /* already gone */
-      }
-    }
+  async function stop(child, timeoutMs = 2500) {
+    if (!child) return;
+    children.delete(child);
+    await killProcessGroup(child, timeoutMs);
   }
 
-  function stopAll(signal = 'SIGTERM') {
-    for (const child of [...children]) stop(child, signal);
+  async function stopAll(timeoutMs = 2500) {
+    const list = [...children];
+    children.clear();
+    await Promise.all(list.map((c) => killProcessGroup(c, timeoutMs)));
   }
 
   return { children, start, stop, stopAll };
