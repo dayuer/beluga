@@ -1,12 +1,16 @@
+import { Mic, X } from 'lucide-react-native';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
+  Pressable,
   StyleSheet,
+  Text,
   TextInput,
+  View,
   type TextInputContentSizeChangeEvent,
   type TextInputKeyPressEvent,
 } from 'react-native';
 import { LIMITS } from '../../../src/studio/protocol';
-import { color, radius } from '../lib/theme';
+import { color, radius, space, type } from '../lib/theme';
 
 export interface KeyPressLike {
   readonly key?: string;
@@ -36,6 +40,14 @@ export function shouldSubmitOnKeyPress(
   return false;
 }
 
+export interface GoalVoiceProps {
+  readonly listening: boolean;
+  readonly onStart: () => void;
+  readonly onCancel: () => void;
+  readonly hint?: string | null;
+  readonly disabled?: boolean;
+}
+
 /**
  * The goal field: at least 120 tall, grows with the text up to `maxHeight` (40% of the visible
  * viewport, computed by the screen), then scrolls inside. 4000 characters, the protocol's cap.
@@ -46,6 +58,7 @@ export function GoalInput({
   onBlur,
   onSubmit,
   submitOnEnter = false,
+  voice,
   maxHeight,
   placeholder,
   accessibilityLabel,
@@ -56,6 +69,7 @@ export function GoalInput({
   onBlur?: () => void;
   onSubmit?: () => void;
   submitOnEnter?: boolean;
+  voice?: GoalVoiceProps;
   maxHeight: number;
   placeholder: string;
   accessibilityLabel: string;
@@ -89,7 +103,7 @@ export function GoalInput({
     },
   };
 
-  return (
+  const inputEl = (
     <TextInput
       ref={ref}
       value={value}
@@ -120,8 +134,54 @@ export function GoalInput({
       scrollEnabled
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      style={[styles.input, focused && styles.inputFocused, { height, maxHeight: Math.max(120, maxHeight) }]}
+      style={[
+        styles.input,
+        voice ? styles.inputWithVoice : null,
+        focused && styles.inputFocused,
+        { height, maxHeight: Math.max(120, maxHeight) },
+      ]}
     />
+  );
+
+  if (!voice) return inputEl;
+
+  return (
+    <View style={styles.voiceContainer}>
+      <View style={styles.inputRow}>
+        {inputEl}
+        {voice.listening ? (
+          <Pressable
+            onPress={voice.onCancel}
+            accessibilityRole="button"
+            accessibilityLabel="取消语音输入"
+            testID="voice-cancel-btn"
+            style={({ pressed }) => [styles.micBtn, styles.micBtnActive, pressed && styles.micPressed]}
+          >
+            <X size={18} color={color.card} />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={voice.onStart}
+            disabled={voice.disabled}
+            accessibilityRole="button"
+            accessibilityLabel="语音输入"
+            testID="voice-mic-btn"
+            style={({ pressed }) => [
+              styles.micBtn,
+              voice.disabled && styles.micDisabled,
+              pressed && styles.micPressed,
+            ]}
+          >
+            <Mic size={18} color={color.text2} />
+          </Pressable>
+        )}
+      </View>
+      {voice.hint ? (
+        <Text style={styles.voiceHint} accessibilityLiveRegion="polite" testID="voice-hint">
+          {voice.hint}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -142,4 +202,24 @@ const styles = StyleSheet.create({
   inputFocused: {
     borderColor: color.info,
   },
+  voiceContainer: { width: '100%' },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
+  inputWithVoice: { flex: 1 },
+  micBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.m,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    backgroundColor: color.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtnActive: {
+    backgroundColor: color.error,
+    borderColor: color.error,
+  },
+  micDisabled: { opacity: 0.45 },
+  micPressed: { opacity: 0.8 },
+  voiceHint: { ...type.caption, color: color.error, marginTop: space[2] },
 });

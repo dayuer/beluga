@@ -25,6 +25,7 @@ import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
 import { ago } from '../lib/time';
 import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
+import { appendSpoken, useVoiceDictation } from '../lib/voice';
 
 type NewMode = 'new' | 'feedback';
 
@@ -248,6 +249,14 @@ export default function NewRequestScreen() {
   const receipt = useMemo(() => receiptOf(state, lang), [state, lang]);
   const busy = state.phase === 'sending';
   const locked = busy || state.phase === 'queued' || state.phase === 'done';
+
+  const voice = useVoiceDictation({
+    lang,
+    onTranscript: (spoken) => {
+      if (mode === 'new') setGoal((prev) => appendSpoken(prev, spoken));
+      else setFeedbackText((prev) => appendSpoken(prev, spoken));
+    },
+  });
   const valid =
     mode === 'new'
       ? goal.trim().length > 0 && platforms.length > 0
@@ -345,6 +354,13 @@ export default function NewRequestScreen() {
                     value={goal}
                     onChangeText={setGoal}
                     onSubmit={handleSubmit}
+                    voice={{
+                      listening: voice.phase !== 'idle',
+                      onStart: () => void voice.start(),
+                      onCancel: voice.cancel,
+                      hint: voice.hint,
+                      disabled: locked,
+                    }}
                     onBlur={() => {
                       if (lockedRef.current) return;
                       if (!goal.trim() && platforms.length === 0) {
@@ -423,6 +439,13 @@ export default function NewRequestScreen() {
                 value={feedbackText}
                 onChangeText={setFeedbackText}
                 onSubmit={handleSubmit}
+                voice={{
+                  listening: voice.phase !== 'idle',
+                  onStart: () => void voice.start(),
+                  onCancel: voice.cancel,
+                  hint: voice.hint,
+                  disabled: locked,
+                }}
                 maxHeight={maxGoal}
                 placeholder={t(lang, 'new.feedbackPlaceholder')}
                 accessibilityLabel={t(lang, 'new.feedbackLabel')}
