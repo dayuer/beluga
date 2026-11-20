@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { ProgressRing } from '../../components/ProgressRing';
@@ -18,6 +18,8 @@ import { color, radius, space, type } from '../../lib/theme';
  * 离线写「等待」灰色。
  */
 export default function MeMachinesScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const lang = detectLang();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -134,7 +136,7 @@ export default function MeMachinesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },

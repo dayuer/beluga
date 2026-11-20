@@ -50,6 +50,7 @@ export const PanResponder = {
 };
 
 export const useWindowDimensions = () => ({ width: 390, height: 844, scale: 3, fontScale: 1 });
+export const useColorScheme = () => 'light';
 export const Keyboard = { addListener: () => ({ remove: () => {} }) };
 export const processColor = (c: unknown) => c;
 export const codegenNativeComponent = (name: string) => createHost(name);

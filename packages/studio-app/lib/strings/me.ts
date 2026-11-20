@@ -20,6 +20,9 @@ export const zh = {
 
   // SS-55 环境与密钥
   'env.title': '环境与密钥',
+  'env.tabTest': '测试',
+  'env.tabStaging': '预发',
+  'env.tabProd': '正式',
   'env.empty': '暂无环境配置',
   'env.colName': '名称',
   'env.colTime': '更新时间',
@@ -47,6 +50,8 @@ export const zh = {
   'project.runAuto': '自动交付',
   'project.runEveryStep': '每步确认',
   'project.deliveryMode': '交付方式',
+  'project.deliveryPreviewOnly': '仅在工作室预览（不交付源码）',
+  'project.deliveryRepo': '工作室托管仓库（可随时查看与下载）',
   'project.deliveryPushMine': '推送到我的仓库',
   'project.deliveryManaged': '托管仓库',
   'project.repo': '仓库地址',
@@ -113,6 +118,9 @@ export const en: Record<MeStringKey, string> = {
   'me.rowAccount': 'Account',
 
   'env.title': 'Environments & Secrets',
+  'env.tabTest': 'Test',
+  'env.tabStaging': 'Staging',
+  'env.tabProd': 'Prod',
   'env.empty': 'No environments configured',
   'env.colName': 'Name',
   'env.colTime': 'Updated',
@@ -138,6 +146,8 @@ export const en: Record<MeStringKey, string> = {
   'project.runAuto': 'Auto delivery',
   'project.runEveryStep': 'Confirm each step',
   'project.deliveryMode': 'Delivery',
+  'project.deliveryPreviewOnly': 'Preview in studio only (no source repo)',
+  'project.deliveryRepo': 'Studio-managed repository',
   'project.deliveryPushMine': 'Push to my repo',
   'project.deliveryManaged': 'Managed repo',
   'project.repo': 'Repository',

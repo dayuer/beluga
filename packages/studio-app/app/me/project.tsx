@@ -1,21 +1,38 @@
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
 import { useSettingsView } from '../../lib/settings-source';
-import { detectLang, t } from '../../lib/strings';
+import { detectLang, t, type Lang } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
+
+export type DeliveryMode = 'preview-only' | 'repo' | 'push-mine';
+
+/** 区分三种代码交付方式，各自显示客户看得懂的说明。 */
+export function deliveryModeLabel(mode: DeliveryMode | undefined, lang: Lang): string {
+  switch (mode) {
+    case 'push-mine':
+      return tMe(lang, 'project.deliveryPushMine');
+    case 'repo':
+      return tMe(lang, 'project.deliveryRepo');
+    case 'preview-only':
+    default:
+      return tMe(lang, 'project.deliveryPreviewOnly');
+  }
+}
 
 function InfoRow({
   label,
   value,
   last,
+  styles,
 }: {
   readonly label: string;
   readonly value: string;
   readonly last?: boolean;
+  readonly styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={[styles.row, !last && styles.rowBorder]}>
@@ -28,10 +45,12 @@ function InfoRow({
 }
 
 /**
- * 我 › 项目与代码交付（只读，SS-57）：
- * 展示每个项目的平台、运行方式、代码交付方式与仓库地址（不显示令牌内容）。
+ * 我 › 项目与代码交付（只读，SS-57 / SS-201）：
+ * 分清 preview-only / repo / push-mine 三种交付方式；颜色在渲染时读取以跟随深色模式。
  */
 export default function MeProjectScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const lang = detectLang();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
@@ -61,27 +80,26 @@ export default function MeProjectScreen() {
                   proj.runMode === 'auto-delivery'
                     ? tMe(lang, 'project.runAuto')
                     : tMe(lang, 'project.runEveryStep');
-                const deliveryLabel =
-                  forge?.mode === 'push-mine'
-                    ? tMe(lang, 'project.deliveryPushMine')
-                    : tMe(lang, 'project.deliveryManaged');
+                const deliveryLabel = deliveryModeLabel(forge?.mode as DeliveryMode | undefined, lang);
 
                 return (
                   <View key={proj.id} style={styles.card} testID={`project-card-${proj.id}`}>
                     <Text style={styles.cardTitle}>{proj.name}</Text>
                     <View style={styles.rows}>
-                      <InfoRow label={tMe(lang, 'project.platform')} value={proj.platform} />
-                      <InfoRow label={tMe(lang, 'project.runMode')} value={runModeLabel} />
+                      <InfoRow label={tMe(lang, 'project.platform')} value={proj.platform} styles={styles} />
+                      <InfoRow label={tMe(lang, 'project.runMode')} value={runModeLabel} styles={styles} />
                       <InfoRow
                         label={tMe(lang, 'project.deliveryMode')}
                         value={deliveryLabel}
                         last={!forge?.repoUrl && !forge?.hasToken}
+                        styles={styles}
                       />
                       {forge?.repoUrl ? (
                         <InfoRow
                           label={tMe(lang, 'project.repo')}
                           value={forge.repoUrl}
                           last={forge.hasToken === undefined}
+                          styles={styles}
                         />
                       ) : null}
                       {forge ? (
@@ -109,57 +127,58 @@ export default function MeProjectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
-  scroll: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
-  column: { flex: 1, width: '100%' },
-  columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
-  list: { gap: space[4] },
-  card: {
-    backgroundColor: color.card,
-    borderRadius: radius.l,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    overflow: 'hidden',
-  },
-  cardTitle: {
-    ...type.heading,
-    color: color.text,
-    paddingHorizontal: space[4],
-    paddingTop: space[4],
-    paddingBottom: space[3],
-  },
-  rows: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.hairline,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    gap: space[3],
-  },
-  rowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.hairline,
-  },
-  rowLabel: { ...type.callout, color: color.text2 },
-  rowValue: { ...type.callout, color: color.text, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
-  tokenRow: {
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
-    backgroundColor: color.sunken,
-  },
-  tokenText: { ...type.caption, color: '#6A6A70' },
-  footerBox: {
-    marginTop: space[5],
-    backgroundColor: color.sunken,
-    borderRadius: radius.m,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
-  footerText: { ...type.caption, color: '#6A6A70', textAlign: 'center' },
-});
+const createStyles = () =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: color.bg },
+    scroll: { flex: 1 },
+    content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },
+    column: { flex: 1, width: '100%' },
+    columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
+    list: { gap: space[4] },
+    card: {
+      backgroundColor: color.card,
+      borderRadius: radius.l,
+      borderWidth: 1,
+      borderColor: color.hairline,
+      overflow: 'hidden',
+    },
+    cardTitle: {
+      ...type.heading,
+      color: color.text,
+      paddingHorizontal: space[4],
+      paddingTop: space[4],
+      paddingBottom: space[3],
+    },
+    rows: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: color.hairline,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      gap: space[3],
+    },
+    rowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: color.hairline,
+    },
+    rowLabel: { ...type.callout, color: color.text2 },
+    rowValue: { ...type.callout, color: color.text, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
+    tokenRow: {
+      paddingHorizontal: space[4],
+      paddingVertical: space[2],
+      backgroundColor: color.sunken,
+    },
+    tokenText: { ...type.caption, color: color.text3OnSunken },
+    footerBox: {
+      marginTop: space[5],
+      backgroundColor: color.sunken,
+      borderRadius: radius.m,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    footerText: { ...type.caption, color: color.text3OnSunken, textAlign: 'center' },
+  });

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -48,11 +49,13 @@ function RequestRow({
   lang,
   onPress,
   last,
+  styles,
 }: {
   readonly item: RequestSummary;
   readonly lang: ReturnType<typeof detectLang>;
   readonly onPress: () => void;
   readonly last?: boolean;
+  readonly styles: ReturnType<typeof createStyles>;
 }) {
   const reason = needsYouReason(item);
   return (
@@ -91,6 +94,8 @@ function RequestRow({
  *   无缓存失败时显示可重试 EmptyState，401 清空会话，离线显示缓存 + SyncBanner，每组末尾折叠已完成项。
  */
 export default function RequestsScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{ state?: string | string[] }>();
   const rawDemoState = Array.isArray(params.state) ? params.state[0] : params.state;
@@ -299,6 +304,7 @@ export default function RequestsScreen() {
                         lang={lang}
                         onPress={() => openRequest(item.id)}
                         last={idx === needsYouItems.length - 1}
+                        styles={styles}
                       />
                     ))}
                   </View>
@@ -339,6 +345,7 @@ export default function RequestsScreen() {
                           lang={lang}
                           onPress={() => openRequest(item.id)}
                           last={idx === active.length - 1 && done.length === 0}
+                          styles={styles}
                         />
                       ))}
                       {done.length > 0 ? (
@@ -370,6 +377,7 @@ export default function RequestsScreen() {
                                   lang={lang}
                                   onPress={() => openRequest(item.id)}
                                   last={idx === done.length - 1}
+                                  styles={styles}
                                 />
                               ))
                             : null}
@@ -387,7 +395,7 @@ export default function RequestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[4], paddingBottom: space[7] },

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
@@ -24,6 +24,8 @@ type RegisteredDevice = SettingsView['devices'][number];
  * - 「加一台设备」行去 /me/devices/add（A6 实现）。
  */
 export default function MeDevicesScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();
   const { width } = useWindowDimensions();
@@ -149,7 +151,7 @@ export default function MeDevicesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },

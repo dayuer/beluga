@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
 import { refusalKey } from '../lib/submit';
 import { t, type Lang } from '../lib/strings';
@@ -21,6 +21,8 @@ interface TodoCardProps {
 
 /** One to-do, with its own action: no filled primary button on this list (M6 §6.4). */
 export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRefresh }: TodoCardProps) {
+  useColorScheme();
+  const styles = createStyles();
   const [notice, setNotice] = useState<string | null>(null);
   const pass = useSend(todo.pid, pendingKey('pass', todo.pid, todo.planRef));
   const apply = useSend(todo.pid, pendingKey('apply', todo.pid, todo.planRef));
@@ -121,7 +123,7 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRe
       <ReceiptLine text={notice} tone="error" />
       <View style={styles.actions}>
         {todo.kind === 'decision' ? (
-          <Action label={t(lang, 'todo.answer')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'decide')} testID="todo-answer" />
+          <Action label={t(lang, 'todo.answer')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'decide')} testID="todo-answer" styles={styles} />
         ) : null}
         {todo.kind === 'review' ? (
           <>
@@ -135,18 +137,19 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRe
               disabled={passBusy}
               main
               testID="todo-approve"
+              styles={styles}
             />
-            {!undo.active && !passBusy ? <Action label={t(lang, 'plan.notYet')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'reason')} testID="todo-not-yet" /> : null}
+            {!undo.active && !passBusy ? <Action label={t(lang, 'plan.notYet')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'reason')} testID="todo-not-yet" styles={styles} /> : null}
           </>
         ) : null}
         {todo.kind === 'changes' ? (
           <>
-            <Action label={applyBusy ? t(lang, 'common.sending') : applyFailed ? t(lang, 'common.retry') : t(lang, 'todo.apply')} onPress={() => (applyFailed ? void apply.retry() : applyGo())} disabled={applyBusy} main testID="todo-apply" />
-            <Action label={discardBusy ? t(lang, 'common.sending') : t(lang, 'todo.discard')} onPress={() => void discardGo()} disabled={discardBusy} testID="todo-discard" />
+            <Action label={applyBusy ? t(lang, 'common.sending') : applyFailed ? t(lang, 'common.retry') : t(lang, 'todo.apply')} onPress={() => (applyFailed ? void apply.retry() : applyGo())} disabled={applyBusy} main testID="todo-apply" styles={styles} />
+            <Action label={discardBusy ? t(lang, 'common.sending') : t(lang, 'todo.discard')} onPress={() => void discardGo()} disabled={discardBusy} testID="todo-discard" styles={styles} />
           </>
         ) : null}
         {todo.kind === 'confirm' ? (
-          <Action label={confirmBusy ? t(lang, 'common.sending') : confirmFailed ? t(lang, 'common.retry') : t(lang, 'todo.confirm')} onPress={() => (confirmFailed ? void confirm.retry() : confirmGo())} disabled={confirmBusy} main testID="todo-confirm" />
+          <Action label={confirmBusy ? t(lang, 'common.sending') : confirmFailed ? t(lang, 'common.retry') : t(lang, 'todo.confirm')} onPress={() => (confirmFailed ? void confirm.retry() : confirmGo())} disabled={confirmBusy} main testID="todo-confirm" styles={styles} />
         ) : null}
       </View>
     </View>
@@ -160,6 +163,8 @@ export function WaitingTodoCard({
   readonly item: WaitingTodoItem;
   readonly onOpenRequest?: (requestId: string, cardId: string) => void;
 }) {
+  useColorScheme();
+  const styles = createStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -182,7 +187,7 @@ export function WaitingTodoCard({
   );
 }
 
-function Action({ label, onPress, disabled, main, testID }: { readonly label: string; readonly onPress: () => void; readonly disabled?: boolean; readonly main?: boolean; readonly testID: string }) {
+function Action({ label, onPress, disabled, main, testID, styles }: { readonly label: string; readonly onPress: () => void; readonly disabled?: boolean; readonly main?: boolean; readonly testID: string; readonly styles: ReturnType<typeof createStyles> }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -197,7 +202,7 @@ function Action({ label, onPress, disabled, main, testID }: { readonly label: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { backgroundColor: color.card, borderRadius: radius.l, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', padding: space[5], marginBottom: space[4], gap: space[2] },
   project: { ...type.caption, color: color.text3, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
@@ -24,6 +24,8 @@ const PUSH_KEY = 'prefs:pushEnabled';
  * - 删除账号独立处理，中台暂无删除接口时不可点并原地说明。
  */
 export default function MeAccountScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const [lang, setLang] = useState<Lang>(() => detectLang());
   const [appearance, setAppearanceState] = useState<AppearanceMode>(() => getAppearance());
@@ -186,7 +188,7 @@ export default function MeAccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },

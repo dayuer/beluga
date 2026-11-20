@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
 import { AttachList } from '../components/AttachList';
 import { GoalInput } from '../components/GoalInput';
@@ -68,7 +68,7 @@ function receiptOf(state: SubmitState, lang: Lang): { text: string; tone: Receip
   }
 }
 
-function Hint({ lang }: { lang: Lang }) {
+function Hint({ lang, styles }: { lang: Lang; styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={styles.hint}>
       <Text style={styles.hintTitle}>{t(lang, 'new.hintTitle')}</Text>
@@ -86,6 +86,8 @@ function Hint({ lang }: { lang: Lang }) {
  * - 「对做好的提意见」使用协议 `chat.send` 发给对应已交付需求并跳转 `/request/<id>`。
  */
 export default function NewRequestScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{ project?: string | string[] }>();
   const routePid = Array.isArray(params.project) ? params.project[0] : params.project;
@@ -438,7 +440,7 @@ export default function NewRequestScreen() {
 
               <View style={styles.intro}>
                 {!compact ? <Text style={styles.introText}>{t(lang, 'new.intro')}</Text> : null}
-                {!compact && !desktop ? <Hint lang={lang} /> : null}
+                {!compact && !desktop ? <Hint lang={lang} styles={styles} /> : null}
               </View>
 
               {examples.length > 0 ? (
@@ -508,7 +510,7 @@ export default function NewRequestScreen() {
                 <View style={[styles.platformCol, desktop && styles.platformColDesktop]}>
                   <Text style={[styles.label, styles.platformLabel]}>{t(lang, 'new.platforms')}</Text>
                   <PlatformPicker value={platforms} onChange={setPlatforms} />
-                  {desktop && !compact ? <Hint lang={lang} /> : null}
+                  {desktop && !compact ? <Hint lang={lang} styles={styles} /> : null}
                 </View>
               </View>
             </>
@@ -600,7 +602,7 @@ export default function NewRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[6] },

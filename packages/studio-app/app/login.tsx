@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, useColorScheme, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { ActionDock } from '../components/ActionDock';
 import { Header } from '../components/Header';
@@ -52,6 +52,8 @@ function parseUrlToken(url: string | null | undefined): string {
  * session exists.
  */
 export default function LoginScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const lang = detectLang();
   const params = useLocalSearchParams<{ token?: string | string[]; next?: string | string[] }>();
   const routeToken = Array.isArray(params.token) ? params.token[0] : params.token;
@@ -254,7 +256,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: space[5] },

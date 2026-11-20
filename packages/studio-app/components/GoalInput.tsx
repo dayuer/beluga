@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
   type TextInputContentSizeChangeEvent,
   type TextInputKeyPressEvent,
@@ -79,6 +80,8 @@ export function GoalInput({
   accessibilityLabel: string;
   testID?: string;
 }) {
+  useColorScheme();
+  const styles = createStyles();
   const [height, setHeight] = useState(120);
   const [focused, setFocused] = useState(false);
   const ref = useRef<ComponentRef<typeof TextInput>>(null);
@@ -189,7 +192,7 @@ export function GoalInput({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   input: {
     minHeight: 120,
     borderWidth: 1,

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
@@ -18,9 +18,10 @@ interface MeRowProps {
   readonly onPress: () => void;
   readonly testID: string;
   readonly last?: boolean;
+  readonly styles: ReturnType<typeof createStyles>;
 }
 
-function MeRow({ label, value, onPress, testID, last }: MeRowProps) {
+function MeRow({ label, value, onPress, testID, last, styles }: MeRowProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -45,6 +46,8 @@ function MeRow({ label, value, onPress, testID, last }: MeRowProps) {
  * P9「我」入口页（SS-54）：账号头 + 两个分组行，每行进入 `app/me/<页>.tsx`。
  */
 export default function MeScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();
   const { width } = useWindowDimensions();
@@ -94,12 +97,14 @@ export default function MeScreen() {
               value={tMe(lang, 'me.rowProjectSub', { n: settings.projects.length })}
               onPress={() => router.push('/me/project')}
               testID="me-row-project"
+              styles={styles}
             />
             <MeRow
               label={tMe(lang, 'me.rowEnv')}
               value={tMe(lang, 'me.rowEnvSub')}
               onPress={() => router.push('/me/env')}
               testID="me-row-env"
+              styles={styles}
             />
             <MeRow
               label={tMe(lang, 'me.rowMachines')}
@@ -110,6 +115,7 @@ export default function MeScreen() {
               onPress={() => router.push('/me/machines')}
               testID="me-row-machines"
               last
+              styles={styles}
             />
           </View>
 
@@ -120,12 +126,14 @@ export default function MeScreen() {
               value={tMe(lang, 'me.rowDevicesSub', { n: settings.devices.length })}
               onPress={() => router.push('/me/devices')}
               testID="me-row-devices"
+              styles={styles}
             />
             <MeRow
               label={tMe(lang, 'me.rowNotifications')}
               value={tMe(lang, pushOn ? 'me.rowNotificationsOn' : 'me.rowNotificationsOff')}
               onPress={() => router.push('/me/account')}
               testID="me-row-notifications"
+              styles={styles}
             />
             <MeRow
               label={tMe(lang, 'me.rowAccount')}
@@ -133,6 +141,7 @@ export default function MeScreen() {
               onPress={() => router.push('/me/account')}
               testID="me-row-account"
               last
+              styles={styles}
             />
           </View>
             </>
@@ -143,7 +152,7 @@ export default function MeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },

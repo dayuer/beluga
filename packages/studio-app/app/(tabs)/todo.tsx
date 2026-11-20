@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
@@ -30,6 +30,8 @@ import type { RequestSummary } from '../../lib/views';
  * - 无待办且无等待时显示 todo-empty。
  */
 export default function TodoScreen() {
+  useColorScheme();
+  const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();
   const online = useOnline();
@@ -185,7 +187,7 @@ export default function TodoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[7] },

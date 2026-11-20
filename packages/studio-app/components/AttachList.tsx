@@ -1,5 +1,5 @@
 import { Camera, Image as ImageIcon, X } from 'lucide-react-native';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import type { MediaAttachment } from '../lib/media';
 import type { Lang } from '../lib/strings';
 import { tMedia } from '../lib/strings/media';
@@ -31,6 +31,8 @@ export function AttachList({
   lang,
   disabled = false,
 }: AttachListProps) {
+  useColorScheme();
+  const styles = createStyles();
   const handleRemove = (item: MediaAttachment, index: number) => {
     onRemove(item.id);
     const label = item.fileName
@@ -109,7 +111,7 @@ export function AttachList({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   wrap: { marginTop: space[3], gap: space[2] },
   buttons: { flexDirection: 'row', gap: space[2] },
   btn: {
