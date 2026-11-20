@@ -219,9 +219,6 @@ export async function registerPush(
 
   const store = deps.kv;
   if (!store) return { ok: false, reason: 'error' };
-  if (!getPushEnabled(store, hydrated)) {
-    return { ok: false, reason: 'disabled' };
-  }
 
   const sessionToken = deps.getToken?.() ?? null;
   if (!sessionToken) {
@@ -234,30 +231,39 @@ export async function registerPush(
   }
 
   if (demoActive(deps)) {
+    if (!getPushEnabled(store, hydrated)) {
+      return { ok: false, reason: 'disabled' };
+    }
     const device = getOrCreateDeviceId(deps);
     return { ok: true, status: 'demo', device, token: 'demo-device-token' };
+  }
+
+  const online = deps.isOnline ?? (() => true);
+  if (online()) {
+    const pending = store.get<PendingUnregisterRecord>(KV_PENDING_UNREGISTER);
+    if (pending?.device) {
+      const delRes = await callPushApi(
+        'DELETE',
+        sessionToken,
+        { device: pending.device, ...(pending.token ? { token: pending.token } : {}) },
+        deps,
+      );
+      if (delRes.ok || delRes.status === 404) {
+        store.remove(KV_PENDING_UNREGISTER);
+        store.remove(KV_REGISTERED);
+      }
+    }
+  }
+
+  if (!getPushEnabled(store, hydrated)) {
+    return { ok: false, reason: 'disabled' };
   }
 
   const perm = await requestPushPermission(options.askPermission ?? true, deps);
   if (perm.status === 'unsupported') return { ok: false, reason: 'unsupported' };
   if (perm.status === 'denied') return { ok: false, reason: 'denied', hint: perm.hint ?? undefined };
 
-  const online = deps.isOnline ?? (() => true);
   if (!online()) return { ok: false, reason: 'offline' };
-
-  const pending = store.get<PendingUnregisterRecord>(KV_PENDING_UNREGISTER);
-  if (pending?.device) {
-    const delRes = await callPushApi(
-      'DELETE',
-      sessionToken,
-      { device: pending.device, ...(pending.token ? { token: pending.token } : {}) },
-      deps,
-    );
-    if (delRes.ok || delRes.status === 404) {
-      store.remove(KV_PENDING_UNREGISTER);
-      store.remove(KV_REGISTERED);
-    }
-  }
 
   if (!deps.notifications) return { ok: false, reason: 'unsupported' };
   let rawDeviceToken: string;

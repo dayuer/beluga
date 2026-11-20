@@ -328,4 +328,70 @@ describe('push registration', () => {
     ]);
     expect(memKv.get('push:pendingUnregister')).toBeUndefined();
   });
+
+  it('clears pendingUnregister via DELETE even when pushEnabled is false, then returns disabled', async () => {
+    memKv.set('push:pendingUnregister', { device: 'app-dev-off', token: 'apns-old' });
+    memKv.set('push:enabled', false);
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const res = await registerPush(
+      { askPermission: true },
+      {
+        kv: memKv,
+        notifications: makeNotifications(),
+        fetch: fetchMock as unknown as typeof fetch,
+        getToken: () => 'sess-next',
+        baseUrl: 'https://hub.example.com',
+        platform: 'ios',
+        isOnline: () => true,
+        isDemo: () => false,
+      },
+    );
+
+    expect(res).toEqual({ ok: false, reason: 'disabled' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hub.example.com/v1/app/push-tokens',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: JSON.stringify({ device: 'app-dev-off', token: 'apns-old' }),
+      }),
+    );
+    expect(memKv.get('push:pendingUnregister')).toBeUndefined();
+  });
+
+  it('clears pendingUnregister via DELETE even when system permission is denied, then returns denied', async () => {
+    memKv.set('push:pendingUnregister', { device: 'app-dev-denied', token: 'apns-old' });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const deniedNotif = makeNotifications({
+      getPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: true })),
+      requestPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: false })),
+    });
+
+    const res = await registerPush(
+      { askPermission: true },
+      {
+        kv: memKv,
+        notifications: deniedNotif,
+        fetch: fetchMock as unknown as typeof fetch,
+        getToken: () => 'sess-next',
+        baseUrl: 'https://hub.example.com',
+        platform: 'ios',
+        lang: 'zh',
+        isOnline: () => true,
+        isDemo: () => false,
+      },
+    );
+
+    expect(res).toMatchObject({ ok: false, reason: 'denied' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://hub.example.com/v1/app/push-tokens',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: JSON.stringify({ device: 'app-dev-denied', token: 'apns-old' }),
+      }),
+    );
+    expect(memKv.get('push:pendingUnregister')).toBeUndefined();
+  });
 });
