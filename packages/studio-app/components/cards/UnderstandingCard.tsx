@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { z } from 'zod';
+import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
 import { tUnderstanding } from '../../lib/strings/understanding';
 import { color, radius, space, type } from '../../lib/theme';
@@ -28,11 +29,12 @@ const COLLAPSE_LIMIT = 5;
 const UNDO_MS = 4000;
 
 /**
- * 理解卡（SS-43 / 决定 sign-in-app-2）：
+ * 理解卡（SS-43 / SS-188 / SS-202）：
  * - 列出理解要点，超过 5 条时折叠；
- * - 主动作「对，就是这样」使用 SignedButton（无设备密钥时不可点并说明原因）；
- * - 点下主动作后进入 4 秒撤销条，撤销窗口内不发任何签名动作；
- * - 否定动作「不对，我改一下」靠左、描边、不用签名。
+ * - requiresSignature !== false 时主按钮用 SignedButton，否则用 PrimaryButton；
+ * - 点下后走 4 秒撤销条；到点进入 working 态 await onConfirm，成功才置 confirmed 并 haptics.success()，
+ *   失败或抛错回到 pending、展示错误原因并 haptics.warning()；
+ * - 否定动作「不对…」用 TextButton 靠左，问原因输入框 16pt。
  */
 export function UnderstandingCard({
   card,
@@ -46,24 +48,45 @@ export function UnderstandingCard({
   const [expanded, setExpanded] = useState(false);
   const [askingReason, setAskingReason] = useState(false);
   const [reason, setReason] = useState('');
-  const [decision, setDecision] = useState<'pending' | 'undoing' | 'confirmed' | 'rejected'>(
+  const [decision, setDecision] = useState<'pending' | 'undoing' | 'working' | 'confirmed' | 'rejected'>(
     card.status === 'done' ? 'confirmed' : card.status === 'dismissed' ? 'rejected' : 'pending',
   );
   const [busy, setBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const shouldFold = card.points.length > COLLAPSE_LIMIT;
   const visiblePoints = shouldFold && !expanded ? card.points.slice(0, COLLAPSE_LIMIT) : card.points;
   const hiddenCount = card.points.length - COLLAPSE_LIMIT;
 
+  const runConfirm = async () => {
+    setDecision('working');
+    setConfirmError(null);
+    try {
+      await onConfirm?.(card.id);
+      setDecision('confirmed');
+      haptics.success();
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : tUnderstanding(lang, 'understanding.confirmFailed');
+      setConfirmError(msg);
+      setDecision('pending');
+      setAttempt((a) => a + 1);
+      haptics.warning();
+    }
+  };
+
   const handleConfirm = () => {
     if (busy || decision !== 'pending') return;
+    setConfirmError(null);
     setDecision('undoing');
     undoStore.show({
       text: tUnderstanding(lang, 'understanding.undoToast'),
       ms: UNDO_MS,
       fire: () => {
-        setDecision('confirmed');
-        void onConfirm?.(card.id);
+        void runConfirm();
       },
       onUndo: () => {
         setDecision('pending');
@@ -83,6 +106,8 @@ export function UnderstandingCard({
       setBusy(false);
     }
   };
+
+  const isWorking = decision === 'working';
 
   const footer =
     decision === 'confirmed' ? (
@@ -136,23 +161,31 @@ export function UnderstandingCard({
         negative={
           <TextButton
             label={tUnderstanding(lang, 'understanding.reject')}
-            onPress={() => setAskingReason(true)}
+            onPress={() => {
+              if (!isWorking) setAskingReason(true);
+            }}
             testID="understanding-reject"
           />
         }
         primary={
           card.requiresSignature !== false ? (
             <SignedButton
+              key={attempt}
               label={tUnderstanding(lang, 'understanding.confirm')}
-              disabled={busy}
+              state={isWorking ? 'working' : 'idle'}
+              disabled={busy || isWorking}
+              error={confirmError}
               hasKeyOverride={hasKeyOverride}
               onPress={handleConfirm}
               testID="understanding-confirm"
             />
           ) : (
             <PrimaryButton
+              key={attempt}
               label={tUnderstanding(lang, 'understanding.confirm')}
-              disabled={busy}
+              state={isWorking ? 'working' : 'idle'}
+              disabled={busy || isWorking}
+              error={confirmError}
               onPress={handleConfirm}
               testID="understanding-confirm"
             />
@@ -164,7 +197,7 @@ export function UnderstandingCard({
   return (
     <Card
       title={decision === 'confirmed' ? tUnderstanding(lang, 'understanding.titleDone') : tUnderstanding(lang, 'understanding.title')}
-      status={decision === 'pending' || decision === 'undoing' ? 'needs-you' : 'done'}
+      status={decision === 'pending' || decision === 'undoing' || decision === 'working' ? 'needs-you' : 'done'}
       footer={footer}
       testID={testID}
     >
@@ -218,19 +251,11 @@ const styles = StyleSheet.create({
   scopeBox: { padding: space[3], borderRadius: radius.m, gap: space[1] },
   scopeTitle: { ...type.caption, fontWeight: '600' },
   scopeItem: { ...type.caption },
-  outlinedBtn: {
-    minHeight: 44,
-    paddingHorizontal: space[3],
-    borderRadius: radius.m,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textBtn: { paddingVertical: space[2], paddingHorizontal: space[1] },
-  textBtnLabel: { ...type.callout, fontWeight: '600' },
   reasonBox: { gap: space[3] },
   reasonInput: {
     ...type.callout,
+    fontSize: 16,
+    lineHeight: 22,
     minHeight: 56,
     textAlignVertical: 'top',
     borderWidth: 1,

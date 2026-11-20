@@ -16,6 +16,9 @@ vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove:
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
 }));
+vi.mock('../lib/haptics', () => ({
+  haptics: { select: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

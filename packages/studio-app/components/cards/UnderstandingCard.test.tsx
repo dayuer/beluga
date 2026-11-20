@@ -1,11 +1,21 @@
 import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const hapticsSuccess = vi.fn();
+const hapticsWarning = vi.fn();
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
+}));
+vi.mock('../../lib/haptics', () => ({
+  haptics: {
+    select: vi.fn(),
+    success: (...args: unknown[]) => hapticsSuccess(...args),
+    warning: (...args: unknown[]) => hapticsWarning(...args),
+  },
 }));
 
 import { setScheme } from '../../lib/theme';
@@ -22,13 +32,18 @@ const SEVEN_POINTS: UnderstandingCardData = {
   requiresSignature: true,
 };
 
-describe('UnderstandingCard (SS-43 / sign-in-app-2)', () => {
+describe('UnderstandingCard (SS-43 / SS-188 / SS-202)', () => {
+  beforeEach(() => {
+    hapticsSuccess.mockClear();
+    hapticsWarning.mockClear();
+  });
+
   afterEach(() => {
     undoStore.cancel();
     vi.useRealTimers();
   });
 
-  it('folds points beyond 5 and expands on toggle', async () => {
+  it('folds points beyond 5 and expands on toggle with >=44pt hit targets', async () => {
     setScheme('light');
     const screen = await render(<UnderstandingCard card={SEVEN_POINTS} lang="zh" hasKeyOverride />);
 
@@ -37,6 +52,7 @@ describe('UnderstandingCard (SS-43 / sign-in-app-2)', () => {
     expect(screen.queryByText('要点 6')).toBeNull();
     expect(screen.queryByText('要点 7')).toBeNull();
     expect(screen.getByText('展开其余 2 条')).toBeTruthy();
+
     const toggle = screen.getByTestId('understanding-toggle');
     const toggleStyle = Object.assign({}, ...(Array.isArray(toggle.props.style) ? toggle.props.style : [toggle.props.style]));
     expect(toggleStyle.minHeight).toBeGreaterThanOrEqual(44);
@@ -46,7 +62,7 @@ describe('UnderstandingCard (SS-43 / sign-in-app-2)', () => {
     const rejectStyle = Object.assign({}, ...(Array.isArray(rejectBtn.props.style) ? rejectBtn.props.style : [rejectBtn.props.style]));
     expect(rejectStyle.minHeight).toBeGreaterThanOrEqual(44);
 
-    await fireEvent.press(screen.getByTestId('understanding-toggle'));
+    await fireEvent.press(toggle);
     expect(screen.getByText('要点 6')).toBeTruthy();
     expect(screen.getByText('要点 7')).toBeTruthy();
     expect(screen.getByText('收起')).toBeTruthy();
@@ -67,46 +83,99 @@ describe('UnderstandingCard (SS-43 / sign-in-app-2)', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it('runs a 4s undo window before firing confirm, and cancels cleanly on undo', async () => {
+  it('shows working state after 4s undo window until onConfirm resolves, then confirmed + success haptic', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     setScheme('light');
-    const onConfirm = vi.fn();
+
+    let resolveConfirm!: () => void;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        }),
+    );
+
     const screen = await render(
       <UnderstandingCard card={SEVEN_POINTS} lang="zh" hasKeyOverride onConfirm={onConfirm} />,
     );
 
-    // 点下主按钮进入 4 秒撤销窗口，期间不触发 onConfirm
+    // 4 秒撤销窗口内未发出
     await fireEvent.press(screen.getByTestId('understanding-confirm'));
     expect(onConfirm).not.toHaveBeenCalled();
     expect(undoStore.getState().active).toBe(true);
-    expect(screen.getByTestId('understanding-undoing')).toBeTruthy();
 
-    // 在撤销窗口内撤销：不发签名，卡片恢复 pending
+    // 撤销后回到 pending
     await act(async () => {
       undoStore.cancel();
     });
     expect(onConfirm).not.toHaveBeenCalled();
     expect(screen.getByTestId('understanding-confirm')).toBeTruthy();
 
-    // 再次点击并等待 4 秒结束：发出确认
+    // 再次点击并等待 4 秒到点：进入 working 态，尚未 confirmed
     await fireEvent.press(screen.getByTestId('understanding-confirm'));
     await act(async () => {
       vi.advanceTimersByTime(4000);
     });
     expect(onConfirm).toHaveBeenCalledWith('card-u-7');
+    expect(screen.getByTestId('understanding-confirm').props.accessibilityState.busy).toBe(true);
+    expect(screen.queryByTestId('understanding-confirmed')).toBeNull();
+
+    // resolve 后才变成已确认并触发 success 触感
+    await act(async () => {
+      resolveConfirm();
+    });
     expect(screen.getByTestId('understanding-confirmed')).toBeTruthy();
+    expect(hapticsSuccess).toHaveBeenCalledTimes(1);
   });
 
-  it('supports outlined negative action with reason without signing', async () => {
+  it('returns to pending with error message and warning haptic when onConfirm rejects', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    setScheme('light');
+
+    const onConfirm = vi.fn().mockRejectedValueOnce(new Error('签名服务暂不可用'));
+    const screen = await render(
+      <UnderstandingCard card={SEVEN_POINTS} lang="zh" hasKeyOverride onConfirm={onConfirm} />,
+    );
+
+    await fireEvent.press(screen.getByTestId('understanding-confirm'));
+    await act(async () => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('understanding-confirm')).toBeTruthy();
+      expect(screen.getByText('签名服务暂不可用')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('understanding-confirmed')).toBeNull();
+    expect(hapticsWarning).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses PrimaryButton instead of SignedButton when requiresSignature is false', async () => {
+    setScheme('light');
+    const card: UnderstandingCardData = { ...SEVEN_POINTS, id: 'card-u-nosig', requiresSignature: false };
+    const screen = await render(<UnderstandingCard card={card} lang="zh" hasKeyOverride={false} />);
+
+    // 即使没有设备密钥也仍可点击，且不显示设备密钥说明
+    expect(screen.getByTestId('understanding-confirm').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByText('由这台设备确认')).toBeNull();
+    expect(screen.queryByText(/没有登记密钥/)).toBeNull();
+  });
+
+  it('uses ellipsis on negative button and 16pt fontSize on reasonInput', async () => {
     setScheme('light');
     const onReject = vi.fn();
     const screen = await render(
       <UnderstandingCard card={SEVEN_POINTS} lang="zh" hasKeyOverride={false} onReject={onReject} />,
     );
 
-    expect(screen.getByText('不对，我改一下')).toBeTruthy();
+    expect(screen.getByText('不对…')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('understanding-reject'));
-    await fireEvent.changeText(screen.getByTestId('understanding-reason-input'), '第 3 条还要支持邮箱');
+
+    const reasonInput = screen.getByTestId('understanding-reason-input');
+    const inputStyle = Object.assign({}, ...(Array.isArray(reasonInput.props.style) ? reasonInput.props.style : [reasonInput.props.style]));
+    expect(inputStyle.fontSize).toBe(16);
+
+    await fireEvent.changeText(reasonInput, '第 3 条还要支持邮箱');
     await fireEvent.press(screen.getByTestId('understanding-reason-submit'));
 
     await waitFor(() => {

@@ -8,6 +8,9 @@ vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove:
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
 }));
+vi.mock('../lib/haptics', () => ({
+  haptics: { select: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
 vi.mock('react-native-svg', async () => {
   const r = await import('react');
   const host = (name: string) =>
