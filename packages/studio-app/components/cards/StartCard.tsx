@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
 import { signedCardStrings } from '../../lib/strings/signed-cards';
@@ -20,6 +20,8 @@ export interface StartCardProps {
   readonly howItWorks?: string;
   /** 可选说明「什么时候开始」。 */
   readonly whenToStart?: string;
+  /** 可选打开结果区计划页签。 */
+  readonly onOpenPlan?: () => void;
   /** 点击「先不做…」回调。 */
   readonly onDecline?: () => void;
   /** 点击「开始做」确认开工回调。 */
@@ -39,6 +41,7 @@ export function StartCard({
   steps,
   howItWorks,
   whenToStart,
+  onOpenPlan,
   onDecline,
   onStart,
   hasKeyOverride,
@@ -49,6 +52,10 @@ export function StartCard({
   const c = signedCardStrings(lang);
   const [started, setStarted] = useState(card.status === 'done');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setStarted(card.status === 'done');
+  }, [card.id, card.status]);
 
   const handleStart = async () => {
     if (started || busy) return;
@@ -120,6 +127,17 @@ export function StartCard({
           <Text style={[styles.label, { color: color.text3 }]}>{c['start.whenLabel']}</Text>
           <Text style={[styles.value, { color: color.text }]}>{whenToStart || c['start.whenFallback']}</Text>
         </View>
+
+        {onOpenPlan ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenPlan}
+            testID="start-open-plan"
+            style={({ pressed }) => [styles.planLink, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={[styles.planLinkText, { color: color.info }]}>{c['start.openPlan']}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Card>
   );
@@ -133,5 +151,7 @@ const styles = StyleSheet.create({
   value: { ...type.callout },
   stepList: { gap: space[1], paddingLeft: space[2] },
   stepItem: { ...type.caption },
+  planLink: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
+  planLinkText: { ...type.callout, fontWeight: '500' },
   doneHint: { ...type.callout, fontWeight: '500' },
 });

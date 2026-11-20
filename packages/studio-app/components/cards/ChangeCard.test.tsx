@@ -61,4 +61,25 @@ describe('ChangeCard', () => {
     expect(hapticsSuccess).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('change-approved-hint')).toBeTruthy();
   });
+
+  it('renders before -> after details when diff is provided', async () => {
+    const screen = await render(
+      <ChangeCard
+        card={sampleCard}
+        diff={{
+          draftRev: 2,
+          added: [],
+          changed: [{ kind: 'task', title: '登录按钮防连点逻辑', before: '禁用 500ms', after: '请求完成前保持禁用' }],
+          removed: [],
+        }}
+        onDecline={() => {}}
+        onApprove={() => {}}
+        hasKeyOverride
+      />,
+    );
+
+    expect(screen.getByTestId('change-before-after-0')).toBeTruthy();
+    expect(screen.getByText('禁用 500ms')).toBeTruthy();
+    expect(screen.getByText('请求完成前保持禁用')).toBeTruthy();
+  });
 });

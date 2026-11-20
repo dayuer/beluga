@@ -65,4 +65,15 @@ describe('StartCard (P10)', () => {
     await fireEvent.press(screen.getByTestId('start-decline'));
     expect(onDecline).toHaveBeenCalledTimes(1);
   });
+
+  it('renders "在结果区看计划" when onOpenPlan is provided and calls it on press', async () => {
+    const onOpenPlan = vi.fn();
+    const screen = await render(
+      <StartCard card={sampleCard} onOpenPlan={onOpenPlan} onDecline={() => {}} onStart={() => {}} hasKeyOverride />,
+    );
+
+    expect(screen.getByText('在结果区看计划')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('start-open-plan'));
+    expect(onOpenPlan).toHaveBeenCalledTimes(1);
+  });
 });

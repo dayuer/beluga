@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StudioMilestone, StudioPlanView } from '../../../src/studio/protocol';
 import { haptics } from '../lib/haptics';
@@ -54,6 +54,11 @@ export function AcceptCard({
   const [pendingUndo, setPendingUndo] = useState(false);
   const [approved, setApproved] = useState(false);
 
+  useEffect(() => {
+    setPendingUndo(false);
+    setApproved(card?.status === 'done');
+  }, [card?.id, card?.status]);
+
   if (!card && milestone) {
     const notes = review?.milestoneRef === milestone.ref ? review.notes.trim() : '';
     return (
@@ -80,15 +85,16 @@ export function AcceptCard({
   const round = card?.round ?? 1;
   const summary = card?.summary ?? '';
   const screenshots = card?.screenshots ?? [];
-  const previewTarget = card?.previewUrl ?? card?.installUrl;
+  const previewUrl = card?.previewUrl;
+  const installUrl = card?.installUrl;
   const isDone = approved || card?.status === 'done';
 
-  const handleOpenPreview = () => {
-    if (!previewTarget) return;
+  const openUrl = (url?: string) => {
+    if (!url) return;
     if (onOpenPreview) {
-      onOpenPreview(previewTarget);
+      onOpenPreview(url);
     } else {
-      void Linking.openURL(previewTarget);
+      void Linking.openURL(url);
     }
   };
 
@@ -172,10 +178,10 @@ export function AcceptCard({
         </View>
       ) : null}
 
-      {previewTarget ? (
+      {previewUrl ? (
         <Pressable
           accessibilityRole="button"
-          onPress={handleOpenPreview}
+          onPress={() => openUrl(previewUrl)}
           testID="accept-open-preview"
           style={({ pressed }) => [
             styles.previewBtn,
@@ -184,6 +190,21 @@ export function AcceptCard({
           ]}
         >
           <Text style={[styles.previewLabel, { color: color.info }]}>{c['accept.openPreview']}</Text>
+        </Pressable>
+      ) : null}
+
+      {installUrl ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => openUrl(installUrl)}
+          testID="accept-open-install"
+          style={({ pressed }) => [
+            styles.previewBtn,
+            { backgroundColor: color.sunken, borderColor: color.hairline },
+            pressed && { backgroundColor: color.press },
+          ]}
+        >
+          <Text style={[styles.previewLabel, { color: color.text }]}>{c['accept.openInstall']}</Text>
         </Pressable>
       ) : null}
     </Card>

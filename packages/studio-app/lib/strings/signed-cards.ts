@@ -10,6 +10,7 @@ export const zh = {
   'accept.howToCheck': '怎么看',
   'accept.screenshots': '截图',
   'accept.openPreview': '打开体验版',
+  'accept.openInstall': '下载安装包',
   'accept.notYet': '还不行…',
   'accept.approve': '通过',
   'accept.approved': '已通过',
@@ -35,6 +36,7 @@ export const zh = {
   'start.decline': '先不做…',
   'start.start': '开始做',
   'start.started': '已确认开工',
+  'start.openPlan': '在结果区看计划',
 
   // ChangeCard
   'change.title': '计划改动',
@@ -54,7 +56,7 @@ export const zh = {
   'release.lastReleasePerson': '上次上线人',
   'release.decline': '先不上…',
   'release.release': '上线',
-  'release.released': '已确认上线',
+  'release.released': (version: string) => `已上线 ${version}`,
   'release.confirmTitle': (env: string) => `上线到「${env}」后不能撤销`,
   'release.confirmDesc': (version: string, env: string, live?: string) =>
     `将把 ${version} 发布到${env}${live ? `（当前线上 ${live}）` : ''}。确认后立即生效且无法撤销。`,
@@ -79,6 +81,7 @@ export const en: SignedCardStrings = {
   'accept.howToCheck': 'What to check',
   'accept.screenshots': 'Screenshots',
   'accept.openPreview': 'Open preview',
+  'accept.openInstall': 'Download build',
   'accept.notYet': 'Not yet…',
   'accept.approve': 'Approve',
   'accept.approved': 'Approved',
@@ -104,6 +107,7 @@ export const en: SignedCardStrings = {
   'start.decline': 'Not now…',
   'start.start': 'Start work',
   'start.started': 'Work started',
+  'start.openPlan': 'View plan in drawer',
 
   // ChangeCard
   'change.title': 'Planned changes',
@@ -123,7 +127,7 @@ export const en: SignedCardStrings = {
   'release.lastReleasePerson': 'Last released by',
   'release.decline': 'Not now…',
   'release.release': 'Release',
-  'release.released': 'Release confirmed',
+  'release.released': (version: string) => `Released ${version}`,
   'release.confirmTitle': (env: string) => `Releasing to “${env}” cannot be undone`,
   'release.confirmDesc': (version: string, env: string, live?: string) =>
     `This will deploy ${version} to ${env}${live ? ` (currently ${live})` : ''}. It takes effect immediately and cannot be undone.`,

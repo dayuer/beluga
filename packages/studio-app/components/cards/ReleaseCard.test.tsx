@@ -79,6 +79,6 @@ describe('ReleaseCard (P11)', () => {
     await fireEvent.press(confirmBtn);
     await vi.waitFor(() => expect(onRelease).toHaveBeenCalledTimes(1));
     expect(hapticsSuccess).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('release-done-hint')).toBeTruthy();
+    expect(screen.getByTestId('release-done-hint').props.children).toBe('已上线 1.8.3');
   });
 });

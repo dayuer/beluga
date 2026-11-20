@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { StudioDraftDiff } from '../../../../src/studio/protocol';
 import { haptics } from '../../lib/haptics';
@@ -43,8 +43,14 @@ export function ChangeCard({
   const [approved, setApproved] = useState(card.status === 'done');
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    setApproved(card.status === 'done');
+  }, [card.id, card.status]);
+
   const addedItems = diff ? diff.added.map((x) => x.title) : card.added;
-  const modifiedItems = diff ? diff.changed.map((x) => x.title) : card.modified;
+  const modifiedItems = diff
+    ? diff.changed.map((x) => ({ title: x.title, before: x.before, after: x.after }))
+    : card.modified.map((title) => ({ title, before: undefined as string | undefined, after: undefined as string | undefined }));
   const removedItems = diff ? diff.removed.map((x) => x.title) : card.removed;
 
   const handleApprove = async () => {
@@ -105,10 +111,19 @@ export function ChangeCard({
       {modifiedItems.length > 0 ? (
         <View style={styles.group} testID="change-modified">
           <Text style={[styles.groupTitle, { color: color.warn }]}>{t(lang, 'diff.changed')}</Text>
-          {modifiedItems.map((title, i) => (
+          {modifiedItems.map((item, i) => (
             <View key={`m-${i}`} style={styles.row}>
               <Text style={[styles.sign, { color: color.warn }]}>~</Text>
-              <Text style={[styles.itemText, { color: color.text }]}>{title}</Text>
+              <View style={styles.itemBody}>
+                <Text style={[styles.itemText, { color: color.text }]}>{item.title}</Text>
+                {item.before !== undefined && item.after !== undefined ? (
+                  <View style={styles.beforeAfter} testID={`change-before-after-${i}`}>
+                    <Text style={[styles.before, { color: color.text3 }]}>{item.before}</Text>
+                    <Text style={[styles.arrow, { color: color.text3 }]}>→</Text>
+                    <Text style={[styles.after, { color: color.text2 }]}>{item.after}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
           ))}
         </View>
@@ -135,7 +150,12 @@ const styles = StyleSheet.create({
   groupTitle: { ...type.caption, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   sign: { ...type.callout, fontWeight: '700', width: 14, textAlign: 'center' },
+  itemBody: { flex: 1, gap: space[1] },
   itemText: { ...type.callout, flex: 1 },
+  beforeAfter: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[1] },
+  before: { ...type.caption, textDecorationLine: 'line-through' },
+  arrow: { ...type.caption },
+  after: { ...type.caption },
   removed: { textDecorationLine: 'line-through' },
   doneHint: { ...type.callout, fontWeight: '500' },
 });

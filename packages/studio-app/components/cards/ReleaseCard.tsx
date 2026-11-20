@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
@@ -50,6 +50,12 @@ export function ReleaseCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setReleased(card.status === 'done');
+    setConfirmOpen(false);
+    setError(null);
+  }, [card.id, card.status]);
+
   if (!protectedEnv) return null;
 
   const actor =
@@ -84,7 +90,7 @@ export function ReleaseCard({
         footer={
           released ? (
             <Text style={[styles.doneHint, { color: color.ok }]} testID="release-done-hint">
-              {c['release.released']}
+              {c['release.released'](card.version)}
             </Text>
           ) : (
             <ActionRow

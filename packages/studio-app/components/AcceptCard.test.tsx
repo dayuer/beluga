@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react-native';
+import { cleanup, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
@@ -45,8 +45,9 @@ describe('AcceptCard (P5)', () => {
     hapticsSuccess.mockClear();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     undoStore.cancel();
+    await cleanup();
     vi.useRealTimers();
   });
 
@@ -103,10 +104,42 @@ describe('AcceptCard (P5)', () => {
       />,
     );
 
-    fireEvent.press(screen.getByTestId('accept-not-yet'));
+    await fireEvent.press(screen.getByTestId('accept-not-yet'));
     expect(onNotYet).toHaveBeenCalledTimes(1);
 
-    fireEvent.press(screen.getByTestId('accept-open-preview'));
+    await fireEvent.press(screen.getByTestId('accept-open-preview'));
     expect(onOpenPreview).toHaveBeenCalledWith('https://demo-preview.synon.invalid/req-export');
+  });
+
+  it('shows both previewUrl and installUrl entrances and resets state when card changes', async () => {
+    const onOpenPreview = vi.fn();
+    const bothCard: DeliveryCard = {
+      ...sampleCard,
+      installUrl: 'https://demo-preview.synon.invalid/req-export.ipa',
+    };
+    const screen = await render(
+      <AcceptCard card={bothCard} onNotYet={() => {}} onSigned={() => {}} onOpenPreview={onOpenPreview} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('accept-open-preview'));
+    expect(onOpenPreview).toHaveBeenCalledWith('https://demo-preview.synon.invalid/req-export');
+
+    await fireEvent.press(screen.getByTestId('accept-open-install'));
+    expect(onOpenPreview).toHaveBeenCalledWith('https://demo-preview.synon.invalid/req-export.ipa');
+
+    await fireEvent.press(screen.getByTestId('accept-approve'));
+    expect(screen.getByTestId('accept-pending-undo')).toBeTruthy();
+
+    await screen.rerender(
+      <AcceptCard
+        card={{ ...bothCard, id: 'card-delivery-2', status: 'pending' }}
+        onNotYet={() => {}}
+        onSigned={() => {}}
+        onOpenPreview={onOpenPreview}
+        hasKeyOverride
+      />,
+    );
+    expect(screen.queryByTestId('accept-pending-undo')).toBeNull();
+    expect(screen.getByTestId('accept-approve')).toBeTruthy();
   });
 });
