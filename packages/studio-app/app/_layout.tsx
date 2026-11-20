@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useScheme } from '../lib/appearance';
 import { useBadgeSync } from '../lib/badge';
 import { useBooted } from '../lib/boot';
 import '../lib/kv';
@@ -56,11 +57,12 @@ function Guard({ children }: { children: ReactNode }) {
 }
 
 export default function RootLayout() {
+  const scheme = useScheme();
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: color.bg }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <StatusBar style="dark" />
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           <View style={{ flex: 1, backgroundColor: color.bg }}>
             <Guard>
               <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />

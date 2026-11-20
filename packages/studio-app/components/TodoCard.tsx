@@ -1,23 +1,29 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useScheme } from '../lib/appearance';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
 import { refusalKey } from '../lib/submit';
 import { t, type Lang } from '../lib/strings';
+import type { WaitingTodoItem } from '../lib/todo';
 import type { TodoCard as TodoData } from '../lib/todo-store';
 import { color, radius, space, type } from '../lib/theme';
 import { useUndoSend } from '../lib/undo';
 import { ReceiptLine } from './ReceiptLine';
+import { StatusDot } from './StatusDot';
 
 interface TodoCardProps {
   readonly todo: TodoData;
   readonly lang: Lang;
   readonly onHidden: (key: string) => void;
   readonly onOpenPlan: (pid: string, planRef: string, open?: 'decide' | 'reason') => void;
+  readonly onOpenRequest?: (requestId: string, cardId: string) => void;
   readonly onRefresh: () => void;
 }
 
 /** One to-do, with its own action: no filled primary button on this list (M6 §6.4). */
-export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCardProps) {
+export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRefresh }: TodoCardProps) {
+  useScheme();
+  const styles = createStyles();
   const [notice, setNotice] = useState<string | null>(null);
   const pass = useSend(todo.pid, pendingKey('pass', todo.pid, todo.planRef));
   const apply = useSend(todo.pid, pendingKey('apply', todo.pid, todo.planRef));
@@ -93,24 +99,32 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCa
   const confirmBusy = confirm.state.phase === 'sending' || confirm.state.phase === 'queued';
   const confirmFailed = confirm.state.phase === 'failed';
 
+  const cardId = todo.decisionId ?? todo.milestoneRef ?? todo.key;
+
   return (
     <View style={styles.card} testID="todo-card">
-      <Text style={styles.project} numberOfLines={1}>
-        {todo.projectName}
-      </Text>
-      <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>
-          {todo.title}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onOpenRequest?.(todo.planRef, cardId)}
+        style={({ pressed }) => [styles.bodyPress, pressed && styles.pressed]}
+      >
+        <Text style={styles.project} numberOfLines={1}>
+          {todo.projectName}
         </Text>
-        <Text style={styles.kind}>{kindLabel}</Text>
-      </View>
-      <Text style={styles.sub} numberOfLines={2}>
-        {todo.sub}
-      </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>
+            {todo.title}
+          </Text>
+          <Text style={styles.kind}>{kindLabel}</Text>
+        </View>
+        <Text style={styles.sub} numberOfLines={2}>
+          {todo.sub}
+        </Text>
+      </Pressable>
       <ReceiptLine text={notice} tone="error" />
       <View style={styles.actions}>
         {todo.kind === 'decision' ? (
-          <Action label={t(lang, 'todo.answer')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'decide')} testID="todo-answer" />
+          <Action label={t(lang, 'todo.answer')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'decide')} testID="todo-answer" styles={styles} />
         ) : null}
         {todo.kind === 'review' ? (
           <>
@@ -124,25 +138,57 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCa
               disabled={passBusy}
               main
               testID="todo-approve"
+              styles={styles}
             />
-            {!undo.active && !passBusy ? <Action label={t(lang, 'plan.notYet')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'reason')} testID="todo-not-yet" /> : null}
+            {!undo.active && !passBusy ? <Action label={t(lang, 'plan.notYet')} onPress={() => onOpenPlan(todo.pid, todo.planRef, 'reason')} testID="todo-not-yet" styles={styles} /> : null}
           </>
         ) : null}
         {todo.kind === 'changes' ? (
           <>
-            <Action label={applyBusy ? t(lang, 'common.sending') : applyFailed ? t(lang, 'common.retry') : t(lang, 'todo.apply')} onPress={() => (applyFailed ? void apply.retry() : applyGo())} disabled={applyBusy} main testID="todo-apply" />
-            <Action label={discardBusy ? t(lang, 'common.sending') : t(lang, 'todo.discard')} onPress={() => void discardGo()} disabled={discardBusy} testID="todo-discard" />
+            <Action label={applyBusy ? t(lang, 'common.sending') : applyFailed ? t(lang, 'common.retry') : t(lang, 'todo.apply')} onPress={() => (applyFailed ? void apply.retry() : applyGo())} disabled={applyBusy} main testID="todo-apply" styles={styles} />
+            <Action label={discardBusy ? t(lang, 'common.sending') : t(lang, 'todo.discard')} onPress={() => void discardGo()} disabled={discardBusy} testID="todo-discard" styles={styles} />
           </>
         ) : null}
         {todo.kind === 'confirm' ? (
-          <Action label={confirmBusy ? t(lang, 'common.sending') : confirmFailed ? t(lang, 'common.retry') : t(lang, 'todo.confirm')} onPress={() => (confirmFailed ? void confirm.retry() : confirmGo())} disabled={confirmBusy} main testID="todo-confirm" />
+          <Action label={confirmBusy ? t(lang, 'common.sending') : confirmFailed ? t(lang, 'common.retry') : t(lang, 'todo.confirm')} onPress={() => (confirmFailed ? void confirm.retry() : confirmGo())} disabled={confirmBusy} main testID="todo-confirm" styles={styles} />
         ) : null}
       </View>
     </View>
   );
 }
 
-function Action({ label, onPress, disabled, main, testID }: { readonly label: string; readonly onPress: () => void; readonly disabled?: boolean; readonly main?: boolean; readonly testID: string }) {
+export function WaitingTodoCard({
+  item,
+  onOpenRequest,
+}: {
+  readonly item: WaitingTodoItem;
+  readonly onOpenRequest?: (requestId: string, cardId: string) => void;
+}) {
+  useScheme();
+  const styles = createStyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onOpenRequest?.(item.requestId, item.id)}
+      testID={`waiting-card-${item.requestId}`}
+      style={({ pressed }) => [styles.card, styles.waitingCard, pressed && styles.pressed]}
+    >
+      <View style={styles.waitingTop}>
+        <StatusDot status="waiting" />
+        <Text style={styles.project} numberOfLines={1}>
+          {item.projectName}
+        </Text>
+      </View>
+      <Text style={styles.title} numberOfLines={2}>
+        {item.requestTitle}
+      </Text>
+      <Text style={styles.sub}>{item.message}</Text>
+      <Text style={styles.eta}>{item.etaText}</Text>
+    </Pressable>
+  );
+}
+
+function Action({ label, onPress, disabled, main, testID, styles }: { readonly label: string; readonly onPress: () => void; readonly disabled?: boolean; readonly main?: boolean; readonly testID: string; readonly styles: ReturnType<typeof createStyles> }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -157,7 +203,7 @@ function Action({ label, onPress, disabled, main, testID }: { readonly label: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { backgroundColor: color.card, borderRadius: radius.l, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', padding: space[5], marginBottom: space[4], gap: space[2] },
   project: { ...type.caption, color: color.text3, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
@@ -171,4 +217,8 @@ const styles = StyleSheet.create({
   actionText: { ...type.callout, color: color.text2, fontWeight: '500' },
   actionTextMain: { color: color.text, fontWeight: '600' },
   pressed: { opacity: 0.9 },
+  bodyPress: { gap: space[2] },
+  waitingCard: { backgroundColor: color.sunken },
+  waitingTop: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  eta: { ...type.caption, color: color.text3, marginTop: 2 },
 });
