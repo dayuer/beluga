@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { signApp, signingIdentity } from './developer-id.mjs';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(here, 'build-number.json');
@@ -28,10 +29,17 @@ writeFileSync(file, `${JSON.stringify({ build }, null, 2)}\n`);
 const { version } = JSON.parse(readFileSync(path.join(here, 'src-tauri', 'tauri.conf.json'), 'utf8'));
 console.log(`Building Beluga ${version} (build ${build})`);
 
-const config = JSON.stringify({ bundle: { macOS: { bundleVersion: String(build) } } });
+// Signed with the fork's Developer ID when it's in the keychain (developer-id.mjs), else ad hoc.
+const identity = signingIdentity();
+// The updater's .tar.gz needs its private key (scripts/release-mac.mjs passes it): without it the
+// build still makes the app and the .dmg instead of failing at the end.
+const config = JSON.stringify({ bundle: { macOS: { bundleVersion: String(build), ...(identity ? { signingIdentity: identity } : {}) }, ...(process.env.TAURI_SIGNING_PRIVATE_KEY ? {} : { createUpdaterArtifacts: false }) } });
+console.log(identity ? `Signing with ${identity}` : 'Signing ad hoc (no Developer ID in the keychain)');
 const r = spawnSync('npx', ['tauri', 'build', '--config', config, ...process.argv.slice(2)], {
   cwd: here,
   stdio: 'inherit',
-  env: { ...process.env, BELUGA_BUILD_NUMBER: String(build) },
+  env: { ...process.env, BELUGA_BUILD_NUMBER: String(build), ...(identity ? { APPLE_SIGNING_IDENTITY: identity } : {}) },
 });
-process.exit(r.status ?? 1);
+if (r.status !== 0) process.exit(r.status ?? 1);
+// Tauri signs the app around what it holds; everything inside it gets the same signature (notarization checks each).
+if (identity && identity !== '-') signApp(identity);

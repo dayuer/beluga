@@ -29,6 +29,15 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 - **构建**只从 `topic/plans` 出（它已经合入三个准备分支）：在干净的 worktree 里 `npm run app:build`。`packages/mac/build-number.json` 记的是上一次用过的号，构建脚本自动加 1；编完把新的号提交到 `topic/plans`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
 
+## 签名与公证（2026-11-20 起）
+
+fork 的构建用于 App Store 以外分发：用杭州耀兴的 Developer ID 签名，再交给苹果公证，任何 Mac 打开都不会弹「无法验证开发者」。都在 fork 自己的 `packages/mac/scripts/developer-id.mjs` 里：
+
+- **证书**：登录钥匙串里的 `Developer ID Application: Hangzhou Yaoxing Intelligent Technology Co., Ltd. (L9YRXEKYN2)`。`tauri-build.mjs` 在钥匙串里找到它就用它签（`$APPLE_SIGNING_IDENTITY` 可以换别的）；找不到就照旧临时签名（ad hoc）。不用 App Store 的 App 记录，也不用描述文件。
+- **里外都签**：Tauri 只签 App、主程序和 node；编完后 `developer-id.mjs sign` 由里到外再签一遍：`Resources` 里的原生模块（node-pty、sodium、udx、resvg、whisper、esbuild）→ 小组件（它自己的 entitlements）→ `MacOS/node` → 整个 App，都带 hardened runtime 和苹果时间戳。公证会逐个检查这些文件。
+- **公证**：`npm run app:build` 最后一步 `developer-id.mjs notarize` 签好 .dmg，用钥匙串里的 `beluga-notary` 凭据提交公证、等结果，再把票据钉在 .dmg 上。凭据要先由你在终端里存一次（会问 App 专用密码，在 appleid.apple.com 生成）：`xcrun notarytool store-credentials beluga-notary --team-id L9YRXEKYN2 --apple-id <你的 Apple ID>`。没有这份凭据时，只签名不公证，并提示这条命令。
+- **更新包**：没有 `TAURI_SIGNING_PRIVATE_KEY` 时不再生成更新包（`.app.tar.gz`），编译不会在最后一步失败；有密钥时（`scripts/release-mac.mjs` 会设），签完名重新打包并重新签更新包。
+
 ## 原则：加自己的文件，不改上游的文件
 
 合并时只有一种地方会冲突：**上游和这个 fork 改了同一个文件的相邻几行**。fork 自己新建的文件，上游不会去碰，所以永远不冲突。因此：
