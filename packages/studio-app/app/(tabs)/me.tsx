@@ -7,6 +7,7 @@ import { SyncBanner } from '../../components/SyncBanner';
 import { TabBar } from '../../components/TabBar';
 import { useScheme } from '../../lib/appearance';
 import { kv } from '../../lib/kv';
+import { phoneSettingsEnabled } from '../../lib/phone-settings-flag';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
@@ -102,7 +103,7 @@ export default function MeScreen() {
             />
             <MeRow
               label={tMe(lang, 'me.rowEnv')}
-              value={tMe(lang, 'me.rowEnvSub')}
+              value={tMe(lang, phoneSettingsEnabled() ? 'me.rowEnvSubOn' : 'me.rowEnvSub')}
               onPress={() => router.push('/me/env')}
               testID="me-row-env"
               styles={styles}
