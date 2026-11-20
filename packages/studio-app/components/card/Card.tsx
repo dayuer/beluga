@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { detectLang, t } from '../../lib/strings';
 import type { RequestStatus } from '../../lib/views';
 import { color, elevation, radius, space, type } from '../../lib/theme';
 
@@ -27,13 +28,21 @@ function dotColorFor(status: RequestStatus): string | null {
   }
 }
 
+const STATUS_KEY: Record<RequestStatus, 'status.needsYou' | 'status.waiting' | 'status.working' | 'status.error' | 'status.done'> = {
+  'needs-you': 'status.needsYou',
+  waiting: 'status.waiting',
+  working: 'status.working',
+  error: 'status.error',
+  done: 'status.done',
+};
+
 /**
- * 卡片外框（SS-27 / SS-141）：标题、状态圆点、正文槽与底部动作区。
+ * 卡片外框（SS-27 / SS-141 / SS-144）：标题、状态圆点、正文槽与底部动作区。
  * 颜色在渲染期读取 `color.*` 以跟随深色模式；状态变化使用 `accessibilityLiveRegion="polite"`。
  */
 export function Card({ title, status, statusLabel, children, footer, testID }: CardProps) {
   const dotColor = status ? dotColorFor(status) : null;
-  const accessibleStatus = statusLabel ?? (status === 'needs-you' ? '等你' : status === 'waiting' ? '等待' : status === 'working' ? '进行中' : status === 'error' ? '需要处理' : status === 'done' ? '已完成' : undefined);
+  const accessibleStatus = statusLabel ?? (status ? t(detectLang(), STATUS_KEY[status]) : undefined);
 
   return (
     <View

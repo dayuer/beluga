@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { detectLang, t } from '../lib/strings';
 import type { RequestStatus } from '../lib/views';
 import { color, radius, space, type } from '../lib/theme';
 
@@ -9,12 +10,12 @@ export interface StatusDotProps {
   readonly testID?: string;
 }
 
-const DEFAULT_LABELS: Record<RequestStatus, string> = {
-  working: 'AI 在做',
-  'needs-you': '等你',
-  waiting: '等待',
-  error: '需要处理',
-  done: '已完成',
+const STATUS_KEYS: Record<RequestStatus, 'status.aiWorking' | 'status.needsYou' | 'status.waiting' | 'status.error' | 'status.done'> = {
+  working: 'status.aiWorking',
+  'needs-you': 'status.needsYou',
+  waiting: 'status.waiting',
+  error: 'status.error',
+  done: 'status.done',
 };
 
 /**
@@ -37,7 +38,7 @@ export function StatusDot({ status, size = 8, label, testID }: StatusDotProps) {
             ? color.error
             : color.ok;
 
-  const a11yLabel = label ?? DEFAULT_LABELS[status];
+  const a11yLabel = label ?? t(detectLang(), STATUS_KEYS[status]);
 
   return (
     <View

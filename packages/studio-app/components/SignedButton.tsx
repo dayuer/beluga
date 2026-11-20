@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useHasDeviceKey } from '../lib/keys';
+import { detectLang, t } from '../lib/strings';
 import { color, space, type } from '../lib/theme';
 import { PrimaryButton, type PrimaryButtonState } from './PrimaryButton';
 
@@ -34,6 +35,7 @@ export function SignedButton({
   const detected = useHasDeviceKey();
   const hasKey = hasKeyOverride ?? detected.hasKey;
   const off = disabled || !hasKey;
+  const lang = detectLang();
 
   return (
     <View style={styles.wrap}>
@@ -48,11 +50,9 @@ export function SignedButton({
         error={error}
       />
       {hasKey ? (
-        <Text style={[styles.hint, { color: color.text3 }]}>由这台设备确认</Text>
+        <Text style={[styles.hint, { color: color.text3 }]}>{t(lang, 'signed.byDevice')}</Text>
       ) : (
-        <Text style={[styles.hint, { color: color.text3 }]}>
-          这台设备还没有登记密钥，无法确认此操作；请前往「我 › 设备」添加设备。
-        </Text>
+        <Text style={[styles.hint, { color: color.text3 }]}>{t(lang, 'signed.noKeyHint')}</Text>
       )}
     </View>
   );

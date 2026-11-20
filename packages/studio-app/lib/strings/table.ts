@@ -1,3 +1,4 @@
+import * as base from './base.js';
 import * as common from './common.js';
 import * as login from './login.js';
 import * as news from './new.js';
@@ -9,6 +10,7 @@ import * as todo from './todo.js';
 export type Lang = 'zh' | 'en';
 
 const zh = {
+  ...base.zh,
   ...common.zh,
   ...login.zh,
   ...projects.zh,
@@ -21,6 +23,7 @@ const zh = {
 export type StringKey = keyof typeof zh;
 
 const en: Record<StringKey, string> = {
+  ...base.en,
   ...common.en,
   ...login.en,
   ...projects.en,
