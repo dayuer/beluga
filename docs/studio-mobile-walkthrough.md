@@ -375,3 +375,28 @@ Maestro 在录屏过程中执行手势。录像在 `.beluga/scratch/ss-233/`。
 
 复跑：`E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-refused.yaml`；
 假 daemon 自检：`node packages/studio-hub/scripts/fake-daemon.mjs --self-test`。
+
+## 19. TalkBack 在 Google APIs 模拟器上的尝试（SS-235）
+
+结论：**这台机器装不了官方 TalkBack，转到 Android 真机（rel-device-android / SS-239）做。**
+
+试过的路径：
+1. `~/Library/Android/sdk/system-images/android-35/google_apis/arm64-v8a` 只有一个空的
+   `.installer` 目录（2026-11-21 03:47 那次下载停在中途），`avdmanager` 报
+   `Package path is not valid`，没有可用的 Google APIs 镜像；`sdkmanager --list` 也拿不到
+   `google_apis_playstore;arm64-v8a`。
+2. 即使拿到 Google APIs 镜像，它也不带 Play 商店；TalkBack（Android Accessibility Suite）
+   只通过 Play 商店分发，装它需要登录 Google 账号，这台机器不能代做。
+3. 手上唯一的 Android 真机（NX733J，Android 15）也没预装 TalkBack
+   （`pm list packages | grep talkback` 为空）。
+
+因此没有从 Google 官方渠道装 TalkBack 的办法，按任务约定停在交接：在真机上从 Play 商店装
+「Android Accessibility Suite / TalkBack」后，执行
+
+```sh
+adb -s <serial> shell settings put secure enabled_accessibility_services com.google.android.marvin.talkback/.TalkBackService
+maestro --device <serial> test e2e/maestro/talkback.yaml
+```
+
+并把录屏与 `adb logcat -s TalkBackService` 的朗读日志存到 `.beluga/scratch/ss-235/`。
+`e2e/maestro/talkback.yaml` 已就绪（单击聚焦、双击激活、逐屏截图）。
