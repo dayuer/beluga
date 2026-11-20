@@ -267,4 +267,21 @@
 - 为了能从深链打开演示态，`lib/links.ts` 的 `/request/:id` 与根路径现在保留已知的 `?state=`
   （`normal|empty|loading|offline|runnerOffline`）；非 demo 构建不读这个参数。补了单测。
 
+## 15. 读屏：TalkBack（Android）
+
+Android 真机（NX733J）与 Android 模拟器（AOSP android-35）都没有预装 TalkBack；Play 商店与
+google_apis 镜像在这台机器上装不下来（下载停在 29%）。所以这一节做的是**无障碍树检查**：
+
+- 脚本：`.beluga/scratch/android-a11y.mjs <serial>`（`uiautomator dump`，找可点击且没有名称的节点）。
+- 结果（Android 模拟器，demo 构建）：需求列表 16 个可点、详情 11 个、待办 14 个、我 9 个、
+  账号与通知 6 个，**没有名字的都是 0**。名字来自 `content-desc` 或文字本身，与 iOS 的
+  `accessibilityLabel` 是同一套组件。
+- 状态变化：卡片状态、状态点、离线横幅、回执与撤销条在 iOS 与 Android 共用同一个组件，
+  Android 上对应 `accessibilityLiveRegion="polite"` 的无障碍事件。
+
+TalkBack 本身（语音朗读与手势）还没有走：`e2e/maestro/talkback.yaml` 已就绪（单击聚焦、
+双击激活、带截图），装好 TalkBack 后用
+`adb shell settings put secure enabled_accessibility_services com.google.android.marvin.talkback/.TalkBackService`
+打开再跑。手机上的 TalkBack 需要用户自己从 Play 商店安装（本机无法代装）。
+
 
