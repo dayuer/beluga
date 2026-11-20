@@ -15,11 +15,16 @@ import { LIMITS, PLATFORMS, type StudioPlatform } from '../../../src/studio/prot
 import { cache } from '../lib/cache';
 import { hub } from '../lib/client';
 import { DEMO_REQUEST_SUMMARIES } from '../lib/demo';
-import { clearDraft, readDraft, writeDraft } from '../lib/drafts';
 import type { ProjectSummary } from '../lib/hub-schema';
-import { kv } from '../lib/kv';
 import { pickPhotos, takePhoto, type MediaAttachment } from '../lib/media';
 import { useOnline } from '../lib/net';
+import {
+  clearFeedbackModeDraft,
+  clearNewModeDraft,
+  restoreBothDrafts,
+  writeFeedbackModeDraft,
+  writeNewModeDraft,
+} from '../lib/new-drafts';
 import { detectLang, t, type Lang } from '../lib/strings';
 import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
 import { ago } from '../lib/time';
@@ -28,32 +33,6 @@ import { useKeyboardInset } from '../lib/viewport';
 import { appendSpoken, useVoiceDictation } from '../lib/voice';
 
 type NewMode = 'new' | 'feedback';
-
-interface FeedbackDraft {
-  readonly requestId: string;
-  readonly text: string;
-  readonly updatedAt: number;
-}
-
-const feedbackDraftKey = (pid: string): string => `draft:feedback:${pid}`;
-
-function readFeedbackDraft(pid: string): FeedbackDraft | undefined {
-  const raw = kv.get<Partial<FeedbackDraft>>(feedbackDraftKey(pid));
-  if (!raw || typeof raw.text !== 'string' || typeof raw.updatedAt !== 'number') return undefined;
-  return {
-    requestId: typeof raw.requestId === 'string' ? raw.requestId : '',
-    text: raw.text.slice(0, LIMITS.text),
-    updatedAt: raw.updatedAt,
-  };
-}
-
-function writeFeedbackDraft(pid: string, draft: FeedbackDraft): void {
-  kv.set(feedbackDraftKey(pid), { ...draft, text: draft.text.slice(0, LIMITS.text) });
-}
-
-function clearFeedbackDraft(pid: string): void {
-  kv.remove(feedbackDraftKey(pid));
-}
 
 function receiptOf(state: SubmitState, lang: Lang): { text: string; tone: ReceiptTone } | null {
   switch (state.phase) {
@@ -122,10 +101,12 @@ export default function NewRequestScreen() {
   );
   const [selectedRequestId, setSelectedRequestId] = useState<string>(() => delivered[0]?.id ?? '');
   const [feedbackText, setFeedbackText] = useState('');
-  const [attachments, setAttachments] = useState<readonly MediaAttachment[]>([]);
+  const [newAttachments, setNewAttachments] = useState<readonly MediaAttachment[]>([]);
+  const [feedbackAttachments, setFeedbackAttachments] = useState<readonly MediaAttachment[]>([]);
   const [mediaHint, setMediaHint] = useState<string | null>(null);
 
   const lockedRef = useRef(false);
+  const hydratedPidRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!pid || project) return;
@@ -141,70 +122,85 @@ export default function NewRequestScreen() {
     };
   }, [pid, project]);
 
-  // 恢复两档草稿，切换分段时不互相覆盖
+  // 独立恢复两档草稿（含附件），互不跳过、互不覆盖；恢复完成前禁止防抖写入或清理
   useEffect(() => {
-    const draft = readDraft(pid);
-    if (draft) {
-      if (!draft.goal.trim() && draft.platforms.length === 0) {
-        clearDraft(pid);
-      } else {
-        setGoal(draft.goal);
-        setPlatforms(draft.platforms);
-        setRestored(t(lang, 'new.restored', { ago: ago(draft.updatedAt, lang) }));
-        const timer = setTimeout(() => setRestored(null), 3000);
-        return () => clearTimeout(timer);
-      }
+    hydratedPidRef.current = null;
+    const { newDraft, feedbackDraft } = restoreBothDrafts(pid);
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (newDraft) {
+      setGoal(newDraft.goal);
+      setPlatforms(newDraft.platforms);
+      setNewAttachments(newDraft.attachments);
+      setRestored(t(lang, 'new.restored', { ago: ago(newDraft.updatedAt, lang) }));
+      timer = setTimeout(() => setRestored(null), 3000);
+    } else {
+      setGoal('');
+      setPlatforms([]);
+      setNewAttachments([]);
     }
-    const fb = readFeedbackDraft(pid);
-    if (fb) {
-      if (!fb.text.trim()) {
-        clearFeedbackDraft(pid);
-      } else {
-        if (fb.requestId) setSelectedRequestId(fb.requestId);
-        setFeedbackText(fb.text);
-      }
+
+    if (feedbackDraft) {
+      if (feedbackDraft.requestId) setSelectedRequestId(feedbackDraft.requestId);
+      setFeedbackText(feedbackDraft.text);
+      setFeedbackAttachments(feedbackDraft.attachments);
+    } else {
+      setFeedbackText('');
+      setFeedbackAttachments([]);
     }
+
+    hydratedPidRef.current = pid;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid]);
 
-  // 300ms 防抖保存新需求草稿
+  // 300ms 防抖保存新需求草稿（含附件）
   useEffect(() => {
+    if (hydratedPidRef.current !== pid) return;
     const id = setTimeout(() => {
-      if (lockedRef.current) return;
-      if (!goal.trim() && platforms.length === 0) {
-        clearDraft(pid);
-        return;
-      }
-      writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
-    }, 300);
-    return () => clearTimeout(id);
-  }, [pid, goal, platforms]);
-
-  // 300ms 防抖保存反馈草稿
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (lockedRef.current) return;
-      if (!feedbackText.trim()) {
-        clearFeedbackDraft(pid);
-        return;
-      }
-      writeFeedbackDraft(pid, {
-        requestId: selectedRequestId,
-        text: feedbackText,
+      if (lockedRef.current || hydratedPidRef.current !== pid) return;
+      writeNewModeDraft(pid, {
+        goal,
+        platforms,
+        attachments: newAttachments,
         updatedAt: Date.now(),
       });
     }, 300);
     return () => clearTimeout(id);
-  }, [pid, selectedRequestId, feedbackText]);
+  }, [pid, goal, platforms, newAttachments]);
+
+  // 300ms 防抖保存反馈草稿（含附件）
+  useEffect(() => {
+    if (hydratedPidRef.current !== pid) return;
+    const id = setTimeout(() => {
+      if (lockedRef.current || hydratedPidRef.current !== pid) return;
+      writeFeedbackModeDraft(pid, {
+        requestId: selectedRequestId,
+        text: feedbackText,
+        attachments: feedbackAttachments,
+        updatedAt: Date.now(),
+      });
+    }, 300);
+    return () => clearTimeout(id);
+  }, [pid, selectedRequestId, feedbackText, feedbackAttachments]);
 
   useEffect(() => {
     const flush = () => {
-      if (lockedRef.current) return;
-      if (!goal.trim() && platforms.length === 0) clearDraft(pid);
-      else writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
-
-      if (!feedbackText.trim()) clearFeedbackDraft(pid);
-      else writeFeedbackDraft(pid, { requestId: selectedRequestId, text: feedbackText, updatedAt: Date.now() });
+      if (lockedRef.current || hydratedPidRef.current !== pid) return;
+      writeNewModeDraft(pid, {
+        goal,
+        platforms,
+        attachments: newAttachments,
+        updatedAt: Date.now(),
+      });
+      writeFeedbackModeDraft(pid, {
+        requestId: selectedRequestId,
+        text: feedbackText,
+        attachments: feedbackAttachments,
+        updatedAt: Date.now(),
+      });
     };
     const sub =
       typeof AppState?.addEventListener === 'function'
@@ -215,20 +211,22 @@ export default function NewRequestScreen() {
     return () => {
       sub?.remove();
     };
-  }, [pid, goal, platforms, selectedRequestId, feedbackText]);
+  }, [pid, goal, platforms, newAttachments, selectedRequestId, feedbackText, feedbackAttachments]);
 
   const onDone = useCallback(() => {
-    clearFeedbackDraft(pid);
+    clearNewModeDraft(pid);
+    clearFeedbackModeDraft(pid);
     router.replace(`/project/${encodeURIComponent(pid)}`);
   }, [pid, router]);
 
   const { state, submit } = useNewRequest(pid, onDone);
   lockedRef.current = state.phase === 'queued' || state.phase === 'done';
 
-  // 收到 queued/done 后清理反馈草稿（新需求草稿由 submit.ts 清理）
+  // 收到 queued/done 后清理两档草稿
   useEffect(() => {
     if (state.phase === 'queued' || state.phase === 'done') {
-      clearFeedbackDraft(pid);
+      clearNewModeDraft(pid);
+      clearFeedbackModeDraft(pid);
     }
   }, [pid, state.phase]);
 
@@ -274,6 +272,11 @@ export default function NewRequestScreen() {
             ? t(lang, 'new.start')
             : t(lang, 'new.feedbackSubmit');
 
+  const setModeAttachments = (updater: (prev: readonly MediaAttachment[]) => readonly MediaAttachment[]) => {
+    if (mode === 'new') setNewAttachments(updater);
+    else setFeedbackAttachments(updater);
+  };
+
   const addFromCamera = async () => {
     setMediaHint(null);
     const res = await takePhoto(lang);
@@ -281,7 +284,7 @@ export default function NewRequestScreen() {
       if (res.reason !== 'cancelled') setMediaHint(res.message);
       return;
     }
-    setAttachments((prev) => [...prev, ...res.items]);
+    setModeAttachments((prev) => [...prev, ...res.items]);
   };
 
   const addFromLibrary = async () => {
@@ -291,15 +294,15 @@ export default function NewRequestScreen() {
       if (res.reason !== 'cancelled') setMediaHint(res.message);
       return;
     }
-    setAttachments((prev) => [...prev, ...res.items]);
+    setModeAttachments((prev) => [...prev, ...res.items]);
   };
 
   const removeAttachment = (id: string) => {
-    setAttachments((prev) => prev.filter((item) => item.id !== id));
+    setModeAttachments((prev) => prev.filter((item) => item.id !== id));
   };
 
   const restoreAttachment = (item: MediaAttachment, index: number) => {
-    setAttachments((prev) => {
+    setModeAttachments((prev) => {
       if (prev.some((p) => p.id === item.id)) return prev;
       const next = [...prev];
       next.splice(Math.min(index, next.length), 0, item);
@@ -362,19 +365,20 @@ export default function NewRequestScreen() {
                       disabled: locked,
                     }}
                     onBlur={() => {
-                      if (lockedRef.current) return;
-                      if (!goal.trim() && platforms.length === 0) {
-                        clearDraft(pid);
-                        return;
-                      }
-                      writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
+                      if (lockedRef.current || hydratedPidRef.current !== pid) return;
+                      writeNewModeDraft(pid, {
+                        goal,
+                        platforms,
+                        attachments: newAttachments,
+                        updatedAt: Date.now(),
+                      });
                     }}
                     maxHeight={maxGoal}
                     placeholder={t(lang, 'new.goalPlaceholder')}
                     accessibilityLabel={t(lang, 'new.goalLabel')}
                   />
                   <AttachList
-                    items={attachments}
+                    items={newAttachments}
                     onAddCamera={() => void addFromCamera()}
                     onAddLibrary={() => void addFromLibrary()}
                     onRemove={removeAttachment}
@@ -451,7 +455,7 @@ export default function NewRequestScreen() {
                 accessibilityLabel={t(lang, 'new.feedbackLabel')}
               />
               <AttachList
-                items={attachments}
+                items={feedbackAttachments}
                 onAddCamera={() => void addFromCamera()}
                 onAddLibrary={() => void addFromLibrary()}
                 onRemove={removeAttachment}
