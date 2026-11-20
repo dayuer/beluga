@@ -28,13 +28,14 @@ describe('ChangesTab (SS-50)', () => {
     expect(screen.getByText('还没有改动记录')).toBeTruthy();
   });
 
-  it('renders read-only diff list with milestone header and pending hint', async () => {
+  it('renders read-only diff list without forcing step 1 header when ungrouped', async () => {
     setScheme('light');
     const screen = await render(
       <ChangesTab changes={DEMO_RESULT_DRAWER.changes} milestones={DEMO_RESULT_DRAWER.plan.milestones} lang="zh" />,
     );
     expect(screen.getByTestId('drawer-changes-tab-pending')).toBeTruthy();
     expect(screen.getByTestId('readonly-diff-list')).toBeTruthy();
+    expect(screen.queryByText(/第 1 步/)).toBeNull();
     expect(screen.getByText('密码明文切换按钮')).toBeTruthy();
     expect(screen.getByText('登录按钮防连点逻辑')).toBeTruthy();
   });

@@ -15,9 +15,14 @@ vi.mock('lucide-react-native', async () => {
 
 import { DEMO_RESULT_DRAWER } from '../../lib/demo/screens';
 import { setScheme } from '../../lib/theme';
-import { PlanTab } from './PlanTab';
+import { PlanTab, toMapItems } from './PlanTab';
 
-describe('PlanTab (SS-48)', () => {
+describe('PlanTab (SS-48 / SS-187)', () => {
+  it('maps waiting step status to plain tone rather than butter', () => {
+    const items = toMapItems([{ id: 'w1', title: '等待队列', status: 'waiting' }], 'zh');
+    expect(items[0]?.tone).toBe('plain');
+  });
+
   it('switches among Map, Outline, and Activity sub-tabs', async () => {
     setScheme('light');
     const screen = await render(<PlanTab plan={DEMO_RESULT_DRAWER.plan} lang="zh" />);

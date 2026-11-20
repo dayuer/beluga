@@ -64,11 +64,11 @@ export function DraftDiff({ pid, planRef, diff, draftRev, lang, onApplied, onRef
           <View style={styles.group} testID="diff-added">
             <Text style={[styles.groupTitle, { color: color.text }]}>{t(lang, 'diff.added')}</Text>
             {diff.added.map((item, i) => (
-              <View key={`a-${i}`} style={styles.row}>
+              <View key={`a-${i}`} style={[styles.row, { borderBottomColor: color.hairline }]}>
                 <Text style={[styles.sign, { color: color.ok }]}>+</Text>
                 <View style={styles.rowMain}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.meta}>
+                  <Text style={[styles.title, { color: color.text }]}>{item.title}</Text>
+                  <Text style={[styles.meta, { color: color.text3 }]}>
                     {t(lang, item.kind === 'milestone' ? 'diff.milestone' : 'diff.task')}
                     {item.under ? ` · ${item.under}` : ''}
                   </Text>
@@ -82,16 +82,27 @@ export function DraftDiff({ pid, planRef, diff, draftRev, lang, onApplied, onRef
           <View style={styles.group} testID="diff-changed">
             <Text style={[styles.groupTitle, { color: color.warn }]}>{t(lang, 'diff.changed')}</Text>
             {diff.changed.map((item, i) => (
-              <Pressable key={`c-${i}`} accessibilityRole="button" accessibilityState={{ expanded: open.has(i) }} onPress={() => toggle(i)} style={({ pressed }) => [styles.row, pressed && styles.pressed]} testID={`diff-changed-${i}`}>
+              <Pressable
+                key={`c-${i}`}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open.has(i) }}
+                onPress={() => toggle(i)}
+                style={({ pressed }) => [
+                  styles.row,
+                  { borderBottomColor: color.hairline },
+                  pressed && { backgroundColor: color.press },
+                ]}
+                testID={`diff-changed-${i}`}
+              >
                 <Text style={[styles.sign, { color: color.warn }]}>~</Text>
                 <View style={styles.rowMain}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.meta}>{t(lang, item.kind === 'milestone' ? 'diff.milestone' : 'diff.task')}</Text>
+                  <Text style={[styles.title, { color: color.text }]}>{item.title}</Text>
+                  <Text style={[styles.meta, { color: color.text3 }]}>{t(lang, item.kind === 'milestone' ? 'diff.milestone' : 'diff.task')}</Text>
                   {open.has(i) ? (
-                    <View style={styles.beforeAfter}>
-                      <Text style={styles.before}>{item.before}</Text>
-                      <Text style={styles.arrow}>→</Text>
-                      <Text style={styles.after}>{item.after}</Text>
+                    <View style={[styles.beforeAfter, { backgroundColor: color.sunken }]}>
+                      <Text style={[styles.before, { color: color.text2 }]}>{item.before}</Text>
+                      <Text style={[styles.arrow, { color: color.text2 }]}>→</Text>
+                      <Text style={[styles.after, { color: color.text }]}>{item.after}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -104,18 +115,18 @@ export function DraftDiff({ pid, planRef, diff, draftRev, lang, onApplied, onRef
           <View style={styles.group} testID="diff-removed">
             <Text style={[styles.groupTitle, { color: color.error }]}>{t(lang, 'diff.removed')}</Text>
             {diff.removed.map((item, i) => (
-              <View key={`r-${i}`} style={styles.row}>
+              <View key={`r-${i}`} style={[styles.row, { borderBottomColor: color.hairline }]}>
                 <Text style={[styles.sign, { color: color.error }]}>−</Text>
                 <View style={styles.rowMain}>
-                  <Text style={[styles.title, styles.removed]}>{item.title}</Text>
-                  <Text style={styles.meta}>{t(lang, item.kind === 'milestone' ? 'diff.milestone' : 'diff.task')}</Text>
+                  <Text style={[styles.title, styles.removed, { color: color.text2 }]}>{item.title}</Text>
+                  <Text style={[styles.meta, { color: color.text3 }]}>{t(lang, item.kind === 'milestone' ? 'diff.milestone' : 'diff.task')}</Text>
                 </View>
               </View>
             ))}
           </View>
         ) : null}
       </ScrollView>
-      <View style={[styles.footer, { paddingBottom: (keyboard > 0 ? 0 : insets.bottom) + space[4] }]}>
+      <View style={[styles.footer, { borderTopColor: color.hairline, paddingBottom: (keyboard > 0 ? 0 : insets.bottom) + space[4] }]}>
         <ReceiptLine text={notice} tone={notice === t(lang, 'plan.changesUpdated') ? 'warn' : 'error'} />
         <PrimaryButton
           label={busy ? t(lang, 'common.sending') : failed ? t(lang, 'common.retry') : t(lang, 'plan.apply')}
@@ -151,15 +162,20 @@ export function ReadOnlyDiffList({
 
   return (
     <View style={roStyles.list} testID={testID}>
-      {rows.map((row, idx) => (
-        <View
-          key={`${row.kind}-${idx}-${row.text}`}
-          style={[roStyles.row, { backgroundColor: color.card, borderColor: color.hairline }]}
-        >
-          <Text style={[roStyles.badge, roStyles[row.kind]]}>{t(lang, `diff.${row.kind}`)}</Text>
-          <Text style={[roStyles.text, { color: color.text }]}>{row.text}</Text>
-        </View>
-      ))}
+      {rows.map((row, idx) => {
+        const badgeColor = row.kind === 'added' ? color.ok : row.kind === 'changed' ? color.warn : color.error;
+        return (
+          <View
+            key={`${row.kind}-${idx}-${row.text}`}
+            style={[roStyles.row, { backgroundColor: color.card, borderColor: color.hairline }]}
+          >
+            <Text style={[roStyles.badge, { color: badgeColor, backgroundColor: color.sunken }]}>
+              {t(lang, `diff.${row.kind}`)}
+            </Text>
+            <Text style={[roStyles.text, { color: color.text }]}>{row.text}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -176,9 +192,6 @@ const roStyles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   badge: { ...type.caption, fontWeight: '600', paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.s },
-  added: { color: color.ok, backgroundColor: color.sunken },
-  changed: { color: color.warn, backgroundColor: color.sunken },
-  removed: { color: color.error, backgroundColor: color.sunken },
   text: { ...type.callout, flex: 1 },
 });
 
@@ -188,16 +201,15 @@ const styles = StyleSheet.create({
   content: { padding: space[4], gap: space[5] },
   group: { gap: space[2] },
   groupTitle: { ...type.caption, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[2], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.hairline },
-  pressed: { backgroundColor: color.press },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[2], borderBottomWidth: StyleSheet.hairlineWidth },
   sign: { ...type.heading, width: 18, textAlign: 'center' },
   rowMain: { flex: 1, gap: 2 },
-  title: { ...type.callout, color: color.text, fontWeight: '600' },
-  meta: { ...type.caption, color: color.text3 },
-  removed: { textDecorationLine: 'line-through', color: color.text2 },
-  beforeAfter: { marginTop: space[2], gap: 2, padding: space[3], backgroundColor: color.sunken, borderRadius: radius.m },
-  before: { ...type.caption, color: color.text2, textDecorationLine: 'line-through' },
-  arrow: { ...type.caption, color: color.text2 },
-  after: { ...type.caption, color: color.text },
-  footer: { paddingHorizontal: space[4], paddingTop: space[2], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  title: { ...type.callout, fontWeight: '600' },
+  meta: { ...type.caption },
+  removed: { textDecorationLine: 'line-through' },
+  beforeAfter: { marginTop: space[2], gap: 2, padding: space[3], borderRadius: radius.m },
+  before: { ...type.caption, textDecorationLine: 'line-through' },
+  arrow: { ...type.caption },
+  after: { ...type.caption },
+  footer: { paddingHorizontal: space[4], paddingTop: space[2], borderTopWidth: StyleSheet.hairlineWidth },
 });

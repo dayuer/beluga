@@ -22,7 +22,7 @@ export interface PlanTabProps {
 const STEP_TONE: Record<StepStatus, PlanTone> = {
   done: 'mint',
   active: 'sky',
-  waiting: 'butter',
+  waiting: 'plain',
   todo: 'plain',
 };
 
@@ -36,7 +36,7 @@ const STEP_LABEL_KEY: Record<
   todo: 'steps.status.todo',
 };
 
-function toMapItems(milestones: readonly RequestStep[], lang: Lang): MapItem[] {
+export function toMapItems(milestones: readonly RequestStep[], lang: Lang): MapItem[] {
   return milestones.map((m, i) => ({
     id: m.id,
     title: m.title,
