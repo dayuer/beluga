@@ -274,9 +274,11 @@ function reinstallApp(udid, appPath) {
 }
 
 function expandFlowPaths(targets) {
-  const inputs = targets.length ? targets : ['e2e/maestro'];
+  if (!targets.length) {
+    return ['e2e/maestro/flow.yaml', 'e2e/maestro/plan.yaml'];
+  }
   const flows = [];
-  for (const target of inputs) {
+  for (const target of targets) {
     const abs = path.resolve(appDir, target);
     if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) {
       const files = fs

@@ -101,6 +101,9 @@ appId: com.synon.studio
 - extendedWaitUntil:
     visible: ".*草稿要留住.*"
     timeout: 15000
+- assertVisible:
+    id: "platform-ios"
+    selected: true
 
 - launchApp:
     clearState: false
@@ -120,6 +123,9 @@ appId: com.synon.studio
 - extendedWaitUntil:
     visible: ".*草稿要留住.*"
     timeout: 15000
+- assertVisible:
+    id: "platform-ios"
+    selected: true
 - tapOn:
     id: "goal-input"
 - assertVisible:

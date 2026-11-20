@@ -240,7 +240,7 @@ appId: com.synon.studio
     timeout: 15000
 
 # No internal identifiers exposed
-- assertNotVisible: ".*(/Users/|planRef|opId|plan1).*"
+- assertNotVisible: ".*(/Users/|planRef|opId|plan1|```|[A-Z]{2,}-[0-9]+).*"
 
 # 2. Primary action: confirm, send back, pass (with undo wait), decide (cancel & answer), apply changes
 - runScript:
@@ -305,12 +305,13 @@ appId: com.synon.studio
     visible:
       id: "reason-input"
     timeout: 10000
+- tapOn:
+    id: "reason-input"
+- inputText: "太短了"
 - assertVisible:
     id: "reason-submit"
     enabled: false
-- tapOn:
-    id: "reason-input"
-- inputText: "和我想的不一样，提醒时间不能改"
+- inputText: "，和我想的不一样，提醒时间不能改"
 - runScript:
     file: scripts/control.js
     env:
@@ -583,6 +584,10 @@ appId: com.synon.studio
     visible:
       id: "todo-card"
     timeout: 20000
+- assertNotVisible:
+    id: "primary"
+- assertVisible:
+    id: "todo-not-yet"
 - assertVisible: ".*记录喝水.*"
 - assertVisible:
     id: "tab-todo-count"
@@ -596,6 +601,10 @@ appId: com.synon.studio
       ACTION: hubOffline
 - tapOn:
     id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 15000
 - assertVisible:
     id: "todo-card"
 - runScript:
@@ -716,6 +725,20 @@ appId: com.synon.studio
       KIND: chat.send
 - tapOn:
     id: "chat-input"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":false,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000},{"id":"t-new","who":"ai","text":"新的回复","at":1760000001000}]}'
+- extendedWaitUntil:
+    visible: ".*新的回复.*"
+    timeout: 10000
+- inputText: "还在打字"
+- assertVisible:
+    id: "chat-input"
+    text: ".*还在打字.*"
+- eraseText: 4
 - inputText: "你好"
 - doubleTapOn:
     id: "chat-send"
