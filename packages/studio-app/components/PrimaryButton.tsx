@@ -26,6 +26,9 @@ const DONE_HOLD_MS = 1200;
  * working 时不可点、锁定空闲时测得的宽度并显示转圈；done 显示对勾 1.2 秒后回调；
  * 失败回 idle 并在旁边一行显示原因。
  */
+/** How long a tap blocks the next one when the caller never changes state. */
+export const REARM_MS = 800;
+
 export function PrimaryButton({
   label,
   onPress,
@@ -63,10 +66,22 @@ export function PrimaryButton({
     }
   };
 
+  const rearmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (rearmTimer.current) clearTimeout(rearmTimer.current);
+  }, []);
+
   const handlePress = () => {
     if (off || firedInCurrentIdle.current) return;
     firedInCurrentIdle.current = true;
     onPress();
+    // A button whose state never leaves idle (plain navigation) must work
+    // again later; the short window still swallows an accidental double tap.
+    if (rearmTimer.current) clearTimeout(rearmTimer.current);
+    rearmTimer.current = setTimeout(() => {
+      rearmTimer.current = null;
+      firedInCurrentIdle.current = false;
+    }, REARM_MS);
   };
 
   return (

@@ -49,6 +49,7 @@ import {
   getOrCreateDeviceId,
   getPushEnabled,
   initPushRegistration,
+  openNotificationSettings,
   registerPush,
   setPushEnabled,
   unregisterPush,
@@ -154,6 +155,35 @@ describe('push registration', () => {
       expect(res.hint).toContain('通知');
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never opens system Settings on its own when permission cannot be asked again', async () => {
+    const openSettings = vi.fn(async () => {});
+    const notifications = makeNotifications({
+      getPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: false })),
+      requestPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: false })),
+    });
+    const res = await registerPush(
+      { askPermission: true },
+      {
+        kv: memKv,
+        notifications,
+        fetch: vi.fn() as unknown as typeof fetch,
+        getToken: () => 'sess-1',
+        platform: 'ios',
+        lang: 'zh',
+        isDemo: () => false,
+        openSettings,
+      },
+    );
+    expect(res).toMatchObject({ ok: false, reason: 'denied', hint: deniedPermissionHint('zh', 'ios') });
+    expect(openSettings).not.toHaveBeenCalled();
+  });
+
+  it('opens system Settings only when explicitly asked', async () => {
+    const openSettings = vi.fn(async () => {});
+    await openNotificationSettings({ openSettings });
+    expect(openSettings).toHaveBeenCalledTimes(1);
   });
 
   it('respects me-account pushEnabled toggle and unregisters on logout', async () => {

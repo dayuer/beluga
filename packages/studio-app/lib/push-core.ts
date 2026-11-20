@@ -158,7 +158,8 @@ export async function requestPushPermission(ask: boolean, deps: PushCoreDeps): P
       return { status: 'denied', canAskAgain: canAsk, hint: deniedPermissionHint(lang, platform) };
     }
     if (!canAsk) {
-      await deps.openSettings?.();
+      // Never jump to system Settings on our own: the hint explains how, and
+      // only an explicit tap (openNotificationSettings) opens Settings.
       return { status: 'denied', canAskAgain: false, hint: deniedPermissionHint(lang, platform) };
     }
     const next = await deps.notifications.requestPermissionsAsync();

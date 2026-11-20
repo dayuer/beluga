@@ -53,3 +53,5 @@ export const useWindowDimensions = () => ({ width: 390, height: 844, scale: 3, f
 export const Keyboard = { addListener: () => ({ remove: () => {} }) };
 export const processColor = (c: unknown) => c;
 export const codegenNativeComponent = (name: string) => createHost(name);
+export const NativeModules = {};
+export const TurboModuleRegistry = { get: () => null, getEnforcing: () => ({}) };

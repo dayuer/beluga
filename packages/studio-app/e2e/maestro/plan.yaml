@@ -1,0 +1,865 @@
+appId: com.synon.studio
+---
+# 1. Plan page follows daemon updates, tabs, milestone sheet, offline banners, and no internal leaks
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "project-card-${E2E_PROJECT_ID}"
+    timeout: 25000
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    id: "project-card-${E2E_PROJECT_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "plan-row-plan1"
+    timeout: 20000
+- tapOn:
+    id: "plan-row-plan1"
+- extendedWaitUntil:
+    visible:
+      id: "plan-header"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*AI 在做.*"
+    timeout: 15000
+- takeScreenshot: plan-map
+
+# Map zoom controls
+- tapOn:
+    id: "zoom-out"
+- tapOn:
+    id: "zoom-in"
+- tapOn:
+    id: "zoom-in"
+- tapOn:
+    id: "zoom-out"
+- assertVisible:
+    id: "map-node-1"
+
+# Daemon view: confirm + milestone sheet
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: confirm
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*确认计划.*"
+    timeout: 10000
+- assertVisible: ".*计划已拟好.*"
+- takeScreenshot: plan-confirm
+
+- tapOn:
+    id: "map-node-1"
+- extendedWaitUntil:
+    visible:
+      id: "milestone-sheet"
+    timeout: 10000
+- assertVisible: ".*里程碑详情.*"
+- tapOn:
+    id: "milestone-sheet-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "milestone-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "primary"
+
+# Outline & Activity tabs
+- tapOn:
+    id: "tab-outline"
+- extendedWaitUntil:
+    visible: ".*记录喝水.*"
+    timeout: 10000
+- takeScreenshot: plan-outline
+- tapOn:
+    id: "tab-activity"
+- extendedWaitUntil:
+    visible: ".*开始做每日提醒.*"
+    timeout: 10000
+- takeScreenshot: plan-activity
+- tapOn:
+    id: "tab-map"
+
+# Phase table: awaitingStart -> approve -> decide -> review -> changes -> done -> draftingAi -> awaitingChanges
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingStart
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*在等工作室批准开工.*"
+    timeout: 10000
+- takeScreenshot: plan-awaiting-start
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonApprove
+- extendedWaitUntil:
+    notVisible:
+      id: "plan-status"
+      text: ".*在等工作室批准开工.*"
+    timeout: 10000
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*回答 1 个问题.*"
+    timeout: 10000
+- takeScreenshot: plan-decide
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*验收.*"
+    timeout: 10000
+- takeScreenshot: plan-review
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*查看计划改动.*"
+    timeout: 10000
+- takeScreenshot: plan-changes
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: done
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*已完成.*"
+    timeout: 10000
+- takeScreenshot: plan-done
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: draftingAi
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*AI 正在写计划.*"
+    timeout: 10000
+- takeScreenshot: plan-drafting
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingChanges
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*在等工作室批准改动.*"
+    timeout: 10000
+- takeScreenshot: plan-awaiting-changes
+
+# Studio offline & recovery
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStop
+- extendedWaitUntil:
+    visible:
+      id: "studio-offline"
+    timeout: 20000
+- takeScreenshot: plan-studio-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStart
+- extendedWaitUntil:
+    notVisible:
+      id: "studio-offline"
+    timeout: 30000
+
+# Client offline & recovery
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "more"
+- tapOn:
+    id: "menu-refresh"
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 15000
+- takeScreenshot: plan-you-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- tapOn:
+    id: "more"
+- tapOn:
+    id: "menu-refresh"
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 15000
+
+# No internal identifiers exposed
+- assertNotVisible: ".*(/Users/|planRef|opId|plan1|```|[A-Z]{2,}-[0-9]+).*"
+
+# 2. Primary action: confirm, send back, pass (with undo wait), decide (cancel & answer), apply changes
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonReset
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "plan-row-plan1"
+    timeout: 10000
+- tapOn:
+    id: "plan-row-plan1"
+- extendedWaitUntil:
+    visible:
+      id: "plan-header"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: confirm
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*确认计划.*"
+    timeout: 10000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*在等工作室批准开工.*"
+    timeout: 10000
+- assertNotVisible:
+    id: "primary"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonApprove
+- extendedWaitUntil:
+    notVisible:
+      id: "plan-status"
+      text: ".*在等工作室批准开工.*"
+    timeout: 10000
+
+# Review: send back requires >= 10 chars
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*通过.*"
+    timeout: 10000
+- tapOn:
+    id: "not-yet"
+- extendedWaitUntil:
+    visible:
+      id: "reason-input"
+    timeout: 10000
+- tapOn:
+    id: "reason-input"
+- inputText: "太短了"
+- assertVisible:
+    id: "reason-submit"
+    enabled: false
+- inputText: "，和我想的不一样，提醒时间不能改"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: milestone.sendBack
+- tapOn:
+    id: "reason-submit"
+- extendedWaitUntil:
+    notVisible:
+      id: "plan-status"
+      text: ".*验收.*"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: milestone.sendBack
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# Review: pass with 10s undo countdown
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*通过.*"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: milestone.pass
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*撤销.*"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible:
+      id: "plan-status"
+      text: ".*验收.*"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: milestone.pass
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# Decide: cancel sends nothing; real answer waits out 10s
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*回答.*"
+    timeout: 10000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "decision-card"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: decision.answer
+- tapOn:
+    id: "decision-option-o0"
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*撤销.*"
+    timeout: 5000
+- tapOn:
+    id: "primary"
+- tapOn:
+    id: "drawer-close"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: decision.answer
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "0"
+
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "decision-card"
+    timeout: 10000
+- tapOn:
+    id: "decision-option-o0"
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*撤销.*"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible:
+      id: "primary"
+      text: ".*撤销.*"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: decision.answer
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# Changes: apply
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- extendedWaitUntil:
+    visible:
+      id: "primary"
+      text: ".*应用改动.*"
+    timeout: 10000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "plan-status"
+      text: ".*在等工作室批准改动.*"
+    timeout: 10000
+- assertNotVisible:
+    id: "primary"
+
+# 3. Draft diff: added, changed, removed; apply or discard
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonReset
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "project-card-${E2E_PROJECT_ID}"
+    timeout: 20000
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    id: "project-card-${E2E_PROJECT_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "plan-row-plan1"
+    timeout: 15000
+- tapOn:
+    id: "plan-row-plan1"
+- extendedWaitUntil:
+    visible:
+      id: "plan-header"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- extendedWaitUntil:
+    visible:
+      id: "changes-summary"
+    timeout: 10000
+- tapOn:
+    id: "changes-summary"
+- extendedWaitUntil:
+    visible:
+      id: "draft-diff"
+    timeout: 10000
+- assertVisible: ".*每周统计.*"
+- assertVisible: ".*每日提醒.*"
+- assertVisible: ".*固定文案提醒.*"
+- tapOn:
+    id: "diff-changed-0"
+- extendedWaitUntil:
+    visible: ".*可以自己设次数.*"
+    timeout: 10000
+- takeScreenshot: plan-diff
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: draft.apply
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    notVisible:
+      id: "draft-diff"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: draft.apply
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- extendedWaitUntil:
+    visible:
+      id: "changes-summary"
+    timeout: 10000
+- tapOn:
+    id: "more"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: draft.discard
+- tapOn:
+    id: "menu-discard"
+- extendedWaitUntil:
+    visible:
+      id: "discard-cancel"
+    timeout: 10000
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    notVisible:
+      id: "changes-summary"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: draft.discard
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 4. To-dos: dot on project card, list, offline retention, pass on card, answer opens plan
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonReset
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "projects-screen"
+    timeout: 20000
+- tapOn:
+    id: "tab-todo"
+- extendedWaitUntil:
+    visible:
+      id: "todo-screen"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 20000
+- assertNotVisible:
+    id: "primary"
+- assertVisible:
+    id: "todo-not-yet"
+- assertVisible: ".*记录喝水.*"
+- assertVisible:
+    id: "tab-todo-count"
+    text: "1"
+- takeScreenshot: todo
+
+# To-do offline cache: cached list stays visible when hub is unreachable
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 15000
+- assertVisible:
+    id: "todo-card"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 15000
+
+# Project card carries the same dot
+- tapOn:
+    id: "tab-requests"
+- extendedWaitUntil:
+    visible:
+      id: "project-dot"
+    timeout: 15000
+- tapOn:
+    id: "tab-todo"
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 15000
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: milestone.pass
+- tapOn:
+    id: "todo-approve"
+- extendedWaitUntil:
+    visible:
+      id: "todo-approve"
+      text: ".*撤销.*"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible:
+      id: "todo-card"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: milestone.pass
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 20000
+- tapOn:
+    id: "todo-answer"
+- extendedWaitUntil:
+    visible:
+      id: "decision-card"
+    timeout: 15000
+- tapOn:
+    id: "drawer-close"
+
+# 5. Chat drawer: studio turn, typing indicator, double-tap send dedup, unread dot, offline retry, keyboard
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonReset
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- extendedWaitUntil:
+    visible:
+      id: "chat-open"
+    timeout: 10000
+- tapOn:
+    id: "chat-open"
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+- assertVisible: ".*小王 · Studio.*"
+- tapOn:
+    id: "drawer-handle"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":true,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- extendedWaitUntil:
+    visible:
+      id: "chat-typing"
+    timeout: 10000
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":false,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: chat.send
+- tapOn:
+    id: "chat-input"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":false,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000},{"id":"t-new","who":"ai","text":"新的回复","at":1760000001000}]}'
+- extendedWaitUntil:
+    visible: ".*新的回复.*"
+    timeout: 10000
+- inputText: "还在打字"
+- assertVisible:
+    id: "chat-input"
+    text: ".*还在打字.*"
+- eraseText: 4
+- inputText: "你好"
+- doubleTapOn:
+    id: "chat-send"
+- extendedWaitUntil:
+    visible: ".*你好.*"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: chat.send
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+- takeScreenshot: plan-chat
+
+# Unread dot
+- tapOn:
+    id: "drawer-close"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000},{"id":"t-unread","who":"ai","text":"你不在时的新消息","at":1999999999999}]}'
+- extendedWaitUntil:
+    visible:
+      id: "chat-unread"
+    timeout: 10000
+- tapOn:
+    id: "chat-open"
+- tapOn:
+    id: "drawer-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "chat-unread"
+    timeout: 10000
+
+# Failed send keeps text and retry works
+- tapOn:
+    id: "chat-open"
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 10000
+- tapOn:
+    id: "chat-input"
+- inputText: "断网也要留住"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "chat-send"
+- extendedWaitUntil:
+    visible: ".*没发出去 · 重试.*"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: chat.send
+- tapOn:
+    id: "chat-retry-.*"
+- extendedWaitUntil:
+    notVisible: ".*没发出去 · 重试.*"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: chat.send
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# Keyboard visible with chat input
+- tapOn:
+    id: "chat-input"
+- assertVisible:
+    id: "chat-input"
+- tapOn:
+    id: "drawer-close"

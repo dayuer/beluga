@@ -98,7 +98,7 @@ export default function TodoScreen() {
     [router],
   );
 
-  const offline = !online;
+  const offline = !online || error === 'offline';
   const fetchedAt = result?.fetchedAt ?? 0;
   const emptyAll = needsYou.length === 0 && waiting.length === 0;
 
