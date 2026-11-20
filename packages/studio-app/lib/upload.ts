@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { File, FileMode, Paths } from 'expo-file-system';
 import type { PackageEntry } from './package-pick';
-import { isOnline, subscribeOnline } from './net';
+import { isOnline, refreshOnline, subscribeOnline } from './net';
 import { onResume } from './resume';
 import { session } from './session';
 import {
@@ -18,12 +18,12 @@ import {
 import { inflateRawStream } from './zip-inflate';
 
 /**
- * 设计稿包分块上传与断网/回前台续传（SS-86）：
- * - 复用 `upload-state.ts` 的状态机与 `kv` 持久化；
- * - 按 studio-hub `/v1/app/uploads` 会话接口分块读取与上传；
- * - 断网时自动暂停，恢复在线或 App 回到前台时先查询 `GET /v1/app/uploads/:sessionId` 已收块，
- *   再续传缺失分块，绝不重传已收块；
- * - 与 `lib/submit.ts` 完全解耦：确认清单开会话后即可异步上传，需求可先发，设计稿卡订阅进度。
+ * 设计稿包分块上传与断网/回前台续传（SS-86 / SS-154 / SS-155 / SS-156 / SS-157 / SS-158）：
+ * - `start()` 同步写入 `preparing` 状态后立即返回，算哈希、开会话、传块全部在后台异步执行，
+ *   调用方（发需求）无需等待上传；
+ * - 遇到任何网络异常（含非 TypeError 错误）或 5xx 时，先主动 `refreshOnline()` 探测一次，
+ *   并进入 `paused` 以便恢复联网或回前台时续传；仅 4xx 拒绝或源文件失效才进 `failed`；
+ * - 会话及文件来源持久化在 `kv` 中，App 重启后无需手动绑定即可直接续传。
  */
 
 export interface UploadSessionStatusResponse {
@@ -45,6 +45,7 @@ export interface UploaderDeps {
   readonly fetch?: typeof fetch;
   readonly getToken?: () => string | undefined;
   readonly isOnline?: () => boolean;
+  readonly refreshOnline?: () => Promise<boolean>;
   readonly subscribeOnline?: (listener: (online: boolean) => void) => () => void;
   readonly onResume?: (listener: () => void) => () => void;
   readonly stateMachine?: UploadStateMachine;
@@ -62,18 +63,36 @@ export interface PackageUploader {
   readonly machine: UploadStateMachine;
   getProgress(): UploadProgress;
   subscribe(listener: UploadProgressListener): () => void;
-  start(input: StartUploadInput): Promise<string>;
+  start(input: StartUploadInput): Promise<void>;
   pause(): void;
   resume(): Promise<void>;
   dispose(): void;
 }
 
+class HubRejectedError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+class HubTransientError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const HASH_CHUNK_BYTES = 512 * 1024;
+
 const envBase = (): string => {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
   return (env?.EXPO_PUBLIC_HUB_URL ?? '').replace(/\/+$/, '');
 };
-
-const HASH_CHUNK_BYTES = 512 * 1024;
 
 function sha256Hex(data: Uint8Array): string {
   return bytesToHex(sha256(data));
@@ -216,11 +235,26 @@ export function createExpoChunkReader(): ChunkReader {
   };
 }
 
+function isFatalError(err: unknown): boolean {
+  if (err instanceof HubRejectedError) return true;
+  if (err instanceof Error) {
+    return (
+      err.message.startsWith('source-missing:') ||
+      err.message.startsWith('zip-crc32-mismatch') ||
+      err.message.startsWith('zip-size-mismatch') ||
+      err.message.startsWith('invalid-deflate:') ||
+      err.message.startsWith('unsupported-zip-compression:')
+    );
+  }
+  return false;
+}
+
 export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader {
   const base = (deps.base ?? envBase()).replace(/\/+$/, '');
   const doFetch = deps.fetch ?? fetch;
   const getToken = deps.getToken ?? (() => session.token());
   const checkOnline = deps.isOnline ?? isOnline;
+  const probeOnline = deps.refreshOnline ?? refreshOnline;
   const watchOnline = deps.subscribeOnline ?? subscribeOnline;
   const watchResume = deps.onResume ?? onResume;
   const machine = deps.stateMachine ?? createUploadStateMachine();
@@ -229,7 +263,6 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
 
   const entryMap = new Map<number, PackageEntry>();
   let activeRunId = 0;
-  let runningLoop: Promise<void> | null = null;
   let pausedByOffline = false;
 
   const restoreEntriesFromState = (): void => {
@@ -263,14 +296,32 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
     return headers;
   };
 
+  const throwForBadStatus = (res: Response, prefix: string): never => {
+    if (res.status >= 400 && res.status < 500) {
+      throw new HubRejectedError(res.status, `${prefix}:${res.status}`);
+    }
+    throw new HubTransientError(res.status, `${prefix}:${res.status}`);
+  };
+
+  const handleFailure = async (runId: number, err: unknown, fallbackMsg: string): Promise<void> => {
+    if (runId !== activeRunId) return;
+    if (isFatalError(err)) {
+      machine.fail(err instanceof Error ? err.message : fallbackMsg);
+      cleanupSessionTemp();
+      return;
+    }
+    await probeOnline().catch(() => false);
+    if (runId !== activeRunId) return;
+    pausedByOffline = true;
+    machine.pause();
+  };
+
   const fetchServerStatus = async (sessionId: string): Promise<UploadSessionStatusResponse> => {
     const res = await doFetch(`${base}/v1/app/uploads/${encodeURIComponent(sessionId)}`, {
       method: 'GET',
       headers: authHeaders(),
     });
-    if (!res.ok) {
-      throw new Error(`hub-upload-resume-failed:${res.status}`);
-    }
+    if (!res.ok) throwForBadStatus(res, 'hub-upload-resume-failed');
     return (await res.json()) as UploadSessionStatusResponse;
   };
 
@@ -295,9 +346,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
         body,
       },
     );
-    if (!res.ok) {
-      throw new Error(`hub-upload-part-failed:${res.status}`);
-    }
+    if (!res.ok) throwForBadStatus(res, 'hub-upload-part-failed');
   };
 
   const completeSession = async (sessionId: string): Promise<void> => {
@@ -305,124 +354,160 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
       method: 'POST',
       headers: authHeaders({ 'content-type': 'application/json' }),
     });
-    if (!res.ok) {
-      throw new Error(`hub-upload-complete-failed:${res.status}`);
-    }
+    if (!res.ok) throwForBadStatus(res, 'hub-upload-complete-failed');
   };
 
-  const runLoop = (chunksToSend: readonly UploadChunkSpec[]): Promise<void> => {
-    const runId = ++activeRunId;
-    const promise = (async () => {
-      const state = machine.getState();
-      if (!state) return;
+  const runLoop = async (runId: number, chunksToSend: readonly UploadChunkSpec[]): Promise<void> => {
+    const state = machine.getState();
+    if (!state || !state.sessionId) return;
 
-      for (const chunk of chunksToSend) {
-        if (runId !== activeRunId) return;
-        const latest = machine.getState();
-        if (!latest || latest.status !== 'uploading') return;
-        if (!checkOnline()) {
-          pausedByOffline = true;
-          machine.pause();
-          return;
-        }
-        const entry = entryMap.get(chunk.fileIndex);
-        if (!entry) {
-          machine.fail(`missing-entry:${chunk.fileIndex}`);
-          cleanupSessionTemp();
-          return;
-        }
-        if (reader.exists && !reader.exists(entry)) {
-          machine.fail(`source-missing:${entry.path}`);
-          cleanupSessionTemp();
-          return;
-        }
+    for (const chunk of chunksToSend) {
+      if (runId !== activeRunId) return;
+      const latest = machine.getState();
+      if (!latest || !latest.sessionId || latest.status !== 'uploading') return;
+      if (!checkOnline()) {
+        pausedByOffline = true;
+        machine.pause();
+        return;
+      }
+      const entry = entryMap.get(chunk.fileIndex);
+      if (!entry) {
+        machine.fail(`missing-entry:${chunk.fileIndex}`);
+        cleanupSessionTemp();
+        return;
+      }
+      if (reader.exists && !reader.exists(entry)) {
+        machine.fail(`source-missing:${entry.path}`);
+        cleanupSessionTemp();
+        return;
+      }
 
-        try {
-          await uploadSingleChunk(latest.sessionId, chunk, entry);
-        } catch (err) {
-          if (runId !== activeRunId) return;
-          const msg = err instanceof Error ? err.message : 'upload-part-error';
-          if (msg.startsWith('source-missing:')) {
-            machine.fail(msg);
-            cleanupSessionTemp();
-            return;
-          }
-          if (!checkOnline() || err instanceof TypeError) {
-            pausedByOffline = true;
-            machine.pause();
-            return;
-          }
-          machine.fail(msg);
-          return;
-        }
-
-        if (runId !== activeRunId) return;
-        machine.markPartReceived(chunk.fileIndex, chunk.partNumber);
+      try {
+        await uploadSingleChunk(latest.sessionId, chunk, entry);
+      } catch (err) {
+        await handleFailure(runId, err, 'upload-part-error');
+        return;
       }
 
       if (runId !== activeRunId) return;
-      const doneState = machine.getState();
-      if (!doneState || doneState.status !== 'uploading') return;
+      machine.markPartReceived(chunk.fileIndex, chunk.partNumber);
+    }
 
-      try {
-        await completeSession(doneState.sessionId);
+    if (runId !== activeRunId) return;
+    const doneState = machine.getState();
+    if (!doneState || !doneState.sessionId || doneState.status !== 'uploading') return;
+
+    try {
+      await completeSession(doneState.sessionId);
+      if (runId !== activeRunId) return;
+      machine.complete();
+      cleanupSessionTemp();
+    } catch (err) {
+      await handleFailure(runId, err, 'upload-complete-error');
+    }
+  };
+
+  const prepareAndBeginSession = async (runId: number): Promise<void> => {
+    const state = machine.getState();
+    if (!state || state.sessionId !== null) return;
+    if (runId !== activeRunId) return;
+
+    if (!checkOnline()) {
+      pausedByOffline = true;
+      machine.pause();
+      return;
+    }
+
+    const batchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const preparedUpdates: Array<{ sha256: string; source: PackageEntry['source'] }> = [];
+    const manifestFiles: Array<{ path: string; size: number; sha256: string }> = [];
+
+    try {
+      for (let i = 0; i < state.files.length; i++) {
         if (runId !== activeRunId) return;
-        machine.complete();
-        cleanupSessionTemp();
-      } catch (err) {
-        if (runId !== activeRunId) return;
-        if (!checkOnline() || err instanceof TypeError) {
-          pausedByOffline = true;
-          machine.pause();
+        const planFile = state.files[i]!;
+        const rawEntry = entryMap.get(i);
+        if (!rawEntry) {
+          machine.fail(`missing-entry:${i}`);
+          cleanupSessionTemp();
           return;
         }
-        machine.fail(err instanceof Error ? err.message : 'upload-complete-error');
-        cleanupSessionTemp();
+        if (reader.exists && !reader.exists(rawEntry)) {
+          machine.fail(`source-missing:${rawEntry.path}`);
+          cleanupSessionTemp();
+          return;
+        }
+        const entry = reader.prepareEntry
+          ? await reader.prepareEntry(rawEntry, `${batchId}-${i}`)
+          : rawEntry;
+        entryMap.set(i, entry);
+        const fileSha = planFile.sha256 ?? (await reader.computeSha256(entry));
+        preparedUpdates.push({ sha256: fileSha, source: entry.source });
+        manifestFiles.push({ path: entry.path, size: entry.size, sha256: fileSha });
       }
-    })();
 
-    runningLoop = promise.finally(() => {
-      if (runningLoop === promise) runningLoop = null;
-    });
-    return runningLoop;
+      if (runId !== activeRunId) return;
+      const res = await doFetch(`${base}/v1/app/uploads`, {
+        method: 'POST',
+        headers: authHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({
+          projectId: state.projectId,
+          name: state.name,
+          files: manifestFiles,
+        }),
+      });
+      if (!res.ok) throwForBadStatus(res, 'hub-upload-begin-failed');
+      const created = (await res.json()) as { readonly sessionId: string };
+      if (runId !== activeRunId) return;
+
+      const attached = machine.attachSession(created.sessionId, preparedUpdates);
+      const missing = computeMissingChunks(attached.files);
+      await runLoop(runId, missing);
+    } catch (err) {
+      await handleFailure(runId, err, 'upload-begin-error');
+    }
   };
 
   const resumeFromServer = async (): Promise<void> => {
     restoreEntriesFromState();
     const state = machine.getState();
     if (!state || state.status === 'done') return;
+
     if (!checkOnline()) {
       pausedByOffline = true;
-      if (state.status === 'uploading') machine.pause();
+      if (state.status === 'uploading' || state.status === 'preparing') machine.pause();
       return;
     }
 
-    // 中止当前正在进行的旧循环，避免并发重传
-    activeRunId += 1;
+    const runId = ++activeRunId;
     pausedByOffline = false;
+
+    if (state.sessionId === null) {
+      machine.resume();
+      await prepareAndBeginSession(runId);
+      return;
+    }
 
     try {
       const serverStatus = await fetchServerStatus(state.sessionId);
+      if (runId !== activeRunId) return;
       if (serverStatus.status === 'ready') {
         machine.reconcileServerParts(serverStatus.files);
         machine.complete();
+        cleanupSessionTemp();
         return;
       }
       if (serverStatus.status === 'expired' || serverStatus.status === 'failed') {
         machine.fail(`session-${serverStatus.status}`);
+        cleanupSessionTemp();
         return;
       }
 
       const missing = machine.reconcileServerParts(serverStatus.files);
       machine.resume();
-      await runLoop(missing);
+      await runLoop(runId, missing);
     } catch (err) {
-      if (!checkOnline() || err instanceof TypeError) {
-        pausedByOffline = true;
-        machine.pause();
-        return;
-      }
-      machine.fail(err instanceof Error ? err.message : 'resume-error');
+      await handleFailure(runId, err, 'resume-error');
     }
   };
 
@@ -430,7 +515,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
     const state = machine.getState();
     if (!state || state.status === 'done') return;
     if (!online) {
-      if (state.status === 'uploading') {
+      if (state.status === 'uploading' || state.status === 'preparing') {
         activeRunId += 1;
         pausedByOffline = true;
         machine.pause();
@@ -445,7 +530,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
   const unsubResume = watchResume(() => {
     const state = machine.getState();
     if (!state || state.status === 'done' || state.status === 'idle') return;
-    if (state.status === 'uploading' || state.status === 'paused') {
+    if (state.status === 'uploading' || state.status === 'preparing' || state.status === 'paused') {
       void resumeFromServer();
     }
   });
@@ -457,54 +542,18 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
 
     async start(input) {
       entryMap.clear();
-      const manifestFiles: Array<{
-        path: string;
-        size: number;
-        sha256: string;
-        source: PackageEntry['source'];
-      }> = [];
-      const batchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       for (let i = 0; i < input.entries.length; i++) {
-        const rawEntry = input.entries[i]!;
-        const entry = reader.prepareEntry
-          ? await reader.prepareEntry(rawEntry, `${batchId}-${i}`)
-          : rawEntry;
-        entryMap.set(i, entry);
-        const sha256 = await reader.computeSha256(entry);
-        manifestFiles.push({
-          path: entry.path,
-          size: entry.size,
-          sha256,
-          source: entry.source,
-        });
+        entryMap.set(i, input.entries[i]!);
       }
-
-      const res = await doFetch(`${base}/v1/app/uploads`, {
-        method: 'POST',
-        headers: authHeaders({ 'content-type': 'application/json' }),
-        body: JSON.stringify({
-          projectId: input.projectId,
-          name: input.name,
-          files: manifestFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`hub-upload-begin-failed:${res.status}`);
-      }
-      const created = (await res.json()) as { readonly sessionId: string };
-
-      const record = machine.initSession({
-        sessionId: created.sessionId,
+      machine.beginPreparing({
         projectId: input.projectId,
         name: input.name,
-        files: manifestFiles,
+        files: input.entries.map((e) => ({ path: e.path, size: e.size, source: e.source })),
         chunkSize,
       });
-      machine.start();
-      const initialMissing = computeMissingChunks(record.files);
-      // 异步启动传输，不阻塞调用方继续发需求
-      void runLoop(initialMissing);
-      return created.sessionId;
+      const runId = ++activeRunId;
+      pausedByOffline = false;
+      void prepareAndBeginSession(runId);
     },
 
     pause() {

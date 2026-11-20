@@ -180,6 +180,7 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       fetch: fakeFetch as unknown as typeof fetch,
       getToken: () => 'tok_1',
       isOnline: () => online,
+      refreshOnline: async () => online,
       subscribeOnline: (l) => {
         onlineListeners.add(l);
         return () => onlineListeners.delete(l);
@@ -193,12 +194,12 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       chunkSize: 100,
     });
 
-    const sessionId = await uploader.start({
+    await uploader.start({
       projectId: 'proj_1',
       name: 'pack.zip',
       entries,
     });
-    expect(sessionId).toBe('up_fake_1');
+    expect(uploader.getProgress().status).toBe('preparing');
 
     // 等待断网触发暂停
     await waitUntil(() => uploader.getProgress().status === 'paused');
@@ -516,6 +517,7 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       fetch: fakeFetch as unknown as typeof fetch,
       getToken: () => 'tok_r',
       isOnline: () => online,
+      refreshOnline: async () => online,
       subscribeOnline: () => () => {},
       onResume: () => () => {},
       stateMachine: createUploadStateMachine({ storage: sharedKv }),
@@ -539,6 +541,7 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       fetch: fakeFetch as unknown as typeof fetch,
       getToken: () => 'tok_r',
       isOnline: () => online,
+      refreshOnline: async () => online,
       subscribeOnline: (l) => {
         onlineListeners2.add(l);
         return () => onlineListeners2.delete(l);
@@ -594,5 +597,159 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
     expect(uploader3.getProgress().status).toBe('failed');
     expect(uploader3.getProgress().error).toContain('source-missing');
     uploader3.dispose();
+  });
+
+  it('emits preparing immediately, allows sending requirement before 38-file 86 MB upload finishes', async () => {
+    // 38 个文件，总计 86 MB（含 1 个 12 MB 大文件跨 3 个 5 MB 分块）
+    const files: PackageEntry[] = [
+      {
+        path: 'screens/hero-12mb.png',
+        size: 12 * 1024 * 1024,
+        source: { kind: 'file', uri: 'file:///mock/hero-12mb.png' },
+      },
+    ];
+    const perSmall = Math.floor((86 * 1024 * 1024 - 12 * 1024 * 1024) / 37);
+    for (let i = 1; i < 38; i++) {
+      files.push({
+        path: `screens/page-${i}.png`,
+        size: i === 37 ? 86 * 1024 * 1024 - 12 * 1024 * 1024 - perSmall * 36 : perSmall,
+        source: { kind: 'file', uri: `file:///mock/page-${i}.png` },
+      });
+    }
+
+    const fakeReader: ChunkReader = {
+      async readChunk(_entry, _offset, size) {
+        return new Uint8Array(Math.min(size, 64)); // 假读取器避免测试分配 86 MB
+      },
+      async computeSha256() {
+        await new Promise((r) => setTimeout(r, 1));
+        return 'c'.repeat(64);
+      },
+    };
+
+    const events: string[] = [];
+    let uploadedPartCount = 0;
+    let requirementSentWhileUploading = false;
+
+    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/v1/app/uploads') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_86mb' }), { status: 201 });
+      }
+      if (url.includes('/parts/') && method === 'PUT') {
+        uploadedPartCount += 1;
+        await new Promise((r) => setTimeout(r, 1));
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (url.endsWith('/complete') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_86mb', status: 'ready' }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    const uploader = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: fakeFetch as unknown as typeof fetch,
+      getToken: () => 'tok_86',
+      isOnline: () => true,
+      subscribeOnline: () => () => {},
+      onResume: () => () => {},
+      stateMachine: createUploadStateMachine({ storage: createMemoryKv() }),
+      reader: fakeReader,
+      chunkSize: 5 * 1024 * 1024,
+    });
+
+    uploader.subscribe((p) => {
+      if (events[events.length - 1] !== p.status) events.push(p.status);
+    });
+
+    await uploader.start({ projectId: 'proj_1', name: 'big-86mb.zip', entries: files });
+    expect(uploader.getProgress().status).toBe('preparing');
+    expect(events[0]).toBe('preparing');
+
+    // 模拟用户立刻发需求，不等上传完成
+    const sendRequirement = async () => {
+      requirementSentWhileUploading = uploader.getProgress().status !== 'done';
+    };
+    await sendRequirement();
+    expect(requirementSentWhileUploading).toBe(true);
+
+    await waitUntil(() => uploader.getProgress().status === 'done', 5000);
+    expect(uploadedPartCount).toBe(40); // 12 MB = 3 parts + 37 files * 1 part = 40 parts
+    expect(uploader.getProgress().totalFiles).toBe(38);
+    expect(uploader.getProgress().totalBytes).toBe(86 * 1024 * 1024);
+
+    uploader.dispose();
+  });
+
+  it('pauses when begin session fails offline and auto-opens session on reconnect, and pauses on non-TypeError network errors', async () => {
+    const raw = new Uint8Array(150).fill(9);
+    mockFiles.set('file:///mock/begin-offline.png', raw);
+
+    let online = true;
+    const onlineListeners = new Set<(v: boolean) => void>();
+    let beginAttempts = 0;
+
+    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/v1/app/uploads') && method === 'POST') {
+        beginAttempts += 1;
+        if (beginAttempts === 1) {
+          // 模拟非 TypeError 的网络错误，且 isOnline() 仍为 true
+          throw new Error('ECONNRESET');
+        }
+        return new Response(JSON.stringify({ sessionId: 'up_reconnected' }), { status: 201 });
+      }
+      if (url.includes('/parts/') && method === 'PUT') {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (url.endsWith('/complete') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_reconnected', status: 'ready' }), {
+          status: 200,
+        });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    const uploader = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: fakeFetch as unknown as typeof fetch,
+      getToken: () => 'tok_net',
+      isOnline: () => online,
+      refreshOnline: async () => true, // 即使探测仍为 true，网络异常也应 pause 而不是 failed
+      subscribeOnline: (l) => {
+        onlineListeners.add(l);
+        return () => onlineListeners.delete(l);
+      },
+      onResume: () => () => {},
+      stateMachine: createUploadStateMachine({ storage: createMemoryKv() }),
+      reader: createExpoChunkReader(),
+      chunkSize: 100,
+    });
+
+    await uploader.start({
+      projectId: 'proj_1',
+      name: 'offline-begin.zip',
+      entries: [
+        {
+          path: 'begin-offline.png',
+          size: raw.byteLength,
+          source: { kind: 'file', uri: 'file:///mock/begin-offline.png' },
+        },
+      ],
+    });
+
+    await waitUntil(() => uploader.getProgress().status === 'paused');
+    expect(uploader.getProgress().sessionId).toBeNull();
+
+    // 联网恢复后自动补发 POST 开会话并传完
+    for (const l of onlineListeners) l(true);
+    await waitUntil(() => uploader.getProgress().status === 'done');
+    expect(beginAttempts).toBe(2);
+    expect(uploader.getProgress().sessionId).toBe('up_reconnected');
+
+    uploader.dispose();
   });
 });

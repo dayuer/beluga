@@ -12,7 +12,7 @@ import type { LocalFileEntrySource, ZipEntrySource } from './package-pick';
 export const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024;
 export const UPLOAD_STATE_STORAGE_KEY = 'upload:session:v1';
 
-export type UploadStatus = 'idle' | 'uploading' | 'paused' | 'done' | 'failed';
+export type UploadStatus = 'idle' | 'preparing' | 'uploading' | 'paused' | 'done' | 'failed';
 
 export interface UploadChunkSpec {
   readonly fileIndex: number;
@@ -34,7 +34,7 @@ export interface UploadFilePlan {
 }
 
 export interface UploadSessionRecord {
-  readonly sessionId: string;
+  readonly sessionId: string | null;
   readonly projectId: string;
   readonly name: string;
   readonly status: UploadStatus;
@@ -192,6 +192,11 @@ export interface UploadStateMachine {
   getState(): UploadSessionRecord | null;
   getProgress(): UploadProgress;
   subscribe(listener: UploadProgressListener): () => void;
+  beginPreparing(input: Omit<InitUploadSessionInput, 'sessionId'>): UploadSessionRecord;
+  attachSession(
+    sessionId: string,
+    files?: ReadonlyArray<{ readonly sha256?: string; readonly source?: UploadFileSource }>,
+  ): UploadSessionRecord;
   initSession(input: InitUploadSessionInput): UploadSessionRecord;
   start(): UploadSessionRecord;
   pause(): UploadSessionRecord;
@@ -247,6 +252,51 @@ export function createUploadStateMachine(options?: {
       return () => {
         listeners.delete(listener);
       };
+    },
+    beginPreparing(input) {
+      const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
+      const files: UploadFilePlan[] = input.files.map((f, fileIndex) => ({
+        fileIndex,
+        path: f.path,
+        size: f.size,
+        sha256: f.sha256,
+        source: f.source,
+        chunks: buildFileChunks(fileIndex, f.size, chunkSize),
+        receivedParts: [],
+      }));
+      const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+      const record: UploadSessionRecord = {
+        sessionId: null,
+        projectId: input.projectId,
+        name: input.name,
+        status: 'preparing',
+        totalBytes,
+        receivedBytes: 0,
+        files,
+        updatedAt: now(),
+      };
+      commit(record);
+      return record;
+    },
+    attachSession(sessionId, updates) {
+      const prev = requireSession();
+      const files = updates
+        ? prev.files.map((f, idx) => ({
+            ...f,
+            sha256: updates[idx]?.sha256 ?? f.sha256,
+            source: updates[idx]?.source ?? f.source,
+          }))
+        : prev.files;
+      const next: UploadSessionRecord = {
+        ...prev,
+        sessionId,
+        status: 'uploading',
+        error: undefined,
+        files,
+        updatedAt: now(),
+      };
+      commit(next);
+      return next;
     },
     initSession(input) {
       const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
