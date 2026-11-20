@@ -70,8 +70,17 @@ export function ReasonSheet({
   const keyboard = useKeyboardInset();
 
   useEffect(() => {
-    setReason(readReasonDraft(draftId) || initialDraft || '');
-  }, [draftId, initialDraft]);
+    if (open === false) return;
+    const next = readReasonDraft(draftId) || initialDraft || '';
+    setReason(next);
+    reasonRef.current = next;
+  }, [draftId, initialDraft, open]);
+
+  const clearDraftState = (): void => {
+    clearReasonDraft(draftId);
+    reasonRef.current = '';
+    setReason('');
+  };
 
   const change = (value: string): void => {
     setReason(value);
@@ -103,8 +112,7 @@ export function ReasonSheet({
       setNotice(null);
       try {
         await onSubmit(text);
-        clearReasonDraft(draftId);
-        setReason('');
+        clearDraftState();
         onSent?.();
         onClose?.();
       } catch (err) {
@@ -119,11 +127,11 @@ export function ReasonSheet({
       (opId) => ({ t: 'action', opId, kind: 'milestone.sendBack', planRef, payload: { milestoneRef, draftRev, reason: text } }),
       {
         onQueued: () => {
-          clearReasonDraft(draftId);
+          clearDraftState();
           onSent?.();
         },
         onDone: () => {
-          clearReasonDraft(draftId);
+          clearDraftState();
           onSent?.();
         },
         onRefused: (code) => {
@@ -148,9 +156,9 @@ export function ReasonSheet({
                 accessibilityRole="button"
                 testID={`reason-tag-${i + 1}`}
                 onPress={() => change(reason.trim() ? `${reason.trim()}${c['reason.tagJoiner']}${tag}` : tag)}
-                style={({ pressed }) => [styles.tag, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.tag, { backgroundColor: color.sunken }, pressed && styles.pressed]}
               >
-                <Text style={styles.tagText}>{tag}</Text>
+                <Text style={[styles.tagText, { color: color.text2 }]}>{tag}</Text>
               </Pressable>
             ))}
           </View>
@@ -162,18 +170,25 @@ export function ReasonSheet({
           placeholderTextColor={color.text3}
           multiline
           maxLength={4000}
-          style={styles.input}
+          style={[styles.input, { color: color.text, backgroundColor: color.card, borderColor: color.hairline }]}
           testID="reason-input"
           accessibilityLabel={title ?? t(lang, 'reason.title')}
         />
-        {reason.length >= 3600 ? <Text style={styles.counter}>{t(lang, 'new.left', { n: 4000 - reason.length })}</Text> : null}
+        {reason.length >= 3600 ? (
+          <Text style={[styles.counter, { color: color.text3 }]}>{t(lang, 'new.left', { n: 4000 - reason.length })}</Text>
+        ) : null}
         {!ready ? (
-          <Text style={styles.hint} testID="reason-too-short">
+          <Text style={[styles.hint, { color: color.text3 }]} accessibilityLiveRegion="polite" testID="reason-too-short">
             {c['reason.missingChars'](missing)}
           </Text>
         ) : null}
       </ScrollView>
-      <View style={[styles.footer, { paddingBottom: (keyboard > 0 ? 0 : insets.bottom) + space[4] }]}>
+      <View
+        style={[
+          styles.footer,
+          { borderTopColor: color.hairline, paddingBottom: (keyboard > 0 ? 0 : insets.bottom) + space[4] },
+        ]}
+      >
         <ReceiptLine text={notice} tone="error" />
         <PrimaryButton
           label={busy ? t(lang, 'common.sending') : failed ? t(lang, 'common.retry') : t(lang, 'reason.send')}
@@ -202,8 +217,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: space[4], gap: space[4] },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  tag: { minHeight: 44, paddingHorizontal: space[4], justifyContent: 'center', backgroundColor: color.sunken, borderRadius: radius.pill },
-  tagText: { ...type.callout, color: color.text2 },
+  tag: { minHeight: 44, paddingHorizontal: space[4], justifyContent: 'center', borderRadius: radius.pill },
+  tagText: { ...type.callout },
   pressed: { opacity: 0.9 },
   input: {
     ...type.callout,
@@ -212,14 +227,11 @@ const styles = StyleSheet.create({
     minHeight: 96,
     maxHeight: 204,
     textAlignVertical: 'top',
-    color: color.text,
-    backgroundColor: color.card,
     borderWidth: 1,
-    borderColor: color.hairline,
     borderRadius: radius.m,
     padding: space[4],
   },
-  counter: { ...type.caption, color: color.text3, textAlign: 'right' },
-  hint: { ...type.caption, color: color.text3 },
-  footer: { paddingHorizontal: space[4], paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  counter: { ...type.caption, textAlign: 'right' },
+  hint: { ...type.caption },
+  footer: { paddingHorizontal: space[4], paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth },
 });

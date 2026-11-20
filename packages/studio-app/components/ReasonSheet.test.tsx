@@ -21,6 +21,7 @@ vi.mock('../lib/kv', () => ({
   },
 }));
 
+import { resetDrawerCount } from '../lib/ui-state';
 import { ReasonSheet } from './ReasonSheet';
 
 describe('ReasonSheet (P7)', () => {
@@ -30,6 +31,7 @@ describe('ReasonSheet (P7)', () => {
 
   afterEach(async () => {
     await cleanup();
+    resetDrawerCount();
   });
 
   it('shows how many characters are still needed when under 10 chars and disables submit', async () => {
@@ -71,5 +73,38 @@ describe('ReasonSheet (P7)', () => {
 
     const reopened = await render(<ReasonSheet cardId="card-99" onSubmit={onSubmit} />);
     expect(reopened.getByTestId('reason-input').props.value).toBe('');
+  });
+
+  it('does not write draft back on unmount when onClose unmounts immediately after submit', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    function Host() {
+      const [mounted, setMounted] = React.useState(true);
+      return mounted ? (
+        <ReasonSheet cardId="card-unmount" open onClose={() => setMounted(false)} onSubmit={onSubmit} />
+      ) : null;
+    }
+
+    const screen = await render(<Host />);
+    await fireEvent.changeText(screen.getByTestId('reason-input'), '导出按钮位置偏左，需要右移对齐');
+    await fireEvent.press(screen.getByTestId('reason-submit'));
+
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(screen.queryByTestId('reason-input')).toBeNull());
+    await screen.unmount();
+
+    const reopened = await render(<ReasonSheet cardId="card-unmount" open onClose={() => {}} onSubmit={onSubmit} />);
+    expect(reopened.getByTestId('reason-input').props.value).toBe('');
+  });
+
+  it('re-reads draft when open toggles from false back to true while mounted', async () => {
+    const onClose = vi.fn();
+    const screen = await render(<ReasonSheet cardId="card-mounted" open onClose={onClose} onSubmit={() => {}} />);
+
+    await fireEvent.changeText(screen.getByTestId('reason-input'), '按钮偏左');
+    await screen.rerender(<ReasonSheet cardId="card-mounted" open={false} onClose={onClose} onSubmit={() => {}} />);
+    expect(screen.queryByTestId('reason-input')).toBeNull();
+
+    await screen.rerender(<ReasonSheet cardId="card-mounted" open onClose={onClose} onSubmit={() => {}} />);
+    expect(screen.getByTestId('reason-input').props.value).toBe('按钮偏左');
   });
 });
