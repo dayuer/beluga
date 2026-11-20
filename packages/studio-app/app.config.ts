@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 import { getHubHost } from './lib/links';
 
@@ -13,8 +15,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...(host ? { associatedDomains: [`applinks:${host}`] } : {}),
   };
 
+  const googleServicesPath = resolve(__dirname, 'google-services.json');
+  const hasGoogleServices = existsSync(googleServicesPath);
+
   const android = {
     ...config.android,
+    ...(hasGoogleServices ? { googleServicesFile: './google-services.json' } : {}),
     ...(host
       ? {
           intentFilters: [

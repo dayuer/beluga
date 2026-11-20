@@ -210,4 +210,29 @@ describe('push registration', () => {
     await expect(unregisterPush('sess-1', deps)).resolves.toBe(true);
     stop();
   });
+
+  it('quietly skips hub registration when device push token is unavailable', async () => {
+    const fetchMock = vi.fn();
+    const throwingNotif = makeNotifications({
+      getDevicePushTokenAsync: vi.fn(async () => {
+        throw new Error('FirebaseApp is not initialized');
+      }),
+    });
+
+    const res = await registerPush(
+      { askPermission: true },
+      {
+        kv: memKv,
+        notifications: throwingNotif,
+        fetch: fetchMock as unknown as typeof fetch,
+        getToken: () => 'sess-1',
+        platform: 'android',
+        isOnline: () => true,
+        isDemo: () => false,
+      },
+    );
+
+    expect(res).toEqual({ ok: false, reason: 'error' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
