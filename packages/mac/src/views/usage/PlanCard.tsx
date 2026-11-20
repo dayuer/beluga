@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
 import type { AppState } from '@beluga/core/store.js';
 import { type CardWindow, type FriendRoom, type ProviderCard, friendRooms, providerCards, shortTokens, windowHeading } from '@beluga/ui/usage-cards.js';
@@ -177,6 +177,12 @@ function FriendsCard({ rooms }: { rooms: FriendRoom[] }) {
  * plans underneath.
  */
 export function PlanCard({ state, now }: { state: AppState; now: number }) {
+  const api = useApi();
+  // Opening Usage asks every agent for its limits now, not at the next 10-minute check (a card
+  // whose agent hasn't reported yet comes as soon as it does). The daemon joins asks, once a minute at most.
+  useEffect(() => {
+    void api.stats.refreshUsage().catch(() => undefined);
+  }, [api]);
   const selfId = state.self?.peerId ?? state.selfId;
   const me = state.peers.find((p) => p.peerId === selfId) ?? state.self;
   // Your setting (unset: Claude) answers at once; the peer card friends see follows it. Only agents ready here have a card.

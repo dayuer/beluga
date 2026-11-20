@@ -131,3 +131,16 @@ describe('usage per provider', () => {
     expect(rooms.map((r) => `${r.name} ${r.agent.label} ${r.left}${r.isDefault ? ' default' : ''}`)).toEqual(['mia Codex 29 default', 'mia Claude 90', 'bob Claude 20 default']);
   });
 });
+
+describe('stats.refreshUsage', () => {
+  it('asks the session for every agent’s limits and answers at once, not when they come', async () => {
+    const { STATS_HANDLERS } = await import('../src/ipc/stats-handlers.js');
+    let asked = 0;
+    let finish: () => void = () => undefined;
+    const session = { refreshUsage: () => (asked++, new Promise<void>((r) => (finish = r))) };
+    const answer = STATS_HANDLERS['stats.refreshUsage'](session as never);
+    expect(asked).toBe(1);
+    expect(answer).toBeUndefined();
+    finish();
+  });
+});

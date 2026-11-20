@@ -12,6 +12,7 @@ type StatsHandlers = { readonly [M in StatsMethod]: (s: Session, ...args: Args<M
 export const STATS_HANDLERS = {
   'stats.get': (s) => statsOf(s).snapshot(),
   'stats.leaderboard': (s) => leaderboardView(s, s.store),
+  'stats.refreshUsage': (s) => void s.refreshUsage(),
   'stats.note': (s, note) => statsOf(s).note(note),
   'stats.saveImage': (_s, png, to) => saveStatsImage(png, to),
 } satisfies StatsHandlers;
