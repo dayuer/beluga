@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
@@ -147,6 +148,18 @@ export default function MeAccountScreen() {
                 </View>
               </View>
 
+              <View style={styles.linkGroup}>
+                <Pressable
+                  onPress={() => router.push('/privacy')}
+                  accessibilityRole="button"
+                  testID="account-privacy"
+                  style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+                >
+                  <Text style={styles.actionText}>{tMe(lang, 'account.privacy')}</Text>
+                  <ChevronRight size={16} color={color.text3} />
+                </Pressable>
+              </View>
+
               <View style={styles.dangerGroup}>
                 <Pressable
                   onPress={() => setConfirmLogout(true)}
@@ -237,6 +250,21 @@ const createStyles = () => StyleSheet.create({
   },
   chipText: { ...type.caption, color: color.text2 },
   chipTextActive: { color: color.text, fontWeight: '600' },
+  linkGroup: {
+    backgroundColor: color.card,
+    borderRadius: radius.l,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    overflow: 'hidden',
+    marginBottom: space[5],
+  },
+  linkRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space[4],
+  },
   dangerGroup: {
     backgroundColor: color.card,
     borderRadius: radius.l,
