@@ -306,6 +306,7 @@ export default function NewRequestScreen() {
                   <GoalInput
                     value={goal}
                     onChangeText={setGoal}
+                    onSubmit={handleSubmit}
                     onBlur={() => {
                       if (lockedRef.current) return;
                       if (!goal.trim() && platforms.length === 0) {
@@ -374,6 +375,7 @@ export default function NewRequestScreen() {
               <GoalInput
                 value={feedbackText}
                 onChangeText={setFeedbackText}
+                onSubmit={handleSubmit}
                 maxHeight={maxGoal}
                 placeholder={t(lang, 'new.feedbackPlaceholder')}
                 accessibilityLabel={t(lang, 'new.feedbackLabel')}
