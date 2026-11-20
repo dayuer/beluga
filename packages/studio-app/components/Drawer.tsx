@@ -1,157 +1,271 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useKeyboardInset } from '../lib/viewport';
 import { acquireDrawer } from '../lib/ui-state';
 import { color, radius, space, type } from '../lib/theme';
+import { useKeyboardInset } from '../lib/viewport';
+import { Segments } from './Segments';
 
-interface DrawerProps {
+export interface DrawerTab {
+  readonly key: string;
+  readonly label: string;
+  readonly render: () => ReactNode;
+}
+
+export interface DrawerProps {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly title?: string;
-  readonly children: ReactNode;
+  readonly tabs?: readonly DrawerTab[];
+  readonly initialTab?: string;
+  readonly children?: ReactNode;
   readonly footer?: ReactNode;
   readonly testID?: string;
-  /** The customer app uses a sheet on phones and a centered layer in the main column on desktop. */
+  /** 手机用底部抽屉，桌面端用居中弹层。 */
   readonly variant?: 'sheet' | 'modal';
   readonly initialSnap?: 0.55 | 0.8;
 }
 
-const MIN_SNAP = 0.55;
-const MAX_SNAP = 0.8;
+const DISMISS_RATIO = 0.3;
+const DISMISS_VELOCITY = 900;
+
+/** 手势关闭判定：拖过三成或向下甩得够快即关闭。 */
+export function shouldDismissDrawer(translationY: number, velocityY: number, sheetHeight: number): boolean {
+  if (translationY <= 0) return false;
+  return translationY > sheetHeight * DISMISS_RATIO || velocityY > DISMISS_VELOCITY;
+}
 
 /**
- * The bottom sheet behind decisions, reasons, changes and chat (M6 §4.8): two snaps, a draggable
- * handle, a 44pt close, and a bottom edge that rides the keyboard. On desktop it becomes a
- * centered layer instead. It owns no content and no actions.
+ * P12 结果抽屉外壳（SS-47）：
+ * - gesture-handler + reanimated：下拉跟手、拖过三成或甩得够快关闭、点遮罩关闭；
+ * - 系统减弱动态效果时直接到位；
+ * - 内容超高在抽屉内滚动；
+ * - 顶部页签由调用方传入 `tabs: {key,label,render}[]`，不耦合任何页签内容；
+ * - 打开时通过 `acquireDrawer()` 设置 `ui-state.drawerOpen`。
  */
-export function Drawer({ open, onClose, title, children, footer, testID = 'drawer', variant = 'sheet', initialSnap = MIN_SNAP }: DrawerProps) {
+export function Drawer({
+  open,
+  onClose,
+  title,
+  tabs,
+  initialTab,
+  children,
+  footer,
+  testID = 'drawer',
+  variant = 'sheet',
+  initialSnap = 0.8,
+}: DrawerProps) {
   const { width, height } = useWindowDimensions();
   const inset = useKeyboardInset();
   const safeBottom = useSafeAreaInsets().bottom;
+  const reducedMotion = useReducedMotion();
   const modal = variant === 'modal' || width >= 900;
-  const visible = Math.max(240, height - inset);
-  const [snap, setSnap] = useState<number>(initialSnap);
-  const [drag, setDrag] = useState(0);
+  const visible = Math.max(280, height - inset);
+  const sheetHeight = Math.round(visible * initialSnap);
+
+  const [activeTab, setActiveTab] = useState<string>(() => initialTab ?? tabs?.[0]?.key ?? '');
+  const translateY = useSharedValue(sheetHeight);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (open) {
-      setSnap(initialSnap);
-      setDrag(0);
+    if (!tabs || tabs.length === 0) return;
+    if (initialTab && tabs.some((tab) => tab.key === initialTab)) {
+      setActiveTab(initialTab);
+    } else if (!tabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(tabs[0]!.key);
     }
-  }, [open, initialSnap]);
+  }, [tabs, initialTab, activeTab]);
 
   useEffect(() => {
     if (!open) return;
     return acquireDrawer();
   }, [open]);
 
-  const pan = useMemo(
+  useEffect(() => {
+    if (!open) return;
+    if (reducedMotion) {
+      translateY.value = 0;
+    } else {
+      translateY.value = sheetHeight;
+      translateY.value = withSpring(0, { damping: 24, stiffness: 260 });
+    }
+  }, [open, reducedMotion, sheetHeight, translateY]);
+
+  const closeWithMotion = () => {
+    if (reducedMotion) {
+      onCloseRef.current();
+      return;
+    }
+    translateY.value = withTiming(sheetHeight, { duration: 160 }, (finished) => {
+      if (finished) runOnJS(onCloseRef.current)();
+    });
+  };
+
+  const panGesture = useMemo(
     () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
-        onPanResponderMove: (_, gesture) => setDrag(gesture.dy),
-        onPanResponderRelease: (_, gesture) => {
-          const moved = Math.abs(gesture.dy);
-          setDrag(0);
-          if (moved < 6) {
-            setSnap((current) => (current === MIN_SNAP ? MAX_SNAP : MIN_SNAP));
-            return;
+      Gesture.Pan()
+        .onUpdate((e) => {
+          translateY.value = Math.max(0, e.translationY);
+        })
+        .onEnd((e) => {
+          if (shouldDismissDrawer(e.translationY, e.velocityY, sheetHeight)) {
+            if (reducedMotion) {
+              runOnJS(onCloseRef.current)();
+            } else {
+              translateY.value = withTiming(sheetHeight, { duration: 150 }, (finished) => {
+                if (finished) runOnJS(onCloseRef.current)();
+              });
+            }
+          } else {
+            translateY.value = reducedMotion ? 0 : withSpring(0, { damping: 24, stiffness: 260 });
           }
-          const next = snap * visible - gesture.dy;
-          if (next < visible * 0.4) {
-            onCloseRef.current();
-            return;
-          }
-          setSnap(next > visible * ((MIN_SNAP + MAX_SNAP) / 2) ? MAX_SNAP : MIN_SNAP);
-        },
-        onPanResponderTerminate: () => setDrag(0),
-      }),
-    [snap, visible],
+        }),
+    [reducedMotion, sheetHeight, translateY],
   );
+
+  const animatedSheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   if (!open) return null;
 
-  const sheetHeight = Math.max(visible * 0.35, Math.min(visible * MAX_SNAP, snap * visible - drag));
+  const currentTab = tabs?.find((tab) => tab.key === activeTab) ?? tabs?.[0];
+  const segmentItems = tabs?.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    testID: `${testID}-tab-${tab.key}`,
+  }));
+
   const body = (
     <>
-      <View style={styles.header}>
-        <View
-          {...pan.panHandlers}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={title ?? '抽屉'}
-          accessibilityState={{ expanded: snap === MAX_SNAP }}
-          onAccessibilityTap={() => setSnap((current) => (current === MIN_SNAP ? MAX_SNAP : MIN_SNAP))}
-          style={styles.handleHit}
-          testID="drawer-handle"
-        >
-          <View style={styles.handle} />
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.header} testID={`${testID}-header`}>
+          <View style={styles.handleHit} testID="drawer-handle">
+            <View style={[styles.handle, { backgroundColor: color.hairlineStrong }]} />
+          </View>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { color: color.text }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="关闭"
+              onPress={closeWithMotion}
+              style={({ pressed }) => [styles.close, pressed && styles.pressed]}
+              testID="drawer-close"
+            >
+              <Text style={[styles.closeInk, { color: color.text2 }]}>×</Text>
+            </Pressable>
+          </View>
         </View>
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="关闭" onPress={onClose} style={({ pressed }) => [styles.close, pressed && styles.pressed]} testID="drawer-close">
-          <Text style={styles.closeInk}>×</Text>
-        </Pressable>
-      </View>
-      <View style={styles.content}>{children}</View>
-      {footer ? <View style={[styles.footer, { paddingBottom: inset > 0 ? space[3] : safeBottom + space[3] }]}>{footer}</View> : null}
+      </GestureDetector>
+
+      {segmentItems && segmentItems.length > 0 ? (
+        <Segments items={segmentItems} value={currentTab?.key ?? ''} onChange={setActiveTab} />
+      ) : null}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        testID={`${testID}-scroll`}
+      >
+        {currentTab ? currentTab.render() : children}
+      </ScrollView>
+
+      {footer ? (
+        <View
+          style={[
+            styles.footer,
+            {
+              borderTopColor: color.hairline,
+              paddingBottom: inset > 0 ? space[3] : safeBottom + space[3],
+            },
+          ]}
+        >
+          {footer}
+        </View>
+      ) : null}
     </>
   );
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID={`${testID}-layer`}>
-      <Pressable accessibilityLabel="关闭" onPress={onClose} style={styles.scrim} testID={`${testID}-scrim`} />
+      <Pressable
+        accessibilityLabel="关闭"
+        onPress={closeWithMotion}
+        style={[styles.scrim, { backgroundColor: color.scrim }]}
+        testID={`${testID}-scrim`}
+      />
       {modal ? (
         <View style={styles.centered} pointerEvents="box-none">
-          <View style={styles.modal} accessibilityViewIsModal role="dialog" testID={testID}>
+          <View
+            style={[styles.modal, { backgroundColor: color.card }]}
+            accessibilityViewIsModal
+            role="dialog"
+            testID={testID}
+          >
             {body}
           </View>
         </View>
       ) : (
-        <View style={[styles.sheet, { height: sheetHeight, bottom: inset }]} accessibilityViewIsModal role="dialog" testID={testID}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { height: sheetHeight, bottom: inset, backgroundColor: color.card },
+            animatedSheetStyle,
+          ]}
+          accessibilityViewIsModal
+          role="dialog"
+          testID={testID}
+        >
           {body}
-        </View>
+        </Animated.View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: color.scrim },
+  scrim: { ...StyleSheet.absoluteFill },
+  centered: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: space[5] },
+  modal: { width: '100%', maxWidth: 560, maxHeight: '85%', borderRadius: radius.l, overflow: 'hidden' },
   sheet: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: color.card,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    borderTopLeftRadius: radius.l,
+    borderTopRightRadius: radius.l,
+    overflow: 'hidden',
+  },
+  header: {
+    paddingTop: space[2],
+    paddingHorizontal: space[4],
+    paddingBottom: space[2],
+    gap: space[1],
+  },
+  handleHit: { height: 20, alignItems: 'center', justifyContent: 'center' },
+  handle: { width: 36, height: 4, borderRadius: 2 },
+  titleRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { ...type.heading, flex: 1 },
+  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -space[2] },
+  closeInk: { fontSize: 22, lineHeight: 24 },
+  pressed: { opacity: 0.55 },
+  scroll: { flex: 1, minHeight: 0 },
+  scrollContent: { padding: space[4], flexGrow: 1 },
+  footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.hairline,
-    overflow: 'hidden',
+    paddingHorizontal: space[4],
+    paddingTop: space[3],
   },
-  centered: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: space[5] },
-  modal: {
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '80%',
-    backgroundColor: color.card,
-    borderRadius: radius.l,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    overflow: 'hidden',
-  },
-  header: { flexDirection: 'row', alignItems: 'center', paddingRight: space[2], gap: space[2], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.hairline },
-  handleHit: { width: 64, height: 44, alignItems: 'center', justifyContent: 'center' },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: color.hairlineStrong },
-  title: { ...type.heading, color: color.text, flex: 1 },
-  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  closeInk: { ...type.title, color: color.text2, lineHeight: 30 },
-  pressed: { backgroundColor: color.press },
-  content: { flex: 1, minHeight: 0 },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline, padding: space[4], paddingBottom: space[4] },
 });
