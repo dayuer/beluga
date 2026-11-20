@@ -4,6 +4,7 @@ import type { Lang } from './index.js';
 
 export const zh = {
   'drawer.title': '结果与详情',
+  'drawer.close': '关闭',
   'drawer.tab.plan': '计划',
   'drawer.tab.outputs': '成果',
   'drawer.tab.changes': '改动',
@@ -35,19 +36,24 @@ export const zh = {
   'preview.deployingReason': '测试环境还在部署中',
   'preview.deployingWhen': '通常需要几分钟，部署好后这里会出现打开按钮',
   'preview.unconfiguredReason': '尚未配置测试环境',
-  'preview.unconfiguredWhen': '请联系工作室或在「我 › 环境」配置测试环境后查看在线预览',
+  'preview.unconfiguredWhen': '这个项目还没有测试环境，做完后会在这里出现预览',
 
   'request.openResults': '结果与计划',
   'request.stepsTitle': '当前进度',
   'request.chatSection': '需求对话',
-  'request.signedCardTitle': '待确认动作（{kind}）',
-  'request.signedCardBody': '此卡片需要设备确认，将在签名能力合流后开放操作。',
+  'request.signedCard.start': '批准开工',
+  'request.signedCard.changes': '批准改动',
+  'request.signedCard.delivery': '验收交付',
+  'request.signedCard.release': '批准上线',
+  'request.signedCard.generic': '待你确认',
+  'request.signedCardBody': '此操作需要这台设备确认，将在签名能力就绪后开放。',
   'request.unknownTitle': '暂不支持的卡片',
-  'request.unknownBody': '当前版本暂不支持展示此类内容（{kind}）。',
+  'request.unknownBody': '当前版本暂不支持展示此类内容。',
 } as const;
 
 export const en: Record<keyof typeof zh, string> = {
   'drawer.title': 'Results & details',
+  'drawer.close': 'Close',
   'drawer.tab.plan': 'Plan',
   'drawer.tab.outputs': 'Outputs',
   'drawer.tab.changes': 'Changes',
@@ -79,15 +85,19 @@ export const en: Record<keyof typeof zh, string> = {
   'preview.deployingReason': 'Test environment is deploying',
   'preview.deployingWhen': 'Usually takes a few minutes; the preview link will appear here once live',
   'preview.unconfiguredReason': 'Test environment not configured',
-  'preview.unconfiguredWhen': 'Ask your studio or configure a test environment in Me › Environments',
+  'preview.unconfiguredWhen': 'This project does not have a test environment yet. A preview will appear here once ready.',
 
   'request.openResults': 'Results & plan',
   'request.stepsTitle': 'Current progress',
   'request.chatSection': 'Conversation',
-  'request.signedCardTitle': 'Action requiring confirmation ({kind})',
-  'request.signedCardBody': 'Device confirmation for this card will be enabled once signing lands.',
+  'request.signedCard.start': 'Approve start',
+  'request.signedCard.changes': 'Approve changes',
+  'request.signedCard.delivery': 'Review delivery',
+  'request.signedCard.release': 'Approve release',
+  'request.signedCard.generic': 'Needs your confirmation',
+  'request.signedCardBody': 'This action requires device confirmation and will be enabled once signing is ready.',
   'request.unknownTitle': 'Unsupported card',
-  'request.unknownBody': 'This version cannot display this card ({kind}) yet.',
+  'request.unknownBody': 'This version cannot display this card yet.',
 };
 
 export type DrawerKey = keyof typeof zh;

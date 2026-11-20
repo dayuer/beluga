@@ -88,23 +88,26 @@ export function CardStream({
             );
 
           default: {
-            const rawKind = card.kind === 'unknown' ? card.rawKind : card.kind;
             const isUnknown = card.kind === 'unknown';
+            const signedTitleKey =
+              card.kind === 'start'
+                ? 'request.signedCard.start'
+                : card.kind === 'changes'
+                  ? 'request.signedCard.changes'
+                  : card.kind === 'delivery'
+                    ? 'request.signedCard.delivery'
+                    : card.kind === 'release'
+                      ? 'request.signedCard.release'
+                      : 'request.signedCard.generic';
             return (
               <Card
                 key={card.id}
-                title={
-                  isUnknown
-                    ? tDrawer(lang, 'request.unknownTitle')
-                    : tDrawer(lang, 'request.signedCardTitle', { kind: rawKind })
-                }
+                title={isUnknown ? tDrawer(lang, 'request.unknownTitle') : tDrawer(lang, signedTitleKey)}
                 status={isUnknown ? 'waiting' : 'needs-you'}
                 testID={`card-${card.id}`}
               >
                 <Text style={[styles.placeholder, { color: color.text2 }]}>
-                  {isUnknown
-                    ? tDrawer(lang, 'request.unknownBody', { kind: rawKind })
-                    : tDrawer(lang, 'request.signedCardBody')}
+                  {isUnknown ? tDrawer(lang, 'request.unknownBody') : tDrawer(lang, 'request.signedCardBody')}
                 </Text>
               </Card>
             );

@@ -46,9 +46,15 @@ describe('CardStream (SS-52)', () => {
     expect(screen.getByTestId('card-card-wait-offline')).toBeTruthy();
     expect(screen.getByTestId('card-card-code-1')).toBeTruthy();
 
-    // 需签名的卡与 unknown 留占位
+    // 需签名的卡与 unknown 留占位，且不露出内部 kind 码
     expect(screen.getByTestId('card-card-start-1')).toBeTruthy();
+    expect(screen.getByText('批准开工')).toBeTruthy();
+    expect(screen.getByText('批准改动')).toBeTruthy();
+    expect(screen.getByText('验收交付')).toBeTruthy();
+    expect(screen.getByText('批准上线')).toBeTruthy();
     expect(screen.getByTestId('card-card-unknown-1')).toBeTruthy();
     expect(screen.getByText('暂不支持的卡片')).toBeTruthy();
+    expect(screen.queryByText(/future-widget/)).toBeNull();
+    expect(screen.queryByText(/\(start\)|\(changes\)|\(delivery\)|\(release\)/)).toBeNull();
   });
 });

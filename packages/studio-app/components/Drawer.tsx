@@ -10,6 +10,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { detectLang, type Lang } from '../lib/strings';
+import { tDrawer } from '../lib/strings/drawer';
 import { acquireDrawer } from '../lib/ui-state';
 import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
@@ -25,6 +27,7 @@ export interface DrawerProps {
   readonly open: boolean;
   readonly onClose: () => void;
   readonly title?: string;
+  readonly lang?: Lang;
   readonly tabs?: readonly DrawerTab[];
   readonly initialTab?: string;
   readonly children?: ReactNode;
@@ -56,6 +59,7 @@ export function Drawer({
   open,
   onClose,
   title,
+  lang: langProp,
   tabs,
   initialTab,
   children,
@@ -65,6 +69,7 @@ export function Drawer({
   initialSnap = 0.8,
 }: DrawerProps) {
   const { width, height } = useWindowDimensions();
+  const lang = langProp ?? detectLang();
   const inset = useKeyboardInset();
   const safeBottom = useSafeAreaInsets().bottom;
   const reducedMotion = useReducedMotion();
@@ -159,7 +164,7 @@ export function Drawer({
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="关闭"
+              accessibilityLabel={tDrawer(lang, 'drawer.close')}
               onPress={closeWithMotion}
               style={({ pressed }) => [styles.close, pressed && styles.pressed]}
               testID="drawer-close"
@@ -202,7 +207,7 @@ export function Drawer({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID={`${testID}-layer`}>
       <Pressable
-        accessibilityLabel="关闭"
+        accessibilityLabel={tDrawer(lang, 'drawer.close')}
         onPress={closeWithMotion}
         style={[styles.scrim, { backgroundColor: color.scrim }]}
         testID={`${testID}-scrim`}
