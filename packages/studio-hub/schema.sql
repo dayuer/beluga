@@ -142,3 +142,22 @@ CREATE TABLE IF NOT EXISTS upload_parts (
   created_at  INTEGER NOT NULL,
   PRIMARY KEY (session_id, file_index, part_number)
 );
+
+CREATE TABLE IF NOT EXISTS studio_invites (
+  id         TEXT PRIMARY KEY,
+  studio_id  TEXT NOT NULL REFERENCES studios(id),
+  daemon_id  TEXT REFERENCES daemons(id),
+  expires_at INTEGER NOT NULL,
+  used_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS studio_invites_by_studio ON studio_invites (studio_id);
+
+CREATE TABLE IF NOT EXISTS studio_devices (
+  device_id   TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  studio_id   TEXT NOT NULL REFERENCES studios(id),
+  pubkey      TEXT NOT NULL,
+  seal_pubkey TEXT,
+  enrolled_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS studio_devices_by_customer ON studio_devices (customer_id);

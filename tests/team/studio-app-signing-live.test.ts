@@ -141,7 +141,7 @@ describe('studio-app signing live (local hub + fake node)', () => {
   let studioId = '';
 
   const invites = new Map<string, InviteRecord>([
-    ['inv-live-1', { id: 'inv-live-1', k, nodeFingerprint, expiresAt: Date.now() + 60_000 }],
+    ['inv-live-1', { id: 'inv-live-1', studioId: 'st-live', expiresAt: Date.now() + 60_000 }],
   ]);
 
   const enrollStore: EnrollStore = {
@@ -247,7 +247,13 @@ describe('studio-app signing live (local hub + fake node)', () => {
           { DB: mockD1, HUB_ORIGIN: 'http://127.0.0.1' } as unknown as Env,
           d1Hub,
           Date.now(),
-          enrollStore,
+          {
+            store: enrollStore,
+            forward: async (input) => {
+              const ok = trust.enrollWithInvite({ k, pubkey: input.pubkey, mac: input.mac });
+              return ok ? { ok: true, fingerprint: nodeFingerprint } : { ok: false, status: 403, error: 'bad-mac' };
+            },
+          },
         );
         const text = await reply!.text();
         res.writeHead(reply!.status, { 'content-type': 'application/json' });
