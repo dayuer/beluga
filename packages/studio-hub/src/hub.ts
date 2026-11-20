@@ -46,7 +46,7 @@ export interface WaitingCard {
   readonly path: string;
 }
 
-interface PlanFrameView {
+export interface PlanFrameView {
   readonly planRef: string;
   readonly draftRev?: number;
   readonly title: string;

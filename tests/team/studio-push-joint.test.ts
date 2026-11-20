@@ -1,51 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.hoisted(() => {
-  (globalThis as { __DEV__?: boolean }).__DEV__ = false;
-});
-
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
 }));
-vi.mock('../../packages/studio-app/node_modules/expo-crypto/build/Crypto.js', () => ({ randomUUID: () => 'joint-uuid-1' }));
-vi.mock('../../packages/studio-app/node_modules/expo-notifications/build/index.js', () => ({
-  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
-  AndroidImportance: { HIGH: 4, DEFAULT: 3 },
-  getPermissionsAsync: vi.fn(async () => ({ granted: true, canAskAgain: true })),
-  requestPermissionsAsync: vi.fn(async () => ({ granted: true, canAskAgain: true })),
-  getDevicePushTokenAsync: vi.fn(async () => ({ type: 'ios', data: 'apns-joint-token-1' })),
-  setNotificationChannelAsync: vi.fn(async () => {}),
-  setBadgeCountAsync: vi.fn(async () => true),
-  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
-  getLastNotificationResponseAsync: vi.fn(async () => null),
-}));
-vi.mock('../../packages/studio-app/node_modules/expo-router/build/index.js', () => ({ router: { push: vi.fn() } }));
-vi.mock('../../packages/studio-app/node_modules/react-native/index.js', () => ({
-  Platform: { OS: 'ios', select: (o: Record<string, unknown>) => o.ios ?? o.default },
-  Linking: { openSettings: vi.fn(async () => {}) },
-  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-}));
-vi.mock('../../packages/studio-app/lib/kv', () => ({
-  kv: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
-}));
-vi.mock('../../packages/studio-app/lib/session', () => ({
-  session: { token: () => undefined, snapshot: () => null, clear: vi.fn(), subscribe: () => () => {} },
-}));
-vi.mock('../../packages/studio-app/lib/client', () => ({
-  hub: { logout: vi.fn(async () => ({ ok: true, value: undefined })) },
-}));
-vi.mock('../../packages/studio-app/lib/net', () => ({ isOnline: () => true }));
-vi.mock('../../packages/studio-app/lib/strings', () => ({ detectLang: () => 'zh' }));
-vi.mock('../../packages/studio-app/lib/badge', () => ({ setBadgeCount: vi.fn(async () => 0) }));
-vi.mock('react-native', () => ({
-  Platform: { OS: 'ios', select: (o: Record<string, unknown>) => o.ios ?? o.default },
-  Linking: { openSettings: vi.fn(async () => {}) },
-  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-}));
 
-import { registerPush } from '../../packages/studio-app/lib/push';
-import { extractPushPath } from '../../packages/studio-app/lib/push-open';
-import { signOut } from '../../packages/studio-app/lib/signout';
+import { registerPush, unregisterPush, type PushNotificationsApi } from '../../packages/studio-app/lib/push-core.js';
+import { extractPushPath } from '../../packages/studio-app/lib/push-open-core.js';
+import { signOut } from '../../packages/studio-app/lib/signout-core.js';
 import { notifyWaitingCards, type PlanFrameView } from '../../packages/studio-hub/src/hub.js';
 import { clearApnsTokenCache, type PushEnv } from '../../packages/studio-hub/src/push.js';
 import { handlePushTokenRequest, type PushPlatform } from '../../packages/studio-hub/src/push-tokens.js';
@@ -231,15 +192,25 @@ describe('studio-app + studio-hub push joint flow (SS-166)', () => {
       return new Response(JSON.stringify({ error: 'not-found' }), { status: 404 });
     };
 
+    const fakeNotifications: PushNotificationsApi = {
+      AndroidImportance: { HIGH: 4, DEFAULT: 3 },
+      getPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
+      requestPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
+      getDevicePushTokenAsync: async () => ({ type: 'ios', data: 'apns-joint-token-1' }),
+      setNotificationChannelAsync: async () => {},
+    };
+
     const memKv = makeMemoryKv();
     let currentSession: string | undefined = rawSessionToken;
 
     const pushDeps = {
       kv: memKv,
+      notifications: fakeNotifications,
       fetch: appFetch,
       getToken: () => currentSession ?? null,
       baseUrl: 'https://hub.joint.test',
       platform: 'ios',
+      randomId: () => 'joint-uuid-1',
       isHydrated: () => true,
       isOnline: () => true,
       isDemo: () => false,
@@ -267,10 +238,9 @@ describe('studio-app + studio-hub push joint flow (SS-166)', () => {
     expect(routed).toBe(`/request/plan-joint-1?card=${encodeURIComponent(expectedCardId)}`);
 
     // 3. signOut() unregisters push token before revoking session -> new waiting card sends 0 pushes.
-    const { unregisterPush } = await import('../../packages/studio-app/lib/push');
     await signOut({
       getToken: () => currentSession,
-      unregisterPush: (tok) => unregisterPush(tok, pushDeps),
+      unregisterPush: (tok?: string) => unregisterPush(tok, pushDeps),
       hubLogout: async () => {
         await hubStore.revokeSession(sessionTokenHash, now + 1500);
       },
