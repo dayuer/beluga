@@ -141,7 +141,7 @@ describe('RequestDetailScreen (SS-184 / SS-185)', () => {
 
     mockParams.mockReturnValue({ id: 'req-login', state: 'offline' });
     const offlineScreen = await render(<RequestDetailScreen />);
-    expect(offlineScreen.getByTestId('sync-banner')).toBeTruthy();
+    expect(offlineScreen.getByTestId('offline-banner')).toBeTruthy();
     expect(offlineScreen.getByText('当前离线，先展示上次缓存的内容')).toBeTruthy();
 
     mockParams.mockReturnValue({ id: 'req-login', state: 'runnerOffline' });

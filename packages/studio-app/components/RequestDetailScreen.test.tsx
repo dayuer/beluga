@@ -127,4 +127,51 @@ describe('需求详情（非 DEMO，SS-223）', () => {
     expect(action.payload.text).toBe('把按钮改成蓝色');
     expect(screen.getByText('把按钮改成蓝色')).toBeTruthy();
   });
+
+  it('可以连续发多条消息，每条有自己的 opId', async () => {
+    const screen = await render(<RequestDetailScreen />);
+    await waitFor(() => expect(screen.getByTestId('card-steps')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByTestId('request-chat-input'), '第一句');
+    await fireEvent.press(screen.getByTestId('request-chat-send'));
+    await waitFor(() => expect(mockState.send).toHaveBeenCalledTimes(1));
+
+    await fireEvent.changeText(screen.getByTestId('request-chat-input'), '第二句');
+    await fireEvent.press(screen.getByTestId('request-chat-send'));
+    await waitFor(() => expect(mockState.send).toHaveBeenCalledTimes(2));
+
+    const [, first] = mockState.send.mock.calls[0] as [string, { opId: string }];
+    const [, second] = mockState.send.mock.calls[1] as [string, { opId: string }];
+    expect(first.opId).not.toBe(second.opId);
+    expect(screen.getByText('第一句')).toBeTruthy();
+    expect(screen.getByText('第二句')).toBeTruthy();
+  });
+
+  it('发失败时写明没发出去，点重试用同一个 opId 再发一次', async () => {
+    let offline = true;
+    mockState.send.mockImplementation(async (_pid: string, action: { opId: string }) =>
+      offline
+        ? { ok: false, error: { kind: 'offline' } }
+        : { ok: true, value: { t: 'receipt', opId: action.opId, state: 'done', planRef: 'plan1' } },
+    );
+
+    const screen = await render(<RequestDetailScreen />);
+    await waitFor(() => expect(screen.getByTestId('card-steps')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByTestId('request-chat-input'), '断网也要留住');
+    await fireEvent.press(screen.getByTestId('request-chat-send'));
+
+    await waitFor(() => expect(screen.getByTestId('request-chat-retry')).toBeTruthy());
+    const [, failed] = mockState.send.mock.calls[0] as [string, { opId: string }];
+    // 断网时一次失败会原地补发一次，仍失败才显示重试
+    expect(mockState.send).toHaveBeenCalledTimes(2);
+
+    offline = false;
+    const before = mockState.send.mock.calls.length;
+    await fireEvent.press(screen.getByTestId('request-chat-retry'));
+    await waitFor(() => expect(mockState.send.mock.calls.length).toBeGreaterThan(before));
+    const [, retried] = mockState.send.mock.calls[before] as [string, { opId: string }];
+    expect(retried.opId).toBe(failed.opId);
+    await waitFor(() => expect(screen.queryByTestId('request-chat-retry')).toBeNull());
+  });
 });

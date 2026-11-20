@@ -347,7 +347,7 @@ function reinstallApp(udid, appPath) {
 
 function expandFlowPaths(targets) {
   if (!targets.length) {
-    return ['e2e/maestro/flow.yaml'];
+    return ['e2e/maestro/flow.yaml', 'e2e/maestro/plan.yaml'];
   }
   const flows = [];
   for (const target of targets) {

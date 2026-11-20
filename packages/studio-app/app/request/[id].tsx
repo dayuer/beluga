@@ -17,7 +17,7 @@ import { StatusDot } from '../../components/StatusDot';
 import { SyncBanner } from '../../components/SyncBanner';
 import { UndoBar } from '../../components/UndoBar';
 import { cache } from '../../lib/cache';
-import { isDemoMode } from '../../lib/client';
+import { hub, isDemoMode } from '../../lib/client';
 import {
   DEMO_CARDS,
   DEMO_REQUEST_SUMMARIES,
@@ -31,6 +31,9 @@ import { usePlanView } from '../../lib/plan-store';
 import { requestViewFromPlan } from '../../lib/request-view';
 import { REQUESTS_CACHE_KEY } from '../../lib/requests-source';
 import { pendingKey, useSend } from '../../lib/send';
+import { session } from '../../lib/session';
+import { randomOpId } from '../../lib/submit';
+import { undoStore } from '../../lib/undo';
 import { detectLang, t } from '../../lib/strings';
 import { tDrawer } from '../../lib/strings/drawer';
 import { tUnderstanding } from '../../lib/strings/understanding';
@@ -65,11 +68,17 @@ export function resolveRequestView(id: string): RequestView | null {
   };
 }
 
-/** 本轮对话里还没被中台收下的消息：按 opId 存，中台 turn 带上同一个 opId 时移除。 */
+/**
+ * 本轮对话里还没被中台收下的消息：按 opId 存，中台 turn 带上同一个 opId 时移除。
+ * 每条消息有自己的 opId（一个 `useSend` 发完一条就进入 done，不能连发）。
+ */
 interface OutboxMessage {
   readonly opId: string;
   readonly text: string;
   readonly at: number;
+  readonly state: 'sending' | 'failed';
+  /** 被拒（opId 在中台已终结）：重试要换一个新 opId。 */
+  readonly refused?: boolean;
 }
 
 /**
@@ -103,6 +112,8 @@ export default function RequestDetailScreen() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  // 输入框的同步副本：双击发送时第二下看到空文本，不会发出第二个动作。
+  const draftRef = useRef('');
   const [extraMessages, setExtraMessages] = useState<RequestMessage[]>([]);
   const [outbox, setOutbox] = useState<OutboxMessage[]>([]);
   const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
@@ -174,15 +185,14 @@ export default function RequestDetailScreen() {
   };
 
   // --- 发动作（非 DEMO）--------------------------------------------------------
-  const chatSend = useSend(projectId, pendingKey('chat', projectId, id));
   const decisionSend = useSend(projectId, pendingKey('decision', projectId, id));
   const discardSend = useSend(projectId, pendingKey('discard', projectId, id));
   const startSend = useSend(projectId, pendingKey('gate-start', projectId, id));
   const changesSend = useSend(projectId, pendingKey('gate-changes', projectId, id));
   const acceptSend = useSend(projectId, pendingKey('accept', projectId, id));
   const releaseSend = useSend(projectId, pendingKey('release', projectId, id));
-  const chatBusy = chatSend.state.phase === 'sending' || chatSend.state.phase === 'queued';
-  const chatFailed = chatSend.state.phase === 'failed';
+  const chatBusy = outbox.some((item) => item.state === 'sending');
+  const chatFailed = outbox.some((item) => item.state === 'failed');
 
   // 中台收下了消息（turn 带上同一个 opId）：移除本地气泡。
   useEffect(() => {
@@ -205,22 +215,62 @@ export default function RequestDetailScreen() {
     ];
   }, [request?.messages, extraMessages, demoMode, outbox]);
 
+  const setOutboxItem = (opId: string, patch: Partial<OutboxMessage>): void => {
+    setOutbox((prev) => prev.map((item) => (item.opId === opId ? { ...item, ...patch } : item)));
+  };
+
+  const deliverChat = async (opId: string, text: string): Promise<void> => {
+    const action = { t: 'action' as const, opId, kind: 'chat.send' as const, planRef: id, payload: { text } };
+    let answer = await hub.send(projectId, action);
+    // 断网恢复后第一个请求常撞上断网前的旧连接（立刻 “network connection was lost”）。
+    // 中台按 opId 幂等，原地再发一次不会多出动作。
+    if (!answer.ok && answer.error.kind === 'offline') {
+      answer = await hub.send(projectId, action);
+    }
+    if (answer.ok) {
+      if (answer.value.state === 'refused') {
+        // opId 在中台已终结：保留气泡，重试时换新 opId。
+        setOutboxItem(opId, { state: 'failed', refused: true });
+        return;
+      }
+      // queued / done / expired：等中台的 turn 带上同一个 opId，再拿掉本地气泡。
+      return;
+    }
+    if (answer.error.kind === 'signed-out') {
+      session.clear();
+      return;
+    }
+    setOutboxItem(opId, { state: 'failed' });
+  };
+
   const sendText = (text: string): void => {
-    void chatSend.send(
-      (opId) => {
+    const opId = randomOpId();
+    setOutbox((prev) => [...prev, { opId, text, at: Date.now(), state: 'sending' }]);
+    void deliverChat(opId, text);
+  };
+
+  /** 失败的气泡：同一个 opId 再发一次；被拒的换新 opId（中台的 opId 是终态）。 */
+  const retryChat = (): void => {
+    for (const item of outbox) {
+      if (item.state !== 'failed') continue;
+      if (item.refused) {
+        const next = randomOpId();
         setOutbox((prev) =>
-          prev.some((item) => item.opId === opId)
-            ? prev.map((item) => (item.opId === opId ? { ...item, text } : item))
-            : [...prev, { opId, text, at: Date.now() }],
+          prev.map((x) => (x.opId === item.opId ? { opId: next, text: item.text, at: item.at, state: 'sending' } : x)),
         );
-        return { t: 'action', opId, kind: 'chat.send', planRef: id, payload: { text } };
-      },
-    );
+        void deliverChat(next, item.text);
+      } else {
+        setOutboxItem(item.opId, { state: 'sending' });
+        void deliverChat(item.opId, item.text);
+      }
+    }
   };
 
   const sendMessage = (): void => {
-    const text = draft.trim();
+    const text = draftRef.current.trim();
     if (!text) return;
+    // 同一 tick 清空同步副本：双击的第二下看到空文本，不会重发。
+    draftRef.current = '';
     setDraft('');
     if (demoMode) {
       setExtraMessages((prev) => [
@@ -230,10 +280,45 @@ export default function RequestDetailScreen() {
       return;
     }
     if (!projectId) {
+      draftRef.current = text;
       setDraft(text);
       return;
     }
     sendText(text);
+  };
+
+  /** 问题回答：先给 10 秒撤销窗口（与旧计划页一致），到点才发 decision.answer。 */
+  const scheduleDecisionAnswer = (cardId: string, picks: string[], free: string): void => {
+    undoStore.show({
+      text: t(lang, 'decision.undo'),
+      ms: 10_000,
+      fire: () => {
+        void decisionSend.send(
+          (opId) => ({
+            t: 'action',
+            opId,
+            kind: 'decision.answer',
+            planRef: id,
+            payload: {
+              decisionId: cardId,
+              ...(picks.length > 0 ? { picks } : {}),
+              ...(free ? { text: free } : {}),
+            },
+          }),
+          {
+            onQueued: () =>
+              setLocal((prev) => ({ ...prev, rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
+            onDone: () =>
+              setLocal((prev) => ({ ...prev, rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
+          },
+        );
+      },
+    });
+  };
+
+  const changeDraft = (value: string): void => {
+    draftRef.current = value;
+    setDraft(value);
   };
 
   const answerQuestions = (cardId: string, answers: readonly { questionId: string; picks: readonly string[]; customText?: string }[]) => {
@@ -244,23 +329,7 @@ export default function RequestDetailScreen() {
       .filter((text): text is string => Boolean(text))
       .join('\n');
     if (picks.length === 0 && !free) return false;
-    void decisionSend.send(
-      (opId) => ({
-        t: 'action',
-        opId,
-        kind: 'decision.answer',
-        planRef: id,
-        payload: {
-          decisionId: cardId,
-          ...(picks.length > 0 ? { picks } : {}),
-          ...(free ? { text: free } : {}),
-        },
-      }),
-      {
-        onQueued: () => setLocal((prev) => ({ rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
-        onDone: () => setLocal((prev) => ({ rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
-      },
-    );
+    scheduleDecisionAnswer(cardId, picks, free);
   };
 
   const confirmUnderstanding = (cardId: string) => {
@@ -393,7 +462,7 @@ export default function RequestDetailScreen() {
         rightPanel={desktop ? 360 : undefined}
       />
 
-      {offline ? <SyncBanner kind="offline" text={bannerText} /> : null}
+      {offline ? <SyncBanner kind="offline" text={bannerText} testID="offline-banner" /> : null}
 
       {loading ? (
         <View style={styles.loadingWrap} testID="request-loading">
@@ -416,7 +485,11 @@ export default function RequestDetailScreen() {
           >
             <View style={[styles.statusBar, { backgroundColor: color.card, borderColor: color.hairline }]}>
               <StatusDot status={request.summary.status} />
-              <Text style={[styles.statusLine, { color: color.text2 }]} numberOfLines={2}>
+              <Text
+                style={[styles.statusLine, { color: color.text2 }]}
+                numberOfLines={2}
+                testID="request-status"
+              >
                 {request.summary.statusLine}
               </Text>
               <Pressable
@@ -490,23 +563,35 @@ export default function RequestDetailScreen() {
                   </View>
                 );
               })}
-              {!demoMode && chatBusy ? (
-                <Text style={[styles.chatStatus, { color: color.text3 }]} testID="request-chat-status">
-                  {chatSend.state.phase === 'sending' ? t(lang, 'common.sending') : t(lang, 'chat.queued')}
-                </Text>
-              ) : null}
-              {!demoMode && chatFailed ? (
-                <Pressable
-                  onPress={() => void chatSend.retry()}
-                  accessibilityRole="button"
-                  testID="request-chat-retry"
-                  style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
-                >
-                  <Text style={[styles.ghostBtnText, { color: color.error }]}>{t(lang, 'chat.failed')}</Text>
-                </Pressable>
+              {!demoMode && view?.typing ? (
+                <View style={styles.typingRow} testID="request-chat-typing">
+                  <View style={styles.typingDot} />
+                  <Text style={[styles.chatStatus, { color: color.text2 }]}>{t(lang, 'chat.aiWriting')}</Text>
+                </View>
               ) : null}
             </View>
           </ScrollView>
+
+          {/* 发送状态与重试放在输入框上方（不随列表滚动），失败的句子看得见也点得到 */}
+          {!demoMode && (chatBusy || chatFailed) ? (
+            <View style={styles.chatBar} testID="request-chat-bar">
+              {chatBusy ? (
+                <Text style={[styles.chatStatus, { color: color.text3 }]} testID="request-chat-status">
+                  {t(lang, 'common.sending')}
+                </Text>
+              ) : null}
+              {chatFailed ? (
+                <Pressable
+                  onPress={retryChat}
+                  accessibilityRole="button"
+                  testID="request-chat-retry"
+                  style={({ pressed }) => [styles.retryBar, pressed && styles.pressed]}
+                >
+                  <Text style={[styles.retryBarText, { color: color.error }]}>{t(lang, 'chat.failed')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {!drawerOpen ? (
             <View pointerEvents="box-none" style={keyboardInset > 0 ? { marginBottom: keyboardInset } : undefined}>
@@ -527,7 +612,7 @@ export default function RequestDetailScreen() {
           >
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={changeDraft}
               placeholder={t(lang, 'chat.saySomething')}
               placeholderTextColor={color.text3}
               style={[styles.input, { color: color.text, backgroundColor: color.sunken, borderColor: color.hairline }]}
@@ -536,19 +621,19 @@ export default function RequestDetailScreen() {
             />
             <Pressable
               onPress={sendMessage}
-              disabled={!draft.trim() || (!demoMode && chatBusy)}
+              disabled={!draft.trim()}
               accessibilityRole="button"
               accessibilityLabel={t(lang, 'chat.send')}
               testID="request-chat-send"
               style={({ pressed }) => [
                 styles.sendBtn,
-                { backgroundColor: draft.trim() && (demoMode || !chatBusy) ? color.primary : color.disabledFill },
+                { backgroundColor: draft.trim() ? color.primary : color.disabledFill },
                 pressed && draft.trim() ? styles.pressed : null,
               ]}
             >
               <Send
                 size={18}
-                color={draft.trim() && (demoMode || !chatBusy) ? color.onPrimary : color.text3}
+                color={draft.trim() ? color.onPrimary : color.text3}
                 strokeWidth={stroke}
               />
             </Pressable>
@@ -620,6 +705,21 @@ const styles = StyleSheet.create({
   messagesSection: { gap: space[2] },
   sectionTitle: { ...type.caption, fontWeight: '600' },
   chatStatus: { ...type.caption, alignSelf: 'flex-end' },
+  chatBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: space[3],
+    paddingHorizontal: space[4],
+    paddingVertical: space[1],
+    backgroundColor: color.bar,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.hairline,
+  },
+  retryBar: { minHeight: 44, paddingHorizontal: space[3], justifyContent: 'center', borderRadius: radius.pill },
+  retryBarText: { ...type.caption, fontWeight: '600' },
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: color.ok },
   bubble: {
     maxWidth: '85%',
     paddingVertical: space[2],
