@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mockFiles = new Map<string, Uint8Array>();
+const readLengths: number[] = [];
 
 vi.mock('expo-file-system', () => ({
   FileMode: { ReadOnly: 'r' },
@@ -16,7 +17,8 @@ vi.mock('expo-file-system', () => ({
       return {
         offset: 0,
         async readBytes(length: number) {
-          await new Promise((r) => setTimeout(r, 5));
+          readLengths.push(length);
+          await new Promise((r) => setTimeout(r, 1));
           if (closed) throw new Error('file handle is closed');
           return data.subarray(this.offset, this.offset + length);
         },
@@ -326,5 +328,30 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       4,
     );
     expect(Array.from(fileChunk)).toEqual([2, 3, 4, 5]);
+  });
+
+  it('computes incremental SHA-256 of a 3 MB file in <= 512 KB slices matching node:crypto', async () => {
+    const size = 3 * 1024 * 1024;
+    const big = new Uint8Array(size);
+    for (let i = 0; i < size; i += 4096) {
+      big[i] = (i * 31) & 0xff;
+    }
+    mockFiles.set('file:///mock/big-3mb.png', big);
+    readLengths.length = 0;
+
+    const reader = createExpoChunkReader();
+    const got = await reader.computeSha256({
+      path: 'big-3mb.png',
+      size,
+      source: { kind: 'file', uri: 'file:///mock/big-3mb.png' },
+    });
+
+    const nodeCrypto = (await import(/* @vite-ignore */ 'node:crypto' as string)) as {
+      createHash(alg: string): { update(d: Uint8Array): { digest(enc: string): string } };
+    };
+    const expected = nodeCrypto.createHash('sha256').update(big).digest('hex');
+    expect(got).toBe(expected);
+    expect(readLengths.length).toBe(6);
+    expect(Math.max(...readLengths)).toBeLessThanOrEqual(512 * 1024);
   });
 });

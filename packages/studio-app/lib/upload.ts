@@ -1,3 +1,5 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { File, FileMode } from 'expo-file-system';
 import type { PackageEntry } from './package-pick';
 import { isOnline, subscribeOnline } from './net';
@@ -68,30 +70,23 @@ const envBase = (): string => {
   return (env?.EXPO_PUBLIC_HUB_URL ?? '').replace(/\/+$/, '');
 };
 
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const copy = new Uint8Array(data.byteLength);
-  copy.set(data);
-  const digest = await crypto.subtle.digest('SHA-256', copy.buffer);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const HASH_CHUNK_BYTES = 512 * 1024;
+
+function sha256Hex(data: Uint8Array): string {
+  return bytesToHex(sha256(data));
 }
 
 async function resolveZipDataOffset(file: File, localHeaderOffset: number): Promise<number> {
-  if (typeof file.open === 'function') {
-    const handle = file.open(FileMode?.ReadOnly);
-    try {
-      handle.offset = localHeaderOffset;
-      const header = await handle.readBytes(30);
-      const nameLen = (header[26] ?? 0) | ((header[27] ?? 0) << 8);
-      const extraLen = (header[28] ?? 0) | ((header[29] ?? 0) << 8);
-      return localHeaderOffset + 30 + nameLen + extraLen;
-    } finally {
-      handle.close();
-    }
+  const handle = file.open(FileMode?.ReadOnly);
+  try {
+    handle.offset = localHeaderOffset;
+    const header = await handle.readBytes(30);
+    const nameLen = (header[26] ?? 0) | ((header[27] ?? 0) << 8);
+    const extraLen = (header[28] ?? 0) | ((header[29] ?? 0) << 8);
+    return localHeaderOffset + 30 + nameLen + extraLen;
+  } finally {
+    handle.close();
   }
-  const all = await file.bytes();
-  const nameLen = (all[localHeaderOffset + 26] ?? 0) | ((all[localHeaderOffset + 27] ?? 0) << 8);
-  const extraLen = (all[localHeaderOffset + 28] ?? 0) | ((all[localHeaderOffset + 29] ?? 0) << 8);
-  return localHeaderOffset + 30 + nameLen + extraLen;
 }
 
 export function createExpoChunkReader(): ChunkReader {
@@ -103,36 +98,36 @@ export function createExpoChunkReader(): ChunkReader {
         }
         const f = new File(entry.source.zipUri);
         const dataOffset = await resolveZipDataOffset(f, entry.source.localHeaderOffset);
-        if (typeof f.open === 'function') {
-          const handle = f.open(FileMode?.ReadOnly);
-          try {
-            handle.offset = dataOffset + offset;
-            return await handle.readBytes(size);
-          } finally {
-            handle.close();
-          }
-        }
-        const all = await f.bytes();
-        return all.subarray(dataOffset + offset, dataOffset + offset + size);
-      }
-
-      const f = new File(entry.source.uri);
-      if (typeof f.open === 'function') {
         const handle = f.open(FileMode?.ReadOnly);
         try {
-          handle.offset = offset;
+          handle.offset = dataOffset + offset;
           return await handle.readBytes(size);
         } finally {
           handle.close();
         }
       }
-      const all = await f.bytes();
-      return all.subarray(offset, offset + size);
+
+      const f = new File(entry.source.uri);
+      const handle = f.open(FileMode?.ReadOnly);
+      try {
+        handle.offset = offset;
+        return await handle.readBytes(size);
+      } finally {
+        handle.close();
+      }
     },
 
     async computeSha256(entry) {
-      const data = await this.readChunk(entry, 0, entry.size);
-      return sha256Hex(data);
+      const hasher = sha256.create();
+      let offset = 0;
+      while (offset < entry.size) {
+        const len = Math.min(HASH_CHUNK_BYTES, entry.size - offset);
+        const chunk = await this.readChunk(entry, offset, len);
+        hasher.update(chunk);
+        offset += chunk.byteLength;
+        if (chunk.byteLength === 0) break;
+      }
+      return bytesToHex(hasher.digest());
     },
   };
 }
@@ -177,7 +172,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
     entry: PackageEntry,
   ): Promise<void> => {
     const bytes = await reader.readChunk(entry, chunk.offset, chunk.size);
-    const partSha = await sha256Hex(bytes);
+    const partSha = sha256Hex(bytes);
     const body = new Uint8Array(bytes.byteLength);
     body.set(bytes);
 
