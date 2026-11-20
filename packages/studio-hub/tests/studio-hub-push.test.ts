@@ -196,6 +196,17 @@ describe('SS-80 push sender (APNs + FCM)', () => {
     );
     expect(second).toEqual({ sent: 2, failed: 0, removed: 0 });
     expect(calls.filter((c) => c.url === 'https://oauth.fake/token')).toHaveLength(1);
+    const fcmCall = calls.find((c) => c.url === 'https://fcm.fake/v1/projects/proj-1/messages:send');
+    expect(fcmCall).toBeDefined();
+    expect(JSON.parse(fcmCall!.body ?? '{}')).toMatchObject({
+      message: {
+        android: {
+          notification: {
+            channel_id: 'needs-you',
+          },
+        },
+      },
+    });
   });
 
   it('SS-127: reuses cached APNs JWT within 50 minutes and refreshes after 50 minutes', async () => {

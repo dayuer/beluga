@@ -93,6 +93,17 @@ async function mintLoginOnly() {
 }
 
 async function pushDemoCard() {
+  let projectId;
+  try {
+    const meta = JSON.parse(fs.readFileSync(sessionMetaFile, 'utf8'));
+    projectId = meta.projectId;
+  } catch {
+    /* fallback below */
+  }
+  if (!projectId) {
+    throw new Error('no running dev:device session projectId found; start `npm run dev:device` first');
+  }
+
   const stamp = Date.now();
   const decisionId = `push-demo-${stamp}`;
   const baseDecision = views.decide.decisions[0];
@@ -113,7 +124,7 @@ async function pushDemoCard() {
   await pushView('dp1', demoView);
   await pushView('dp1', demoView);
 
-  const cardId = `dp1:${demoView.planRef}:decision:${decisionId}`;
+  const cardId = `${projectId}:${demoView.planRef}:decision:${decisionId}`;
   log(`pushed waiting card twice for dedup check: ${cardId}`);
   log(`expected notification path: /request/${encodeURIComponent(demoView.planRef)}?card=${encodeURIComponent(cardId)}`);
   log(`check hub log: ${path.relative(repo, wranglerLog)}`);
@@ -201,7 +212,10 @@ async function main() {
       }),
   });
 
-  fs.writeFileSync(sessionMetaFile, JSON.stringify({ customerId: seeded.customerId, hubUrl: localHubUrl }, null, 2));
+  fs.writeFileSync(
+    sessionMetaFile,
+    JSON.stringify({ customerId: seeded.customerId, projectId: seeded.projectId, hubUrl: localHubUrl }, null, 2),
+  );
 
   log('pushing sample plan fixtures from e2e/fixtures/views.ts');
   await pushView('dp1', views.running);

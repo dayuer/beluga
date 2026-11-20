@@ -6,6 +6,7 @@ import { kv } from './kv';
 import { isOnline } from './net';
 import { session } from './session';
 import { detectLang } from './strings';
+import { en as pushEn, zh as pushZh } from './strings/push';
 import type { Lang } from './strings/table.js';
 import { ink } from './theme';
 
@@ -76,14 +77,8 @@ function platformOf(deps: PushDeps): PushPlatform | null {
 
 /** 拒绝通知权限时，在「设置 › 通知」展示的系统开启指引。 */
 export function deniedPermissionHint(lang: Lang = detectLang(), platform: string = Platform.OS): string {
-  if (lang === 'en') {
-    return platform === 'android'
-      ? 'Notifications are off. Enable them in System Settings › Apps › Synon Studio › Notifications.'
-      : 'Notifications are off. Enable them in System Settings › Synon Studio › Notifications.';
-  }
-  return platform === 'android'
-    ? '通知权限已关闭，请前往系统「设置 › 应用 › Synon Studio › 通知」开启允许通知。'
-    : '通知权限已关闭，请前往系统「设置 › Synon Studio › 通知」开启允许通知。';
+  const dict = lang === 'en' ? pushEn : pushZh;
+  return platform === 'android' ? dict['push.denied.android'] : dict['push.denied.ios'];
 }
 
 /** 读取「设置 › 账号」中的通知总开关（默认开启）。 */
@@ -115,11 +110,16 @@ export function getOrCreateDeviceId(deps: PushDeps = {}): string {
   return id;
 }
 
-async function ensureChannels(notifications: PushNotificationsApi, platform: PushPlatform): Promise<void> {
+async function ensureChannels(
+  notifications: PushNotificationsApi,
+  platform: PushPlatform,
+  lang: Lang = detectLang(),
+): Promise<void> {
   if (platform !== 'android' || typeof notifications.setNotificationChannelAsync !== 'function') return;
   const high = notifications.AndroidImportance?.HIGH ?? Notifications.AndroidImportance?.HIGH ?? 4;
+  const dict = lang === 'en' ? pushEn : pushZh;
   await notifications.setNotificationChannelAsync('needs-you', {
-    name: 'Needs you',
+    name: dict['push.channel.needsYou'],
     importance: high,
     lightColor: ink.peach,
   });
@@ -142,7 +142,7 @@ export async function requestPushPermission(ask: boolean, deps: PushDeps = {}): 
   try {
     const now = await notifications.getPermissionsAsync();
     if (now.granted) {
-      await ensureChannels(notifications, platform);
+      await ensureChannels(notifications, platform, lang);
       return { status: 'granted', canAskAgain: true, hint: null };
     }
     const canAsk = now.canAskAgain ?? true;
@@ -155,7 +155,7 @@ export async function requestPushPermission(ask: boolean, deps: PushDeps = {}): 
     }
     const next = await notifications.requestPermissionsAsync();
     if (next.granted) {
-      await ensureChannels(notifications, platform);
+      await ensureChannels(notifications, platform, lang);
       return { status: 'granted', canAskAgain: true, hint: null };
     }
     return {
