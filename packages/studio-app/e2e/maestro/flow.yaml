@@ -3,6 +3,8 @@ appId: com.synon.studio
 # 1. Sign in via magic link, see projects, open a plan, and send one request (double-tap dedup)
 - launchApp:
     clearState: true
+    permissions:
+      notifications: allow
 - tapOn:
     text: "取消|Cancel"
     optional: true
@@ -23,6 +25,9 @@ appId: com.synon.studio
 - openLink: "${output.loginLink}"
 - tapOn:
     text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
     optional: true
 - extendedWaitUntil:
     visible:
@@ -98,6 +103,11 @@ appId: com.synon.studio
     timeout: 15000
 - tapOn:
     id: "primary"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
 - extendedWaitUntil:
     visible: ".*草稿要留住.*"
     timeout: 15000
@@ -108,6 +118,8 @@ appId: com.synon.studio
 - launchApp:
     clearState: false
     stopApp: true
+    permissions:
+      notifications: allow
 - extendedWaitUntil:
     visible:
       id: "project-card-${E2E_PROJECT_ID}"
@@ -120,6 +132,11 @@ appId: com.synon.studio
     timeout: 20000
 - tapOn:
     id: "primary"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
 - extendedWaitUntil:
     visible: ".*草稿要留住.*"
     timeout: 15000

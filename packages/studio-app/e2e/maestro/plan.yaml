@@ -3,6 +3,8 @@ appId: com.synon.studio
 # 1. Plan page follows daemon updates, tabs, milestone sheet, offline banners, and no internal leaks
 - launchApp:
     clearState: true
+    permissions:
+      notifications: allow
 - tapOn:
     text: "取消|Cancel"
     optional: true
@@ -17,6 +19,9 @@ appId: com.synon.studio
 - openLink: "${output.loginLink}"
 - tapOn:
     text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
     optional: true
 - extendedWaitUntil:
     visible:
@@ -463,6 +468,8 @@ appId: com.synon.studio
       ACTION: daemonReset
 - launchApp:
     clearState: true
+    permissions:
+      notifications: allow
 - extendedWaitUntil:
     visible:
       id: "project-card-${E2E_PROJECT_ID}"
@@ -570,6 +577,8 @@ appId: com.synon.studio
       VIEW: review
 - launchApp:
     clearState: true
+    permissions:
+      notifications: allow
 - extendedWaitUntil:
     visible:
       id: "projects-screen"

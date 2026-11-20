@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { findAllJson } from '../test/json';
-import { PrimaryButton } from './PrimaryButton';
+import { PrimaryButton, REARM_MS } from './PrimaryButton';
 
 describe('PrimaryButton', () => {
   afterEach(() => {
@@ -43,5 +43,17 @@ describe('PrimaryButton', () => {
 
     await screen.rerender(<PrimaryButton label="开始做" onPress={onPress} state="idle" error="网络超时，请重试" />);
     expect(screen.getByText('网络超时，请重试')).toBeTruthy();
+  });
+  it('works again after the double-tap window when its state never leaves idle (navigation button)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onPress = vi.fn();
+    const screen = await render(<PrimaryButton label="新需求" onPress={onPress} />);
+    const btn = screen.getByTestId('primary');
+    await fireEvent.press(btn);
+    await fireEvent.press(btn);
+    expect(onPress).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(REARM_MS);
+    await fireEvent.press(btn);
+    expect(onPress).toHaveBeenCalledTimes(2);
   });
 });
