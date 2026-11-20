@@ -1,5 +1,5 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
-import { getHubHost } from './lib/links';
+import { getHubHost } from './lib/links.ts';
 
 /**
  * 动态 Expo 配置（SS-25）：从 `EXPO_PUBLIC_HUB_URL` 派生 iOS `associatedDomains`

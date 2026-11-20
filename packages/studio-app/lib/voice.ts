@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
-import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import type { Lang } from './strings';
 import { tVoice } from './strings/voice';
+import { createVoiceRecognizer } from './voice-recognizer';
 
 const NOISE = /\[[^\]]*\]|\([^)]*\)|\*[^*]*\*|[♪♫]+/g;
 
@@ -30,63 +30,10 @@ export interface VoiceRecognizer {
 }
 
 /**
- * Check microphone (and iOS speech recognition) permissions across Android and iOS.
+ * 默认识别器：真的录音、本机 Whisper 识别、真的弹麦克风授权（lib/voice-recognizer.ts）。
+ * 测试和组件可以传入自己的 recognizer 替换掉它。
  */
-export async function requestMicPermission(
-  lang: Lang,
-  os: string = Platform.OS,
-): Promise<PermissionCheck> {
-  if (os === 'android') {
-    try {
-      const res = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      );
-      if (res !== PermissionsAndroid.RESULTS.GRANTED) {
-        return { granted: false, message: tVoice(lang, 'voice.micDenied') };
-      }
-      return { granted: true };
-    } catch {
-      return { granted: false, message: tVoice(lang, 'voice.micDenied') };
-    }
-  }
-
-  if (os === 'ios') {
-    const audioSession = NativeModules?.AudioSession as
-      | { requestRecordPermission?: () => Promise<boolean> }
-      | undefined;
-    const speechMod = NativeModules?.SpeechRecognition as
-      | { requestAuthorization?: () => Promise<string> }
-      | undefined;
-
-    if (audioSession?.requestRecordPermission) {
-      const micOk = await audioSession.requestRecordPermission().catch(() => false);
-      if (!micOk) return { granted: false, message: tVoice(lang, 'voice.micDenied') };
-    }
-    if (speechMod?.requestAuthorization) {
-      const auth = await speechMod.requestAuthorization().catch(() => 'denied');
-      if (auth !== 'authorized' && auth !== 'granted') {
-        return { granted: false, message: tVoice(lang, 'voice.speechDeniedIos') };
-      }
-    }
-    if (!audioSession?.requestRecordPermission && !speechMod?.requestAuthorization) {
-      return { granted: false, message: tVoice(lang, 'voice.unavailable') };
-    }
-    return { granted: true };
-  }
-
-  return { granted: false, message: tVoice(lang, 'voice.unavailable') };
-}
-
-const defaultRecognizer: VoiceRecognizer = {
-  requestPermission: (lang, os) => requestMicPermission(lang, os),
-  async start() {
-    throw new Error('voice-module-not-installed');
-  },
-  async stop() {
-    return '';
-  },
-  async cancel() {},
-};
+const defaultRecognizer: VoiceRecognizer = createVoiceRecognizer();
 
 export type VoicePhase = 'idle' | 'listening' | 'recognizing';
 
