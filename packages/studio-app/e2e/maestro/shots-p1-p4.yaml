@@ -1,0 +1,124 @@
+appId: com.synon.studio
+---
+# Walkthrough screenshots for P1–P4 (milestone A10 / SS-90). Runs against the fake daemon.
+# P1 登录 / P2 提需求 / P3 回答问题 / P4 需求详情
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- takeScreenshot: p1-login
+- tapOn:
+    id: "email"
+- inputText: "customer@example.test"
+- hideKeyboard
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "login-sent"
+    timeout: 15000
+- takeScreenshot: p1-login-sent
+
+# P2: 提需求（新需求）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- tapOn:
+    id: "new-request-button"
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
+- takeScreenshot: p2-new-empty
+- tapOn:
+    id: "goal-input"
+- inputText: "给门店做一个预约小程序：顾客选时间、留手机号，店主在后台看到今天的预约。"
+- hideKeyboard
+- takeScreenshot: p2-new-filled
+- swipe:
+    start: 50%, 70%
+    end: 50%, 25%
+- takeScreenshot: p2-new-scrolled
+- tapOn:
+    id: "platform-miniprogram"
+- takeScreenshot: p2-new-selected
+- tapOn:
+    id: "back"
+
+# P3: 回答问题（一题一题，选项 + 自己写）
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*在等你回答.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-d-m0-t0"
+    direction: DOWN
+- takeScreenshot: p3-question
+
+# P4: 需求详情（对话 + 状态行 + 步骤 + 卡片流）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*AI 在做.*"
+    timeout: 15000
+- takeScreenshot: p4-detail-top
+- scrollUntilVisible:
+    element:
+      id: "card-steps"
+    direction: DOWN
+    optional: true
+- takeScreenshot: p4-detail-cards

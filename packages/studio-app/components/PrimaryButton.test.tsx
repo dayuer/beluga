@@ -1,7 +1,9 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { findAllJson } from '../test/json';
+import { color } from '../lib/theme';
 import { PrimaryButton, REARM_MS } from './PrimaryButton';
 
 describe('PrimaryButton', () => {
@@ -44,6 +46,12 @@ describe('PrimaryButton', () => {
     await screen.rerender(<PrimaryButton label="开始做" onPress={onPress} state="idle" error="网络超时，请重试" />);
     expect(screen.getByText('网络超时，请重试')).toBeTruthy();
   });
+  it('keeps the disabled label readable: text2 on disabledFill is 5.3:1 (UX-21)', async () => {
+    const screen = await render(<PrimaryButton label="开始规划" onPress={() => {}} disabled />);
+    const label = screen.getByText('开始规划');
+    expect(StyleSheet.flatten(label.props.style).color).toBe(color.text2);
+  });
+
   it('works again after the double-tap window when its state never leaves idle (navigation button)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const onPress = vi.fn();
