@@ -1,6 +1,6 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react-native';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render } from '@testing-library/react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hapticsSuccess = vi.fn();
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
@@ -13,6 +13,7 @@ vi.mock('../../lib/haptics', () => ({
   },
 }));
 
+import { undoStore } from '../../lib/undo';
 import { ChangeCard, type ChangesCardModel } from './ChangeCard';
 
 const sampleCard: ChangesCardModel = {
@@ -29,7 +30,15 @@ const sampleCard: ChangesCardModel = {
 
 describe('ChangeCard', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    undoStore.cancel();
     hapticsSuccess.mockClear();
+  });
+
+  afterEach(async () => {
+    undoStore.cancel();
+    await cleanup();
+    vi.useRealTimers();
   });
 
   it('renders added, modified, and removed sections and disables SignedButton without key', async () => {
@@ -46,7 +55,24 @@ describe('ChangeCard', () => {
     expect(screen.getByText(/我 › 设备/)).toBeTruthy();
   });
 
-  it('calls onApprove and onDecline properly when key exists', async () => {
+  it('does not call onApprove or haptics if cancelled within 4s undo window', async () => {
+    const onApprove = vi.fn().mockResolvedValue(undefined);
+    const screen = await render(
+      <ChangeCard card={sampleCard} onDecline={() => {}} onApprove={onApprove} hasKeyOverride />,
+    );
+
+    await fireEvent.press(screen.getByTestId('change-approve'));
+    expect(undoStore.getState().active).toBe(true);
+    expect(undoStore.getState().remaining).toBe(4);
+    expect(onApprove).not.toHaveBeenCalled();
+
+    undoStore.cancel();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(onApprove).not.toHaveBeenCalled();
+    expect(hapticsSuccess).not.toHaveBeenCalled();
+  });
+
+  it('calls onApprove after 4s undo window and triggers onDecline', async () => {
     const onApprove = vi.fn().mockResolvedValue(undefined);
     const onDecline = vi.fn();
     const screen = await render(
@@ -57,9 +83,12 @@ describe('ChangeCard', () => {
     expect(onDecline).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(screen.getByTestId('change-approve'));
-    await vi.waitFor(() => expect(onApprove).toHaveBeenCalledTimes(1));
-    expect(hapticsSuccess).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('change-approved-hint')).toBeTruthy();
+    expect(onApprove).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(4000);
+    await vi.waitFor(() => expect(screen.getByTestId('change-approved-hint')).toBeTruthy());
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(hapticsSuccess).not.toHaveBeenCalled();
   });
 
   it('renders before -> after details when diff is provided', async () => {

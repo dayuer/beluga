@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { StudioDraftDiff } from '../../../../src/studio/protocol';
-import { haptics } from '../../lib/haptics';
 import { detectLang, t, type Lang } from '../../lib/strings';
 import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
+import { undoStore } from '../../lib/undo';
 import type { KnownStudioCard } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
 import { Card } from '../card/Card';
@@ -41,10 +41,11 @@ export function ChangeCard({
   const lang = langProp ?? detectLang();
   const c = signedCardStrings(lang);
   const [approved, setApproved] = useState(card.status === 'done');
-  const [busy, setBusy] = useState(false);
+  const [pendingUndo, setPendingUndo] = useState(false);
 
   useEffect(() => {
     setApproved(card.status === 'done');
+    setPendingUndo(false);
   }, [card.id, card.status]);
 
   const addedItems = diff ? diff.added.map((x) => x.title) : card.added;
@@ -53,16 +54,28 @@ export function ChangeCard({
     : card.modified.map((title) => ({ title, before: undefined as string | undefined, after: undefined as string | undefined }));
   const removedItems = diff ? diff.removed.map((x) => x.title) : card.removed;
 
-  const handleApprove = async () => {
-    if (approved || busy) return;
-    setBusy(true);
-    try {
-      await onApprove?.();
-      setApproved(true);
-      haptics.success();
-    } finally {
-      setBusy(false);
-    }
+  const handleApprove = () => {
+    if (approved || pendingUndo) return;
+    setPendingUndo(true);
+    undoStore.show({
+      text: c['change.undoText'],
+      ms: 4000,
+      fire: () => {
+        setPendingUndo(false);
+        const res = onApprove?.();
+        if (res && typeof (res as Promise<void>).then === 'function') {
+          void (res as Promise<void>).then(
+            () => setApproved(true),
+            () => {},
+          );
+        } else {
+          setApproved(true);
+        }
+      },
+      onUndo: () => {
+        setPendingUndo(false);
+      },
+    });
   };
 
   return (
@@ -76,6 +89,10 @@ export function ChangeCard({
           <Text style={[styles.doneHint, { color: color.ok }]} testID="change-approved-hint">
             {c['change.approved']}
           </Text>
+        ) : pendingUndo ? (
+          <Text style={[styles.doneHint, { color: color.text2 }]} testID="change-pending-undo">
+            {c['change.pendingUndo']}
+          </Text>
         ) : (
           <ActionRow
             negative={
@@ -84,8 +101,7 @@ export function ChangeCard({
             primary={
               <SignedButton
                 label={c['change.approve']}
-                onPress={() => void handleApprove()}
-                loading={busy}
+                onPress={handleApprove}
                 hasKeyOverride={hasKeyOverride}
                 testID="change-approve"
               />

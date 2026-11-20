@@ -4,6 +4,7 @@ import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
 import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
+import { undoStore } from '../../lib/undo';
 import type { KnownStudioCard } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
 import { Card } from '../card/Card';
@@ -51,22 +52,39 @@ export function StartCard({
   const lang = langProp ?? detectLang();
   const c = signedCardStrings(lang);
   const [started, setStarted] = useState(card.status === 'done');
-  const [busy, setBusy] = useState(false);
+  const [pendingUndo, setPendingUndo] = useState(false);
 
   useEffect(() => {
     setStarted(card.status === 'done');
+    setPendingUndo(false);
   }, [card.id, card.status]);
 
-  const handleStart = async () => {
-    if (started || busy) return;
-    setBusy(true);
-    try {
-      await onStart?.();
-      setStarted(true);
-      haptics.success();
-    } finally {
-      setBusy(false);
-    }
+  const handleStart = () => {
+    if (started || pendingUndo) return;
+    setPendingUndo(true);
+    undoStore.show({
+      text: c['start.undoText'](card.planTitle),
+      ms: 4000,
+      fire: () => {
+        setPendingUndo(false);
+        const res = onStart?.();
+        if (res && typeof (res as Promise<void>).then === 'function') {
+          void (res as Promise<void>).then(
+            () => {
+              setStarted(true);
+              haptics.success();
+            },
+            () => {},
+          );
+        } else {
+          setStarted(true);
+          haptics.success();
+        }
+      },
+      onUndo: () => {
+        setPendingUndo(false);
+      },
+    });
   };
 
   return (
@@ -80,6 +98,10 @@ export function StartCard({
           <Text style={[styles.doneHint, { color: color.ok }]} testID="start-confirmed-hint">
             {c['start.started']}
           </Text>
+        ) : pendingUndo ? (
+          <Text style={[styles.doneHint, { color: color.text2 }]} testID="start-pending-undo">
+            {c['start.pendingUndo']}
+          </Text>
         ) : (
           <ActionRow
             negative={
@@ -88,8 +110,7 @@ export function StartCard({
             primary={
               <SignedButton
                 label={c['start.start']}
-                onPress={() => void handleStart()}
-                loading={busy}
+                onPress={handleStart}
                 hasKeyOverride={hasKeyOverride}
                 testID="start-approve"
               />

@@ -36,6 +36,8 @@ export const zh = {
   'start.decline': '先不做…',
   'start.start': '开始做',
   'start.started': '已确认开工',
+  'start.pendingUndo': '已确认开工，4 秒内可撤销',
+  'start.undoText': (title: string) => `已批准开工「${title}」`,
   'start.openPlan': '在结果区看计划',
 
   // ChangeCard
@@ -45,6 +47,8 @@ export const zh = {
   'change.decline': '先不改…',
   'change.approve': '按这个改',
   'change.approved': '已按此改动继续',
+  'change.pendingUndo': '已按此改动继续，4 秒内可撤销',
+  'change.undoText': '已批准计划改动',
 
   // ReleaseCard (P11)
   'release.title': (env: string) => `上线到${env}`,
@@ -107,6 +111,8 @@ export const en: SignedCardStrings = {
   'start.decline': 'Not now…',
   'start.start': 'Start work',
   'start.started': 'Work started',
+  'start.pendingUndo': 'Started · undo within 4s',
+  'start.undoText': (title: string) => `Approved start for “${title}”`,
   'start.openPlan': 'View plan in drawer',
 
   // ChangeCard
@@ -116,6 +122,8 @@ export const en: SignedCardStrings = {
   'change.decline': 'Not now…',
   'change.approve': 'Apply changes',
   'change.approved': 'Changes approved',
+  'change.pendingUndo': 'Applied · undo within 4s',
+  'change.undoText': 'Approved planned changes',
 
   // ReleaseCard (P11)
   'release.title': (env: string) => `Release to ${env}`,
