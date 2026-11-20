@@ -13,6 +13,11 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), canGoBack: () => true, replace: vi.fn() }),
 }));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('../lib/client', () => ({
+  isDemoMode: () => true,
+  hub: { plan: vi.fn(), plans: vi.fn(), send: vi.fn() },
+  live: { subscribe: () => () => {} },
+}));
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
 }));

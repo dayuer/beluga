@@ -3,9 +3,14 @@ import { detectLang, type Lang } from '../lib/strings';
 import { tDrawer } from '../lib/strings/drawer';
 import { color, radius, space, type } from '../lib/theme';
 import type { StudioCard } from '../lib/views';
+import { AcceptCard } from './AcceptCard';
 import { Card } from './card/Card';
+import { ChangeCard } from './cards/ChangeCard';
 import { CodeCard } from './cards/CodeCard';
+import { DeliveryCard } from './cards/DeliveryCard';
 import { DesignCard } from './cards/DesignCard';
+import { ReleaseCard } from './cards/ReleaseCard';
+import { StartCard } from './cards/StartCard';
 import { UnderstandingCard } from './cards/UnderstandingCard';
 import { WaitCard } from './cards/WaitCard';
 import { DecisionCard, type QuestionAnswerItem } from './DecisionCard';
@@ -20,13 +25,40 @@ export interface CardStreamProps {
   readonly onConfirmUnderstanding?: (cardId: string) => Promise<void> | void;
   readonly onRejectUnderstanding?: (cardId: string, reason: string) => Promise<void> | void;
   readonly onRetryCodePush?: (cardId: string) => Promise<void> | void;
+  /** 批准开工：签名动作 gate.answer（start）；卡内 4 秒撤销后才真正发出。 */
+  readonly onStartPlan?: (cardId: string) => Promise<void> | void;
+  /** 批准改动：签名动作 gate.answer（changes）。 */
+  readonly onApproveChanges?: (cardId: string) => Promise<void> | void;
+  /** 「先不改…」：不签名的 draft.discard。 */
+  readonly onDeclineChanges?: (cardId: string) => void;
+  /** 交付通过：签名动作 delivery.accept。 */
+  readonly onAcceptDelivery?: (cardId: string) => Promise<void> | void;
+  /** 交付卡「还不行…」：打开原因抽屉（milestone.sendBack）。 */
+  readonly onNotYet?: (cardId: string) => void;
+  /** 上线：签名动作 release.approve。 */
+  readonly onRelease?: (cardId: string) => Promise<void> | void;
+  /** 交付卡「去看看」：打开结果抽屉。 */
+  readonly onOpenPreview?: (url?: string) => void;
+  /** 开工卡「在结果区看计划」。 */
+  readonly onOpenPlan?: () => void;
+  /** 单测 / 预览用：覆盖设备密钥状态。 */
+  readonly hasKeyOverride?: boolean;
   readonly testID?: string;
 }
 
+/** 同一张流里的步骤条给开工卡当步骤清单（开工卡只展示标题）。 */
+function stepTitles(cards: readonly StudioCard[]): string[] | undefined {
+  for (const card of cards) {
+    if (card.kind === 'steps' && card.steps.length > 0) return card.steps.map((step) => step.title);
+  }
+  return undefined;
+}
+
 /**
- * 卡片流（SS-52 / SS-185）：按卡片类型 switch 渲染不用签名的卡；
- * 需签名的卡（start/changes/delivery/release）与 unknown 留 default 占位，待 A9 合流补齐。
- * 支持 ?card= 高亮与定位回调。
+ * 卡片流（SS-52 / SS-185 / SS-87）：按卡片类型 switch 渲染。
+ * 不用签名的卡直接用；需要签名的卡（开工、改动、交付验收、上线）交给对应卡片组件，
+ * 动作通过回调由需求详情页用 `useSend` 发出（签名在 `prepareActionForSend` 里补）。
+ * 只有 `unknown` 留占位，支持 `?card=` 高亮与定位回调。
  */
 export function CardStream({
   cards,
@@ -37,9 +69,19 @@ export function CardStream({
   onConfirmUnderstanding,
   onRejectUnderstanding,
   onRetryCodePush,
+  onStartPlan,
+  onApproveChanges,
+  onDeclineChanges,
+  onAcceptDelivery,
+  onNotYet,
+  onRelease,
+  onOpenPreview,
+  onOpenPlan,
+  hasKeyOverride,
   testID = 'card-stream',
 }: CardStreamProps) {
   const lang = langProp ?? detectLang();
+  const steps = stepTitles(cards);
 
   return (
     <View style={styles.list} testID={testID}>
@@ -74,6 +116,33 @@ export function CardStream({
             );
             break;
 
+          case 'start':
+            node = (
+              <StartCard
+                card={card}
+                steps={steps}
+                lang={lang}
+                hasKeyOverride={hasKeyOverride}
+                onStart={() => onStartPlan?.(card.id)}
+                onOpenPlan={onOpenPlan}
+                testID={`card-${card.id}`}
+              />
+            );
+            break;
+
+          case 'changes':
+            node = (
+              <ChangeCard
+                card={card}
+                lang={lang}
+                hasKeyOverride={hasKeyOverride}
+                onApprove={() => onApproveChanges?.(card.id)}
+                onDecline={() => onDeclineChanges?.(card.id)}
+                testID={`card-${card.id}`}
+              />
+            );
+            break;
+
           case 'steps':
             node = (
               <Card title={tDrawer(lang, 'request.stepsTitle')} status="working" testID={`card-${card.id}`}>
@@ -84,6 +153,41 @@ export function CardStream({
 
           case 'wait':
             node = <WaitCard card={card} lang={lang} testID={`card-${card.id}`} />;
+            break;
+
+          case 'delivery':
+            // 还没通过：验收卡（通过 / 还不行…）；已通过（自动交付的通知）：交付卡。
+            node =
+              card.status === 'done' ? (
+                <DeliveryCard
+                  card={card}
+                  lang={lang}
+                  onOpenPreviewTab={(url) => onOpenPreview?.(url)}
+                  testID={`card-${card.id}`}
+                />
+              ) : (
+                <AcceptCard
+                  card={card}
+                  lang={lang}
+                  hasKeyOverride={hasKeyOverride}
+                  onNotYet={() => onNotYet?.(card.id)}
+                  onSigned={() => onAcceptDelivery?.(card.id)}
+                  onOpenPreview={(url) => onOpenPreview?.(url)}
+                  testID={`card-${card.id}`}
+                />
+              );
+            break;
+
+          case 'release':
+            node = (
+              <ReleaseCard
+                card={card}
+                lang={lang}
+                hasKeyOverride={hasKeyOverride}
+                onRelease={() => onRelease?.(card.id)}
+                testID={`card-${card.id}`}
+              />
+            );
             break;
 
           case 'code':
@@ -98,25 +202,14 @@ export function CardStream({
             break;
 
           default: {
-            const isUnknown = card.kind === 'unknown';
-            const signedTitleKey =
-              card.kind === 'start'
-                ? 'request.signedCard.start'
-                : card.kind === 'changes'
-                  ? 'request.signedCard.changes'
-                  : card.kind === 'delivery'
-                    ? 'request.signedCard.delivery'
-                    : card.kind === 'release'
-                      ? 'request.signedCard.release'
-                      : 'request.signedCard.generic';
             node = (
               <Card
-                title={isUnknown ? tDrawer(lang, 'request.unknownTitle') : tDrawer(lang, signedTitleKey)}
-                status={isUnknown ? 'waiting' : 'needs-you'}
+                title={tDrawer(lang, 'request.unknownTitle')}
+                status="waiting"
                 testID={`card-${card.id}`}
               >
                 <Text style={[styles.placeholder, { color: color.text2 }]}>
-                  {isUnknown ? tDrawer(lang, 'request.unknownBody') : tDrawer(lang, 'request.signedCardBody')}
+                  {tDrawer(lang, 'request.unknownBody')}
                 </Text>
               </Card>
             );

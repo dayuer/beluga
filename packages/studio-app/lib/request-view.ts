@@ -133,7 +133,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
   if (view.draftDiff) {
     const diff = view.draftDiff;
     cards.push({
-      id: `changes-${diff.draftRev}`,
+      id: `changes:${view.planRef}`,
       kind: 'changes',
       createdAt,
       status: 'pending',
@@ -155,7 +155,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
     (view.stage === 'drafting' && view.milestones.length > 0 && !view.typing && !gatePending)
   ) {
     cards.push({
-      id: `start-${view.draftRev}`,
+      id: `confirm:${view.planRef}`,
       kind: 'start',
       createdAt,
       status: 'pending',
@@ -191,7 +191,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
     const reviewMilestone = view.milestones.find((m) => m.status === 'review');
     const round = view.milestones.filter((m) => m.status === 'passed').length + 1;
     cards.push({
-      id: `delivery-${reviewMilestone?.ref ?? 'review'}`,
+      id: reviewMilestone?.ref ?? 'review',
       kind: 'delivery',
       createdAt,
       status: 'pending',

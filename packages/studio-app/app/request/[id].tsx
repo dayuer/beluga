@@ -177,6 +177,10 @@ export default function RequestDetailScreen() {
   const chatSend = useSend(projectId, pendingKey('chat', projectId, id));
   const decisionSend = useSend(projectId, pendingKey('decision', projectId, id));
   const discardSend = useSend(projectId, pendingKey('discard', projectId, id));
+  const startSend = useSend(projectId, pendingKey('gate-start', projectId, id));
+  const changesSend = useSend(projectId, pendingKey('gate-changes', projectId, id));
+  const acceptSend = useSend(projectId, pendingKey('accept', projectId, id));
+  const releaseSend = useSend(projectId, pendingKey('release', projectId, id));
   const chatBusy = chatSend.state.phase === 'sending' || chatSend.state.phase === 'queued';
   const chatFailed = chatSend.state.phase === 'failed';
 
@@ -280,6 +284,59 @@ export default function RequestDetailScreen() {
     );
   };
 
+  // --- 需要签名的动作（SS-87）：签名在 prepareActionForSend 里补，没设备密钥时按钮自己置灰 ---
+  const startPlan = (): void => {
+    if (demoMode || !view || !projectId) return;
+    const draftRev = view.draftRev;
+    void startSend.send((opId) => ({
+      t: 'action',
+      opId,
+      kind: 'gate.answer',
+      planRef: id,
+      rev: store.rev,
+      payload: { gate: 'start', approved: true, draftRev },
+    }));
+  };
+
+  const approveChanges = (): void => {
+    if (demoMode || !view || !projectId) return;
+    const draftRev = view.draftRev;
+    void changesSend.send((opId) => ({
+      t: 'action',
+      opId,
+      kind: 'gate.answer',
+      planRef: id,
+      rev: store.rev,
+      payload: { gate: 'changes', approved: true, draftRev },
+    }));
+  };
+
+  const acceptDelivery = (milestoneRef: string): void => {
+    if (demoMode || !view || !projectId) return;
+    const draftRev = view.draftRev;
+    void acceptSend.send((opId) => ({
+      t: 'action',
+      opId,
+      kind: 'delivery.accept',
+      planRef: id,
+      rev: store.rev,
+      payload: { milestoneRef, draftRev },
+    }));
+  };
+
+  const releaseApprove = (): void => {
+    if (demoMode || !view || !projectId) return;
+    const draftRev = view.draftRev;
+    void releaseSend.send((opId) => ({
+      t: 'action',
+      opId,
+      kind: 'release.approve',
+      planRef: id,
+      rev: store.rev,
+      payload: { draftRev },
+    }));
+  };
+
   const drawerTabs: readonly DrawerTab[] = useMemo(() => {
     const results = request?.results ?? DEMO_REQUEST_VIEW.results;
     return [
@@ -326,8 +383,6 @@ export default function RequestDetailScreen() {
   const bannerText = !online
     ? tDrawer(lang, 'request.offlineBanner')
     : tRequests(lang, 'requests.waitingRunnerOffline');
-
-  const reviewMilestone = view?.milestones.find((milestone) => milestone.status === 'review');
 
   return (
     <View style={[styles.screen, { backgroundColor: color.bg }]} testID="request-detail-screen">
@@ -388,6 +443,16 @@ export default function RequestDetailScreen() {
               onAnswerQuestions={answerQuestions}
               onConfirmUnderstanding={confirmUnderstanding}
               onRejectUnderstanding={rejectUnderstanding}
+              onStartPlan={startPlan}
+              onApproveChanges={approveChanges}
+              onDeclineChanges={discardDraft}
+              onAcceptDelivery={acceptDelivery}
+              onNotYet={(cardId) =>
+                setReasonFor({ milestoneRef: cardId, draftRev: view?.draftRev ?? 0 })
+              }
+              onRelease={releaseApprove}
+              onOpenPreview={() => setDrawerOpen(true)}
+              onOpenPlan={() => setDrawerOpen(true)}
             />
 
             {!demoMode && view?.draftDiff ? (
@@ -399,19 +464,6 @@ export default function RequestDetailScreen() {
                   style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
                 >
                   <Text style={[styles.ghostBtnText, { color: color.text2 }]}>{t(lang, 'plan.discard')}</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {!demoMode && reviewMilestone ? (
-              <View style={styles.cardActions} testID="request-review-actions">
-                <Pressable
-                  onPress={() => setReasonFor({ milestoneRef: reviewMilestone.ref, draftRev: view?.draftRev ?? 0 })}
-                  accessibilityRole="button"
-                  testID="request-send-back"
-                  style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
-                >
-                  <Text style={[styles.ghostBtnText, { color: color.text2 }]}>{t(lang, 'plan.notYet')}</Text>
                 </Pressable>
               </View>
             ) : null}
