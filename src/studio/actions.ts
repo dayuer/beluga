@@ -126,6 +126,12 @@ export function checkAction(frame: unknown, ctx: ActionContext): ActionVerdict {
     return { ok: true, signed: true };
   }
 
+  // 项目级的签名动作（不是计划级的，没有 planRef）：手机填密钥、改项目设置（SS-226）。
+  // 值已在设备上封给节点，节点验签后自己处理；中台只按白名单转发。
+  if (a.kind === 'secret.set' || a.kind === 'settings.update') {
+    return { ok: true, signed: true };
+  }
+
   const plan = ctx.plan;
   // The plan the frame names must be the one the caller looked up (and scoped the opId by).
   if (!plan || a.planRef !== ctx.scope.plan) return no('unknown-plan', 'no such plan');

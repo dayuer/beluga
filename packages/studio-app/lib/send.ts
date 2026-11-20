@@ -16,6 +16,8 @@ export const SIGNED_ACTION_KINDS = new Set<string>([
   'delivery.accept',
   'release.approve',
   'device.remove',
+  'secret.set',
+  'settings.update',
 ]);
 
 export interface SignableAction {

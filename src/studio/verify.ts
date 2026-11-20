@@ -1,4 +1,11 @@
-import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from 'node:crypto';
+import { createDecipheriv, createHash, createHmac, createPublicKey, diffieHellman, hkdfSync, timingSafeEqual, verify, type KeyObject } from 'node:crypto';
+
+/**
+ * 与 `protocol.ts` 的 `SECRET_SEAL_LABEL` 相同。这里不 import 它：`fake-daemon.mjs` 用
+ * `node --experimental-strip-types` 直接跑这个文件，而带类型的 Node 不把 `./protocol.js` 找回 `.ts`。
+ * `tests/studio-protocol-settings.test.ts` 断言两者一致。
+ */
+export const SEAL_LABEL = 'synon-studio-secret-v1';
 
 /**
  * S2 节点端设备登记与签名帧校验（SS-175）：
@@ -77,7 +84,40 @@ export const SIGNED_ACTION_KINDS = new Set<string>([
   'delivery.accept',
   'release.approve',
   'device.remove',
+  'secret.set',
+  'settings.update',
 ]);
+
+const X25519_SPKI = Buffer.from('302a300506032b656e032100', 'hex');
+
+/**
+ * 用节点自己的 X25519 私钥解一份 `secret.set` 的封装（SS-226）。
+ * 不是封给这把公钥的、密文被改过的、AAD 对不上的，都返回 `undefined`——不区分原因，免得成为提示。
+ */
+export function openSealedBox(
+  box: { readonly nodeKey: string; readonly epk: string; readonly nonce: string; readonly ct: string },
+  nodePublicKey: string,
+  nodePrivateKey: KeyObject,
+  aad: string,
+): Buffer | undefined {
+  try {
+    if (box.nodeKey !== nodePublicKey) return undefined;
+    const nodeRaw = Buffer.from(nodePublicKey, 'base64url');
+    const epk = Buffer.from(box.epk, 'base64url');
+    const nonce = Buffer.from(box.nonce, 'base64url');
+    const body = Buffer.from(box.ct, 'base64url');
+    if (nodeRaw.length !== 32 || epk.length !== 32 || nonce.length !== 12 || body.length < 16) return undefined;
+    const peer = createPublicKey({ key: Buffer.concat([X25519_SPKI, epk]), format: 'der', type: 'spki' });
+    const shared = diffieHellman({ privateKey: nodePrivateKey, publicKey: peer });
+    const key = Buffer.from(hkdfSync('sha256', shared, Buffer.concat([epk, nodeRaw]), Buffer.from(SEAL_LABEL), 32));
+    const decipher = createDecipheriv('chacha20-poly1305', key, nonce, { authTagLength: 16 });
+    decipher.setAAD(Buffer.from(aad, 'utf8'));
+    decipher.setAuthTag(body.subarray(body.length - 16));
+    return Buffer.concat([decipher.update(body.subarray(0, body.length - 16)), decipher.final()]);
+  } catch {
+    return undefined;
+  }
+}
 
 export type EnrollFrameResult =
   | { readonly ok: true; readonly fingerprint: string }
