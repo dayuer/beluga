@@ -123,7 +123,7 @@ export async function enrollDevice(invite: InviteParams, options: EnrollOptions 
 
   let res: Response;
   try {
-    res = await doFetch(`${base}/api/devices/enroll`, {
+    res = await doFetch(`${base}/v1/app/devices/enroll`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

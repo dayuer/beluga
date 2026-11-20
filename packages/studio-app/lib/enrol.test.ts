@@ -71,7 +71,8 @@ describe('lib/enrol', () => {
     const k = toBase64Url(kBytes);
     const invite = parseInvitePayload(`https://hub.example/join/inv-once#k=${k}&n=A1B2C3D4E5F67890`)!;
 
-    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe('https://hub.example/v1/app/devices/enroll');
       const body = JSON.parse(String(init?.body)) as { pubkey: string; mac: string };
       const expectedMac = toBase64Url(hmac(sha256, kBytes, fromBase64Url(body.pubkey)));
       expect(body.mac).toBe(expectedMac);

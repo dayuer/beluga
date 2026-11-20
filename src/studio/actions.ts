@@ -90,7 +90,8 @@ export type ActionVerdict =
   | { readonly ok: false; readonly code: RefusalCode; readonly reason: string }
   | { readonly ok: true; readonly replay: StudioReceipt }
   | { readonly ok: true; readonly call: InternalCall }
-  | { readonly ok: true; readonly gate: { readonly kind: 'start' | 'changes'; readonly draftRev: number } };
+  | { readonly ok: true; readonly gate: { readonly kind: 'start' | 'changes'; readonly draftRev: number } }
+  | { readonly ok: true; readonly signed: true };
 
 const no = (code: RefusalCode, reason: string): ActionVerdict => ({ ok: false, code, reason });
 
@@ -122,7 +123,7 @@ export function checkAction(frame: unknown, ctx: ActionContext): ActionVerdict {
   }
 
   if (a.kind === 'device.remove') {
-    return no('not-allowed', 'signed action requires device verification');
+    return { ok: true, signed: true };
   }
 
   const plan = ctx.plan;
@@ -160,6 +161,11 @@ export function checkAction(frame: unknown, ctx: ActionContext): ActionVerdict {
     }
     case 'decision.answer':
       return answerDecision(plan, a.payload);
+    case 'request.confirm':
+    case 'gate.answer':
+    case 'delivery.accept':
+    case 'release.approve':
+      return { ok: true, signed: true };
     default:
       return no('not-allowed', 'signed action requires device verification');
   }
