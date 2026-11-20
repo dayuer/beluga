@@ -67,6 +67,8 @@ const BASE = {
     waitingStripe: '#E6E6EA',
     /** 「等你」状态圆点（区别于正文警告色 warn）。 */
     needsYouDot: '#C28A1E',
+    /** 主按钮禁用底色。 */
+    disabledFill: '#E7E7EA',
     hairline: 'rgba(0,0,0,0.09)',
     hairlineStrong: 'rgba(0,0,0,0.16)',
     press: 'rgba(0,0,0,0.045)',
@@ -104,6 +106,8 @@ const BASE = {
     waitingStripe: '#38383E',
     /** 「等你」状态圆点（深色模式）。 */
     needsYouDot: '#E2B45C',
+    /** 主按钮禁用底色（深色模式）。 */
+    disabledFill: '#343439',
     hairline: 'rgba(255,255,255,0.075)',
     hairlineStrong: 'rgba(255,255,255,0.14)',
     press: 'rgba(255,255,255,0.1)',

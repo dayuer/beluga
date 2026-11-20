@@ -12,20 +12,27 @@ export interface CardProps {
   readonly testID?: string;
 }
 
-const DOT_COLOR: Record<RequestStatus, string | null> = {
-  working: color.ok,
-  'needs-you': color.needsYouDot,
-  waiting: color.waiting,
-  error: color.error,
-  done: null,
-};
+function dotColorFor(status: RequestStatus): string | null {
+  switch (status) {
+    case 'working':
+      return color.ok;
+    case 'needs-you':
+      return color.needsYouDot;
+    case 'waiting':
+      return color.waiting;
+    case 'error':
+      return color.error;
+    case 'done':
+      return null;
+  }
+}
 
 /**
- * 卡片外框（SS-27）：标题、状态圆点、正文槽与底部动作区。
- * 状态变化使用 `accessibilityLiveRegion="polite"`，读屏礼貌播报且不抢焦点。
+ * 卡片外框（SS-27 / SS-141）：标题、状态圆点、正文槽与底部动作区。
+ * 颜色在渲染期读取 `color.*` 以跟随深色模式；状态变化使用 `accessibilityLiveRegion="polite"`。
  */
 export function Card({ title, status, statusLabel, children, footer, testID }: CardProps) {
-  const dotColor = status ? DOT_COLOR[status] : null;
+  const dotColor = status ? dotColorFor(status) : null;
   const accessibleStatus = statusLabel ?? (status === 'needs-you' ? '等你' : status === 'waiting' ? '等待' : status === 'working' ? '进行中' : status === 'error' ? '需要处理' : status === 'done' ? '已完成' : undefined);
 
   return (

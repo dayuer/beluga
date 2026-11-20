@@ -82,7 +82,7 @@ export function PrimaryButton({
           styles.button,
           { backgroundColor: color.primary },
           lockedWidth ? { minWidth: lockedWidth } : null,
-          disabled && effectiveState === 'idle' && styles.off,
+          disabled && effectiveState === 'idle' && { backgroundColor: color.disabledFill },
           effectiveState === 'working' && styles.working,
           pressed && !off && styles.pressed,
         ]}
@@ -117,7 +117,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  off: { backgroundColor: '#E7E7EA' },
   working: { opacity: 0.85 },
   pressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   label: { ...type.heading, textAlign: 'center' },
