@@ -286,4 +286,46 @@ describe('push registration', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(randomSeq).toBe(1);
   });
+
+  it('records pending unregister on 5xx and deletes old token before re-registering on next login', async () => {
+    const calls: Array<{ method: string; auth: string | null }> = [];
+    let failDelete = true;
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      const headers = new Headers(init?.headers);
+      calls.push({ method, auth: headers.get('authorization') });
+      if (method === 'DELETE' && failDelete) {
+        return new Response(JSON.stringify({ error: 'internal' }), { status: 500 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+
+    const deps: PushDeps = {
+      kv: memKv,
+      notifications: makeNotifications(),
+      fetch: fetchMock as unknown as typeof fetch,
+      getToken: () => 'sess-old',
+      baseUrl: 'https://hub.example.com',
+      platform: 'ios',
+      randomId: () => 'dev-500',
+      isOnline: () => true,
+      isDemo: () => false,
+    };
+
+    await expect(registerPush({ askPermission: true }, deps)).resolves.toMatchObject({ ok: true, status: 'registered' });
+    await expect(unregisterPush('sess-old', deps)).resolves.toBe(false);
+    expect(memKv.get('push:pendingUnregister')).toEqual({ device: 'app-dev-500', token: 'apns-tok-xyz' });
+    expect(memKv.get('push:registered')).toBeDefined();
+
+    // Next login with new session: DELETE runs first to clean up old token, then POST registers.
+    failDelete = false;
+    calls.length = 0;
+    const nextRes = await registerPush({ askPermission: true }, { ...deps, getToken: () => 'sess-new' });
+    expect(nextRes).toMatchObject({ ok: true, status: 'registered' });
+    expect(calls).toEqual([
+      { method: 'DELETE', auth: 'Bearer sess-new' },
+      { method: 'POST', auth: 'Bearer sess-new' },
+    ]);
+    expect(memKv.get('push:pendingUnregister')).toBeUndefined();
+  });
 });

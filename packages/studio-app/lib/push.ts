@@ -60,7 +60,13 @@ export type RegisterPushResult =
 const KV_PUSH_ENABLED = 'push:enabled';
 const KV_DEVICE_ID = 'push:deviceId';
 const KV_REGISTERED = 'push:registered';
+const KV_PENDING_UNREGISTER = 'push:pendingUnregister';
 const TIMEOUT_MS = 10_000;
+
+interface PendingUnregisterRecord {
+  readonly device: string;
+  readonly token?: string;
+}
 
 function hubBase(deps: PushDeps): string {
   const raw = deps.baseUrl ?? process.env.EXPO_PUBLIC_HUB_URL ?? '';
@@ -181,9 +187,9 @@ async function callPushApi(
   sessionToken: string,
   body: Record<string, unknown>,
   deps: PushDeps,
-): Promise<boolean> {
+): Promise<{ readonly ok: boolean; readonly status: number }> {
   const doFetch = deps.fetch ?? (typeof fetch === 'undefined' ? undefined : fetch);
-  if (!doFetch) return false;
+  if (!doFetch) return { ok: false, status: 0 };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -196,9 +202,9 @@ async function callPushApi(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    return res.ok;
+    return { ok: res.ok, status: res.status };
   } catch {
-    return false;
+    return { ok: false, status: 0 };
   } finally {
     clearTimeout(timer);
   }
@@ -245,6 +251,21 @@ export async function registerPush(
   const online = deps.isOnline ?? isOnline;
   if (!online()) return { ok: false, reason: 'offline' };
 
+  // 若上次退出登录时注销推送失败，先用当前有效会话补删旧令牌再登记。
+  const pending = store.get<PendingUnregisterRecord>(KV_PENDING_UNREGISTER);
+  if (pending?.device) {
+    const delRes = await callPushApi(
+      'DELETE',
+      sessionToken,
+      { device: pending.device, ...(pending.token ? { token: pending.token } : {}) },
+      deps,
+    );
+    if (delRes.ok || delRes.status === 404) {
+      store.remove(KV_PENDING_UNREGISTER);
+      store.remove(KV_REGISTERED);
+    }
+  }
+
   const notifications = deps.notifications ?? (Notifications as unknown as PushNotificationsApi);
   let rawDeviceToken: string;
   try {
@@ -267,29 +288,53 @@ export async function registerPush(
     return { ok: true, status: 'cached', device, token: rawDeviceToken };
   }
 
-  const ok = await callPushApi('POST', sessionToken, { device, platform, token: rawDeviceToken }, deps);
-  if (!ok) return { ok: false, reason: 'error' };
+  const res = await callPushApi('POST', sessionToken, { device, platform, token: rawDeviceToken }, deps);
+  if (!res.ok) return { ok: false, reason: 'error' };
 
   store.set(KV_REGISTERED, { device, platform, token: rawDeviceToken } satisfies RegisteredPushRecord);
   return { ok: true, status: 'registered', device, token: rawDeviceToken };
 }
 
-/** 退出登录或关闭通知开关时向中台注销当前设备的推送令牌。 */
+/**
+ * 退出登录或关闭通知开关时向中台注销当前设备的推送令牌。
+ * 仅在服务端删除成功（或返回 404）时清理本地缓存；失败时记入待补删队列，下次登录补删。
+ */
 export async function unregisterPush(sessionTokenOverride?: string, deps: PushDeps = {}): Promise<boolean> {
   const store = deps.kv ?? kv;
   const cached = store.get<RegisteredPushRecord>(KV_REGISTERED);
-  const device = cached?.device ?? store.get<string>(KV_DEVICE_ID);
-  store.remove(KV_REGISTERED);
+  const pending = store.get<PendingUnregisterRecord>(KV_PENDING_UNREGISTER);
+  const device = cached?.device ?? pending?.device;
+  const token = cached?.token ?? pending?.token;
 
-  if (demoActive(deps) || !device) return true;
+  if (demoActive(deps) || !device) {
+    store.remove(KV_REGISTERED);
+    store.remove(KV_PENDING_UNREGISTER);
+    return true;
+  }
+
+  const record: PendingUnregisterRecord = { device, ...(token ? { token } : {}) };
   const getToken = deps.getToken ?? (() => session.snapshot());
   const sessionToken = sessionTokenOverride ?? getToken();
-  if (!sessionToken) return false;
+  if (!sessionToken) {
+    store.set(KV_PENDING_UNREGISTER, record);
+    return false;
+  }
 
   const online = deps.isOnline ?? isOnline;
-  if (!online()) return false;
+  if (!online()) {
+    store.set(KV_PENDING_UNREGISTER, record);
+    return false;
+  }
 
-  return callPushApi('DELETE', sessionToken, { device, ...(cached?.token ? { token: cached.token } : {}) }, deps);
+  const res = await callPushApi('DELETE', sessionToken, { device, ...(token ? { token } : {}) }, deps);
+  if (res.ok || res.status === 404) {
+    store.remove(KV_REGISTERED);
+    store.remove(KV_PENDING_UNREGISTER);
+    return true;
+  }
+
+  store.set(KV_PENDING_UNREGISTER, record);
+  return false;
 }
 
 /**
