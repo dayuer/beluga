@@ -1,5 +1,7 @@
 export const zh = {
   'new.title': '新需求',
+  'new.projectLabel': '属于哪个项目？',
+  'new.examplesLabel': '从例子开始',
   'new.tabNew': '新需求',
   'new.tabFeedback': '对做好的提意见',
   'new.feedbackPick': '选一条已交付的需求',
@@ -32,6 +34,8 @@ export const zh = {
 
 export const en: Record<keyof typeof zh, string> = {
   'new.title': 'New request',
+  'new.projectLabel': 'Which project?',
+  'new.examplesLabel': 'Start from an example',
   'new.tabNew': 'New request',
   'new.tabFeedback': 'Feedback',
   'new.feedbackPick': 'Pick a delivered request',

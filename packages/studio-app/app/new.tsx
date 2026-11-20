@@ -11,10 +11,10 @@ import { ReceiptLine, type ReceiptTone } from '../components/ReceiptLine';
 import { Segments, type SegmentItem } from '../components/Segments';
 import { SyncBanner } from '../components/SyncBanner';
 import { UndoBar } from '../components/UndoBar';
-import { LIMITS, PLATFORMS, type StudioPlatform } from '../../../src/studio/protocol';
+import { LIMITS, type StudioPlatform } from '../../../src/studio/protocol';
 import { cache } from '../lib/cache';
-import { hub } from '../lib/client';
-import { DEMO_REQUEST_SUMMARIES } from '../lib/demo';
+import { hub, isDemoMode } from '../lib/client';
+import { DEMO_SCREENS } from '../lib/demo';
 import type { ProjectSummary } from '../lib/hub-schema';
 import { pickPhotos, takePhoto, type MediaAttachment } from '../lib/media';
 import { useOnline } from '../lib/net';
@@ -25,14 +25,23 @@ import {
   writeFeedbackModeDraft,
   writeNewModeDraft,
 } from '../lib/new-drafts';
+import { loadRequestsFromHub, REQUESTS_CACHE_KEY } from '../lib/requests-source';
+import { pendingKey, useSend } from '../lib/send';
+import { session } from '../lib/session';
 import { detectLang, t, type Lang } from '../lib/strings';
 import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
 import { ago } from '../lib/time';
 import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
 import { appendSpoken, useVoiceDictation } from '../lib/voice';
+import type { RequestSummary } from '../lib/views';
 
 type NewMode = 'new' | 'feedback';
+
+interface SelectableProject {
+  readonly id: string;
+  readonly name: string;
+}
 
 function receiptOf(state: SubmitState, lang: Lang): { text: string; tone: ReceiptTone } | null {
   switch (state.phase) {
@@ -71,35 +80,48 @@ function Hint({ lang }: { lang: Lang }) {
 }
 
 /**
- * P2 提需求（SS-38）：顶部分段「新需求」/「对做好的提意见」，两档各自保留草稿。
- * 发送走 lib/submit.ts 状态机；断网时草稿留在本机，直到中台回执 queued 或 done。
+ * P2 提需求（SS-38 / SS-196 / SS-197）：
+ * - 顶部分段「新需求」/「对做好的提意见」，两档各自保留文字与附件草稿；
+ * - 支持项目切换与「从例子开始」；
+ * - 「对做好的提意见」使用协议 `chat.send` 发给对应已交付需求并跳转 `/request/<id>`。
  */
 export default function NewRequestScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ project?: string | string[] }>();
   const routePid = Array.isArray(params.project) ? params.project[0] : params.project;
-  const cachedProjects = cache.get<ProjectSummary[]>('projects')?.value ?? [];
-  const pid = routePid || cachedProjects[0]?.id || DEMO_REQUEST_SUMMARIES[0]?.projectId || 'proj-shop';
-
+  const demoMode = isDemoMode();
   const lang = detectLang();
   const online = useOnline();
   const { width, height } = useWindowDimensions();
   const keyboard = useKeyboardInset();
   const desktop = width >= 900;
 
+  const [projects, setProjects] = useState<readonly SelectableProject[]>(() => {
+    if (demoMode) return DEMO_SCREENS.P2.normal.data.projects;
+    return cache.get<ProjectSummary[]>('projects')?.value ?? [];
+  });
+  const [pid, setPid] = useState<string>(
+    () => routePid || projects[0]?.id || '',
+  );
+
+  const [delivered, setDelivered] = useState<readonly RequestSummary[]>(() => {
+    if (demoMode) return DEMO_SCREENS.P2.normal.data.completedRequests;
+    const cached = cache.get<RequestSummary[]>(REQUESTS_CACHE_KEY)?.value ?? [];
+    return cached.filter((r) => r.status === 'done');
+  });
+
+  const examples = useMemo(
+    () => (demoMode ? DEMO_SCREENS.P2.normal.data.examples : []),
+    [demoMode],
+  );
+
   const [mode, setMode] = useState<NewMode>('new');
   const [goal, setGoal] = useState('');
   const [platforms, setPlatforms] = useState<StudioPlatform[]>([]);
   const [restored, setRestored] = useState<string | null>(null);
-  const [project, setProject] = useState<ProjectSummary | undefined>(() =>
-    cachedProjects.find((p) => p.id === pid),
+  const [selectedRequestId, setSelectedRequestId] = useState<string>(
+    () => delivered[0]?.id ?? '',
   );
-
-  const delivered = useMemo(
-    () => DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'done'),
-    [],
-  );
-  const [selectedRequestId, setSelectedRequestId] = useState<string>(() => delivered[0]?.id ?? '');
   const [feedbackText, setFeedbackText] = useState('');
   const [newAttachments, setNewAttachments] = useState<readonly MediaAttachment[]>([]);
   const [feedbackAttachments, setFeedbackAttachments] = useState<readonly MediaAttachment[]>([]);
@@ -109,21 +131,35 @@ export default function NewRequestScreen() {
   const hydratedPidRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pid || project) return;
+    if (demoMode) return;
     let alive = true;
     void hub.projects().then((r) => {
       if (!alive || !r.ok) return;
       cache.set('projects', r.value.projects, Date.now());
-      const found = r.value.projects.find((p) => p.id === pid);
-      if (found) setProject(found);
+      setProjects(r.value.projects);
+      setPid((cur) => cur || r.value.projects[0]?.id || '');
+    });
+    void loadRequestsFromHub({
+      hub,
+      cache,
+      onSignedOut: () => session.clear(),
+      lang,
+    }).then((outcome) => {
+      if (!alive) return;
+      if (outcome.kind === 'ok' || ((outcome.kind === 'offline' || outcome.kind === 'error') && outcome.items)) {
+        const done = (outcome.items ?? []).filter((item) => item.status === 'done');
+        setDelivered(done);
+        setSelectedRequestId((cur) => cur || done[0]?.id || '');
+      }
     });
     return () => {
       alive = false;
     };
-  }, [pid, project]);
+  }, [demoMode, lang]);
 
-  // 独立恢复两档草稿（含附件），互不跳过、互不覆盖；恢复完成前禁止防抖写入或清理
+  // 独立恢复两档草稿（含附件），互不跳过、互不覆盖
   useEffect(() => {
+    if (!pid) return;
     hydratedPidRef.current = null;
     const { newDraft, feedbackDraft } = restoreBothDrafts(pid);
 
@@ -156,9 +192,8 @@ export default function NewRequestScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid]);
 
-  // 300ms 防抖保存新需求草稿（含附件）
   useEffect(() => {
-    if (hydratedPidRef.current !== pid) return;
+    if (!pid || hydratedPidRef.current !== pid) return;
     const id = setTimeout(() => {
       if (lockedRef.current || hydratedPidRef.current !== pid) return;
       writeNewModeDraft(pid, {
@@ -171,9 +206,8 @@ export default function NewRequestScreen() {
     return () => clearTimeout(id);
   }, [pid, goal, platforms, newAttachments]);
 
-  // 300ms 防抖保存反馈草稿（含附件）
   useEffect(() => {
-    if (hydratedPidRef.current !== pid) return;
+    if (!pid || hydratedPidRef.current !== pid) return;
     const id = setTimeout(() => {
       if (lockedRef.current || hydratedPidRef.current !== pid) return;
       writeFeedbackModeDraft(pid, {
@@ -187,6 +221,7 @@ export default function NewRequestScreen() {
   }, [pid, selectedRequestId, feedbackText, feedbackAttachments]);
 
   useEffect(() => {
+    if (!pid) return;
     const flush = () => {
       if (lockedRef.current || hydratedPidRef.current !== pid) return;
       writeNewModeDraft(pid, {
@@ -213,22 +248,33 @@ export default function NewRequestScreen() {
     };
   }, [pid, goal, platforms, newAttachments, selectedRequestId, feedbackText, feedbackAttachments]);
 
-  const onDone = useCallback(() => {
-    clearNewModeDraft(pid);
-    clearFeedbackModeDraft(pid);
-    router.replace(`/project/${encodeURIComponent(pid)}`);
+  const onNewDone = useCallback(() => {
+    if (pid) clearNewModeDraft(pid);
+    router.replace('/');
   }, [pid, router]);
 
-  const { state, submit } = useNewRequest(pid, onDone);
-  lockedRef.current = state.phase === 'queued' || state.phase === 'done';
+  const { state: newState, submit: submitNew } = useNewRequest(pid, onNewDone);
 
-  // 收到 queued/done 后清理两档草稿
+  const selectedRequest = delivered.find((r) => r.id === selectedRequestId);
+  const feedbackSend = useSend(
+    selectedRequest?.projectId ?? pid,
+    pendingKey('chat', selectedRequest?.projectId ?? pid, selectedRequest?.id ?? 'none'),
+  );
+
+  const activePhase = mode === 'new' ? newState.phase : feedbackSend.state.phase;
+  lockedRef.current = activePhase === 'queued' || activePhase === 'done';
+
   useEffect(() => {
-    if (state.phase === 'queued' || state.phase === 'done') {
+    if (pid && (newState.phase === 'queued' || newState.phase === 'done')) {
       clearNewModeDraft(pid);
+    }
+  }, [pid, newState.phase]);
+
+  useEffect(() => {
+    if (pid && (feedbackSend.state.phase === 'queued' || feedbackSend.state.phase === 'done')) {
       clearFeedbackModeDraft(pid);
     }
-  }, [pid, state.phase]);
+  }, [pid, feedbackSend.state.phase]);
 
   const segments: readonly SegmentItem[] = useMemo(
     () => [
@@ -238,15 +284,21 @@ export default function NewRequestScreen() {
     [lang],
   );
 
-  const selectedRequest = delivered.find((r) => r.id === selectedRequestId);
   const visibleHeight = Math.max(240, height - keyboard);
   const compact = keyboard > 0;
   const maxGoal = Math.max(120, Math.round(visibleHeight * 0.4));
   const activeText = mode === 'new' ? goal : feedbackText;
-  const count = activeText.length >= 3600 ? t(lang, 'new.left', { n: LIMITS.text - activeText.length }) : null;
-  const receipt = useMemo(() => receiptOf(state, lang), [state, lang]);
-  const busy = state.phase === 'sending';
-  const locked = busy || state.phase === 'queued' || state.phase === 'done';
+  const count =
+    activeText.length >= 3600 ? t(lang, 'new.left', { n: LIMITS.text - activeText.length }) : null;
+
+  const activeState: SubmitState = mode === 'new' ? newState : (feedbackSend.state as SubmitState);
+  const receipt = useMemo(() => receiptOf(activeState, lang), [activeState, lang]);
+  const busy = activeState.phase === 'sending';
+  const locked = busy || activeState.phase === 'queued' || activeState.phase === 'done';
+  const valid =
+    mode === 'new'
+      ? Boolean(pid) && goal.trim().length > 0 && platforms.length > 0
+      : Boolean(selectedRequest) && feedbackText.trim().length > 0;
 
   const voice = useVoiceDictation({
     lang,
@@ -255,24 +307,22 @@ export default function NewRequestScreen() {
       else setFeedbackText((prev) => appendSpoken(prev, spoken));
     },
   });
-  const valid =
-    mode === 'new'
-      ? goal.trim().length > 0 && platforms.length > 0
-      : Boolean(selectedRequest) && feedbackText.trim().length > 0;
 
   const label = busy
     ? t(lang, 'common.sending')
-    : state.phase === 'queued'
+    : activeState.phase === 'queued'
       ? t(lang, 'common.submitted')
-      : state.phase === 'done'
+      : activeState.phase === 'done'
         ? t(lang, 'common.done')
-        : state.phase === 'failed' || state.phase === 'refused'
+        : activeState.phase === 'failed' || activeState.phase === 'refused'
           ? t(lang, 'new.retry')
           : mode === 'new'
             ? t(lang, 'new.start')
             : t(lang, 'new.feedbackSubmit');
 
-  const setModeAttachments = (updater: (prev: readonly MediaAttachment[]) => readonly MediaAttachment[]) => {
+  const setModeAttachments = (
+    updater: (prev: readonly MediaAttachment[]) => readonly MediaAttachment[],
+  ) => {
     if (mode === 'new') setNewAttachments(updater);
     else setFeedbackAttachments(updater);
   };
@@ -313,23 +363,40 @@ export default function NewRequestScreen() {
   const handleSubmit = () => {
     if (!valid || locked) return;
     if (mode === 'new') {
-      void submit(goal.trim(), platforms);
+      void submitNew(goal.trim(), platforms);
       return;
     }
     if (!selectedRequest) return;
-    const rawPlat = selectedRequest.platform;
-    const plat: StudioPlatform = (PLATFORMS as readonly string[]).includes(rawPlat)
-      ? (rawPlat as StudioPlatform)
-      : 'web';
-    const payload = `[${selectedRequest.title}] ${feedbackText.trim()}`;
-    void submit(payload, [plat]);
+    const text = feedbackText.trim();
+    const targetId = selectedRequest.id;
+    void feedbackSend.send(
+      (opId) => ({
+        t: 'action',
+        opId,
+        kind: 'chat.send',
+        planRef: targetId,
+        payload: { text },
+      }),
+      {
+        onDone: () => {
+          if (pid) clearFeedbackModeDraft(pid);
+          router.replace(`/request/${encodeURIComponent(targetId)}`);
+        },
+        onQueued: () => {
+          if (pid) clearFeedbackModeDraft(pid);
+          router.replace(`/request/${encodeURIComponent(targetId)}`);
+        },
+      },
+    );
   };
 
   return (
     <View style={styles.root} testID="new-screen">
       <Header title={t(lang, 'new.title')} back />
       <Segments items={segments} value={mode} onChange={(k) => setMode(k as NewMode)} />
-      {!online ? <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" /> : null}
+      {!online ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
 
       <ScrollView
         style={styles.scroll}
@@ -340,15 +407,58 @@ export default function NewRequestScreen() {
         <View style={[styles.column, desktop && styles.columnDesktop]}>
           {mode === 'new' ? (
             <>
+              {projects.length > 0 ? (
+                <View style={styles.projectSection} testID="new-project-picker">
+                  <Text style={styles.label}>{t(lang, 'new.projectLabel')}</Text>
+                  <View style={styles.chipRow}>
+                    {projects.map((p) => {
+                      const selected = p.id === pid;
+                      return (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => setPid(p.id)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          testID={`new-project-${p.id}`}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            selected && styles.chipSelected,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                            {p.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.intro}>
-                {project ? (
-                  <Text style={styles.eyebrow}>
-                    {project.name} · {project.studioName}
-                  </Text>
-                ) : null}
                 {!compact ? <Text style={styles.introText}>{t(lang, 'new.intro')}</Text> : null}
                 {!compact && !desktop ? <Hint lang={lang} /> : null}
               </View>
+
+              {examples.length > 0 ? (
+                <View style={styles.examplesSection} testID="new-examples">
+                  <Text style={styles.label}>{t(lang, 'new.examplesLabel')}</Text>
+                  <View style={styles.chipRow}>
+                    {examples.map((ex, i) => (
+                      <Pressable
+                        key={ex}
+                        onPress={() => setGoal(ex)}
+                        accessibilityRole="button"
+                        testID={`new-example-${i}`}
+                        style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.chipText}>{ex}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
 
               <View style={[styles.composer, desktop && styles.composerDesktop]}>
                 <View style={[styles.goalCol, desktop && styles.goalColDesktop]}>
@@ -365,7 +475,7 @@ export default function NewRequestScreen() {
                       disabled: locked,
                     }}
                     onBlur={() => {
-                      if (lockedRef.current || hydratedPidRef.current !== pid) return;
+                      if (!pid || lockedRef.current || hydratedPidRef.current !== pid) return;
                       writeNewModeDraft(pid, {
                         goal,
                         platforms,
@@ -406,7 +516,9 @@ export default function NewRequestScreen() {
             <View style={styles.feedbackSection} testID="feedback-panel">
               <Text style={styles.label}>{t(lang, 'new.feedbackPick')}</Text>
               {delivered.length === 0 ? (
-                <Text style={styles.emptyText}>{t(lang, 'new.feedbackEmpty')}</Text>
+                <Text style={styles.emptyText} testID="feedback-empty">
+                  {t(lang, 'new.feedbackEmpty')}
+                </Text>
               ) : (
                 <View style={styles.deliveredList}>
                   {delivered.map((item) => {
@@ -494,8 +606,22 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: space[5], paddingTop: space[5], paddingBottom: space[6] },
   column: { flex: 1, width: '100%' },
   columnDesktop: { maxWidth: 720, alignSelf: 'center', paddingTop: space[4] },
+  projectSection: { marginBottom: space[4] },
+  examplesSection: { marginBottom: space[4] },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  chip: {
+    minHeight: 44,
+    paddingHorizontal: space[3],
+    borderRadius: radius.m,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    backgroundColor: color.card,
+    justifyContent: 'center',
+  },
+  chipSelected: { borderColor: color.primary, backgroundColor: color.sunken },
+  chipText: { ...type.callout, color: color.text2 },
+  chipTextSelected: { color: color.text, fontWeight: '600' },
   intro: { marginBottom: space[5] },
-  eyebrow: { ...type.caption, fontWeight: '600', color: color.text2, letterSpacing: 0.2, marginBottom: space[3] },
   introText: { ...type.body, color: color.text2 },
   hint: {
     marginTop: space[5],
