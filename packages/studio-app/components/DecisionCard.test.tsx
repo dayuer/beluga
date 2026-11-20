@@ -56,21 +56,25 @@ describe('DecisionCard (P3 问题卡)', () => {
 
     expect(screen.getByText('1.')).toBeTruthy();
     expect(screen.getByText('2.')).toBeTruthy();
-    expect(screen.getByTestId('questions-remaining').props.children).toBe('还差 2 题');
+    expect(screen.getByTestId('questions-action-row')).toBeTruthy();
+    expect(screen.getByText('还差 2 题')).toBeTruthy();
     expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(true);
 
     // 回答第 1 题
     await fireEvent.press(screen.getByTestId('question-q1-option-opt-sms'));
-    expect(screen.getByTestId('questions-remaining').props.children).toBe('还差 1 题');
+    expect(screen.getByText('还差 1 题')).toBeTruthy();
     expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(true);
 
     // 第 2 题选择「自己写…」
     await fireEvent.press(screen.getByTestId('question-q2-write-own'));
-    expect(screen.getByTestId('questions-remaining').props.children).toBe('还差 1 题');
-    await fireEvent.changeText(screen.getByTestId('question-q2-custom-input'), '提示用户先注册');
+    expect(screen.getByText('还差 1 题')).toBeTruthy();
+    const customInput = screen.getByTestId('question-q2-custom-input');
+    const flatStyle = Object.assign({}, ...(Array.isArray(customInput.props.style) ? customInput.props.style : [customInput.props.style]));
+    expect(flatStyle.fontSize).toBe(16);
+    await fireEvent.changeText(customInput, '提示用户先注册');
 
     // 全部答完：还差提示消失，主按钮可点
-    expect(screen.queryByTestId('questions-remaining')).toBeNull();
+    expect(screen.queryByText(/还差/)).toBeNull();
     expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(false);
 
     // 一起提交

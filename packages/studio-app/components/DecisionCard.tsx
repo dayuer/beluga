@@ -7,6 +7,7 @@ import { detectLang, type Lang } from '../lib/strings';
 import { tQuestions } from '../lib/strings/questions';
 import { color, radius, space, type } from '../lib/theme';
 import type { QuestionCardSchema, QuestionItemSchema } from '../lib/views';
+import { ActionRow } from './card/ActionRow';
 import { Card } from './card/Card';
 import { PrimaryButton } from './PrimaryButton';
 
@@ -206,8 +207,10 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
       {tQuestions(lang, 'questions.submitted')}
     </Text>
   ) : (
-    <View style={styles.footerRow}>
-      <View style={styles.buttonWrap}>
+    <ActionRow
+      testID="questions-action-row"
+      hint={remaining > 0 ? tQuestions(lang, 'questions.remaining', { n: remaining }) : undefined}
+      primary={
         <PrimaryButton
           key={attempt}
           label={
@@ -223,13 +226,8 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
           onPress={() => void handleSubmit()}
           testID="questions-submit"
         />
-      </View>
-      {remaining > 0 ? (
-        <Text style={[styles.remaining, { color: color.text3 }]} testID="questions-remaining">
-          {tQuestions(lang, 'questions.remaining', { n: remaining })}
-        </Text>
-      ) : null}
-    </View>
+      }
+    />
   );
 
   return (
@@ -406,6 +404,8 @@ const styles = StyleSheet.create({
   writeOwnWrap: { gap: space[2] },
   input: {
     ...type.callout,
+    fontSize: 16,
+    lineHeight: 22,
     minHeight: 44,
     maxHeight: 100,
     textAlignVertical: 'top',
@@ -413,8 +413,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
     padding: space[3],
   },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], flexWrap: 'wrap' },
-  buttonWrap: { minWidth: 120 },
-  remaining: { ...type.caption },
   submittedNote: { ...type.callout, fontWeight: '600' },
 });
