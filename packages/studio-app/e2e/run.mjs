@@ -340,11 +340,17 @@ async function main() {
       if (req.method === 'POST' && url.pathname === '/assert-delivered') {
         const payload = await readJson();
         const kind = payload.kind ?? 'plan.create';
-        const actual = deliveredCount(kind);
         const expected =
           typeof payload.expected === 'number'
             ? payload.expected
             : Number(payload.baseline ?? 0) + Number(payload.delta ?? 0);
+        const waitMs = Number(payload.delta ?? 0) > 0 || (typeof payload.expected === 'number' && payload.expected > 0) ? 5_000 : 0;
+        const deadline = Date.now() + waitMs;
+        let actual = deliveredCount(kind);
+        while (actual < expected && Date.now() < deadline) {
+          await sleep(100);
+          actual = deliveredCount(kind);
+        }
         if (actual !== expected) {
           return send(400, { error: `expected ${kind} count ${expected}, got ${actual}`, kind, expected, actual });
         }
