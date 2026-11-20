@@ -1,18 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { z } from 'zod';
 import type { StudioDecision } from '../../../src/studio/protocol';
 import { kv } from '../lib/kv';
-import { pendingKey, useSend, type SendFailure } from '../lib/send';
-import { refusalKey } from '../lib/submit';
-import { t, type Lang } from '../lib/strings';
+import { detectLang, type Lang } from '../lib/strings';
+import { tQuestions } from '../lib/strings/questions';
 import { color, radius, space, type } from '../lib/theme';
-import { useUndoSend } from '../lib/undo';
-import { useKeyboardInset } from '../lib/viewport';
+import type { QuestionCardSchema, QuestionItemSchema } from '../lib/views';
+import { ActionRow } from './card/ActionRow';
+import { Card } from './card/Card';
 import { PrimaryButton } from './PrimaryButton';
-import { ReceiptLine } from './ReceiptLine';
 
-interface DecisionCardProps {
+export type QuestionCardData = z.infer<typeof QuestionCardSchema>;
+export type QuestionItemData = z.infer<typeof QuestionItemSchema> & { readonly multi?: boolean };
+
+export interface QuestionAnswerItem {
+  readonly questionId: string;
+  readonly picks: readonly string[];
+  readonly customText?: string;
+}
+
+export interface QuestionCardProps {
+  readonly card: QuestionCardData;
+  readonly lang?: Lang;
+  /** 全部答完后一起发送；返回 false 或抛错视为发送失败（不清空已选）。 */
+  readonly onSubmit?: (answers: QuestionAnswerItem[]) => Promise<boolean | void> | boolean | void;
+  readonly testID?: string;
+}
+
+/** 兼容旧版 app/plan/[id].tsx 的调用方式（SS-117 移除旧路由后可删除）。 */
+export interface LegacyDecisionCardProps {
   readonly pid: string;
   readonly planRef: string;
   readonly decision: StudioDecision;
@@ -21,208 +38,380 @@ interface DecisionCardProps {
   readonly lang: Lang;
   readonly onAnswered: (decisionId: string) => void;
   readonly onRefresh: () => void;
+  readonly testID?: string;
+}
+
+export type DecisionCardProps = QuestionCardProps | LegacyDecisionCardProps;
+
+interface QuestionDraft {
+  readonly picks: string[];
+  readonly writeOwn: boolean;
+  readonly customText: string;
 }
 
 const MAX_ANSWER = 2000;
 
-/** One question at a time (M6 §4.10): wide option rows, a 10-second undo, free text with a cap. */
-export function DecisionCard({ pid, planRef, decision, index, total, lang, onAnswered, onRefresh }: DecisionCardProps) {
-  const key = `draft:decision:${pid}:${planRef}:${decision.decisionId}`;
-  const saved = kv.get<{ picks?: string[]; text?: string }>(key);
-  const [picks, setPicks] = useState<string[]>(() => (Array.isArray(saved?.picks) ? saved.picks.filter((p) => decision.options.some((o) => o.id === p)) : []));
-  const [text, setText] = useState(() => (typeof saved?.text === 'string' ? saved.text.slice(0, MAX_ANSWER) : ''));
-  const [notice, setNotice] = useState<string | null>(null);
-  const send = useSend(pid, pendingKey('decision', pid, planRef, decision.decisionId));
-  const undo = useUndoSend(10_000);
-  const insets = useSafeAreaInsets();
-  const keyboard = useKeyboardInset();
-  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stateRef = useRef({ picks, text });
-  stateRef.current = { picks, text };
+function isLegacyProps(props: DecisionCardProps): props is LegacyDecisionCardProps {
+  return 'decision' in props;
+}
 
-  const save = (nextPicks: string[], nextText: string): void => {
-    stateRef.current = { picks: nextPicks, text: nextText };
-    setPicks(nextPicks);
-    setText(nextText);
-    if (draftTimer.current) clearTimeout(draftTimer.current);
-    draftTimer.current = setTimeout(() => kv.set(key, { picks: nextPicks, text: nextText, updatedAt: Date.now() }), 300);
-  };
-
-  useEffect(
-    () => () => {
-      if (draftTimer.current) clearTimeout(draftTimer.current);
-      const value = stateRef.current;
-      if (value.picks.length || value.text.trim()) kv.set(key, { picks: value.picks, text: value.text, updatedAt: Date.now() });
+function normalizeQuestions(card: QuestionCardData): QuestionItemData[] {
+  if (card.questions && card.questions.length > 0) {
+    return card.questions.map((q, idx) => ({
+      ...q,
+      index: q.index || idx + 1,
+    }));
+  }
+  return [
+    {
+      id: card.id,
+      index: card.index ?? 1,
+      prompt: card.prompt,
+      options: card.options,
+      allowFreeText: card.allowFreeText,
+      answer: card.answer,
     },
-    [key],
-  );
+  ];
+}
 
-  const failedText = (failure: SendFailure): string => t(lang, failure === 'offline' ? 'refusal.offline' : failure === 'expired' ? 'refusal.expired' : 'refusal.http');
+function isQuestionAnswered(draft: QuestionDraft | undefined): boolean {
+  if (!draft) return false;
+  if (draft.picks.length > 0) return true;
+  return draft.writeOwn && draft.customText.trim().length > 0;
+}
 
-  const submit = (chosen: string[], value: string): void => {
-    const trimmed = value.trim();
-    if (!chosen.length && !trimmed) return;
-    undo.start(() => {
-      void send.send(
-        (opId) => ({
-          t: 'action',
-          opId,
-          kind: 'decision.answer',
-          planRef,
-          payload: {
-            decisionId: decision.decisionId,
-            ...(chosen.length ? { picks: chosen } : {}),
-            ...(trimmed ? { text: trimmed } : {}),
-          },
-        }),
+/**
+ * P3 问题卡（SS-42）：每题编号、单选/多选加「自己写…」、全部答完主按钮才可点，一起发一个动作。
+ * 使用 `Card` 外框；发送失败不丢已选。
+ */
+export function DecisionCard(props: DecisionCardProps) {
+  if (isLegacyProps(props)) {
+    const legacyCard: QuestionCardData = {
+      id: props.decision.decisionId,
+      kind: 'question',
+      createdAt: 0,
+      status: 'pending',
+      index: props.index + 1,
+      total: props.total,
+      prompt: props.decision.question,
+      options: props.decision.options,
+      allowFreeText: true,
+      questions: [
         {
-          onQueued: () => {
-            kv.remove(key);
-            onAnswered(decision.decisionId);
-          },
-          onDone: () => {
-            kv.remove(key);
-            onAnswered(decision.decisionId);
-          },
-          onRefused: (code) => {
-            setNotice(t(lang, refusalKey(code)));
-            if (code === 'stale' || code === 'not-open') onRefresh();
-          },
-          onFailed: (failure) => setNotice(failedText(failure)),
+          id: props.decision.decisionId,
+          index: props.index + 1,
+          prompt: props.decision.question,
+          options: props.decision.options,
+          allowFreeText: true,
         },
-      );
+      ],
+    };
+    return (
+      <QuestionCardInner
+        card={legacyCard}
+        lang={props.lang}
+        testID={props.testID}
+        onSubmit={() => {
+          props.onAnswered(props.decision.decisionId);
+        }}
+      />
+    );
+  }
+  return <QuestionCardInner {...props} />;
+}
+
+function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-card' }: QuestionCardProps) {
+  const lang = langProp ?? detectLang();
+  const questions = normalizeQuestions(card);
+  const draftKey = `draft:questions:${card.id}`;
+
+  const [drafts, setDrafts] = useState<Record<string, QuestionDraft>>(() => {
+    const saved = kv.get<Record<string, QuestionDraft>>(draftKey);
+    return saved && typeof saved === 'object' ? saved : {};
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(card.status === 'done');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  const updateDraft = (questionId: string, next: QuestionDraft) => {
+    setSendError(null);
+    setDrafts((prev) => {
+      const updated = { ...prev, [questionId]: next };
+      kv.set(draftKey, updated);
+      return updated;
     });
   };
 
-  const toggle = (id: string): void => {
-    const next = picks.includes(id) ? picks.filter((p) => p !== id) : [...picks, id];
-    save(next, text);
+  const toggleOption = (q: QuestionItemData, optionId: string) => {
+    const cur = drafts[q.id] ?? { picks: [], writeOwn: false, customText: '' };
+    if (q.multi) {
+      const exists = cur.picks.includes(optionId);
+      const picks = exists ? cur.picks.filter((id) => id !== optionId) : [...cur.picks, optionId];
+      updateDraft(q.id, { ...cur, picks });
+    } else {
+      updateDraft(q.id, { ...cur, picks: [optionId], writeOwn: false });
+    }
   };
 
-  const pickOne = (id: string): void => {
-    save([id], text);
-    submit([id], text);
+  const toggleWriteOwn = (q: QuestionItemData) => {
+    const cur = drafts[q.id] ?? { picks: [], writeOwn: false, customText: '' };
+    if (q.multi) {
+      updateDraft(q.id, { ...cur, writeOwn: !cur.writeOwn });
+    } else {
+      updateDraft(q.id, { ...cur, picks: [], writeOwn: true });
+    }
   };
 
-  const busy = !undo.active && (send.state.phase === 'sending' || send.state.phase === 'queued');
-  const failed = !undo.active && send.state.phase === 'failed';
-  const canSubmit = decision.multi || text.trim().length > 0 || failed;
-  const showButton = undo.active || busy || failed || canSubmit;
+  const setCustomText = (q: QuestionItemData, value: string) => {
+    const cur = drafts[q.id] ?? { picks: [], writeOwn: true, customText: '' };
+    updateDraft(q.id, { ...cur, writeOwn: true, customText: value.slice(0, MAX_ANSWER) });
+  };
+
+  const answeredCount = questions.filter((q) => isQuestionAnswered(drafts[q.id])).length;
+  const remaining = Math.max(0, questions.length - answeredCount);
+  const allAnswered = remaining === 0;
+
+  const handleSubmit = async () => {
+    if (!allAnswered || submitting || submitted) return;
+    setSubmitting(true);
+    setSendError(null);
+    const payload: QuestionAnswerItem[] = questions.map((q) => {
+      const d = drafts[q.id] ?? { picks: [], writeOwn: false, customText: '' };
+      const trimmed = d.customText.trim();
+      return {
+        questionId: q.id,
+        picks: d.picks,
+        ...(d.writeOwn && trimmed ? { customText: trimmed } : {}),
+      };
+    });
+    try {
+      const result = await onSubmit?.(payload);
+      if (result === false) {
+        setSendError(tQuestions(lang, 'questions.sendFailed'));
+        setAttempt((a) => a + 1);
+        return;
+      }
+      kv.remove(draftKey);
+      setSubmitted(true);
+    } catch {
+      setSendError(tQuestions(lang, 'questions.sendFailed'));
+      setAttempt((a) => a + 1);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const footer = submitted ? (
+    <Text style={[styles.submittedNote, { color: color.ok }]} testID="questions-submitted">
+      {tQuestions(lang, 'questions.submitted')}
+    </Text>
+  ) : (
+    <ActionRow
+      testID="questions-action-row"
+      hint={remaining > 0 ? tQuestions(lang, 'questions.remaining', { n: remaining }) : undefined}
+      primary={
+        <PrimaryButton
+          key={attempt}
+          label={
+            submitting
+              ? tQuestions(lang, 'questions.submitting')
+              : sendError
+                ? tQuestions(lang, 'questions.retry')
+                : tQuestions(lang, 'questions.submit')
+          }
+          state={submitting ? 'working' : 'idle'}
+          disabled={!allAnswered || submitting}
+          error={sendError}
+          onPress={() => void handleSubmit()}
+          testID="questions-submit"
+        />
+      }
+    />
+  );
 
   return (
-    <View style={styles.root} testID="decision-card">
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.count}>{t(lang, 'decision.count', { i: index + 1, n: total })}</Text>
-        <Text style={styles.question}>{decision.question}</Text>
-        {decision.multi ? <Text style={styles.multi}>{t(lang, 'decision.multi')}</Text> : null}
-        <View style={styles.options}>
-          {decision.options.map((option) => {
-            const selected = picks.includes(option.id);
-            return (
-              <Pressable
-                key={option.id}
-                accessibilityRole={decision.multi ? 'checkbox' : 'radio'}
-                accessibilityState={{ checked: selected, disabled: undo.active || busy }}
-                disabled={undo.active || busy}
-                onPress={() => (decision.multi ? toggle(option.id) : pickOne(option.id))}
-                style={({ pressed }) => [styles.option, selected && styles.optionOn, pressed && styles.pressed]}
-                testID={`decision-option-${option.id}`}
-              >
-                <View style={[styles.check, selected && styles.checkOn]}>
-                  {selected ? <Text style={styles.checkInk}>✓</Text> : null}
+    <Card
+      title={submitted ? tQuestions(lang, 'questions.cardTitleDone') : tQuestions(lang, 'questions.cardTitle')}
+      status={submitted ? 'done' : 'needs-you'}
+      footer={footer}
+      testID={testID}
+    >
+      <View style={styles.questionsList}>
+        {questions.map((q, idx) => {
+          const draft = drafts[q.id] ?? { picks: [], writeOwn: false, customText: '' };
+          const num = q.index || idx + 1;
+          const allowFree = q.allowFreeText !== false;
+          const options = q.options ?? [];
+
+          return (
+            <View key={q.id} style={styles.questionBlock} testID={`question-item-${q.id}`}>
+              <View style={styles.promptRow}>
+                <Text style={[styles.num, { color: color.text3 }]}>{tQuestions(lang, 'questions.number', { i: num })}</Text>
+                <View style={styles.promptWrap}>
+                  <Text style={[styles.prompt, { color: color.text }]}>{q.prompt}</Text>
+                  {q.multi ? (
+                    <Text style={[styles.multiHint, { color: color.text3 }]}>{tQuestions(lang, 'questions.multiHint')}</Text>
+                  ) : null}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.optionLabel}>{option.label}</Text>
-                  {option.description ? <Text style={styles.optionDescription}>{option.description}</Text> : null}
+              </View>
+
+              {submitted && q.answer ? (
+                <Text style={[styles.answerSummary, { color: color.text2 }]}>{q.answer}</Text>
+              ) : (
+                <View style={styles.optionsList}>
+                  {options.map((opt) => {
+                    const selected = draft.picks.includes(opt.id);
+                    return (
+                      <Pressable
+                        key={opt.id}
+                        accessibilityRole={q.multi ? 'checkbox' : 'radio'}
+                        accessibilityState={{ checked: selected, disabled: submitted || submitting }}
+                        disabled={submitted || submitting}
+                        onPress={() => toggleOption(q, opt.id)}
+                        style={({ pressed }) => [
+                          styles.option,
+                          {
+                            backgroundColor: color.card,
+                            borderColor: selected ? color.text : color.hairline,
+                            borderWidth: selected ? 1.5 : 1,
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                        testID={`question-${q.id}-option-${opt.id}`}
+                      >
+                        <View
+                          style={[
+                            styles.check,
+                            q.multi && styles.checkSquare,
+                            {
+                              borderColor: selected ? color.text : color.hairlineStrong,
+                              backgroundColor: selected ? color.text : 'transparent',
+                            },
+                          ]}
+                        >
+                          {selected ? <Text style={[styles.checkInk, { color: color.onPrimary }]}>✓</Text> : null}
+                        </View>
+                        <View style={styles.optionCopy}>
+                          <Text style={[styles.optionLabel, { color: color.text }]}>{opt.label}</Text>
+                          {opt.description ? (
+                            <Text style={[styles.optionDesc, { color: color.text2 }]}>{opt.description}</Text>
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+
+                  {allowFree ? (
+                    <View style={styles.writeOwnWrap}>
+                      <Pressable
+                        accessibilityRole={q.multi ? 'checkbox' : 'radio'}
+                        accessibilityState={{ checked: draft.writeOwn, disabled: submitted || submitting }}
+                        disabled={submitted || submitting}
+                        onPress={() => toggleWriteOwn(q)}
+                        style={({ pressed }) => [
+                          styles.option,
+                          {
+                            backgroundColor: color.card,
+                            borderColor: draft.writeOwn ? color.text : color.hairline,
+                            borderWidth: draft.writeOwn ? 1.5 : 1,
+                          },
+                          pressed && styles.pressed,
+                        ]}
+                        testID={`question-${q.id}-write-own`}
+                      >
+                        <View
+                          style={[
+                            styles.check,
+                            q.multi && styles.checkSquare,
+                            {
+                              borderColor: draft.writeOwn ? color.text : color.hairlineStrong,
+                              backgroundColor: draft.writeOwn ? color.text : 'transparent',
+                            },
+                          ]}
+                        >
+                          {draft.writeOwn ? <Text style={[styles.checkInk, { color: color.onPrimary }]}>✓</Text> : null}
+                        </View>
+                        <Text style={[styles.optionLabel, { color: color.text }]}>{tQuestions(lang, 'questions.writeOwn')}</Text>
+                      </Pressable>
+
+                      {draft.writeOwn ? (
+                        <TextInput
+                          value={draft.customText}
+                          onChangeText={(val) => setCustomText(q, val)}
+                          placeholder={tQuestions(lang, 'questions.writePlaceholder')}
+                          placeholderTextColor={color.text3}
+                          editable={!submitted && !submitting}
+                          multiline
+                          maxLength={MAX_ANSWER}
+                          style={[
+                            styles.input,
+                            {
+                              color: color.text,
+                              backgroundColor: color.sunken,
+                              borderColor: color.hairline,
+                            },
+                          ]}
+                          testID={`question-${q.id}-custom-input`}
+                          accessibilityLabel={tQuestions(lang, 'questions.writePlaceholder')}
+                        />
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
-              </Pressable>
-            );
-          })}
-        </View>
-        <TextInput
-          value={text}
-          onChangeText={(value) => save(picks, value.slice(0, MAX_ANSWER))}
-          placeholder={t(lang, 'decision.textPlaceholder')}
-          placeholderTextColor={color.text3}
-          multiline
-          maxLength={MAX_ANSWER}
-          style={styles.input}
-          testID="decision-text"
-          accessibilityLabel={t(lang, 'decision.textPlaceholder')}
-        />
-        {text.length >= 1800 ? <Text style={styles.counter}>{t(lang, 'decision.left', { n: MAX_ANSWER - text.length })}</Text> : null}
-        <Text style={styles.private}>{t(lang, 'plan.privateNote')}</Text>
-      </ScrollView>
-      {showButton ? (
-        <View style={[styles.footer, { paddingBottom: (keyboard > 0 ? 0 : insets.bottom) + space[4] }]}>
-          <ReceiptLine text={notice} tone="error" />
-          <PrimaryButton
-            label={
-              undo.active
-                ? t(lang, 'decision.undoCount', { n: undo.remaining })
-                : busy
-                  ? t(lang, 'common.sending')
-                  : failed
-                    ? t(lang, 'common.retry')
-                    : t(lang, 'decision.submit')
-            }
-            onPress={() => {
-              if (undo.active) undo.cancel();
-              else if (failed) void send.retry();
-              else submit(picks, text);
-            }}
-            disabled={busy || (!failed && !undo.active && !decision.multi && !text.trim() && picks.length === 0)}
-            loading={busy}
-            testID="primary"
-          />
-        </View>
-      ) : null}
-    </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, minHeight: 0 },
-  scroll: { flex: 1 },
-  content: { padding: space[4], gap: space[3] },
-  count: { ...type.caption, color: color.text3 },
-  question: { ...type.heading, color: color.text, fontSize: 18, lineHeight: 24 },
-  multi: { ...type.caption, color: color.text2 },
-  options: { gap: space[2], marginTop: space[1] },
+  questionsList: { gap: space[5] },
+  questionBlock: { gap: space[2] },
+  promptRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
+  num: { ...type.callout, fontWeight: '700', minWidth: 20 },
+  promptWrap: { flex: 1, gap: 2 },
+  prompt: { ...type.callout, fontWeight: '600' },
+  multiHint: { ...type.caption },
+  answerSummary: { ...type.callout, paddingLeft: 28 },
+  optionsList: { gap: space[2], paddingLeft: 28 },
   option: {
-    minHeight: 56,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    backgroundColor: color.card,
-    borderWidth: 1,
-    borderColor: color.hairline,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
     borderRadius: radius.m,
   },
-  optionOn: { borderWidth: 1.5, borderColor: color.text },
-  pressed: { opacity: 0.9 },
-  check: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: color.hairlineStrong, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { backgroundColor: color.text, borderColor: color.text },
-  checkInk: { ...type.caption, color: color.onPrimary, fontSize: 13, fontWeight: '800' },
-  optionLabel: { ...type.callout, color: color.text, fontWeight: '600' },
-  optionDescription: { ...type.caption, color: color.text2, marginTop: 2 },
+  pressed: { opacity: 0.88 },
+  check: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkSquare: { borderRadius: 5 },
+  checkInk: { fontSize: 12, fontWeight: '800' },
+  optionCopy: { flex: 1 },
+  optionLabel: { ...type.callout, fontWeight: '500' },
+  optionDesc: { ...type.caption, marginTop: 2 },
+  writeOwnWrap: { gap: space[2] },
   input: {
     ...type.callout,
     fontSize: 16,
     lineHeight: 22,
     minHeight: 44,
-    maxHeight: 84,
+    maxHeight: 100,
     textAlignVertical: 'top',
-    color: color.text,
-    backgroundColor: color.card,
     borderWidth: 1,
-    borderColor: color.hairline,
     borderRadius: radius.m,
     padding: space[3],
   },
-  counter: { ...type.caption, color: color.text3, textAlign: 'right' },
-  private: { ...type.caption, color: color.text3, marginTop: space[2] },
-  footer: { paddingHorizontal: space[4], paddingTop: space[2], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  submittedNote: { ...type.callout, fontWeight: '600' },
 });

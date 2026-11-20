@@ -14,8 +14,8 @@ describe('getHubHost', () => {
 
 describe('parseDeepLink', () => {
   it('parses all synon:// routes', () => {
-    expect(parseDeepLink('synon://join/inv_123#k=secret&n=Alice', HUB)).toBe('/join/inv_123#k=secret&n=Alice');
-    expect(parseDeepLink('synon:///join/inv_123#k=secret&n=Alice', HUB)).toBe('/join/inv_123#k=secret&n=Alice');
+    expect(parseDeepLink('synon://join/inv_123#k=secret&n=Alice', HUB)).toBe('/join/inv_123?k=secret&n=Alice');
+    expect(parseDeepLink('synon:///join/inv_123#k=secret&n=Alice', HUB)).toBe('/join/inv_123?k=secret&n=Alice');
     expect(parseDeepLink('synon://request/req_42', HUB)).toBe('/request/req_42');
     expect(parseDeepLink('synon://request/req_42?card=c_9', HUB)).toBe('/request/req_42?card=c_9');
     expect(parseDeepLink('synon://login?token=tok_abc', HUB)).toBe('/login?token=tok_abc');
@@ -24,7 +24,7 @@ describe('parseDeepLink', () => {
   });
 
   it('parses all https:// routes matching EXPO_PUBLIC_HUB_URL', () => {
-    expect(parseDeepLink('https://studio.example.com/join/inv_123#k=sec&n=Bob', HUB)).toBe('/join/inv_123#k=sec&n=Bob');
+    expect(parseDeepLink('https://studio.example.com/join/inv_123#k=sec&n=Bob', HUB)).toBe('/join/inv_123?k=sec&n=Bob');
     expect(parseDeepLink('https://studio.example.com/request/req_42', HUB)).toBe('/request/req_42');
     expect(parseDeepLink('https://studio.example.com/request/req_42?card=c_9', HUB)).toBe('/request/req_42?card=c_9');
     expect(parseDeepLink('https://studio.example.com/login?token=tok_abc', HUB)).toBe('/login?token=tok_abc');

@@ -2,10 +2,33 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { RefusalCode, StudioAction, StudioReceipt } from '../../../src/studio/protocol';
 import { hub, live } from './client';
+import { DeviceKeyMissingError } from './keys';
 import { kv } from './kv';
 import { isOnline, subscribeOnline } from './net';
 import { session } from './session';
+import { signFrame, type SignedEnvelope } from './signed';
 import { randomOpId, submitNext, type SubmitState } from './submit';
+
+/** S2 规定必须携带设备签名的动作类型。 */
+export const SIGNED_ACTION_KINDS = new Set<string>([
+  'gate.answer',
+  'request.confirm',
+  'delivery.accept',
+  'release.approve',
+  'device.remove',
+]);
+
+export interface SignableAction {
+  readonly t?: 'action';
+  readonly opId?: string;
+  readonly kind: string;
+  readonly planRef?: string;
+  readonly payload: unknown;
+  readonly rev?: number;
+  readonly signed?: SignedEnvelope;
+}
+
+export type SendableAction = StudioAction | SignableAction;
 
 /** The pending record `synon:pending:<kind>:<pid>:<ref>[:sub]`: the opId survives a reload. */
 interface PendingSend {
@@ -26,12 +49,49 @@ export interface SendHandlers {
 export interface Sender {
   readonly state: SubmitState;
   /** Send one action; `build` is called with the opId the hub will see. */
-  send(build: (opId: string) => StudioAction, handlers?: SendHandlers): Promise<void>;
+  send(build: (opId: string) => SendableAction, handlers?: SendHandlers): Promise<void>;
   /** After a failure: same opId; after refused/expired: a new one. */
   retry(): Promise<void>;
   reset(): void;
 }
 
+const signedCacheKey = (opId: string) => `signed:op:${opId}`;
+const signedByOpId = new Map<string, StudioAction>();
+
+function clearSignedCache(opId: string | undefined): void {
+  if (!opId) return;
+  signedByOpId.delete(opId);
+  kv.remove(signedCacheKey(opId));
+}
+
+export async function prepareActionForSend(raw: SendableAction): Promise<StudioAction> {
+  if (!SIGNED_ACTION_KINDS.has(raw.kind)) {
+    return raw as StudioAction;
+  }
+  const opId = typeof raw.opId === 'string' && raw.opId.length > 0 ? raw.opId : undefined;
+  if (opId) {
+    const cached = signedByOpId.get(opId) ?? kv.get<StudioAction>(signedCacheKey(opId));
+    if (cached) {
+      signedByOpId.set(opId, cached);
+      return cached;
+    }
+  }
+  const rev = 'rev' in raw ? raw.rev : undefined;
+  const envelope = await signFrame({
+    kind: raw.kind,
+    payload: raw.payload,
+    ...(rev !== undefined ? { rev } : {}),
+  });
+  const prepared = {
+    ...raw,
+    signed: envelope,
+  } as unknown as StudioAction;
+  if (opId) {
+    signedByOpId.set(opId, prepared);
+    kv.set(signedCacheKey(opId), prepared);
+  }
+  return prepared;
+}
 /** `pending:<kind>:<pid>[:<ref>[:<sub>]]`, the app's one pending-key shape. */
 export function pendingKey(kind: string, pid: string, ...refs: string[]): string {
   return ['pending', kind, pid, ...refs].join(':');
@@ -52,7 +112,7 @@ export function useSend(pid: string, key: string): Sender {
   const [state, setState] = useState<SubmitState>({ phase: 'idle' });
   const stateRef = useRef(state);
   stateRef.current = state;
-  const buildRef = useRef<((opId: string) => StudioAction) | null>(null);
+  const buildRef = useRef<((opId: string) => SendableAction) | null>(null);
   const handlersRef = useRef<SendHandlers>({});
   const inFlight = useRef(false);
   const autoRetried = useRef(false);
@@ -76,6 +136,7 @@ export function useSend(pid: string, key: string): Sender {
         const next = submitNext(current, { type: 'done' });
         set(next);
         kv.remove(key);
+        clearSignedCache(current.opId);
         handlersRef.current.onDone?.(receipt);
         return;
       }
@@ -83,12 +144,14 @@ export function useSend(pid: string, key: string): Sender {
         const next = submitNext(current, { type: 'refused', code: receipt.code! });
         set(next);
         kv.remove(key);
+        clearSignedCache(current.opId);
         handlersRef.current.onRefused?.(receipt.code!);
         return;
       }
       // `expired` is a receipt state, not a local event: it can arrive while queued.
       set({ phase: 'failed', opId: current.opId, failure: 'expired' });
       kv.remove(key);
+      clearSignedCache(current.opId);
       handlersRef.current.onFailed?.('expired');
       handlersRef.current.onExpired?.();
     },
@@ -111,7 +174,21 @@ export function useSend(pid: string, key: string): Sender {
         kv.set(key, { opId, updatedAt: Date.now() } satisfies PendingSend);
         const started: SubmitState = { phase: 'sending', opId };
         set(started);
-        const answer = await hub.send(pid, build(opId));
+        let prepared: StudioAction;
+        try {
+          prepared = await prepareActionForSend(build(opId));
+        } catch (err) {
+          if (err instanceof DeviceKeyMissingError) {
+            const refused = submitNext(started, { type: 'refused', code: 'unregistered-device' });
+            set(refused);
+            kv.remove(key);
+            clearSignedCache(opId);
+            handlersRef.current.onRefused?.('unregistered-device');
+            return;
+          }
+          throw err;
+        }
+        const answer = await hub.send(pid, prepared);
         if (answer.ok) {
           settle(answer.value);
           return;
@@ -131,7 +208,7 @@ export function useSend(pid: string, key: string): Sender {
   );
 
   const send = useCallback(
-    async (build: (opId: string) => StudioAction, handlers: SendHandlers = {}) => {
+    async (build: (opId: string) => SendableAction, handlers: SendHandlers = {}) => {
       buildRef.current = build;
       handlersRef.current = handlers;
       await run(false);
@@ -144,6 +221,7 @@ export function useSend(pid: string, key: string): Sender {
   }, [run]);
 
   const reset = useCallback(() => {
+    clearSignedCache(stateRef.current.opId);
     kv.remove(key);
     buildRef.current = null;
     handlersRef.current = {};
@@ -162,9 +240,11 @@ export function useSend(pid: string, key: string): Sender {
       },
       state: (socket) => {
         if (socket !== 'open' || stateRef.current.phase !== 'queued' || !buildRef.current) return;
-        void hub.send(pid, buildRef.current(opId)).then((answer) => {
-          if (answer.ok) settle(answer.value);
-        });
+        void prepareActionForSend(buildRef.current(opId))
+          .then((prepared) => hub.send(pid, prepared))
+          .then((answer) => {
+            if (answer.ok) settle(answer.value);
+          });
       },
     });
     return close;

@@ -15,6 +15,12 @@ export const zh = {
   'todo.changesSub': '计划有改动：+{a} ~{c} −{r}',
   'todo.confirmSub': '计划已拟好，等你确认',
   'todo.dotLabel': '有待办',
+  'todo.needsYouGroup': '要你做的',
+  'todo.waitingGroup': '在等待，你不用做什么',
+  'todo.waitOfflineEta': '执行机器上线后自动继续，通常几分钟内恢复',
+  'todo.waitQueuedEta': '按队列顺序自动开始，你不需要做什么',
+  'todo.waitQuotaEta': '额度恢复或扩容后自动继续',
+  'todo.waitHumanEta': '工作室人员处理完后会同步进展',
 } as const;
 
 export const en: Record<keyof typeof zh, string> = {
@@ -34,4 +40,10 @@ export const en: Record<keyof typeof zh, string> = {
   'todo.changesSub': 'The plan changed: +{a} ~{c} −{r}',
   'todo.confirmSub': 'The plan is ready for you to confirm',
   'todo.dotLabel': 'To-dos waiting',
+  'todo.needsYouGroup': 'Needs you',
+  'todo.waitingGroup': 'Waiting · nothing for you to do',
+  'todo.waitOfflineEta': 'Continues automatically when the runner is back online',
+  'todo.waitQueuedEta': 'Starts automatically in queue order',
+  'todo.waitQuotaEta': 'Continues automatically once quota resets',
+  'todo.waitHumanEta': 'Updates as soon as the studio finishes checking',
 };

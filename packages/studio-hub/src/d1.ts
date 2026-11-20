@@ -198,6 +198,7 @@ export class D1HubStore implements HubStore {
       this.db.prepare('DELETE FROM outbox WHERE customer_id = ?').bind(id),
       this.db.prepare('DELETE FROM push_tokens WHERE customer_id = ?').bind(id),
       this.db.prepare('DELETE FROM push_dedup WHERE customer_id = ?').bind(id),
+      this.db.prepare('DELETE FROM studio_devices WHERE customer_id = ?').bind(id),
       this.db.prepare('DELETE FROM upload_parts WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?)').bind(id),
       this.db.prepare('DELETE FROM upload_files WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?)').bind(id),
       this.db.prepare('DELETE FROM upload_sessions WHERE customer_id = ?').bind(id),
@@ -209,6 +210,7 @@ export class D1HubStore implements HubStore {
     await this.db.batch([
       this.db.prepare(`DELETE FROM push_tokens WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
       this.db.prepare(`DELETE FROM push_dedup WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db.prepare(`DELETE FROM studio_devices WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
       this.db
         .prepare(`DELETE FROM upload_parts WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?) AND ${isRemoved}`)
         .bind(id, id),

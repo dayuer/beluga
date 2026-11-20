@@ -10,6 +10,7 @@ export default defineConfig({
       'react-native': resolve(__dirname, 'test/rn-mock.ts'),
       'react-native-svg': resolve(__dirname, 'test/svg-mock.ts'),
       'lucide-react-native': resolve(__dirname, 'test/lucide-mock.ts'),
+      expo: resolve(__dirname, 'test/expo-mock.ts'),
     },
   },
   test: {
