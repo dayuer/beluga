@@ -10,6 +10,7 @@ import { ActionRow } from '../card/ActionRow';
 import { Card } from '../card/Card';
 import { PrimaryButton } from '../PrimaryButton';
 import { SignedButton } from '../SignedButton';
+import { TextButton } from '../TextButton';
 
 export type UnderstandingCardData = z.infer<typeof UnderstandingCardSchema>;
 
@@ -113,17 +114,11 @@ export function UnderstandingCard({
         />
         <ActionRow
           negative={
-            <Pressable
+            <TextButton
+              label={tUnderstanding(lang, 'understanding.reasonCancel')}
               onPress={() => setAskingReason(false)}
-              disabled={busy}
-              accessibilityRole="button"
               testID="understanding-reason-cancel"
-              style={styles.textBtn}
-            >
-              <Text style={[styles.textBtnLabel, { color: color.text2 }]}>
-                {tUnderstanding(lang, 'understanding.reasonCancel')}
-              </Text>
-            </Pressable>
+            />
           }
           primary={
             <PrimaryButton
@@ -139,28 +134,29 @@ export function UnderstandingCard({
     ) : (
       <ActionRow
         negative={
-          <Pressable
+          <TextButton
+            label={tUnderstanding(lang, 'understanding.reject')}
             onPress={() => setAskingReason(true)}
-            disabled={busy}
-            accessibilityRole="button"
             testID="understanding-reject"
-            style={({ pressed }) => [
-              styles.outlinedBtn,
-              { borderColor: color.hairlineStrong, backgroundColor: color.card },
-              pressed && { backgroundColor: color.press },
-            ]}
-          >
-            <Text style={[styles.textBtnLabel, { color: color.text }]}>{tUnderstanding(lang, 'understanding.reject')}</Text>
-          </Pressable>
+          />
         }
         primary={
-          <SignedButton
-            label={tUnderstanding(lang, 'understanding.confirm')}
-            disabled={busy}
-            hasKeyOverride={hasKeyOverride}
-            onPress={handleConfirm}
-            testID="understanding-confirm"
-          />
+          card.requiresSignature !== false ? (
+            <SignedButton
+              label={tUnderstanding(lang, 'understanding.confirm')}
+              disabled={busy}
+              hasKeyOverride={hasKeyOverride}
+              onPress={handleConfirm}
+              testID="understanding-confirm"
+            />
+          ) : (
+            <PrimaryButton
+              label={tUnderstanding(lang, 'understanding.confirm')}
+              disabled={busy}
+              onPress={handleConfirm}
+              testID="understanding-confirm"
+            />
+          )
         }
       />
     );
