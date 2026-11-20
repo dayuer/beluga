@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
-import { getAppearance, setAppearance, type AppearanceMode } from '../../lib/appearance';
+import { getAppearance, setAppearance, useScheme, type AppearanceMode } from '../../lib/appearance';
 import { hub } from '../../lib/client';
 import { kv } from '../../lib/kv';
 import { session } from '../../lib/session';
@@ -18,13 +18,13 @@ const PUSH_KEY = 'prefs:pushEnabled';
 
 /**
  * 我 › 账号与通知（SS-59 / SS-200）：
- * - 邮箱、语言（点击区 ≥ 44pt）、外观设置（浅色 / 深色 / 跟随系统，存 kv 并调用 Appearance.setColorScheme）；
+ * - 邮箱、语言（点击区 ≥ 44pt）、外观设置（浅色 / 深色 / 跟随系统，存 kv，换 theme 色板并让原生控件跟随）；
  * - 通知开关（写 kv 供 A7 读取）；
  * - 退出登录走 hub.logout() + session.clear()（待 A7 合入后在 A9 换为 signOut()）；
  * - 删除账号独立处理，中台暂无删除接口时不可点并原地说明。
  */
 export default function MeAccountScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const router = useRouter();
   const [lang, setLang] = useState<Lang>(() => detectLang());

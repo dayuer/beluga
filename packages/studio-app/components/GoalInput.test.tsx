@@ -2,6 +2,12 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { describe, expect, it, vi } from 'vitest';
 import { GoalInput, shouldSubmitOnKeyPress } from './GoalInput';
 
+// lib/appearance 读 kv，kv 用 expo-file-system；node 下没有原生模块，给个空的。
+vi.mock('expo-file-system', () => ({
+  Paths: { document: '/mock-doc' },
+  File: class {},
+}));
+
 describe('GoalInput IME and submit behavior', () => {
   it('never submits while composing (composition state, isComposing, or Android keyCode 229)', () => {
     expect(shouldSubmitOnKeyPress({ key: 'Enter' }, true, true)).toBe(false);

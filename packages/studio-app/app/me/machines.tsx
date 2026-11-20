@@ -1,10 +1,11 @@
-import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { ProgressRing } from '../../components/ProgressRing';
 import { Skeleton } from '../../components/Skeleton';
 import { StatusDot } from '../../components/StatusDot';
 import { SyncBanner } from '../../components/SyncBanner';
+import { useScheme } from '../../lib/appearance';
 import { isDemoMode } from '../../lib/client';
 import { DEMO_REQUEST_SUMMARIES } from '../../lib/demo';
 import { useSettingsView } from '../../lib/settings-source';
@@ -18,7 +19,7 @@ import { color, radius, space, type } from '../../lib/theme';
  * 离线写「等待」灰色。
  */
 export default function MeMachinesScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const lang = detectLang();
   const { width } = useWindowDimensions();

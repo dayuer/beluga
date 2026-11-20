@@ -9,6 +9,12 @@ vi.mock('react-native', async (importOriginal) => {
   return { ...actual, Image: 'Image' };
 });
 
+// lib/appearance 读 kv，kv 用 expo-file-system；node 下没有原生模块，给个空的。
+vi.mock('expo-file-system', () => ({
+  Paths: { document: '/mock-doc' },
+  File: class {},
+}));
+
 vi.mock('lucide-react-native', () => ({
   Camera: () => null,
   Image: () => null,

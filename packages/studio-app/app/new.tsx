@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
 import { AttachList } from '../components/AttachList';
 import { GoalInput } from '../components/GoalInput';
@@ -12,6 +12,7 @@ import { Segments, type SegmentItem } from '../components/Segments';
 import { SyncBanner } from '../components/SyncBanner';
 import { UndoBar } from '../components/UndoBar';
 import { LIMITS, type StudioPlatform } from '../../../src/studio/protocol';
+import { useScheme } from '../lib/appearance';
 import { cache } from '../lib/cache';
 import { hub, isDemoMode } from '../lib/client';
 import { DEMO_SCREENS } from '../lib/demo';
@@ -86,7 +87,7 @@ function Hint({ lang, styles }: { lang: Lang; styles: ReturnType<typeof createSt
  * - 「对做好的提意见」使用协议 `chat.send` 发给对应已交付需求并跳转 `/request/<id>`。
  */
 export default function NewRequestScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{ project?: string | string[] }>();

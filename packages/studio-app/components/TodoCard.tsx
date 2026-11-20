@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useScheme } from '../lib/appearance';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
 import { refusalKey } from '../lib/submit';
 import { t, type Lang } from '../lib/strings';
@@ -21,7 +22,7 @@ interface TodoCardProps {
 
 /** One to-do, with its own action: no filled primary button on this list (M6 §6.4). */
 export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRefresh }: TodoCardProps) {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const [notice, setNotice] = useState<string | null>(null);
   const pass = useSend(todo.pid, pendingKey('pass', todo.pid, todo.planRef));
@@ -163,7 +164,7 @@ export function WaitingTodoCard({
   readonly item: WaitingTodoItem;
   readonly onOpenRequest?: (requestId: string, cardId: string) => void;
 }) {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   return (
     <Pressable

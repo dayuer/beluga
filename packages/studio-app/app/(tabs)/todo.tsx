@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
@@ -9,6 +9,7 @@ import { SyncBanner } from '../../components/SyncBanner';
 import { TabBar } from '../../components/TabBar';
 import { TextButton } from '../../components/TextButton';
 import { TodoCard, WaitingTodoCard } from '../../components/TodoCard';
+import { useScheme } from '../../lib/appearance';
 import { cache } from '../../lib/cache';
 import { hub, isDemoMode } from '../../lib/client';
 import { DEMO_REQUEST_SUMMARIES } from '../../lib/demo';
@@ -30,7 +31,7 @@ import type { RequestSummary } from '../../lib/views';
  * - 无待办且无等待时显示 todo-empty。
  */
 export default function TodoScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();

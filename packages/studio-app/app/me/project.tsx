@@ -1,8 +1,9 @@
-import { ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { useScheme } from '../../lib/appearance';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t, type Lang } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
@@ -49,7 +50,7 @@ function InfoRow({
  * 分清 preview-only / repo / push-mine 三种交付方式；颜色在渲染时读取以跟随深色模式。
  */
 export default function MeProjectScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const lang = detectLang();
   const { width } = useWindowDimensions();

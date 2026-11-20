@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { useScheme } from '../../lib/appearance';
 import { useHasDeviceKey } from '../../lib/keys';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t } from '../../lib/strings';
@@ -24,7 +25,7 @@ type RegisteredDevice = SettingsView['devices'][number];
  * - 「加一台设备」行去 /me/devices/add（A6 实现）。
  */
 export default function MeDevicesScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();

@@ -5,12 +5,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useColorScheme,
   View,
   type TextInputContentSizeChangeEvent,
   type TextInputKeyPressEvent,
 } from 'react-native';
 import { LIMITS } from '../../../src/studio/protocol';
+import { useScheme } from '../lib/appearance';
 import type { Lang } from '../lib/strings';
 import { tVoice } from '../lib/strings/voice';
 import { color, radius, space, type } from '../lib/theme';
@@ -80,7 +80,7 @@ export function GoalInput({
   accessibilityLabel: string;
   testID?: string;
 }) {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const [height, setHeight] = useState(120);
   const [focused, setFocused] = useState(false);

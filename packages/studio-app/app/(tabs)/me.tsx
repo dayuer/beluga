@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
 import { TabBar } from '../../components/TabBar';
+import { useScheme } from '../../lib/appearance';
 import { kv } from '../../lib/kv';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t } from '../../lib/strings';
@@ -46,7 +47,7 @@ function MeRow({ label, value, onPress, testID, last, styles }: MeRowProps) {
  * P9「我」入口页（SS-54）：账号头 + 两个分组行，每行进入 `app/me/<页>.tsx`。
  */
 export default function MeScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const router = useRouter();
   const lang = detectLang();

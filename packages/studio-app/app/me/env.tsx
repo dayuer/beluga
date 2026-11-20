@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Segments, type SegmentItem } from '../../components/Segments';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { useScheme } from '../../lib/appearance';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
@@ -36,7 +37,7 @@ const ENV_TABS: readonly {
  * 密钥显示用途但不显示值；底部灰底说明使用 color.text3OnSunken，颜色跟随深色模式。
  */
 export default function MeEnvScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const lang = detectLang();
   const { width } = useWindowDimensions();

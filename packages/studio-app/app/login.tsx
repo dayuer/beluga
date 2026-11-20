@@ -1,13 +1,14 @@
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TextInput, useColorScheme, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { ActionDock } from '../components/ActionDock';
 import { Header } from '../components/Header';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SyncBanner } from '../components/SyncBanner';
 import { TextButton } from '../components/TextButton';
+import { useScheme } from '../lib/appearance';
 import { hub } from '../lib/client';
 import { useOnline } from '../lib/net';
 import { session } from '../lib/session';
@@ -52,7 +53,7 @@ function parseUrlToken(url: string | null | undefined): string {
  * session exists.
  */
 export default function LoginScreen() {
-  useColorScheme();
+  useScheme();
   const styles = createStyles();
   const lang = detectLang();
   const params = useLocalSearchParams<{ token?: string | string[]; next?: string | string[] }>();
