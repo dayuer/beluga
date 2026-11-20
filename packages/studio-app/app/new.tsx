@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
+import { AttachList } from '../components/AttachList';
 import { GoalInput } from '../components/GoalInput';
 import { Header } from '../components/Header';
 import { PlatformPicker } from '../components/PlatformPicker';
@@ -9,6 +10,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { ReceiptLine, type ReceiptTone } from '../components/ReceiptLine';
 import { Segments, type SegmentItem } from '../components/Segments';
 import { SyncBanner } from '../components/SyncBanner';
+import { UndoBar } from '../components/UndoBar';
 import { LIMITS, PLATFORMS, type StudioPlatform } from '../../../src/studio/protocol';
 import { cache } from '../lib/cache';
 import { hub } from '../lib/client';
@@ -16,6 +18,7 @@ import { DEMO_REQUEST_SUMMARIES } from '../lib/demo';
 import { clearDraft, readDraft, writeDraft } from '../lib/drafts';
 import type { ProjectSummary } from '../lib/hub-schema';
 import { kv } from '../lib/kv';
+import { pickPhotos, takePhoto, type MediaAttachment } from '../lib/media';
 import { useOnline } from '../lib/net';
 import { detectLang, t, type Lang } from '../lib/strings';
 import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
@@ -118,6 +121,8 @@ export default function NewRequestScreen() {
   );
   const [selectedRequestId, setSelectedRequestId] = useState<string>(() => delivered[0]?.id ?? '');
   const [feedbackText, setFeedbackText] = useState('');
+  const [attachments, setAttachments] = useState<readonly MediaAttachment[]>([]);
+  const [mediaHint, setMediaHint] = useState<string | null>(null);
 
   const lockedRef = useRef(false);
 
@@ -260,6 +265,39 @@ export default function NewRequestScreen() {
             ? t(lang, 'new.start')
             : t(lang, 'new.feedbackSubmit');
 
+  const addFromCamera = async () => {
+    setMediaHint(null);
+    const res = await takePhoto(lang);
+    if (!res.ok) {
+      if (res.reason !== 'cancelled') setMediaHint(res.message);
+      return;
+    }
+    setAttachments((prev) => [...prev, ...res.items]);
+  };
+
+  const addFromLibrary = async () => {
+    setMediaHint(null);
+    const res = await pickPhotos(lang);
+    if (!res.ok) {
+      if (res.reason !== 'cancelled') setMediaHint(res.message);
+      return;
+    }
+    setAttachments((prev) => [...prev, ...res.items]);
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const restoreAttachment = (item: MediaAttachment, index: number) => {
+    setAttachments((prev) => {
+      if (prev.some((p) => p.id === item.id)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(index, next.length), 0, item);
+      return next;
+    });
+  };
+
   const handleSubmit = () => {
     if (!valid || locked) return;
     if (mode === 'new') {
@@ -319,7 +357,16 @@ export default function NewRequestScreen() {
                     placeholder={t(lang, 'new.goalPlaceholder')}
                     accessibilityLabel={t(lang, 'new.goalLabel')}
                   />
-                  {/* SS-40 附件清单 AttachList 插槽 */}
+                  <AttachList
+                    items={attachments}
+                    onAddCamera={() => void addFromCamera()}
+                    onAddLibrary={() => void addFromLibrary()}
+                    onRemove={removeAttachment}
+                    onRestore={restoreAttachment}
+                    permissionHint={mediaHint}
+                    lang={lang}
+                    disabled={locked}
+                  />
                   <View style={styles.goalMeta}>
                     <Text style={styles.caption} numberOfLines={1}>
                       {restored ?? ''}
@@ -380,7 +427,16 @@ export default function NewRequestScreen() {
                 placeholder={t(lang, 'new.feedbackPlaceholder')}
                 accessibilityLabel={t(lang, 'new.feedbackLabel')}
               />
-              {/* SS-40 附件清单 AttachList 插槽 */}
+              <AttachList
+                items={attachments}
+                onAddCamera={() => void addFromCamera()}
+                onAddLibrary={() => void addFromLibrary()}
+                onRemove={removeAttachment}
+                onRestore={restoreAttachment}
+                permissionHint={mediaHint}
+                lang={lang}
+                disabled={locked}
+              />
               <View style={styles.goalMeta}>
                 <View />
                 <Text style={[styles.caption, count !== null && styles.warn]}>{count ?? ''}</Text>
@@ -390,6 +446,7 @@ export default function NewRequestScreen() {
         </View>
       </ScrollView>
 
+      <UndoBar />
       <ActionDock>
         {receipt ? <ReceiptLine text={receipt.text} tone={receipt.tone} /> : null}
         <PrimaryButton
