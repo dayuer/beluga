@@ -1,6 +1,8 @@
 import type { StudioPlanView } from '../../../src/studio/protocol.js';
 import { pagePhase } from './plan-phase.js';
 import { t, type Lang } from './strings/table.js';
+import type { TodoCard } from './todo-store.js';
+import type { RequestSummary, WaitReason } from './views.js';
 
 export type TodoKind = 'decision' | 'review' | 'changes' | 'confirm';
 
@@ -79,4 +81,89 @@ export function todosOf(pid: string, view: StudioPlanView, lang: Lang): Todo[] {
     ];
   }
   return [];
+}
+
+export interface WaitingTodoItem {
+  readonly id: string;
+  readonly requestId: string;
+  readonly requestTitle: string;
+  readonly projectName: string;
+  readonly reason: WaitReason;
+  readonly message: string;
+  readonly etaText: string;
+  readonly updatedAt: number;
+}
+
+const URGENCY_RANK: Record<TodoKind, number> = {
+  decision: 0,
+  review: 1,
+  changes: 2,
+  confirm: 3,
+};
+
+/** 按紧急程度排序「要你做的」：决策 > 验收 > 改动 > 确认开工，同级按到达时间升序。 */
+export function sortNeedsYouTodos<T extends Pick<TodoCard, 'kind' | 'updatedAt' | 'key'>>(
+  items: readonly T[],
+): T[] {
+  return [...items].sort((a, b) => {
+    const rankDiff = URGENCY_RANK[a.kind] - URGENCY_RANK[b.kind];
+    if (rankDiff !== 0) return rankDiff;
+    if (a.updatedAt !== b.updatedAt) return a.updatedAt - b.updatedAt;
+    return a.key.localeCompare(b.key);
+  });
+}
+
+function defaultWaitEta(reason: WaitReason, lang: Lang): string {
+  switch (reason) {
+    case 'offline':
+      return t(lang, 'todo.waitOfflineEta');
+    case 'queued':
+      return t(lang, 'todo.waitQueuedEta');
+    case 'quota':
+      return t(lang, 'todo.waitQuotaEta');
+    case 'needs-human':
+      return t(lang, 'todo.waitHumanEta');
+  }
+}
+
+/**
+ * 把待办拆成两组：
+ * 1. `needsYou`：要你做的（按紧急程度排序）；
+ * 2. `waiting`：在等待，你不用做什么（只读，写清在等什么与何时会好）。
+ */
+export function partitionTodos({
+  todos,
+  requests = [],
+  waitingCards = [],
+  lang,
+}: {
+  readonly todos: readonly TodoCard[];
+  readonly requests?: readonly RequestSummary[];
+  readonly waitingCards?: readonly WaitingTodoItem[];
+  readonly lang: Lang;
+}): {
+  readonly needsYou: readonly TodoCard[];
+  readonly waiting: readonly WaitingTodoItem[];
+} {
+  const needsYou = sortNeedsYouTodos(todos);
+  const byReq = new Map<string, WaitingTodoItem>();
+  for (const card of waitingCards) {
+    byReq.set(card.requestId, card);
+  }
+  for (const req of requests) {
+    if (req.status !== 'waiting' || byReq.has(req.id)) continue;
+    const reason: WaitReason = req.waitReason ?? 'queued';
+    byReq.set(req.id, {
+      id: `wait:${req.id}`,
+      requestId: req.id,
+      requestTitle: req.title,
+      projectName: req.projectName,
+      reason,
+      message: req.statusLine,
+      etaText: defaultWaitEta(reason, lang),
+      updatedAt: req.updatedAt,
+    });
+  }
+  const waiting = [...byReq.values()].sort((a, b) => a.updatedAt - b.updatedAt);
+  return { needsYou, waiting };
 }

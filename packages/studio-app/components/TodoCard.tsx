@@ -3,21 +3,24 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
 import { refusalKey } from '../lib/submit';
 import { t, type Lang } from '../lib/strings';
+import type { WaitingTodoItem } from '../lib/todo';
 import type { TodoCard as TodoData } from '../lib/todo-store';
 import { color, radius, space, type } from '../lib/theme';
 import { useUndoSend } from '../lib/undo';
 import { ReceiptLine } from './ReceiptLine';
+import { StatusDot } from './StatusDot';
 
 interface TodoCardProps {
   readonly todo: TodoData;
   readonly lang: Lang;
   readonly onHidden: (key: string) => void;
   readonly onOpenPlan: (pid: string, planRef: string, open?: 'decide' | 'reason') => void;
+  readonly onOpenRequest?: (requestId: string, cardId: string) => void;
   readonly onRefresh: () => void;
 }
 
 /** One to-do, with its own action: no filled primary button on this list (M6 §6.4). */
-export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCardProps) {
+export function TodoCard({ todo, lang, onHidden, onOpenPlan, onOpenRequest, onRefresh }: TodoCardProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const pass = useSend(todo.pid, pendingKey('pass', todo.pid, todo.planRef));
   const apply = useSend(todo.pid, pendingKey('apply', todo.pid, todo.planRef));
@@ -93,20 +96,28 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCa
   const confirmBusy = confirm.state.phase === 'sending' || confirm.state.phase === 'queued';
   const confirmFailed = confirm.state.phase === 'failed';
 
+  const cardId = todo.decisionId ?? todo.milestoneRef ?? todo.key;
+
   return (
     <View style={styles.card} testID="todo-card">
-      <Text style={styles.project} numberOfLines={1}>
-        {todo.projectName}
-      </Text>
-      <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>
-          {todo.title}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onOpenRequest?.(todo.planRef, cardId)}
+        style={({ pressed }) => [styles.bodyPress, pressed && styles.pressed]}
+      >
+        <Text style={styles.project} numberOfLines={1}>
+          {todo.projectName}
         </Text>
-        <Text style={styles.kind}>{kindLabel}</Text>
-      </View>
-      <Text style={styles.sub} numberOfLines={2}>
-        {todo.sub}
-      </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>
+            {todo.title}
+          </Text>
+          <Text style={styles.kind}>{kindLabel}</Text>
+        </View>
+        <Text style={styles.sub} numberOfLines={2}>
+          {todo.sub}
+        </Text>
+      </Pressable>
       <ReceiptLine text={notice} tone="error" />
       <View style={styles.actions}>
         {todo.kind === 'decision' ? (
@@ -142,6 +153,35 @@ export function TodoCard({ todo, lang, onHidden, onOpenPlan, onRefresh }: TodoCa
   );
 }
 
+export function WaitingTodoCard({
+  item,
+  onOpenRequest,
+}: {
+  readonly item: WaitingTodoItem;
+  readonly onOpenRequest?: (requestId: string, cardId: string) => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onOpenRequest?.(item.requestId, item.id)}
+      testID={`waiting-card-${item.requestId}`}
+      style={({ pressed }) => [styles.card, styles.waitingCard, pressed && styles.pressed]}
+    >
+      <View style={styles.waitingTop}>
+        <StatusDot status="waiting" />
+        <Text style={styles.project} numberOfLines={1}>
+          {item.projectName}
+        </Text>
+      </View>
+      <Text style={styles.title} numberOfLines={2}>
+        {item.requestTitle}
+      </Text>
+      <Text style={styles.sub}>{item.message}</Text>
+      <Text style={styles.eta}>{item.etaText}</Text>
+    </Pressable>
+  );
+}
+
 function Action({ label, onPress, disabled, main, testID }: { readonly label: string; readonly onPress: () => void; readonly disabled?: boolean; readonly main?: boolean; readonly testID: string }) {
   return (
     <Pressable
@@ -171,4 +211,8 @@ const styles = StyleSheet.create({
   actionText: { ...type.callout, color: color.text2, fontWeight: '500' },
   actionTextMain: { color: color.text, fontWeight: '600' },
   pressed: { opacity: 0.9 },
+  bodyPress: { gap: space[2] },
+  waitingCard: { backgroundColor: color.sunken },
+  waitingTop: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  eta: { ...type.caption, color: color.text3, marginTop: 2 },
 });
