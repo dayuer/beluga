@@ -1,33 +1,76 @@
-# Synon Studio app (P1: web)
+# Synon Studio app
 
-The customer's phone-first web app: sign in, see projects, add a request. Expo Router, one code
-base; P1 builds for web only (native iOS/Android is P2).
+The customer's phone-first app: sign in, write a request, watch the plan, approve and receive
+delivery. Expo Router, one codebase; it ships to iOS and Android (no web build). Screens and their
+rules are in `docs/studio-app-screens.md`; the daemon and hub are in `docs/studio.md`.
 
 ## Local dev
 
 ```sh
-# 1. The hub (packages/studio-hub), on :8787
-npm run dev --prefix ../studio-hub
+# Local hub (wrangler on :8787), fake daemon and seeded sample data; prints the LAN URL and
+# the synon:// login link for a phone on the same Wi-Fi.
+npm run dev:device
 
-# 2. The app's dev server, on :8081
-npm run web
-
-# 3. The same-origin proxy, on :8790
-npm run proxy        # add --dist to serve ./dist instead of the Expo dev server
+# The Expo dev server (:8081); with the hub above, open the app on a simulator or a phone.
+npm start          # then press i / a, or scan the QR with Expo Go
+npm run ios        # a native debug build on an iOS simulator / device
+npm run android    # the same on Android
 ```
 
-Open <http://localhost:8790>. Put `HUB_ORIGIN=http://localhost:8790` in
-`packages/studio-hub/.dev.vars` so a magic link lands on the app's `/login`.
-
-**Why the proxy:** the hub has no CORS and its magic links are `<HUB_ORIGIN>/login#token=…`. In
-development the proxy makes `/v1/*` (HTTP and WebSocket) and the app share one origin. This is a
-development-only arrangement: in P2 the Worker must host the app (or route the same origin), or
-the link will land on the wrong host. The hub deliberately does not enable CORS.
+`EXPO_PUBLIC_HUB_URL` points the app at a hub (the deep-link host, magic links and push
+registration all follow it). `EXPO_PUBLIC_DEMO=1` runs against the offline demo hub in `lib/demo/`.
 
 ## Checks
 
 ```sh
 npm run typecheck
-npm run export       # static web build in dist/
-npm run e2e          # Maestro flows on iOS simulator (e2e/maestro/)
+npm test               # vitest
+npm run check:native   # the browser-global boundary scan
+npm run e2e            # Maestro on an iOS simulator: real hub + fake daemon
 ```
+
+## Release
+
+**Version and build number have one source: `app.json`.** `expo.version` is the marketing version
+(`CFBundleShortVersionString` / `versionName`); `expo.ios.buildNumber` and `expo.android.versionCode`
+are the build numbers. A release script reads them, and `--bump` writes the next free number back
+before building, so they are never set in two places.
+
+Icons and the splash live in `assets/` and are wired through `app.json` (`icon`, `splash`,
+`android.adaptiveIcon`, the `expo-splash-screen` plugin). `npx expo prebuild` generates `ios/` and
+`android/` — both are git-ignored and never edited by hand. The privacy notice is
+`docs/studio-privacy.md`; the same text is in the app under Me › Account › Privacy notice.
+
+### iOS (TestFlight)
+
+The studio's Apple team is **L9YRXEKYN2** (Hangzhou Yaoxing Intelligent Technology Co., Ltd.),
+bundle ID **com.synon.studio**, signing with that team's Apple Distribution certificate.
+
+```sh
+node scripts/build-ios.mjs check                 # tools, team, certificate, version and next number
+node scripts/build-ios.mjs archive --bump        # prebuild, archive, export dist/ios/Synon-Studio-<version>-<build>.ipa
+CONFIRM_UPLOAD=yes ASC_APP_ID=<id> GROUP="<group>" node scripts/build-ios.mjs upload
+```
+
+`upload` is an outward action: it uses up the build number and shows the build to testers, so the
+script refuses without `CONFIRM_UPLOAD=yes`.
+
+Signing has two modes. `IOS_SIGNING=automatic` (the default) needs an Apple account signed in under
+Xcode › Settings › Accounts — then Xcode fetches the profile itself. On a build machine without that
+account, install the App Store profile once and use manual signing:
+
+```sh
+asc profiles create --name "Synon Studio App Store" --profile-type IOS_APP_STORE \
+  --bundle <bundle-id-id> --certificate <distribution-cert-id>
+asc profiles download --id <profile-id> --output /tmp/SynonStudio.mobileprovision
+asc profiles local install --path /tmp/SynonStudio.mobileprovision
+IOS_SIGNING=manual node scripts/build-ios.mjs archive
+```
+
+The App ID needs the **Push Notifications** capability (`asc bundle-ids capabilities add
+--bundle <id> --capability PUSH_NOTIFICATIONS`) because the app registers APNs tokens.
+
+> Publishing to TestFlight also needs an App Store Connect **app record** for `com.synon.studio`.
+> Creating one is the owner's step (Apple only exposes it in the web UI). Until it exists there is no
+> `ASC_APP_ID`, and `upload` will stop and say so. The exported IPA is still valid and can be uploaded
+> later with the same command.
