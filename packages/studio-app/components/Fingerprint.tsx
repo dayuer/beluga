@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AlertCircle, Check } from 'lucide-react-native';
+import { detectLang } from '../lib/strings';
+import { joinT } from '../lib/strings/join';
 import { color, radius, space, tint, type } from '../lib/theme';
+import { ActionRow } from './card/ActionRow';
 import { PrimaryButton } from './PrimaryButton';
 import { TextButton } from './TextButton';
 
 export interface FingerprintLabels {
   readonly title?: string;
   readonly hint?: string;
+  readonly actionHint?: string;
   readonly match?: string;
   readonly mismatch?: string;
   readonly mismatchTitle?: string;
@@ -25,7 +29,7 @@ export interface FingerprintProps {
   readonly testID?: string;
 }
 
-/** 将节点公钥指纹规范化并切分为 4 组短码，便于客户逐组核对。 */
+/** Normalize and split a node public-key fingerprint into 4 short groups. */
 export function splitFingerprintGroups(fingerprint: string): [string, string, string, string] {
   const clean = fingerprint.replace(/[\s:-]+/g, '').toUpperCase();
   if (!clean) return ['----', '----', '----', '----'];
@@ -39,9 +43,7 @@ export function splitFingerprintGroups(fingerprint: string): [string, string, st
 }
 
 /**
- * 节点指纹核对组件（SS-72）：
- * 展示 4 组大字短码，由客户对照搭环境的人给的纸条/消息点击「一致」；
- * 若「不一致」，明确给出风险提示与处理方式。
+ * Node fingerprint verification component (SS-72 / SS-179).
  */
 export function Fingerprint({
   fingerprint,
@@ -53,18 +55,18 @@ export function Fingerprint({
   testID = 'fingerprint',
 }: FingerprintProps) {
   const [step, setStep] = useState<'verify' | 'mismatch'>(initialState);
+  const lang = detectLang();
   const groups = splitFingerprintGroups(fingerprint);
 
   const copy = {
-    title: labels?.title ?? '核对节点指纹',
-    hint: labels?.hint ?? '请对照搭环境的人给你的纸条或消息，确认下面 4 组短码完全一致：',
-    match: labels?.match ?? '一致，继续登记',
-    mismatch: labels?.mismatch ?? '不一致',
-    mismatchTitle: labels?.mismatchTitle ?? '指纹不一致，已暂停登记',
-    mismatchBody:
-      labels?.mismatchBody ??
-      '这可能是链接被篡改，或对方重新初始化了节点。\n\n请不要继续登记，立即联系搭环境的人核实，并请对方重新发送一条新的邀请链接。',
-    mismatchRetry: labels?.mismatchRetry ?? '重新核对',
+    title: labels?.title ?? joinT(lang, 'fp.title'),
+    hint: labels?.hint ?? joinT(lang, 'fp.hint'),
+    actionHint: labels?.actionHint ?? joinT(lang, 'fp.actionHint'),
+    match: labels?.match ?? joinT(lang, 'fp.match'),
+    mismatch: labels?.mismatch ?? joinT(lang, 'fp.mismatch'),
+    mismatchTitle: labels?.mismatchTitle ?? joinT(lang, 'fp.mismatchTitle'),
+    mismatchBody: labels?.mismatchBody ?? joinT(lang, 'fp.mismatchBody'),
+    mismatchRetry: labels?.mismatchRetry ?? joinT(lang, 'fp.mismatchRetry'),
   };
 
   if (step === 'mismatch') {
@@ -134,22 +136,28 @@ export function Fingerprint({
         ))}
       </View>
 
-      <View style={styles.actions}>
-        <PrimaryButton
-          testID={`${testID}-match`}
-          label={copy.match}
-          onPress={onMatch}
-          loading={busy}
-        />
-        <TextButton
-          testID={`${testID}-mismatch-btn`}
-          label={copy.mismatch}
-          onPress={() => {
-            setStep('mismatch');
-            onMismatch?.();
-          }}
-        />
-      </View>
+      <ActionRow
+        testID={`${testID}-actions`}
+        negative={
+          <TextButton
+            testID={`${testID}-mismatch-btn`}
+            label={copy.mismatch}
+            onPress={() => {
+              setStep('mismatch');
+              onMismatch?.();
+            }}
+          />
+        }
+        hint={copy.actionHint}
+        primary={
+          <PrimaryButton
+            testID={`${testID}-match`}
+            label={copy.match}
+            onPress={onMatch}
+            loading={busy}
+          />
+        }
+      />
     </View>
   );
 }

@@ -21,9 +21,7 @@ const REASON_KEY: Record<EnrollErrorReason, JoinStringKey> = {
 };
 
 /**
- * 扫码加设备屏（SS-74）：
- * 用 `expo-camera` 扫描桌面端出示的邀请二维码（与 `/join/<inviteId>#k=&n=` 同格式），
- * 复用 `lib/enrol.ts` 与 `Fingerprint` 完成设备登记，成功后返回「设置 › 设备」。
+ * QR code device enrollment screen (SS-74 / SS-179).
  */
 export default function AddDeviceScreen() {
   const router = useRouter();
@@ -39,11 +37,7 @@ export default function AddDeviceScreen() {
     if (scanLock.current || invite) return;
     const parsed = parseInvitePayload(result.data);
     if (!parsed) {
-      setScanError(
-        lang === 'en'
-          ? 'Not a valid device invite QR code. Point the camera at the QR code shown on desktop.'
-          : '这不是有效的设备邀请二维码，请对准桌面端显示的二维码重试。',
-      );
+      setScanError(joinT(lang, 'add.invalidQr'));
       return;
     }
     scanLock.current = true;
@@ -74,34 +68,30 @@ export default function AddDeviceScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: color.bg }]} edges={['top', 'bottom']}>
-      <Header title={lang === 'en' ? 'Add a device' : '扫码加设备'} back />
+      <Header title={joinT(lang, 'add.title')} back />
       <ScrollView contentContainerStyle={styles.body}>
         {!permission ? (
           <Text style={[styles.hint, { color: color.text2 }]}>
-            {lang === 'en' ? 'Checking camera permission…' : '正在检查相机权限…'}
+            {joinT(lang, 'add.checkingPermission')}
           </Text>
         ) : !permission.granted ? (
           <View style={[styles.card, { backgroundColor: color.card, borderColor: color.hairline }]} testID="camera-denied">
             <Text style={[styles.cardTitle, { color: color.text }]}>
-              {lang === 'en' ? 'Camera access needed' : '需要相机权限才能扫码'}
+              {joinT(lang, 'add.cameraTitle')}
             </Text>
             <Text style={[styles.hint, { color: color.text2 }]}>
               {permission.canAskAgain
-                ? lang === 'en'
-                  ? 'Allow camera access to scan the invite QR code shown on your desktop.'
-                  : '请允许使用相机，以扫描桌面端显示的设备邀请二维码。'
-                : lang === 'en'
-                  ? 'Camera permission was denied. Enable Camera in system Settings and come back.'
-                  : '相机权限已被拒绝。请前往系统设置开启本应用的相机权限后再回来扫码。'}
+                ? joinT(lang, 'add.cameraAskHint')
+                : joinT(lang, 'add.cameraDeniedHint')}
             </Text>
             {permission.canAskAgain ? (
               <PrimaryButton
-                label={lang === 'en' ? 'Allow camera' : '允许使用相机'}
+                label={joinT(lang, 'add.allowCamera')}
                 onPress={() => void requestPermission()}
               />
             ) : (
               <PrimaryButton
-                label={lang === 'en' ? 'Open Settings' : '打开系统设置'}
+                label={joinT(lang, 'add.openSettings')}
                 onPress={() => void Linking.openSettings()}
               />
             )}
@@ -109,9 +99,7 @@ export default function AddDeviceScreen() {
         ) : !invite ? (
           <View style={styles.scannerWrap}>
             <Text style={[styles.hint, { color: color.text2 }]}>
-              {lang === 'en'
-                ? 'Point your camera at the invite QR code on your desktop.'
-                : '将镜头对准桌面端「加一台设备」出示的二维码：'}
+              {joinT(lang, 'add.scanHint')}
             </Text>
             <View style={[styles.cameraFrame, { borderColor: color.hairline }]}>
               <CameraView
@@ -135,7 +123,7 @@ export default function AddDeviceScreen() {
                 <Text style={[styles.noticeText, { color: color.error }]}>{joinT(lang, REASON_KEY[errorReason])}</Text>
               </View>
             ) : null}
-            <TextButton label={lang === 'en' ? 'Scan a different code' : '重新扫码'} onPress={handleRescan} />
+            <TextButton label={joinT(lang, 'add.rescan')} onPress={handleRescan} />
           </View>
         )}
       </ScrollView>

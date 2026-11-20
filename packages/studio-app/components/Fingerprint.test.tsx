@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
+vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+
 import { Fingerprint, splitFingerprintGroups } from './Fingerprint';
 
 describe('Fingerprint', () => {
@@ -9,7 +13,7 @@ describe('Fingerprint', () => {
     expect(splitFingerprintGroups('1234567890abcdef')).toEqual(['1234', '5678', '90AB', 'CDEF']);
   });
 
-  it('supports match confirmation and mismatch guidance states', async () => {
+  it('uses ActionRow with negative left, action-only labels, and primary right', async () => {
     const onMatch = vi.fn();
     const onMismatch = vi.fn();
     const screen = await render(
@@ -20,6 +24,13 @@ describe('Fingerprint', () => {
     expect(screen.getByText('C3D4')).toBeTruthy();
     expect(screen.getByText('E5F6')).toBeTruthy();
     expect(screen.getByText('7890')).toBeTruthy();
+
+    // 按钮只写动作：否定靠左（不一样）、主动作靠右（登记）
+    const actionRow = screen.getByTestId('fingerprint-actions');
+    const rowChildren = actionRow.children;
+    expect(rowChildren.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('不一样')).toBeTruthy();
+    expect(screen.getByText('登记')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('fingerprint-match'));
     expect(onMatch).toHaveBeenCalledTimes(1);
