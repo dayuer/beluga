@@ -1,15 +1,22 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const openURL = vi.fn().mockResolvedValue(true);
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
+vi.mock('expo-linking', () => ({ openURL: (...args: unknown[]) => openURL(...args) }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 
 import { setScheme } from '../../lib/theme';
 import { CodeCard, type CodeCardData } from './CodeCard';
 import { DesignCard, type DesignCardData } from './DesignCard';
 
-describe('DesignCard & CodeCard (SS-46)', () => {
+describe('DesignCard & CodeCard (SS-46 / SS-191)', () => {
+  beforeEach(() => {
+    openURL.mockClear();
+  });
+
   it('renders uploading and received states in DesignCard', async () => {
     setScheme('light');
     const uploading: DesignCardData = {
@@ -38,10 +45,9 @@ describe('DesignCard & CodeCard (SS-46)', () => {
     expect(s2.queryByTestId('design-card-progress')).toBeNull();
   });
 
-  it('renders pushed and failed states in CodeCard with retry push action', async () => {
+  it('syncs pushState prop updates, hides retry without onRetryPush, shows retry error, and opens links', async () => {
     setScheme('light');
-    const onRetry = vi.fn();
-    const failed: CodeCardData = {
+    const base: CodeCardData = {
       id: 'c1',
       kind: 'code',
       createdAt: 1000,
@@ -51,15 +57,37 @@ describe('DesignCard & CodeCard (SS-46)', () => {
       pushState: 'failed',
     };
 
-    const screen = await render(<CodeCard card={failed} lang="zh" onRetryPush={onRetry} />);
-    expect(screen.getByText('推送失败')).toBeTruthy();
-    expect(screen.getByText('https://git.synon.invalid/shop/ios-app')).toBeTruthy();
-    expect(screen.getByTestId('code-card-retry')).toBeTruthy();
+    // 没有 onRetryPush 时不显示重试按钮
+    const noHandler = await render(<CodeCard card={base} lang="zh" />);
+    expect(noHandler.queryByTestId('code-card-retry')).toBeNull();
+
+    // prop 的 pushState 变化会同步
+    await noHandler.rerender(<CodeCard card={{ ...base, pushState: 'pushed' }} lang="zh" />);
+    expect(noHandler.getByText('已推送')).toBeTruthy();
+
+    // 重试失败时显示原因；再次重试成功
+    const onRetry = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('网络超时'))
+      .mockResolvedValueOnce(true);
+    const screen = await render(<CodeCard card={base} lang="zh" onRetryPush={onRetry} />);
 
     await fireEvent.press(screen.getByTestId('code-card-retry'));
     await waitFor(() => {
-      expect(onRetry).toHaveBeenCalledWith('c1');
+      expect(screen.getByText('网络超时')).toBeTruthy();
+    });
+
+    await fireEvent.press(screen.getByTestId('code-card-retry'));
+    await waitFor(() => {
+      expect(onRetry).toHaveBeenCalledTimes(2);
       expect(screen.getByText('已推送')).toBeTruthy();
     });
+
+    // 点仓库与 PR 链接会调 Linking.openURL
+    await fireEvent.press(screen.getByTestId('code-card-repo-link'));
+    expect(openURL).toHaveBeenCalledWith('https://git.synon.invalid/shop/ios-app');
+
+    await fireEvent.press(screen.getByTestId('code-card-pr-link'));
+    expect(openURL).toHaveBeenCalledWith('https://git.synon.invalid/shop/ios-app/pull/42');
   });
 });

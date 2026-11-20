@@ -18,6 +18,7 @@ export const zh = {
   'codeCard.state.failed': '推送失败',
   'codeCard.retryPush': '重新推送',
   'codeCard.retrying': '推送中…',
+  'codeCard.retryFailed': '推送失败，请稍后重试',
 } as const;
 
 export const en: Record<keyof typeof zh, string> = {
@@ -36,6 +37,7 @@ export const en: Record<keyof typeof zh, string> = {
   'codeCard.state.failed': 'Push failed',
   'codeCard.retryPush': 'Push again',
   'codeCard.retrying': 'Pushing…',
+  'codeCard.retryFailed': 'Push failed, please try again',
 };
 
 export type CardsKey = keyof typeof zh;
