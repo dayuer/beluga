@@ -10,6 +10,7 @@ export const zh = {
   'requests.searchEmpty': '没有匹配的需求',
   'requests.groupCount': '{n} 条',
   'requests.completedToggle': '已完成（{n}）',
+  'requests.waitingRunnerOffline': '等待：执行机器暂时离线',
 } as const;
 
 export type RequestsStringKey = keyof typeof zh;
@@ -24,6 +25,7 @@ export const en: Record<RequestsStringKey, string> = {
   'requests.searchEmpty': 'No matching requests',
   'requests.groupCount': '{n}',
   'requests.completedToggle': 'Completed ({n})',
+  'requests.waitingRunnerOffline': 'Waiting: runner is offline',
 };
 
 const table: Record<Lang, Record<RequestsStringKey, string>> = { zh, en };

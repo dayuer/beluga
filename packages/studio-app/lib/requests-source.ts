@@ -1,4 +1,5 @@
 import type { PlanSummary, PlansRes, ProjectSummary } from './hub-schema.js';
+import { tRequests } from './strings/requests';
 import type { Lang } from './strings/table.js';
 import type { RequestSummary } from './views.js';
 
@@ -52,8 +53,7 @@ export function planToRequestSummary(
       platform: 'web',
       status: 'waiting',
       waitReason: 'offline',
-      statusLine:
-        lang === 'en' ? 'Waiting: runner is offline' : '等待：执行机器暂时离线',
+      statusLine: tRequests(lang, 'requests.waitingRunnerOffline'),
       updatedAt: plan.updatedAt,
     };
   }
