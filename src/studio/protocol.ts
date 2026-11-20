@@ -112,7 +112,7 @@ const action = <K extends string, P extends z.ZodRawShape>(kind: K, payload: P, 
 const draftRev = { draftRev: rev };
 const optionId = z.string().regex(/^o\d{1,2}$/);
 
-export const StudioAction = z.discriminatedUnion('kind', [
+const UnsignedStudioAction = z.discriminatedUnion('kind', [
   action('plan.create', { goal: text.min(1), platforms: z.array(z.enum(PLATFORMS)).min(1).max(4).refine((p) => new Set(p).size === p.length, 'platforms repeat') }, 'none'),
   action('chat.send', { text: text.min(1) }, 'required'),
   action('plan.verify', {}, 'required'),
@@ -128,12 +128,59 @@ export const StudioAction = z.discriminatedUnion('kind', [
   action('draft.apply', draftRev, 'required'),
   action('draft.discard', draftRev, 'required'),
 ]);
+
+export const SignedFrameSchema = z
+  .object({
+    kind: z.string().min(1).max(LIMITS.ref),
+    payload: z.unknown(),
+    rev: rev.optional(),
+    at: int,
+    deviceKey: z.string().min(1).max(LIMITS.title),
+  })
+  .strict();
+
+export const SignedEnvelopeSchema = z
+  .object({
+    frame: SignedFrameSchema,
+    sig: z.string().min(1).max(LIMITS.title),
+  })
+  .strict();
+export type SignedEnvelopeWire = z.infer<typeof SignedEnvelopeSchema>;
+
+const signedBase = <K extends string, P extends z.ZodRawShape>(kind: K, payload: P) => ({
+  t: z.literal('action'),
+  opId,
+  kind: z.literal(kind),
+  payload: z.object(payload).strict(),
+  signed: SignedEnvelopeSchema,
+});
+
+export const StudioAction = z.discriminatedUnion('kind', [
+  ...UnsignedStudioAction.options,
+  z.object({ ...signedBase('request.confirm', {}), planRef: ref, rev }).strict(),
+  z.object({ ...signedBase('gate.answer', { gate: z.enum(['start', 'changes']), approved: z.boolean(), draftRev: rev, reason: text.optional() }), planRef: ref, rev }).strict(),
+  z.object({ ...signedBase('delivery.accept', { milestoneRef: ref, ...draftRev }), planRef: ref, rev }).strict(),
+  z.object({ ...signedBase('release.approve', { releaseId: ref.optional(), draftRev: rev.optional() }), planRef: ref, rev: rev.optional() }).strict(),
+  z.object(signedBase('device.remove', { deviceId: ref })).strict(),
+]);
 export type StudioAction = z.infer<typeof StudioAction>;
 export type StudioActionKind = StudioAction['kind'];
-export const ACTION_KINDS: readonly StudioActionKind[] = StudioAction.options.map((o) => o.shape.kind.value);
+export const ACTION_KINDS = UnsignedStudioAction.options.map((o) => o.shape.kind.value);
 
 export const RECEIPT_STATES = ['done', 'refused', 'queued', 'expired'] as const;
-export const REFUSAL_CODES = ['not-allowed', 'bad-args', 'stale', 'not-yours', 'already-done', 'rate-limited', 'not-open', 'unknown-plan'] as const;
+export const REFUSAL_CODES = [
+  'not-allowed',
+  'bad-args',
+  'stale',
+  'not-yours',
+  'already-done',
+  'rate-limited',
+  'not-open',
+  'unknown-plan',
+  'unregistered-device',
+  'bad-signature',
+  'stale-clock',
+] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
 /** What came of an action: never the daemon's own words, only a code the app says in the customer's. */
