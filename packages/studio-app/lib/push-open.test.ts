@@ -167,4 +167,58 @@ describe('initPushOpen', () => {
 
     stop();
   });
+
+  it('survives /login redirect remount when logged out on /login, lands on home, and navigates once', async () => {
+    let token: string | null = null;
+    let pathname = '/login';
+    let authListener: (() => void) | undefined;
+    const navigate = vi.fn();
+    const canOpen = () => Boolean(token) && pathname !== '/login';
+
+    const coldResponse = makeResponse('cold-login-redirect', { path: '/request/req-204?card=card-204' });
+    const notifications: NotificationsOpenApi = {
+      DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+      getLastNotificationResponseAsync: vi.fn(async () => coldResponse),
+      addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
+    };
+
+    // 1. Logged out on /login: cold-start notification is captured but not navigated or marked handled.
+    const stop1 = initPushOpen({
+      notifications,
+      navigate,
+      isAuthenticated: canOpen,
+      subscribeAuth: (cb) => {
+        authListener = cb;
+        return vi.fn();
+      },
+    });
+    await vi.waitFor(() => expect(notifications.getLastNotificationResponseAsync).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    expect(navigate).not.toHaveBeenCalled();
+
+    // 2. Login triggers /login Redirect (still pathname === '/login', or even an unmount/remount frame).
+    token = 'sess-204';
+    authListener?.();
+    expect(navigate).not.toHaveBeenCalled();
+    stop1();
+
+    // 3. Lands on home ('/') -> remounted or updated listener flushes pending target and navigates once.
+    pathname = '/';
+    const stop2 = initPushOpen({
+      notifications,
+      navigate,
+      isAuthenticated: canOpen,
+      subscribeAuth: (cb) => {
+        authListener = cb;
+        return vi.fn();
+      },
+    });
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+    expect(navigate).toHaveBeenCalledWith('/request/req-204?card=card-204');
+
+    // Same notification will not navigate a second time.
+    authListener?.();
+    expect(navigate).toHaveBeenCalledTimes(1);
+    stop2();
+  });
 });

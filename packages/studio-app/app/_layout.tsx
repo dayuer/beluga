@@ -14,11 +14,20 @@ import { session } from '../lib/session';
 import { color } from '../lib/theme';
 
 /** 启动补水且 <Stack /> 挂载后再挂推送登记、角标同步与通知跳转。 */
-function PushEffects({ authenticated }: { authenticated: boolean }) {
+function PushEffects({ canOpen }: { canOpen: boolean }) {
   usePushRegistration();
   useBadgeSync();
-  usePushOpen(authenticated);
+  usePushOpen(canOpen);
   return null;
+}
+
+/** 挂在 RootLayout 中与 <Guard> 同级：booted 后只挂载一次，跨 /login 重定向不卸载；仅在已登录且不在 /login 时跳卡。 */
+function BootedPushEffects() {
+  const booted = useBooted();
+  const pathname = usePathname();
+  const token = useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
+  if (!booted) return null;
+  return <PushEffects canOpen={Boolean(token) && pathname !== '/login'} />;
 }
 
 /**
@@ -43,12 +52,7 @@ function Guard({ children }: { children: ReactNode }) {
     const dest = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
     return <Redirect href={dest} />;
   }
-  return (
-    <>
-      {children}
-      <PushEffects authenticated={Boolean(token)} />
-    </>
-  );
+  return <>{children}</>;
 }
 
 export default function RootLayout() {
@@ -61,6 +65,7 @@ export default function RootLayout() {
             <Guard>
               <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
             </Guard>
+            <BootedPushEffects />
           </View>
         </KeyboardProvider>
       </SafeAreaProvider>

@@ -34,6 +34,7 @@ export interface PushOpenOptions {
 const DEFAULT_ACTION = 'expo.modules.notifications.actions.DEFAULT';
 const MAX_HANDLED = 100;
 const globalHandled = new Set<string>();
+let pendingResponse: { readonly target: string; readonly key: string | null } | null = null;
 
 function readDataObject(raw: unknown): Record<string, unknown> | null {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -101,13 +102,17 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
   const isAuthenticated = options.isAuthenticated ?? (() => true);
 
   let disposed = false;
-  let pendingTarget: string | null = null;
+
+  const navigateOnce = (target: string, key: string | null): void => {
+    if (key && !rememberHandled(handled, key)) return;
+    navigate(target);
+  };
 
   const flushPending = (): void => {
-    if (disposed || !pendingTarget || !isAuthenticated()) return;
-    const next = pendingTarget;
-    pendingTarget = null;
-    navigate(next);
+    if (disposed || !pendingResponse || !isAuthenticated()) return;
+    const next = pendingResponse;
+    pendingResponse = null;
+    navigateOnce(next.target, next.key);
   };
 
   const handle = (response: NotificationResponseLike | null | undefined): void => {
@@ -115,17 +120,21 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
     const target = extractPushPath(response, options.hubUrl, defaultActionId);
     if (!target) return;
     const key = responseKey(response);
-    if (key && !rememberHandled(handled, key)) return;
+    if (key && handled.has(key)) return;
     if (isAuthenticated()) {
-      pendingTarget = null;
-      navigate(target);
+      pendingResponse = null;
+      navigateOnce(target, key);
     } else {
-      pendingTarget = target;
+      pendingResponse = { target, key };
     }
   };
 
   const unsubAuth = options.subscribeAuth ? options.subscribeAuth(flushPending) : undefined;
   const sub = notifications.addNotificationResponseReceivedListener(handle);
+
+  if (pendingResponse && isAuthenticated()) {
+    flushPending();
+  }
 
   if (typeof notifications.getLastNotificationResponseAsync === 'function') {
     void notifications
@@ -147,7 +156,8 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
   };
 }
 
-/** 仅用于测试清理模块级去重记录。 */
+/** 仅用于测试清理模块级去重记录与暂存目标。 */
 export function resetPushOpenForTest(): void {
   globalHandled.clear();
+  pendingResponse = null;
 }
