@@ -3,6 +3,7 @@ import * as login from './login.js';
 import * as news from './new.js';
 import * as plan from './plan.js';
 import * as projects from './projects.js';
+import * as tabs from './tabs.js';
 import * as todo from './todo.js';
 
 export type Lang = 'zh' | 'en';
@@ -14,6 +15,7 @@ const zh = {
   ...plan.zh,
   ...todo.zh,
   ...news.zh,
+  ...tabs.zh,
 } as const;
 
 export type StringKey = keyof typeof zh;
@@ -25,6 +27,7 @@ const en: Record<StringKey, string> = {
   ...plan.en,
   ...todo.en,
   ...news.en,
+  ...tabs.en,
 };
 
 const table: Record<Lang, Record<StringKey, string>> = { zh, en };
