@@ -49,6 +49,9 @@ export const zh = {
   'request.signedCardBody': '此操作需要这台设备确认，将在签名能力就绪后开放。',
   'request.unknownTitle': '暂不支持的卡片',
   'request.unknownBody': '当前版本暂不支持展示此类内容。',
+  'request.emptyTitle': '找不到这个需求',
+  'request.emptyBody': '它可能已被移除，或链接里的编号不对。',
+  'request.offlineBanner': '当前离线，先展示上次缓存的内容',
 } as const;
 
 export const en: Record<keyof typeof zh, string> = {
@@ -98,6 +101,9 @@ export const en: Record<keyof typeof zh, string> = {
   'request.signedCardBody': 'This action requires device confirmation and will be enabled once signing is ready.',
   'request.unknownTitle': 'Unsupported card',
   'request.unknownBody': 'This version cannot display this card yet.',
+  'request.emptyTitle': 'Request not found',
+  'request.emptyBody': 'It may have been removed, or the link id is invalid.',
+  'request.offlineBanner': 'You are offline — showing cached data',
 };
 
 export type DrawerKey = keyof typeof zh;

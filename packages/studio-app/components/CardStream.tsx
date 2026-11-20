@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { detectLang, type Lang } from '../lib/strings';
 import { tDrawer } from '../lib/strings/drawer';
-import { color, space, type } from '../lib/theme';
+import { color, radius, space, type } from '../lib/theme';
 import type { StudioCard } from '../lib/views';
 import { Card } from './card/Card';
 import { CodeCard } from './cards/CodeCard';
@@ -14,6 +14,8 @@ import { StepBar } from './StepBar';
 export interface CardStreamProps {
   readonly cards: readonly StudioCard[];
   readonly lang?: Lang;
+  readonly highlightedCardId?: string | null;
+  readonly onCardLayout?: (cardId: string, y: number) => void;
   readonly onAnswerQuestions?: (cardId: string, answers: QuestionAnswerItem[]) => Promise<boolean | void> | boolean | void;
   readonly onConfirmUnderstanding?: (cardId: string) => Promise<void> | void;
   readonly onRejectUnderstanding?: (cardId: string, reason: string) => Promise<void> | void;
@@ -22,12 +24,15 @@ export interface CardStreamProps {
 }
 
 /**
- * 卡片流（SS-52）：按卡片类型 switch 渲染不用签名的卡；
+ * 卡片流（SS-52 / SS-185）：按卡片类型 switch 渲染不用签名的卡；
  * 需签名的卡（start/changes/delivery/release）与 unknown 留 default 占位，待 A9 合流补齐。
+ * 支持 ?card= 高亮与定位回调。
  */
 export function CardStream({
   cards,
   lang: langProp,
+  highlightedCardId,
+  onCardLayout,
   onAnswerQuestions,
   onConfirmUnderstanding,
   onRejectUnderstanding,
@@ -39,25 +44,27 @@ export function CardStream({
   return (
     <View style={styles.list} testID={testID}>
       {cards.map((card) => {
+        const isHighlighted = Boolean(highlightedCardId && highlightedCardId === card.id);
+        let node: React.ReactNode;
         switch (card.kind) {
           case 'design':
-            return <DesignCard key={card.id} card={card} lang={lang} testID={`card-${card.id}`} />;
+            node = <DesignCard card={card} lang={lang} testID={`card-${card.id}`} />;
+            break;
 
           case 'question':
-            return (
+            node = (
               <DecisionCard
-                key={card.id}
                 card={card}
                 lang={lang}
                 onSubmit={(answers) => onAnswerQuestions?.(card.id, answers)}
                 testID={`card-${card.id}`}
               />
             );
+            break;
 
           case 'understanding':
-            return (
+            node = (
               <UnderstandingCard
-                key={card.id}
                 card={card}
                 lang={lang}
                 onConfirm={onConfirmUnderstanding}
@@ -65,27 +72,30 @@ export function CardStream({
                 testID={`card-${card.id}`}
               />
             );
+            break;
 
           case 'steps':
-            return (
-              <Card key={card.id} title={tDrawer(lang, 'request.stepsTitle')} status="working" testID={`card-${card.id}`}>
+            node = (
+              <Card title={tDrawer(lang, 'request.stepsTitle')} status="working" testID={`card-${card.id}`}>
                 <StepBar steps={card.steps} lang={lang} />
               </Card>
             );
+            break;
 
           case 'wait':
-            return <WaitCard key={card.id} card={card} lang={lang} testID={`card-${card.id}`} />;
+            node = <WaitCard card={card} lang={lang} testID={`card-${card.id}`} />;
+            break;
 
           case 'code':
-            return (
+            node = (
               <CodeCard
-                key={card.id}
                 card={card}
                 lang={lang}
                 onRetryPush={onRetryCodePush}
                 testID={`card-${card.id}`}
               />
             );
+            break;
 
           default: {
             const isUnknown = card.kind === 'unknown';
@@ -99,9 +109,8 @@ export function CardStream({
                     : card.kind === 'release'
                       ? 'request.signedCard.release'
                       : 'request.signedCard.generic';
-            return (
+            node = (
               <Card
-                key={card.id}
                 title={isUnknown ? tDrawer(lang, 'request.unknownTitle') : tDrawer(lang, signedTitleKey)}
                 status={isUnknown ? 'waiting' : 'needs-you'}
                 testID={`card-${card.id}`}
@@ -111,8 +120,24 @@ export function CardStream({
                 </Text>
               </Card>
             );
+            break;
           }
         }
+
+        return (
+          <View
+            key={card.id}
+            testID={`card-slot-${card.id}`}
+            onLayout={(e) => onCardLayout?.(card.id, e.nativeEvent.layout.y)}
+            style={
+              isHighlighted
+                ? [styles.highlighted, { borderColor: color.info, borderRadius: radius.l }]
+                : undefined
+            }
+          >
+            {node}
+          </View>
+        );
       })}
     </View>
   );
@@ -121,4 +146,5 @@ export function CardStream({
 const styles = StyleSheet.create({
   list: { gap: space[4] },
   placeholder: { ...type.callout },
+  highlighted: { borderWidth: 2, padding: 2 },
 });

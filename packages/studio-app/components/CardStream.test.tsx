@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
+vi.mock('expo-linking', () => ({ openURL: vi.fn() }));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),

@@ -2,12 +2,14 @@ import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const mockParams = vi.fn<() => { id?: string; card?: string; state?: string }>(() => ({ id: 'req-login' }));
+
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: async () => null, setItemAsync: async () => {} }));
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ id: 'req-login' }),
+  useLocalSearchParams: () => mockParams(),
   useRouter: () => ({ back: vi.fn(), canGoBack: () => true, replace: vi.fn() }),
 }));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
@@ -84,14 +86,16 @@ vi.mock('lucide-react-native', async () => {
 });
 
 import RequestDetailScreen from '../app/request/[id]';
+import { color } from '../lib/theme';
 import { resetDrawerCount } from '../lib/ui-state';
 import { undoStore } from '../lib/undo';
 import { findAllJson } from '../test/json';
 
-describe('RequestDetailScreen (SS-184)', () => {
+describe('RequestDetailScreen (SS-184 / SS-185)', () => {
   afterEach(() => {
     undoStore.cancel();
     resetDrawerCount();
+    mockParams.mockReturnValue({ id: 'req-login' });
   });
 
   it('has a single vertical ScrollView, orders drawer tabs as outputs/changes/plan/preview, and yields UndoBar when drawer opens', async () => {
@@ -127,5 +131,49 @@ describe('RequestDetailScreen (SS-184)', () => {
     // 关闭抽屉后撤销条恢复可见
     await fireEvent.press(screen.getByTestId('drawer-close'));
     expect(screen.getByText('已确认「需求理解」')).toBeTruthy();
+  });
+
+  it('loads different cards per id and renders empty state for unknown id', async () => {
+    mockParams.mockReturnValue({ id: 'req-push' });
+    const pushScreen = await render(<RequestDetailScreen />);
+    expect(pushScreen.getByText('发货通知模板消息')).toBeTruthy();
+    expect(pushScreen.getByTestId('card-card-wait-offline')).toBeTruthy();
+    expect(pushScreen.queryByTestId('card-card-design-1')).toBeNull();
+
+    mockParams.mockReturnValue({ id: 'req-nonexistent' });
+    const emptyScreen = await render(<RequestDetailScreen />);
+    expect(emptyScreen.getByTestId('request-empty')).toBeTruthy();
+    expect(emptyScreen.getByText('找不到这个需求')).toBeTruthy();
+  });
+
+  it('renders loading, offline, and runnerOffline states without red on WaitCard', async () => {
+    mockParams.mockReturnValue({ id: 'req-login', state: 'loading' });
+    const loadingScreen = await render(<RequestDetailScreen />);
+    expect(loadingScreen.getByTestId('request-loading')).toBeTruthy();
+    expect(loadingScreen.getByTestId('skeleton')).toBeTruthy();
+
+    mockParams.mockReturnValue({ id: 'req-login', state: 'offline' });
+    const offlineScreen = await render(<RequestDetailScreen />);
+    expect(offlineScreen.getByTestId('sync-banner')).toBeTruthy();
+    expect(offlineScreen.getByText('当前离线，先展示上次缓存的内容')).toBeTruthy();
+
+    mockParams.mockReturnValue({ id: 'req-login', state: 'runnerOffline' });
+    const runnerScreen = await render(<RequestDetailScreen />);
+    expect(runnerScreen.getByTestId('card-card-wait-offline')).toBeTruthy();
+    const waitNode = runnerScreen.getByTestId('card-card-wait-offline');
+    const redNodes = findAllJson(
+      waitNode as never,
+      (n) => n.props.style?.color === color.error || n.props.style?.backgroundColor === color.error,
+    );
+    expect(redNodes).toHaveLength(0);
+  });
+
+  it('highlights and scrolls to target card when ?card= exists', async () => {
+    mockParams.mockReturnValue({ id: 'req-login', card: 'card-understanding-1' });
+    const screen = await render(<RequestDetailScreen />);
+    const slot = screen.getByTestId('card-slot-card-understanding-1');
+    const flatStyle = Object.assign({}, ...(Array.isArray(slot.props.style) ? slot.props.style : [slot.props.style]));
+    expect(flatStyle.borderWidth).toBe(2);
+    expect(flatStyle.borderColor).toBe(color.info);
   });
 });
