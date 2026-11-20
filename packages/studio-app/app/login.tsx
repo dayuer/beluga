@@ -179,12 +179,22 @@ export default function LoginScreen() {
       >
         <View style={[styles.column, desktop && styles.columnDesktop]}>
           <View style={styles.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Svg width={34} height={26} viewBox="0 0 34 26">
+            <Svg width={29} height={42} viewBox="0 0 356 520">
               <Path
-                d="M3 15c0-5 4.6-9 10.3-9 4.8 0 8.7 2.6 9.9 6.2l2.7-2.6c1.2-1.1 3.1-.3 3.1 1.4v3.1c0 4.6-3.9 8.4-8.8 8.4H11C6.6 22.5 3 19.2 3 15z"
-                fill="#F5F5F7"
+                d="M 300 174 A 130 130 0 1 0 178 260"
+                stroke="#FFFFFF"
+                strokeWidth={96}
+                strokeLinecap="round"
+                fill="none"
               />
-              <Circle cx={12.5} cy={13.5} r={1.15} fill="#1D1D1F" />
+              <Path
+                d="M 178 260 A 130 130 0 1 1 56 434"
+                stroke="#FFFFFF"
+                strokeWidth={96}
+                strokeLinecap="round"
+                fill="none"
+              />
+              <Circle cx={300} cy={174} r={30} fill="#86AAF2" />
             </Svg>
           </View>
           <Text style={styles.title} accessibilityRole="header">
