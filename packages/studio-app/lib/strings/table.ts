@@ -1,4 +1,5 @@
 import * as base from './base.js';
+import * as cards from './cards.js';
 import * as common from './common.js';
 import * as login from './login.js';
 import * as news from './new.js';
@@ -26,6 +27,7 @@ const zh = {
   ...understanding.zh,
   ...steps.zh,
   ...wait.zh,
+  ...cards.zh,
 } as const;
 
 export type StringKey = keyof typeof zh;
@@ -43,6 +45,7 @@ const en: Record<StringKey, string> = {
   ...understanding.en,
   ...steps.en,
   ...wait.en,
+  ...cards.en,
 };
 
 const table: Record<Lang, Record<StringKey, string>> = { zh, en };
