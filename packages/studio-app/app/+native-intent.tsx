@@ -1,9 +1,9 @@
-import { parseDeepLink } from '../lib/links';
+import { resolveNativeIntent } from '../lib/links';
 
 /**
- * 原生深链入口（SS-25）：参考 companion 的做法，把系统传入的 `synon://` 与 `https://`
- * 统一交给 `lib/links.ts` 解析，坏链接返回 `null` 忽略。
+ * 原生深链入口（SS-25 / SS-143）：参考 companion 的做法，只有 `synon://` 与匹配中台
+ * 主机的 `https://` 链接才走深链重写；应用内路径与 Dev Client 链接原样放行。
  */
 export function redirectSystemPath({ path }: { path: string | null; initial: boolean }): string | null {
-  return parseDeepLink(path);
+  return resolveNativeIntent(path);
 }

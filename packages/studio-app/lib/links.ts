@@ -80,9 +80,10 @@ export function parseDeepLink(raw: string | null | undefined, hubUrl = process.e
     return card ? `${base}?card=${encodeURIComponent(card)}` : base;
   }
 
-  // 3. /login?token=
+  // 3. /login?token= 与 /login#token=（中台邮件链接使用 #token=）
   if (segments[0] === 'login' && segments.length === 1) {
-    const token = searchParams.get('token')?.trim();
+    const hashToken = hash ? new URLSearchParams(hash.replace(/^#/, '')).get('token')?.trim() : undefined;
+    const token = searchParams.get('token')?.trim() || hashToken;
     if (!token) return null;
     return `/login?token=${encodeURIComponent(token)}`;
   }
@@ -102,4 +103,38 @@ function decodeSegment(seg: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * 供 `app/+native-intent.tsx` 调用的路由分流（SS-143）：
+ * 只有 `synon://`（排除 expo-development-client）与匹配 `EXPO_PUBLIC_HUB_URL` 的 `https://`
+ * 才走深链解析；应用内路径（`/`、`/todo` 等）与 Dev Client 链接原样放行。
+ */
+export function resolveNativeIntent(path: string | null, hubUrl = process.env.EXPO_PUBLIC_HUB_URL): string | null {
+  if (!path) return path;
+  if (path.startsWith('/')) return path;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(path);
+  } catch {
+    return path;
+  }
+
+  if (parsed.hostname === 'expo-development-client' || parsed.pathname.includes('expo-development-client')) {
+    return path;
+  }
+
+  if (parsed.protocol === 'synon:') {
+    return parseDeepLink(path, hubUrl);
+  }
+
+  if (parsed.protocol === 'https:') {
+    const expectedHost = getHubHost(hubUrl);
+    if (expectedHost && parsed.host.toLowerCase() === expectedHost) {
+      return parseDeepLink(path, hubUrl);
+    }
+  }
+
+  return path;
 }

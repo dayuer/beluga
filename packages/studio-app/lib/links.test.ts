@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getHubHost, parseDeepLink } from './links';
+import { getHubHost, parseDeepLink, resolveNativeIntent } from './links';
 
 const HUB = 'https://studio.example.com';
 
@@ -19,6 +19,7 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('synon://request/req_42', HUB)).toBe('/request/req_42');
     expect(parseDeepLink('synon://request/req_42?card=c_9', HUB)).toBe('/request/req_42?card=c_9');
     expect(parseDeepLink('synon://login?token=tok_abc', HUB)).toBe('/login?token=tok_abc');
+    expect(parseDeepLink('synon://login#token=tok_hash', HUB)).toBe('/login?token=tok_hash');
     expect(parseDeepLink('synon://me/devices/add', HUB)).toBe('/me/devices/add');
   });
 
@@ -27,6 +28,7 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('https://studio.example.com/request/req_42', HUB)).toBe('/request/req_42');
     expect(parseDeepLink('https://studio.example.com/request/req_42?card=c_9', HUB)).toBe('/request/req_42?card=c_9');
     expect(parseDeepLink('https://studio.example.com/login?token=tok_abc', HUB)).toBe('/login?token=tok_abc');
+    expect(parseDeepLink('https://studio.example.com/login#token=tok_hash', HUB)).toBe('/login?token=tok_hash');
     expect(parseDeepLink('https://studio.example.com/me/devices/add', HUB)).toBe('/me/devices/add');
   });
 
@@ -43,6 +45,24 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('synon://request/', HUB)).toBeNull();
     expect(parseDeepLink('synon://login', HUB)).toBeNull();
     expect(parseDeepLink('synon://login?token=', HUB)).toBeNull();
+    expect(parseDeepLink('synon://login#token=', HUB)).toBeNull();
     expect(parseDeepLink('synon://me/devices', HUB)).toBeNull();
+  });
+});
+
+describe('resolveNativeIntent', () => {
+  it('passes through in-app paths and dev-client URLs untouched', () => {
+    expect(resolveNativeIntent('/', HUB)).toBe('/');
+    expect(resolveNativeIntent('/todo', HUB)).toBe('/todo');
+    expect(resolveNativeIntent('/me', HUB)).toBe('/me');
+    const devClient = 'exp+synon-studio://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081';
+    expect(resolveNativeIntent(devClient, HUB)).toBe(devClient);
+    const synonDevClient = 'synon://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081';
+    expect(resolveNativeIntent(synonDevClient, HUB)).toBe(synonDevClient);
+  });
+
+  it('rewrites hub #token= login links and drops malformed synon:// links', () => {
+    expect(resolveNativeIntent('https://studio.example.com/login#token=abc', HUB)).toBe('/login?token=abc');
+    expect(resolveNativeIntent('synon://unknown/path', HUB)).toBeNull();
   });
 });
