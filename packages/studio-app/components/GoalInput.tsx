@@ -10,6 +10,8 @@ import {
   type TextInputKeyPressEvent,
 } from 'react-native';
 import { LIMITS } from '../../../src/studio/protocol';
+import type { Lang } from '../lib/strings';
+import { tVoice } from '../lib/strings/voice';
 import { color, radius, space, type } from '../lib/theme';
 
 export interface KeyPressLike {
@@ -59,6 +61,7 @@ export function GoalInput({
   onSubmit,
   submitOnEnter = false,
   voice,
+  lang = 'zh',
   maxHeight,
   placeholder,
   accessibilityLabel,
@@ -70,6 +73,7 @@ export function GoalInput({
   onSubmit?: () => void;
   submitOnEnter?: boolean;
   voice?: GoalVoiceProps;
+  lang?: Lang;
   maxHeight: number;
   placeholder: string;
   accessibilityLabel: string;
@@ -153,7 +157,7 @@ export function GoalInput({
           <Pressable
             onPress={voice.onCancel}
             accessibilityRole="button"
-            accessibilityLabel="取消语音输入"
+            accessibilityLabel={tVoice(lang, 'voice.cancelLabel')}
             testID="voice-cancel-btn"
             style={({ pressed }) => [styles.micBtn, styles.micBtnActive, pressed && styles.micPressed]}
           >
@@ -164,7 +168,7 @@ export function GoalInput({
             onPress={voice.onStart}
             disabled={voice.disabled}
             accessibilityRole="button"
-            accessibilityLabel="语音输入"
+            accessibilityLabel={tVoice(lang, 'voice.micLabel')}
             testID="voice-mic-btn"
             style={({ pressed }) => [
               styles.micBtn,
