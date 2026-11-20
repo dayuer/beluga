@@ -155,7 +155,7 @@ export function Drawer({
     <>
       <GestureDetector gesture={panGesture}>
         <View style={styles.header} testID={`${testID}-header`}>
-          <View style={styles.handleHit} testID="drawer-handle">
+          <View style={styles.handleHit} hitSlop={{ top: 12, bottom: 12 }} testID="drawer-handle">
             <View style={[styles.handle, { backgroundColor: color.hairlineStrong }]} />
           </View>
           <View style={styles.titleRow}>
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     paddingBottom: space[2],
     gap: space[1],
   },
-  handleHit: { height: 20, alignItems: 'center', justifyContent: 'center' },
+  handleHit: { height: 20, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   handle: { width: 36, height: 4, borderRadius: 2 },
   titleRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { ...type.heading, flex: 1 },

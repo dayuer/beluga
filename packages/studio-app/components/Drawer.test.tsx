@@ -67,6 +67,11 @@ describe('Drawer (SS-47)', () => {
     expect(getDrawerOpen()).toBe(true);
     expect(screen.getByText('计划内容')).toBeTruthy();
 
+    const handle = screen.getByTestId('drawer-handle');
+    const handleStyle = Object.assign({}, ...(Array.isArray(handle.props.style) ? handle.props.style : [handle.props.style]));
+    expect(handleStyle.height + handle.props.hitSlop.top + handle.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(handleStyle.minWidth).toBeGreaterThanOrEqual(44);
+
     await fireEvent.press(screen.getByTestId('drawer-tab-outputs'));
     expect(screen.getByText('成果内容')).toBeTruthy();
 

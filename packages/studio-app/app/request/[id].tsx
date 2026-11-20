@@ -332,6 +332,7 @@ const styles = StyleSheet.create({
   statusLine: { ...type.caption, flex: 1 },
   resultsPill: {
     minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: space[3],
     justifyContent: 'center',
     borderRadius: radius.pill,

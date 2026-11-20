@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   bullet: { width: 5, height: 5, borderRadius: 3, marginTop: 8 },
   point: { ...type.callout, flex: 1 },
-  toggleBtn: { paddingVertical: space[1], alignSelf: 'flex-start' },
+  toggleBtn: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   toggleLabel: { ...type.caption, fontWeight: '600' },
   scopeBox: { padding: space[3], borderRadius: radius.m, gap: space[1] },
   scopeTitle: { ...type.caption, fontWeight: '600' },

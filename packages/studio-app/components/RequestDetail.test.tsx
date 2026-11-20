@@ -105,6 +105,12 @@ describe('RequestDetailScreen (SS-184 / SS-185)', () => {
     const scrollViews = findAllJson(screen.toJSON(), (n) => n.type === 'ScrollView');
     expect(scrollViews).toHaveLength(1);
 
+    // 结果入口点击区不小于 44x44
+    const pill = screen.getByTestId('request-results-pill');
+    const pillStyle = Object.assign({}, ...(Array.isArray(pill.props.style) ? pill.props.style : [pill.props.style]));
+    expect(pillStyle.minHeight).toBeGreaterThanOrEqual(44);
+    expect(pillStyle.minWidth).toBeGreaterThanOrEqual(44);
+
     // 触发 undoStore.show 后能看到撤销条
     await act(async () => {
       undoStore.show({ text: '已确认「需求理解」', ms: 4000, fire: vi.fn() });

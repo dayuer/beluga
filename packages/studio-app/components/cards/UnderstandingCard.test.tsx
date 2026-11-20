@@ -37,6 +37,14 @@ describe('UnderstandingCard (SS-43 / sign-in-app-2)', () => {
     expect(screen.queryByText('要点 6')).toBeNull();
     expect(screen.queryByText('要点 7')).toBeNull();
     expect(screen.getByText('展开其余 2 条')).toBeTruthy();
+    const toggle = screen.getByTestId('understanding-toggle');
+    const toggleStyle = Object.assign({}, ...(Array.isArray(toggle.props.style) ? toggle.props.style : [toggle.props.style]));
+    expect(toggleStyle.minHeight).toBeGreaterThanOrEqual(44);
+    expect(toggleStyle.minWidth).toBeGreaterThanOrEqual(44);
+
+    const rejectBtn = screen.getByTestId('understanding-reject');
+    const rejectStyle = Object.assign({}, ...(Array.isArray(rejectBtn.props.style) ? rejectBtn.props.style : [rejectBtn.props.style]));
+    expect(rejectStyle.minHeight).toBeGreaterThanOrEqual(44);
 
     await fireEvent.press(screen.getByTestId('understanding-toggle'));
     expect(screen.getByText('要点 6')).toBeTruthy();

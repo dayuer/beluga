@@ -45,7 +45,13 @@ describe('StepBar (SS-44)', () => {
     const s3 = screen.getByTestId('step-cell-s3');
     const s4 = screen.getByTestId('step-cell-s4');
 
-    // 读屏读出第几步与什么状态
+    // 读屏读出第几步与什么状态，且与外层 tablist 角色一致（tab）
+    const tablist = findAllJson(screen.toJSON(), (n) => n.props.accessibilityRole === 'tablist');
+    expect(tablist).toHaveLength(1);
+    expect(s1.props.accessibilityRole).toBe('tab');
+    const s1Style = Object.assign({}, ...(Array.isArray(s1.props.style) ? s1.props.style : [s1.props.style]));
+    expect(s1Style.height + s1.props.hitSlop.top + s1.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(s1Style.minWidth).toBeGreaterThanOrEqual(44);
     expect(s1.props.accessibilityLabel).toBe('第 1 / 4 步：核对设计稿与登录接口，已完成');
     expect(s2.props.accessibilityLabel).toBe('第 2 / 4 步：实现登录表单与一键登录按钮，进行中');
     expect(s3.props.accessibilityLabel).toBe('第 3 / 4 步：接入错误提示与触感反馈，等待中');

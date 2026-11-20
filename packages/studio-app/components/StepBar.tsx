@@ -76,9 +76,10 @@ export function StepBar({ steps, lang: langProp, initialExpandedId = null, testI
             <Pressable
               key={step.id}
               onPress={() => setExpandedId((cur) => (cur === step.id ? null : step.id))}
-              accessibilityRole="button"
+              accessibilityRole="tab"
               accessibilityLabel={a11yLabel}
               accessibilityState={{ expanded: isExpanded, selected: isExpanded }}
+              hitSlop={{ top: 16, bottom: 16 }}
               testID={`step-cell-${step.id}`}
               style={({ pressed }) => [
                 styles.cell,
@@ -122,6 +123,7 @@ const styles = StyleSheet.create({
   track: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   cell: {
     flex: 1,
+    minWidth: 44,
     height: 12,
     borderRadius: radius.s,
     overflow: 'hidden',
