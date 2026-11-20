@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fugood/react-native-audio-pcm-stream": "^1.1.4",
+    "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@types/react": "~19.3.0",

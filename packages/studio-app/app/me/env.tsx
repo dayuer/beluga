@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
+import { SecretSheet } from '../../components/SecretSheet';
 import { Segments, type SegmentItem } from '../../components/Segments';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { TextButton } from '../../components/TextButton';
 import { useScheme } from '../../lib/appearance';
+import { resolveNodeSealKey } from '../../lib/node-seal-key';
+import { phoneSettingsEnabled } from '../../lib/phone-settings-flag';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
@@ -20,6 +24,8 @@ interface EnvTableRow {
   readonly at: number;
   readonly byName: string;
   readonly staleDays?: number;
+  /** 有没有填过：没填过的按钮写「填写」。 */
+  readonly filled?: boolean;
 }
 
 const ENV_TABS: readonly {
@@ -70,6 +76,14 @@ export default function MeEnvScreen() {
 
   const activeEnv = projectEnvs.find((e) => e.id === envTab);
 
+  // 手机临时填密钥（SS-227）：开关关掉时两个入口都不出现，页面回到只读。
+  const canEditSecrets = phoneSettingsEnabled();
+  const nodeSealKey = useMemo(() => resolveNodeSealKey(settings), [settings]);
+
+  /** 本机刚保存成功的密钥：先把列表上的时间与更新人换掉，等视图刷新再以节点为准。 */
+  const [saved, setSaved] = useState<Record<string, { at: number; byName: string }>>({});
+  const [editing, setEditing] = useState<{ name: string; purpose: string } | null>(null);
+
   const rows: EnvTableRow[] = useMemo(() => {
     if (!activeEnv) return [];
     const list: EnvTableRow[] = [];
@@ -83,18 +97,20 @@ export default function MeEnvScreen() {
       });
     }
     for (const s of activeEnv.secrets) {
+      const local = saved[`${project?.id}:${envTab}:${s.name}`];
       list.push({
         key: `secret:${s.name}`,
         name: s.name,
         kind: 'secret',
         purpose: s.purpose,
-        at: s.at,
-        byName: s.by.name,
-        staleDays: s.staleDays,
+        at: local?.at ?? s.at,
+        byName: local?.byName ?? s.by.name,
+        staleDays: local ? undefined : s.staleDays,
+        filled: (local?.at ?? s.at) > 0,
       });
     }
     return list;
-  }, [activeEnv]);
+  }, [activeEnv, saved, project?.id, envTab]);
 
   return (
     <View style={styles.root} testID="me-env-screen">
@@ -155,6 +171,9 @@ export default function MeEnvScreen() {
                 <Text style={[styles.colHeader, styles.colName]}>{tMe(lang, 'env.colName')}</Text>
                 <Text style={[styles.colHeader, styles.colTime]}>{tMe(lang, 'env.colTime')}</Text>
                 <Text style={[styles.colHeader, styles.colBy]}>{tMe(lang, 'env.colBy')}</Text>
+                {canEditSecrets ? (
+                  <Text style={[styles.colHeader, styles.colActionHeader]}>{tMe(lang, 'env.colAction')}</Text>
+                ) : null}
               </View>
               {rows.map((row, idx) => (
                 <View
@@ -177,22 +196,59 @@ export default function MeEnvScreen() {
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={[styles.cellText, styles.colTime]} numberOfLines={1}>
+                  <Text style={[styles.cellText, styles.colTime]} numberOfLines={1} testID={`env-time-${row.name}`}>
                     {ago(row.at, lang)}
                   </Text>
                   <Text style={[styles.cellText, styles.colBy]} numberOfLines={1}>
                     {row.byName}
                   </Text>
+                  {canEditSecrets ? (
+                    <View style={styles.colAction}>
+                      {row.kind === 'secret' ? (
+                        <TextButton
+                          label={tMe(lang, row.filled ? 'env.secretUpdate' : 'env.secretFill')}
+                          onPress={() => setEditing({ name: row.name, purpose: row.purpose ?? '' })}
+                          testID={`env-secret-${row.name}`}
+                        />
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </View>
           )}
 
           <View style={styles.footerBox} testID="env-desktop-note">
-            <Text style={styles.footerText}>{tMe(lang, 'env.desktopNote')}</Text>
+            <Text style={styles.footerText}>
+              {tMe(lang, canEditSecrets ? 'env.mobileNote' : 'env.desktopNote')}
+            </Text>
           </View>
         </View>
       </ScrollView>
+
+      {canEditSecrets && project ? (
+        <SecretSheet
+          open={editing !== null}
+          onClose={() => setEditing(null)}
+          projectId={project.id}
+          envId={envTab}
+          name={editing?.name ?? ''}
+          purpose={editing?.purpose ?? ''}
+          nodeSealKey={nodeSealKey}
+          lang={lang}
+          onSaved={() => {
+            if (!editing) return;
+            setSaved((prev) => ({
+              ...prev,
+              [`${project.id}:${envTab}:${editing.name}`]: {
+                at: Date.now(),
+                byName: tMe(lang, 'env.byThisDevice'),
+              },
+            }));
+          }}
+          testID="secret-sheet"
+        />
+      ) : null}
     </View>
   );
 }
@@ -246,6 +302,8 @@ const createStyles = () =>
     colName: { flex: 2, minWidth: 0 },
     colTime: { flex: 1, textAlign: 'right' },
     colBy: { flex: 1, textAlign: 'right' },
+    colAction: { width: 64, alignItems: 'flex-end' },
+    colActionHeader: { width: 64, textAlign: 'right' },
     nameText: { ...type.callout, fontWeight: '500', color: color.text },
     purposeText: { ...type.caption, color: color.text3, marginTop: 2 },
     staleText: { ...type.caption, color: color.warn, marginTop: 2 },

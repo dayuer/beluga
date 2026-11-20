@@ -160,6 +160,44 @@ const signedBase = <K extends string, P extends z.ZodRawShape>(kind: K, payload:
   signed: SignedEnvelopeSchema,
 });
 
+// --- M13（SS-226，加法）：手机临时填密钥、改项目设置。动作名与载荷都是新的，旧客户端不认识就不发。 ---
+
+/** 密钥封装的派生标签：设备与节点用同一个字符串，AAD 也由它拼出。 */
+export const SECRET_SEAL_LABEL = 'synon-studio-secret-v1';
+/** 一个密钥明文的字节上限（证书、私钥文件够用）。 */
+export const SECRET_MAX_BYTES = 16 * 1024;
+/** 项目设置里手机可以改的字段：代码交付方式，以及选了「推到我的仓库」时的地址。 */
+export const SETTINGS_FIELDS = ['delivery', 'repoUrl'] as const;
+/** 代码交付方式：只给预览 / 托管仓库 / 推到我的仓库。 */
+export const DELIVERY_MODES = ['preview', 'hosted', 'repo'] as const;
+export type DeliveryMode = (typeof DELIVERY_MODES)[number];
+
+/** 封给节点的一份值要用到的 AAD：换名字、换环境或换项目都解不开。 */
+export function secretAad(projectId: string, envId: string, name: string): string {
+  return `${SECRET_SEAL_LABEL}:${projectId}:${envId}:${name}`;
+}
+
+const b64url32 = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+const b64url12 = z.string().regex(/^[A-Za-z0-9_-]{16}$/);
+/** 用节点 X25519 公钥封好的一份值：只有那把私钥解得开（ChaCha20-Poly1305，`SECRET_MAX_BYTES` 上限）。 */
+export const SealedBox = z
+  .object({
+    nodeKey: b64url32,
+    epk: b64url32,
+    nonce: b64url12,
+    ct: z.string().min(16).max(24000).regex(/^[A-Za-z0-9_-]+$/),
+  })
+  .strict();
+export type SealedBox = z.infer<typeof SealedBox>;
+
+const secretName = z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/);
+const repoUrl = z.string().max(LIMITS.line).regex(/^https:\/\/[^\s]+$/);
+/** `settings.update` 的白名单：只收这两个字段，`{}` 不收。 */
+const settingsPatch = z.union([
+  z.object({ delivery: z.enum(DELIVERY_MODES), repoUrl: repoUrl.optional() }).strict(),
+  z.object({ repoUrl }).strict(),
+]);
+
 export const StudioAction = z.discriminatedUnion('kind', [
   ...UnsignedStudioAction.options,
   z.object({ ...signedBase('request.confirm', {}), planRef: ref, rev }).strict(),
@@ -167,6 +205,10 @@ export const StudioAction = z.discriminatedUnion('kind', [
   z.object({ ...signedBase('delivery.accept', { milestoneRef: ref, ...draftRev }), planRef: ref, rev }).strict(),
   z.object({ ...signedBase('release.approve', { releaseId: ref.optional(), draftRev: rev.optional() }), planRef: ref, rev: rev.optional() }).strict(),
   z.object(signedBase('device.remove', { deviceId: ref })).strict(),
+  // 手机临时填密钥：明文只在设备内存里，到这里已经是封给节点公钥的密文。
+  z.object(signedBase('secret.set', { projectId: ref, envId: ref, name: secretName, purpose: z.string().min(1).max(LIMITS.title), sealed: SealedBox })).strict(),
+  // 改项目设置：只收白名单里的字段。
+  z.object(signedBase('settings.update', { projectId: ref, settings: settingsPatch })).strict(),
 ]);
 export type StudioAction = z.infer<typeof StudioAction>;
 export type StudioActionKind = StudioAction['kind'];

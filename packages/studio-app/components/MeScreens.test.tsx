@@ -19,6 +19,7 @@ const mockSettings = {
 vi.mock('lucide-react-native', () => ({
   ChevronRight: () => null,
 }));
+vi.mock('../lib/viewport', () => ({ useKeyboardInset: () => 0 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

@@ -13,12 +13,29 @@
  * Every important step is one JSON line on stdout: {"kind":"registered"|"open"|"sent"|"recv"|"closed",...}.
  */
 
-import { createHash, createPrivateKey, createPublicKey, createHmac, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { createCipheriv, createHash, createPrivateKey, createPublicKey, createHmac, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { dirname } from 'node:path';
 import WebSocket from 'ws';
-import { canonicalJson, computeNodeFingerprint, createDeviceTrustStore, SIGNED_ACTION_KINDS } from '../../../src/studio/verify.ts';
+import { SECRET_SEAL_LABEL, secretAad } from '../../../src/studio/protocol.ts';
+import { canonicalJson, computeNodeFingerprint, createDeviceTrustStore, openSealedBox, SIGNED_ACTION_KINDS } from '../../../src/studio/verify.ts';
+
+const X25519_SPKI = Buffer.from('302a300506032b656e032100', 'hex');
+
+/** 自测用：与设备侧 `lib/seal.ts` 同一套格式把值封给节点公钥（只有 node:crypto）。 */
+const sealForTest = (nodeKey, plain, aad) => {
+  const nodeRaw = Buffer.from(nodeKey, 'base64url');
+  const nodePub = createPublicKey({ key: Buffer.concat([X25519_SPKI, nodeRaw]), format: 'der', type: 'spki' });
+  const eph = generateKeyPairSync('x25519');
+  const epk = Buffer.from(eph.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32));
+  const key = Buffer.from(hkdfSync('sha256', diffieHellman({ privateKey: eph.privateKey, publicKey: nodePub }), Buffer.concat([epk, nodeRaw]), Buffer.from(SECRET_SEAL_LABEL), 32));
+  const nonce = Buffer.alloc(12, 7);
+  const cipher = createCipheriv('chacha20-poly1305', key, nonce, { authTagLength: 16 });
+  cipher.setAAD(Buffer.from(aad, 'utf8'));
+  const body = Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
+  return { nodeKey, epk: epk.toString('base64url'), nonce: nonce.toString('base64url'), ct: body.toString('base64url') };
+};
 
 const args = process.argv.slice(2);
 const selfTest = args.includes('--self-test');
@@ -79,12 +96,41 @@ if (selfTest) {
   const removed = node.verifySignedAction(buildSigned('device.remove', { deviceId: 'dev_1' }, undefined, 201));
   const afterRemove = node.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 202));
 
-  const report = { enrolled, unreg, accepted, badSig, stale, badMac, enrollOk, enrollAgain, beforeRemove, removed, afterRemove };
+  // 8. 填密钥：登记设备签的 secret.set 验签通过，节点用 X25519 私钥解出原值，整帧里没有明文
+  const sealPair = generateKeyPairSync('x25519');
+  const sealPub = Buffer.from(sealPair.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32)).toString('base64url');
+  const secretPlain = 'sk_live_51N7example';
+  const secretAadText = secretAad('proj-1', 'test', 'STRIPE_SECRET_KEY');
+  const secretPayload = {
+    projectId: 'proj-1',
+    envId: 'test',
+    name: 'STRIPE_SECRET_KEY',
+    purpose: '收款的密钥',
+    sealed: sealForTest(sealPub, Buffer.from(secretPlain, 'utf8'), secretAadText),
+  };
+  // device.remove 之后原设备已不在名单里：换一台新登记的设备来签。
+  const phone2 = generateKeyPairSync('ed25519');
+  const pub2 = phone2.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64url');
+  const node2 = createDeviceTrustStore();
+  node2.enroll(pub2);
+  const secretAction = buildSigned('secret.set', secretPayload, undefined, 400, phone2.privateKey, pub2);
+  const secretAccepted = node2.verifySignedAction(secretAction);
+  const opened = openSealedBox(secretPayload.sealed, sealPub, sealPair.privateKey, secretAadText);
+  const noPlaintext = !JSON.stringify(secretAction).includes(secretPlain);
+  // 9. 改设置：登记设备签的 settings.update 验签通过
+  const settingsAction = buildSigned('settings.update', { projectId: 'proj-1', settings: { delivery: 'repo', repoUrl: 'https://github.com/me/app' } }, undefined, 401, phone2.privateKey, pub2);
+  const settingsAccepted = node2.verifySignedAction(settingsAction);
+
+  const report = {
+    enrolled, unreg, accepted, badSig, stale, badMac, enrollOk, enrollAgain, beforeRemove, removed, afterRemove,
+    secretAccepted, opened: opened?.toString('utf8') === secretPlain, noPlaintext, settingsAccepted,
+  };
   console.log(JSON.stringify(report, null, 2));
   const failed =
     !enrolled || unreg.code !== 'unregistered-device' || !accepted.ok || badSig.code !== 'bad-signature' || stale.code !== 'stale-clock' ||
     badMac.code !== 'bad-mac' || !enrollOk.ok || enrollOk.fingerprint !== 'A1B2C3D4E5F67890' || enrollAgain.code !== 'invite-used' ||
-    !beforeRemove.ok || !removed.ok || afterRemove.code !== 'unregistered-device';
+    !beforeRemove.ok || !removed.ok || afterRemove.code !== 'unregistered-device' ||
+    !secretAccepted.ok || opened?.toString('utf8') !== secretPlain || !noPlaintext || !settingsAccepted.ok;
   if (failed) process.exit(1);
   process.exit(0);
 }
@@ -116,6 +162,27 @@ const nodeFingerprint = computeNodeFingerprint(der);
 const trust = createDeviceTrustStore({ nodeFingerprint });
 for (const pk of flags('enroll-pubkey')) trust.enroll(pk);
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
+
+// 节点自己的 X25519 密钥（studio-env.md §2）：手机把密钥值封给它，私钥不离开这台“机器”。
+// 设备从哪里拿到这把公钥，是后续里程碑的事；这里经 `GET /seal-key` 与第一行日志交给联调。
+const sealKeyFile = flag('seal-key-file', keyFile ? `${keyFile}.seal` : undefined);
+let sealPrivateKey;
+if (sealKeyFile && existsSync(sealKeyFile)) {
+  sealPrivateKey = createPrivateKey(readFileSync(sealKeyFile));
+} else {
+  sealPrivateKey = generateKeyPairSync('x25519').privateKey;
+  if (sealKeyFile) {
+    mkdirSync(dirname(sealKeyFile), { recursive: true });
+    writeFileSync(sealKeyFile, sealPrivateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+  }
+}
+const sealPublicKey = Buffer.from(createPublicKey(sealPrivateKey).export({ type: 'spki', format: 'der' }).subarray(-32)).toString('base64url');
+log('seal-key', { publicKey: sealPublicKey });
+
+/** 手机封来的密钥：只记名字、用途、时间和内容的哈希，没有值、没有长度（studio-env.md §8）。 */
+const secrets = new Map();
+/** 手机改过的项目设置，按 Studio 项目 id 记。 */
+const settings = new Map();
 
 // The first view's turn time is fixed for the process: a new `at` on every tick would look like
 // a new unread message to the app (the real daemon keeps the turn's own time).
@@ -276,6 +343,30 @@ function connect() {
           return;
         }
       }
+      // 手机填的密钥 / 改的设置：验签之后各自落地；封给别的节点或密文被改过就回 bad-args。
+      if (frame.action?.kind === 'secret.set') {
+        const p = frame.action.payload ?? {};
+        const aad = secretAad(String(p.projectId ?? ''), String(p.envId ?? ''), String(p.name ?? ''));
+        const plain = openSealedBox(p.sealed ?? {}, sealPublicKey, sealPrivateKey, aad);
+        if (plain === undefined) {
+          log('secret-set', { projectId: p.projectId, envId: p.envId, name: p.name, ok: false });
+          setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'refused', code: 'bad-args', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 40);
+          return;
+        }
+        secrets.set(`${p.projectId}:${p.envId}:${p.name}`, {
+          projectId: p.projectId,
+          envId: p.envId,
+          name: p.name,
+          purpose: p.purpose,
+          sha256: createHash('sha256').update(plain).digest('hex'),
+          at: Date.now(),
+        });
+        log('secret-set', { projectId: p.projectId, envId: p.envId, name: p.name, ok: true });
+      } else if (frame.action?.kind === 'settings.update') {
+        const p = frame.action.payload ?? {};
+        settings.set(String(p.projectId), { ...(p.settings ?? {}), at: Date.now() });
+        log('settings-update', { projectId: p.projectId, fields: Object.keys(p.settings ?? {}) });
+      }
       const entry = plans.find((p) => p.project === frame.project);
       if (entry) applyAction(entry, frame.action);
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
@@ -316,6 +407,14 @@ if (controlPort) {
         }
         const entry = pick(data);
         try {
+          // 联调用：节点的封装公钥（设备封给谁），以及验签、解封之后记下的密钥与设置（没有值）。
+          if (req.method === 'GET' && req.url === '/seal-key') return answer(200, { publicKey: sealPublicKey });
+          if (req.method === 'GET' && req.url === '/state') {
+            return answer(200, {
+              secrets: [...secrets.values()],
+              settings: [...settings.entries()].map(([projectId, value]) => ({ projectId, ...value })),
+            });
+          }
           if (req.method === 'POST' && req.url === '/view') {
             if (!data.view || typeof data.view !== 'object') return answer(400, { error: 'view-required' });
             customViews.set(entry.project, data.view);

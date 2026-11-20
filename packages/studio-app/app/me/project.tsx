@@ -1,15 +1,19 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
+import { ProjectSettingsSheet, type ProjectDeliveryMode } from '../../components/ProjectSettingsSheet';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { TextButton } from '../../components/TextButton';
 import { useScheme } from '../../lib/appearance';
+import { phoneSettingsEnabled } from '../../lib/phone-settings-flag';
 import { useSettingsView } from '../../lib/settings-source';
 import { detectLang, t, type Lang } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
 
-export type DeliveryMode = 'preview-only' | 'repo' | 'push-mine';
+export type DeliveryMode = ProjectDeliveryMode;
 
 /** 区分三种代码交付方式，各自显示客户看得懂的说明。 */
 export function deliveryModeLabel(mode: DeliveryMode | undefined, lang: Lang): string {
@@ -59,6 +63,17 @@ export default function MeProjectScreen() {
   const { data: settings, loading, offline } = useSettingsView();
   const { projects, forges } = settings;
 
+  // 手机改项目设置（SS-228）：开关关掉时入口不出现，卡片回到只读。
+  const canEditSettings = phoneSettingsEnabled();
+  const [saved, setSaved] = useState<Record<string, { mode: DeliveryMode; repoUrl?: string }>>({});
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const editingProject = editing ? projects.find((p) => p.id === editing) : undefined;
+  const editingForge = editingProject ? forges.find((f) => f.projectId === editingProject.id) : undefined;
+  const editingPatch = editingProject ? saved[editingProject.id] : undefined;
+  const editingMode: DeliveryMode = editingPatch?.mode ?? (editingForge?.mode as DeliveryMode | undefined) ?? 'preview-only';
+  const editingRepoUrl = editingPatch ? editingPatch.repoUrl : editingForge?.repoUrl;
+
   return (
     <View style={styles.root} testID="me-project-screen">
       <Header title={tMe(lang, 'project.title')} back />
@@ -81,7 +96,11 @@ export default function MeProjectScreen() {
                   proj.runMode === 'auto-delivery'
                     ? tMe(lang, 'project.runAuto')
                     : tMe(lang, 'project.runEveryStep');
-                const deliveryLabel = deliveryModeLabel(forge?.mode as DeliveryMode | undefined, lang);
+                // 刚在本机保存过的设置先显示；视图刷新后仍以节点为准。
+                const patch = saved[proj.id];
+                const mode: DeliveryMode = patch?.mode ?? (forge?.mode as DeliveryMode | undefined) ?? 'preview-only';
+                const repoUrl = patch ? patch.repoUrl : forge?.repoUrl;
+                const deliveryLabel = deliveryModeLabel(mode, lang);
 
                 return (
                   <View key={proj.id} style={styles.card} testID={`project-card-${proj.id}`}>
@@ -92,14 +111,14 @@ export default function MeProjectScreen() {
                       <InfoRow
                         label={tMe(lang, 'project.deliveryMode')}
                         value={deliveryLabel}
-                        last={!forge?.repoUrl && !forge?.hasToken}
+                        last={!repoUrl && !(forge?.hasToken ?? false)}
                         styles={styles}
                       />
-                      {forge?.repoUrl ? (
+                      {repoUrl ? (
                         <InfoRow
                           label={tMe(lang, 'project.repo')}
-                          value={forge.repoUrl}
-                          last={forge.hasToken === undefined}
+                          value={repoUrl}
+                          last={forge?.hasToken === undefined}
                           styles={styles}
                         />
                       ) : null}
@@ -113,6 +132,15 @@ export default function MeProjectScreen() {
                         </View>
                       ) : null}
                     </View>
+                    {canEditSettings ? (
+                      <View style={styles.editRow}>
+                        <TextButton
+                          label={tMe(lang, 'project.edit')}
+                          onPress={() => setEditing(proj.id)}
+                          testID={`project-settings-${proj.id}`}
+                        />
+                      </View>
+                    ) : null}
                   </View>
                 );
               })}
@@ -120,10 +148,28 @@ export default function MeProjectScreen() {
           )}
 
           <View style={styles.footerBox}>
-            <Text style={styles.footerText}>{tMe(lang, 'env.desktopNote')}</Text>
+            <Text style={styles.footerText}>
+              {tMe(lang, canEditSettings ? 'project.mobileNote' : 'env.desktopNote')}
+            </Text>
           </View>
         </View>
       </ScrollView>
+
+      {canEditSettings && editingProject ? (
+        <ProjectSettingsSheet
+          open
+          onClose={() => setEditing(null)}
+          projectId={editingProject.id}
+          projectName={editingProject.name}
+          initialMode={editingMode}
+          initialRepoUrl={editingRepoUrl}
+          lang={lang}
+          onSaved={(mode, repoUrl) =>
+            setSaved((prev) => ({ ...prev, [editingProject.id]: { mode, repoUrl } }))
+          }
+          testID="project-settings-sheet"
+        />
+      ) : null}
     </View>
   );
 }
@@ -174,6 +220,13 @@ const createStyles = () =>
       backgroundColor: color.sunken,
     },
     tokenText: { ...type.caption, color: color.text3OnSunken },
+    editRow: {
+      alignItems: 'flex-end',
+      paddingHorizontal: space[4],
+      paddingVertical: space[2],
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: color.hairline,
+    },
     footerBox: {
       marginTop: space[5],
       backgroundColor: color.sunken,

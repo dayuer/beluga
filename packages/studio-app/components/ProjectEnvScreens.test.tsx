@@ -52,6 +52,8 @@ const twoProjectSettings: SettingsView = {
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+// Drawer (SS-227 的密钥抽屉) 经 viewport 引入键盘模块，测试里不需要真实键盘。
+vi.mock('../lib/viewport', () => ({ useKeyboardInset: () => 0 }));
 vi.mock('./Header', () => ({ Header: () => null }));
 vi.mock('./Skeleton', () => ({ Skeleton: () => null }));
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
