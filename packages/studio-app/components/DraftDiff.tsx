@@ -129,6 +129,59 @@ export function DraftDiff({ pid, planRef, diff, draftRev, lang, onApplied, onRef
   );
 }
 
+/** 只读改动明细列表（供 P12 抽屉 ChangesTab 复用）。 */
+export function ReadOnlyDiffList({
+  added,
+  modified,
+  removed,
+  lang,
+  testID = 'readonly-diff-list',
+}: {
+  readonly added: readonly string[];
+  readonly modified: readonly string[];
+  readonly removed: readonly string[];
+  readonly lang: Lang;
+  readonly testID?: string;
+}) {
+  const rows: { kind: 'added' | 'changed' | 'removed'; text: string }[] = [
+    ...added.map((text) => ({ kind: 'added' as const, text })),
+    ...modified.map((text) => ({ kind: 'changed' as const, text })),
+    ...removed.map((text) => ({ kind: 'removed' as const, text })),
+  ];
+
+  return (
+    <View style={roStyles.list} testID={testID}>
+      {rows.map((row, idx) => (
+        <View
+          key={`${row.kind}-${idx}-${row.text}`}
+          style={[roStyles.row, { backgroundColor: color.card, borderColor: color.hairline }]}
+        >
+          <Text style={[roStyles.badge, roStyles[row.kind]]}>{t(lang, `diff.${row.kind}`)}</Text>
+          <Text style={[roStyles.text, { color: color.text }]}>{row.text}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const roStyles = StyleSheet.create({
+  list: { gap: space[2] },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingVertical: space[3],
+    paddingHorizontal: space[3],
+    borderRadius: radius.m,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  badge: { ...type.caption, fontWeight: '600', paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.s },
+  added: { color: color.ok, backgroundColor: color.sunken },
+  changed: { color: color.warn, backgroundColor: color.sunken },
+  removed: { color: color.error, backgroundColor: color.sunken },
+  text: { ...type.callout, flex: 1 },
+});
+
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0 },
   scroll: { flex: 1 },
