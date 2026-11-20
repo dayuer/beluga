@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearReasonDraft, readReasonDraft, writeReasonDraft } from '../lib/drafts';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
 import { detectLang, t, type Lang } from '../lib/strings';
+import { signedCardStrings } from '../lib/strings/signed-cards';
 import { refusalKey } from '../lib/submit';
 import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
@@ -34,15 +35,6 @@ export interface ReasonSheetProps {
 
 const MIN_REASON = 10;
 
-const COPY = {
-  zh: {
-    missingChars: (n: number) => `还差 ${n} 个字（至少 ${MIN_REASON} 个字）`,
-  },
-  en: {
-    missingChars: (n: number) => `${n} more character${n === 1 ? '' : 's'} needed (min ${MIN_REASON})`,
-  },
-} as const;
-
 /**
  * P7 原因抽屉（SS-61）：
  * 至少 10 个字才可发，不足时明确提示还差几个字；
@@ -66,7 +58,7 @@ export function ReasonSheet({
   onRefresh,
 }: ReasonSheetProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
   const draftId = cardId ?? `sendback:${pid}:${planRef}:${milestoneRef}`;
   const [reason, setReason] = useState(() => readReasonDraft(draftId) || initialDraft || '');
   const [notice, setNotice] = useState<string | null>(null);
@@ -155,7 +147,7 @@ export function ReasonSheet({
                 key={tag}
                 accessibilityRole="button"
                 testID={`reason-tag-${i + 1}`}
-                onPress={() => change(reason.trim() ? `${reason.trim()}；${tag}` : tag)}
+                onPress={() => change(reason.trim() ? `${reason.trim()}${c['reason.tagJoiner']}${tag}` : tag)}
                 style={({ pressed }) => [styles.tag, pressed && styles.pressed]}
               >
                 <Text style={styles.tagText}>{tag}</Text>
@@ -177,7 +169,7 @@ export function ReasonSheet({
         {reason.length >= 3600 ? <Text style={styles.counter}>{t(lang, 'new.left', { n: 4000 - reason.length })}</Text> : null}
         {!ready ? (
           <Text style={styles.hint} testID="reason-too-short">
-            {c.missingChars(missing)}
+            {c['reason.missingChars'](missing)}
           </Text>
         ) : null}
       </ScrollView>

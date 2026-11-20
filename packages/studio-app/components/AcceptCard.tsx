@@ -3,6 +3,7 @@ import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'r
 import type { StudioMilestone, StudioPlanView } from '../../../src/studio/protocol';
 import { haptics } from '../lib/haptics';
 import { detectLang, t, type Lang } from '../lib/strings';
+import { signedCardStrings } from '../lib/strings/signed-cards';
 import { color, radius, space, type } from '../lib/theme';
 import { undoStore } from '../lib/undo';
 import type { KnownStudioCard } from '../lib/views';
@@ -31,33 +32,6 @@ export interface AcceptCardProps {
   readonly review?: StudioPlanView['review'];
 }
 
-const COPY = {
-  zh: {
-    roundTitle: (n: number) => `第 ${n} 轮交付`,
-    howToCheck: '怎么看',
-    screenshots: '截图',
-    openPreview: '打开体验版',
-    notYet: '还不行…',
-    approve: '通过',
-    approved: '已通过',
-    pendingUndo: '已通过，10 秒内可撤销',
-    undoText: (n: number) => `已通过第 ${n} 轮交付`,
-    needsYou: '等你验收',
-  },
-  en: {
-    roundTitle: (n: number) => `Delivery round ${n}`,
-    howToCheck: 'What to check',
-    screenshots: 'Screenshots',
-    openPreview: 'Open preview',
-    notYet: 'Not yet…',
-    approve: 'Approve',
-    approved: 'Approved',
-    pendingUndo: 'Approved · undo within 10s',
-    undoText: (n: number) => `Approved delivery round ${n}`,
-    needsYou: 'Needs review',
-  },
-} as const;
-
 /**
  * P5 交付验收卡（SS-60）：
  * 展示第几次交付、截图、怎么看、打开体验版；
@@ -76,7 +50,7 @@ export function AcceptCard({
   review,
 }: AcceptCardProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
   const [pendingUndo, setPendingUndo] = useState(false);
   const [approved, setApproved] = useState(false);
 
@@ -122,7 +96,7 @@ export function AcceptCard({
     if (pendingUndo || isDone) return;
     setPendingUndo(true);
     undoStore.show({
-      text: c.undoText(round),
+      text: c['accept.undoText'](round),
       ms: 10_000,
       fire: () => {
         setPendingUndo(false);
@@ -145,27 +119,27 @@ export function AcceptCard({
 
   return (
     <Card
-      title={c.roundTitle(round)}
+      title={c['accept.roundTitle'](round)}
       status={isDone ? 'done' : 'needs-you'}
-      statusLabel={isDone ? c.approved : c.needsYou}
+      statusLabel={isDone ? c['accept.approved'] : c['accept.needsYou']}
       testID={testID}
       footer={
         isDone ? (
           <Text style={[styles.doneHint, { color: color.ok }]} testID="accept-approved-hint">
-            {c.approved}
+            {c['accept.approved']}
           </Text>
         ) : pendingUndo ? (
           <Text style={[styles.doneHint, { color: color.text2 }]} testID="accept-pending-undo">
-            {c.pendingUndo}
+            {c['accept.pendingUndo']}
           </Text>
         ) : (
           <ActionRow
             negative={
-              onNotYet ? <TextButton label={c.notYet} onPress={onNotYet} testID="accept-not-yet" /> : undefined
+              onNotYet ? <TextButton label={c['accept.notYet']} onPress={onNotYet} testID="accept-not-yet" /> : undefined
             }
             primary={
               <SignedButton
-                label={c.approve}
+                label={c['accept.approve']}
                 onPress={handleApprove}
                 hasKeyOverride={hasKeyOverride}
                 testID="accept-approve"
@@ -177,21 +151,21 @@ export function AcceptCard({
     >
       {summary ? (
         <View style={styles.sectionPlain}>
-          <Text style={[styles.label, { color: color.text3 }]}>{c.howToCheck}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['accept.howToCheck']}</Text>
           <Text style={[styles.bodyText, { color: color.text }]}>{summary}</Text>
         </View>
       ) : null}
 
       {screenshots.length > 0 ? (
         <View style={styles.sectionPlain} testID="accept-screenshots">
-          <Text style={[styles.label, { color: color.text3 }]}>{c.screenshots}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['accept.screenshots']}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shotRow}>
             {screenshots.map((uri, idx) => (
               <Image
                 key={`${uri}-${idx}`}
                 source={{ uri }}
                 style={[styles.shot, { borderColor: color.hairline, backgroundColor: color.sunken }]}
-                accessibilityLabel={`${c.screenshots} ${idx + 1}`}
+                accessibilityLabel={`${c['accept.screenshots']} ${idx + 1}`}
               />
             ))}
           </ScrollView>
@@ -209,7 +183,7 @@ export function AcceptCard({
             pressed && { backgroundColor: color.press },
           ]}
         >
-          <Text style={[styles.previewLabel, { color: color.info }]}>{c.openPreview}</Text>
+          <Text style={[styles.previewLabel, { color: color.info }]}>{c['accept.openPreview']}</Text>
         </Pressable>
       ) : null}
     </Card>

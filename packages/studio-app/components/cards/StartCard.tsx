@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
+import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
 import type { KnownStudioCard } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
@@ -28,39 +29,6 @@ export interface StartCardProps {
   readonly testID?: string;
 }
 
-const COPY = {
-  zh: {
-    statusPending: '等你确认开工',
-    statusDone: '已开工',
-    stepsLabel: '步骤',
-    stepsCount: (n: number) => `共 ${n} 步`,
-    estimateLabel: '大约多久',
-    estimateFallback: '以实际进度为准',
-    howLabel: '怎么做',
-    howFallback: '按已确认的需求与规范逐步推进，每步完成自动检查',
-    whenLabel: '什么时候开始',
-    whenFallback: '确认后立即开始',
-    decline: '先不做…',
-    start: '开始做',
-    started: '已确认开工',
-  },
-  en: {
-    statusPending: 'Waiting to start',
-    statusDone: 'Started',
-    stepsLabel: 'Steps',
-    stepsCount: (n: number) => `${n} steps`,
-    estimateLabel: 'Estimated time',
-    estimateFallback: 'Depends on scope',
-    howLabel: 'How it will run',
-    howFallback: 'Follows the confirmed plan step by step with automatic checks',
-    whenLabel: 'When it starts',
-    whenFallback: 'Immediately after confirmation',
-    decline: 'Not now…',
-    start: 'Start work',
-    started: 'Work started',
-  },
-} as const;
-
 /**
  * P10 批准开工卡（SS-62）：
  * 展示步骤、大约多久、怎么做、什么时候开始；
@@ -78,7 +46,7 @@ export function StartCard({
   testID = 'start-card',
 }: StartCardProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
   const [started, setStarted] = useState(card.status === 'done');
   const [busy, setBusy] = useState(false);
 
@@ -98,21 +66,21 @@ export function StartCard({
     <Card
       title={card.planTitle}
       status={started ? 'done' : 'needs-you'}
-      statusLabel={started ? c.statusDone : c.statusPending}
+      statusLabel={started ? c['start.statusDone'] : c['start.statusPending']}
       testID={testID}
       footer={
         started ? (
           <Text style={[styles.doneHint, { color: color.ok }]} testID="start-confirmed-hint">
-            {c.started}
+            {c['start.started']}
           </Text>
         ) : (
           <ActionRow
             negative={
-              onDecline ? <TextButton label={c.decline} onPress={onDecline} testID="start-decline" /> : undefined
+              onDecline ? <TextButton label={c['start.decline']} onPress={onDecline} testID="start-decline" /> : undefined
             }
             primary={
               <SignedButton
-                label={c.start}
+                label={c['start.start']}
                 onPress={() => void handleStart()}
                 loading={busy}
                 hasKeyOverride={hasKeyOverride}
@@ -125,8 +93,8 @@ export function StartCard({
     >
       <View style={styles.rows}>
         <View style={styles.row}>
-          <Text style={[styles.label, { color: color.text3 }]}>{c.stepsLabel}</Text>
-          <Text style={[styles.value, { color: color.text }]}>{c.stepsCount(card.stepCount)}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['start.stepsLabel']}</Text>
+          <Text style={[styles.value, { color: color.text }]}>{c['start.stepsCount'](card.stepCount)}</Text>
         </View>
         {steps && steps.length > 0 ? (
           <View style={styles.stepList}>
@@ -139,18 +107,18 @@ export function StartCard({
         ) : null}
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: color.text3 }]}>{c.estimateLabel}</Text>
-          <Text style={[styles.value, { color: color.text }]}>{card.estimateLabel || c.estimateFallback}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['start.estimateLabel']}</Text>
+          <Text style={[styles.value, { color: color.text }]}>{card.estimateLabel || c['start.estimateFallback']}</Text>
         </View>
 
         <View style={styles.block}>
-          <Text style={[styles.label, { color: color.text3 }]}>{c.howLabel}</Text>
-          <Text style={[styles.value, { color: color.text2 }]}>{howItWorks || c.howFallback}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['start.howLabel']}</Text>
+          <Text style={[styles.value, { color: color.text2 }]}>{howItWorks || c['start.howFallback']}</Text>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.label, { color: color.text3 }]}>{c.whenLabel}</Text>
-          <Text style={[styles.value, { color: color.text }]}>{whenToStart || c.whenFallback}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{c['start.whenLabel']}</Text>
+          <Text style={[styles.value, { color: color.text }]}>{whenToStart || c['start.whenFallback']}</Text>
         </View>
       </View>
     </Card>

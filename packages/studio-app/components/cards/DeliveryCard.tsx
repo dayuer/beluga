@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { detectLang, type Lang } from '../../lib/strings';
+import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, radius, space, type } from '../../lib/theme';
 import type { KnownStudioCard } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
@@ -20,25 +21,6 @@ export interface DeliveryCardProps {
   readonly testID?: string;
 }
 
-const COPY = {
-  zh: {
-    title: (round: number) => `第 ${round} 轮已交付`,
-    statusDone: '自动交付完成',
-    checksPassed: '检查全部通过',
-    merged: '已合并',
-    previewLabel: '预览地址',
-    openPreview: '去看看',
-  },
-  en: {
-    title: (round: number) => `Round ${round} delivered`,
-    statusDone: 'Auto-delivered',
-    checksPassed: 'All checks passed',
-    merged: 'Merged',
-    previewLabel: 'Preview URL',
-    openPreview: 'Take a look',
-  },
-} as const;
-
 /**
  * 交付卡（SS-65，自动交付的通知卡）：
  * 自动交付后出现，说明检查通过、已合并、预览地址；
@@ -53,19 +35,19 @@ export function DeliveryCard({
   testID = 'delivery-card',
 }: DeliveryCardProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
 
   return (
     <Card
-      title={c.title(card.round)}
+      title={c['delivery.title'](card.round)}
       status="done"
-      statusLabel={c.statusDone}
+      statusLabel={c['delivery.statusDone']}
       testID={testID}
       footer={
         <ActionRow
           primary={
             <PrimaryButton
-              label={c.openPreview}
+              label={c['delivery.openPreview']}
               onPress={() => onOpenPreviewTab?.(card.previewUrl)}
               testID="delivery-open-preview"
             />
@@ -77,13 +59,13 @@ export function DeliveryCard({
         {checksPassed ? (
           <View style={[styles.badge, { backgroundColor: color.sunken }]} testID="delivery-checks-passed">
             <Text style={[styles.badgeCheck, { color: color.ok }]}>✓</Text>
-            <Text style={[styles.badgeText, { color: color.text }]}>{c.checksPassed}</Text>
+            <Text style={[styles.badgeText, { color: color.text }]}>{c['delivery.checksPassed']}</Text>
           </View>
         ) : null}
         {merged ? (
           <View style={[styles.badge, { backgroundColor: color.sunken }]} testID="delivery-merged">
             <Text style={[styles.badgeCheck, { color: color.ok }]}>✓</Text>
-            <Text style={[styles.badgeText, { color: color.text }]}>{c.merged}</Text>
+            <Text style={[styles.badgeText, { color: color.text }]}>{c['delivery.merged']}</Text>
           </View>
         ) : null}
       </View>
@@ -92,7 +74,7 @@ export function DeliveryCard({
 
       {card.previewUrl ? (
         <View style={[styles.urlBox, { backgroundColor: color.sunken, borderColor: color.hairline }]} testID="delivery-preview-url">
-          <Text style={[styles.urlLabel, { color: color.text3OnSunken }]}>{c.previewLabel}</Text>
+          <Text style={[styles.urlLabel, { color: color.text3OnSunken }]}>{c['delivery.previewLabel']}</Text>
           <Text style={[styles.urlValue, { color: color.info }]} selectable numberOfLines={2}>
             {card.previewUrl}
           </Text>

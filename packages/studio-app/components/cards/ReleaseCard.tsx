@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { haptics } from '../../lib/haptics';
 import { detectLang, type Lang } from '../../lib/strings';
+import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
 import { ago } from '../../lib/time';
 import type { KnownStudioCard } from '../../lib/views';
@@ -26,41 +27,6 @@ export interface ReleaseCardProps {
   readonly testID?: string;
 }
 
-const COPY = {
-  zh: {
-    title: (env: string) => `上线到${env}`,
-    statusPending: '等你批准上线',
-    statusDone: '已上线',
-    targetVersion: '要上的版本',
-    liveVersion: '线上版本',
-    lastReleaseTime: '上次上线时间',
-    lastReleasePerson: '上次上线人',
-    decline: '先不上…',
-    release: '上线',
-    released: '已确认上线',
-    confirmTitle: (env: string) => `上线到「${env}」后不能撤销`,
-    confirmDesc: (version: string, env: string, live?: string) =>
-      `将把 ${version} 发布到${env}${live ? `（当前线上 ${live}）` : ''}。确认后立即生效且无法撤销。`,
-    unknown: '—',
-  },
-  en: {
-    title: (env: string) => `Release to ${env}`,
-    statusPending: 'Needs release approval',
-    statusDone: 'Released',
-    targetVersion: 'Version to release',
-    liveVersion: 'Current live',
-    lastReleaseTime: 'Last release time',
-    lastReleasePerson: 'Last released by',
-    decline: 'Not now…',
-    release: 'Release',
-    released: 'Release confirmed',
-    confirmTitle: (env: string) => `Releasing to “${env}” cannot be undone`,
-    confirmDesc: (version: string, env: string, live?: string) =>
-      `This will deploy ${version} to ${env}${live ? ` (currently ${live})` : ''}. It takes effect immediately and cannot be undone.`,
-    unknown: '—',
-  },
-} as const;
-
 /**
  * P11 批准上线卡（SS-64）：
  * 只在受保护环境展示；展示要上的版本、线上版本、上次上线（时间与人分列）；
@@ -78,7 +44,7 @@ export function ReleaseCard({
   testID = 'release-card',
 }: ReleaseCardProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [released, setReleased] = useState(card.status === 'done');
   const [busy, setBusy] = useState(false);
@@ -102,7 +68,7 @@ export function ReleaseCard({
       setConfirmOpen(false);
       haptics.success();
     } catch (err) {
-      setError(err instanceof Error ? err.message : c.unknown);
+      setError(err instanceof Error ? err.message : c['release.unknown']);
     } finally {
       setBusy(false);
     }
@@ -111,23 +77,23 @@ export function ReleaseCard({
   return (
     <>
       <Card
-        title={c.title(card.envTitle)}
+        title={c['release.title'](card.envTitle)}
         status={released ? 'done' : 'needs-you'}
-        statusLabel={released ? c.statusDone : c.statusPending}
+        statusLabel={released ? c['release.statusDone'] : c['release.statusPending']}
         testID={testID}
         footer={
           released ? (
             <Text style={[styles.doneHint, { color: color.ok }]} testID="release-done-hint">
-              {c.released}
+              {c['release.released']}
             </Text>
           ) : (
             <ActionRow
               negative={
-                onDecline ? <TextButton label={c.decline} onPress={onDecline} testID="release-decline" /> : undefined
+                onDecline ? <TextButton label={c['release.decline']} onPress={onDecline} testID="release-decline" /> : undefined
               }
               primary={
                 <SignedButton
-                  label={c.release}
+                  label={c['release.release']}
                   onPress={() => setConfirmOpen(true)}
                   hasKeyOverride={hasKeyOverride}
                   testID="release-approve"
@@ -139,29 +105,29 @@ export function ReleaseCard({
       >
         <View style={styles.grid}>
           <View style={styles.col}>
-            <Text style={[styles.label, { color: color.text3 }]}>{c.targetVersion}</Text>
+            <Text style={[styles.label, { color: color.text3 }]}>{c['release.targetVersion']}</Text>
             <Text style={[styles.value, { color: color.text }]} testID="release-target-version">
               {card.version}
             </Text>
           </View>
           <View style={styles.col}>
-            <Text style={[styles.label, { color: color.text3 }]}>{c.liveVersion}</Text>
+            <Text style={[styles.label, { color: color.text3 }]}>{c['release.liveVersion']}</Text>
             <Text style={[styles.value, { color: color.text2 }]} testID="release-live-version">
-              {card.lastVersion || c.unknown}
+              {card.lastVersion || c['release.unknown']}
             </Text>
           </View>
         </View>
 
         <View style={[styles.grid, styles.divider, { borderTopColor: color.hairline }]}>
           <View style={styles.col} testID="release-last-time-col">
-            <Text style={[styles.label, { color: color.text3 }]}>{c.lastReleaseTime}</Text>
+            <Text style={[styles.label, { color: color.text3 }]}>{c['release.lastReleaseTime']}</Text>
             <Text style={[styles.value, { color: color.text2 }]}>
-              {card.lastReleaseAt ? ago(card.lastReleaseAt, lang) : c.unknown}
+              {card.lastReleaseAt ? ago(card.lastReleaseAt, lang) : c['release.unknown']}
             </Text>
           </View>
           <View style={styles.col} testID="release-last-person-col">
-            <Text style={[styles.label, { color: color.text3 }]}>{c.lastReleasePerson}</Text>
-            <Text style={[styles.value, { color: color.text2 }]}>{actor || c.unknown}</Text>
+            <Text style={[styles.label, { color: color.text3 }]}>{c['release.lastReleasePerson']}</Text>
+            <Text style={[styles.value, { color: color.text2 }]}>{actor || c['release.unknown']}</Text>
           </View>
         </View>
       </Card>
@@ -169,9 +135,9 @@ export function ReleaseCard({
       <ConfirmSheet
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        title={c.confirmTitle(card.envTitle)}
-        description={c.confirmDesc(card.version, card.envTitle, card.lastVersion)}
-        confirmLabel={c.release}
+        title={c['release.confirmTitle'](card.envTitle)}
+        description={c['release.confirmDesc'](card.version, card.envTitle, card.lastVersion)}
+        confirmLabel={c['release.release']}
         onConfirm={() => void handleConfirm()}
         state={busy ? 'working' : 'idle'}
         error={error}

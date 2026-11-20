@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { StudioDraftDiff } from '../../../../src/studio/protocol';
 import { haptics } from '../../lib/haptics';
 import { detectLang, t, type Lang } from '../../lib/strings';
+import { signedCardStrings } from '../../lib/strings/signed-cards';
 import { color, space, type } from '../../lib/theme';
 import type { KnownStudioCard } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
@@ -23,25 +24,6 @@ export interface ChangeCardProps {
   readonly testID?: string;
 }
 
-const COPY = {
-  zh: {
-    title: '计划改动',
-    statusPending: '等你确认改动',
-    statusDone: '已确认改动',
-    decline: '先不改…',
-    approve: '按这个改',
-    approved: '已按此改动继续',
-  },
-  en: {
-    title: 'Planned changes',
-    statusPending: 'Review changes',
-    statusDone: 'Changes approved',
-    decline: 'Not now…',
-    approve: 'Apply changes',
-    approved: 'Changes approved',
-  },
-} as const;
-
 /**
  * 批准改动卡（SS-63）：
  * 「还不行…」之后计划的改动，复用 DraftDiff 的增（+）、改（~）、删（−）样式；
@@ -57,7 +39,7 @@ export function ChangeCard({
   testID = 'change-card',
 }: ChangeCardProps) {
   const lang = langProp ?? detectLang();
-  const c = COPY[lang];
+  const c = signedCardStrings(lang);
   const [approved, setApproved] = useState(card.status === 'done');
   const [busy, setBusy] = useState(false);
 
@@ -79,23 +61,23 @@ export function ChangeCard({
 
   return (
     <Card
-      title={c.title}
+      title={c['change.title']}
       status={approved ? 'done' : 'needs-you'}
-      statusLabel={approved ? c.statusDone : c.statusPending}
+      statusLabel={approved ? c['change.statusDone'] : c['change.statusPending']}
       testID={testID}
       footer={
         approved ? (
           <Text style={[styles.doneHint, { color: color.ok }]} testID="change-approved-hint">
-            {c.approved}
+            {c['change.approved']}
           </Text>
         ) : (
           <ActionRow
             negative={
-              onDecline ? <TextButton label={c.decline} onPress={onDecline} testID="change-decline" /> : undefined
+              onDecline ? <TextButton label={c['change.decline']} onPress={onDecline} testID="change-decline" /> : undefined
             }
             primary={
               <SignedButton
-                label={c.approve}
+                label={c['change.approve']}
                 onPress={() => void handleApprove()}
                 loading={busy}
                 hasKeyOverride={hasKeyOverride}
