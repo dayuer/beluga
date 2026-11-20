@@ -14,6 +14,9 @@ export const STATS_API = {
   'stats.get': { args: z.tuple([]) },
   // You and your friends on prompt characters, merged PRs and agent time, a day at a time → LeaderboardView (BLG-904).
   'stats.leaderboard': { args: z.tuple([]) },
+  // Ask every agent of yours for its plan limits now (the Usage tab as it opens): joined with the
+  // asks around it, at most once a minute (core/session.ts). Answers at once; the cards follow.
+  'stats.refreshUsage': { args: z.tuple([]) },
   // You pasted text into the composer (its length only), or dictated for `ms`.
   'stats.note': {
     args: z.tuple([
