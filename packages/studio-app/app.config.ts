@@ -1,7 +1,17 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
-import { getHubHost } from './lib/links';
+
+/** 从 `EXPO_PUBLIC_HUB_URL` 提取中台主机名（内联于此，避免 @expo/config 编译 CJS 时解析不到 ./lib/links）。 */
+function getHubHost(hubUrl = process.env.EXPO_PUBLIC_HUB_URL): string | null {
+  if (!hubUrl) return null;
+  try {
+    const parsed = new URL(hubUrl.trim());
+    return parsed.hostname ? parsed.host.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 动态 Expo 配置（SS-25）：从 `EXPO_PUBLIC_HUB_URL` 派生 iOS `associatedDomains`
