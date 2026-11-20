@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { partitionTodos, sortNeedsYouTodos, type WaitingTodoItem } from './todo';
-import type { TodoCard } from './todo-store';
+import { partitionTodos, sortNeedsYouTodos, type TodoCardItem, type WaitingTodoItem } from './todo';
 import type { RequestSummary } from './views';
 
-function makeTodo(overrides: Partial<TodoCard> & Pick<TodoCard, 'key' | 'kind'>): TodoCard {
+function makeTodo(overrides: Partial<TodoCardItem> & Pick<TodoCardItem, 'key' | 'kind'>): TodoCardItem {
   return {
     pid: 'proj-shop',
     planRef: 'req-login',
@@ -30,7 +29,7 @@ function makeReq(overrides: Partial<RequestSummary> & Pick<RequestSummary, 'id'>
 
 describe('lib/todo grouping and urgency', () => {
   it('sorts needs-you todos by urgency (decision > review > changes > confirm) then arrival time', () => {
-    const list: TodoCard[] = [
+    const list: TodoCardItem[] = [
       makeTodo({ key: 'c1', kind: 'confirm', updatedAt: 500 }),
       makeTodo({ key: 'r2', kind: 'review', updatedAt: 2_000 }),
       makeTodo({ key: 'd1', kind: 'decision', updatedAt: 3_000 }),
@@ -43,7 +42,7 @@ describe('lib/todo grouping and urgency', () => {
   });
 
   it('partitions into needsYou and read-only waiting groups with clear reason and eta', () => {
-    const todos: TodoCard[] = [
+    const todos: TodoCardItem[] = [
       makeTodo({ key: 'c1', kind: 'confirm', updatedAt: 2_000 }),
       makeTodo({ key: 'd1', kind: 'decision', updatedAt: 1_000 }),
     ];

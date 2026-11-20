@@ -1,7 +1,6 @@
 import type { StudioPlanView } from '../../../src/studio/protocol.js';
 import { pagePhase } from './plan-phase.js';
 import { t, type Lang } from './strings/table.js';
-import type { TodoCard } from './todo-store.js';
 import type { RequestSummary, WaitReason } from './views.js';
 
 export type TodoKind = 'decision' | 'review' | 'changes' | 'confirm';
@@ -17,6 +16,12 @@ export interface Todo {
   readonly decisionId?: string;
   readonly milestoneRef?: string;
   readonly draftRev?: number;
+}
+
+/** 带项目名与更新时间的纯待办卡片模型，供 `todo.ts` 与 `todo-store.ts` 共用，避免引入 RN/Expo 类型。 */
+export interface TodoCardItem extends Todo {
+  readonly projectName: string;
+  readonly updatedAt: number;
 }
 
 /**
@@ -102,7 +107,7 @@ const URGENCY_RANK: Record<TodoKind, number> = {
 };
 
 /** 按紧急程度排序「要你做的」：决策 > 验收 > 改动 > 确认开工，同级按到达时间升序。 */
-export function sortNeedsYouTodos<T extends Pick<TodoCard, 'kind' | 'updatedAt' | 'key'>>(
+export function sortNeedsYouTodos<T extends Pick<TodoCardItem, 'kind' | 'updatedAt' | 'key'>>(
   items: readonly T[],
 ): T[] {
   return [...items].sort((a, b) => {
@@ -131,18 +136,18 @@ function defaultWaitEta(reason: WaitReason, lang: Lang): string {
  * 1. `needsYou`：要你做的（按紧急程度排序）；
  * 2. `waiting`：在等待，你不用做什么（只读，写清在等什么与何时会好）。
  */
-export function partitionTodos({
+export function partitionTodos<T extends TodoCardItem>({
   todos,
   requests = [],
   waitingCards = [],
   lang,
 }: {
-  readonly todos: readonly TodoCard[];
+  readonly todos: readonly T[];
   readonly requests?: readonly RequestSummary[];
   readonly waitingCards?: readonly WaitingTodoItem[];
   readonly lang: Lang;
 }): {
-  readonly needsYou: readonly TodoCard[];
+  readonly needsYou: readonly T[];
   readonly waiting: readonly WaitingTodoItem[];
 } {
   const needsYou = sortNeedsYouTodos(todos);
