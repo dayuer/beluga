@@ -11,7 +11,7 @@ export interface ConfirmSheetProps {
   /** 标题直接说后果，例如「移除后这台设备将无法确认任何操作」。 */
   readonly title: string;
   readonly description?: string;
-  /** 主按钮动作名，必须由调用方传入（如「上线」「移除设备」），不写「确定」。 */
+  /** 主按钮动作名，必须由调用方传入（如「上线」「移除设备」），禁止传「确定」或「OK」。 */
   readonly confirmLabel: string;
   readonly cancelLabel?: string;
   readonly onConfirm: () => void;
@@ -20,9 +20,17 @@ export interface ConfirmSheetProps {
   readonly testID?: string;
 }
 
+/** 开发态校验：不可逆确认抽屉的主按钮必须写具体动作名，禁止「确定」或「OK」。 */
+export function assertConfirmActionLabel(label: string): void {
+  const normalized = label.trim();
+  if (normalized === '确定' || normalized.toUpperCase() === 'OK') {
+    throw new Error('ConfirmSheet: 主按钮文字必须写具体动作名（如「上线」「移除设备」），禁止使用「确定」或「OK」');
+  }
+}
+
 /**
- * 不可逆动作的确认抽屉（SS-34）：
- * 复用 `Drawer` 的抽屉手势；取消在左、主动作在右，主按钮文字必须由调用方传入具体动作名。
+ * 不可逆动作的确认抽屉（SS-34 / SS-142）：
+ * 复用 `Drawer` 的抽屉手势；标题只出现在头部一次；取消在左、主动作在右。
  */
 export function ConfirmSheet({
   open,
@@ -36,6 +44,10 @@ export function ConfirmSheet({
   error,
   testID = 'confirm-sheet',
 }: ConfirmSheetProps) {
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    assertConfirmActionLabel(confirmLabel);
+  }
+
   return (
     <Drawer
       open={open}
@@ -57,10 +69,11 @@ export function ConfirmSheet({
         />
       }
     >
-      <View style={styles.body}>
-        <Text style={[styles.titleText, { color: color.text }]}>{title}</Text>
-        {description ? <Text style={[styles.desc, { color: color.text2 }]}>{description}</Text> : null}
-      </View>
+      {description ? (
+        <View style={styles.body}>
+          <Text style={[styles.desc, { color: color.text2 }]}>{description}</Text>
+        </View>
+      ) : null}
     </Drawer>
   );
 }
@@ -69,9 +82,6 @@ const styles = StyleSheet.create({
   body: {
     padding: space[4],
     gap: space[3],
-  },
-  titleText: {
-    ...type.heading,
   },
   desc: {
     ...type.body,
