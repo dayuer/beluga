@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useHasDeviceKey } from '../lib/keys';
 import { detectLang, t } from '../lib/strings';
 import { color, space, type } from '../lib/theme';
+import { useInsideActionRow } from './card/ActionRow';
 import { PrimaryButton, type PrimaryButtonState } from './PrimaryButton';
 
 export interface SignedButtonProps {
@@ -36,6 +37,7 @@ export function SignedButton({
   const hasKey = hasKeyOverride ?? detected.hasKey;
   const off = disabled || !hasKey;
   const lang = detectLang();
+  const insideActionRow = useInsideActionRow();
 
   return (
     <View style={styles.wrap}>
@@ -49,7 +51,7 @@ export function SignedButton({
         onDone={onDone}
         error={error}
       />
-      {hasKey ? (
+      {insideActionRow ? null : hasKey ? (
         <Text style={[styles.hint, { color: color.text3 }]}>{t(lang, 'signed.byDevice')}</Text>
       ) : (
         <Text style={[styles.hint, { color: color.text3 }]}>{t(lang, 'signed.noKeyHint')}</Text>
@@ -63,8 +65,10 @@ SignedButton.displayName = 'SignedButton';
 const styles = StyleSheet.create({
   wrap: {
     gap: space[2],
+    flexShrink: 1,
   },
   hint: {
     ...type.caption,
+    flexShrink: 1,
   },
 });
