@@ -1,4 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
@@ -8,35 +9,66 @@ import { SyncBanner } from '../../components/SyncBanner';
 import { TabBar } from '../../components/TabBar';
 import { TextButton } from '../../components/TextButton';
 import { TodoCard, WaitingTodoCard } from '../../components/TodoCard';
+import { cache } from '../../lib/cache';
+import { hub, isDemoMode } from '../../lib/client';
 import { DEMO_REQUEST_SUMMARIES } from '../../lib/demo';
 import { useOnline } from '../../lib/net';
+import { loadRequestsFromHub, REQUESTS_CACHE_KEY } from '../../lib/requests-source';
 import { useOnResume } from '../../lib/resume';
+import { session } from '../../lib/session';
 import { detectLang, t } from '../../lib/strings';
 import { color, space, type } from '../../lib/theme';
 import { ago } from '../../lib/time';
 import { partitionTodos } from '../../lib/todo';
 import { useTodos } from '../../lib/todo-store';
+import type { RequestSummary } from '../../lib/views';
 
 /**
- * P8 待办（SS-53）：分成「要你做的」（按紧急程度置顶）与「在等待，你不用做什么」（只读，写清在等什么与何时会好）。
+ * P8 待办（SS-53 / SS-194）：
+ * - 非 DEMO 时绝不注入 DEMO_REQUEST_SUMMARIES，等待列表从真实需求数据派生；
+ * - !online 时无论是否有 result 都在顶部显示 SyncBanner；
+ * - 无待办且无等待时显示 todo-empty。
  */
 export default function TodoScreen() {
   const router = useRouter();
   const lang = detectLang();
   const online = useOnline();
+  const demoMode = isDemoMode();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
   const { result, loading, error, refresh } = useTodos();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [realRequests, setRealRequests] = useState<readonly RequestSummary[]>(() =>
+    demoMode
+      ? DEMO_REQUEST_SUMMARIES
+      : (cache.get<RequestSummary[]>(REQUESTS_CACHE_KEY)?.value ?? []),
+  );
+
+  const refreshAll = useCallback(async () => {
+    await refresh();
+    if (demoMode) {
+      setRealRequests(DEMO_REQUEST_SUMMARIES);
+      return;
+    }
+    const outcome = await loadRequestsFromHub({
+      hub,
+      cache,
+      onSignedOut: () => session.clear(),
+      lang,
+    });
+    if (outcome.kind === 'ok' || ((outcome.kind === 'offline' || outcome.kind === 'error') && outcome.items)) {
+      setRealRequests(outcome.items ?? []);
+    }
+  }, [demoMode, lang, refresh]);
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
-    }, [refresh]),
+      void refreshAll();
+    }, [refreshAll]),
   );
 
   useOnResume(() => {
-    void refresh();
+    void refreshAll();
   });
 
   const visibleTodos = useMemo(
@@ -48,10 +80,10 @@ export default function TodoScreen() {
     () =>
       partitionTodos({
         todos: visibleTodos,
-        requests: DEMO_REQUEST_SUMMARIES,
+        requests: realRequests,
         lang,
       }),
-    [visibleTodos, lang],
+    [visibleTodos, realRequests, lang],
   );
 
   const openRequest = useCallback(
@@ -69,14 +101,22 @@ export default function TodoScreen() {
 
   return (
     <View style={styles.root} testID="todo-screen">
-      <Header title={t(lang, 'todo.title')} onRefresh={() => void refresh()} refreshing={loading} />
+      <Header
+        title={t(lang, 'todo.title')}
+        onRefresh={() => void refreshAll()}
+        refreshing={loading}
+      />
       {desktop ? <TabBar todoCount={needsYou.length} /> : null}
-      {offline && result ? (
+      {offline ? (
         <SyncBanner
           kind="offline"
-          text={t(lang, 'common.offlineYou', {
-            ago: fetchedAt ? ago(fetchedAt, lang) : t(lang, 'time.justNow'),
-          })}
+          text={
+            result
+              ? t(lang, 'common.offlineYou', {
+                  ago: fetchedAt ? ago(fetchedAt, lang) : t(lang, 'time.justNow'),
+                })
+              : t(lang, 'common.offline')
+          }
           testID="offline-banner"
         />
       ) : null}
@@ -90,7 +130,7 @@ export default function TodoScreen() {
               action={
                 <TextButton
                   label={t(lang, 'common.retry')}
-                  onPress={() => void refresh()}
+                  onPress={() => void refreshAll()}
                   testID="todo-retry"
                 />
               }
@@ -119,7 +159,7 @@ export default function TodoScreen() {
                           `/plan/${encodeURIComponent(planRef)}?project=${encodeURIComponent(pid)}${open ? `&open=${open}` : ''}`,
                         )
                       }
-                      onRefresh={() => void refresh()}
+                      onRefresh={() => void refreshAll()}
                     />
                   ))}
                 </View>
