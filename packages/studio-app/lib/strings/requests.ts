@@ -9,6 +9,7 @@ export const zh = {
   'requests.emptyBody': '点右上角「提需求」，告诉工作室你想做什么',
   'requests.searchEmpty': '没有匹配的需求',
   'requests.groupCount': '{n} 条',
+  'requests.completedToggle': '已完成（{n}）',
 } as const;
 
 export type RequestsStringKey = keyof typeof zh;
@@ -22,6 +23,7 @@ export const en: Record<RequestsStringKey, string> = {
   'requests.emptyBody': 'Tap “New request” above to tell your studio what to build',
   'requests.searchEmpty': 'No matching requests',
   'requests.groupCount': '{n}',
+  'requests.completedToggle': 'Completed ({n})',
 };
 
 const table: Record<Lang, Record<RequestsStringKey, string>> = { zh, en };
