@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { z } from 'zod';
 import { detectLang, t, type Lang } from '../../lib/strings';
 import { color, radius, space, type } from '../../lib/theme';
+import { undoStore } from '../../lib/undo';
 import type { UnderstandingCardSchema } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
 import { Card } from '../card/Card';
 import { PrimaryButton } from '../PrimaryButton';
+import { SignedButton } from '../SignedButton';
 
 export type UnderstandingCardData = z.infer<typeof UnderstandingCardSchema>;
 
@@ -15,27 +17,34 @@ export interface UnderstandingCardProps {
   readonly lang?: Lang;
   readonly onConfirm?: (cardId: string) => Promise<void> | void;
   readonly onReject?: (cardId: string, reason: string) => Promise<void> | void;
+  /** 可选覆盖设备密钥状态（主要供单测与预览使用）。 */
+  readonly hasKeyOverride?: boolean;
   readonly testID?: string;
 }
 
 const COLLAPSE_LIMIT = 5;
+const UNDO_MS = 4000;
 
 /**
- * 理解卡（SS-43）：列出理解要点（超过 5 条默认折叠），主动作「对，就是这样」，否定「不对…」问原因。
- * 先用普通 PrimaryButton；若按 decide-sign-understanding 需签名，换 SignedButton 一行即可。
+ * 理解卡（SS-43 / 决定 sign-in-app-2）：
+ * - 列出理解要点，超过 5 条时折叠；
+ * - 主动作「对，就是这样」使用 SignedButton（无设备密钥时不可点并说明原因）；
+ * - 点下主动作后进入 4 秒撤销条，撤销窗口内不发任何签名动作；
+ * - 否定动作「不对，我改一下」靠左、描边、不用签名。
  */
 export function UnderstandingCard({
   card,
   lang: langProp,
   onConfirm,
   onReject,
+  hasKeyOverride,
   testID = 'understanding-card',
 }: UnderstandingCardProps) {
   const lang = langProp ?? detectLang();
   const [expanded, setExpanded] = useState(false);
   const [askingReason, setAskingReason] = useState(false);
   const [reason, setReason] = useState('');
-  const [decision, setDecision] = useState<'pending' | 'confirmed' | 'rejected'>(
+  const [decision, setDecision] = useState<'pending' | 'undoing' | 'confirmed' | 'rejected'>(
     card.status === 'done' ? 'confirmed' : card.status === 'dismissed' ? 'rejected' : 'pending',
   );
   const [busy, setBusy] = useState(false);
@@ -44,15 +53,20 @@ export function UnderstandingCard({
   const visiblePoints = shouldFold && !expanded ? card.points.slice(0, COLLAPSE_LIMIT) : card.points;
   const hiddenCount = card.points.length - COLLAPSE_LIMIT;
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     if (busy || decision !== 'pending') return;
-    setBusy(true);
-    try {
-      await onConfirm?.(card.id);
-      setDecision('confirmed');
-    } finally {
-      setBusy(false);
-    }
+    setDecision('undoing');
+    undoStore.show({
+      text: t(lang, 'understanding.undoToast'),
+      ms: UNDO_MS,
+      fire: () => {
+        setDecision('confirmed');
+        void onConfirm?.(card.id);
+      },
+      onUndo: () => {
+        setDecision('pending');
+      },
+    });
   };
 
   const handleRejectSubmit = async () => {
@@ -76,6 +90,10 @@ export function UnderstandingCard({
     ) : decision === 'rejected' ? (
       <Text style={[styles.doneNote, { color: color.text2 }]} testID="understanding-rejected">
         {t(lang, 'understanding.rejected')}
+      </Text>
+    ) : decision === 'undoing' ? (
+      <Text style={[styles.pendingUndo, { color: color.text3 }]} testID="understanding-undoing">
+        {t(lang, 'understanding.pendingUndo')}
       </Text>
     ) : askingReason ? (
       <View style={styles.reasonBox}>
@@ -125,17 +143,21 @@ export function UnderstandingCard({
             disabled={busy}
             accessibilityRole="button"
             testID="understanding-reject"
-            style={styles.textBtn}
+            style={({ pressed }) => [
+              styles.outlinedBtn,
+              { borderColor: color.hairlineStrong, backgroundColor: color.card },
+              pressed && { backgroundColor: color.press },
+            ]}
           >
-            <Text style={[styles.textBtnLabel, { color: color.text2 }]}>{t(lang, 'understanding.reject')}</Text>
+            <Text style={[styles.textBtnLabel, { color: color.text }]}>{t(lang, 'understanding.reject')}</Text>
           </Pressable>
         }
         primary={
-          <PrimaryButton
+          <SignedButton
             label={t(lang, 'understanding.confirm')}
             disabled={busy}
-            state={busy ? 'working' : 'idle'}
-            onPress={() => void handleConfirm()}
+            hasKeyOverride={hasKeyOverride}
+            onPress={handleConfirm}
             testID="understanding-confirm"
           />
         }
@@ -145,7 +167,7 @@ export function UnderstandingCard({
   return (
     <Card
       title={decision === 'confirmed' ? t(lang, 'understanding.titleDone') : t(lang, 'understanding.title')}
-      status={decision === 'pending' ? 'needs-you' : 'done'}
+      status={decision === 'pending' || decision === 'undoing' ? 'needs-you' : 'done'}
       footer={footer}
       testID={testID}
     >
@@ -199,6 +221,14 @@ const styles = StyleSheet.create({
   scopeBox: { padding: space[3], borderRadius: radius.m, gap: space[1] },
   scopeTitle: { ...type.caption, fontWeight: '600' },
   scopeItem: { ...type.caption },
+  outlinedBtn: {
+    minHeight: 44,
+    paddingHorizontal: space[3],
+    borderRadius: radius.m,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   textBtn: { paddingVertical: space[2], paddingHorizontal: space[1] },
   textBtnLabel: { ...type.callout, fontWeight: '600' },
   reasonBox: { gap: space[3] },
@@ -210,5 +240,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
     padding: space[3],
   },
+  pendingUndo: { ...type.caption },
   doneNote: { ...type.callout, fontWeight: '600' },
 });
