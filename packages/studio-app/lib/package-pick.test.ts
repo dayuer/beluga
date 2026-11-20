@@ -43,6 +43,7 @@ vi.mock('expo-file-system/legacy', () => ({
 import {
   PACKAGE_LIMITS,
   createExpoFileReader,
+  isSecretPath,
   parseZipBufferManifest,
   pickAndroidFolderPackage,
   pickZipPackage,
@@ -242,6 +243,53 @@ describe('package-pick', () => {
       ['screens/ok.png', undefined],
       ['screens/secret.png', 'encrypted-entry'],
       ['screens/bzip.png', 'unsupported-compression'],
+    ]);
+  });
+
+  it('flags secret and credential files as secret-file while keeping .env.example unflagged', async () => {
+    expect(isSecretPath('.env')).toBe(true);
+    expect(isSecretPath('.env.local')).toBe(true);
+    expect(isSecretPath('config/credentials.json')).toBe(true);
+    expect(isSecretPath('firebase-service-account.json')).toBe(true);
+    expect(isSecretPath('id_rsa')).toBe(true);
+    expect(isSecretPath('.ssh/config')).toBe(true);
+    expect(isSecretPath('.aws/credentials')).toBe(true);
+    expect(isSecretPath('cert.pem')).toBe(true);
+    expect(isSecretPath('.env.example')).toBe(false);
+    expect(isSecretPath('.env.sample')).toBe(false);
+    expect(isSecretPath('.env.template')).toBe(false);
+
+    const zipBytes = buildMinimalZip([
+      { name: 'screens/home.png', size: 1024, method: 8 },
+      { name: '.env', size: 128, method: 8 },
+      { name: 'credentials.json', size: 256, method: 8 },
+      { name: 'id_rsa', size: 512, method: 8 },
+      { name: '.env.example', size: 128, method: 8 },
+    ]);
+
+    const reader: RandomAccessReader = {
+      size: zipBytes.length,
+      async readRange(off, len) {
+        return zipBytes.subarray(off, off + len);
+      },
+    };
+
+    const result = await pickZipPackage({
+      pickDocument: async () => ({
+        canceled: false,
+        assets: [{ uri: 'file:///tmp/secrets.zip', name: 'secrets.zip', lastModified: 0 }],
+      }),
+      openReader: async () => reader,
+    });
+
+    expect(result.canceled).toBe(false);
+    if (result.canceled) return;
+    expect(result.pkg.entries.map((e) => [e.path, e.issue])).toEqual([
+      ['screens/home.png', undefined],
+      ['.env', 'secret-file'],
+      ['credentials.json', 'secret-file'],
+      ['id_rsa', 'secret-file'],
+      ['.env.example', 'unsupported-type'],
     ]);
   });
 

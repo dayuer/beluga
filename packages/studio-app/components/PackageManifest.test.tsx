@@ -15,7 +15,8 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-import { PACKAGE_LIMITS, type PickedPackage } from '../lib/package-pick';
+import { PACKAGE_LIMITS, classifyEntryIssue, type PickedPackage } from '../lib/package-pick';
+import { color } from '../lib/theme';
 import { resetDrawerCount } from '../lib/ui-state';
 import { PackageManifest } from './PackageManifest';
 
@@ -88,5 +89,52 @@ describe('PackageManifest', () => {
 
     await fireEvent.press(screen.getByTestId('package-manifest-confirm'));
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('skips secret files with muted gray text (not color.error) and never uploads them', async () => {
+    const onConfirm = vi.fn();
+    const secretPkg: PickedPackage = {
+      kind: 'zip',
+      name: 'with-secrets.zip',
+      uri: 'file:///tmp/with-secrets.zip',
+      totalBytes: 2048,
+      entries: [
+        { path: 'screens/app.png', size: 1024, source: { kind: 'file', uri: 'file:///tmp/app.png' } },
+        {
+          path: '.env',
+          size: 256,
+          source: { kind: 'file', uri: 'file:///tmp/.env' },
+          issue: classifyEntryIssue('.env', 256),
+        },
+        {
+          path: 'credentials.json',
+          size: 256,
+          source: { kind: 'file', uri: 'file:///tmp/credentials.json' },
+          issue: classifyEntryIssue('credentials.json', 256),
+        },
+        {
+          path: 'id_rsa',
+          size: 512,
+          source: { kind: 'file', uri: 'file:///tmp/id_rsa' },
+          issue: classifyEntryIssue('id_rsa', 512),
+        },
+      ],
+    };
+
+    const screen = await render(
+      <PackageManifest open pkg={secretPkg} onClose={vi.fn()} onConfirm={onConfirm} />,
+    );
+
+    const issueLabel = screen.getByTestId('package-manifest-issue-1');
+    expect(issueLabel.props.style).toMatchObject({ color: color.text3 });
+    expect(issueLabel.props.style.color).not.toBe(color.error);
+
+    // 尝试点击跳过条目，不可勾选
+    await fireEvent.press(screen.getByTestId('package-manifest-item-1'));
+    await fireEvent.press(screen.getByTestId('package-manifest-confirm'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm.mock.calls[0]?.[0].map((e: { path: string }) => e.path)).toEqual([
+      'screens/app.png',
+    ]);
   });
 });

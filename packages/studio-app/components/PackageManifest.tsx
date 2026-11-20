@@ -44,6 +44,8 @@ export function describeEntryIssue(issue: PackageEntryIssue): string {
       return '已加密条目，已跳过';
     case 'unsupported-compression':
       return '不支持的压缩方式，已跳过';
+    case 'secret-file':
+      return '疑似密钥或凭证，已跳过';
   }
 }
 
@@ -187,7 +189,7 @@ export function PackageManifest({
                       <Text style={[styles.fileSize, { color: color.text3 }]}>{formatBytes(entry.size)}</Text>
                       {entry.issue ? (
                         <Text
-                          style={[styles.issueText, { color: color.error }]}
+                          style={[styles.issueText, { color: color.text3 }]}
                           testID={`${testID}-issue-${idx}`}
                         >
                           {describeEntryIssue(entry.issue)}

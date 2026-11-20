@@ -36,7 +36,8 @@ export type PackageEntryIssue =
   | 'unsupported-type'
   | 'empty-file'
   | 'encrypted-entry'
-  | 'unsupported-compression';
+  | 'unsupported-compression'
+  | 'secret-file';
 
 export interface ZipEntrySource {
   readonly kind: 'zip';
@@ -112,6 +113,37 @@ function normalizeEntryPath(raw: string): string | undefined {
   return segments.join('/');
 }
 
+const SECRET_DIRS = new Set(['.ssh', '.aws', '.gnupg']);
+const ENV_SAFE_EXAMPLES = new Set(['.env.example', '.env.sample', '.env.template']);
+
+export function isSecretPath(entryPath: string): boolean {
+  const normalized = entryPath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) return false;
+
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (SECRET_DIRS.has(segments[i]!.toLowerCase())) return true;
+  }
+
+  const base = (segments[segments.length - 1] ?? '').toLowerCase();
+  if (base === '.env' || (base.startsWith('.env.') && !ENV_SAFE_EXAMPLES.has(base))) {
+    return true;
+  }
+  if (base === 'id_rsa' || base === 'id_ed25519') return true;
+  if (
+    base.endsWith('.pem') ||
+    base.endsWith('.key') ||
+    base.endsWith('.p8') ||
+    base.endsWith('.p12')
+  ) {
+    return true;
+  }
+  if (base.endsWith('.json') && (base.includes('credentials') || base.includes('service-account'))) {
+    return true;
+  }
+  return false;
+}
+
 export function classifyEntryIssue(
   path: string,
   size: number,
@@ -125,6 +157,7 @@ export function classifyEntryIssue(
   ) {
     return 'unsupported-compression';
   }
+  if (isSecretPath(path)) return 'secret-file';
   if (!Number.isFinite(size) || size <= 0) return 'empty-file';
   if (size > PACKAGE_LIMITS.maxFileBytes) return 'file-too-large';
   const last = path.split('/').pop() ?? '';
