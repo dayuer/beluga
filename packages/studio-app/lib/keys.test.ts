@@ -1,4 +1,5 @@
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mem = new Map<string, unknown>();
@@ -68,7 +69,13 @@ describe('lib/keys', () => {
 
     const sealPub = await keys.sealPublicKey();
     expect(sealPub).not.toBeNull();
-    expect(bytesToHex(sealPub!)).toBe(bytesToHex(x25519.getPublicKey(nextRandom)));
+    const domain = new TextEncoder().encode('synon-studio-seal-v1');
+    const domainInput = new Uint8Array(domain.length + nextRandom.length);
+    domainInput.set(domain, 0);
+    domainInput.set(nextRandom, domain.length);
+    expect(bytesToHex(sealPub!)).toBe(bytesToHex(x25519.getPublicKey(sha256(domainInput))));
+    expect(bytesToHex(sealPub!)).not.toBe(bytesToHex(pub));
+    expect(bytesToHex(sealPub!)).not.toBe(bytesToHex(x25519.getPublicKey(nextRandom)));
 
     // 再次调用 ensureDeviceKey 不覆盖已有密钥
     nextRandom = new Uint8Array(32).fill(0xff);
@@ -79,6 +86,21 @@ describe('lib/keys', () => {
     expect(Object.keys(keys)).not.toContain('seed');
     expect(Object.keys(keys)).not.toContain('secret');
     expect(Object.keys(keys)).not.toContain('privateKey');
+  });
+
+  it('deduplicates concurrent ensureDeviceKey calls so only one seed is generated', async () => {
+    const { getRandomBytes } = await import('expo-crypto');
+    const { secure } = await import('./secure');
+    vi.mocked(getRandomBytes).mockClear();
+    vi.mocked(secure.set).mockClear();
+
+    nextRandom = new Uint8Array(32).fill(42);
+    const keys = await import('./keys');
+
+    const [p1, p2] = await Promise.all([keys.ensureDeviceKey(), keys.ensureDeviceKey()]);
+    expect(bytesToHex(p1)).toBe(bytesToHex(p2));
+    expect(getRandomBytes).toHaveBeenCalledTimes(1);
+    expect(secure.set).toHaveBeenCalledTimes(1);
   });
 
   it('persists seed in secure.ts with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY', async () => {

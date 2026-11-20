@@ -1,21 +1,26 @@
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { getRandomBytes } from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { secure } from './secure';
 
 /**
- * 设备密钥管理（SS-70）：
+ * 设备密钥管理（SS-70 / SS-180）：
  * - 32 字节随机种子存放在 `lib/secure.ts`（iOS Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` / Android Keystore），卸载重装不保留。
- * - Ed25519 用于动作签名，X25519 用于密钥封装公钥导出；私钥种子只在本文件模块内存里，绝不导出。
+ * - Ed25519 用于动作签名，X25519 封装密钥由 `sha256('synon-studio-seal-v1' || seed)` 域分离派生；私钥种子只在本文件模块内存里，绝不导出。
+ * - `loadSeed` 与 `ensureDeviceKey` 使用单飞锁去重，避免并发重复生成或覆盖。
  */
 
 const SECRET_KEY = 'device-secret';
+const SEAL_DOMAIN = new TextEncoder().encode('synon-studio-seal-v1');
 
 interface DeviceSecret {
   readonly seed: string;
 }
 
 let cachedSeed: Uint8Array | null | undefined;
+let inflightLoad: Promise<Uint8Array | null> | null = null;
+let inflightEnsure: Promise<Uint8Array> | null = null;
 const listeners = new Set<(hasKey: boolean) => void>();
 
 export class DeviceKeyMissingError extends Error {
@@ -48,12 +53,25 @@ function notify(hasKey: boolean): void {
   for (const fn of listeners) fn(hasKey);
 }
 
+function deriveSealSecret(seed: Uint8Array): Uint8Array {
+  const input = new Uint8Array(SEAL_DOMAIN.length + seed.length);
+  input.set(SEAL_DOMAIN, 0);
+  input.set(seed, SEAL_DOMAIN.length);
+  return sha256(input);
+}
+
 async function loadSeed(): Promise<Uint8Array | null> {
   if (cachedSeed !== undefined) return cachedSeed;
-  const stored = await secure.get<DeviceSecret>(SECRET_KEY);
-  const parsed = stored && typeof stored.seed === 'string' ? hexToBytes(stored.seed) : null;
-  cachedSeed = parsed;
-  return parsed;
+  if (inflightLoad) return inflightLoad;
+  inflightLoad = (async () => {
+    const stored = await secure.get<DeviceSecret>(SECRET_KEY);
+    const parsed = stored && typeof stored.seed === 'string' ? hexToBytes(stored.seed) : null;
+    cachedSeed = parsed;
+    return parsed;
+  })().finally(() => {
+    inflightLoad = null;
+  });
+  return inflightLoad;
 }
 
 /** 当前设备是否已登记可用于签名的设备密钥。 */
@@ -61,16 +79,22 @@ export async function hasDeviceKey(): Promise<boolean> {
   return (await loadSeed()) !== null;
 }
 
-/** 若尚无设备密钥则生成 32 字节随机种子并写入安全存储；返回 Ed25519 公钥字节。 */
+/** 若尚无设备密钥则生成 32 字节随机种子并写入安全存储；并发调用只生成一次，返回 Ed25519 公钥字节。 */
 export async function ensureDeviceKey(): Promise<Uint8Array> {
-  let seed = await loadSeed();
-  if (!seed) {
-    seed = getRandomBytes(32);
-    await secure.set(SECRET_KEY, { seed: bytesToHex(seed) } satisfies DeviceSecret);
-    cachedSeed = seed;
-    notify(true);
-  }
-  return ed25519.getPublicKey(seed);
+  if (inflightEnsure) return inflightEnsure;
+  inflightEnsure = (async () => {
+    let seed = await loadSeed();
+    if (!seed) {
+      seed = getRandomBytes(32);
+      await secure.set(SECRET_KEY, { seed: bytesToHex(seed) } satisfies DeviceSecret);
+      cachedSeed = seed;
+      notify(true);
+    }
+    return ed25519.getPublicKey(seed);
+  })().finally(() => {
+    inflightEnsure = null;
+  });
+  return inflightEnsure;
 }
 
 /** 读取当前设备的 Ed25519 公钥字节；没有密钥时返回 `null`。 */
@@ -79,10 +103,10 @@ export async function publicKey(): Promise<Uint8Array | null> {
   return seed ? ed25519.getPublicKey(seed) : null;
 }
 
-/** 读取当前设备的 X25519 封装公钥字节；没有密钥时返回 `null`。 */
+/** 读取当前设备的 X25519 封装公钥字节（域分离派生）；没有密钥时返回 `null`。 */
 export async function sealPublicKey(): Promise<Uint8Array | null> {
   const seed = await loadSeed();
-  return seed ? x25519.getPublicKey(seed) : null;
+  return seed ? x25519.getPublicKey(deriveSealSecret(seed)) : null;
 }
 
 /** 使用设备私钥对载荷字节签名；没有密钥时抛出 `DeviceKeyMissingError`。 */
