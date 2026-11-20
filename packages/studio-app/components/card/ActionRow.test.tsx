@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { render } from '@testing-library/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,8 +9,10 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: vi.fn(async () => {}),
   deleteItemAsync: vi.fn(async () => {}),
 }));
+vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 
 import { PrimaryButton } from '../PrimaryButton';
+import { SignedButton } from '../SignedButton';
 import { TextButton } from '../TextButton';
 import { ActionRow, assertSingleFilledButton } from './ActionRow';
 
@@ -53,5 +56,27 @@ describe('ActionRow', () => {
         <PrimaryButton label="开始做" onPress={() => {}} />,
       ),
     ).not.toThrow();
+  });
+
+  it('places SignedButton no-key hint on full-width wrapping row below buttons for 320pt and 390pt screens', async () => {
+    for (const width of [320, 390]) {
+      const screen = await render(
+        <View style={{ width }}>
+          <ActionRow
+            testID={`row-${width}`}
+            negative={<TextButton label="先不做…" onPress={() => {}} />}
+            primary={<SignedButton label="开始做" onPress={() => {}} hasKeyOverride={false} />}
+          />
+        </View>,
+      );
+
+      expect(screen.getByText('先不做…')).toBeTruthy();
+      expect(screen.getByText('开始做')).toBeTruthy();
+      const hints = screen.getAllByTestId('action-row-hint');
+      expect(hints).toHaveLength(1);
+      expect(hints[0]?.props.children).toContain('我 › 设备');
+      expect(hints[0]?.props.numberOfLines).toBeUndefined();
+      expect(hints[0]?.props.style).toMatchObject({ width: '100%', flexShrink: 1 });
+    }
   });
 });
