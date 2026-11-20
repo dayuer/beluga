@@ -13,13 +13,15 @@
  * Every important step is one JSON line on stdout: {"kind":"registered"|"open"|"sent"|"recv"|"closed",...}.
  */
 
-import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, createHmac, generateKeyPairSync, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { dirname } from 'node:path';
 import WebSocket from 'ws';
+import { canonicalJson, computeNodeFingerprint, createDeviceTrustStore, SIGNED_ACTION_KINDS } from '../../../src/studio/verify.ts';
 
 const args = process.argv.slice(2);
+const selfTest = args.includes('--self-test');
 const flag = (name, fallback) => {
   const at = args.indexOf(`--${name}`);
   return at >= 0 && args[at + 1] !== undefined ? args[at + 1] : fallback;
@@ -36,6 +38,42 @@ const keyFile = flag('key-file');
 const controlPort = Number(flag('control-port', '0'));
 
 const log = (kind, extra = {}) => console.log(JSON.stringify({ kind, at: Date.now(), ...extra }));
+
+if (selfTest) {
+  const trust = createDeviceTrustStore();
+  const { publicKey: devPub, privateKey: devPriv } = generateKeyPairSync('ed25519');
+  const rawPub = devPub.export({ type: 'spki', format: 'der' }).subarray(-32);
+  const pubB64 = rawPub.toString('base64url');
+  const k = Buffer.alloc(32, 9).toString('base64url');
+  const mac = createHmac('sha256', Buffer.from(k, 'base64url')).update(rawPub).digest('base64url');
+
+  const signFrame = (frame, priv = devPriv) =>
+    sign(null, Buffer.from(canonicalJson(frame), 'utf8'), priv).toString('base64url');
+
+  const buildSigned = (kind, payload, rev, at, priv = devPriv, deviceKey = pubB64) => {
+    const frame = { kind, payload, ...(rev !== undefined ? { rev } : {}), at, deviceKey };
+    return { kind, payload, ...(rev !== undefined ? { rev } : {}), signed: { frame, sig: signFrame(frame, priv) } };
+  };
+
+  // 1. 未登记设备 -> unregistered-device
+  const unreg = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+  // 2. 登记公钥
+  const enrolled = trust.enrollWithInvite({ k, pubkey: pubB64, mac });
+  // 3. 登记过的公钥验签通过
+  const accepted = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+  // 4. 签名不对 -> bad-signature
+  const badSigAction = buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 101);
+  badSigAction.signed.sig = Buffer.alloc(64, 0).toString('base64url');
+  const badSig = trust.verifySignedAction(badSigAction);
+  // 5. at 回退 -> stale-clock
+  const stale = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+
+  console.log(JSON.stringify({ enrolled, unreg, accepted, badSig, stale }, null, 2));
+  if (!enrolled || unreg.code !== 'unregistered-device' || !accepted.ok || badSig.code !== 'bad-signature' || stale.code !== 'stale-clock') {
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 const keyExists = keyFile !== undefined && existsSync(keyFile);
 if ((!keyExists && !code) || projects.length === 0) {
@@ -60,6 +98,9 @@ const publicKey = createPublicKey(privateKey);
 const der = publicKey.export({ type: 'spki', format: 'der' });
 const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
+const nodeFingerprint = computeNodeFingerprint(der);
+const trust = createDeviceTrustStore();
+for (const pk of flags('enroll-pubkey')) trust.enroll(pk);
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
 
 // The first view's turn time is fixed for the process: a new `at` on every tick would look like
@@ -194,8 +235,26 @@ function connect() {
     log('recv', { t: frame.t, ...(frame.seq !== undefined ? { seq: frame.seq } : {}), ...(frame.project ? { project: frame.project } : {}) });
     if (frame.t === 'welcome') pushAll();
     else if (frame.t === 'deliver') {
-      // The hub delivered a customer action; say it ran. M3 would use the daemon's own OpLog here.
+      // The hub delivered a customer action; verify S2 signature for signed action kinds.
       log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
+      if (SIGNED_ACTION_KINDS.has(frame.action?.kind)) {
+        const verdict = trust.verifySignedAction(frame.action);
+        if (!verdict.ok) {
+          log('verify-refused', { opId: frame.action?.opId, code: verdict.code });
+          setTimeout(
+            () =>
+              send({
+                t: 'receipt',
+                opId: frame.action.opId,
+                state: 'refused',
+                code: verdict.code,
+                ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}),
+              }),
+            40,
+          );
+          return;
+        }
+      }
       const entry = plans.find((p) => p.project === frame.project);
       if (entry) applyAction(entry, frame.action);
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
