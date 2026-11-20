@@ -19,7 +19,7 @@ export interface InviteParams {
   readonly n: string;
 }
 
-export type EnrollErrorReason = 'used' | 'expired' | 'fingerprint-mismatch' | 'offline' | 'failed';
+export type EnrollErrorReason = 'used' | 'expired' | 'fingerprint-mismatch' | 'offline' | 'waiting' | 'failed';
 
 export type EnrollResult =
   | { readonly ok: true; readonly pubkey: string }
@@ -138,12 +138,15 @@ export async function enrollDevice(invite: InviteParams, options: EnrollOptions 
     return { ok: false, reason: 'offline' };
   }
 
-  let body: { error?: string; code?: string; fingerprint?: string } | undefined;
+  let body: { error?: string; code?: string; fingerprint?: string; waiting?: boolean } | undefined;
   try {
-    body = (await res.json()) as { error?: string; code?: string; fingerprint?: string };
+    body = (await res.json()) as { error?: string; code?: string; fingerprint?: string; waiting?: boolean };
   } catch {
     body = undefined;
   }
+
+  // The node is offline or slow: the invite is not spent, the customer just waits (waiting-not-failed).
+  if (res.status === 202 || body?.waiting) return { ok: false, reason: 'waiting' };
 
   if (!res.ok) {
     const reason = mapServerError(body?.code ?? body?.error, res.status);

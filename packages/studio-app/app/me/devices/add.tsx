@@ -17,6 +17,7 @@ const REASON_KEY: Record<EnrollErrorReason, JoinStringKey> = {
   expired: 'join.errExpired',
   'fingerprint-mismatch': 'join.errFingerprint',
   offline: 'join.errOffline',
+  waiting: 'join.errWaiting',
   failed: 'join.errFailed',
 };
 

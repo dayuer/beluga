@@ -13,7 +13,7 @@
  * Every important step is one JSON line on stdout: {"kind":"registered"|"open"|"sent"|"recv"|"closed",...}.
  */
 
-import { createHash, createPrivateKey, createPublicKey, createHmac, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, createHmac, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { dirname } from 'node:path';
@@ -68,10 +68,24 @@ if (selfTest) {
   // 5. at 回退 -> stale-clock
   const stale = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
 
-  console.log(JSON.stringify({ enrolled, unreg, accepted, badSig, stale }, null, 2));
-  if (!enrolled || unreg.code !== 'unregistered-device' || !accepted.ok || badSig.code !== 'bad-signature' || stale.code !== 'stale-clock') {
-    process.exit(1);
-  }
+  // 6. 中台转来的 device.enroll 帧：mac 错被拒、对的记下公钥并回指纹、同一邀请不能再用
+  const node = createDeviceTrustStore({ nodeFingerprint: 'A1B2C3D4E5F67890' });
+  node.addInvite('inv-1', k);
+  const badMac = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac: Buffer.alloc(32, 1).toString('base64url') });
+  const enrollOk = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac, deviceId: 'dev_1' });
+  const enrollAgain = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac });
+  const beforeRemove = node.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 200));
+  // 7. device.remove 验签通过后，被移除的设备再签的动作得到 unregistered-device
+  const removed = node.verifySignedAction(buildSigned('device.remove', { deviceId: 'dev_1' }, undefined, 201));
+  const afterRemove = node.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 202));
+
+  const report = { enrolled, unreg, accepted, badSig, stale, badMac, enrollOk, enrollAgain, beforeRemove, removed, afterRemove };
+  console.log(JSON.stringify(report, null, 2));
+  const failed =
+    !enrolled || unreg.code !== 'unregistered-device' || !accepted.ok || badSig.code !== 'bad-signature' || stale.code !== 'stale-clock' ||
+    badMac.code !== 'bad-mac' || !enrollOk.ok || enrollOk.fingerprint !== 'A1B2C3D4E5F67890' || enrollAgain.code !== 'invite-used' ||
+    !beforeRemove.ok || !removed.ok || afterRemove.code !== 'unregistered-device';
+  if (failed) process.exit(1);
   process.exit(0);
 }
 
@@ -99,7 +113,7 @@ const der = publicKey.export({ type: 'spki', format: 'der' });
 const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
 const nodeFingerprint = computeNodeFingerprint(der);
-const trust = createDeviceTrustStore();
+const trust = createDeviceTrustStore({ nodeFingerprint });
 for (const pk of flags('enroll-pubkey')) trust.enroll(pk);
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
 
@@ -132,6 +146,7 @@ const view = (planRef, rev) => ({
 });
 
 let ws;
+let studioIdSeen;
 let synced = false;
 let stopping = false;
 let rev = 0;
@@ -211,6 +226,7 @@ async function register() {
   });
   const body = await res.json().catch(() => ({}));
   if (res.status !== 200) throw new Error(`link failed: ${res.status} ${JSON.stringify(body)}`);
+  studioIdSeen = body.studioId;
   log('registered', { studioId: body.studioId, daemonId: body.daemonId });
 }
 
@@ -234,7 +250,12 @@ function connect() {
     }
     log('recv', { t: frame.t, ...(frame.seq !== undefined ? { seq: frame.seq } : {}), ...(frame.project ? { project: frame.project } : {}) });
     if (frame.t === 'welcome') pushAll();
-    else if (frame.t === 'deliver') {
+    else if (frame.t === 'enroll') {
+      // The hub relays a device.enroll frame: the node alone holds k, checks the mac, remembers the key.
+      const result = trust.enrollFrame(frame);
+      log('enroll', { inviteId: frame.inviteId, ok: result.ok, ...(result.ok ? {} : { code: result.code }) });
+      send({ t: 'enroll-result', reqId: frame.reqId, ...(result.ok ? { ok: true, fingerprint: result.fingerprint } : { ok: false, code: result.code }) });
+    } else if (frame.t === 'deliver') {
       // The hub delivered a customer action; verify S2 signature for signed action kinds.
       log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
       if (SIGNED_ACTION_KINDS.has(frame.action?.kind)) {
@@ -304,6 +325,21 @@ if (controlPort) {
           if (req.method === 'POST' && req.url === '/approve') {
             approve(entry);
             return answer(200, { ok: true });
+          }
+          if (req.method === 'POST' && req.url === '/invite') {
+            // Issue a test invite: k stays here; the hub only gets the route (invite id -> studio/daemon).
+            const inviteId = `inv-${randomBytes(6).toString('hex')}`;
+            const k = randomBytes(32).toString('base64url');
+            trust.addInvite(inviteId, k);
+            const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+            fetch(`${hub}/v1/admin/invites`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${flag('operator-token', '')}` },
+              body: JSON.stringify({ inviteId, studioId: data.studioId ?? studioIdSeen, daemonId, expiresAt }),
+            })
+              .then((r) => answer(r.ok ? 200 : 502, { ok: r.ok, inviteId, k, fingerprint: nodeFingerprint }))
+              .catch((error) => answer(502, { error: String(error?.message ?? error) }));
+            return;
           }
           if (req.method === 'POST' && req.url === '/reset') {
             customViews.delete(entry.project);

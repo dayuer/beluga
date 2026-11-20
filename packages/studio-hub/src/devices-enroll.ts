@@ -6,7 +6,7 @@
  */
 
 import { authCustomer, bearerOf } from '../../../src/net/studio/session.js';
-import { randomToken } from '../../../src/net/studio/store.js';
+import { randomToken, sha256Hex } from '../../../src/net/studio/store.js';
 import type { D1HubStore } from './d1.js';
 import type { Env } from './hub.js';
 import { jsonOf } from './reply.js';
@@ -162,7 +162,10 @@ export async function handleDeviceEnrollRequest(
       mac,
     });
     if (!forwarded.ok) {
-      return jsonOf({ error: forwarded.error, code: forwarded.code ?? forwarded.error }, forwarded.status);
+      return jsonOf(
+        { error: forwarded.error, code: forwarded.code ?? forwarded.error, ...(forwarded.status === 202 ? { waiting: true } : {}) },
+        forwarded.status,
+      );
     }
     fingerprint = forwarded.fingerprint;
   }
@@ -191,4 +194,55 @@ export async function handleDeviceEnrollRequest(
     },
     200,
   );
+}
+
+/** The Worker's forwarder: through the invite's studio DO to its daemon. Offline or slow is waiting, never a failure. */
+export function relayForwarder(env: Env, call: (studioId: string, path: string, body: unknown) => Promise<Response>): EnrollForwarder {
+  return async (input) => {
+    if (!input.invite.daemonId) return { ok: false, status: 202, error: 'waiting', code: 'waiting' };
+    const res = await call(input.invite.studioId, '/v1/internal/enroll', {
+      daemonId: input.invite.daemonId,
+      inviteId: input.invite.id,
+      deviceId: input.deviceId,
+      pubkey: input.pubkey,
+      ...(input.sealPubkey ? { sealPubkey: input.sealPubkey } : {}),
+      mac: input.mac,
+    });
+    const reply = (await res.json().catch(() => undefined)) as
+      | { status: 'ok'; fingerprint: string }
+      | { status: 'refused'; code: string }
+      | { status: 'offline' | 'timeout' }
+      | undefined;
+    if (!res.ok || !reply) return { ok: false, status: 502, error: 'relay-failed' };
+    if (reply.status === 'ok') return { ok: true, fingerprint: reply.fingerprint };
+    if (reply.status === 'refused') return { ok: false, status: reply.code === 'invite-used' ? 409 : 403, error: reply.code, code: reply.code };
+    return { ok: false, status: 202, error: 'waiting', code: 'waiting' };
+  };
+}
+
+const INVITES_PATH = '/v1/admin/invites';
+
+/** `POST /v1/admin/invites` (operator token): a node-issued invite's route, never its secret. Local dev and the fake node use it. */
+export async function handleInviteRouteRequest(req: Request, env: Env, store?: { put(invite: InviteRecord): Promise<void> }): Promise<Response | undefined> {
+  if (new URL(req.url).pathname !== INVITES_PATH) return undefined;
+  if (req.method !== 'POST') return jsonOf({ error: 'method-not-allowed' }, 405);
+  const bearer = bearerOf(req) ?? '';
+  const expected = env.OPERATOR_TOKEN ?? '';
+  if (!expected || (await sha256Hex(bearer)) !== (await sha256Hex(expected))) return jsonOf({ error: 'not-yours' }, 403);
+  const body = (await req.json().catch(() => undefined)) as { inviteId?: string; studioId?: string; daemonId?: string; expiresAt?: number } | undefined;
+  if (!body?.inviteId || !body.studioId || typeof body.expiresAt !== 'number') return jsonOf({ error: 'bad-args' }, 400);
+  const record: InviteRecord = { id: body.inviteId, studioId: body.studioId, ...(body.daemonId ? { daemonId: body.daemonId } : {}), expiresAt: body.expiresAt };
+  await (store ?? d1InviteRoutes(env.DB)).put(record);
+  return jsonOf({ ok: true }, 200);
+}
+
+function d1InviteRoutes(db: D1Database): { put(invite: InviteRecord): Promise<void> } {
+  return {
+    async put(invite) {
+      await db
+        .prepare('INSERT OR IGNORE INTO studio_invites (id, studio_id, daemon_id, expires_at, used_at) VALUES (?, ?, ?, ?, NULL)')
+        .bind(invite.id, invite.studioId, invite.daemonId ?? null, invite.expiresAt)
+        .run();
+    },
+  };
 }

@@ -23,6 +23,7 @@ import { expire, prune } from '../../../src/net/studio/queue.js';
 import { DAY_MS, sha256Hex } from '../../../src/net/studio/store.js';
 import { D1HubStore } from './d1.js';
 import { DoStudioStore } from './do-store.js';
+import { EnrollRelay } from './enroll-relay.js';
 import { sendPushToCustomer, type PushEnv, type PushOptions } from './push.js';
 import { jsonOf, responseOf } from './reply.js';
 import { type AppAttachment, type DaemonAttachment, appTags, attachmentOf, daemonTags } from './ws.js';
@@ -264,6 +265,7 @@ const TABLES: readonly string[] = [
 export class StudioHub extends DurableObject<Env> {
   private readonly sql: SqlStorage;
   private operatorHash: string | undefined;
+  private readonly enrollRelay = new EnrollRelay();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -311,6 +313,7 @@ export class StudioHub extends DurableObject<Env> {
       return this.acceptApp(auth, deps);
     }
     if (socketRoute !== undefined) return jsonOf({ error: 'upgrade-required' }, 400);
+    if (url.pathname === '/v1/internal/enroll' && req.method === 'POST' && auth.role === 'operator') return this.relayEnroll(req);
 
     const reply: HubReply = await handleStudioRequest(req, await this.deps(), auth);
     await this.apply(reply.effects ?? []);
@@ -361,10 +364,38 @@ export class StudioHub extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: pair[0], headers: { 'Sec-WebSocket-Protocol': 'synon.v1' } });
   }
 
+  /** Worker → DO: hand a device.enroll frame to the invite's daemon and wait for its answer (SS-210). */
+  private async relayEnroll(req: Request): Promise<Response> {
+    const body = (await req.json().catch(() => undefined)) as
+      | { daemonId?: string; inviteId?: string; deviceId?: string; pubkey?: string; sealPubkey?: string; mac?: string }
+      | undefined;
+    if (!body?.daemonId || !body.inviteId || !body.deviceId || !body.pubkey || !body.mac) return jsonOf({ error: 'bad-args' }, 400);
+    const daemonId = body.daemonId;
+    const reply = await this.enrollRelay.request(
+      {
+        t: 'enroll',
+        reqId: crypto.randomUUID(),
+        inviteId: body.inviteId,
+        deviceId: body.deviceId,
+        pubkey: body.pubkey,
+        ...(body.sealPubkey ? { sealPubkey: body.sealPubkey } : {}),
+        mac: body.mac,
+      },
+      (frame) => {
+        const sockets = this.ctx.getWebSockets(`daemon:${daemonId}`);
+        if (sockets.length === 0) return false;
+        for (const ws of sockets) ws.send(JSON.stringify(frame));
+        return true;
+      },
+    );
+    return jsonOf(reply, 200);
+  }
+
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const att = attachmentOf(ws);
     if (att?.role !== 'daemon') return; // customers act over HTTP only
     const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    if (this.enrollRelay.settle(raw)) return;
     await this.apply(await onDaemonMessage(att.daemonId, raw, await this.deps(), att.at));
   }
 

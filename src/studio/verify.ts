@@ -79,19 +79,52 @@ export const SIGNED_ACTION_KINDS = new Set<string>([
   'device.remove',
 ]);
 
-export function createDeviceTrustStore() {
+export type EnrollFrameResult =
+  | { readonly ok: true; readonly fingerprint: string }
+  | { readonly ok: false; readonly code: 'unknown-invite' | 'invite-used' | 'bad-mac' };
+
+export function createDeviceTrustStore(opts: { readonly nodeFingerprint?: string } = {}) {
+  /** 信任名单：公钥 -> 上次的 at；`aliases` 记下中台给的 deviceId，供 device.remove 按 id 移除。 */
   const devices = new Map<string, { lastAt: number }>();
+  const aliases = new Map<string, string>();
+  /** 一次性邀请：k 只存在节点这一侧，用过即废。 */
+  const invites = new Map<string, { k: string; used: boolean }>();
 
   return {
-    enroll(pubkey: string): void {
+    enroll(pubkey: string, deviceId?: string): void {
       if (!devices.has(pubkey)) {
         devices.set(pubkey, { lastAt: 0 });
       }
+      if (deviceId) aliases.set(deviceId, pubkey);
     },
 
     enrollWithInvite(opts: { readonly k: string; readonly pubkey: string; readonly mac: string }): boolean {
       if (!verifyEnrollMac(opts.k, opts.pubkey, opts.mac)) return false;
       this.enroll(opts.pubkey);
+      return true;
+    },
+
+    /** 节点签发邀请：记下 inviteId 与 k（k 不离开节点）。 */
+    addInvite(inviteId: string, k: string): void {
+      invites.set(inviteId, { k, used: false });
+    },
+
+    /** 处理中台转来的 device.enroll 帧：核对 mac、一次性、记下公钥，成功时回节点公钥指纹。 */
+    enrollFrame(frame: { readonly inviteId: string; readonly pubkey: string; readonly mac: string; readonly deviceId?: string }): EnrollFrameResult {
+      const invite = invites.get(frame.inviteId);
+      if (!invite) return { ok: false, code: 'unknown-invite' };
+      if (invite.used) return { ok: false, code: 'invite-used' };
+      if (!verifyEnrollMac(invite.k, frame.pubkey, frame.mac)) return { ok: false, code: 'bad-mac' };
+      invite.used = true;
+      this.enroll(frame.pubkey, frame.deviceId);
+      return { ok: true, fingerprint: opts.nodeFingerprint ?? '' };
+    },
+
+    /** 移出信任名单：`target` 可以是公钥，也可以是登记时记下的 deviceId。 */
+    remove(target: string): boolean {
+      const pubkey = devices.has(target) ? target : aliases.get(target);
+      if (!pubkey || !devices.delete(pubkey)) return false;
+      for (const [id, pk] of aliases) if (pk === pubkey) aliases.delete(id);
       return true;
     },
 
@@ -143,6 +176,11 @@ export function createDeviceTrustStore() {
       }
 
       entry.lastAt = frame.at;
+      // 验签通过的 device.remove：真的把目标设备从信任名单里去掉。
+      if (action.kind === 'device.remove') {
+        const target = (action.payload as { deviceId?: unknown } | undefined)?.deviceId;
+        if (typeof target === 'string') this.remove(target);
+      }
       return { ok: true };
     },
   };

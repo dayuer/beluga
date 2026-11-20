@@ -8,6 +8,7 @@ export const zh = {
   'join.errExpired': '这条邀请链接已过期（超过 7 天有效期），请让搭环境的人重新生成一条。',
   'join.errFingerprint': '节点返回的指纹与链接里的不一致，已中止登记。请勿继续，并立即联系搭环境的人核实。',
   'join.errOffline': '当前没有网络连接，连上网后再试一次。',
+  'join.errWaiting': '等待执行机器上线：邀请码还没用掉，机器回来后再点一次「登记」。',
   'join.errFailed': '登记没能完成，请稍后再试，或联系搭环境的人。',
   'join.backHome': '返回首页',
 
@@ -41,6 +42,7 @@ export const en: Record<keyof typeof zh, string> = {
   'join.errExpired': 'This invite link has expired (valid for 7 days). Ask your administrator for a new one.',
   'join.errFingerprint': 'The node fingerprint did not match the invite link. Enrollment was aborted — contact your administrator.',
   'join.errOffline': 'You are offline. Reconnect and try again.',
+  'join.errWaiting': 'Waiting for the node to come online — the invite is not used yet. Tap Enroll again once it is back.',
   'join.errFailed': 'Enrollment failed. Try again shortly or contact your administrator.',
   'join.backHome': 'Back to home',
 
