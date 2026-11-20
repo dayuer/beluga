@@ -9,6 +9,7 @@ import * as steps from './steps.js';
 import * as tabs from './tabs.js';
 import * as todo from './todo.js';
 import * as understanding from './understanding.js';
+import * as wait from './wait.js';
 
 export type Lang = 'zh' | 'en';
 
@@ -24,6 +25,7 @@ const zh = {
   ...questions.zh,
   ...understanding.zh,
   ...steps.zh,
+  ...wait.zh,
 } as const;
 
 export type StringKey = keyof typeof zh;
@@ -40,6 +42,7 @@ const en: Record<StringKey, string> = {
   ...questions.en,
   ...understanding.en,
   ...steps.en,
+  ...wait.en,
 };
 
 const table: Record<Lang, Record<StringKey, string>> = { zh, en };
