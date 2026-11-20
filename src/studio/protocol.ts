@@ -84,6 +84,11 @@ const viewShape = {
   review: z.object({ milestoneRef: ref, verdict: z.enum(['pass', 'fail']), notes: text }).strict().optional(),
   draftDiff: StudioDraftDiff.optional(),
   gate: StudioGate.optional(),
+  // 计划完成后、项目有正式环境时：等客户批准上线的那一次。加法字段，旧客户端忽略它。
+  release: z
+    .object({ envId: ref, envTitle: title, version: title, lastVersion: title.optional(), lastReleaseAt: int.optional() })
+    .strict()
+    .optional(),
   // P2 adds `previews`, P3 `entitlement` (optional, here): see docs/studio-protocol.md §3.4.
 };
 

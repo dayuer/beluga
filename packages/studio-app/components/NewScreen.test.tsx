@@ -80,6 +80,13 @@ vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
+vi.mock('../lib/design-upload', () => ({
+  useDesignUpload: () => ({ uploader: { start: vi.fn(), machine: { getState: () => null } }, info: null }),
+}));
+vi.mock('../lib/package-pick', () => ({
+  PACKAGE_LIMITS: { maxPackageBytes: 200 * 1024 * 1024, maxFileBytes: 25 * 1024 * 1024, maxFiles: 500 },
+  pickDesignPackage: vi.fn(async () => ({ canceled: true })),
+}));
 vi.mock('../lib/kv', () => ({
   kv: { get: () => undefined, set: () => {}, remove: () => {} },
 }));

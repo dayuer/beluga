@@ -19,6 +19,9 @@ export const zh = {
   'package.issue.encryptedEntry': '已加密条目，已跳过',
   'package.issue.unsupportedCompression': '不支持的压缩方式，已跳过',
   'package.issue.secretFile': '疑似密钥或凭证，已跳过',
+  'package.add': '设计稿包',
+  'package.viewManifest': '查看清单',
+  'package.pickFailed': '没能读取这个设计稿包，换一个试试',
 } as const;
 
 export type PackageStringKey = keyof typeof zh;
@@ -37,6 +40,9 @@ export const en: Record<PackageStringKey, string> = {
   'package.issue.encryptedEntry': 'Encrypted entry, skipped',
   'package.issue.unsupportedCompression': 'Unsupported compression method, skipped',
   'package.issue.secretFile': 'Possible secret or credential, skipped',
+  'package.add': 'Design package',
+  'package.viewManifest': 'View files',
+  'package.pickFailed': 'Could not read this package — try another one',
 };
 
 const tables: Record<Lang, Record<PackageStringKey, string>> = { zh, en };

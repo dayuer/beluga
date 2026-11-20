@@ -5,6 +5,12 @@ const icon = (name: string) => (props: Record<string, unknown>) =>
 
 export const AlertCircle = icon('AlertCircle');
 export const Check = icon('Check');
+export const ChevronDown = icon('ChevronDown');
+export const ChevronRight = icon('ChevronRight');
+export const Layers = icon('Layers');
+export const RotateCw = icon('RotateCw');
+export const Send = icon('Send');
+export const X = icon('X');
 export const Clock = icon('Clock');
 export const Gauge = icon('Gauge');
 export const Info = icon('Info');

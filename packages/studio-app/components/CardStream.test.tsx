@@ -4,7 +4,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardEvents: undefined,
+  useKeyboardHandler: () => {},
+  KeyboardProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
 }));
@@ -21,15 +29,16 @@ vi.mock('react-native-svg', async () => {
   return { default: Svg, Svg, Defs: host('Defs'), Pattern: host('Pattern'), Rect: host('Rect'), Line: host('Line') };
 });
 
-import { DEMO_REQUEST_VIEW } from '../lib/demo/screens';
+import { DEMO_CARDS, DEMO_REQUEST_VIEW } from '../lib/demo/screens';
 import { setScheme } from '../lib/theme';
 import { CardStream } from './CardStream';
 
-describe('CardStream (SS-52)', () => {
-  it('renders every non-signed card in DEMO_REQUEST_VIEW and placeholders for signed/unknown cards', async () => {
+describe('CardStream (SS-52 / SS-87)', () => {
+  it('renders every card type once: the unsigned cards, the signed cards and the delivery notice', async () => {
     setScheme('light');
     const cards = [
       ...DEMO_REQUEST_VIEW.cards,
+      { ...DEMO_CARDS.delivery!, id: 'card-delivery-done', status: 'done' as const },
       {
         id: 'card-unknown-1',
         kind: 'unknown' as const,
@@ -50,12 +59,22 @@ describe('CardStream (SS-52)', () => {
     expect(screen.getByTestId('card-card-wait-offline')).toBeTruthy();
     expect(screen.getByTestId('card-card-code-1')).toBeTruthy();
 
-    // 需签名的卡与 unknown 留占位，且不露出内部 kind 码
+    // 需要签名的卡：开工、改动、交付验收、上线
     expect(screen.getByTestId('card-card-start-1')).toBeTruthy();
-    expect(screen.getByText('批准开工')).toBeTruthy();
-    expect(screen.getByText('批准改动')).toBeTruthy();
-    expect(screen.getByText('验收交付')).toBeTruthy();
-    expect(screen.getByText('批准上线')).toBeTruthy();
+    expect(screen.getByTestId('start-approve')).toBeTruthy();
+    expect(screen.getByTestId('card-card-changes-1')).toBeTruthy();
+    expect(screen.getByTestId('change-approve')).toBeTruthy();
+    expect(screen.getByTestId('card-card-delivery-1')).toBeTruthy();
+    expect(screen.getByTestId('accept-approve')).toBeTruthy();
+    expect(screen.getByTestId('accept-not-yet')).toBeTruthy();
+    expect(screen.getByTestId('card-card-release-1')).toBeTruthy();
+    expect(screen.getByTestId('release-approve')).toBeTruthy();
+
+    // 已通过的交付是通知卡（不是验收卡）
+    expect(screen.getByTestId('card-card-delivery-done')).toBeTruthy();
+    expect(screen.getByTestId('delivery-open-preview')).toBeTruthy();
+
+    // unknown 留占位，且不露出内部 kind 码
     expect(screen.getByTestId('card-card-unknown-1')).toBeTruthy();
     expect(screen.getByText('暂不支持的卡片')).toBeTruthy();
     expect(screen.queryByText(/future-widget/)).toBeNull();

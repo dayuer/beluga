@@ -114,7 +114,8 @@ export async function enrollDevice(invite: InviteParams, options: EnrollOptions 
   const pubkey = toBase64Url(pub);
   const mac = computeEnrollMac(invite.k, pub);
 
-  const envBase = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EXPO_PUBLIC_HUB_URL;
+  // 直接写 process.env.EXPO_PUBLIC_HUB_URL：Expo 只内联这种静态写法（经 globalThis 读不到）。
+  const envBase = process.env.EXPO_PUBLIC_HUB_URL;
   const base = (options.baseUrl ?? envBase ?? '').replace(/\/+$/, '');
   const token = options.token ?? session.token();
 

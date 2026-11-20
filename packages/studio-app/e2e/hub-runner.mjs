@@ -199,6 +199,7 @@ export function startFakeDaemon({
   interval = 1000,
   controlPort = 8792,
   code,
+  operatorToken,
   logFile,
   start,
 }) {
@@ -217,6 +218,7 @@ export function startFakeDaemon({
     String(controlPort),
   ];
   if (code) args.push('--code', code);
+  if (operatorToken) args.push('--operator-token', operatorToken);
   return start('daemon', process.execPath, args, { cwd: hubDir, log: logFile });
 }
 

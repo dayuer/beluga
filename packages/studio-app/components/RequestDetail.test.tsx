@@ -12,7 +12,15 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams(),
   useRouter: () => ({ back: vi.fn(), canGoBack: () => true, replace: vi.fn() }),
 }));
+vi.mock('../lib/design-upload', () => ({
+  useDesignUpload: () => ({ uploader: { start: vi.fn(), machine: { getState: () => null } }, info: null }),
+}));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('../lib/client', () => ({
+  isDemoMode: () => true,
+  hub: { plan: vi.fn(), plans: vi.fn(), send: vi.fn() },
+  live: { subscribe: () => () => {} },
+}));
 vi.mock('../lib/keys', () => ({
   useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
 }));
@@ -136,7 +144,7 @@ describe('RequestDetailScreen (SS-184 / SS-185)', () => {
 
     mockParams.mockReturnValue({ id: 'req-login', state: 'offline' });
     const offlineScreen = await render(<RequestDetailScreen />);
-    expect(offlineScreen.getByTestId('sync-banner')).toBeTruthy();
+    expect(offlineScreen.getByTestId('offline-banner')).toBeTruthy();
     expect(offlineScreen.getByText('当前离线，先展示上次缓存的内容')).toBeTruthy();
 
     mockParams.mockReturnValue({ id: 'req-login', state: 'runnerOffline' });

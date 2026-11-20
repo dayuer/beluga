@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
 import { AttachList } from '../components/AttachList';
+import { DesignCard } from '../components/cards/DesignCard';
 import { GoalInput } from '../components/GoalInput';
+import { PackageManifest } from '../components/PackageManifest';
 import { Header } from '../components/Header';
 import { PlatformPicker } from '../components/PlatformPicker';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -16,6 +18,8 @@ import { useScheme } from '../lib/appearance';
 import { cache } from '../lib/cache';
 import { hub, isDemoMode } from '../lib/client';
 import { DEMO_SCREENS } from '../lib/demo';
+import { useDesignUpload } from '../lib/design-upload';
+import { pickDesignPackage, type PackageEntry, type PickedPackage } from '../lib/package-pick';
 import type { ProjectSummary } from '../lib/hub-schema';
 import { pickPhotos, takePhoto, type MediaAttachment } from '../lib/media';
 import { useOnline } from '../lib/net';
@@ -30,6 +34,7 @@ import { loadRequestsFromHub, REQUESTS_CACHE_KEY } from '../lib/requests-source'
 import { pendingKey, useSend } from '../lib/send';
 import { session } from '../lib/session';
 import { detectLang, t, type Lang } from '../lib/strings';
+import { packageT } from '../lib/strings/package';
 import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
 import { ago } from '../lib/time';
 import { color, radius, space, type } from '../lib/theme';
@@ -129,6 +134,10 @@ export default function NewRequestScreen() {
   const [newAttachments, setNewAttachments] = useState<readonly MediaAttachment[]>([]);
   const [feedbackAttachments, setFeedbackAttachments] = useState<readonly MediaAttachment[]>([]);
   const [mediaHint, setMediaHint] = useState<string | null>(null);
+  const [designPkg, setDesignPkg] = useState<PickedPackage | null>(null);
+  const [manifestOpen, setManifestOpen] = useState(false);
+  const [packageHint, setPackageHint] = useState<string | null>(null);
+  const design = useDesignUpload();
 
   const lockedRef = useRef(false);
   const hydratedPidRef = useRef<string | null>(null);
@@ -330,6 +339,80 @@ export default function NewRequestScreen() {
     else setFeedbackAttachments(updater);
   };
 
+  /** 「设计稿包」：选包 → 清单 → 开始后台分块上传；需求可以先发，上传不挡发送。 */
+  const pickPackage = async () => {
+    setPackageHint(null);
+    try {
+      const picked = await pickDesignPackage('zip');
+      if (picked.canceled) return;
+      setDesignPkg(picked.pkg);
+      setManifestOpen(true);
+    } catch {
+      setPackageHint(packageT(lang, 'package.pickFailed'));
+    }
+  };
+
+  const confirmPackage = (entries: readonly PackageEntry[]) => {
+    setManifestOpen(false);
+    if (!designPkg) return;
+    const targetProject = mode === 'feedback' ? (selectedRequest?.projectId ?? pid) : pid;
+    if (!targetProject) return;
+    const current = design.uploader.machine.getState();
+    // 同一个包再打开清单后确认：还在传/已经传完的不要重来
+    if (current && current.projectId === targetProject && current.name === designPkg.name && current.status !== 'failed') {
+      return;
+    }
+    void design.uploader.start({ projectId: targetProject, name: designPkg.name, entries });
+  };
+
+  const designCard = useMemo(
+    () =>
+      design.info
+        ? {
+            id: 'design-upload',
+            kind: 'design' as const,
+            createdAt: 0,
+            status: design.info.status === 'done' ? ('done' as const) : ('pending' as const),
+            fileCount: design.info.fileCount,
+            totalBytes: design.info.totalBytes,
+            imageCount: design.info.imageCount,
+            specCount: design.info.specCount,
+            skipped: [] as { name: string; reason: string }[],
+            packageName: design.info.name,
+            progress: design.info.progress,
+          }
+        : null,
+    [design.info],
+  );
+
+  const designPackageBlock = (
+    <View style={styles.packageBlock} testID="design-package-block">
+      <View style={styles.chipRow}>
+        <Pressable
+          onPress={() => void pickPackage()}
+          disabled={locked}
+          accessibilityRole="button"
+          testID="pick-package"
+          style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+        >
+          <Text style={styles.chipText}>{packageT(lang, 'package.add')}</Text>
+        </Pressable>
+        {designPkg ? (
+          <Pressable
+            onPress={() => setManifestOpen(true)}
+            accessibilityRole="button"
+            testID="view-package-manifest"
+            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          >
+            <Text style={styles.chipText}>{packageT(lang, 'package.viewManifest')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {packageHint ? <Text style={styles.caption}>{packageHint}</Text> : null}
+      {designCard ? <DesignCard card={designCard} lang={lang} testID="design-upload-card" /> : null}
+    </View>
+  );
+
   const addFromCamera = async () => {
     setMediaHint(null);
     const res = await takePhoto(lang);
@@ -502,6 +585,7 @@ export default function NewRequestScreen() {
                     lang={lang}
                     disabled={locked}
                   />
+                  {designPackageBlock}
                   <View style={styles.goalMeta}>
                     <Text style={styles.caption} numberOfLines={1}>
                       {restored ?? ''}
@@ -583,6 +667,7 @@ export default function NewRequestScreen() {
                 lang={lang}
                 disabled={locked}
               />
+              {designPackageBlock}
               <View style={styles.goalMeta}>
                 <View />
                 <Text style={[styles.caption, count !== null && styles.warn]}>{count ?? ''}</Text>
@@ -591,6 +676,13 @@ export default function NewRequestScreen() {
           )}
         </View>
       </ScrollView>
+
+      <PackageManifest
+        open={manifestOpen}
+        pkg={designPkg}
+        onClose={() => setManifestOpen(false)}
+        onConfirm={confirmPackage}
+      />
 
       <UndoBar />
       <ActionDock>
@@ -646,6 +738,7 @@ const createStyles = () => StyleSheet.create({
   platformColDesktop: { width: 264 },
   label: { ...type.callout, fontWeight: '500', color: color.text2, marginBottom: space[3] },
   platformLabel: { marginTop: space[3] },
+  packageBlock: { gap: space[2], marginTop: space[3] },
   goalMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
