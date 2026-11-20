@@ -1,98 +1,168 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { kv } from '../lib/kv';
+import { clearReasonDraft, readReasonDraft, writeReasonDraft } from '../lib/drafts';
 import { pendingKey, useSend, type SendFailure } from '../lib/send';
+import { detectLang, t, type Lang } from '../lib/strings';
 import { refusalKey } from '../lib/submit';
-import { t, type Lang } from '../lib/strings';
 import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
+import { Drawer } from './Drawer';
 import { PrimaryButton } from './PrimaryButton';
 import { ReceiptLine } from './ReceiptLine';
 
-interface ReasonSheetProps {
-  readonly pid: string;
-  readonly planRef: string;
-  readonly milestoneRef: string;
-  readonly draftRev: number;
-  readonly lang: Lang;
-  readonly onSent: () => void;
-  readonly onRefresh: () => void;
+export interface ReasonSheetProps {
+  /** 卡片 ID（P7 新版按卡片 ID 存草稿）。 */
+  readonly cardId?: string;
+  /** 抽屉开关（传入时内部包裹 Drawer；不传时只渲染内容区以兼容旧调用）。 */
+  readonly open?: boolean;
+  readonly onClose?: () => void;
+  readonly title?: string;
+  readonly quickTags?: readonly string[];
+  readonly initialDraft?: string;
+  readonly onSubmit?: (reason: string) => void | Promise<void>;
+  readonly lang?: Lang;
+  readonly testID?: string;
+  /** 兼容旧版 app/plan/[id].tsx 调用的字段。 */
+  readonly pid?: string;
+  readonly planRef?: string;
+  readonly milestoneRef?: string;
+  readonly draftRev?: number;
+  readonly onSent?: () => void;
+  readonly onRefresh?: () => void;
 }
 
 const MIN_REASON = 10;
 
-/** "Not yet…": why the milestone is going back, with three quick tags and a kept draft (M6 §4.11). */
-export function ReasonSheet({ pid, planRef, milestoneRef, draftRev, lang, onSent, onRefresh }: ReasonSheetProps) {
-  const key = `draft:sendback:${pid}:${planRef}:${milestoneRef}`;
-  const [reason, setReason] = useState(() => kv.get<{ reason?: string }>(key)?.reason ?? '');
+const COPY = {
+  zh: {
+    missingChars: (n: number) => `还差 ${n} 个字（至少 ${MIN_REASON} 个字）`,
+  },
+  en: {
+    missingChars: (n: number) => `${n} more character${n === 1 ? '' : 's'} needed (min ${MIN_REASON})`,
+  },
+} as const;
+
+/**
+ * P7 原因抽屉（SS-61）：
+ * 至少 10 个字才可发，不足时明确提示还差几个字；
+ * 关掉抽屉或卸载时通过 `lib/drafts.ts` 按卡片 ID 保留草稿，发送成功后清除。
+ */
+export function ReasonSheet({
+  cardId,
+  open,
+  onClose,
+  title,
+  quickTags,
+  initialDraft,
+  onSubmit,
+  lang: langProp,
+  testID = 'reason-sheet',
+  pid = '',
+  planRef = '',
+  milestoneRef = '',
+  draftRev = 0,
+  onSent,
+  onRefresh,
+}: ReasonSheetProps) {
+  const lang = langProp ?? detectLang();
+  const c = COPY[lang];
+  const draftId = cardId ?? `sendback:${pid}:${planRef}:${milestoneRef}`;
+  const [reason, setReason] = useState(() => readReasonDraft(draftId) || initialDraft || '');
   const [notice, setNotice] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const reasonRef = useRef(reason);
   reasonRef.current = reason;
   const send = useSend(pid, pendingKey('sendback', pid, planRef, milestoneRef));
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardInset();
 
+  useEffect(() => {
+    setReason(readReasonDraft(draftId) || initialDraft || '');
+  }, [draftId, initialDraft]);
+
   const change = (value: string): void => {
     setReason(value);
     reasonRef.current = value;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => kv.set(key, { reason: value, updatedAt: Date.now() }), 300);
+    writeReasonDraft(draftId, value);
   };
 
   useEffect(
     () => () => {
-      if (timer.current) clearTimeout(timer.current);
       const value = reasonRef.current;
-      if (value.trim()) kv.set(key, { reason: value, updatedAt: Date.now() });
+      if (value.trim()) writeReasonDraft(draftId, value);
     },
-    [key],
+    [draftId],
   );
 
-  const failedText = (failure: SendFailure): string => t(lang, failure === 'offline' ? 'refusal.offline' : failure === 'expired' ? 'refusal.expired' : 'refusal.http');
-  const ready = reason.trim().length >= MIN_REASON;
-  const busy = send.state.phase === 'sending' || send.state.phase === 'queued';
+  const failedText = (failure: SendFailure): string =>
+    t(lang, failure === 'offline' ? 'refusal.offline' : failure === 'expired' ? 'refusal.expired' : 'refusal.http');
+  const trimmedLen = reason.trim().length;
+  const missing = Math.max(0, MIN_REASON - trimmedLen);
+  const ready = missing === 0;
+  const busy = submitting || send.state.phase === 'sending' || send.state.phase === 'queued';
   const failed = send.state.phase === 'failed';
 
-  const submit = (): void => {
-    if (!ready) return;
+  const submit = async (): Promise<void> => {
+    if (!ready || busy) return;
+    const text = reason.trim();
+    if (onSubmit) {
+      setSubmitting(true);
+      setNotice(null);
+      try {
+        await onSubmit(text);
+        clearReasonDraft(draftId);
+        setReason('');
+        onSent?.();
+        onClose?.();
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : t(lang, 'refusal.http'));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     void send.send(
-      (opId) => ({ t: 'action', opId, kind: 'milestone.sendBack', planRef, payload: { milestoneRef, draftRev, reason: reason.trim() } }),
+      (opId) => ({ t: 'action', opId, kind: 'milestone.sendBack', planRef, payload: { milestoneRef, draftRev, reason: text } }),
       {
         onQueued: () => {
-          kv.remove(key);
-          onSent();
+          clearReasonDraft(draftId);
+          onSent?.();
         },
         onDone: () => {
-          kv.remove(key);
-          onSent();
+          clearReasonDraft(draftId);
+          onSent?.();
         },
         onRefused: (code) => {
           setNotice(t(lang, refusalKey(code)));
-          if (code === 'stale') onRefresh();
+          if (code === 'stale') onRefresh?.();
         },
         onFailed: (failure) => setNotice(failedText(failure)),
       },
     );
   };
 
-  return (
-    <View style={styles.root}>
+  const tags = quickTags ?? [t(lang, 'reason.tag1'), t(lang, 'reason.tag2'), t(lang, 'reason.tag3')];
+
+  const body = (
+    <View style={styles.root} testID={open === undefined ? testID : undefined}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.tags}>
-          {[t(lang, 'reason.tag1'), t(lang, 'reason.tag2'), t(lang, 'reason.tag3')].map((tag, i) => (
-            <Pressable
-              key={tag}
-              accessibilityRole="button"
-              testID={`reason-tag-${i + 1}`}
-              onPress={() => change(reason.trim() ? `${reason.trim()}；${tag}` : tag)}
-              style={({ pressed }) => [styles.tag, pressed && styles.pressed]}
-            >
-              <Text style={styles.tagText}>{tag}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {tags.length > 0 ? (
+          <View style={styles.tags}>
+            {tags.map((tag, i) => (
+              <Pressable
+                key={tag}
+                accessibilityRole="button"
+                testID={`reason-tag-${i + 1}`}
+                onPress={() => change(reason.trim() ? `${reason.trim()}；${tag}` : tag)}
+                style={({ pressed }) => [styles.tag, pressed && styles.pressed]}
+              >
+                <Text style={styles.tagText}>{tag}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <TextInput
           value={reason}
           onChangeText={change}
@@ -102,12 +172,12 @@ export function ReasonSheet({ pid, planRef, milestoneRef, draftRev, lang, onSent
           maxLength={4000}
           style={styles.input}
           testID="reason-input"
-          accessibilityLabel={t(lang, 'reason.title')}
+          accessibilityLabel={title ?? t(lang, 'reason.title')}
         />
         {reason.length >= 3600 ? <Text style={styles.counter}>{t(lang, 'new.left', { n: 4000 - reason.length })}</Text> : null}
         {!ready ? (
           <Text style={styles.hint} testID="reason-too-short">
-            {t(lang, 'reason.tooShort')}
+            {c.missingChars(missing)}
           </Text>
         ) : null}
       </ScrollView>
@@ -115,14 +185,24 @@ export function ReasonSheet({ pid, planRef, milestoneRef, draftRev, lang, onSent
         <ReceiptLine text={notice} tone="error" />
         <PrimaryButton
           label={busy ? t(lang, 'common.sending') : failed ? t(lang, 'common.retry') : t(lang, 'reason.send')}
-          onPress={() => (failed ? void send.retry() : submit())}
+          onPress={() => (failed ? void send.retry() : void submit())}
           disabled={busy || (!failed && !ready)}
           loading={busy}
-          testID="primary"
+          testID="reason-submit"
         />
       </View>
     </View>
   );
+
+  if (open !== undefined && onClose) {
+    return (
+      <Drawer open={open} onClose={onClose} title={title ?? t(lang, 'reason.title')} testID={testID}>
+        {body}
+      </Drawer>
+    );
+  }
+
+  return body;
 }
 
 const styles = StyleSheet.create({
@@ -148,6 +228,6 @@ const styles = StyleSheet.create({
     padding: space[4],
   },
   counter: { ...type.caption, color: color.text3, textAlign: 'right' },
-  hint: { ...type.caption, color: color.warn },
-  footer: { paddingHorizontal: space[4], paddingTop: space[2], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  hint: { ...type.caption, color: color.text3 },
+  footer: { paddingHorizontal: space[4], paddingTop: space[3], gap: space[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
 });
