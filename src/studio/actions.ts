@@ -121,6 +121,10 @@ export function checkAction(frame: unknown, ctx: ActionContext): ActionVerdict {
     return { ok: true, call: { method: 'plans.create', args: [{ projectId: ctx.projectId, goal: wrapCustomerText(`${a.payload.goal}\n\n涉及平台：${platforms}`) }] } };
   }
 
+  if (a.kind === 'device.remove') {
+    return no('not-allowed', 'signed action requires device verification');
+  }
+
   const plan = ctx.plan;
   // The plan the frame names must be the one the caller looked up (and scoped the opId by).
   if (!plan || a.planRef !== ctx.scope.plan) return no('unknown-plan', 'no such plan');
@@ -156,6 +160,8 @@ export function checkAction(frame: unknown, ctx: ActionContext): ActionVerdict {
     }
     case 'decision.answer':
       return answerDecision(plan, a.payload);
+    default:
+      return no('not-allowed', 'signed action requires device verification');
   }
 }
 
