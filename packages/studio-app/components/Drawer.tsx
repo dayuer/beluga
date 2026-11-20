@@ -1,15 +1,17 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  AnimatedView,
+  Gesture,
+  GestureDetector,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
-} from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from './drawer/motion';
 import { detectLang, type Lang } from '../lib/strings';
 import { tDrawer } from '../lib/strings/drawer';
 import { acquireDrawer } from '../lib/ui-state';
@@ -224,7 +226,7 @@ export function Drawer({
           </View>
         </View>
       ) : (
-        <Animated.View
+        <AnimatedView
           style={[
             styles.sheet,
             { height: sheetHeight, bottom: inset, backgroundColor: color.card },
@@ -235,7 +237,7 @@ export function Drawer({
           testID={testID}
         >
           {body}
-        </Animated.View>
+        </AnimatedView>
       )}
     </View>
   );

@@ -13,33 +13,6 @@ vi.mock('react-native-keyboard-controller', () => ({
   useKeyboardHandler: () => {},
   KeyboardProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => {
-      const chain = { onUpdate: () => chain, onEnd: () => chain };
-      return chain;
-    },
-  },
-}));
-vi.mock('react-native-reanimated', async () => {
-  const r = await import('react');
-  const AnimatedView = r.forwardRef((props: Record<string, unknown>, ref: unknown) =>
-    r.createElement('View', { ...props, ref }, props.children as React.ReactNode),
-  );
-  return {
-    default: { View: AnimatedView },
-    runOnJS: <T extends (...args: never[]) => unknown>(fn: T) => fn,
-    useReducedMotion: () => true,
-    useSharedValue: <T,>(v: T) => ({ value: v }),
-    useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
-    withSpring: <T,>(v: T) => v,
-    withTiming: <T,>(v: T, _cfg?: unknown, cb?: (done: boolean) => void) => {
-      cb?.(true);
-      return v;
-    },
-  };
-});
 
 import { getDrawerOpen, resetDrawerCount } from '../lib/ui-state';
 import { Drawer, shouldDismissDrawer, type DrawerTab } from './Drawer';
