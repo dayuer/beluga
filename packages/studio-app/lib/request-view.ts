@@ -241,6 +241,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
       status: 'pending',
       round,
       summary: view.review?.notes || view.headline,
+      criteria: reviewMilestone?.criteria ?? [],
       screenshots: [],
       requiresSignature: true,
     });

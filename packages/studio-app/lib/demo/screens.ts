@@ -216,6 +216,7 @@ export const DEMO_CARDS: Record<string, StudioCard> = {
     status: 'pending',
     round: 2,
     summary: '第 2 轮交付已部署到测试环境，检查全部通过。',
+    criteria: ['记录后列表立刻更新', '关掉 App 再打开数据还在'],
     previewUrl: 'https://demo-preview.synon.invalid/req-export',
     installUrl: 'https://demo-preview.synon.invalid/req-export.ipa',
     screenshots: [],

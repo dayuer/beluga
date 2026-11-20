@@ -152,6 +152,8 @@ export const DeliveryCardSchema = z
     kind: z.literal('delivery'),
     round: z.number().default(1),
     summary: z.string(),
+    /** 这一轮要满足的验收标准；A10 走查补上，老卡片没有时是空数组。 */
+    criteria: z.array(z.string()).default([]),
     previewUrl: z.string().optional(),
     installUrl: z.string().optional(),
     screenshots: z.array(z.string()).default([]),

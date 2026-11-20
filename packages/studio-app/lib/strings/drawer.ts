@@ -38,7 +38,7 @@ export const zh = {
   'preview.unconfiguredReason': '尚未配置测试环境',
   'preview.unconfiguredWhen': '这个项目还没有测试环境，做完后会在这里出现预览',
 
-  'request.openResults': '结果与计划',
+  'request.openResults': '结果与详情',
   'request.stepsTitle': '当前进度',
   'request.chatSection': '需求对话',
   'request.signedCard.start': '批准开工',
@@ -90,7 +90,7 @@ export const en: Record<keyof typeof zh, string> = {
   'preview.unconfiguredReason': 'Test environment not configured',
   'preview.unconfiguredWhen': 'This project does not have a test environment yet. A preview will appear here once ready.',
 
-  'request.openResults': 'Results & plan',
+  'request.openResults': 'Results & details',
   'request.stepsTitle': 'Current progress',
   'request.chatSection': 'Conversation',
   'request.signedCard.start': 'Approve start',

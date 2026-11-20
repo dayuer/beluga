@@ -155,7 +155,10 @@ export function ReasonSheet({
                 key={tag}
                 accessibilityRole="button"
                 testID={`reason-tag-${i + 1}`}
-                onPress={() => change(reason.trim() ? `${reason.trim()}${c['reason.tagJoiner']}${tag}` : tag)}
+                // 标签后面留一个分隔符：接着打字是「有错误；第二个提醒…」，不会粘成一个词。
+                onPress={() =>
+                  change(`${reason.trim() ? `${reason.trim()}${c['reason.tagJoiner']}` : ''}${tag}${c['reason.tagJoiner']}`)
+                }
                 style={({ pressed }) => [styles.tag, { backgroundColor: color.sunken }, pressed && styles.pressed]}
               >
                 <Text style={[styles.tagText, { color: color.text2 }]}>{tag}</Text>

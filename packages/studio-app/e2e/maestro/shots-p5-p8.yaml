@@ -1,0 +1,94 @@
+appId: com.synon.studio
+---
+# Walkthrough screenshots for P5–P8 (milestone A10 / SS-91). Runs against the fake daemon.
+# P5 交付验收卡 / P6 交付流转与预览（在 demo 版补拍）/ P7 原因抽屉 / P8 待办
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+
+# P5: 交付验收卡
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你验收.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- takeScreenshot: p5-acceptance
+
+# P7: 原因抽屉（还不行…）
+- tapOn:
+    id: "accept-not-yet"
+- extendedWaitUntil:
+    visible: ".*哪里还不行.*"
+    timeout: 10000
+- takeScreenshot: p7-reason-empty
+- tapOn:
+    id: "reason-tag-1"
+- tapOn:
+    id: "reason-input"
+- inputText: "第二个提醒到点后没有弹出，重新打开 App 才出现。"
+- hideKeyboard
+- takeScreenshot: p7-reason-filled
+- tapOn:
+    id: "drawer-close"
+
+# P8: 待办
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "tab-todo"
+- extendedWaitUntil:
+    visible:
+      id: "todo-screen"
+    timeout: 15000
+- takeScreenshot: p8-todo

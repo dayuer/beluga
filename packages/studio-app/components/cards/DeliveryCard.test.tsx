@@ -14,6 +14,7 @@ const sampleCard: DeliveryCardModel = {
   status: 'done',
   round: 2,
   summary: '第 2 轮交付已部署到测试环境，检查全部通过。',
+  criteria: [],
   previewUrl: 'https://demo-preview.synon.invalid/req-export',
   screenshots: [],
   requiresSignature: false,
