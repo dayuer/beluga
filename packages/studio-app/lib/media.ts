@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import type { Lang } from './strings';
+import { tMedia } from './strings/media';
 
 export const MAX_LONG_EDGE = 2048;
 
@@ -48,24 +49,12 @@ function mapAsset(asset: ImagePicker.ImagePickerAsset, index: number): MediaAtta
   };
 }
 
-function cameraDeniedMessage(lang: Lang): string {
-  return lang === 'en'
-    ? 'Camera permission is off. Enable it in Settings › Synon Studio › Camera to take a photo.'
-    : '未开启相机权限。请在系统「设置 › Synon Studio › 相机」中允许访问后再试。';
-}
-
-function libraryDeniedMessage(lang: Lang): string {
-  return lang === 'en'
-    ? 'Photos permission is off. Enable it in Settings › Synon Studio › Photos to pick images.'
-    : '未开启相册权限。请在系统「设置 › Synon Studio › 照片」中允许访问后再试。';
-}
-
 /** 拍照并按长边 2048 归一化尺寸；拒绝相机权限时返回原地说明。 */
 export async function takePhoto(lang: Lang): Promise<MediaPickResult> {
   try {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      return { ok: false, reason: 'denied', message: cameraDeniedMessage(lang) };
+      return { ok: false, reason: 'denied', message: tMedia(lang, 'media.cameraDenied') };
     }
     const res = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
@@ -80,7 +69,7 @@ export async function takePhoto(lang: Lang): Promise<MediaPickResult> {
     return {
       ok: false,
       reason: 'error',
-      message: lang === 'en' ? 'Could not open camera.' : '暂时无法打开相机，请稍后再试。',
+      message: tMedia(lang, 'media.cameraError'),
     };
   }
 }
@@ -90,7 +79,7 @@ export async function pickPhotos(lang: Lang): Promise<MediaPickResult> {
   try {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      return { ok: false, reason: 'denied', message: libraryDeniedMessage(lang) };
+      return { ok: false, reason: 'denied', message: tMedia(lang, 'media.libraryDenied') };
     }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -106,7 +95,7 @@ export async function pickPhotos(lang: Lang): Promise<MediaPickResult> {
     return {
       ok: false,
       reason: 'error',
-      message: lang === 'en' ? 'Could not open photo library.' : '暂时无法打开相册，请稍后再试。',
+      message: tMedia(lang, 'media.libraryError'),
     };
   }
 }

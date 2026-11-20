@@ -2,6 +2,7 @@ import { Camera, Image as ImageIcon, X } from 'lucide-react-native';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { MediaAttachment } from '../lib/media';
 import type { Lang } from '../lib/strings';
+import { tMedia } from '../lib/strings/media';
 import { color, radius, space, type } from '../lib/theme';
 import { undoStore } from '../lib/undo';
 
@@ -17,7 +18,8 @@ export interface AttachListProps {
 }
 
 /**
- * 附件清单（SS-40）：拍照 / 选图按钮、权限拒绝原地说明、缩略图横排与移除 4 秒撤销（undoStore）。
+ * 附件清单（SS-40 / SS-199）：拍照 / 选图按钮与移除按钮均满足 ≥ 44pt 点击区，
+ * 文案来自 lib/strings/media.ts，移除给 4 秒撤销（undoStore）。
  */
 export function AttachList({
   items,
@@ -31,10 +33,9 @@ export function AttachList({
 }: AttachListProps) {
   const handleRemove = (item: MediaAttachment, index: number) => {
     onRemove(item.id);
-    const label =
-      lang === 'en'
-        ? `Removed ${item.fileName ?? 'attachment'}`
-        : `已移除${item.fileName ? `「${item.fileName}」` : '图片'}`;
+    const label = item.fileName
+      ? tMedia(lang, 'media.removedNamed', { name: item.fileName })
+      : tMedia(lang, 'media.removedUnnamed');
     undoStore.show({
       text: label,
       ms: 4000,
@@ -54,7 +55,7 @@ export function AttachList({
           style={({ pressed }) => [styles.btn, disabled && styles.disabled, pressed && styles.pressed]}
         >
           <Camera size={15} color={color.text2} />
-          <Text style={styles.btnText}>{lang === 'en' ? 'Camera' : '拍照'}</Text>
+          <Text style={styles.btnText}>{tMedia(lang, 'media.camera')}</Text>
         </Pressable>
 
         <Pressable
@@ -65,7 +66,7 @@ export function AttachList({
           style={({ pressed }) => [styles.btn, disabled && styles.disabled, pressed && styles.pressed]}
         >
           <ImageIcon size={15} color={color.text2} />
-          <Text style={styles.btnText}>{lang === 'en' ? 'Photos' : '从相册选'}</Text>
+          <Text style={styles.btnText}>{tMedia(lang, 'media.library')}</Text>
         </Pressable>
       </View>
 
@@ -92,8 +93,9 @@ export function AttachList({
               <Pressable
                 onPress={() => handleRemove(item, idx)}
                 disabled={disabled}
+                hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel={lang === 'en' ? 'Remove attachment' : '移除附件'}
+                accessibilityLabel={tMedia(lang, 'media.removeLabel')}
                 testID={`attach-remove-${item.id}`}
                 style={styles.removeBtn}
               >
@@ -111,7 +113,8 @@ const styles = StyleSheet.create({
   wrap: { marginTop: space[3], gap: space[2] },
   buttons: { flexDirection: 'row', gap: space[2] },
   btn: {
-    minHeight: 36,
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: space[3],
     borderRadius: radius.s,
     borderWidth: 1,
