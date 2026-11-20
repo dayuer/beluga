@@ -7,6 +7,7 @@ import { AUTO_CONTINUE_OFF_MAX } from './auto-continue.js';
 import { MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH } from './agent-args.js';
 import { THREAD_LIMITS_DEFAULT, THREAD_LIMITS_MAX } from './threads.js';
 import { FETCH_EVERY_DEFAULT, fetchEveryMinutes } from './background-fetch.js';
+import { REPLY_LANGUAGES } from './reply-language.js';
 import { AUTOPILOT_WAIT_DEFAULT, autopilotWaitMinutes } from './autopilot-wait.js';
 import { coercePerKind, coerceSound, DEFAULT_SOUND, DEFAULT_VOLUME, PerKindSounds, SoundChoice } from './notify-sound.js';
 
@@ -177,6 +178,8 @@ export const Settings = z.object({
   autopilotWait: z.number().transform(autopilotWaitMinutes).catch(AUTOPILOT_WAIT_DEFAULT),
   /** Claude keeps screenshots and scratch output in the workspace's git-ignored `.beluga/scratch/` folder. */
   scratchFolder: z.boolean().default(true),
+  /** The language your agents answer you in: the Mac's (shared/reply-language.ts). Unset: whatever you wrote in. */
+  replyLanguage: z.enum(REPLY_LANGUAGES).optional().catch(undefined),
   /** How much of Claude's sub-agent work the chat shows. */
   subagents: z.enum(['full', 'compact', 'hidden']).default('full'),
   /** Workspace buttons you chose to hide from the top bar. */
