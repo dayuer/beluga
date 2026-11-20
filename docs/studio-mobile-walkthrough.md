@@ -331,3 +331,26 @@ E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-states.yaml
 EXPO_PUBLIC_DEMO=1 npx expo run:ios --no-bundler --configuration Release --device generic --output .beluga/scratch/demo-ios-build
 maestro --device <udid> test --test-output-dir e2e/out/demo-states e2e/maestro/shots-states-demo.yaml
 ```
+
+## 17. 手势规则逐条录屏（SS-233）
+
+脚本：`e2e/maestro/gestures.yaml`（对着 `EXPO_PUBLIC_DEMO=1` 的构建跑）。iOS 用
+`xcrun simctl io <udid> recordVideo --codec h264`，Android 用 `adb shell screenrecord`，
+Maestro 在录屏过程中执行手势。录像在 `.beluga/scratch/ss-233/`。
+
+| SS-47 的规则 | 录像里的做法 | 文件 |
+|---|---|---|
+| 点「结果与详情」向上滑出 | 点标题下的入口，抽屉从底部滑出 | `ios-gestures.mp4` 00:00–00:06；`android-gestures.mp4` |
+| 下拉跟手 | 从抽屉顶部的拖拽条向下拖 13%（不到三成）再松手，抽屉跟手回弹到打开位置 | `ios-gestures.mp4` 00:06–00:14 |
+| 拖过三成关闭 | 从拖拽条慢慢拖到屏幕底部松手，抽屉关闭回到需求详情 | `ios-gestures.mp4` 00:14–00:24 |
+| 甩得够快也关闭 | 从拖拽条快速下滑（位移约 6%、80 ms）松手，抽屉关闭 | `ios-gestures.mp4` 00:24–00:34 |
+| 点遮罩关闭 | 点抽屉上方的半透明遮罩，抽屉关闭 | `ios-gestures.mp4` 00:34–00:44 |
+| 内容超高时在抽屉内滚动 | 打开「计划」页签，在抽屉里向上滚动两次，背后的卡片流不动 | `ios-gestures.mp4` 00:44–00:52 |
+| 返回手势 | iOS：从屏幕左缘向右滑，回到需求列表（`ios-gestures.mp4` 00:52–00:57）。Android 这个 AOSP 模拟器是 3 键导航，没有边缘返回手势，用系统返回键 |
+| 减弱动态效果时直接到位 | 打开系统「减弱动态效果」后重放同一套手势：抽屉没有动画，直接出现 / 消失 | `ios-gestures-reduced-motion.mp4` |
+
+说明：
+- 拖拽手势只挂在抽屉顶部（拖拽条与标题那一行），抽屉内容用 ScrollView，所以从内容区向下滑是滚动内容，不是关抽屉——这与设计一致。
+- iOS 系统「减弱动态效果」用 `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true` 打开，录完再关。
+- 复跑：`maestro --device <udid> test e2e/maestro/gestures.yaml`；Android 录屏用
+  `adb -s <serial> shell screenrecord /sdcard/g.mp4` 与 `adb pull`。
