@@ -249,17 +249,47 @@ async function setup() {
   const appName = fs.readdirSync(buildDir).find((name) => name.endsWith('.app'));
   if (!appName) throw new Error(`no .app bundle found in ${buildDir}`);
   const appPath = path.join(buildDir, appName);
-  log(`installing ${appName} onto simulator ${udid}`);
-  execFileSync('xcrun', ['simctl', 'install', udid, appPath], { stdio: 'inherit' });
 
   return {
     udid,
+    appPath,
     proxy,
     projectId: seeded.projectId,
     project2Id: seeded.project2Id,
     customerId: seeded.customerId,
     sessionJson: seeded.sessionJson,
   };
+}
+
+function reinstallApp(udid, appPath) {
+  // Wipe iOS Keychain (expo-secure-store) and app container so every flow starts logged out.
+  try {
+    execFileSync('xcrun', ['simctl', 'uninstall', udid, 'com.synon.studio'], { stdio: 'ignore' });
+  } catch {}
+  try {
+    execFileSync('xcrun', ['simctl', 'keychain', udid, 'reset'], { stdio: 'ignore' });
+  } catch {}
+  log(`installing ${path.basename(appPath)} onto simulator ${udid}`);
+  execFileSync('xcrun', ['simctl', 'install', udid, appPath], { stdio: 'inherit' });
+}
+
+function expandFlowPaths(targets) {
+  const inputs = targets.length ? targets : ['e2e/maestro'];
+  const flows = [];
+  for (const target of inputs) {
+    const abs = path.resolve(appDir, target);
+    if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) {
+      const files = fs
+        .readdirSync(abs)
+        .filter((name) => name.endsWith('.yaml') || name.endsWith('.yml'))
+        .sort()
+        .map((name) => path.join(target, name));
+      flows.push(...files);
+    } else {
+      flows.push(target);
+    }
+  }
+  return flows;
 }
 
 let cleaningUp = false;
@@ -401,27 +431,31 @@ async function main() {
     };
 
     const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
-    const flowPaths = targets.length ? targets : ['e2e/maestro'];
+    const flowPaths = expandFlowPaths(targets);
+    const maestroArgs = [
+      '--udid',
+      env.udid,
+      '--test-output-dir',
+      outDir,
+      '-e',
+      `E2E_CONTROL=http://127.0.0.1:${controlPort}`,
+      '-e',
+      `E2E_PROJECT_ID=${env.projectId}`,
+      '-e',
+      `E2E_PROJECT2_ID=${env.project2Id}`,
+    ];
 
-    log(`running Maestro tests (${flowPaths.join(', ')})`);
-    await runCommand(
-      'maestro',
-      [
-        'test',
-        '--udid',
-        env.udid,
-        '--test-output-dir',
-        outDir,
-        '-e',
-        `E2E_CONTROL=http://127.0.0.1:${controlPort}`,
-        '-e',
-        `E2E_PROJECT_ID=${env.projectId}`,
-        '-e',
-        `E2E_PROJECT2_ID=${env.project2Id}`,
-        ...flowPaths,
-      ],
-      { env: maestroEnv },
-    );
+    for (let i = 0; i < flowPaths.length; i += 1) {
+      const flowFile = flowPaths[i];
+      proxy.setOffline(false);
+      if (i > 0) {
+        await fetch(`http://127.0.0.1:${controlPort}/daemon/start`, { method: 'POST' });
+        await fetch(`http://127.0.0.1:${controlPort}/daemon/reset`, { method: 'POST' });
+      }
+      reinstallApp(env.udid, env.appPath);
+      log(`running Maestro test (${flowFile})`);
+      await runCommand('maestro', ['test', ...maestroArgs, flowFile], { env: maestroEnv });
+    }
     log(`screenshots and reports in ${outDir}`);
   } catch (error) {
     failed = true;
