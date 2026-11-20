@@ -179,10 +179,11 @@ export function useSend(pid: string, key: string): Sender {
           prepared = await prepareActionForSend(build(opId));
         } catch (err) {
           if (err instanceof DeviceKeyMissingError) {
-            const refused = submitNext(started, { type: 'refused', code: 'not-allowed' });
+            const refused = submitNext(started, { type: 'refused', code: 'unregistered-device' });
             set(refused);
             kv.remove(key);
-            handlersRef.current.onRefused?.('not-allowed');
+            clearSignedCache(opId);
+            handlersRef.current.onRefused?.('unregistered-device');
             return;
           }
           throw err;
