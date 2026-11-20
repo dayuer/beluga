@@ -201,6 +201,7 @@ export async function sendFcmNotification(
       message: {
         token: record.token,
         notification: { title: payload.title, body: payload.body },
+        android: { notification: { channel_id: 'needs-you' } },
         ...(Object.keys(data).length > 0 ? { data } : {}),
       },
     }),
