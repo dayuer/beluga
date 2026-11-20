@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -46,6 +46,23 @@ export const RULES: readonly RegenRule[] = [
   { what: 'tool caches', names: ['.cache'], beside: [...JS, ...PY] },
 ];
 
+/**
+ * Folders known by what's in them, whatever they're called: all of these are there. Xcode's build
+ * folder is named by whoever runs the build (`-derivedDataPath dd181`), and agents name it as they like.
+ */
+export const CONTENT_RULES: readonly (RegenRule & { readonly inside: readonly string[] })[] = [
+  { what: 'Xcode build output', names: [], inside: ['info.plist', 'Build/', 'Logs/', 'ModuleCache.noindex/'] },
+];
+
+const holds = (dir: string, entry: string): boolean => {
+  try {
+    const st = statSync(path.join(dir, entry));
+    return entry.endsWith('/') ? st.isDirectory() : st.isFile();
+  } catch {
+    return false;
+  }
+};
+
 /** Single files that are only ever made by a tool (never anything of yours). */
 export const FILE_RULES: readonly RegenRule[] = [
   { what: 'Finder’s folder settings', names: ['.DS_Store'] },
@@ -72,11 +89,14 @@ export function regenRule(root: string, rel: string): RegenRule | undefined {
       if (rule.beside && !rule.beside.some((b) => existsSync(path.join(dir, b)))) continue;
       return rule;
     }
+    const folder = path.join(root, ...parts.slice(0, i + 1));
+    const byContent = CONTENT_RULES.find((r) => r.inside.every((e) => holds(folder, e)));
+    if (byContent) return byContent;
   }
   return undefined;
 }
 
 /** The commands that bring back what was thrown away (each once, in rule order). */
 export function remakeSteps(rules: readonly RegenRule[]): string[] {
-  return [...new Set(RULES.filter((r) => rules.includes(r) && r.remake).map((r) => r.remake!))];
+  return [...new Set([...RULES, ...CONTENT_RULES].filter((r) => rules.includes(r) && r.remake).map((r) => r.remake!))];
 }

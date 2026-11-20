@@ -46,6 +46,12 @@ describe('what can be thrown away and made again', () => {
     expect(regenRule(root, 'apps/web/.DS_Store')?.what).toBe('Finder’s folder settings');
     expect(regenRule(root, 'tsconfig.tsbuildinfo')?.what).toBe('TypeScript build info');
     expect(regenRule(root, 'node_modules')).toBeUndefined();
+    // Xcode's build folder, by what's in it (an agent names it as it likes: -derivedDataPath dd181).
+    for (const f of ['info.plist', 'Build/Products/x', 'Logs/Build/x', 'ModuleCache.noindex/x']) put(path.join(root, 'dd181', f), '');
+    expect(regenRule(root, 'dd181/')?.what).toBe('Xcode build output');
+    expect(regenRule(root, 'dd181/Build/Products/x')?.what).toBe('Xcode build output');
+    for (const f of ['info.plist', 'Build/x']) put(path.join(root, 'half', f), '');
+    expect(regenRule(root, 'half/')).toBeUndefined();
     expect(remakeSteps([regenRule(root, 'dist/')!, regenRule(root, 'node_modules/')!, regenRule(root, '.next/')!])).toEqual(['npm install', 'npm run build']);
   });
 });
@@ -155,6 +161,45 @@ describe('a smart archive', () => {
     expect(readFileSync(path.join(wt, '.beluga/scratch/log.txt'), 'utf8')).toBe('Claude’s');
     expect(existsSync(path.join(wt, '.beluga/reports/r.md'))).toBe(true);
     expect(existsSync(path.join(wt, '.beluga/scratch/sent'))).toBe(false);
+  });
+
+  it('in Beluga’s own folder, build output goes, whatever it’s called, and the rest stays', async () => {
+    put(path.join(repo, '.git/info/exclude'), '.beluga/\n');
+    const derived = (rel: string): void => {
+      put(path.join(wt, rel, 'info.plist'), 'plist');
+      put(path.join(wt, rel, 'Build/Products/App.app/App'), 'b'.repeat(30_000));
+      put(path.join(wt, rel, 'Logs/Build/x.xcactivitylog'), 'log');
+      put(path.join(wt, rel, 'ModuleCache.noindex/m.pcm'), 'pcm');
+    };
+    derived('.beluga/scratch/dd181');
+    derived('.beluga/scratch/perf-313f7b8/.build/DerivedData');
+    put(path.join(wt, '.beluga/scratch/perf-313f7b8/notes.md'), 'kept');
+    put(path.join(wt, '.beluga/scratch/run.xcresult/Info.plist'), 'evidence');
+    put(path.join(wt, '.beluga/scratch/sent/shot.png'), 'png');
+    // A folder that only has some of what Xcode makes is yours.
+    put(path.join(wt, '.beluga/scratch/half/info.plist'), 'mine');
+    put(path.join(wt, '.beluga/scratch/half/Build/x'), 'mine');
+    // A git repo of yours inside is never looked into.
+    put(path.join(wt, '.beluga/scratch/clone/.git/HEAD'), 'ref: refs/heads/main\n');
+    derived('.beluga/scratch/clone/dd');
+    put(path.join(wt, '.beluga/reports/r.md'), '# report');
+
+    const plan = await planArchive(wt, { archiving: true });
+    const dropped = plan.drop.map((d) => d.path);
+    expect(dropped).toEqual(expect.arrayContaining(['.beluga/scratch/dd181/', '.beluga/scratch/perf-313f7b8/.build/DerivedData/', '.beluga/scratch/sent/']));
+    expect(plan.drop.find((d) => d.path === '.beluga/scratch/dd181/')?.rule.what).toBe('Xcode build output');
+    expect(dropped.filter((d) => d.startsWith('.beluga/scratch/clone/') || d.startsWith('.beluga/scratch/half/'))).toEqual([]);
+    expect(plan.keep).toEqual(expect.arrayContaining(['.beluga/reports/', '.beluga/scratch/perf-313f7b8/notes.md', '.beluga/scratch/run.xcresult/', '.beluga/scratch/half/', '.beluga/scratch/clone/']));
+    expect(plan.keep.some((k) => k.startsWith('.beluga/scratch/dd181') || k.includes('DerivedData'))).toBe(false);
+
+    await archiveWorktree({ repo, dir: wt, id: 'w-scratch', archivesDir: archives });
+    await restoreWorktree({ repo, dir: wt, id: 'w-scratch', archivesDir: archives });
+    expect(readFileSync(path.join(wt, '.beluga/scratch/perf-313f7b8/notes.md'), 'utf8')).toBe('kept');
+    expect(readFileSync(path.join(wt, '.beluga/scratch/run.xcresult/Info.plist'), 'utf8')).toBe('evidence');
+    expect(readFileSync(path.join(wt, '.beluga/scratch/half/info.plist'), 'utf8')).toBe('mine');
+    expect(existsSync(path.join(wt, '.beluga/scratch/clone/dd/info.plist'))).toBe(true);
+    expect(existsSync(path.join(wt, '.beluga/scratch/dd181'))).toBe(false);
+    expect(existsSync(path.join(wt, '.beluga/scratch/perf-313f7b8/.build'))).toBe(false);
   });
 
   it('in a folder the project ignores whole, build output goes and the rest stays (BLG-612)', async () => {

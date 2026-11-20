@@ -6,7 +6,7 @@ import { parseWorktreeList } from './git.js';
 import { deleteFolderInBackground, removeWorktreeKeepingBranch } from './others.js';
 import { ArchiveError, LONG_MS, RAW_ARGS, RAW_ENV, assertSettled, fingerprint, git, gitLiteral, ignoredByProject, ignoredIn, pack, run, snapshot, submoduleOnlyHere, submodulesIn, tryGit, unpackKeeping, untrackedDirs } from './archive-git.js';
 import { type RegenRule, regenRule, remakeSteps } from './regenerable.js';
-import { SENT_DIR } from '../shared/scratch-dir.js';
+import { LEGACY_PROJECT_DIR, PROJECT_DIR, SENT_DIR } from '../shared/scratch-dir.js';
 
 /**
  * A smart archive of a worktree: nothing of yours is lost, and what can be made again doesn't
@@ -143,6 +143,9 @@ function without(dir: string, folder: string, out: ReadonlySet<string>): string[
 const SENT = `${SENT_DIR}/`;
 const SENT_RULE: RegenRule = { what: 'copies of files you sent Claude', names: [] };
 
+/** Beluga's own folders in a worktree (reports, scratch): what tools make in them is throwaway too. */
+const OWN = [`${PROJECT_DIR}/`, `${LEGACY_PROJECT_DIR}/`];
+
 /** Whether what would be kept holds the sent copies (a real folder, never a link). */
 function sentIn(dir: string, kept: readonly string[]): boolean {
   if (!kept.some((rel) => rel.startsWith(SENT) || (rel.endsWith('/') && SENT.startsWith(rel)))) return false;
@@ -167,11 +170,12 @@ export async function planArchive(dir: string, opts: { readonly archiving?: bool
   );
   const kept = outermost(entries.filter((rel) => !theirs.has(rel)));
   // A folder the project ignores whole (an Android project, a vendored app): what's made again inside it goes too.
-  const ignoredFolders = await ignoredByProject(
-    dir,
-    kept.filter((rel) => rel.endsWith('/') && !regenRule(dir, rel)),
-  );
-  const inside = [...ignoredFolders].flatMap((folder) => regenUnder(dir, folder));
+  const folders = kept.filter((rel) => rel.endsWith('/') && !regenRule(dir, rel));
+  const ignoredFolders = await ignoredByProject(dir, folders);
+  // Beluga's own folder (kept out of git by .git/info/exclude, not the project): what's made again in it goes too.
+  for (const rel of folders) if (OWN.some((own) => rel === own || rel.startsWith(own))) ignoredFolders.add(rel);
+  const sentGoes = opts.archiving === true;
+  const inside = [...ignoredFolders].flatMap((folder) => regenUnder(dir, folder)).filter((d) => !(sentGoes && (d.rel.startsWith(SENT) || SENT.startsWith(d.rel))));
   const drop = [...candidates.filter((c) => theirs.has(c.rel)), ...inside];
   const nestedDrops = new Set(inside.map((d) => d.rel));
   const listed = kept.flatMap((rel) => (ignoredFolders.has(rel) ? without(dir, rel, nestedDrops) : [rel]));
