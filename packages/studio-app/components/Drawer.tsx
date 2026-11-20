@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardInset } from '../lib/viewport';
+import { acquireDrawer } from '../lib/ui-state';
 import { color, radius, space, type } from '../lib/theme';
 
 interface DrawerProps {
@@ -41,6 +42,11 @@ export function Drawer({ open, onClose, title, children, footer, testID = 'drawe
       setDrag(0);
     }
   }, [open, initialSnap]);
+
+  useEffect(() => {
+    if (!open) return;
+    return acquireDrawer();
+  }, [open]);
 
   const pan = useMemo(
     () =>

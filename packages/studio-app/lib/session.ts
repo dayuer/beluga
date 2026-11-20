@@ -13,6 +13,14 @@ const listeners = new Set<() => void>();
 let cached: StoredSession | undefined;
 let generation = 0;
 
+const isDemo = (): boolean => process.env.EXPO_PUBLIC_DEMO === '1';
+
+const DEMO_SESSION: StoredSession = {
+  session: 'demo-session',
+  expiresAt: Number.MAX_SAFE_INTEGER,
+  customerId: 'cust-demo',
+};
+
 const isSession = (v: unknown): v is StoredSession => {
   if (!v || typeof v !== 'object') return false;
   const s = v as Partial<StoredSession>;
@@ -51,11 +59,11 @@ async function hydrate(): Promise<void> {
 registerBoot(hydrate);
 
 const read = (): StoredSession | undefined => {
-  if (!cached) return undefined;
+  if (!cached) return isDemo() ? DEMO_SESSION : undefined;
   if (cached.expiresAt <= Date.now()) {
     cached = undefined;
     void secure.remove(KEY);
-    return undefined;
+    return isDemo() ? DEMO_SESSION : undefined;
   }
   return cached;
 };
