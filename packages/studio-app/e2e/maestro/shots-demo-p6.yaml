@@ -1,0 +1,40 @@
+appId: com.synon.studio
+---
+# P6 交付流转与预览（demo 版：完整交付卡 + 代码卡 + 结果抽屉的预览页签）。
+# 需要 EXPO_PUBLIC_DEMO=1 的构建；直接由 maestro 驱动，不经过 e2e/run.mjs。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- openLink: "synon://request/req-export"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: p6-delivery
+- tapOn:
+    id: "request-results-pill"
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-preview"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-preview-tab"
+    timeout: 10000
+- takeScreenshot: p6-preview

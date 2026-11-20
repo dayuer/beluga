@@ -1,0 +1,83 @@
+appId: com.synon.studio
+---
+# 异常状态（demo 版）：空列表、加载中、执行机器离线、用量已满、需要人、上传中。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+
+# 空列表
+- stopApp
+- openLink: "synon:///?state=empty"
+- extendedWaitUntil:
+    visible:
+      id: "requests-empty"
+    timeout: 10000
+- takeScreenshot: state-empty
+
+# 加载中（骨架）
+- stopApp
+- openLink: "synon:///?state=loading"
+- extendedWaitUntil:
+    visible:
+      id: "requests-skeleton"
+    timeout: 10000
+- takeScreenshot: state-loading
+
+# 执行机器离线（列表只留等待项）
+- stopApp
+- openLink: "synon:///?state=runnerOffline"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 10000
+- takeScreenshot: state-runner-offline-list
+
+# 用量已满
+- openLink: "synon://request/req-quota"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "card-card-wait-quota"
+    timeout: 10000
+- takeScreenshot: state-quota
+
+# 需要人
+- openLink: "synon://request/req-human"
+- extendedWaitUntil:
+    visible:
+      id: "card-card-wait-human"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: state-human
+
+# 上传中（中断时停在同一个百分比，恢复后自动继续）
+- openLink: "synon://request/req-upload"
+- extendedWaitUntil:
+    visible:
+      id: "card-card-design-up"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: state-uploading

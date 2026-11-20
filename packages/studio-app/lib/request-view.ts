@@ -142,7 +142,9 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
     } as StudioCard);
   }
 
-  if (view.stage === 'drafting') {
+  // 开工 Gate 已经升起（等工作室批准）时，理解卡不再带「对，就是这样」的动作。
+  const gatePendingEarly = view.gate?.state === 'pending';
+  if (view.stage === 'drafting' && !gatePendingEarly) {
     const points = view.milestones.map((m) => m.title).filter(Boolean);
     cards.push({
       id: `understanding-${view.draftRev}`,
@@ -178,7 +180,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
     });
   }
 
-  const gatePending = view.gate?.state === 'pending';
+  const gatePending = gatePendingEarly;
   if (
     (view.gate?.kind === 'start' && gatePending) ||
     (view.stage === 'drafting' && view.milestones.length > 0 && !view.typing && !gatePending)
@@ -241,6 +243,7 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
       status: 'pending',
       round,
       summary: view.review?.notes || view.headline,
+      criteria: reviewMilestone?.criteria ?? [],
       screenshots: [],
       requiresSignature: true,
     });

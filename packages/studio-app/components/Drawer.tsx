@@ -209,6 +209,7 @@ export function Drawer({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID={`${testID}-layer`}>
       <Pressable
+        accessibilityRole="button"
         accessibilityLabel={tDrawer(lang, 'drawer.close')}
         onPress={closeWithMotion}
         style={[styles.scrim, { backgroundColor: color.scrim }]}

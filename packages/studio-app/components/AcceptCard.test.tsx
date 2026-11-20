@@ -34,6 +34,7 @@ const sampleCard: DeliveryCard = {
   status: 'pending',
   round: 2,
   summary: '第 2 轮交付已部署到测试环境，检查全部通过。',
+  criteria: ['记录后列表立刻更新', '关掉 App 再打开数据还在'],
   previewUrl: 'https://demo-preview.synon.invalid/req-export',
   screenshots: ['https://demo-preview.synon.invalid/shot1.png'],
   requiresSignature: true,
@@ -51,6 +52,13 @@ describe('AcceptCard (P5)', () => {
     undoStore.cancel();
     await cleanup();
     vi.useRealTimers();
+  });
+
+  it('lists the acceptance criteria above what to check (P5 walkthrough)', async () => {
+    const screen = await render(<AcceptCard card={sampleCard} onNotYet={() => {}} onSigned={() => {}} />);
+    expect(screen.getByTestId('accept-criteria')).toBeTruthy();
+    expect(screen.getByText(/记录后列表立刻更新/)).toBeTruthy();
+    expect(screen.getByText(/关掉 App 再打开数据还在/)).toBeTruthy();
   });
 
   it('disables approve button when device has no key', async () => {

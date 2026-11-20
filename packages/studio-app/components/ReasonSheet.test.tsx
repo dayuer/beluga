@@ -37,7 +37,7 @@ describe('ReasonSheet (P7)', () => {
   it('shows how many characters are still needed when under 10 chars and disables submit', async () => {
     const screen = await render(<ReasonSheet cardId="card-1" onSubmit={() => {}} />);
 
-    expect(screen.getByTestId('reason-too-short').props.children).toContain('还差 10 个字');
+    expect(screen.getByTestId('reason-too-short').props.children).toContain('再多写一点');
     expect(screen.getByTestId('reason-submit').props.accessibilityState.disabled).toBe(true);
 
     await fireEvent.changeText(screen.getByTestId('reason-input'), '样式不对啊');
@@ -47,6 +47,14 @@ describe('ReasonSheet (P7)', () => {
     await fireEvent.changeText(screen.getByTestId('reason-input'), '导出按钮位置偏左需要调整');
     expect(screen.queryByTestId('reason-too-short')).toBeNull();
     expect(screen.getByTestId('reason-submit').props.accessibilityState.disabled).toBe(false);
+  });
+
+  it('leaves a separator after a quick tag so typing does not glue words together', async () => {
+    const screen = await render(<ReasonSheet cardId="card-7" onSubmit={() => {}} />);
+    await fireEvent.press(screen.getByTestId('reason-tag-1'));
+    expect(screen.getByTestId('reason-input').props.value).toBe('和我说的不一样；');
+    await fireEvent.changeText(screen.getByTestId('reason-input'), '和我说的不一样；第二个提醒没有弹出');
+    expect(screen.getByTestId('reason-input').props.value).toContain('不一样；第二个');
   });
 
   it('keeps draft per cardId after closing and reopening', async () => {

@@ -7,6 +7,7 @@ import type { Lang } from './index';
 export const zh = {
   // AcceptCard (P5)
   'accept.roundTitle': (n: number) => `第 ${n} 轮交付`,
+  'accept.criteria': '验收标准',
   'accept.howToCheck': '怎么看',
   'accept.screenshots': '截图',
   'accept.openPreview': '打开体验版',
@@ -19,7 +20,7 @@ export const zh = {
   'accept.needsYou': '等你验收',
 
   // ReasonSheet (P7)
-  'reason.missingChars': (n: number) => `还差 ${n} 个字（至少 10 个字）`,
+  'reason.missingChars': (n: number) => (n >= 10 ? '再多写一点（至少 10 个字）' : `还差 ${n} 个字（至少 10 个字）`),
   'reason.tagJoiner': '；',
 
   // StartCard (P10)
@@ -83,6 +84,7 @@ export type SignedCardStrings = {
 export const en: SignedCardStrings = {
   // AcceptCard (P5)
   'accept.roundTitle': (n: number) => `Delivery round ${n}`,
+  'accept.criteria': 'Acceptance criteria',
   'accept.howToCheck': 'What to check',
   'accept.screenshots': 'Screenshots',
   'accept.openPreview': 'Open preview',
@@ -95,7 +97,8 @@ export const en: SignedCardStrings = {
   'accept.needsYou': 'Needs review',
 
   // ReasonSheet (P7)
-  'reason.missingChars': (n: number) => `${n} more character${n === 1 ? '' : 's'} needed (min 10)`,
+  'reason.missingChars': (n: number) =>
+    n >= 10 ? 'Write a little more (at least 10 characters)' : `${n} more character${n === 1 ? '' : 's'} needed (min 10)`,
   'reason.tagJoiner': ', ',
 
   // StartCard (P10)

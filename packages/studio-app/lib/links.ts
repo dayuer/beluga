@@ -62,7 +62,6 @@ export function parseDeepLink(raw: string | null | undefined, hubUrl = process.e
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 0) return null;
 
   // 1. /join/<inviteId>#k=&n= -> 应用内重写为 /join/<inviteId>?k=&n=，供 useLocalSearchParams 读取
   if (segments[0] === 'join' && segments.length === 2) {
@@ -75,13 +74,23 @@ export function parseDeepLink(raw: string | null | undefined, hubUrl = process.e
     return k && n ? `${base}?k=${encodeURIComponent(k)}&n=${encodeURIComponent(n)}` : base;
   }
 
-  // 2. /request/<id> 与 /request/<id>?card=<cardId>
+  // 2. /request/<id>、?card=<cardId>、?state=<演示态>
   if (segments[0] === 'request' && segments.length === 2) {
     const id = decodeSegment(segments[1]!);
     if (!id) return null;
     const card = searchParams.get('card')?.trim();
+    const state = demoState(searchParams.get('state'));
+    const query = [card ? `card=${encodeURIComponent(card)}` : '', state ? `state=${state}` : '']
+      .filter(Boolean)
+      .join('&');
     const base = `/request/${encodeURIComponent(id)}`;
-    return card ? `${base}?card=${encodeURIComponent(card)}` : base;
+    return query ? `${base}?${query}` : base;
+  }
+
+  // 2b. 根路径带演示态：/?state=empty（A10 走查用；非 demo 构建忽略这个参数）
+  if (segments.length === 0) {
+    const state = demoState(searchParams.get('state'));
+    return state ? `/?state=${state}` : null;
   }
 
   // 3. /login?token= 与 /login#token=（中台邮件链接使用 #token=）
@@ -98,6 +107,14 @@ export function parseDeepLink(raw: string | null | undefined, hubUrl = process.e
   }
 
   return null;
+}
+
+const DEMO_STATES = new Set(['normal', 'empty', 'loading', 'offline', 'runnerOffline']);
+
+/** 深链里只放行已知的演示态，避免把任意值塞进路由。 */
+function demoState(raw: string | null | undefined): string | null {
+  const state = raw?.trim();
+  return state && DEMO_STATES.has(state) ? state : null;
 }
 
 function decodeSegment(seg: string): string | null {

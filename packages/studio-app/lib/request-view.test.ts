@@ -22,10 +22,14 @@ const BASE: StudioPlanView = {
   activity: [],
 };
 
-const milestone = (ref: string, status: StudioPlanView['milestones'][number]['status']) => ({
+const milestone = (
+  ref: string,
+  status: StudioPlanView['milestones'][number]['status'],
+  criteria: string[] = [],
+) => ({
   ref,
   title: `里程碑 ${ref}`,
-  criteria: [],
+  criteria,
   status,
   tasks: [],
 });
@@ -53,6 +57,23 @@ describe('requestViewFromPlan：各阶段映射', () => {
     ]);
     expect(request.cards.some((c) => c.kind === 'start')).toBe(false);
     expect(request.cards.some((c) => c.kind === 'steps')).toBe(true);
+  });
+
+  it('开工 Gate 已升起时不再显示带动作的理解卡（P10 走查）', () => {
+    const view: StudioPlanView = {
+      ...BASE,
+      stage: 'drafting',
+      waitingOn: 'studio',
+      typing: false,
+      headline: '等你确认的计划已提交',
+      draftRev: 2,
+      milestones: [milestone('m0', 'planned')],
+      gate: { kind: 'start', state: 'pending', draftRev: 2 },
+    };
+    const request = requestViewFromPlan(view, input);
+
+    expect(request.cards.some((c) => c.kind === 'understanding')).toBe(false);
+    expect(request.cards.some((c) => c.kind === 'start')).toBe(true);
   });
 
   it('待开工：等你处理/等工作室，出开工卡（需签名）', () => {
@@ -116,7 +137,7 @@ describe('requestViewFromPlan：各阶段映射', () => {
       waitingOn: 'customer',
       typing: false,
       headline: '等你验收：里程碑 m0',
-      milestones: [milestone('m0', 'review'), milestone('m1', 'planned')],
+      milestones: [milestone('m0', 'review', ['可以记录', '数据不会丢']), milestone('m1', 'planned')],
       review: { milestoneRef: 'm0', verdict: 'pass', notes: '请看一下首页的登录入口' },
     };
     const request = requestViewFromPlan(view, input);
@@ -125,6 +146,7 @@ describe('requestViewFromPlan：各阶段映射', () => {
     const delivery = request.cards.find((c) => c.kind === 'delivery');
     expect(delivery && 'summary' in delivery ? delivery.summary : '').toBe('请看一下首页的登录入口');
     expect(delivery && 'round' in delivery ? delivery.round : 0).toBe(1);
+    expect(delivery && 'criteria' in delivery ? delivery.criteria : []).toEqual(['可以记录', '数据不会丢']);
 
     const steps = request.cards.find((c) => c.kind === 'steps');
     expect(steps && 'steps' in steps ? steps.steps[0] : undefined).toMatchObject({

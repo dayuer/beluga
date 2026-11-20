@@ -1,0 +1,126 @@
+appId: com.synon.studio
+---
+# Walkthrough screenshots for P10–P12 (milestone A10 / SS-92), plus the real-mode slices of P12.
+# P9「我」和它的子页在 shots-demo-p9-p12.yaml 里用演示数据拍。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+
+# P10: 批准开工卡
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingStart
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你确认的计划已提交.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-confirm:plan1"
+    direction: DOWN
+- takeScreenshot: p10-start
+
+# P10: 批准改动卡
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*计划有改动.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-changes:plan1"
+    direction: DOWN
+- takeScreenshot: p10-changes
+
+# P11: 批准上线卡
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: release
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你批准上线.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-release-prod"
+    direction: DOWN
+- takeScreenshot: p11-release
+
+# P12: 结果抽屉（计划 / 改动两个页签；成果、预览在 demo 版补拍）
+- tapOn:
+    id: "request-results-pill"
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-plan"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-plan-tab"
+    timeout: 10000
+- takeScreenshot: p12-plan
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 10000
+- takeScreenshot: p12-changes

@@ -88,6 +88,7 @@ export function AcceptCard({
 
   const round = card?.round ?? 1;
   const summary = card?.summary ?? '';
+  const criteria = card?.criteria ?? [];
   const screenshots = card?.screenshots ?? [];
   const previewUrl = card?.previewUrl;
   const installUrl = card?.installUrl;
@@ -167,6 +168,17 @@ export function AcceptCard({
         )
       }
     >
+      {criteria.length > 0 ? (
+        <View style={styles.sectionPlain} testID="accept-criteria">
+          <Text style={[styles.label, { color: color.text3 }]}>{c['accept.criteria']}</Text>
+          {criteria.map((item) => (
+            <Text key={item} style={[styles.bodyText, { color: color.text }]}>
+              ◦ {item}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       {summary ? (
         <View style={styles.sectionPlain}>
           <Text style={[styles.label, { color: color.text3 }]}>{c['accept.howToCheck']}</Text>

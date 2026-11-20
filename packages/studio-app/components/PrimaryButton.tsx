@@ -84,6 +84,7 @@ export function PrimaryButton({
     }, REARM_MS);
   };
 
+  // 禁用态也要可读：text3 在 disabledFill 上只有 3.82:1，换成 text2 是 5.30:1（UX-21）。
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -107,7 +108,7 @@ export function PrimaryButton({
         ) : effectiveState === 'done' ? (
           <Check size={18} color={color.onPrimary} strokeWidth={stroke} />
         ) : (
-          <Text style={[styles.label, { color: color.onPrimary }, disabled && { color: color.text3 }]}>
+          <Text style={[styles.label, { color: color.onPrimary }, disabled && { color: color.text2 }]}>
             {label}
           </Text>
         )}
