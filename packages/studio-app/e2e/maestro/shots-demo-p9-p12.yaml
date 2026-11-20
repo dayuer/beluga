@@ -1,0 +1,124 @@
+appId: com.synon.studio
+---
+# P9「我」和它的子页，以及 P12 结果抽屉的「成果 / 预览」两页（demo 版，演示数据）。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+- tapOn:
+    id: "tab-me"
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 20000
+- takeScreenshot: p9-me
+
+- tapOn:
+    id: "me-row-account"
+- extendedWaitUntil:
+    visible:
+      id: "me-account-screen"
+    timeout: 10000
+- takeScreenshot: p9-account
+- tapOn:
+    id: "back"
+
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 10000
+- tapOn:
+    id: "me-row-env"
+- extendedWaitUntil:
+    visible:
+      id: "me-env-screen"
+    timeout: 10000
+- takeScreenshot: p9-env
+- tapOn:
+    id: "back"
+
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 10000
+- tapOn:
+    id: "me-row-machines"
+- extendedWaitUntil:
+    visible:
+      id: "me-machines-screen"
+    timeout: 10000
+- takeScreenshot: p9-machines
+- tapOn:
+    id: "back"
+
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 10000
+- tapOn:
+    id: "me-row-devices"
+- extendedWaitUntil:
+    visible:
+      id: "me-devices-screen"
+    timeout: 10000
+- takeScreenshot: p9-devices
+- tapOn:
+    id: "back"
+
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 10000
+- tapOn:
+    id: "me-row-project"
+- extendedWaitUntil:
+    visible:
+      id: "me-project-screen"
+    timeout: 10000
+- takeScreenshot: p9-project
+- tapOn:
+    id: "back"
+
+# P12：结果抽屉的「成果」与「预览」页签
+- openLink: "synon://request/req-export"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: "request-results-pill"
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-outputs"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-outputs-tab"
+    timeout: 10000
+- takeScreenshot: p12-outputs
+- tapOn:
+    id: "request-results-drawer-tab-preview"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-preview-tab"
+    timeout: 10000
+- takeScreenshot: p12-preview

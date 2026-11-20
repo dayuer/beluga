@@ -59,6 +59,23 @@ describe('requestViewFromPlan：各阶段映射', () => {
     expect(request.cards.some((c) => c.kind === 'steps')).toBe(true);
   });
 
+  it('开工 Gate 已升起时不再显示带动作的理解卡（P10 走查）', () => {
+    const view: StudioPlanView = {
+      ...BASE,
+      stage: 'drafting',
+      waitingOn: 'studio',
+      typing: false,
+      headline: '等你确认的计划已提交',
+      draftRev: 2,
+      milestones: [milestone('m0', 'planned')],
+      gate: { kind: 'start', state: 'pending', draftRev: 2 },
+    };
+    const request = requestViewFromPlan(view, input);
+
+    expect(request.cards.some((c) => c.kind === 'understanding')).toBe(false);
+    expect(request.cards.some((c) => c.kind === 'start')).toBe(true);
+  });
+
   it('待开工：等你处理/等工作室，出开工卡（需签名）', () => {
     const view: StudioPlanView = {
       ...BASE,
