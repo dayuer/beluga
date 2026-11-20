@@ -2,9 +2,13 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-n
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { ProgressRing } from '../../components/ProgressRing';
+import { Skeleton } from '../../components/Skeleton';
 import { StatusDot } from '../../components/StatusDot';
-import { DEMO_REQUEST_SUMMARIES, DEMO_SETTINGS_VIEW } from '../../lib/demo';
-import { detectLang } from '../../lib/strings';
+import { SyncBanner } from '../../components/SyncBanner';
+import { isDemoMode } from '../../lib/client';
+import { DEMO_REQUEST_SUMMARIES } from '../../lib/demo';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
 
@@ -18,19 +22,27 @@ export default function MeMachinesScreen() {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
-  const runners = DEMO_SETTINGS_VIEW.runners;
+  const { data: settings, loading, offline } = useSettingsView();
+  const runners = settings.runners;
   const onlineCount = runners.filter((r) => r.online).length;
   const acceptingCount = runners.filter((r) => r.online && r.accepting).length;
-  const activeRequests = DEMO_REQUEST_SUMMARIES.filter(
-    (r) => r.status === 'working' || r.status === 'needs-you',
-  );
+  const activeRequests = isDemoMode()
+    ? DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'working' || r.status === 'needs-you')
+    : [];
 
   return (
     <View style={styles.root} testID="me-machines-screen">
       <Header title={tMe(lang, 'machines.title')} back />
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          {runners.length === 0 ? (
+          {loading ? (
+            <View testID="machines-skeleton">
+              <Skeleton count={3} />
+            </View>
+          ) : runners.length === 0 ? (
             <EmptyState title={tMe(lang, 'machines.empty')} testID="machines-empty" />
           ) : (
             <>

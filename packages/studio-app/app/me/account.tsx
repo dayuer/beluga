@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { Header } from '../../components/Header';
-import { DEMO_SETTINGS_VIEW } from '../../lib/demo';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
 import { kv } from '../../lib/kv';
 import { session } from '../../lib/session';
-import { detectLang, type Lang } from '../../lib/strings';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t, type Lang } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
 
@@ -23,8 +25,9 @@ export default function MeAccountScreen() {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
+  const { data: settings, loading, offline } = useSettingsView();
   const [pushEnabled, setPushEnabled] = useState<boolean>(
-    () => kv.get<boolean>(PUSH_KEY) ?? DEMO_SETTINGS_VIEW.account.pushEnabled,
+    () => kv.get<boolean>(PUSH_KEY) ?? settings.account.pushEnabled,
   );
   const [confirmKind, setConfirmKind] = useState<'logout' | 'delete' | null>(null);
 
@@ -47,15 +50,24 @@ export default function MeAccountScreen() {
   return (
     <View style={styles.root} testID="me-account-screen">
       <Header title={tMe(lang, 'account.title')} back />
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          <View style={styles.card}>
-            <View style={[styles.row, styles.rowBorder]}>
-              <Text style={styles.rowLabel}>{tMe(lang, 'account.email')}</Text>
-              <Text style={styles.rowValue} testID="account-email">
-                {DEMO_SETTINGS_VIEW.account.email}
-              </Text>
+          {loading ? (
+            <View testID="account-skeleton">
+              <Skeleton count={3} />
             </View>
+          ) : (
+            <>
+              <View style={styles.card}>
+                <View style={[styles.row, styles.rowBorder]}>
+                  <Text style={styles.rowLabel}>{tMe(lang, 'account.email')}</Text>
+                  <Text style={styles.rowValue} testID="account-email">
+                    {settings.account.email || '—'}
+                  </Text>
+                </View>
 
             <View style={[styles.row, styles.rowBorder]}>
               <Text style={styles.rowLabel}>{tMe(lang, 'account.language')}</Text>
@@ -111,6 +123,8 @@ export default function MeAccountScreen() {
               <Text style={styles.dangerText}>{tMe(lang, 'account.delete')}</Text>
             </Pressable>
           </View>
+            </>
+          )}
         </View>
       </ScrollView>
 

@@ -3,8 +3,10 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-n
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { Segments, type SegmentItem } from '../../components/Segments';
-import { DEMO_SETTINGS_VIEW } from '../../lib/demo';
-import { detectLang } from '../../lib/strings';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { ago } from '../../lib/time';
 import { color, radius, space, type } from '../../lib/theme';
@@ -34,8 +36,9 @@ export default function MeEnvScreen() {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
-  const project = DEMO_SETTINGS_VIEW.projects[0];
-  const projectEnvs = project ? (DEMO_SETTINGS_VIEW.envs[project.id] ?? []) : [];
+  const { data: settings, loading, offline } = useSettingsView();
+  const project = settings.projects[0];
+  const projectEnvs = project ? (settings.envs[project.id] ?? []) : [];
 
   const [envTab, setEnvTab] = useState<'test' | 'staging' | 'prod'>('test');
 
@@ -80,6 +83,9 @@ export default function MeEnvScreen() {
     <View style={styles.root} testID="me-env-screen">
       <Header title={tMe(lang, 'env.title')} back />
       <Segments items={segmentItems} value={envTab} onChange={(k) => setEnvTab(k as 'test' | 'staging' | 'prod')} />
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
@@ -90,7 +96,11 @@ export default function MeEnvScreen() {
             </Text>
           ) : null}
 
-          {rows.length === 0 ? (
+          {loading ? (
+            <View testID="env-skeleton">
+              <Skeleton count={3} />
+            </View>
+          ) : rows.length === 0 ? (
             <EmptyState title={tMe(lang, 'env.empty')} testID="env-empty" />
           ) : (
             <View style={styles.tableCard} testID="env-table">

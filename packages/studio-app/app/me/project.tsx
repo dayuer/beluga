@@ -1,8 +1,10 @@
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
-import { DEMO_SETTINGS_VIEW } from '../../lib/demo';
-import { detectLang } from '../../lib/strings';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
 
@@ -34,14 +36,22 @@ export default function MeProjectScreen() {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
-  const { projects, forges } = DEMO_SETTINGS_VIEW;
+  const { data: settings, loading, offline } = useSettingsView();
+  const { projects, forges } = settings;
 
   return (
     <View style={styles.root} testID="me-project-screen">
       <Header title={tMe(lang, 'project.title')} back />
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          {projects.length === 0 ? (
+          {loading ? (
+            <View testID="project-skeleton">
+              <Skeleton count={3} />
+            </View>
+          ) : projects.length === 0 ? (
             <EmptyState title={tMe(lang, 'project.empty')} testID="project-empty" />
           ) : (
             <View style={styles.list}>

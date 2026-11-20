@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { SignedButton } from '../../components/SignedButton';
-import { DEMO_SETTINGS_VIEW } from '../../lib/demo';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
 import { useHasDeviceKey } from '../../lib/keys';
-import { detectLang } from '../../lib/strings';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { ago } from '../../lib/time';
 import { color, radius, space, type } from '../../lib/theme';
@@ -29,9 +31,11 @@ export default function MeDevicesScreen() {
   const desktop = width >= 900;
   const { hasKey } = useHasDeviceKey();
 
-  const [devices, setDevices] = useState<readonly RegisteredDevice[]>(
-    () => DEMO_SETTINGS_VIEW.devices,
-  );
+  const { data: settings, loading, offline } = useSettingsView();
+  const [devices, setDevices] = useState<readonly RegisteredDevice[]>(() => settings.devices);
+  useEffect(() => {
+    setDevices(settings.devices);
+  }, [settings.devices]);
   const [pendingRemove, setPendingRemove] = useState<RegisteredDevice | null>(null);
 
   const confirmRemove = () => {
@@ -43,9 +47,16 @@ export default function MeDevicesScreen() {
   return (
     <View style={styles.root} testID="me-devices-screen">
       <Header title={tMe(lang, 'devices.title')} back />
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          {devices.length === 0 ? (
+          {loading ? (
+            <View testID="devices-skeleton">
+              <Skeleton count={3} />
+            </View>
+          ) : devices.length === 0 ? (
             <EmptyState title={tMe(lang, 'devices.empty')} testID="devices-empty" />
           ) : (
             <View style={styles.tableCard} testID="devices-table">

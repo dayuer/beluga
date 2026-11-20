@@ -2,10 +2,12 @@ import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Header } from '../../components/Header';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
 import { TabBar } from '../../components/TabBar';
-import { DEMO_SETTINGS_VIEW } from '../../lib/demo';
 import { kv } from '../../lib/kv';
-import { detectLang } from '../../lib/strings';
+import { useSettingsView } from '../../lib/settings-source';
+import { detectLang, t } from '../../lib/strings';
 import { tMe } from '../../lib/strings/me';
 import { color, radius, space, type } from '../../lib/theme';
 import { useTodos } from '../../lib/todo-store';
@@ -50,30 +52,40 @@ export default function MeScreen() {
   const { result } = useTodos();
   const todoCount = result?.todos.length ?? 0;
 
-  const settings = DEMO_SETTINGS_VIEW;
+  const { data: settings, loading, offline } = useSettingsView();
   const onlineRunners = settings.runners.filter((r) => r.online).length;
   const pushPref = kv.get<boolean>('prefs:pushEnabled');
   const pushOn = pushPref ?? settings.account.pushEnabled;
+  const emailDisplay = settings.account.email || tMe(lang, 'me.accountHeader');
 
   return (
     <View style={styles.root} testID="me-screen">
       <Header title={tMe(lang, 'me.title')} />
       {desktop ? <TabBar todoCount={todoCount} /> : null}
+      {offline ? (
+        <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" />
+      ) : null}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          <View style={styles.accountCard} testID="me-account-header">
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {(settings.account.email[0] ?? 'S').toUpperCase()}
-              </Text>
+          {loading ? (
+            <View testID="me-skeleton">
+              <Skeleton count={4} />
             </View>
-            <View style={styles.accountMeta}>
-              <Text style={styles.accountEmail} numberOfLines={1}>
-                {settings.account.email}
-              </Text>
-              <Text style={styles.accountCaption}>{tMe(lang, 'me.accountHeader')}</Text>
-            </View>
-          </View>
+          ) : (
+            <>
+              <View style={styles.accountCard} testID="me-account-header">
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {(emailDisplay[0] ?? 'S').toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.accountMeta}>
+                  <Text style={styles.accountEmail} numberOfLines={1}>
+                    {emailDisplay}
+                  </Text>
+                  <Text style={styles.accountCaption}>{tMe(lang, 'me.accountHeader')}</Text>
+                </View>
+              </View>
 
           <Text style={styles.groupTitle}>{tMe(lang, 'me.groupWorkspace')}</Text>
           <View style={styles.groupCard}>
@@ -117,12 +129,14 @@ export default function MeScreen() {
             />
             <MeRow
               label={tMe(lang, 'me.rowAccount')}
-              value={settings.account.email}
+              value={emailDisplay}
               onPress={() => router.push('/me/account')}
               testID="me-row-account"
               last
             />
           </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </View>
