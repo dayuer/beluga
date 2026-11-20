@@ -1,5 +1,12 @@
 export const zh = {
   'new.title': '新需求',
+  'new.tabNew': '新需求',
+  'new.tabFeedback': '对做好的提意见',
+  'new.feedbackPick': '选一条已交付的需求',
+  'new.feedbackEmpty': '暂无已交付的需求',
+  'new.feedbackLabel': '哪里需要调整？',
+  'new.feedbackPlaceholder': '例如：首页轮播图的圆角再大一点，底部留白再宽一些。',
+  'new.feedbackSubmit': '提交意见',
   'new.intro': '描述你想做的，越具体越好。工作室会先拆成里程碑，等你确认。',
   'new.hintTitle': '写得具体一点',
   'new.hint1': '给谁用：自己、家人，还是门店的顾客',
@@ -25,6 +32,13 @@ export const zh = {
 
 export const en: Record<keyof typeof zh, string> = {
   'new.title': 'New request',
+  'new.tabNew': 'New request',
+  'new.tabFeedback': 'Feedback',
+  'new.feedbackPick': 'Pick a delivered request',
+  'new.feedbackEmpty': 'No delivered requests yet',
+  'new.feedbackLabel': 'What should we adjust?',
+  'new.feedbackPlaceholder': 'e.g. Make the home carousel corners rounder and add more bottom spacing.',
+  'new.feedbackSubmit': 'Send feedback',
   'new.intro': 'Describe what you want, as specifically as you can. The studio will break it into milestones for you to confirm.',
   'new.hintTitle': 'A few specifics help',
   'new.hint1': "Who it's for: you, your family, or your customers",

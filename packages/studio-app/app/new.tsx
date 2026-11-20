@@ -1,24 +1,55 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ActionDock } from '../components/ActionDock';
 import { GoalInput } from '../components/GoalInput';
 import { Header } from '../components/Header';
 import { PlatformPicker } from '../components/PlatformPicker';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ReceiptLine, type ReceiptTone } from '../components/ReceiptLine';
+import { Segments, type SegmentItem } from '../components/Segments';
 import { SyncBanner } from '../components/SyncBanner';
-import { LIMITS, type StudioPlatform } from '../../../src/studio/protocol';
+import { LIMITS, PLATFORMS, type StudioPlatform } from '../../../src/studio/protocol';
 import { cache } from '../lib/cache';
 import { hub } from '../lib/client';
+import { DEMO_REQUEST_SUMMARIES } from '../lib/demo';
 import { clearDraft, readDraft, writeDraft } from '../lib/drafts';
 import type { ProjectSummary } from '../lib/hub-schema';
+import { kv } from '../lib/kv';
 import { useOnline } from '../lib/net';
 import { detectLang, t, type Lang } from '../lib/strings';
 import { refusalKey, useNewRequest, type SubmitState } from '../lib/submit';
 import { ago } from '../lib/time';
-import { color, space, type } from '../lib/theme';
+import { color, radius, space, type } from '../lib/theme';
 import { useKeyboardInset } from '../lib/viewport';
+
+type NewMode = 'new' | 'feedback';
+
+interface FeedbackDraft {
+  readonly requestId: string;
+  readonly text: string;
+  readonly updatedAt: number;
+}
+
+const feedbackDraftKey = (pid: string): string => `draft:feedback:${pid}`;
+
+function readFeedbackDraft(pid: string): FeedbackDraft | undefined {
+  const raw = kv.get<Partial<FeedbackDraft>>(feedbackDraftKey(pid));
+  if (!raw || typeof raw.text !== 'string' || typeof raw.updatedAt !== 'number') return undefined;
+  return {
+    requestId: typeof raw.requestId === 'string' ? raw.requestId : '',
+    text: raw.text.slice(0, LIMITS.text),
+    updatedAt: raw.updatedAt,
+  };
+}
+
+function writeFeedbackDraft(pid: string, draft: FeedbackDraft): void {
+  kv.set(feedbackDraftKey(pid), { ...draft, text: draft.text.slice(0, LIMITS.text) });
+}
+
+function clearFeedbackDraft(pid: string): void {
+  kv.remove(feedbackDraftKey(pid));
+}
 
 function receiptOf(state: SubmitState, lang: Lang): { text: string; tone: ReceiptTone } | null {
   switch (state.phase) {
@@ -57,33 +88,39 @@ function Hint({ lang }: { lang: Lang }) {
 }
 
 /**
- * New request (M5 design §4): the goal, platforms, and one Start planning button in the thumb
- * zone. The draft is written 300ms after typing and on leave; it is deleted only when the hub
- * answers queued/done. Double taps and retries reuse the same opId (lib/submit.ts), so the hub's
- * idempotency yields one queue entry.
+ * P2 提需求（SS-38）：顶部分段「新需求」/「对做好的提意见」，两档各自保留草稿。
+ * 发送走 lib/submit.ts 状态机；断网时草稿留在本机，直到中台回执 queued 或 done。
  */
 export default function NewRequestScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ project?: string | string[] }>();
-  const pid = Array.isArray(params.project) ? params.project[0] : params.project;
+  const routePid = Array.isArray(params.project) ? params.project[0] : params.project;
+  const cachedProjects = cache.get<ProjectSummary[]>('projects')?.value ?? [];
+  const pid = routePid || cachedProjects[0]?.id || DEMO_REQUEST_SUMMARIES[0]?.projectId || 'proj-shop';
+
   const lang = detectLang();
   const online = useOnline();
   const { width, height } = useWindowDimensions();
   const keyboard = useKeyboardInset();
   const desktop = width >= 900;
 
+  const [mode, setMode] = useState<NewMode>('new');
   const [goal, setGoal] = useState('');
   const [platforms, setPlatforms] = useState<StudioPlatform[]>([]);
   const [restored, setRestored] = useState<string | null>(null);
-  const [project, setProject] = useState<ProjectSummary | undefined>(() => (pid ? cache.get<ProjectSummary[]>('projects')?.value.find((p) => p.id === pid) : undefined));
+  const [project, setProject] = useState<ProjectSummary | undefined>(() =>
+    cachedProjects.find((p) => p.id === pid),
+  );
+
+  const delivered = useMemo(
+    () => DEMO_REQUEST_SUMMARIES.filter((r) => r.status === 'done'),
+    [],
+  );
+  const [selectedRequestId, setSelectedRequestId] = useState<string>(() => delivered[0]?.id ?? '');
+  const [feedbackText, setFeedbackText] = useState('');
+
   const lockedRef = useRef(false);
 
-  useEffect(() => {
-    if (!pid) router.replace('/');
-  }, [pid, router]);
-
-  // A reload or a deep link to /new has no projects cache: fetch just the name for the context
-  // line, so the screen still says which project and studio this request belongs to.
   useEffect(() => {
     if (!pid || project) return;
     let alive = true;
@@ -98,26 +135,34 @@ export default function NewRequestScreen() {
     };
   }, [pid, project]);
 
+  // 恢复两档草稿，切换分段时不互相覆盖
   useEffect(() => {
-    if (!pid) return;
     const draft = readDraft(pid);
-    if (!draft) return;
-    if (!draft.goal.trim() && draft.platforms.length === 0) {
-      clearDraft(pid);
-      return;
+    if (draft) {
+      if (!draft.goal.trim() && draft.platforms.length === 0) {
+        clearDraft(pid);
+      } else {
+        setGoal(draft.goal);
+        setPlatforms(draft.platforms);
+        setRestored(t(lang, 'new.restored', { ago: ago(draft.updatedAt, lang) }));
+        const timer = setTimeout(() => setRestored(null), 3000);
+        return () => clearTimeout(timer);
+      }
     }
-    setGoal(draft.goal);
-    setPlatforms(draft.platforms);
-    setRestored(t(lang, 'new.restored', { ago: ago(draft.updatedAt, lang) }));
-    const id = setTimeout(() => setRestored(null), 3000);
-    return () => clearTimeout(id);
-    // One restore per project; the language does not change while the screen is open.
+    const fb = readFeedbackDraft(pid);
+    if (fb) {
+      if (!fb.text.trim()) {
+        clearFeedbackDraft(pid);
+      } else {
+        if (fb.requestId) setSelectedRequestId(fb.requestId);
+        setFeedbackText(fb.text);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid]);
 
-  // 300ms debounce; blur, pagehide and hidden visibility flush immediately below.
+  // 300ms 防抖保存新需求草稿
   useEffect(() => {
-    if (!pid) return;
     const id = setTimeout(() => {
       if (lockedRef.current) return;
       if (!goal.trim() && platforms.length === 0) {
@@ -129,15 +174,31 @@ export default function NewRequestScreen() {
     return () => clearTimeout(id);
   }, [pid, goal, platforms]);
 
+  // 300ms 防抖保存反馈草稿
   useEffect(() => {
-    if (!pid) return;
-    const flush = () => {
+    const id = setTimeout(() => {
       if (lockedRef.current) return;
-      if (!goal.trim() && platforms.length === 0) {
-        clearDraft(pid);
+      if (!feedbackText.trim()) {
+        clearFeedbackDraft(pid);
         return;
       }
-      writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
+      writeFeedbackDraft(pid, {
+        requestId: selectedRequestId,
+        text: feedbackText,
+        updatedAt: Date.now(),
+      });
+    }, 300);
+    return () => clearTimeout(id);
+  }, [pid, selectedRequestId, feedbackText]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (lockedRef.current) return;
+      if (!goal.trim() && platforms.length === 0) clearDraft(pid);
+      else writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
+
+      if (!feedbackText.trim()) clearFeedbackDraft(pid);
+      else writeFeedbackDraft(pid, { requestId: selectedRequestId, text: feedbackText, updatedAt: Date.now() });
     };
     const sub =
       typeof AppState?.addEventListener === 'function'
@@ -148,24 +209,45 @@ export default function NewRequestScreen() {
     return () => {
       sub?.remove();
     };
-  }, [pid, goal, platforms]);
+  }, [pid, goal, platforms, selectedRequestId, feedbackText]);
 
   const onDone = useCallback(() => {
-    if (pid) router.replace(`/project/${encodeURIComponent(pid)}`);
+    clearFeedbackDraft(pid);
+    router.replace(`/project/${encodeURIComponent(pid)}`);
   }, [pid, router]);
 
-  const { state, submit } = useNewRequest(pid ?? '', onDone);
-  // Once the hub has the request (queued/done), leaving must not resurrect the draft.
+  const { state, submit } = useNewRequest(pid, onDone);
   lockedRef.current = state.phase === 'queued' || state.phase === 'done';
 
+  // 收到 queued/done 后清理反馈草稿（新需求草稿由 submit.ts 清理）
+  useEffect(() => {
+    if (state.phase === 'queued' || state.phase === 'done') {
+      clearFeedbackDraft(pid);
+    }
+  }, [pid, state.phase]);
+
+  const segments: readonly SegmentItem[] = useMemo(
+    () => [
+      { key: 'new', label: t(lang, 'new.tabNew'), testID: 'seg-new' },
+      { key: 'feedback', label: t(lang, 'new.tabFeedback'), testID: 'seg-feedback' },
+    ],
+    [lang],
+  );
+
+  const selectedRequest = delivered.find((r) => r.id === selectedRequestId);
   const visibleHeight = Math.max(240, height - keyboard);
   const compact = keyboard > 0;
   const maxGoal = Math.max(120, Math.round(visibleHeight * 0.4));
-  const count = goal.length >= 3600 ? t(lang, 'new.left', { n: LIMITS.text - goal.length }) : null;
+  const activeText = mode === 'new' ? goal : feedbackText;
+  const count = activeText.length >= 3600 ? t(lang, 'new.left', { n: LIMITS.text - activeText.length }) : null;
   const receipt = useMemo(() => receiptOf(state, lang), [state, lang]);
   const busy = state.phase === 'sending';
   const locked = busy || state.phase === 'queued' || state.phase === 'done';
-  const valid = goal.trim().length > 0 && platforms.length > 0;
+  const valid =
+    mode === 'new'
+      ? goal.trim().length > 0 && platforms.length > 0
+      : Boolean(selectedRequest) && feedbackText.trim().length > 0;
+
   const label = busy
     ? t(lang, 'common.sending')
     : state.phase === 'queued'
@@ -174,53 +256,135 @@ export default function NewRequestScreen() {
         ? t(lang, 'common.done')
         : state.phase === 'failed' || state.phase === 'refused'
           ? t(lang, 'new.retry')
-          : t(lang, 'new.start');
+          : mode === 'new'
+            ? t(lang, 'new.start')
+            : t(lang, 'new.feedbackSubmit');
 
-  if (!pid) return <View style={styles.root} />;
+  const handleSubmit = () => {
+    if (!valid || locked) return;
+    if (mode === 'new') {
+      void submit(goal.trim(), platforms);
+      return;
+    }
+    if (!selectedRequest) return;
+    const rawPlat = selectedRequest.platform;
+    const plat: StudioPlatform = (PLATFORMS as readonly string[]).includes(rawPlat)
+      ? (rawPlat as StudioPlatform)
+      : 'web';
+    const payload = `[${selectedRequest.title}] ${feedbackText.trim()}`;
+    void submit(payload, [plat]);
+  };
 
   return (
     <View style={styles.root} testID="new-screen">
       <Header title={t(lang, 'new.title')} back />
+      <Segments items={segments} value={mode} onChange={(k) => setMode(k as NewMode)} />
       {!online ? <SyncBanner kind="offline" text={t(lang, 'common.offline')} testID="offline-banner" /> : null}
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
         <View style={[styles.column, desktop && styles.columnDesktop]}>
-          <View style={styles.intro}>
-            {project ? <Text style={styles.eyebrow}>{project.name} · {project.studioName}</Text> : null}
-            {!compact ? <Text style={styles.introText}>{t(lang, 'new.intro')}</Text> : null}
-            {!compact && !desktop ? <Hint lang={lang} /> : null}
-          </View>
+          {mode === 'new' ? (
+            <>
+              <View style={styles.intro}>
+                {project ? (
+                  <Text style={styles.eyebrow}>
+                    {project.name} · {project.studioName}
+                  </Text>
+                ) : null}
+                {!compact ? <Text style={styles.introText}>{t(lang, 'new.intro')}</Text> : null}
+                {!compact && !desktop ? <Hint lang={lang} /> : null}
+              </View>
 
-          <View style={[styles.composer, desktop && styles.composerDesktop]}>
-            <View style={[styles.goalCol, desktop && styles.goalColDesktop]}>
-              <Text style={styles.label}>{t(lang, 'new.goalLabel')}</Text>
+              <View style={[styles.composer, desktop && styles.composerDesktop]}>
+                <View style={[styles.goalCol, desktop && styles.goalColDesktop]}>
+                  <Text style={styles.label}>{t(lang, 'new.goalLabel')}</Text>
+                  <GoalInput
+                    value={goal}
+                    onChangeText={setGoal}
+                    onBlur={() => {
+                      if (lockedRef.current) return;
+                      if (!goal.trim() && platforms.length === 0) {
+                        clearDraft(pid);
+                        return;
+                      }
+                      writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
+                    }}
+                    maxHeight={maxGoal}
+                    placeholder={t(lang, 'new.goalPlaceholder')}
+                    accessibilityLabel={t(lang, 'new.goalLabel')}
+                  />
+                  {/* SS-40 附件清单 AttachList 插槽 */}
+                  <View style={styles.goalMeta}>
+                    <Text style={styles.caption} numberOfLines={1}>
+                      {restored ?? ''}
+                    </Text>
+                    <Text style={[styles.caption, count !== null && styles.warn]}>{count ?? ''}</Text>
+                  </View>
+                </View>
+
+                <View style={[styles.platformCol, desktop && styles.platformColDesktop]}>
+                  <Text style={[styles.label, styles.platformLabel]}>{t(lang, 'new.platforms')}</Text>
+                  <PlatformPicker value={platforms} onChange={setPlatforms} />
+                  {desktop && !compact ? <Hint lang={lang} /> : null}
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.feedbackSection} testID="feedback-panel">
+              <Text style={styles.label}>{t(lang, 'new.feedbackPick')}</Text>
+              {delivered.length === 0 ? (
+                <Text style={styles.emptyText}>{t(lang, 'new.feedbackEmpty')}</Text>
+              ) : (
+                <View style={styles.deliveredList}>
+                  {delivered.map((item) => {
+                    const selected = item.id === selectedRequestId;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => setSelectedRequestId(item.id)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        testID={`delivered-${item.id}`}
+                        style={({ pressed }) => [
+                          styles.deliveredRow,
+                          selected && styles.deliveredRowSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.deliveredText}>
+                          <Text style={styles.deliveredTitle} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          <Text style={styles.deliveredSub} numberOfLines={1}>
+                            {item.projectName} · {item.statusLine}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              <Text style={[styles.label, styles.feedbackLabel]}>{t(lang, 'new.feedbackLabel')}</Text>
               <GoalInput
-                value={goal}
-                onChangeText={setGoal}
-                onBlur={() => {
-                  if (lockedRef.current) return;
-                  if (!goal.trim() && platforms.length === 0) {
-                    clearDraft(pid);
-                    return;
-                  }
-                  writeDraft(pid, { goal, platforms, updatedAt: Date.now() });
-                }}
+                value={feedbackText}
+                onChangeText={setFeedbackText}
                 maxHeight={maxGoal}
-                placeholder={t(lang, 'new.goalPlaceholder')}
-                accessibilityLabel={t(lang, 'new.goalLabel')}
+                placeholder={t(lang, 'new.feedbackPlaceholder')}
+                accessibilityLabel={t(lang, 'new.feedbackLabel')}
               />
+              {/* SS-40 附件清单 AttachList 插槽 */}
               <View style={styles.goalMeta}>
-                <Text style={styles.caption} numberOfLines={1}>{restored ?? ''}</Text>
+                <View />
                 <Text style={[styles.caption, count !== null && styles.warn]}>{count ?? ''}</Text>
               </View>
             </View>
-
-            <View style={[styles.platformCol, desktop && styles.platformColDesktop]}>
-              <Text style={[styles.label, styles.platformLabel]}>{t(lang, 'new.platforms')}</Text>
-              <PlatformPicker value={platforms} onChange={setPlatforms} />
-              {desktop && !compact ? <Hint lang={lang} /> : null}
-            </View>
-          </View>
+          )}
         </View>
       </ScrollView>
 
@@ -228,9 +392,7 @@ export default function NewRequestScreen() {
         {receipt ? <ReceiptLine text={receipt.text} tone={receipt.tone} /> : null}
         <PrimaryButton
           label={label}
-          onPress={() => {
-            if (valid && !locked) void submit(goal.trim(), platforms);
-          }}
+          onPress={handleSubmit}
           disabled={!valid || locked}
           loading={busy}
           testID="primary"
@@ -249,7 +411,12 @@ const styles = StyleSheet.create({
   intro: { marginBottom: space[5] },
   eyebrow: { ...type.caption, fontWeight: '600', color: color.text2, letterSpacing: 0.2, marginBottom: space[3] },
   introText: { ...type.body, color: color.text2 },
-  hint: { marginTop: space[5], paddingTop: space[4], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.hairline },
+  hint: {
+    marginTop: space[5],
+    paddingTop: space[4],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.hairline,
+  },
   hintTitle: { ...type.callout, fontWeight: '500', color: color.text2, marginBottom: 6 },
   hintLine: { ...type.callout, color: color.text2, lineHeight: 21 },
   composer: { marginTop: 'auto' },
@@ -260,7 +427,34 @@ const styles = StyleSheet.create({
   platformColDesktop: { width: 264 },
   label: { ...type.callout, fontWeight: '500', color: color.text2, marginBottom: space[3] },
   platformLabel: { marginTop: space[3] },
-  goalMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 18, marginTop: space[2], gap: space[4] },
+  goalMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 18,
+    marginTop: space[2],
+    gap: space[4],
+  },
   caption: { ...type.caption, color: color.text2, flexShrink: 1 },
   warn: { color: color.warn },
+  feedbackSection: { flex: 1 },
+  feedbackLabel: { marginTop: space[5] },
+  emptyText: { ...type.callout, color: color.text3, paddingVertical: space[3] },
+  deliveredList: { gap: space[2] },
+  deliveredRow: {
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    borderRadius: radius.m,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    backgroundColor: color.card,
+  },
+  deliveredRowSelected: {
+    borderColor: color.primary,
+    backgroundColor: color.sunken,
+  },
+  pressed: { backgroundColor: color.press },
+  deliveredText: { gap: 2 },
+  deliveredTitle: { ...type.callout, fontWeight: '600', color: color.text },
+  deliveredSub: { ...type.caption, color: color.text2 },
 });
