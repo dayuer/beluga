@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
-import { SignedButton } from '../../components/SignedButton';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
 import { useHasDeviceKey } from '../../lib/keys';
@@ -19,10 +18,10 @@ import type { SettingsView } from '../../lib/views';
 type RegisteredDevice = SettingsView['devices'][number];
 
 /**
- * 我 › 设备（列表与移除，SS-58）：
- * 已登记设备（名字、类型、登记时间各一列，标出「这台」）；
- * 移除走 ConfirmSheet 二次确认 + SignedButton（无密钥时不可点）；
- * 「加一台设备」行去 /me/devices/add（A6 实现）。
+ * 我 › 设备（列表与移除，SS-58 / SS-200）：
+ * - 已登记设备（名字、类型、登记时间各一列，标出「这台」）；
+ * - 行内「移除」为文字按钮（无密钥时禁用并说明），整屏只有 ConfirmSheet 使用实底主按钮，且按钮写动作名「移除设备」；
+ * - 「加一台设备」行去 /me/devices/add（A6 实现）。
  */
 export default function MeDevicesScreen() {
   const router = useRouter();
@@ -59,49 +58,65 @@ export default function MeDevicesScreen() {
           ) : devices.length === 0 ? (
             <EmptyState title={tMe(lang, 'devices.empty')} testID="devices-empty" />
           ) : (
-            <View style={styles.tableCard} testID="devices-table">
-              <View style={[styles.row, styles.headerRow]}>
-                <Text style={[styles.colHeader, styles.colName]}>{tMe(lang, 'devices.colName')}</Text>
-                <Text style={[styles.colHeader, styles.colType]}>{tMe(lang, 'devices.colType')}</Text>
-                <Text style={[styles.colHeader, styles.colTime]}>{tMe(lang, 'devices.colTime')}</Text>
-              </View>
-              {devices.map((dev, idx) => (
-                <View
-                  key={dev.id}
-                  testID={`device-row-${dev.id}`}
-                  style={[styles.deviceBlock, idx < devices.length - 1 && styles.rowBorder]}
-                >
-                  <View style={styles.row}>
-                    <View style={[styles.colName, styles.nameCell]}>
-                      <Text style={styles.nameText} numberOfLines={1}>
-                        {dev.name}
-                      </Text>
-                      {dev.isCurrent ? (
-                        <View style={styles.currentBadge} testID={`device-current-${dev.id}`}>
-                          <Text style={styles.currentBadgeText}>{tMe(lang, 'devices.current')}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text style={[styles.cellText, styles.colType]} numberOfLines={1}>
-                      {dev.platform}
-                    </Text>
-                    <Text style={[styles.cellText, styles.colTime]} numberOfLines={1}>
-                      {ago(dev.registeredAt, lang)}
-                    </Text>
-                  </View>
-
-                  {!dev.isCurrent ? (
-                    <View style={styles.removeWrap}>
-                      <SignedButton
-                        label={tMe(lang, 'devices.remove')}
-                        onPress={() => setPendingRemove(dev)}
-                        testID={`device-remove-${dev.id}`}
-                      />
-                    </View>
-                  ) : null}
+            <>
+              <View style={styles.tableCard} testID="devices-table">
+                <View style={[styles.row, styles.headerRow]}>
+                  <Text style={[styles.colHeader, styles.colName]}>{tMe(lang, 'devices.colName')}</Text>
+                  <Text style={[styles.colHeader, styles.colType]}>{tMe(lang, 'devices.colType')}</Text>
+                  <Text style={[styles.colHeader, styles.colTime]}>{tMe(lang, 'devices.colTime')}</Text>
                 </View>
-              ))}
-            </View>
+                {devices.map((dev, idx) => (
+                  <View
+                    key={dev.id}
+                    testID={`device-row-${dev.id}`}
+                    style={[styles.deviceBlock, idx < devices.length - 1 && styles.rowBorder]}
+                  >
+                    <View style={styles.row}>
+                      <View style={[styles.colName, styles.nameCell]}>
+                        <Text style={styles.nameText} numberOfLines={1}>
+                          {dev.name}
+                        </Text>
+                        {dev.isCurrent ? (
+                          <View style={styles.currentBadge} testID={`device-current-${dev.id}`}>
+                            <Text style={styles.currentBadgeText}>{tMe(lang, 'devices.current')}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.cellText, styles.colType]} numberOfLines={1}>
+                        {dev.platform}
+                      </Text>
+                      <Text style={[styles.cellText, styles.colTime]} numberOfLines={1}>
+                        {ago(dev.registeredAt, lang)}
+                      </Text>
+                    </View>
+
+                    {!dev.isCurrent ? (
+                      <View style={styles.removeWrap}>
+                        <Pressable
+                          onPress={() => setPendingRemove(dev)}
+                          disabled={!hasKey}
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: !hasKey }}
+                          testID={`device-remove-${dev.id}`}
+                          style={({ pressed }) => [
+                            styles.removeTextBtn,
+                            !hasKey && styles.removeDisabled,
+                            pressed && hasKey && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.removeText}>{tMe(lang, 'devices.remove')}</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+              {!hasKey ? (
+                <Text style={styles.noKeyHint} testID="devices-no-key-hint">
+                  {tMe(lang, 'devices.noKeyHint')}
+                </Text>
+              ) : null}
+            </>
           )}
 
           <Pressable
@@ -182,8 +197,17 @@ const styles = StyleSheet.create({
   cellText: { ...type.caption, color: color.text2 },
   removeWrap: {
     paddingHorizontal: space[4],
-    paddingBottom: space[2],
+    paddingBottom: space[1],
+    alignItems: 'flex-start',
   },
+  removeTextBtn: {
+    minHeight: 44,
+    paddingHorizontal: space[2],
+    justifyContent: 'center',
+  },
+  removeDisabled: { opacity: 0.45 },
+  removeText: { ...type.callout, color: color.error, fontWeight: '500' },
+  noKeyHint: { ...type.caption, color: color.text3, marginTop: space[3], paddingHorizontal: space[1] },
   addRow: {
     marginTop: space[5],
     minHeight: 48,

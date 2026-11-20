@@ -63,7 +63,7 @@ export const zh = {
   'devices.remove': '移除',
   'devices.removeTitle': '移除「{name}」？',
   'devices.removeBody': '移除后该设备不能再签名确认或接收推送，需要重新配对才能恢复。',
-  'devices.removeConfirm': '确认移除',
+  'devices.removeConfirm': '移除设备',
   'devices.cancel': '取消',
   'devices.noKeyHint': '本机没有签名密钥，无法移除设备',
   'devices.add': '加一台设备',
@@ -83,7 +83,12 @@ export const zh = {
   'account.delete': '删除账号',
   'account.deleteTitle': '确定要删除账号？',
   'account.deleteBody': '此操作不可恢复，将清除本机登录凭证并提交注销申请。',
-  'account.deleteConfirm': '确认删除',
+  'account.deleteConfirm': '删除账号',
+  'account.deleteUnavailable': '暂不支持在手机端直接删除账号，请联系工作室或到桌面端操作。',
+  'account.appearance': '外观',
+  'account.appearanceLight': '浅色',
+  'account.appearanceDark': '深色',
+  'account.appearanceSystem': '跟随系统',
   'account.cancel': '取消',
 } as const;
 
@@ -168,6 +173,11 @@ export const en: Record<MeStringKey, string> = {
   'account.deleteTitle': 'Delete your account?',
   'account.deleteBody': 'This cannot be undone. Local credentials will be cleared.',
   'account.deleteConfirm': 'Delete account',
+  'account.deleteUnavailable': 'Deleting your account on mobile is not available yet. Contact your studio or use desktop.',
+  'account.appearance': 'Appearance',
+  'account.appearanceLight': 'Light',
+  'account.appearanceDark': 'Dark',
+  'account.appearanceSystem': 'System',
   'account.cancel': 'Cancel',
 };
 

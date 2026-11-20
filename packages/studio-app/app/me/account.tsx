@@ -5,6 +5,8 @@ import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { Header } from '../../components/Header';
 import { Skeleton } from '../../components/Skeleton';
 import { SyncBanner } from '../../components/SyncBanner';
+import { getAppearance, setAppearance, type AppearanceMode } from '../../lib/appearance';
+import { hub } from '../../lib/client';
 import { kv } from '../../lib/kv';
 import { session } from '../../lib/session';
 import { useSettingsView } from '../../lib/settings-source';
@@ -15,13 +17,16 @@ import { color, radius, space, type } from '../../lib/theme';
 const PUSH_KEY = 'prefs:pushEnabled';
 
 /**
- * 我 › 账号与通知（SS-59）：
- * 邮箱、语言、通知开关（写入 kv 供 A7 读取）、退出登录（ConfirmSheet）、
- * 删除账号（ConfirmSheet，说明不可恢复）。退出后清空凭证并回到登录屏。
+ * 我 › 账号与通知（SS-59 / SS-200）：
+ * - 邮箱、语言（点击区 ≥ 44pt）、外观设置（浅色 / 深色 / 跟随系统，存 kv 并调用 Appearance.setColorScheme）；
+ * - 通知开关（写 kv 供 A7 读取）；
+ * - 退出登录走 hub.logout() + session.clear()（待 A7 合入后在 A9 换为 signOut()）；
+ * - 删除账号独立处理，中台暂无删除接口时不可点并原地说明。
  */
 export default function MeAccountScreen() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>(() => detectLang());
+  const [appearance, setAppearanceState] = useState<AppearanceMode>(() => getAppearance());
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
 
@@ -29,11 +34,16 @@ export default function MeAccountScreen() {
   const [pushEnabled, setPushEnabled] = useState<boolean>(
     () => kv.get<boolean>(PUSH_KEY) ?? settings.account.pushEnabled,
   );
-  const [confirmKind, setConfirmKind] = useState<'logout' | 'delete' | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const selectLang = (next: Lang) => {
     setLang(next);
     kv.set('lang', next);
+  };
+
+  const selectAppearance = (next: AppearanceMode) => {
+    setAppearanceState(next);
+    setAppearance(next);
   };
 
   const togglePush = (next: boolean) => {
@@ -41,8 +51,9 @@ export default function MeAccountScreen() {
     kv.set(PUSH_KEY, next);
   };
 
-  const performSignOut = () => {
-    setConfirmKind(null);
+  const performSignOut = async () => {
+    setConfirmLogout(false);
+    await hub.logout().catch(() => {});
     session.clear();
     router.replace('/login');
   };
@@ -69,85 +80,107 @@ export default function MeAccountScreen() {
                   </Text>
                 </View>
 
-            <View style={[styles.row, styles.rowBorder]}>
-              <Text style={styles.rowLabel}>{tMe(lang, 'account.language')}</Text>
-              <View style={styles.langRow}>
-                {(['zh', 'en'] as const).map((code) => {
-                  const active = lang === code;
-                  return (
-                    <Pressable
-                      key={code}
-                      onPress={() => selectLang(code)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      testID={`account-lang-${code}`}
-                      style={[styles.langChip, active && styles.langChipActive]}
-                    >
-                      <Text style={[styles.langText, active && styles.langTextActive]}>
-                        {tMe(lang, code === 'zh' ? 'account.langZh' : 'account.langEn')}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
+                <View style={[styles.row, styles.rowBorder]}>
+                  <Text style={styles.rowLabel}>{tMe(lang, 'account.language')}</Text>
+                  <View style={styles.chipRow}>
+                    {(['zh', 'en'] as const).map((code) => {
+                      const active = lang === code;
+                      return (
+                        <Pressable
+                          key={code}
+                          onPress={() => selectLang(code)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          testID={`account-lang-${code}`}
+                          style={[styles.chip, active && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {tMe(lang, code === 'zh' ? 'account.langZh' : 'account.langEn')}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
 
-            <View style={styles.row}>
-              <View style={styles.pushText}>
-                <Text style={styles.rowLabel}>{tMe(lang, 'account.notifications')}</Text>
-                <Text style={styles.rowSub}>{tMe(lang, 'account.notificationsDesc')}</Text>
-              </View>
-              <Switch
-                value={pushEnabled}
-                onValueChange={togglePush}
-                testID="account-push-switch"
-              />
-            </View>
-          </View>
+                <View style={[styles.row, styles.rowBorder]}>
+                  <Text style={styles.rowLabel}>{tMe(lang, 'account.appearance')}</Text>
+                  <View style={styles.chipRow}>
+                    {(['light', 'dark', 'system'] as const).map((mode) => {
+                      const active = appearance === mode;
+                      const key =
+                        mode === 'light'
+                          ? 'account.appearanceLight'
+                          : mode === 'dark'
+                            ? 'account.appearanceDark'
+                            : 'account.appearanceSystem';
+                      return (
+                        <Pressable
+                          key={mode}
+                          onPress={() => selectAppearance(mode)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          testID={`account-appearance-${mode}`}
+                          style={[styles.chip, active && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {tMe(lang, key)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
 
-          <View style={styles.dangerGroup}>
-            <Pressable
-              onPress={() => setConfirmKind('logout')}
-              accessibilityRole="button"
-              testID="account-logout"
-              style={({ pressed }) => [styles.actionRow, styles.rowBorder, pressed && styles.pressed]}
-            >
-              <Text style={styles.actionText}>{tMe(lang, 'account.logout')}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setConfirmKind('delete')}
-              accessibilityRole="button"
-              testID="account-delete"
-              style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}
-            >
-              <Text style={styles.dangerText}>{tMe(lang, 'account.delete')}</Text>
-            </Pressable>
-          </View>
+                <View style={styles.row}>
+                  <View style={styles.pushText}>
+                    <Text style={styles.rowLabel}>{tMe(lang, 'account.notifications')}</Text>
+                    <Text style={styles.rowSub}>{tMe(lang, 'account.notificationsDesc')}</Text>
+                  </View>
+                  <Switch
+                    value={pushEnabled}
+                    onValueChange={togglePush}
+                    testID="account-push-switch"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.dangerGroup}>
+                <Pressable
+                  onPress={() => setConfirmLogout(true)}
+                  accessibilityRole="button"
+                  testID="account-logout"
+                  style={({ pressed }) => [styles.actionRow, styles.rowBorder, pressed && styles.pressed]}
+                >
+                  <Text style={styles.actionText}>{tMe(lang, 'account.logout')}</Text>
+                </Pressable>
+                <Pressable
+                  disabled
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: true }}
+                  testID="account-delete"
+                  style={[styles.actionRow, styles.actionDisabled]}
+                >
+                  <Text style={styles.dangerText}>{tMe(lang, 'account.delete')}</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.deleteNote} testID="account-delete-note">
+                {tMe(lang, 'account.deleteUnavailable')}
+              </Text>
             </>
           )}
         </View>
       </ScrollView>
 
       <ConfirmSheet
-        open={confirmKind === 'logout'}
-        onClose={() => setConfirmKind(null)}
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
         title={tMe(lang, 'account.logoutTitle')}
         description={tMe(lang, 'account.logoutBody')}
         confirmLabel={tMe(lang, 'account.logoutConfirm')}
         cancelLabel={tMe(lang, 'account.cancel')}
-        onConfirm={performSignOut}
+        onConfirm={() => void performSignOut()}
         testID="account-logout-confirm"
-      />
-
-      <ConfirmSheet
-        open={confirmKind === 'delete'}
-        onClose={() => setConfirmKind(null)}
-        title={tMe(lang, 'account.deleteTitle')}
-        description={tMe(lang, 'account.deleteBody')}
-        confirmLabel={tMe(lang, 'account.deleteConfirm')}
-        cancelLabel={tMe(lang, 'account.cancel')}
-        onConfirm={performSignOut}
-        testID="account-delete-confirm"
       />
     </View>
   );
@@ -184,21 +217,24 @@ const styles = StyleSheet.create({
   rowSub: { ...type.caption, color: color.text3, marginTop: 2 },
   rowValue: { ...type.callout, color: color.text2 },
   pushText: { flex: 1 },
-  langRow: { flexDirection: 'row', gap: space[2] },
-  langChip: {
+  chipRow: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap', justifyContent: 'flex-end' },
+  chip: {
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: space[3],
-    paddingVertical: 6,
     borderRadius: radius.s,
     borderWidth: 1,
     borderColor: color.hairline,
     backgroundColor: color.sunken,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  langChipActive: {
+  chipActive: {
     borderColor: color.primary,
     backgroundColor: color.card,
   },
-  langText: { ...type.caption, color: color.text2 },
-  langTextActive: { color: color.text, fontWeight: '600' },
+  chipText: { ...type.caption, color: color.text2 },
+  chipTextActive: { color: color.text, fontWeight: '600' },
   dangerGroup: {
     backgroundColor: color.card,
     borderRadius: radius.l,
@@ -212,7 +248,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: space[4],
   },
+  actionDisabled: { opacity: 0.45 },
   pressed: { backgroundColor: color.press },
   actionText: { ...type.callout, fontWeight: '500', color: color.text },
   dangerText: { ...type.callout, fontWeight: '600', color: color.error },
+  deleteNote: { ...type.caption, color: color.text3, marginTop: space[2], paddingHorizontal: space[1] },
 });
