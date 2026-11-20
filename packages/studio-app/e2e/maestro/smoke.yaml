@@ -6,6 +6,14 @@ appId: com.synon.studio
       notifications: allow
 - extendedWaitUntil:
     visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
       id: "email"
     timeout: 30000
 - assertVisible:

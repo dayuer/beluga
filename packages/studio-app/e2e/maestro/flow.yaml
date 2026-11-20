@@ -5,6 +5,14 @@ appId: com.synon.studio
     clearState: true
     permissions:
       notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
 - tapOn:
     text: "取消|Cancel"
     optional: true
@@ -35,6 +43,9 @@ appId: com.synon.studio
     timeout: 25000
 - takeScreenshot: flow-projects
 
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
 - tapOn:
     id: "project-card-${E2E_PROJECT_ID}"
 - extendedWaitUntil:
@@ -122,8 +133,19 @@ appId: com.synon.studio
       notifications: allow
 - extendedWaitUntil:
     visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
       id: "project-card-${E2E_PROJECT_ID}"
     timeout: 20000
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
 - tapOn:
     id: "project-card-${E2E_PROJECT_ID}"
 - extendedWaitUntil:

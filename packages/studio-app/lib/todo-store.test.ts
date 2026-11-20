@@ -114,3 +114,13 @@ describe('todo-store + badge integration (SS-164)', () => {
     stopBadge();
   });
 });
+
+describe('refreshError', () => {
+  it('keeps the cached list but reports offline when the hub is unreachable', async () => {
+    const { refreshError } = await import('./todo-store');
+    expect(refreshError(new Error('offline'), true)).toBe('offline');
+    expect(refreshError(new Error('offline'), false)).toBe('offline');
+    expect(refreshError(new Error('http'), true)).toBeNull();
+    expect(refreshError(new Error('http'), false)).toBe('error');
+  });
+});

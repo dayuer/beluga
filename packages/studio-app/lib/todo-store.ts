@@ -126,6 +126,12 @@ export async function fetchTodos(force = false): Promise<TodosResult> {
   return current;
 }
 
+/** Unreachable hub keeps the cached list and says so; other failures only matter with nothing to show. */
+export function refreshError(err: unknown, hasResult: boolean): 'offline' | 'error' | null {
+  if (err instanceof Error && err.message === 'offline') return 'offline';
+  return hasResult ? null : 'error';
+}
+
 export interface TodosStore {
   readonly result: TodosResult | undefined;
   readonly loading: boolean;
@@ -147,8 +153,8 @@ export function useTodos(): TodosStore {
       const next = await fetchTodos(true);
       setResult(next);
       setError(null);
-    } catch {
-      if (resultRef.current === undefined) setError('error');
+    } catch (err) {
+      setError(refreshError(err, resultRef.current !== undefined));
     } finally {
       setLoading(false);
     }

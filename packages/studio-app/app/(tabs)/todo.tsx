@@ -39,7 +39,7 @@ export default function TodoScreen() {
   });
 
   const todos = (result?.todos ?? []).filter((todo) => !hidden.has(todo.key));
-  const offline = !online;
+  const offline = !online || error === 'offline';
   const fetchedAt = result?.fetchedAt ?? 0;
 
   return (
