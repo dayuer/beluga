@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { PrimaryButtonState } from '../components/PrimaryButton';
 import { useSend, type SendHandlers, type SendableAction } from './send';
 import { detectLang } from './strings';
-import { signRefusalMessage } from './strings/sign';
+import { signRefusalFallback, signRefusalMessage, signT } from './strings/sign';
 import type { SubmitState } from './submit';
 
 export interface SignedActionController {
@@ -20,10 +20,9 @@ export function mapSubmitToButtonState(state: SubmitState): PrimaryButtonState {
 }
 
 /**
- * 封装带签名的动作发送状态（SS-177）：
- * - `sending` / `queued` -> 按钮 `working`
- * - `done` -> 按钮 `done`
- * - `refused` -> 按钮回到 `idle`，用 `signRefusalMessage` 给出明确原因，不触发成功回调
+ * Signed-action send controller (SS-177 / SS-212):
+ * maps `sending`/`queued` -> `working`, `done` -> `done`, `refused`/`failed` -> `idle`
+ * with localized messages from `lib/strings/sign.ts`.
  */
 export function useSignedAction(pid: string, key: string): SignedActionController {
   const sender = useSend(pid, key);
@@ -33,16 +32,14 @@ export function useSignedAction(pid: string, key: string): SignedActionControlle
   let error: string | null = null;
   if (sender.state.phase === 'refused') {
     const code = sender.state.code ?? 'not-allowed';
-    error =
-      signRefusalMessage(lang, code) ??
-      (lang === 'en' ? `Action refused (${code}).` : `操作被拒绝（${code}）。`);
+    error = signRefusalMessage(lang, code) ?? signRefusalFallback(lang, code);
   } else if (sender.state.phase === 'failed') {
     if (sender.state.failure === 'offline') {
-      error = lang === 'en' ? 'You are offline. Reconnect and try again.' : '当前没有网络，连上网后再试。';
+      error = signT(lang, 'sign.waitingOffline');
     } else if (sender.state.failure === 'expired') {
-      error = lang === 'en' ? 'Request expired. Please try again.' : '操作已过期，请再试一次。';
+      error = signT(lang, 'sign.expired');
     } else {
-      error = lang === 'en' ? 'Request failed. Please try again.' : '发送失败，请再试一次。';
+      error = signT(lang, 'sign.sendFailed');
     }
   }
 
