@@ -34,6 +34,14 @@ export const zh = {
   'preview.deployingWhen': '通常需要几分钟，部署好后这里会出现打开按钮',
   'preview.unconfiguredReason': '尚未配置测试环境',
   'preview.unconfiguredWhen': '请联系工作室或在「我 › 环境」配置测试环境后查看在线预览',
+
+  'request.openResults': '结果与计划',
+  'request.stepsTitle': '当前进度',
+  'request.chatSection': '需求对话',
+  'request.signedCardTitle': '待确认动作（{kind}）',
+  'request.signedCardBody': '此卡片需要设备确认，将在签名能力合流后开放操作。',
+  'request.unknownTitle': '暂不支持的卡片',
+  'request.unknownBody': '当前版本暂不支持展示此类内容（{kind}）。',
 } as const;
 
 export const en: Record<keyof typeof zh, string> = {
@@ -70,4 +78,12 @@ export const en: Record<keyof typeof zh, string> = {
   'preview.deployingWhen': 'Usually takes a few minutes; the preview link will appear here once live',
   'preview.unconfiguredReason': 'Test environment not configured',
   'preview.unconfiguredWhen': 'Ask your studio or configure a test environment in Me › Environments',
+
+  'request.openResults': 'Results & plan',
+  'request.stepsTitle': 'Current progress',
+  'request.chatSection': 'Conversation',
+  'request.signedCardTitle': 'Action requiring confirmation ({kind})',
+  'request.signedCardBody': 'Device confirmation for this card will be enabled once signing lands.',
+  'request.unknownTitle': 'Unsupported card',
+  'request.unknownBody': 'This version cannot display this card ({kind}) yet.',
 };
