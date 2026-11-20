@@ -4,7 +4,9 @@
  * e2e/fixtures/views.ts, and print the LAN URL + native deep-link login commands.
  *
  * Pass --login to mint a fresh one-time token against the running dev:device hub without
- * restarting services. Pass --smoke to boot, print, and shut down cleanly.
+ * restarting services. Pass --push-demo to push a fresh "waiting on you" decision card
+ * twice (testing push deduplication) against the running dev:device daemon. Pass --smoke
+ * to boot, print, and shut down cleanly.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -39,6 +41,7 @@ const operator = 'dev-operator';
 const localHubUrl = `http://127.0.0.1:${port}`;
 const smoke = process.argv.includes('--smoke');
 const loginOnly = process.argv.includes('--login');
+const pushDemo = process.argv.includes('--push-demo');
 
 const log = (...args) => console.log('[dev:device]', ...args);
 const pm = createProcessManager(appDir);
@@ -89,6 +92,33 @@ async function mintLoginOnly() {
   printLoginCommands(token);
 }
 
+async function pushDemoCard() {
+  const stamp = Date.now();
+  const decisionId = `push-demo-${stamp}`;
+  const baseDecision = views.decide.decisions[0];
+  const demoView = {
+    ...views.decide,
+    headline: '在等你回答（推送演示）',
+    decisions: [
+      {
+        ...baseDecision,
+        decisionId,
+        question: `推送演示 #${stamp % 10000}：先做提醒还是先做统计？`,
+        open: true,
+      },
+    ],
+  };
+
+  // Push the same card twice to verify hub push_dedup only sends one notification.
+  await pushView('dp1', demoView);
+  await pushView('dp1', demoView);
+
+  const cardId = `dp1:${demoView.planRef}:decision:${decisionId}`;
+  log(`pushed waiting card twice for dedup check: ${cardId}`);
+  log(`expected notification path: /request/${encodeURIComponent(demoView.planRef)}?card=${encodeURIComponent(cardId)}`);
+  log(`check hub log: ${path.relative(repo, wranglerLog)}`);
+}
+
 async function pushView(project, view) {
   const res = await fetch(`http://127.0.0.1:${daemonControlPort}/view`, {
     method: 'POST',
@@ -118,6 +148,10 @@ process.on('SIGTERM', () => void shutdown(0));
 async function main() {
   if (loginOnly) {
     await mintLoginOnly();
+    return;
+  }
+  if (pushDemo) {
+    await pushDemoCard();
     return;
   }
 
@@ -188,6 +222,8 @@ async function main() {
   console.log('');
   console.log('Mint another one-time login link while running:');
   console.log('  npm run dev:device -- --login');
+  console.log('Push a waiting card twice (dedup + push test) while running:');
+  console.log('  npm run dev:device -- --push-demo');
   console.log('');
   console.log('Logs: .beluga/scratch/dev-device/{wrangler,daemon}.log');
   console.log('Press Ctrl-C to stop.');
@@ -204,6 +240,6 @@ async function main() {
 
 main().catch(async (err) => {
   console.error('[dev:device] failed:', err instanceof Error ? err.message : err);
-  if (!loginOnly) console.error('[dev:device] logs: .beluga/scratch/dev-device/{wrangler,daemon}.log');
+  if (!loginOnly && !pushDemo) console.error('[dev:device] logs: .beluga/scratch/dev-device/{wrangler,daemon}.log');
   await shutdown(1);
 });
