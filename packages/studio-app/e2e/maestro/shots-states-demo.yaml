@@ -1,0 +1,94 @@
+appId: com.synon.studio
+---
+# SS-232：演示数据才能到的子状态（EXPO_PUBLIC_DEMO=1 构建，不需要中台）。
+# 直接对装好的 demo 包跑：maestro --device <udid> test e2e/maestro/shots-states-demo.yaml
+# 覆盖：SS-33 等待原因（quota / needs-human / offline）、SS-46 设计稿上传中与已收下、
+# SS-46 代码卡推送失败、SS-51 预览有地址（ready）。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 30000
+
+# SS-33：每种等待原因
+- openLink: "synon://request/req-quota"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "card-card-wait-quota"
+    direction: DOWN
+- takeScreenshot: state-wait-quota
+- openLink: "synon://request/req-human"
+- scrollUntilVisible:
+    element:
+      id: "card-card-wait-human"
+    direction: DOWN
+- takeScreenshot: state-wait-human
+- openLink: "synon://request/req-push"
+- scrollUntilVisible:
+    element:
+      id: "card-card-wait-offline"
+    direction: DOWN
+- takeScreenshot: state-wait-offline
+
+# SS-46：设计稿卡（上传中 / 已收下）与代码卡推送失败
+- openLink: "synon://request/req-upload"
+- scrollUntilVisible:
+    element:
+      id: "card-card-design-up"
+    direction: DOWN
+- takeScreenshot: state-design-uploading
+- openLink: "synon://request/req-pay"
+- scrollUntilVisible:
+    element:
+      id: "card-card-design-1"
+    direction: DOWN
+- takeScreenshot: state-design-received
+- openLink: "synon://request/req-code-failed"
+- scrollUntilVisible:
+    element:
+      id: "card-card-code-failed"
+    direction: DOWN
+- takeScreenshot: state-code-failed
+
+# SS-51：有预览地址
+- openLink: "synon://request/req-export"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "request-results-pill"
+    timeout: 10000
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 15000
+- tapOn:
+    id: "request-results-drawer-tab-preview"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-preview-tab"
+    timeout: 10000
+- takeScreenshot: state-preview-ready

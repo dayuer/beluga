@@ -285,3 +285,49 @@ TalkBack 本身（语音朗读与手势）还没有走：`e2e/maestro/talkback.y
 打开再跑。手机上的 TalkBack 需要用户自己从 Play 商店安装（本机无法代装）。
 
 
+
+## 16. 补拍：两档尺寸、子状态、链接过期、指纹（SS-232）
+
+脚本：`e2e/maestro/shots-sizes.yaml`（两档尺寸，用 `e2e/run.mjs` 的真中台 + 假 daemon）、
+`e2e/maestro/shots-states.yaml`（真中台子状态）、`e2e/maestro/shots-states-demo.yaml`
+（`EXPO_PUBLIC_DEMO=1` 才能到的假数据状态）。截图都落在 `.beluga/scratch/ss-232/`。
+
+屏幕尺寸：iPhone 14（390×844）与 iPhone SE（3rd gen，375×667）。**320×568 建不出来**：
+iOS 26.5/27.2 已不支持 4 英寸设备类型，`simctl create` 报 `Incompatible device`；
+SE 3rd gen 是这台机器上能建的最小尺寸，用它当小屏档。
+
+| 任务 | 截图（`.beluga/scratch/ss-232/`） | 结果 |
+|---|---|---|
+| SS-16 键盘不挡输入框与主按钮 | `size-login-keyboard-390.png`、`size-login-keyboard-375.png` | 两档键盘弹起时邮箱框与「继续」都完整可见 |
+| SS-24 三页签不被安全区挡 | `size-requests-tabs-{390,375}.png`、`size-todo-tabs-{390,375}.png`、`size-me-tabs-{390,375}.png` | 三页签都在底部安全区之上 |
+| SS-27 三种动作排法 | `state-action-row-start.png`（只有主动作）、`state-action-row-understanding.png`（主 + 否定）、`state-action-row-accept.png`（主 + 否定 + 「由这台设备确认」） | 三种都拍到；说明行在动作行下方整行折行 |
+| SS-28 主按钮三态 | idle 见上面各卡；working / done 见「补拍时发现的问题」 | **不能静态截屏**：所有调用方只传 idle / working，working 只在一次发送往返里（< 1 秒），done 没有任何调用方。三态由 `components/PrimaryButton.test.tsx` 覆盖 |
+| SS-33 每种等待原因 | `state-wait-queued.png`（真中台排队）、`state-wait-quota.png`、`state-wait-human.png`、`state-wait-offline.png`（demo） | 四种原因齐全，都带「什么时候会好」 |
+| SS-37 登录三态 | `size-login-idle-390.png`（发送）、`state-login-sent.png`（已发送）、`state-login-expired.png`（链接已失效，红色原地提示） | 三态都拍到；点邮件链接回 App 的联合验收仍留给真机（SS-240） |
+| SS-46 设计稿卡与代码卡 | `state-design-uploading.png`（42%）、`state-design-received.png`（已收下 18 个文件）、`state-code-failed.png`（推送失败，红点） | 三态拍到；**推送失败卡没有「重新推送」按钮**（见问题 1） |
+| SS-48 计划页签三档 | `state-plan-map.png`、`state-plan-outline.png`、`state-plan-activity.png` | 图 / 大纲 / 动态都拍到 |
+| SS-51 预览三态 | `state-preview-ready.png`（demo，有测试环境地址与安装包）、`state-preview-unconfigured.png`（真中台，没有预览地址的原地说明） | **「部署中」到不了**（见问题 2） |
+| SS-72 指纹两态 | `state-fingerprint-match.png`、`state-fingerprint-mismatch.png` | 一致（4 组短码 + 登记）与不一致（红框 + 暂停登记 + 重新核对）都拍到 |
+
+### 补拍时发现的问题（本次不改界面）
+
+1. **代码卡推送失败没有重试入口**：`components/cards/CodeCard.tsx` 只在调用方传 `onRetryPush`
+   时才画「重新推送」，而 `CardStream` 没有传（`state-code-failed.png` 里只有红点「推送失败」）。
+   SS-46 的验收里有这一条，需要后续接 `code.push` 动作或在视图里补按钮。
+2. **预览的「部署中」态从界面进不去**：`PreviewTab` 有 `state: 'deploying'`，但
+   `app/request/[id].tsx` 只传 `previewUrl` / `installUrl`，没有任何数据能让它变成 deploying。
+3. **主按钮的 done 态没有调用方**：所有 `PrimaryButton`/`SignedButton` 只传 `idle | working`，
+   `state="done"` 只在单测里出现。
+
+### 复跑
+
+```sh
+# 两档尺寸（各跑一次，换 E2E_IOS_UDID）
+E2E_IOS_UDID=<iPhone 14 udid> npm run e2e -- e2e/maestro/shots-sizes.yaml
+E2E_IOS_UDID=<iPhone SE udid>  npm run e2e -- e2e/maestro/shots-sizes.yaml
+# 真中台子状态
+E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-states.yaml
+# demo 构建 + demo 子状态
+EXPO_PUBLIC_DEMO=1 npx expo run:ios --no-bundler --configuration Release --device generic --output .beluga/scratch/demo-ios-build
+maestro --device <udid> test --test-output-dir e2e/out/demo-states e2e/maestro/shots-states-demo.yaml
+```

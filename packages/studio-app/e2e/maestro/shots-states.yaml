@@ -1,0 +1,187 @@
+appId: com.synon.studio
+---
+# SS-232：子状态补拍（真中台 + 假 daemon）。
+# E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-states.yaml
+# 覆盖：SS-37 链接过期、SS-72 指纹一致/不一致、SS-27 三种动作排法、SS-48 计划三档、
+# SS-51 预览未配置、SS-28 主按钮 working / 失败回 idle（done 态界面里没有调用方，见文档）。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+
+# SS-37：登录链接过期 / 已失效
+- openLink: "synon://login?token=ss232-stale-token"
+- extendedWaitUntil:
+    visible:
+      id: "login-message"
+    timeout: 20000
+- takeScreenshot: state-login-expired
+
+# SS-37：已发送（发一封新链接）
+- tapOn:
+    id: "email"
+- inputText: "customer@example.test"
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      id: "login-sent"
+    timeout: 15000
+- takeScreenshot: state-login-sent
+
+# 正常登录
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# SS-72：指纹一致 / 不一致（邀请链接登记设备）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: invite
+- openLink: "${output.deviceLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint"
+    timeout: 20000
+- takeScreenshot: state-fingerprint-match
+- tapOn:
+    id: "fingerprint-mismatch-btn"
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint-mismatch"
+    timeout: 10000
+- takeScreenshot: state-fingerprint-mismatch
+- tapOn:
+    id: "fingerprint-retry"
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint-match"
+    timeout: 10000
+- tapOn:
+    id: "fingerprint-match"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# 进入需求详情
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+
+# SS-27：三种动作排法（只有主动作 / 主+否定 / 主+否定+说明）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: confirm
+- scrollUntilVisible:
+    element:
+      id: "card-understanding-2"
+    direction: DOWN
+- takeScreenshot: state-action-row-understanding
+- scrollUntilVisible:
+    element:
+      id: "card-confirm:plan1"
+    direction: DOWN
+- takeScreenshot: state-action-row-start
+
+# SS-33：排队中的等待卡（工作室还没接单）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingChanges
+- scrollUntilVisible:
+    element:
+      id: "card-wait-queued"
+    direction: DOWN
+- takeScreenshot: state-wait-queued
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- takeScreenshot: state-action-row-accept
+
+# SS-48：计划页签的图 / 大纲 / 动态
+- tapOn:
+    id: "request-results-pill"
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-plan"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-plan-tab"
+    timeout: 10000
+- takeScreenshot: state-plan-map
+- tapOn:
+    id: "plan-subtab-outline"
+- takeScreenshot: state-plan-outline
+- tapOn:
+    id: "plan-subtab-activity"
+- takeScreenshot: state-plan-activity
+
+# SS-51：没有预览地址时的原地说明
+- tapOn:
+    id: "request-results-drawer-tab-preview"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-preview-tab-unconfigured"
+    timeout: 10000
+- takeScreenshot: state-preview-unconfigured
+- tapOn:
+    id: "drawer-close"
+
+# SS-28：主按钮三态里的 idle 在各卡上随处可见（上面几张截图）；working 与 done 在运行中的
+# 界面里停不住：所有调用方只传 idle / working，working 只在一次发送的往返里（< 1 秒），
+# done 没有任何调用方，因此这三态由 components/PrimaryButton.test 覆盖，见文档「SS-28」。

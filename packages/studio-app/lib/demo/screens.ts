@@ -126,6 +126,16 @@ export const DEMO_REQUEST_SUMMARIES: readonly RequestSummary[] = [
     updatedAt: NOW - 2 * 60_000,
   },
   {
+    id: 'req-code-failed',
+    projectId: 'proj-shop',
+    projectName: '优选商城 App',
+    title: '代码交付推送',
+    platform: 'ios',
+    status: 'needs-you',
+    statusLine: '代码推送失败，等你处理',
+    updatedAt: NOW - 60_000,
+  },
+  {
     id: 'req-home',
     projectId: 'proj-shop',
     projectName: '优选商城 App',
@@ -293,6 +303,15 @@ export const DEMO_CARDS: Record<string, StudioCard> = {
     repoUrl: 'https://git.synon.invalid/shop/ios-app',
     prUrl: 'https://git.synon.invalid/shop/ios-app/pull/42',
     pushState: 'pushed',
+  },
+  /** 推送失败态（SS-232 补拍）：真实视图里还没有 code 卡，只用来给走查截图。 */
+  codeFailed: {
+    id: 'card-code-failed',
+    kind: 'code',
+    createdAt: NOW - 120_000,
+    status: 'pending',
+    repoUrl: 'https://git.synon.invalid/shop/ios-app',
+    pushState: 'failed',
   },
   release: {
     id: 'card-release-1',

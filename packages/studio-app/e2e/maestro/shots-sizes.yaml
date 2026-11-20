@@ -1,0 +1,66 @@
+appId: com.synon.studio
+---
+# SS-232：两档屏幕尺寸的截图（iPhone 14 390×844 / iPhone SE 375×667）。
+# 由 e2e/run.mjs 驱动（真中台 + 假 daemon）：E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-sizes.yaml
+# SS-16：键盘弹起时输入框与主按钮不被挡；SS-24：三页签不被底部安全区挡。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- takeScreenshot: size-login-idle
+- tapOn:
+    id: "email"
+- inputText: "customer@example.test"
+- takeScreenshot: size-login-keyboard
+# 不调 hideKeyboard：SE 模拟器上它偶尔失败；打开登录链接会把键盘自然收起。
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+# 登录后推送登记会再问一次通知权限
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- takeScreenshot: size-requests-tabs
+- tapOn:
+    id: "tab-todo"
+- extendedWaitUntil:
+    visible:
+      id: "todo-screen"
+    timeout: 15000
+- takeScreenshot: size-todo-tabs
+- tapOn:
+    id: "tab-me"
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 15000
+- takeScreenshot: size-me-tabs

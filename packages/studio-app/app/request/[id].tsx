@@ -58,6 +58,7 @@ const DEMO_CARDS_BY_ID: Record<string, readonly StudioCard[]> = {
   'req-quota': [DEMO_CARDS.waitQuota!, DEMO_CARDS.steps!],
   'req-human': [DEMO_CARDS.waitHuman!, DEMO_CARDS.steps!],
   'req-upload': [DEMO_CARDS.designUploading!, DEMO_CARDS.steps!],
+  'req-code-failed': [DEMO_CARDS.codeFailed!, DEMO_CARDS.code!],
 };
 
 /** 按路由 id 取对应的演示需求详情；未知 id 返回 null（触发空态）。 */
