@@ -29,5 +29,5 @@ the link will land on the wrong host. The hub deliberately does not enable CORS.
 ```sh
 npm run typecheck
 npm run export       # static web build in dist/
-npm run e2e          # Playwright flow, when e2e/ exists (BLG-86)
+npm run e2e          # Maestro flows on iOS simulator (e2e/maestro/)
 ```

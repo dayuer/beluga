@@ -306,7 +306,7 @@ appId: com.synon.studio
       id: "reason-input"
     timeout: 10000
 - assertVisible:
-    id: "primary"
+    id: "reason-submit"
     enabled: false
 - tapOn:
     id: "reason-input"
@@ -317,7 +317,7 @@ appId: com.synon.studio
       ACTION: getDelivered
       KIND: milestone.sendBack
 - tapOn:
-    id: "primary"
+    id: "reason-submit"
 - extendedWaitUntil:
     notVisible:
       id: "plan-status"
@@ -611,7 +611,7 @@ appId: com.synon.studio
 
 # Project card carries the same dot
 - tapOn:
-    id: "tab-projects"
+    id: "tab-requests"
 - extendedWaitUntil:
     visible:
       id: "project-dot"

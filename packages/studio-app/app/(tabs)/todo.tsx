@@ -1,19 +1,19 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { EmptyState } from '../components/EmptyState';
-import { Header } from '../components/Header';
-import { Skeleton } from '../components/Skeleton';
-import { SyncBanner } from '../components/SyncBanner';
-import { TabBar } from '../components/TabBar';
-import { TodoCard } from '../components/TodoCard';
-import { TextButton } from '../components/TextButton';
-import { useOnline } from '../lib/net';
-import { useOnResume } from '../lib/resume';
-import { detectLang, t } from '../lib/strings';
-import { color, space } from '../lib/theme';
-import { ago } from '../lib/time';
-import { useTodos } from '../lib/todo-store';
+import { EmptyState } from '../../components/EmptyState';
+import { Header } from '../../components/Header';
+import { Skeleton } from '../../components/Skeleton';
+import { SyncBanner } from '../../components/SyncBanner';
+import { TabBar } from '../../components/TabBar';
+import { TodoCard } from '../../components/TodoCard';
+import { TextButton } from '../../components/TextButton';
+import { useOnline } from '../../lib/net';
+import { useOnResume } from '../../lib/resume';
+import { detectLang, t } from '../../lib/strings';
+import { color, space } from '../../lib/theme';
+import { ago } from '../../lib/time';
+import { useTodos } from '../../lib/todo-store';
 
 /**
  * Everything waiting on the customer, across projects (M6 §6): one card per question, review,
@@ -77,7 +77,6 @@ export default function TodoScreen() {
           )}
         </View>
       </ScrollView>
-      {!desktop ? <TabBar todoCount={todos.length} /> : null}
     </View>
   );
 }

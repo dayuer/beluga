@@ -22,6 +22,7 @@
   "exclude": [
     "tests/team/studio-app-cards.test.ts",
     "tests/team/studio-app-hub.test.ts",
-    "tests/team/studio-app-submit.test.ts"
+    "tests/team/studio-app-submit.test.ts",
+    "tests/team/studio-push-joint.test.ts"
   ]
 }

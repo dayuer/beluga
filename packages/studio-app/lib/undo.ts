@@ -149,3 +149,154 @@ export function useUndoSend(ms = 10_000, subscribeAppState: SubscribeAppState = 
 
   return { active: state.active, remaining: state.remaining, start, cancel, flush };
 }
+
+// --- 全局单例撤销条 Store（SS-29） ---
+
+export interface UndoBarOptions {
+  /** 写清做了什么和对象名，例如「已通过「登录页改版」」。 */
+  readonly text: string;
+  /** 撤销窗口毫秒数；默认 4000，通过交付用 10000。 */
+  readonly ms?: number;
+  /** 窗口结束且未被撤销时真正发出的动作。 */
+  readonly fire: () => void;
+  /** 用户点「撤销」时的可选回调。 */
+  readonly onUndo?: () => void;
+}
+
+export interface UndoBarState {
+  readonly active: boolean;
+  readonly text: string;
+  readonly remaining: number;
+}
+
+export interface UndoStore {
+  getState(): UndoBarState;
+  subscribe(listener: (state: UndoBarState) => void): () => void;
+  show(options: UndoBarOptions): void;
+  cancel(): void;
+  flush(): void;
+  dispose(): void;
+}
+
+const IDLE_BAR: UndoBarState = { active: false, text: '', remaining: 0 };
+
+/**
+ * 全局撤销条 store（纯逻辑，支持注入假时钟 `now` 与假 `subscribeAppState`）：
+ * - 同时只有一条；调用 `show()` 时若上一条仍在倒计时，先 `fire` 上一条再展示新一条。
+ * - 点 `cancel()` 撤销后不发出任何动作。
+ * - 沿用 A1：切后台保留 deadline，回到前台若已超时立刻 `flush`。
+ */
+export function createUndoStore(
+  subscribeAppState: SubscribeAppState = defaultSubscribeAppState,
+  now: () => number = () => Date.now(),
+): UndoStore {
+  let state: UndoBarState = IDLE_BAR;
+  let deadline = 0;
+  let fireFn: (() => void) | null = null;
+  let onUndoFn: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let tick: ReturnType<typeof setInterval> | null = null;
+  const listeners = new Set<(s: UndoBarState) => void>();
+
+  const clearTimers = () => {
+    if (timer) clearTimeout(timer);
+    if (tick) clearInterval(tick);
+    timer = null;
+    tick = null;
+  };
+
+  const emit = () => {
+    for (const l of [...listeners]) l(state);
+  };
+
+  const flush = () => {
+    if (!state.active) return;
+    const run = fireFn;
+    fireFn = null;
+    onUndoFn = null;
+    deadline = 0;
+    clearTimers();
+    state = IDLE_BAR;
+    emit();
+    run?.();
+  };
+
+  const scheduleTimers = () => {
+    clearTimers();
+    const left = Math.max(0, deadline - now());
+    state = {
+      ...state,
+      remaining: Math.max(0, Math.ceil(left / 1000)),
+    };
+    emit();
+    tick = setInterval(() => {
+      const next = Math.max(0, Math.ceil((deadline - now()) / 1000));
+      if (next !== state.remaining) {
+        state = { ...state, remaining: next };
+        emit();
+      }
+    }, 250);
+    timer = setTimeout(flush, left);
+  };
+
+  const unsubApp = subscribeAppState((nextState) => {
+    if (nextState !== 'active' || !state.active) return;
+    if (now() >= deadline) {
+      flush();
+      return;
+    }
+    scheduleTimers();
+  });
+
+  return {
+    getState: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    show({ text, ms = 4000, fire, onUndo }) {
+      if (state.active) {
+        flush();
+      }
+      fireFn = fire;
+      onUndoFn = onUndo ?? null;
+      deadline = now() + ms;
+      state = {
+        active: true,
+        text,
+        remaining: Math.max(0, Math.ceil(ms / 1000)),
+      };
+      scheduleTimers();
+    },
+    cancel() {
+      if (!state.active) return;
+      const undoCb = onUndoFn;
+      fireFn = null;
+      onUndoFn = null;
+      deadline = 0;
+      clearTimers();
+      state = IDLE_BAR;
+      emit();
+      undoCb?.();
+    },
+    flush,
+    dispose() {
+      unsubApp();
+      flush();
+      listeners.clear();
+    },
+  };
+}
+
+export const undoStore = createUndoStore();
+
+/** 订阅全局撤销条状态，供 `UndoBar` 使用。 */
+export function useUndoBar(): UndoBarState & { cancel: () => void } {
+  const [state, setState] = useState<UndoBarState>(() => undoStore.getState());
+  useEffect(() => {
+    setState(undoStore.getState());
+    return undoStore.subscribe(setState);
+  }, []);
+  const cancel = useCallback(() => undoStore.cancel(), []);
+  return { ...state, cancel };
+}

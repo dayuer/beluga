@@ -38,6 +38,41 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, run: (item: T)
 let lastResult: TodosResult | undefined;
 let inflight: Promise<TodosResult> | null = null;
 let generation = 0;
+const listeners = new Set<(result: TodosResult) => void>();
+
+function notify(result: TodosResult): void {
+  for (const listener of listeners) listener(result);
+}
+
+/** 订阅 todo-store 的最近一次结果（fetchTodos 更新或 markTodoHandled 本地扣减时触发）。 */
+export function subscribeTodos(listener: (result: TodosResult) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** 处理掉某张待办卡后立即从内存与缓存列表移除并通知订阅者（如图标角标）。 */
+export function markTodoHandled(key: string): TodosResult | undefined {
+  if (!lastResult) return undefined;
+  const todos = lastResult.todos.filter((todo) => todo.key !== key);
+  if (todos.length === lastResult.todos.length) return lastResult;
+  const byProject: Record<string, number> = {};
+  for (const todo of todos) byProject[todo.pid] = (byProject[todo.pid] ?? 0) + 1;
+  const next: TodosResult = { ...lastResult, todos, byProject };
+  lastResult = next;
+  cache.set('todos', next, next.fetchedAt);
+  notify(next);
+  return next;
+}
+
+/** 仅用于测试重置 todo-store 模块级状态。 */
+export function resetTodoStoreForTest(): void {
+  lastResult = undefined;
+  inflight = null;
+  generation = 0;
+  listeners.clear();
+}
 
 async function run(gen: number): Promise<TodosResult> {
   const projects = await hub.projects();
@@ -73,6 +108,7 @@ async function run(gen: number): Promise<TodosResult> {
   if (gen === generation) {
     lastResult = result;
     cache.set('todos', result, result.fetchedAt);
+    notify(result);
   }
   return result;
 }
@@ -119,17 +155,23 @@ export function useTodos(): TodosStore {
   }, []);
 
   useEffect(() => {
-    if (resultRef.current) return;
-    setLoading(true);
-    void fetchTodos(false)
-      .then((next) => {
-        setResult(next);
-        setError(null);
-      })
-      .catch(() => {
-        if (resultRef.current === undefined) setError('error');
-      })
-      .finally(() => setLoading(false));
+    const unsub = subscribeTodos((next) => {
+      setResult(next);
+      setError(null);
+    });
+    if (!resultRef.current) {
+      setLoading(true);
+      void fetchTodos(false)
+        .then((next) => {
+          setResult(next);
+          setError(null);
+        })
+        .catch(() => {
+          if (resultRef.current === undefined) setError('error');
+        })
+        .finally(() => setLoading(false));
+    }
+    return unsub;
   }, []);
 
   return { result, loading, error, refresh };

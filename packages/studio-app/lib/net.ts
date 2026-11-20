@@ -11,10 +11,13 @@ const PROBES = [
 ];
 
 let currentOnline = true;
+let demoOnline = true;
 const listeners = new Set<(online: boolean) => void>();
 let inFlight: Promise<boolean> | null = null;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let appStateSub: { remove: () => void } | null = null;
+
+const isDemo = (): boolean => process.env.EXPO_PUBLIC_DEMO === '1';
 
 function notify(next: boolean): void {
   if (next === currentOnline) return;
@@ -24,7 +27,16 @@ function notify(next: boolean): void {
   }
 }
 
+/** DEMO 模式下切换在线/离线状态（仅用于演示离线态，不触发网络探测）。 */
+export function setDemoOnline(online: boolean): void {
+  demoOnline = online;
+  if (isDemo()) {
+    notify(online);
+  }
+}
+
 export async function checkOnline(timeoutMs = 4_000): Promise<boolean> {
+  if (isDemo()) return demoOnline;
   const one = async (url: string): Promise<boolean> => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), timeoutMs);
@@ -43,6 +55,10 @@ export async function checkOnline(timeoutMs = 4_000): Promise<boolean> {
 
 /** 主动探测一次并更新在线状态，并发调用会复用同一个探测请求。 */
 export function refreshOnline(): Promise<boolean> {
+  if (isDemo()) {
+    notify(demoOnline);
+    return Promise.resolve(demoOnline);
+  }
   if (inFlight) return inFlight;
   inFlight = checkOnline()
     .then((next) => {
@@ -69,6 +85,7 @@ function schedulePoll(): void {
 }
 
 function ensureWatching(): void {
+  if (isDemo()) return;
   if (!appStateSub && typeof AppState?.addEventListener === 'function') {
     appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void refreshOnline();
@@ -92,7 +109,7 @@ function stopWatchingIfIdle(): void {
 }
 
 /** 当前是否在线（乐观初始为 true，由原生探测与请求结果更新）。 */
-export const isOnline = (): boolean => currentOnline;
+export const isOnline = (): boolean => (isDemo() ? demoOnline : currentOnline);
 
 /** 订阅在线状态变化，返回取消订阅函数。 */
 export function subscribeOnline(listener: (online: boolean) => void): () => void {

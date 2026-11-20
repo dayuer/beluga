@@ -45,6 +45,11 @@ const subscribe = (listener: () => void): (() => void) => {
 
 const snapshot = (): boolean => booted;
 
+/** 当前是否已完成所有启动异步补水。 */
+export function isBooted(): boolean {
+  return booted;
+}
+
 /** 所有注册的启动补水任务完成后返回 true；无注册任务时立即可用。 */
 export function useBooted(): boolean {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
