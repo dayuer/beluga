@@ -11,6 +11,7 @@
     "test": "vitest run",
     "check:native": "node scripts/check-native.mjs",
     "build:ios": "node scripts/build-ios.mjs",
+    "build:apk": "node scripts/build-apk.mjs",
     "dev:device": "node --experimental-strip-types scripts/dev-device.mjs",
     "e2e": "node e2e/run.mjs"
   },

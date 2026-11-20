@@ -74,3 +74,22 @@ The App ID needs the **Push Notifications** capability (`asc bundle-ids capabili
 > Creating one is the owner's step (Apple only exposes it in the web UI). Until it exists there is no
 > `ASC_APP_ID`, and `upload` will stop and say so. The exported IPA is still valid and can be uploaded
 > later with the same command.
+
+### Android (self-signed APK)
+
+```sh
+node scripts/build-apk.mjs           # prebuild, gradle assembleRelease, check the signer, copy to dist/
+node scripts/build-apk.mjs --bump    # app.json's android.versionCode +1 first, for an update build
+```
+
+The APK is `dist/Synon-Studio-<version>.apk`, named after `expo.version`, signed with **Synon
+Studio's own key** — never Beluga's (`signing.json` holds its certificate fingerprint and the script
+refuses anything else). The keystore is `~/.synon-release/synon-studio-android.p12` on the build Mac,
+its password in the Keychain as `synon-studio-android-release`; `SYNON_STUDIO_ANDROID_KEYSTORE` and
+`SYNON_STUDIO_ANDROID_KEY_PASSWORD` override both. Back it up: a phone only accepts updates signed
+with the same key, so losing it means uninstall-and-reinstall everywhere.
+
+Install on a phone that never had the app with `adb install dist/Synon-Studio-<version>.apk` (or
+send the file — Android asks to allow installs from that source). The plugin in
+`plugins/release-signing.js` wires the key into the generated `android/` project; without the key a
+release build falls back to the debug key and the script then fails on purpose.
