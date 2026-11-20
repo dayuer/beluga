@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { z } from 'zod';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tCards } from '../../lib/strings/cards';
 import { color, radius, space, type } from '../../lib/theme';
 import type { DesignCardSchema } from '../../lib/views';
 import { Card } from '../card/Card';
@@ -25,18 +26,18 @@ export function DesignCard({ card, lang: langProp, testID = 'design-card' }: Des
   const lang = langProp ?? detectLang();
   const isUploading = typeof card.progress === 'number' && card.progress < 1 && card.status !== 'done';
   const pct = isUploading ? Math.max(0, Math.min(99, Math.round((card.progress ?? 0) * 100))) : 100;
-  const packageName = card.packageName?.trim() || t(lang, 'designCard.defaultName');
+  const packageName = card.packageName?.trim() || tCards(lang, 'designCard.defaultName');
 
   return (
     <Card
-      title={t(lang, 'designCard.title')}
+      title={tCards(lang, 'designCard.title')}
       status={isUploading ? 'working' : 'done'}
-      statusLabel={isUploading ? t(lang, 'designCard.uploading', { pct }) : t(lang, 'designCard.received')}
+      statusLabel={isUploading ? tCards(lang, 'designCard.uploading', { pct }) : tCards(lang, 'designCard.received')}
       testID={testID}
     >
       <Text style={[styles.name, { color: color.text }]}>{packageName}</Text>
       <Text style={[styles.summary, { color: color.text2 }]}>
-        {t(lang, 'designCard.summary', {
+        {tCards(lang, 'designCard.summary', {
           files: card.fileCount,
           images: card.imageCount,
           specs: card.specCount,
@@ -51,7 +52,7 @@ export function DesignCard({ card, lang: langProp, testID = 'design-card' }: Des
 
       {card.skipped.length > 0 ? (
         <Text style={[styles.skipped, { color: color.text3 }]}>
-          {t(lang, 'designCard.skipped', { n: card.skipped.length })}
+          {tCards(lang, 'designCard.skipped', { n: card.skipped.length })}
         </Text>
       ) : null}
     </Card>

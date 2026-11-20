@@ -1,4 +1,6 @@
-/** P12 结果抽屉与四个页签文案（SS-49 / SS-50 / SS-51 / SS-52）。 */
+/** P12 结果抽屉与四个页签文案（SS-49 / SS-50 / SS-51 / SS-52 / SS-182）。 */
+
+import type { Lang } from './index.js';
 
 export const zh = {
   'drawer.title': '结果与详情',
@@ -87,3 +89,13 @@ export const en: Record<keyof typeof zh, string> = {
   'request.unknownTitle': 'Unsupported card',
   'request.unknownBody': 'This version cannot display this card ({kind}) yet.',
 };
+
+export type DrawerKey = keyof typeof zh;
+
+const table: Record<Lang, Record<DrawerKey, string>> = { zh, en };
+
+export function tDrawer(lang: Lang, key: DrawerKey, vars?: Record<string, string | number>): string {
+  const text = table[lang][key] ?? table.zh[key];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

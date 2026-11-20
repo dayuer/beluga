@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tDrawer } from '../../lib/strings/drawer';
 import { color, space, type } from '../../lib/theme';
 import type { RequestStep, ResultDrawerView } from '../../lib/views';
 import { ReadOnlyDiffList } from '../DraftDiff';
@@ -24,8 +25,8 @@ export function ChangesTab({ changes, milestones = [], lang: langProp, testID = 
       <View testID={testID}>
         <InlineHint
           tone="info"
-          reason={t(lang, 'changes.emptyReason')}
-          whenReady={t(lang, 'changes.emptyWhen')}
+          reason={tDrawer(lang, 'changes.emptyReason')}
+          whenReady={tDrawer(lang, 'changes.emptyWhen')}
           testID={`${testID}-empty`}
         />
       </View>
@@ -35,13 +36,13 @@ export function ChangesTab({ changes, milestones = [], lang: langProp, testID = 
   return (
     <View style={styles.root} testID={testID}>
       {changes.pendingApproval ? (
-        <InlineHint tone="info" reason={t(lang, 'changes.pendingHint')} testID={`${testID}-pending`} />
+        <InlineHint tone="info" reason={tDrawer(lang, 'changes.pendingHint')} testID={`${testID}-pending`} />
       ) : null}
 
       {milestones.length > 0 ? (
         <View style={styles.groupHeader}>
           <Text style={[styles.groupTitle, { color: color.text3 }]}>
-            {t(lang, 'changes.milestonePrefix', { n: 1 })}
+            {tDrawer(lang, 'changes.milestonePrefix', { n: 1 })}
             {milestones[0]!.title}
           </Text>
         </View>

@@ -13,7 +13,8 @@ import { Header } from '../../components/Header';
 import { PlanChat } from '../../components/PlanChat';
 import { StatusDot } from '../../components/StatusDot';
 import { DEMO_REQUEST_SUMMARIES, DEMO_REQUEST_VIEW } from '../../lib/demo/screens';
-import { detectLang, t } from '../../lib/strings';
+import { detectLang } from '../../lib/strings';
+import { tDrawer } from '../../lib/strings/drawer';
 import { color, radius, space, stroke, type } from '../../lib/theme';
 import type { RequestMessage } from '../../lib/views';
 
@@ -48,12 +49,12 @@ export default function RequestDetailScreen() {
     () => [
       {
         key: 'plan',
-        label: t(lang, 'drawer.tab.plan'),
+        label: tDrawer(lang, 'drawer.tab.plan'),
         render: () => <PlanTab plan={request.results.plan} lang={lang} />,
       },
       {
         key: 'outputs',
-        label: t(lang, 'drawer.tab.outputs'),
+        label: tDrawer(lang, 'drawer.tab.outputs'),
         render: () => (
           <OutputsTab
             artifacts={request.results.artifacts}
@@ -64,7 +65,7 @@ export default function RequestDetailScreen() {
       },
       {
         key: 'changes',
-        label: t(lang, 'drawer.tab.changes'),
+        label: tDrawer(lang, 'drawer.tab.changes'),
         render: () => (
           <ChangesTab
             changes={request.results.changes}
@@ -75,7 +76,7 @@ export default function RequestDetailScreen() {
       },
       {
         key: 'preview',
-        label: t(lang, 'drawer.tab.preview'),
+        label: tDrawer(lang, 'drawer.tab.preview'),
         render: () => {
           const buildItem = request.results.artifacts.find((a) => a.kind === 'build');
           return (
@@ -95,7 +96,7 @@ export default function RequestDetailScreen() {
     <Pressable
       onPress={() => setDrawerOpen(true)}
       accessibilityRole="button"
-      accessibilityLabel={t(lang, 'request.openResults')}
+      accessibilityLabel={tDrawer(lang, 'request.openResults')}
       testID="open-results-drawer"
       style={({ pressed }) => [styles.headerBtn, pressed && styles.pressed]}
     >
@@ -128,7 +129,7 @@ export default function RequestDetailScreen() {
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.resultsPillText, { color: color.text }]}>{t(lang, 'request.openResults')}</Text>
+              <Text style={[styles.resultsPillText, { color: color.text }]}>{tDrawer(lang, 'request.openResults')}</Text>
             </Pressable>
           </View>
 
@@ -136,7 +137,7 @@ export default function RequestDetailScreen() {
 
           {!desktop ? (
             <View style={[styles.chatBox, { backgroundColor: color.card, borderColor: color.hairline }]}>
-              <Text style={[styles.chatTitle, { color: color.text }]}>{t(lang, 'request.chatSection')}</Text>
+              <Text style={[styles.chatTitle, { color: color.text }]}>{tDrawer(lang, 'request.chatSection')}</Text>
               <View style={styles.chatInner}>
                 <PlanChat
                   pid={request.summary.projectId}
@@ -170,7 +171,7 @@ export default function RequestDetailScreen() {
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={t(lang, 'drawer.title')}
+        title={tDrawer(lang, 'drawer.title')}
         tabs={drawerTabs}
         testID="request-results-drawer"
       />

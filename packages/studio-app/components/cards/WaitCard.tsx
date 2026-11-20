@@ -1,6 +1,7 @@
 import { StyleSheet, Text } from 'react-native';
 import type { z } from 'zod';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tWait } from '../../lib/strings/wait';
 import { color, type } from '../../lib/theme';
 import type { WaitCardSchema, WaitReason } from '../../lib/views';
 import { Card } from '../card/Card';
@@ -40,12 +41,12 @@ const ETA_KEY: Record<
  */
 export function WaitCard({ card, lang: langProp, testID = 'wait-card' }: WaitCardProps) {
   const lang = langProp ?? detectLang();
-  const reasonText = card.message?.trim() ? card.message : t(lang, REASON_KEY[card.reason]);
-  const whenReady = card.etaText?.trim() ? card.etaText : t(lang, ETA_KEY[card.reason]);
-  const noAction = card.customerAction?.trim() ? card.customerAction : t(lang, 'wait.noAction');
+  const reasonText = card.message?.trim() ? card.message : tWait(lang, REASON_KEY[card.reason]);
+  const whenReady = card.etaText?.trim() ? card.etaText : tWait(lang, ETA_KEY[card.reason]);
+  const noAction = card.customerAction?.trim() ? card.customerAction : tWait(lang, 'wait.noAction');
 
   return (
-    <Card title={t(lang, 'wait.title')} status="waiting" testID={testID}>
+    <Card title={tWait(lang, 'wait.title')} status="waiting" testID={testID}>
       <InlineHint
         tone="waiting"
         waitReason={card.reason}

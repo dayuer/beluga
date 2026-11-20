@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: async () => null, setItemAsync: async () => {} }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('../../lib/viewport', () => ({ useKeyboardInset: () => 0 }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../../lib/send', () => ({
   pendingKey: () => 'k',

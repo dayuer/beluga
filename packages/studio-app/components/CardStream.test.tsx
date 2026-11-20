@@ -4,6 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('../lib/keys', () => ({
+  useHasDeviceKey: () => ({ hasKey: true, loading: false, refresh: vi.fn() }),
+}));
+vi.mock('react-native-svg', async () => {
+  const r = await import('react');
+  const host = (name: string) =>
+    r.forwardRef((props: Record<string, unknown>, ref: unknown) =>
+      r.createElement(name, { ...props, ref }, props.children as React.ReactNode),
+    );
+  const Svg = host('Svg');
+  return { default: Svg, Svg, Defs: host('Defs'), Pattern: host('Pattern'), Rect: host('Rect'), Line: host('Line') };
+});
 
 import { DEMO_REQUEST_VIEW } from '../lib/demo/screens';
 import { setScheme } from '../lib/theme';

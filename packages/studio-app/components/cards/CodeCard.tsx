@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { z } from 'zod';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tCards } from '../../lib/strings/cards';
 import { color, space, type } from '../../lib/theme';
 import type { CodeCardSchema } from '../../lib/views';
 import { ActionRow } from '../card/ActionRow';
@@ -46,15 +47,15 @@ export function CodeCard({ card, lang: langProp, onRetryPush, testID = 'code-car
 
   return (
     <Card
-      title={t(lang, 'codeCard.title')}
+      title={tCards(lang, 'codeCard.title')}
       status={cardStatus}
-      statusLabel={t(lang, STATE_KEY[pushState])}
+      statusLabel={tCards(lang, STATE_KEY[pushState])}
       footer={
         pushState === 'failed' ? (
           <ActionRow
             primary={
               <PrimaryButton
-                label={retrying ? t(lang, 'codeCard.retrying') : t(lang, 'codeCard.retryPush')}
+                label={retrying ? tCards(lang, 'codeCard.retrying') : tCards(lang, 'codeCard.retryPush')}
                 state={retrying ? 'working' : 'idle'}
                 onPress={() => void handleRetry()}
                 testID={`${testID}-retry`}
@@ -66,14 +67,14 @@ export function CodeCard({ card, lang: langProp, onRetryPush, testID = 'code-car
       testID={testID}
     >
       <View style={styles.row}>
-        <Text style={[styles.label, { color: color.text3 }]}>{t(lang, 'codeCard.repo')}</Text>
+        <Text style={[styles.label, { color: color.text3 }]}>{tCards(lang, 'codeCard.repo')}</Text>
         <Text style={[styles.value, { color: color.text }]} numberOfLines={1}>
           {card.repoUrl}
         </Text>
       </View>
       {card.prUrl ? (
         <View style={styles.row}>
-          <Text style={[styles.label, { color: color.text3 }]}>{t(lang, 'codeCard.pr')}</Text>
+          <Text style={[styles.label, { color: color.text3 }]}>{tCards(lang, 'codeCard.pr')}</Text>
           <Text style={[styles.value, { color: color.info }]} numberOfLines={1}>
             {card.prUrl}
           </Text>

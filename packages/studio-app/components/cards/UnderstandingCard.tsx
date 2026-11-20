@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { z } from 'zod';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tUnderstanding } from '../../lib/strings/understanding';
 import { color, radius, space, type } from '../../lib/theme';
 import { undoStore } from '../../lib/undo';
 import type { UnderstandingCardSchema } from '../../lib/views';
@@ -57,7 +58,7 @@ export function UnderstandingCard({
     if (busy || decision !== 'pending') return;
     setDecision('undoing');
     undoStore.show({
-      text: t(lang, 'understanding.undoToast'),
+      text: tUnderstanding(lang, 'understanding.undoToast'),
       ms: UNDO_MS,
       fire: () => {
         setDecision('confirmed');
@@ -85,22 +86,22 @@ export function UnderstandingCard({
   const footer =
     decision === 'confirmed' ? (
       <Text style={[styles.doneNote, { color: color.ok }]} testID="understanding-confirmed">
-        {t(lang, 'understanding.confirmed')}
+        {tUnderstanding(lang, 'understanding.confirmed')}
       </Text>
     ) : decision === 'rejected' ? (
       <Text style={[styles.doneNote, { color: color.text2 }]} testID="understanding-rejected">
-        {t(lang, 'understanding.rejected')}
+        {tUnderstanding(lang, 'understanding.rejected')}
       </Text>
     ) : decision === 'undoing' ? (
       <Text style={[styles.pendingUndo, { color: color.text3 }]} testID="understanding-undoing">
-        {t(lang, 'understanding.pendingUndo')}
+        {tUnderstanding(lang, 'understanding.pendingUndo')}
       </Text>
     ) : askingReason ? (
       <View style={styles.reasonBox}>
         <TextInput
           value={reason}
           onChangeText={setReason}
-          placeholder={t(lang, 'understanding.reasonPlaceholder')}
+          placeholder={tUnderstanding(lang, 'understanding.reasonPlaceholder')}
           placeholderTextColor={color.text3}
           multiline
           style={[
@@ -108,7 +109,7 @@ export function UnderstandingCard({
             { color: color.text, backgroundColor: color.sunken, borderColor: color.hairline },
           ]}
           testID="understanding-reason-input"
-          accessibilityLabel={t(lang, 'understanding.reasonPlaceholder')}
+          accessibilityLabel={tUnderstanding(lang, 'understanding.reasonPlaceholder')}
         />
         <ActionRow
           negative={
@@ -120,13 +121,13 @@ export function UnderstandingCard({
               style={styles.textBtn}
             >
               <Text style={[styles.textBtnLabel, { color: color.text2 }]}>
-                {t(lang, 'understanding.reasonCancel')}
+                {tUnderstanding(lang, 'understanding.reasonCancel')}
               </Text>
             </Pressable>
           }
           primary={
             <PrimaryButton
-              label={t(lang, 'understanding.reasonSend')}
+              label={tUnderstanding(lang, 'understanding.reasonSend')}
               disabled={!reason.trim() || busy}
               state={busy ? 'working' : 'idle'}
               onPress={() => void handleRejectSubmit()}
@@ -149,12 +150,12 @@ export function UnderstandingCard({
               pressed && { backgroundColor: color.press },
             ]}
           >
-            <Text style={[styles.textBtnLabel, { color: color.text }]}>{t(lang, 'understanding.reject')}</Text>
+            <Text style={[styles.textBtnLabel, { color: color.text }]}>{tUnderstanding(lang, 'understanding.reject')}</Text>
           </Pressable>
         }
         primary={
           <SignedButton
-            label={t(lang, 'understanding.confirm')}
+            label={tUnderstanding(lang, 'understanding.confirm')}
             disabled={busy}
             hasKeyOverride={hasKeyOverride}
             onPress={handleConfirm}
@@ -166,7 +167,7 @@ export function UnderstandingCard({
 
   return (
     <Card
-      title={decision === 'confirmed' ? t(lang, 'understanding.titleDone') : t(lang, 'understanding.title')}
+      title={decision === 'confirmed' ? tUnderstanding(lang, 'understanding.titleDone') : tUnderstanding(lang, 'understanding.title')}
       status={decision === 'pending' || decision === 'undoing' ? 'needs-you' : 'done'}
       footer={footer}
       testID={testID}
@@ -188,8 +189,8 @@ export function UnderstandingCard({
           >
             <Text style={[styles.toggleLabel, { color: color.info }]}>
               {expanded
-                ? t(lang, 'understanding.collapse')
-                : t(lang, 'understanding.expand', { n: hiddenCount })}
+                ? tUnderstanding(lang, 'understanding.collapse')
+                : tUnderstanding(lang, 'understanding.expand', { n: hiddenCount })}
             </Text>
           </Pressable>
         ) : null}
@@ -198,7 +199,7 @@ export function UnderstandingCard({
       {card.outOfScope && card.outOfScope.length > 0 ? (
         <View style={[styles.scopeBox, { backgroundColor: color.sunken }]}>
           <Text style={[styles.scopeTitle, { color: color.text3OnSunken }]}>
-            {t(lang, 'understanding.outOfScope')}
+            {tUnderstanding(lang, 'understanding.outOfScope')}
           </Text>
           {card.outOfScope.map((item, idx) => (
             <Text key={`${idx}-${item}`} style={[styles.scopeItem, { color: color.text2 }]}>

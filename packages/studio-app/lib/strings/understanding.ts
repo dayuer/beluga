@@ -1,4 +1,6 @@
-/** 理解卡文案（SS-43）。 */
+/** 理解卡文案（SS-43 / SS-182）。 */
+
+import type { Lang } from './index.js';
 
 export const zh = {
   'understanding.title': '我们理解的需求',
@@ -33,3 +35,13 @@ export const en: Record<keyof typeof zh, string> = {
   'understanding.confirmed': 'Confirmed',
   'understanding.rejected': 'Sent back for revision',
 };
+
+export type UnderstandingKey = keyof typeof zh;
+
+const table: Record<Lang, Record<UnderstandingKey, string>> = { zh, en };
+
+export function tUnderstanding(lang: Lang, key: UnderstandingKey, vars?: Record<string, string | number>): string {
+  const text = table[lang][key] ?? table.zh[key];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

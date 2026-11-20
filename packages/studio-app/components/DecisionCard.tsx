@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { z } from 'zod';
 import type { StudioDecision } from '../../../src/studio/protocol';
 import { kv } from '../lib/kv';
-import { detectLang, t, type Lang } from '../lib/strings';
+import { detectLang, type Lang } from '../lib/strings';
+import { tQuestions } from '../lib/strings/questions';
 import { color, radius, space, type } from '../lib/theme';
 import type { QuestionCardSchema, QuestionItemSchema } from '../lib/views';
 import { Card } from './card/Card';
@@ -186,14 +187,14 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
     try {
       const result = await onSubmit?.(payload);
       if (result === false) {
-        setSendError(t(lang, 'questions.sendFailed'));
+        setSendError(tQuestions(lang, 'questions.sendFailed'));
         setAttempt((a) => a + 1);
         return;
       }
       kv.remove(draftKey);
       setSubmitted(true);
     } catch {
-      setSendError(t(lang, 'questions.sendFailed'));
+      setSendError(tQuestions(lang, 'questions.sendFailed'));
       setAttempt((a) => a + 1);
     } finally {
       setSubmitting(false);
@@ -202,7 +203,7 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
 
   const footer = submitted ? (
     <Text style={[styles.submittedNote, { color: color.ok }]} testID="questions-submitted">
-      {t(lang, 'questions.submitted')}
+      {tQuestions(lang, 'questions.submitted')}
     </Text>
   ) : (
     <View style={styles.footerRow}>
@@ -211,10 +212,10 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
           key={attempt}
           label={
             submitting
-              ? t(lang, 'questions.submitting')
+              ? tQuestions(lang, 'questions.submitting')
               : sendError
-                ? t(lang, 'questions.retry')
-                : t(lang, 'questions.submit')
+                ? tQuestions(lang, 'questions.retry')
+                : tQuestions(lang, 'questions.submit')
           }
           state={submitting ? 'working' : 'idle'}
           disabled={!allAnswered || submitting}
@@ -225,7 +226,7 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
       </View>
       {remaining > 0 ? (
         <Text style={[styles.remaining, { color: color.text3 }]} testID="questions-remaining">
-          {t(lang, 'questions.remaining', { n: remaining })}
+          {tQuestions(lang, 'questions.remaining', { n: remaining })}
         </Text>
       ) : null}
     </View>
@@ -233,7 +234,7 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
 
   return (
     <Card
-      title={submitted ? t(lang, 'questions.cardTitleDone') : t(lang, 'questions.cardTitle')}
+      title={submitted ? tQuestions(lang, 'questions.cardTitleDone') : tQuestions(lang, 'questions.cardTitle')}
       status={submitted ? 'done' : 'needs-you'}
       footer={footer}
       testID={testID}
@@ -248,11 +249,11 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
           return (
             <View key={q.id} style={styles.questionBlock} testID={`question-item-${q.id}`}>
               <View style={styles.promptRow}>
-                <Text style={[styles.num, { color: color.text3 }]}>{t(lang, 'questions.number', { i: num })}</Text>
+                <Text style={[styles.num, { color: color.text3 }]}>{tQuestions(lang, 'questions.number', { i: num })}</Text>
                 <View style={styles.promptWrap}>
                   <Text style={[styles.prompt, { color: color.text }]}>{q.prompt}</Text>
                   {q.multi ? (
-                    <Text style={[styles.multiHint, { color: color.text3 }]}>{t(lang, 'questions.multiHint')}</Text>
+                    <Text style={[styles.multiHint, { color: color.text3 }]}>{tQuestions(lang, 'questions.multiHint')}</Text>
                   ) : null}
                 </View>
               </View>
@@ -333,14 +334,14 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
                         >
                           {draft.writeOwn ? <Text style={[styles.checkInk, { color: color.onPrimary }]}>✓</Text> : null}
                         </View>
-                        <Text style={[styles.optionLabel, { color: color.text }]}>{t(lang, 'questions.writeOwn')}</Text>
+                        <Text style={[styles.optionLabel, { color: color.text }]}>{tQuestions(lang, 'questions.writeOwn')}</Text>
                       </Pressable>
 
                       {draft.writeOwn ? (
                         <TextInput
                           value={draft.customText}
                           onChangeText={(val) => setCustomText(q, val)}
-                          placeholder={t(lang, 'questions.writePlaceholder')}
+                          placeholder={tQuestions(lang, 'questions.writePlaceholder')}
                           placeholderTextColor={color.text3}
                           editable={!submitted && !submitting}
                           multiline
@@ -354,7 +355,7 @@ function QuestionCardInner({ card, lang: langProp, onSubmit, testID = 'decision-
                             },
                           ]}
                           testID={`question-${q.id}-custom-input`}
-                          accessibilityLabel={t(lang, 'questions.writePlaceholder')}
+                          accessibilityLabel={tQuestions(lang, 'questions.writePlaceholder')}
                         />
                       ) : null}
                     </View>

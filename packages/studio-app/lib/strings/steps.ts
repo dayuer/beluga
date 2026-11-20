@@ -1,4 +1,6 @@
-/** P4 步骤条文案（SS-44）。 */
+/** P4 步骤条文案（SS-44 / SS-182）。 */
+
+import type { Lang } from './index.js';
 
 export const zh = {
   'steps.status.done': '已完成',
@@ -19,3 +21,13 @@ export const en: Record<keyof typeof zh, string> = {
   'steps.stepLabel': 'Step {i} · {status}',
   'steps.noSummary': 'Proceeding as planned',
 };
+
+export type StepsKey = keyof typeof zh;
+
+const table: Record<Lang, Record<StepsKey, string>> = { zh, en };
+
+export function tSteps(lang: Lang, key: StepsKey, vars?: Record<string, string | number>): string {
+  const text = table[lang][key] ?? table.zh[key];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

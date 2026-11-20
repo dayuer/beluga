@@ -5,6 +5,41 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardEvents: undefined,
+  useKeyboardHandler: () => {},
+  KeyboardProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock('react-native-gesture-handler', () => ({
+  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+  Gesture: {
+    Pan: () => {
+      const chain = { onUpdate: () => chain, onEnd: () => chain };
+      return chain;
+    },
+  },
+}));
+vi.mock('react-native-reanimated', async () => {
+  const r = await import('react');
+  const AnimatedView = r.forwardRef((props: Record<string, unknown>, ref: unknown) =>
+    r.createElement('View', { ...props, ref }, props.children as React.ReactNode),
+  );
+  return {
+    default: { View: AnimatedView },
+    runOnJS: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    useReducedMotion: () => true,
+    useSharedValue: <T,>(v: T) => ({ value: v }),
+    useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
+    withSpring: <T,>(v: T) => v,
+    withTiming: <T,>(v: T, _cfg?: unknown, cb?: (done: boolean) => void) => {
+      cb?.(true);
+      return v;
+    },
+  };
+});
 
 import { getDrawerOpen, resetDrawerCount } from '../lib/ui-state';
 import { Drawer, shouldDismissDrawer, type DrawerTab } from './Drawer';

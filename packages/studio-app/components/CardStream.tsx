@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { detectLang, t, type Lang } from '../lib/strings';
+import { detectLang, type Lang } from '../lib/strings';
+import { tDrawer } from '../lib/strings/drawer';
 import { color, space, type } from '../lib/theme';
 import type { StudioCard } from '../lib/views';
 import { Card } from './card/Card';
@@ -67,7 +68,7 @@ export function CardStream({
 
           case 'steps':
             return (
-              <Card key={card.id} title={t(lang, 'request.stepsTitle')} status="working" testID={`card-${card.id}`}>
+              <Card key={card.id} title={tDrawer(lang, 'request.stepsTitle')} status="working" testID={`card-${card.id}`}>
                 <StepBar steps={card.steps} lang={lang} />
               </Card>
             );
@@ -94,16 +95,16 @@ export function CardStream({
                 key={card.id}
                 title={
                   isUnknown
-                    ? t(lang, 'request.unknownTitle')
-                    : t(lang, 'request.signedCardTitle', { kind: rawKind })
+                    ? tDrawer(lang, 'request.unknownTitle')
+                    : tDrawer(lang, 'request.signedCardTitle', { kind: rawKind })
                 }
                 status={isUnknown ? 'waiting' : 'needs-you'}
                 testID={`card-${card.id}`}
               >
                 <Text style={[styles.placeholder, { color: color.text2 }]}>
                   {isUnknown
-                    ? t(lang, 'request.unknownBody', { kind: rawKind })
-                    : t(lang, 'request.signedCardBody')}
+                    ? tDrawer(lang, 'request.unknownBody', { kind: rawKind })
+                    : tDrawer(lang, 'request.signedCardBody')}
                 </Text>
               </Card>
             );

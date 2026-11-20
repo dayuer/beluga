@@ -1,4 +1,6 @@
-/** 设计稿卡与代码卡文案（SS-46）。 */
+/** 设计稿卡与代码卡文案（SS-46 / SS-182）。 */
+
+import type { Lang } from './index.js';
 
 export const zh = {
   'designCard.title': '设计稿',
@@ -35,3 +37,13 @@ export const en: Record<keyof typeof zh, string> = {
   'codeCard.retryPush': 'Push again',
   'codeCard.retrying': 'Pushing…',
 };
+
+export type CardsKey = keyof typeof zh;
+
+const table: Record<Lang, Record<CardsKey, string>> = { zh, en };
+
+export function tCards(lang: Lang, key: CardsKey, vars?: Record<string, string | number>): string {
+  const text = table[lang][key] ?? table.zh[key];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

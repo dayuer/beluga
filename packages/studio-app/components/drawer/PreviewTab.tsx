@@ -2,7 +2,8 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Download, Globe } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tDrawer } from '../../lib/strings/drawer';
 import { color, radius, space, stroke, type } from '../../lib/theme';
 import { InlineHint } from '../InlineHint';
 import { PrimaryButton } from '../PrimaryButton';
@@ -40,8 +41,8 @@ export function PreviewTab({
       <View testID={testID}>
         <InlineHint
           tone="waiting"
-          reason={t(lang, 'preview.deployingReason')}
-          whenReady={t(lang, 'preview.deployingWhen')}
+          reason={tDrawer(lang, 'preview.deployingReason')}
+          whenReady={tDrawer(lang, 'preview.deployingWhen')}
           testID={`${testID}-deploying`}
         />
       </View>
@@ -53,8 +54,8 @@ export function PreviewTab({
       <View testID={testID}>
         <InlineHint
           tone="info"
-          reason={t(lang, 'preview.unconfiguredReason')}
-          whenReady={t(lang, 'preview.unconfiguredWhen')}
+          reason={tDrawer(lang, 'preview.unconfiguredReason')}
+          whenReady={tDrawer(lang, 'preview.unconfiguredWhen')}
           testID={`${testID}-unconfigured`}
         />
       </View>
@@ -84,9 +85,9 @@ export function PreviewTab({
       <View style={[styles.card, { backgroundColor: color.card, borderColor: color.hairline }]}>
         <View style={styles.titleRow}>
           <Globe size={18} color={color.info} strokeWidth={stroke} />
-          <Text style={[styles.title, { color: color.text }]}>{t(lang, 'preview.readyTitle')}</Text>
+          <Text style={[styles.title, { color: color.text }]}>{tDrawer(lang, 'preview.readyTitle')}</Text>
         </View>
-        <Text style={[styles.desc, { color: color.text2 }]}>{t(lang, 'preview.readyDesc')}</Text>
+        <Text style={[styles.desc, { color: color.text2 }]}>{tDrawer(lang, 'preview.readyDesc')}</Text>
         {previewUrl ? (
           <Text style={[styles.url, { color: color.text3 }]} numberOfLines={1}>
             {previewUrl}
@@ -96,7 +97,7 @@ export function PreviewTab({
 
       <View style={styles.actions}>
         {previewUrl ? (
-          <PrimaryButton label={t(lang, 'preview.openBrowser')} onPress={openBrowser} testID="preview-open-browser" />
+          <PrimaryButton label={tDrawer(lang, 'preview.openBrowser')} onPress={openBrowser} testID="preview-open-browser" />
         ) : null}
 
         {installUrl ? (
@@ -111,7 +112,7 @@ export function PreviewTab({
             ]}
           >
             <Download size={16} color={color.text} strokeWidth={stroke} />
-            <Text style={[styles.secondaryLabel, { color: color.text }]}>{t(lang, 'preview.downloadBuild')}</Text>
+            <Text style={[styles.secondaryLabel, { color: color.text }]}>{tDrawer(lang, 'preview.downloadBuild')}</Text>
           </Pressable>
         ) : null}
       </View>

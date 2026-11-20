@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { MapItem, OutlineMilestone, PlanTone } from '../../../ui-plan';
 import { detectLang, t, type Lang } from '../../lib/strings';
+import { tSteps } from '../../lib/strings/steps';
 import { color, space, type } from '../../lib/theme';
 import type { RequestStep, ResultDrawerView, StepStatus } from '../../lib/views';
 import { ActivityList } from '../ActivityList';
@@ -41,7 +42,7 @@ function toMapItems(milestones: readonly RequestStep[], lang: Lang): MapItem[] {
     title: m.title,
     index: i + 1,
     tone: STEP_TONE[m.status],
-    statusLabel: t(lang, STEP_LABEL_KEY[m.status]),
+    statusLabel: tSteps(lang, STEP_LABEL_KEY[m.status]),
     done: m.status === 'done' ? 1 : 0,
     total: 1,
     emphasized: m.status === 'active',
@@ -55,7 +56,7 @@ function toOutlineMilestones(milestones: readonly RequestStep[], lang: Lang): Ou
     title: m.title,
     index: i + 1,
     tone: STEP_TONE[m.status],
-    statusLabel: t(lang, STEP_LABEL_KEY[m.status]),
+    statusLabel: tSteps(lang, STEP_LABEL_KEY[m.status]),
     goal: m.summary ?? '',
     criteria: [],
     done: m.status === 'done' ? 1 : 0,

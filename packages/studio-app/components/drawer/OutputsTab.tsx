@@ -1,7 +1,8 @@
 import * as Linking from 'expo-linking';
 import { Download, ExternalLink, FileText, Globe, Image } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { detectLang, t, type Lang } from '../../lib/strings';
+import { detectLang, type Lang } from '../../lib/strings';
+import { tDrawer } from '../../lib/strings/drawer';
 import { color, radius, space, stroke, type } from '../../lib/theme';
 import type { ResultDrawerView } from '../../lib/views';
 import { InlineHint } from '../InlineHint';
@@ -66,8 +67,8 @@ export function OutputsTab({
       <View testID={testID}>
         <InlineHint
           tone="info"
-          reason={t(lang, 'outputs.emptyReason')}
-          whenReady={t(lang, 'outputs.emptyWhen')}
+          reason={tDrawer(lang, 'outputs.emptyReason')}
+          whenReady={tDrawer(lang, 'outputs.emptyWhen')}
           testID={`${testID}-empty`}
         />
       </View>
@@ -83,7 +84,7 @@ export function OutputsTab({
         const items = artifacts.filter((a) => a.round === round);
         return (
           <View key={round} style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: color.text3 }]}>{t(lang, 'outputs.round', { n: round })}</Text>
+            <Text style={[styles.sectionTitle, { color: color.text3 }]}>{tDrawer(lang, 'outputs.round', { n: round })}</Text>
             <View style={[styles.group, { backgroundColor: color.card, borderColor: color.hairline }]}>
               {items.map((item, idx) => {
                 const Icon = iconFor(item.kind);
@@ -104,7 +105,7 @@ export function OutputsTab({
                     <Icon size={18} color={color.text2} strokeWidth={stroke} />
                     <View style={styles.rowCopy}>
                       <Text style={[styles.rowTitle, { color: color.text }]}>{item.title}</Text>
-                      <Text style={[styles.rowMeta, { color: color.text3 }]}>{t(lang, KIND_KEY[item.kind])}</Text>
+                      <Text style={[styles.rowMeta, { color: color.text3 }]}>{tDrawer(lang, KIND_KEY[item.kind])}</Text>
                     </View>
                     {tappable ? <ExternalLink size={16} color={color.text3} strokeWidth={stroke} /> : null}
                   </Pressable>
@@ -117,7 +118,7 @@ export function OutputsTab({
 
       {attachments.length > 0 ? (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: color.text3 }]}>{t(lang, 'outputs.attachments')}</Text>
+          <Text style={[styles.sectionTitle, { color: color.text3 }]}>{tDrawer(lang, 'outputs.attachments')}</Text>
           <View style={[styles.group, { backgroundColor: color.card, borderColor: color.hairline }]}>
             {attachments.map((att, idx) => {
               const tappable = Boolean(att.url);

@@ -6,6 +6,21 @@ vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }]
 vi.mock('expo-linking', () => ({ openURL: vi.fn() }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('lucide-react-native', async () => {
+  const r = await import('react');
+  const icon = (name: string) => (props: Record<string, unknown>) => r.createElement('LucideIcon', { ...props, iconName: name });
+  return {
+    AlertCircle: icon('AlertCircle'),
+    Check: icon('Check'),
+    Clock: icon('Clock'),
+    Download: icon('Download'),
+    Gauge: icon('Gauge'),
+    Globe: icon('Globe'),
+    Info: icon('Info'),
+    UserCheck: icon('UserCheck'),
+    WifiOff: icon('WifiOff'),
+  };
+});
 
 import { setScheme } from '../../lib/theme';
 import { PreviewTab } from './PreviewTab';

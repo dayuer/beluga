@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
 vi.mock('../../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
+vi.mock('lucide-react-native', async () => {
+  const r = await import('react');
+  const icon = (name: string) => (props: Record<string, unknown>) => r.createElement('LucideIcon', { ...props, iconName: name });
+  return {
+    Check: icon('Check'),
+    ChevronRight: icon('ChevronRight'),
+  };
+});
 
 import { DEMO_RESULT_DRAWER } from '../../lib/demo/screens';
 import { setScheme } from '../../lib/theme';

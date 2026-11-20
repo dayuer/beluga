@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
-import { detectLang, t, type Lang } from '../lib/strings';
+import { detectLang, type Lang } from '../lib/strings';
+import { tSteps } from '../lib/strings/steps';
 import { color, radius, space, type } from '../lib/theme';
 import type { RequestStep, StepStatus } from '../lib/views';
 
@@ -53,9 +54,9 @@ export function StepBar({ steps, lang: langProp, initialExpandedId = null, testI
     <View style={styles.root} testID={testID}>
       <View style={styles.track} accessibilityRole="tablist">
         {steps.map((step, idx) => {
-          const statusLabel = t(lang, STATUS_KEY[step.status]);
+          const statusLabel = tSteps(lang, STATUS_KEY[step.status]);
           const isExpanded = expandedStep?.id === step.id;
-          const a11yLabel = t(lang, 'steps.a11y', {
+          const a11yLabel = tSteps(lang, 'steps.a11y', {
             i: idx + 1,
             n: steps.length,
             title: step.title,
@@ -101,14 +102,14 @@ export function StepBar({ steps, lang: langProp, initialExpandedId = null, testI
           testID="step-detail"
         >
           <Text style={[styles.detailMeta, { color: color.text3OnSunken }]}>
-            {t(lang, 'steps.stepLabel', {
+            {tSteps(lang, 'steps.stepLabel', {
               i: expandedIndex + 1,
-              status: t(lang, STATUS_KEY[expandedStep.status]),
+              status: tSteps(lang, STATUS_KEY[expandedStep.status]),
             })}
           </Text>
           <Text style={[styles.detailTitle, { color: color.text }]}>{expandedStep.title}</Text>
           <Text style={[styles.detailSummary, { color: color.text2 }]}>
-            {expandedStep.summary ?? t(lang, 'steps.noSummary')}
+            {expandedStep.summary ?? tSteps(lang, 'steps.noSummary')}
           </Text>
         </View>
       ) : null}

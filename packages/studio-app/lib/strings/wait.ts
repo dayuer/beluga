@@ -1,4 +1,6 @@
-/** P4 等待卡文案（SS-45）。 */
+/** P4 等待卡文案（SS-45 / SS-182）。 */
+
+import type { Lang } from './index.js';
 
 export const zh = {
   'wait.title': '暂时在等待',
@@ -25,3 +27,13 @@ export const en: Record<keyof typeof zh, string> = {
   'wait.eta.needs-human': 'Resumes automatically once handled',
   'wait.noAction': 'You don’t need to do anything',
 };
+
+export type WaitKey = keyof typeof zh;
+
+const table: Record<Lang, Record<WaitKey, string>> = { zh, en };
+
+export function tWait(lang: Lang, key: WaitKey, vars?: Record<string, string | number>): string {
+  const text = table[lang][key] ?? table.zh[key];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}

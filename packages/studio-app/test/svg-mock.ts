@@ -13,6 +13,4 @@ export const Line = createSvgHost('Line');
 export const Polyline = createSvgHost('Polyline');
 export const Polygon = createSvgHost('Polygon');
 export const G = createSvgHost('G');
-export const Defs = createSvgHost('Defs');
-export const Pattern = createSvgHost('Pattern');
 export default Svg;
