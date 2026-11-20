@@ -5,10 +5,21 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useBadgeSync } from '../lib/badge';
 import { useBooted } from '../lib/boot';
 import '../lib/kv';
+import { usePushRegistration } from '../lib/push';
+import { usePushOpen } from '../lib/push-open';
 import { session } from '../lib/session';
 import { color } from '../lib/theme';
+
+/** 启动补水且 <Stack /> 挂载后再挂推送登记、角标同步与通知跳转。 */
+function PushEffects({ authenticated }: { authenticated: boolean }) {
+  usePushRegistration();
+  useBadgeSync();
+  usePushOpen(authenticated);
+  return null;
+}
 
 /**
  * The sign-in guard: no session → /login?next=<where they were>; a session on /login → the
@@ -32,7 +43,12 @@ function Guard({ children }: { children: ReactNode }) {
     const dest = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
     return <Redirect href={dest} />;
   }
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <PushEffects authenticated={Boolean(token)} />
+    </>
+  );
 }
 
 export default function RootLayout() {

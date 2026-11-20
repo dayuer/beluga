@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import * as Crypto from 'expo-crypto';
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
+import { isBooted } from './boot';
 import { kv } from './kv';
 import { isOnline } from './net';
 import { session } from './session';
@@ -49,11 +50,12 @@ export interface PushDeps {
   readonly lang?: Lang;
   readonly kv?: Pick<typeof kv, 'get' | 'set' | 'remove'>;
   readonly randomId?: () => string;
+  readonly isHydrated?: () => boolean;
 }
 
 export type RegisterPushResult =
   | { readonly ok: true; readonly status: 'registered' | 'cached' | 'demo'; readonly device: string; readonly token: string }
-  | { readonly ok: false; readonly reason: 'disabled' | 'signed-out' | 'unsupported' | 'denied' | 'offline' | 'error'; readonly hint?: string };
+  | { readonly ok: false; readonly reason: 'unhydrated' | 'disabled' | 'signed-out' | 'unsupported' | 'denied' | 'offline' | 'error'; readonly hint?: string };
 
 const KV_PUSH_ENABLED = 'push:enabled';
 const KV_DEVICE_ID = 'push:deviceId';
@@ -81,8 +83,12 @@ export function deniedPermissionHint(lang: Lang = detectLang(), platform: string
   return platform === 'android' ? dict['push.denied.android'] : dict['push.denied.ios'];
 }
 
-/** 读取「设置 › 账号」中的通知总开关（默认开启）。 */
-export function getPushEnabled(store: Pick<typeof kv, 'get'> = kv): boolean {
+/** 读取「设置 › 账号」中的通知总开关（默认开启；未完成启动补水时拒绝读取）。 */
+export function getPushEnabled(
+  store: Pick<typeof kv, 'get'> = kv,
+  hydrated: () => boolean = isBooted,
+): boolean {
+  if (!hydrated()) throw new Error('push: kv not hydrated');
   const saved = store.get<unknown>(KV_PUSH_ENABLED);
   return typeof saved === 'boolean' ? saved : true;
 }
@@ -99,6 +105,8 @@ export async function setPushEnabled(enabled: boolean, deps: PushDeps = {}): Pro
 }
 
 export function getOrCreateDeviceId(deps: PushDeps = {}): string {
+  const hydrated = deps.isHydrated ?? isBooted;
+  if (!hydrated()) throw new Error('push: kv not hydrated');
   const store = deps.kv ?? kv;
   const existing = store.get<unknown>(KV_DEVICE_ID);
   if (typeof existing === 'string' && existing.trim().length > 0) {
@@ -204,8 +212,13 @@ export async function registerPush(
   options: { readonly askPermission?: boolean; readonly force?: boolean } = {},
   deps: PushDeps = {},
 ): Promise<RegisterPushResult> {
+  const hydrated = deps.isHydrated ?? isBooted;
+  if (!hydrated()) {
+    return { ok: false, reason: 'unhydrated' };
+  }
+
   const store = deps.kv ?? kv;
-  if (!getPushEnabled(store)) {
+  if (!getPushEnabled(store, hydrated)) {
     return { ok: false, reason: 'disabled' };
   }
 
@@ -286,16 +299,17 @@ export async function unregisterPush(sessionTokenOverride?: string, deps: PushDe
 export function initPushRegistration(deps: PushDeps = {}): () => void {
   const getToken = deps.getToken ?? (() => session.snapshot());
   const subscribeSession = deps.subscribeSession ?? session.subscribe;
+  const hydrated = deps.isHydrated ?? isBooted;
 
   let disposed = false;
-  let lastToken = getToken();
+  let lastToken = hydrated() ? getToken() : null;
 
-  if (lastToken) {
+  if (hydrated() && lastToken) {
     void registerPush({ askPermission: true }, deps);
   }
 
   const unsub = subscribeSession(() => {
-    if (disposed) return;
+    if (disposed || !hydrated()) return;
     const nextToken = getToken();
     if (nextToken === lastToken) return;
     const prevToken = lastToken;

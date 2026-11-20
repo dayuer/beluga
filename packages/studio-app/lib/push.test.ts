@@ -46,6 +46,8 @@ vi.mock('./strings', () => ({
 
 import {
   deniedPermissionHint,
+  getOrCreateDeviceId,
+  getPushEnabled,
   initPushRegistration,
   registerPush,
   setPushEnabled,
@@ -86,7 +88,7 @@ describe('push registration', () => {
   });
 
   it('registers native device token with hub and skips duplicate POST when unchanged', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
     const deps: PushDeps = {
       kv: memKv,
       notifications: makeNotifications(),
@@ -155,7 +157,7 @@ describe('push registration', () => {
   });
 
   it('respects me-account pushEnabled toggle and unregisters on logout', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
     let token: string | null = 'sess-1';
     let sessionCb: (() => void) | undefined;
 
@@ -234,5 +236,54 @@ describe('push registration', () => {
 
     expect(res).toEqual({ ok: false, reason: 'error' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not register before hydration, registers once after hydration, and reuses the same device ID across cold starts', async () => {
+    let hydrated = false;
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    let randomSeq = 0;
+
+    const sharedDeps: PushDeps = {
+      kv: memKv,
+      notifications: makeNotifications(),
+      fetch: fetchMock as unknown as typeof fetch,
+      getToken: () => 'sess-1',
+      baseUrl: 'https://hub.example.com',
+      platform: 'ios',
+      isHydrated: () => hydrated,
+      randomId: () => `boot-${++randomSeq}`,
+      isOnline: () => true,
+      isDemo: () => false,
+    };
+
+    // Before hydration: getOrCreateDeviceId & getPushEnabled refuse to read/generate; registerPush skips.
+    expect(() => getOrCreateDeviceId(sharedDeps)).toThrow();
+    expect(() => getPushEnabled(memKv, () => hydrated)).toThrow();
+    await expect(registerPush({ askPermission: true }, sharedDeps)).resolves.toEqual({
+      ok: false,
+      reason: 'unhydrated',
+    });
+    const stopUnhydrated = initPushRegistration(sharedDeps);
+    expect(fetchMock).not.toHaveBeenCalled();
+    stopUnhydrated();
+
+    // First cold start after hydration: registers once and persists device ID.
+    hydrated = true;
+    const stopBoot1 = initPushRegistration(sharedDeps);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const firstBody = JSON.parse((fetchMock.mock.calls[0]?.[1] as { body: string }).body) as { device: string };
+    expect(firstBody.device).toBe('app-boot-1');
+    stopBoot1();
+
+    // Second cold start with same hydrated kv: reuses the exact same device ID and skips duplicate POST.
+    const secondRes = await registerPush({ askPermission: true }, sharedDeps);
+    expect(secondRes).toEqual({
+      ok: true,
+      status: 'cached',
+      device: 'app-boot-1',
+      token: 'apns-tok-xyz',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(randomSeq).toBe(1);
   });
 });

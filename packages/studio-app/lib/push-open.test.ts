@@ -130,4 +130,41 @@ describe('initPushOpen', () => {
 
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('queues cold-start notification tap when logged out and navigates with ?card= after login', async () => {
+    let authenticated = false;
+    let authListener: (() => void) | undefined;
+    const navigate = vi.fn();
+
+    const notifications: NotificationsOpenApi = {
+      DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
+      getLastNotificationResponseAsync: vi.fn(async () =>
+        makeResponse('cold-auth-1', { path: '/request/req-77?card=card-99' }),
+      ),
+      addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
+    };
+
+    const stop = initPushOpen({
+      notifications,
+      navigate,
+      isAuthenticated: () => authenticated,
+      subscribeAuth: (cb) => {
+        authListener = cb;
+        return vi.fn();
+      },
+    });
+
+    await vi.waitFor(() =>
+      expect(notifications.getLastNotificationResponseAsync).toHaveBeenCalledTimes(1),
+    );
+    await Promise.resolve();
+    expect(navigate).not.toHaveBeenCalled();
+
+    authenticated = true;
+    authListener?.();
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('/request/req-77?card=card-99');
+
+    stop();
+  });
 });

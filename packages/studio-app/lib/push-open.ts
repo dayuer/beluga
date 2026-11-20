@@ -30,6 +30,9 @@ export interface PushOpenOptions {
   readonly notifications?: NotificationsOpenApi;
   readonly hubUrl?: string;
   readonly handled?: Set<string>;
+  /** 是否已完成登录；未登录时先暂存目标路由，登录后再跳转。 */
+  readonly isAuthenticated?: () => boolean;
+  readonly subscribeAuth?: (listener: () => void) => () => void;
 }
 
 const DEFAULT_ACTION = Notifications.DEFAULT_ACTION_IDENTIFIER ?? 'expo.modules.notifications.actions.DEFAULT';
@@ -100,8 +103,17 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
   const navigate = options.navigate ?? ((path: string) => router.push(path as Href));
   const handled = options.handled ?? globalHandled;
   const defaultActionId = notifications.DEFAULT_ACTION_IDENTIFIER ?? DEFAULT_ACTION;
+  const isAuthenticated = options.isAuthenticated ?? (() => true);
 
   let disposed = false;
+  let pendingTarget: string | null = null;
+
+  const flushPending = (): void => {
+    if (disposed || !pendingTarget || !isAuthenticated()) return;
+    const next = pendingTarget;
+    pendingTarget = null;
+    navigate(next);
+  };
 
   const handle = (response: NotificationResponseLike | null | undefined): void => {
     if (disposed || !response) return;
@@ -109,9 +121,15 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
     if (!target) return;
     const key = responseKey(response);
     if (key && !rememberHandled(handled, key)) return;
-    navigate(target);
+    if (isAuthenticated()) {
+      pendingTarget = null;
+      navigate(target);
+    } else {
+      pendingTarget = target;
+    }
   };
 
+  const unsubAuth = options.subscribeAuth ? options.subscribeAuth(flushPending) : undefined;
   const sub = notifications.addNotificationResponseReceivedListener(handle);
 
   if (typeof notifications.getLastNotificationResponseAsync === 'function') {
@@ -130,6 +148,7 @@ export function initPushOpen(options: PushOpenOptions = {}): () => void {
   return () => {
     disposed = true;
     sub.remove();
+    unsubAuth?.();
   };
 }
 
@@ -138,13 +157,29 @@ export function resetPushOpenForTest(): void {
   globalHandled.clear();
 }
 
-/** React Hook：在根布局挂载期间监听推送点击与冷启动唤醒并自动跳转。 */
-export function usePushOpen(navigate?: (path: string) => void): void {
+/** React Hook：在根布局挂载期间监听推送点击与冷启动唤醒；未登录时先暂存，登录后再跳。 */
+export function usePushOpen(authenticated = true, navigate?: (path: string) => void): void {
   const navRef = useRef(navigate);
   navRef.current = navigate;
+  const authRef = useRef(authenticated);
+  authRef.current = authenticated;
+  const authListenersRef = useRef(new Set<() => void>());
+
+  useEffect(() => {
+    if (!authenticated) return;
+    for (const listener of authListenersRef.current) listener();
+  }, [authenticated]);
+
   useEffect(
     () =>
       initPushOpen({
+        isAuthenticated: () => authRef.current,
+        subscribeAuth: (listener) => {
+          authListenersRef.current.add(listener);
+          return () => {
+            authListenersRef.current.delete(listener);
+          };
+        },
         navigate: (path) => {
           if (navRef.current) navRef.current(path);
           else router.push(path as Href);
