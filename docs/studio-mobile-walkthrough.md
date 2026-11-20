@@ -354,3 +354,24 @@ Maestro 在录屏过程中执行手势。录像在 `.beluga/scratch/ss-233/`。
 - iOS 系统「减弱动态效果」用 `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true` 打开，录完再关。
 - 复跑：`maestro --device <udid> test e2e/maestro/gestures.yaml`；Android 录屏用
   `adb -s <serial> shell screenrecord /sdcard/g.mp4` 与 `adb pull`。
+
+## 18. 签名被拒（SS-234）
+
+假 daemon 多了一个只在 e2e 用的控制口：`POST /revoke-device`（`{}` 吊销全部、`{pubkey}` 吊销一台），
+把登记过的设备移出信任名单。`run.mjs` 转发为 `/daemon/revoke-device`，Maestro 的
+`control.js` 里是 `ACTION: daemonRevoke`。脚本：`e2e/maestro/shots-refused.yaml`。
+
+流程：登录 → 邀请链接登记设备 → 进需求 → 交付验收卡 → 假节点吊销 → 点「通过」。
+
+结果（`.beluga/scratch/ss-234/refused-unregistered.png`）：卡片仍是「等你验收」，按钮回到空闲，
+按钮下方一行红字「这台手机还没登记，无法确认。请先在「我 › 设备」完成登记。」；
+假 daemon 的日志同时打出 `verify-refused … code: unregistered-device`。
+
+**顺带修掉的问题**：之前四个签名动作（`gate.answer` 开工 / 改动、`delivery.accept`、
+`release.approve`）都是 `void send(...)`，卡片把「发出去」当成功。拒绝时卡片反而显示
+「已通过」，客户会以为验收成功了。现在 `app/request/[id].tsx` 的 `signAndSettle` 等回执：
+只有 `done` 才 resolve，`refused` / `failed` 用 `lib/strings/sign.ts` 的文案 reject，卡片
+把原因显示在按钮下方并回到空闲。
+
+复跑：`E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-refused.yaml`；
+假 daemon 自检：`node packages/studio-hub/scripts/fake-daemon.mjs --self-test`。

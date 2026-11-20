@@ -42,6 +42,9 @@ if (ACTION === 'loginLink') {
   post('/daemon/start');
 } else if (ACTION === 'daemonReset') {
   post('/daemon/reset');
+} else if (ACTION === 'daemonRevoke') {
+  // SS-234：把登记过的设备移出假节点的信任名单，下一次签名动作会被拒。
+  post('/daemon/revoke-device', typeof REVOKE_PUBKEY !== 'undefined' && REVOKE_PUBKEY ? { pubkey: REVOKE_PUBKEY } : {});
 } else if (ACTION === 'daemonApprove') {
   post('/daemon/approve');
 } else if (ACTION === 'daemonView') {

@@ -115,6 +115,8 @@ const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 3
 const nodeFingerprint = computeNodeFingerprint(der);
 const trust = createDeviceTrustStore({ nodeFingerprint });
 for (const pk of flags('enroll-pubkey')) trust.enroll(pk);
+/** 通过邀请登记过的设备公钥：只用给 e2e 的「吊销设备」测试口。 */
+const enrolledDevices = [];
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
 
 // The first view's turn time is fixed for the process: a new `at` on every tick would look like
@@ -253,6 +255,7 @@ function connect() {
     else if (frame.t === 'enroll') {
       // The hub relays a device.enroll frame: the node alone holds k, checks the mac, remembers the key.
       const result = trust.enrollFrame(frame);
+      if (result.ok && typeof frame.pubkey === 'string') enrolledDevices.push(frame.pubkey);
       log('enroll', { inviteId: frame.inviteId, ok: result.ok, ...(result.ok ? {} : { code: result.code }) });
       send({ t: 'enroll-result', reqId: frame.reqId, ...(result.ok ? { ok: true, fingerprint: result.fingerprint } : { ok: false, code: result.code }) });
     } else if (frame.t === 'deliver') {
@@ -340,6 +343,18 @@ if (controlPort) {
               .then((r) => answer(r.ok ? 200 : 502, { ok: r.ok, inviteId, k, fingerprint: nodeFingerprint }))
               .catch((error) => answer(502, { error: String(error?.message ?? error) }));
             return;
+          }
+          if (req.method === 'POST' && req.url === '/revoke-device') {
+            // e2e 专用（SS-234）：把登记过的设备移出信任名单，下一次签名动作会被拒为
+            // unregistered-device。可选 `pubkey` 只吊销一台；不传就吊销全部。
+            const targets = typeof data.pubkey === 'string' ? [data.pubkey] : [...enrolledDevices];
+            const removed = targets.filter((pk) => trust.remove(pk)).length;
+            for (const pk of targets) {
+              const at = enrolledDevices.indexOf(pk);
+              if (at >= 0) enrolledDevices.splice(at, 1);
+            }
+            log('revoked-device', { removed });
+            return answer(200, { ok: removed > 0, removed });
           }
           if (req.method === 'POST' && req.url === '/reset') {
             customViews.delete(entry.project);

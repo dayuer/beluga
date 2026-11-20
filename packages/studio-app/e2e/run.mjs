@@ -473,7 +473,7 @@ async function main() {
         startDaemon();
         return send(200, { ok: true });
       }
-      if (req.method === 'POST' && (url.pathname === '/daemon/view' || url.pathname === '/daemon/approve' || url.pathname === '/daemon/reset')) {
+      if (req.method === 'POST' && (url.pathname === '/daemon/view' || url.pathname === '/daemon/approve' || url.pathname === '/daemon/reset' || url.pathname === '/daemon/revoke-device')) {
         const payload = await readJson();
         let forwardBody = payload;
         if (url.pathname === '/daemon/view' && typeof payload.name === 'string') {

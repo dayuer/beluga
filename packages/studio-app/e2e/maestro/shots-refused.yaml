@@ -1,0 +1,99 @@
+appId: com.synon.studio
+---
+# SS-234：真实的「签名被拒」画面。真中台 + 假 daemon：
+# 登记设备 → 假节点把设备移出信任名单 → 点交付卡的「通过」→ 原因出现、按钮回到空闲。
+# E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/shots-refused.yaml
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+
+# 登录
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# 登记这台设备（拿到设备密钥，签名按钮才可点）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: invite
+- openLink: "${output.deviceLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint-match"
+    timeout: 20000
+- tapOn:
+    id: "fingerprint-match"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# 进需求详情，把交付验收卡调出来
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- takeScreenshot: refused-before
+
+# 假节点吊销这台设备，再点「通过」
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonRevoke
+- tapOn:
+    id: "accept-approve"
+- extendedWaitUntil:
+    visible:
+      text: ".*还没登记.*|.*not enrolled.*"
+    timeout: 30000
+- takeScreenshot: refused-unregistered
