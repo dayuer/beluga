@@ -1,4 +1,5 @@
 import { kv } from './kv';
+import type { LocalFileEntrySource, ZipEntrySource } from './package-pick';
 
 /**
  * 上传状态机与进度订阅（SS-121，纯逻辑，不碰网络）：
@@ -20,11 +21,14 @@ export interface UploadChunkSpec {
   readonly size: number;
 }
 
+export type UploadFileSource = ZipEntrySource | LocalFileEntrySource;
+
 export interface UploadFilePlan {
   readonly fileIndex: number;
   readonly path: string;
   readonly size: number;
   readonly sha256?: string;
+  readonly source?: UploadFileSource;
   readonly chunks: readonly UploadChunkSpec[];
   readonly receivedParts: readonly number[];
 }
@@ -71,6 +75,7 @@ export interface InitUploadSessionInput {
     readonly path: string;
     readonly size: number;
     readonly sha256?: string;
+    readonly source?: UploadFileSource;
   }>;
   readonly chunkSize?: number;
 }
@@ -250,6 +255,7 @@ export function createUploadStateMachine(options?: {
         path: f.path,
         size: f.size,
         sha256: f.sha256,
+        source: f.source,
         chunks: buildFileChunks(fileIndex, f.size, chunkSize),
         receivedParts: [],
       }));

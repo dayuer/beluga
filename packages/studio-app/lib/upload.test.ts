@@ -274,7 +274,7 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       projectId: 'proj_1',
       name: 'fg.zip',
       chunkSize: 100,
-      files: [{ path: 'screen.png', size: 200 }],
+      files: [{ path: 'screen.png', size: 200, source: entries[0]!.source }],
     });
     machine.start();
     machine.pause();
@@ -294,8 +294,7 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
       chunkSize: 100,
     });
 
-    // 绑定本地文件引用后，模拟 App 回到前台（触发 onResume）
-    uploader.bindEntries(entries);
+    // 不需手动绑定，直接模拟 App 回到前台（触发 onResume）
     for (const l of resumeListeners) l();
     await waitUntil(() => uploader.getProgress().status === 'done');
     expect(resumeQueried).toBe(true);
@@ -468,5 +467,132 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
     expect(remainingTmp).toEqual([]);
 
     uploader.dispose();
+  });
+
+  it('resumes from kv after app restart without bindEntries and fails with reason if source disappears', async () => {
+    const sharedKv = createMemoryKv();
+    const raw = new Uint8Array(250).fill(77);
+    mockFiles.set('file:///mock/restart.png', raw);
+
+    let online = true;
+    const onlineListeners2 = new Set<(v: boolean) => void>();
+    const serverParts = new Map<number, number>();
+    let shouldDropAtPart2 = true;
+
+    const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (url.endsWith('/v1/app/uploads') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_restart_auto' }), { status: 201 });
+      }
+      const m = url.match(/\/parts\/(\d+)$/);
+      if (m && method === 'PUT') {
+        const pn = Number(m[1]);
+        if (pn === 2 && shouldDropAtPart2) {
+          shouldDropAtPart2 = false;
+          online = false;
+          throw new TypeError('offline');
+        }
+        serverParts.set(pn, (init?.body as Uint8Array).byteLength);
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (url.endsWith('/v1/app/uploads/up_restart_auto') && method === 'GET') {
+        const parts = Array.from(serverParts.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([partNumber, size]) => ({ partNumber, size }));
+        return new Response(
+          JSON.stringify({ sessionId: 'up_restart_auto', status: 'uploading', files: [{ fileIndex: 0, parts }] }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith('/complete') && method === 'POST') {
+        return new Response(JSON.stringify({ sessionId: 'up_restart_auto', status: 'ready' }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    const uploader1 = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: fakeFetch as unknown as typeof fetch,
+      getToken: () => 'tok_r',
+      isOnline: () => online,
+      subscribeOnline: () => () => {},
+      onResume: () => () => {},
+      stateMachine: createUploadStateMachine({ storage: sharedKv }),
+      reader: createExpoChunkReader(),
+      chunkSize: 100,
+    });
+
+    await uploader1.start({
+      projectId: 'proj_1',
+      name: 'restart.zip',
+      entries: [
+        { path: 'restart.png', size: raw.byteLength, source: { kind: 'file', uri: 'file:///mock/restart.png' } },
+      ],
+    });
+    await waitUntil(() => uploader1.getProgress().status === 'paused');
+    uploader1.dispose();
+
+    // 模拟 App 重启：用同一个 kv 新建 uploader2，不调 bindEntries
+    const uploader2 = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: fakeFetch as unknown as typeof fetch,
+      getToken: () => 'tok_r',
+      isOnline: () => online,
+      subscribeOnline: (l) => {
+        onlineListeners2.add(l);
+        return () => onlineListeners2.delete(l);
+      },
+      onResume: () => () => {},
+      stateMachine: createUploadStateMachine({ storage: sharedKv }),
+      reader: createExpoChunkReader(),
+      chunkSize: 100,
+    });
+
+    online = true;
+    for (const l of onlineListeners2) l(true);
+    await waitUntil(() => uploader2.getProgress().status === 'done');
+    expect(serverParts.size).toBe(3);
+    uploader2.dispose();
+
+    // 再测来源文件被清理后进入 failed 且带原因
+    const sharedKv2 = createMemoryKv();
+    const machineFail = createUploadStateMachine({ storage: sharedKv2 });
+    machineFail.initSession({
+      sessionId: 'up_missing',
+      projectId: 'proj_1',
+      name: 'missing.zip',
+      chunkSize: 100,
+      files: [
+        { path: 'gone.png', size: 100, source: { kind: 'file', uri: 'file:///mock/gone.png' } },
+      ],
+    });
+    machineFail.start();
+    machineFail.pause();
+
+    const uploader3 = createPackageUploader({
+      base: 'https://hub.example.com',
+      fetch: (async (input: RequestInfo | URL) => {
+        if (String(input).endsWith('/up_missing')) {
+          return new Response(
+            JSON.stringify({ sessionId: 'up_missing', status: 'uploading', files: [] }),
+            { status: 200 },
+          );
+        }
+        return new Response('{}', { status: 404 });
+      }) as unknown as typeof fetch,
+      getToken: () => 'tok_r',
+      isOnline: () => true,
+      subscribeOnline: () => () => {},
+      onResume: () => () => {},
+      stateMachine: machineFail,
+      reader: createExpoChunkReader(),
+      chunkSize: 100,
+    });
+
+    await uploader3.resume();
+    expect(uploader3.getProgress().status).toBe('failed');
+    expect(uploader3.getProgress().error).toContain('source-missing');
+    uploader3.dispose();
   });
 });

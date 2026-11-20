@@ -36,7 +36,8 @@ export interface ChunkReader {
   readChunk(entry: PackageEntry, offset: number, size: number): Promise<Uint8Array>;
   computeSha256(entry: PackageEntry): Promise<string>;
   prepareEntry?(entry: PackageEntry, key: string): Promise<PackageEntry>;
-  cleanupTemp?(): void;
+  exists?(entry: PackageEntry): boolean;
+  cleanupTemp?(uris?: readonly string[]): void;
 }
 
 export interface UploaderDeps {
@@ -62,9 +63,8 @@ export interface PackageUploader {
   getProgress(): UploadProgress;
   subscribe(listener: UploadProgressListener): () => void;
   start(input: StartUploadInput): Promise<string>;
-  bindEntries(entries: readonly PackageEntry[]): void;
   pause(): void;
-  resume(entries?: readonly PackageEntry[]): Promise<void>;
+  resume(): Promise<void>;
   dispose(): void;
 }
 
@@ -150,9 +150,22 @@ export function createExpoChunkReader(): ChunkReader {
       };
     },
 
-    cleanupTemp() {
-      for (const f of tempFiles.splice(0, tempFiles.length)) {
+    exists(entry) {
+      const uri = entry.source.kind === 'zip' ? entry.source.zipUri : entry.source.uri;
+      return new File(uri).exists;
+    },
+
+    cleanupTemp(uris?: readonly string[]) {
+      const targets = new Set<string>(tempFiles.map((f) => f.uri));
+      if (uris) {
+        for (const u of uris) {
+          if (u.includes('upload-tmp')) targets.add(u);
+        }
+      }
+      tempFiles.length = 0;
+      for (const uri of targets) {
         try {
+          const f = new File(uri);
           if (f.exists) f.delete();
         } catch {
           // 清理临时文件失败不影响主流程
@@ -166,6 +179,7 @@ export function createExpoChunkReader(): ChunkReader {
           throw new Error(`unsupported-zip-compression:${entry.path}`);
         }
         const f = new File(entry.source.zipUri);
+        if (!f.exists) throw new Error(`source-missing:${entry.path}`);
         const dataOffset = await resolveZipDataOffset(f, entry.source.localHeaderOffset);
         const handle = f.open(FileMode?.ReadOnly);
         try {
@@ -177,6 +191,7 @@ export function createExpoChunkReader(): ChunkReader {
       }
 
       const f = new File(entry.source.uri);
+      if (!f.exists) throw new Error(`source-missing:${entry.path}`);
       const handle = f.open(FileMode?.ReadOnly);
       try {
         handle.offset = offset;
@@ -216,6 +231,30 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
   let activeRunId = 0;
   let runningLoop: Promise<void> | null = null;
   let pausedByOffline = false;
+
+  const restoreEntriesFromState = (): void => {
+    const state = machine.getState();
+    if (!state) return;
+    for (const f of state.files) {
+      if (!entryMap.has(f.fileIndex) && f.source) {
+        entryMap.set(f.fileIndex, {
+          path: f.path,
+          size: f.size,
+          source: f.source,
+        });
+      }
+    }
+  };
+
+  restoreEntriesFromState();
+
+  const cleanupSessionTemp = (): void => {
+    const state = machine.getState();
+    const uris = state?.files
+      .map((f) => (f.source?.kind === 'file' ? f.source.uri : undefined))
+      .filter((u): u is string => Boolean(u));
+    reader.cleanupTemp?.(uris);
+  };
 
   const authHeaders = (extra?: Record<string, string>): Record<string, string> => {
     const headers: Record<string, string> = { ...(extra ?? {}) };
@@ -289,6 +328,12 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
         const entry = entryMap.get(chunk.fileIndex);
         if (!entry) {
           machine.fail(`missing-entry:${chunk.fileIndex}`);
+          cleanupSessionTemp();
+          return;
+        }
+        if (reader.exists && !reader.exists(entry)) {
+          machine.fail(`source-missing:${entry.path}`);
+          cleanupSessionTemp();
           return;
         }
 
@@ -296,12 +341,18 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
           await uploadSingleChunk(latest.sessionId, chunk, entry);
         } catch (err) {
           if (runId !== activeRunId) return;
+          const msg = err instanceof Error ? err.message : 'upload-part-error';
+          if (msg.startsWith('source-missing:')) {
+            machine.fail(msg);
+            cleanupSessionTemp();
+            return;
+          }
           if (!checkOnline() || err instanceof TypeError) {
             pausedByOffline = true;
             machine.pause();
             return;
           }
-          machine.fail(err instanceof Error ? err.message : 'upload-part-error');
+          machine.fail(msg);
           return;
         }
 
@@ -317,7 +368,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
         await completeSession(doneState.sessionId);
         if (runId !== activeRunId) return;
         machine.complete();
-        reader.cleanupTemp?.();
+        cleanupSessionTemp();
       } catch (err) {
         if (runId !== activeRunId) return;
         if (!checkOnline() || err instanceof TypeError) {
@@ -326,7 +377,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
           return;
         }
         machine.fail(err instanceof Error ? err.message : 'upload-complete-error');
-        reader.cleanupTemp?.();
+        cleanupSessionTemp();
       }
     })();
 
@@ -337,6 +388,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
   };
 
   const resumeFromServer = async (): Promise<void> => {
+    restoreEntriesFromState();
     const state = machine.getState();
     if (!state || state.status === 'done') return;
     if (!checkOnline()) {
@@ -405,7 +457,12 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
 
     async start(input) {
       entryMap.clear();
-      const manifestFiles: Array<{ path: string; size: number; sha256: string }> = [];
+      const manifestFiles: Array<{
+        path: string;
+        size: number;
+        sha256: string;
+        source: PackageEntry['source'];
+      }> = [];
       const batchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       for (let i = 0; i < input.entries.length; i++) {
         const rawEntry = input.entries[i]!;
@@ -414,7 +471,12 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
           : rawEntry;
         entryMap.set(i, entry);
         const sha256 = await reader.computeSha256(entry);
-        manifestFiles.push({ path: entry.path, size: entry.size, sha256 });
+        manifestFiles.push({
+          path: entry.path,
+          size: entry.size,
+          sha256,
+          source: entry.source,
+        });
       }
 
       const res = await doFetch(`${base}/v1/app/uploads`, {
@@ -423,7 +485,7 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
         body: JSON.stringify({
           projectId: input.projectId,
           name: input.name,
-          files: manifestFiles,
+          files: manifestFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
         }),
       });
       if (!res.ok) {
@@ -445,31 +507,18 @@ export function createPackageUploader(deps: UploaderDeps = {}): PackageUploader 
       return created.sessionId;
     },
 
-    bindEntries(entries: readonly PackageEntry[]) {
-      entryMap.clear();
-      for (let i = 0; i < entries.length; i++) {
-        entryMap.set(i, entries[i]!);
-      }
-    },
-
     pause() {
       activeRunId += 1;
       pausedByOffline = false;
       machine.pause();
     },
 
-    resume(entries?: readonly PackageEntry[]) {
-      if (entries) {
-        this.bindEntries(entries);
-      }
-      return resumeFromServer();
-    },
+    resume: resumeFromServer,
 
     dispose() {
       activeRunId += 1;
       unsubOnline();
       unsubResume();
-      reader.cleanupTemp?.();
     },
   };
 }
