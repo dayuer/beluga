@@ -216,6 +216,21 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
     });
   }
 
+  if (view.release) {
+    cards.push({
+      id: `release-${view.release.envId}`,
+      kind: 'release',
+      createdAt,
+      status: 'pending',
+      envId: view.release.envId,
+      envTitle: view.release.envTitle,
+      version: view.release.version,
+      ...(view.release.lastVersion ? { lastVersion: view.release.lastVersion } : {}),
+      ...(view.release.lastReleaseAt !== undefined ? { lastReleaseAt: view.release.lastReleaseAt } : {}),
+      requiresSignature: true,
+    });
+  }
+
   if (view.stage === 'awaiting-review') {
     const reviewMilestone = view.milestones.find((m) => m.status === 'review');
     const round = view.milestones.filter((m) => m.status === 'passed').length + 1;

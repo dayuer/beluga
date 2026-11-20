@@ -222,6 +222,25 @@ describe('requestViewFromPlan：各阶段映射', () => {
     expect(done.cards[0]?.status).toBe('done');
   });
 
+  it('上线：视图带 release 时出上线卡（需签名），目标版本与线上版本都在', () => {
+    const view: StudioPlanView = {
+      ...BASE,
+      stage: 'done',
+      waitingOn: 'customer',
+      typing: false,
+      headline: '等你批准上线',
+      milestones: [milestone('m0', 'passed')],
+      release: { envId: 'prod', envTitle: '正式环境', version: '1.4.0', lastVersion: '1.3.2', lastReleaseAt: 1_700_000_000_000 },
+    };
+    const request = requestViewFromPlan(view, input);
+    const release = request.cards.find((c) => c.kind === 'release');
+    expect(release && 'envTitle' in release ? release.envTitle : '').toBe('正式环境');
+    expect(release && 'version' in release ? release.version : '').toBe('1.4.0');
+    expect(release && 'lastVersion' in release ? release.lastVersion : '').toBe('1.3.2');
+    expect(release && 'requiresSignature' in release ? release.requiresSignature : false).toBe(true);
+    expect(request.summary.status).toBe('needs-you');
+  });
+
   it('对话：turn 映射成消息，空消息丢掉', () => {
     const request = requestViewFromPlan(
       { ...BASE, turns: [...BASE.turns, { id: 't3', who: 'studio', text: '   ', at: 1 }] },

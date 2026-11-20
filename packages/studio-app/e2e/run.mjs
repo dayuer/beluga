@@ -85,6 +85,7 @@ function startDaemon(code) {
     keyFile,
     controlPort: daemonControlPort,
     code,
+    operatorToken: operator,
     logFile: daemonLog,
     start: pm.start,
   });
@@ -426,6 +427,19 @@ async function main() {
       if (req.method === 'POST' && url.pathname === '/hub/online') {
         proxy.setOffline(false);
         return send(200, { ok: true, offline: false });
+      }
+      // 设备登记邀请：假的 daemon 发一次性码（k 留在 daemon），中台只存路由（SS-89）。
+      if (req.method === 'POST' && url.pathname === '/invite') {
+        try {
+          const answer = await fetch(`http://127.0.0.1:${daemonControlPort}/invite`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: '{}',
+          });
+          return send(answer.status, await answer.json().catch(() => ({})));
+        } catch (error) {
+          return send(502, { error: String(error instanceof Error ? error.message : error) });
+        }
       }
       if (req.method === 'GET' && url.pathname === '/delivered') {
         const kind = url.searchParams.get('kind') ?? 'plan.create';

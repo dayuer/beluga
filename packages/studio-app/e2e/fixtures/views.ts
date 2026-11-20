@@ -154,4 +154,18 @@ export const views = {
     ],
     activity: [{ at, text: '计划完成' }],
   }),
+
+  /** 计划完成后、项目有正式环境：等客户批准上线（SS-89 的签名流程用）。 */
+  release: base({
+    stage: 'done',
+    waitingOn: 'customer',
+    headline: '等你批准上线',
+    progress: { done: 3, total: 3 },
+    milestones: [
+      milestone({ ref: 'm0', title: '记录喝水', status: 'passed' }),
+      milestone({ ref: 'm1', title: '每日提醒', status: 'passed' }),
+    ],
+    release: { envId: 'prod', envTitle: '正式环境', version: '1.4.0', lastVersion: '1.3.2', lastReleaseAt: at - 86_400_000 },
+    activity: [{ at, text: '计划完成' }],
+  }),
 } as const;

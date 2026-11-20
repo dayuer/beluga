@@ -89,10 +89,8 @@ class HubTransientError extends Error {
 
 const HASH_CHUNK_BYTES = 512 * 1024;
 
-const envBase = (): string => {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return (env?.EXPO_PUBLIC_HUB_URL ?? '').replace(/\/+$/, '');
-};
+// 直接写 process.env.EXPO_PUBLIC_HUB_URL：Expo 只内联这种静态写法（经 globalThis 读不到）。
+const envBase = (): string => (process.env.EXPO_PUBLIC_HUB_URL ?? '').replace(/\/+$/, '');
 
 function sha256Hex(data: Uint8Array): string {
   return bytesToHex(sha256(data));

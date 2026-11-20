@@ -19,6 +19,19 @@ function post(pathname, payload) {
 if (ACTION === 'loginLink') {
   const data = mustOk(http.get(base + '/login-link'), 'GET /login-link');
   output.loginLink = data.link;
+} else if (ACTION === 'invite') {
+  // 设备登记邀请：daemon 发一次性码，App 用 synon://join/<id>#k=…&n=… 登记设备密钥。
+  const data = mustOk(
+    http.post(base + '/invite', { headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+    'POST /invite',
+  );
+  output.deviceLink =
+    'synon://join/' +
+    encodeURIComponent(String(data.inviteId)) +
+    '#k=' +
+    encodeURIComponent(String(data.k)) +
+    '&n=' +
+    encodeURIComponent(String(data.fingerprint));
 } else if (ACTION === 'hubOffline') {
   post('/hub/offline');
 } else if (ACTION === 'hubOnline') {
