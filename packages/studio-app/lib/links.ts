@@ -64,11 +64,15 @@ export function parseDeepLink(raw: string | null | undefined, hubUrl = process.e
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0) return null;
 
-  // 1. /join/<inviteId>#k=&n=
+  // 1. /join/<inviteId>#k=&n= -> 应用内重写为 /join/<inviteId>?k=&n=，供 useLocalSearchParams 读取
   if (segments[0] === 'join' && segments.length === 2) {
     const inviteId = decodeSegment(segments[1]!);
     if (!inviteId) return null;
-    return `/join/${encodeURIComponent(inviteId)}${hash}`;
+    const hashParams = hash ? new URLSearchParams(hash.replace(/^#/, '')) : null;
+    const k = (hashParams?.get('k') ?? searchParams.get('k') ?? '').trim();
+    const n = (hashParams?.get('n') ?? searchParams.get('n') ?? '').trim();
+    const base = `/join/${encodeURIComponent(inviteId)}`;
+    return k && n ? `${base}?k=${encodeURIComponent(k)}&n=${encodeURIComponent(n)}` : base;
   }
 
   // 2. /request/<id> 与 /request/<id>?card=<cardId>

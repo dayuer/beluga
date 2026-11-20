@@ -1,12 +1,11 @@
-import { useURL } from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Fingerprint } from '../../components/Fingerprint';
 import { Header } from '../../components/Header';
 import { TextButton } from '../../components/TextButton';
-import { enrollDevice, parseInvitePayload, type EnrollErrorReason } from '../../lib/enrol';
+import { enrollDevice, type EnrollErrorReason } from '../../lib/enrol';
 import { detectLang } from '../../lib/strings';
 import { joinT, type JoinStringKey } from '../../lib/strings/join';
 import { color, radius, space, tint, type } from '../../lib/theme';
@@ -29,7 +28,6 @@ const REASON_KEY: Record<EnrollErrorReason, JoinStringKey> = {
 export default function JoinDeviceScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; k?: string; n?: string }>();
-  const linkingUrl = useURL();
   const lang = detectLang();
   const [busy, setBusy] = useState(false);
   const [errorReason, setErrorReason] = useState<EnrollErrorReason | null>(null);
@@ -38,19 +36,8 @@ export default function JoinDeviceScreen() {
     const id = typeof params.id === 'string' ? params.id.trim() : '';
     const k = typeof params.k === 'string' ? params.k.trim() : '';
     const n = typeof params.n === 'string' ? params.n.trim() : '';
-    if (id && k && n) return { inviteId: id, k, n };
-
-    if (linkingUrl) {
-      const fromDeepLink = parseInvitePayload(linkingUrl);
-      if (fromDeepLink) return fromDeepLink;
-    }
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const fromUrl = parseInvitePayload(window.location.href);
-      if (fromUrl) return fromUrl;
-    }
-    return null;
-  }, [params.id, params.k, params.n, linkingUrl]);
+    return id && k && n ? { inviteId: id, k, n } : null;
+  }, [params.id, params.k, params.n]);
 
   const handleMatch = async () => {
     if (!invite || busy) return;
