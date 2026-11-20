@@ -55,9 +55,26 @@ export interface Sender {
   reset(): void;
 }
 
+const signedCacheKey = (opId: string) => `signed:op:${opId}`;
+const signedByOpId = new Map<string, StudioAction>();
+
+function clearSignedCache(opId: string | undefined): void {
+  if (!opId) return;
+  signedByOpId.delete(opId);
+  kv.remove(signedCacheKey(opId));
+}
+
 export async function prepareActionForSend(raw: SendableAction): Promise<StudioAction> {
   if (!SIGNED_ACTION_KINDS.has(raw.kind)) {
     return raw as StudioAction;
+  }
+  const opId = typeof raw.opId === 'string' && raw.opId.length > 0 ? raw.opId : undefined;
+  if (opId) {
+    const cached = signedByOpId.get(opId) ?? kv.get<StudioAction>(signedCacheKey(opId));
+    if (cached) {
+      signedByOpId.set(opId, cached);
+      return cached;
+    }
   }
   const rev = 'rev' in raw ? raw.rev : undefined;
   const envelope = await signFrame({
@@ -65,10 +82,15 @@ export async function prepareActionForSend(raw: SendableAction): Promise<StudioA
     payload: raw.payload,
     ...(rev !== undefined ? { rev } : {}),
   });
-  return {
+  const prepared = {
     ...raw,
     signed: envelope,
   } as unknown as StudioAction;
+  if (opId) {
+    signedByOpId.set(opId, prepared);
+    kv.set(signedCacheKey(opId), prepared);
+  }
+  return prepared;
 }
 /** `pending:<kind>:<pid>[:<ref>[:<sub>]]`, the app's one pending-key shape. */
 export function pendingKey(kind: string, pid: string, ...refs: string[]): string {
@@ -114,6 +136,7 @@ export function useSend(pid: string, key: string): Sender {
         const next = submitNext(current, { type: 'done' });
         set(next);
         kv.remove(key);
+        clearSignedCache(current.opId);
         handlersRef.current.onDone?.(receipt);
         return;
       }
@@ -121,12 +144,14 @@ export function useSend(pid: string, key: string): Sender {
         const next = submitNext(current, { type: 'refused', code: receipt.code! });
         set(next);
         kv.remove(key);
+        clearSignedCache(current.opId);
         handlersRef.current.onRefused?.(receipt.code!);
         return;
       }
       // `expired` is a receipt state, not a local event: it can arrive while queued.
       set({ phase: 'failed', opId: current.opId, failure: 'expired' });
       kv.remove(key);
+      clearSignedCache(current.opId);
       handlersRef.current.onFailed?.('expired');
       handlersRef.current.onExpired?.();
     },
@@ -195,6 +220,7 @@ export function useSend(pid: string, key: string): Sender {
   }, [run]);
 
   const reset = useCallback(() => {
+    clearSignedCache(stateRef.current.opId);
     kv.remove(key);
     buildRef.current = null;
     handlersRef.current = {};

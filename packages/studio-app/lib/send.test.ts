@@ -142,4 +142,31 @@ describe('lib/send signing', () => {
     expect(sent).toHaveLength(0);
     expect(kvStore.get('signed:last-at')).toBeUndefined();
   });
+
+  it('signs once per opId across retries and increments `at` only after a new opId', async () => {
+    const keys = await import('./keys');
+    await keys.ensureDeviceKey();
+    const { prepareActionForSend } = await import('./send');
+    const { buildApproveStart } = await import('./signed-actions');
+
+    const op1 = '6f1c2a5e-3b7d-4c8e-9f0a-1b2c3d4e5f61';
+    const action1 = buildApproveStart({ opId: op1, planRef: 'p1', draftRev: 2 });
+
+    const s1 = (await prepareActionForSend(action1)) as unknown as { signed: { frame: { at: number }; sig: string } };
+    const atAfterFirst = kvStore.get('signed:last-at');
+    const s2 = (await prepareActionForSend(action1)) as unknown as { signed: { frame: { at: number }; sig: string } };
+    const s3 = (await prepareActionForSend(action1)) as unknown as { signed: { frame: { at: number }; sig: string } };
+
+    expect(s2.signed.frame.at).toBe(s1.signed.frame.at);
+    expect(s2.signed.sig).toBe(s1.signed.sig);
+    expect(s3.signed.frame.at).toBe(s1.signed.frame.at);
+    expect(s3.signed.sig).toBe(s1.signed.sig);
+    expect(kvStore.get('signed:last-at')).toBe(atAfterFirst);
+
+    // 换新 opId（如 refused 后重新发起）时，at 严格递增
+    const op2 = '6f1c2a5e-3b7d-4c8e-9f0a-1b2c3d4e5f62';
+    const action2 = buildApproveStart({ opId: op2, planRef: 'p1', draftRev: 2 });
+    const s4 = (await prepareActionForSend(action2)) as unknown as { signed: { frame: { at: number }; sig: string } };
+    expect(s4.signed.frame.at).toBeGreaterThan(s1.signed.frame.at);
+  });
 });
