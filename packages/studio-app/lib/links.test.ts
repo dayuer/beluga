@@ -21,6 +21,13 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('synon://login?token=tok_abc', HUB)).toBe('/login?token=tok_abc');
     expect(parseDeepLink('synon://login#token=tok_hash', HUB)).toBe('/login?token=tok_hash');
     expect(parseDeepLink('synon://me/devices/add', HUB)).toBe('/me/devices/add');
+    // 走查用的演示态：根路径与需求详情都保留 state，未知值丢掉
+    expect(parseDeepLink('synon://?state=empty', HUB)).toBe('/?state=empty');
+    expect(parseDeepLink('synon://request/req_42?state=loading', HUB)).toBe('/request/req_42?state=loading');
+    expect(parseDeepLink('synon://request/req_42?card=c_9&state=runnerOffline', HUB)).toBe(
+      '/request/req_42?card=c_9&state=runnerOffline',
+    );
+    expect(parseDeepLink('synon://request/req_42?state=weird', HUB)).toBe('/request/req_42');
   });
 
   it('parses all https:// routes matching EXPO_PUBLIC_HUB_URL', () => {

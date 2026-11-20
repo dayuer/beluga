@@ -55,6 +55,9 @@ const DEMO_CARDS_BY_ID: Record<string, readonly StudioCard[]> = {
   'req-push': [DEMO_CARDS.waitOffline!, DEMO_CARDS.steps!],
   'req-cert': [DEMO_CARDS.release!, DEMO_CARDS.code!],
   'req-home': [DEMO_CARDS.code!, DEMO_CARDS.delivery!],
+  'req-quota': [DEMO_CARDS.waitQuota!, DEMO_CARDS.steps!],
+  'req-human': [DEMO_CARDS.waitHuman!, DEMO_CARDS.steps!],
+  'req-upload': [DEMO_CARDS.designUploading!, DEMO_CARDS.steps!],
 };
 
 /** 按路由 id 取对应的演示需求详情；未知 id 返回 null（触发空态）。 */
