@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
+import { File, FileMode } from 'expo-file-system';
 import { StorageAccessFramework, getInfoAsync } from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
@@ -212,7 +212,7 @@ export interface RandomAccessReader {
   readRange(offset: number, length: number): Promise<Uint8Array>;
 }
 
-async function createExpoFileReader(uri: string): Promise<RandomAccessReader> {
+export async function createExpoFileReader(uri: string): Promise<RandomAccessReader> {
   const f = new File(uri);
   const totalSize = f.size ?? 0;
 
@@ -220,10 +220,10 @@ async function createExpoFileReader(uri: string): Promise<RandomAccessReader> {
     return {
       size: totalSize,
       async readRange(offset: number, length: number): Promise<Uint8Array> {
-        const handle = f.open();
+        const handle = f.open(FileMode?.ReadOnly);
         try {
           handle.offset = offset;
-          return handle.readBytes(length);
+          return await handle.readBytes(length);
         } finally {
           handle.close();
         }

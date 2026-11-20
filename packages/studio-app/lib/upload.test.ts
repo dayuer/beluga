@@ -1,7 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const mockFiles = new Map<string, Uint8Array>();
+
 vi.mock('expo-file-system', () => ({
-  File: class {},
+  FileMode: { ReadOnly: 'r' },
+  File: class {
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    open(mode?: string) {
+      expect(mode).toBe('r');
+      const data = mockFiles.get(this.uri) ?? new Uint8Array();
+      let closed = false;
+      return {
+        offset: 0,
+        async readBytes(length: number) {
+          await new Promise((r) => setTimeout(r, 5));
+          if (closed) throw new Error('file handle is closed');
+          return data.subarray(this.offset, this.offset + length);
+        },
+        close() {
+          closed = true;
+        },
+      };
+    }
+  },
   Paths: { document: '' },
 }));
 vi.mock('expo-secure-store', () => ({
@@ -11,7 +35,7 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 import type { PackageEntry } from './package-pick';
-import { createPackageUploader, type ChunkReader } from './upload';
+import { createExpoChunkReader, createPackageUploader, type ChunkReader } from './upload';
 import { createUploadStateMachine, type UploadKvStorage } from './upload-state';
 
 function createMemoryKv(): UploadKvStorage {
@@ -259,5 +283,48 @@ describe('upload (chunked transfer & offline/foreground resume)', () => {
     expect(resumeQueried).toBe(false);
 
     uploader.dispose();
+  });
+
+  it('awaits handle.readBytes before closing handle for both zip and file entries', async () => {
+    // 构造一个带 local file header 的最小 zip buffer
+    const payload = new Uint8Array([1, 2, 3, 4, 5, 6]);
+    const zip = new Uint8Array(30 + 4 + payload.length);
+    const view = new DataView(zip.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(26, 4, true); // nameLen = 4
+    zip.set(payload, 34);
+
+    mockFiles.set('file:///mock/pack.zip', zip);
+    mockFiles.set('file:///mock/raw.png', payload);
+
+    const reader = createExpoChunkReader();
+    const zipChunk = await reader.readChunk(
+      {
+        path: 'a.png',
+        size: 6,
+        source: {
+          kind: 'zip',
+          zipUri: 'file:///mock/pack.zip',
+          compressionMethod: 0,
+          compressedSize: 6,
+          localHeaderOffset: 0,
+          crc32: 0,
+        },
+      },
+      2,
+      3,
+    );
+    expect(Array.from(zipChunk)).toEqual([3, 4, 5]);
+
+    const fileChunk = await reader.readChunk(
+      {
+        path: 'raw.png',
+        size: 6,
+        source: { kind: 'file', uri: 'file:///mock/raw.png' },
+      },
+      1,
+      4,
+    );
+    expect(Array.from(fileChunk)).toEqual([2, 3, 4, 5]);
   });
 });

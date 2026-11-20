@@ -1,10 +1,36 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const mockFileImpl = new Map<string, Uint8Array>();
+
 vi.mock('expo-document-picker', () => ({
   getDocumentAsync: vi.fn(),
 }));
 vi.mock('expo-file-system', () => ({
-  File: class {},
+  FileMode: { ReadOnly: 'r' },
+  File: class {
+    uri: string;
+    size: number;
+    constructor(uri: string) {
+      this.uri = uri;
+      this.size = mockFileImpl.get(uri)?.byteLength ?? 0;
+    }
+    open(mode?: string) {
+      expect(mode).toBe('r');
+      const data = mockFileImpl.get(this.uri) ?? new Uint8Array();
+      let closed = false;
+      return {
+        offset: 0,
+        async readBytes(length: number) {
+          await new Promise((r) => setTimeout(r, 5));
+          if (closed) throw new Error('file handle is closed');
+          return data.subarray(this.offset, this.offset + length);
+        },
+        close() {
+          closed = true;
+        },
+      };
+    }
+  },
 }));
 vi.mock('expo-file-system/legacy', () => ({
   StorageAccessFramework: {
@@ -16,6 +42,7 @@ vi.mock('expo-file-system/legacy', () => ({
 
 import {
   PACKAGE_LIMITS,
+  createExpoFileReader,
   parseZipBufferManifest,
   pickAndroidFolderPackage,
   pickZipPackage,
@@ -177,5 +204,13 @@ describe('package-pick', () => {
       pickDocument: async () => ({ canceled: true, assets: null }),
     });
     expect(res).toEqual({ canceled: true });
+  });
+
+  it('awaits handle.readBytes before closing file handle in createExpoFileReader', async () => {
+    const bytes = new Uint8Array([10, 20, 30, 40, 50]);
+    mockFileImpl.set('file:///tmp/test.zip', bytes);
+    const reader = await createExpoFileReader('file:///tmp/test.zip');
+    const slice = await reader.readRange(1, 3);
+    expect(Array.from(slice)).toEqual([20, 30, 40]);
   });
 });

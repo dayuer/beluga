@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { File, FileMode } from 'expo-file-system';
 import type { PackageEntry } from './package-pick';
 import { isOnline, subscribeOnline } from './net';
 import { onResume } from './resume';
@@ -77,7 +77,7 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
 
 async function resolveZipDataOffset(file: File, localHeaderOffset: number): Promise<number> {
   if (typeof file.open === 'function') {
-    const handle = file.open();
+    const handle = file.open(FileMode?.ReadOnly);
     try {
       handle.offset = localHeaderOffset;
       const header = await handle.readBytes(30);
@@ -94,7 +94,7 @@ async function resolveZipDataOffset(file: File, localHeaderOffset: number): Prom
   return localHeaderOffset + 30 + nameLen + extraLen;
 }
 
-function createExpoChunkReader(): ChunkReader {
+export function createExpoChunkReader(): ChunkReader {
   return {
     async readChunk(entry, offset, size) {
       if (entry.source.kind === 'zip') {
@@ -104,10 +104,10 @@ function createExpoChunkReader(): ChunkReader {
         const f = new File(entry.source.zipUri);
         const dataOffset = await resolveZipDataOffset(f, entry.source.localHeaderOffset);
         if (typeof f.open === 'function') {
-          const handle = f.open();
+          const handle = f.open(FileMode?.ReadOnly);
           try {
             handle.offset = dataOffset + offset;
-            return handle.readBytes(size);
+            return await handle.readBytes(size);
           } finally {
             handle.close();
           }
@@ -118,10 +118,10 @@ function createExpoChunkReader(): ChunkReader {
 
       const f = new File(entry.source.uri);
       if (typeof f.open === 'function') {
-        const handle = f.open();
+        const handle = f.open(FileMode?.ReadOnly);
         try {
           handle.offset = offset;
-          return handle.readBytes(size);
+          return await handle.readBytes(size);
         } finally {
           handle.close();
         }
