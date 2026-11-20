@@ -114,4 +114,42 @@ describe('demo fixtures (P1–P12)', () => {
     unsub();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('provides a demo session and all 4 todo kinds when EXPO_PUBLIC_DEMO=1', async () => {
+    vi.stubEnv('EXPO_PUBLIC_DEMO', '1');
+    vi.resetModules();
+
+    const { session } = await import('../session');
+    const { hub } = await import('../client');
+    const { todosOf } = await import('../todo');
+
+    expect(session.snapshot()).toBe('demo-session');
+
+    const projectsRes = await hub.projects();
+    expect(projectsRes.ok).toBe(true);
+    if (!projectsRes.ok) return;
+
+    const allTodos = [];
+    for (const proj of projectsRes.value.projects) {
+      const plansRes = await hub.plans(proj.id);
+      if (!plansRes.ok) continue;
+      for (const p of plansRes.value.plans) {
+        const planRes = await hub.plan(proj.id, p.planRef);
+        if (!planRes.ok) continue;
+        allTodos.push(...todosOf(proj.id, planRes.value.view, 'zh'));
+      }
+    }
+
+    expect(allTodos.length).toBeGreaterThanOrEqual(4);
+    const kinds = new Set(allTodos.map((t) => t.kind));
+    expect(kinds).toEqual(new Set(['decision', 'review', 'changes', 'confirm']));
+  });
+
+  it('does not inject a demo session when EXPO_PUBLIC_DEMO is unset', async () => {
+    vi.stubEnv('EXPO_PUBLIC_DEMO', '');
+    vi.resetModules();
+
+    const { session } = await import('../session');
+    expect(session.snapshot()).toBeNull();
+  });
 });
