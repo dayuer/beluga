@@ -24,6 +24,16 @@ import type {
  * - 任何阶段有未答的决策就出问题卡，有草稿改动就出改动卡（需签名）。
  * 代码卡与设计稿卡要等 protocol 带上 repoUrl / 设计稿字段（P2/P3），现在 protocol 里没有。
  */
+/** 客户这次上传的设计稿包（上传进度来自本机的上传会话，不是中台视图）。 */
+export interface RequestDesignPackage {
+  readonly name: string;
+  readonly fileCount: number;
+  readonly imageCount: number;
+  readonly specCount: number;
+  readonly progress: number;
+  readonly done?: boolean;
+}
+
 export interface RequestViewInput {
   /** 需求所属项目；路由只带 planRef，项目从 `?project=` 或缓存的需求列表来。 */
   readonly projectId: string;
@@ -34,6 +44,8 @@ export interface RequestViewInput {
   readonly studioOnline?: boolean;
   /** 中台给的更新时间（PlanRes.updatedAt）；缺省用 0，不用本地时钟。 */
   readonly updatedAt?: number;
+  /** 同一项目正在（或已经）上传的设计稿包，排在最前面。 */
+  readonly design?: RequestDesignPackage;
 }
 
 function messageOf(turn: StudioTurn): RequestMessage {
@@ -112,6 +124,23 @@ function cardsOf(view: StudioPlanView, input: RequestViewInput): StudioCard[] {
   const createdAt = input.updatedAt ?? 0;
   const offline = input.studioOnline === false;
   const cards: StudioCard[] = [];
+
+  if (input.design) {
+    const done = input.design.done === true || input.design.progress >= 1;
+    cards.push({
+      id: 'design',
+      kind: 'design',
+      createdAt,
+      status: done ? 'done' : 'pending',
+      fileCount: input.design.fileCount,
+      totalBytes: 0,
+      imageCount: input.design.imageCount,
+      specCount: input.design.specCount,
+      skipped: [],
+      packageName: input.design.name,
+      progress: input.design.progress,
+    } as StudioCard);
+  }
 
   if (view.stage === 'drafting') {
     const points = view.milestones.map((m) => m.title).filter(Boolean);

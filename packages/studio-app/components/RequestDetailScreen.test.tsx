@@ -24,6 +24,9 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('../lib/viewport', () => ({ useKeyboardInset: () => 0 }));
+vi.mock('../lib/design-upload', () => ({
+  useDesignUpload: () => ({ uploader: { start: vi.fn(), machine: { getState: () => null } }, info: null }),
+}));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../lib/cache', () => ({
   cache: { get: () => undefined, set: () => {}, remove: () => {} },

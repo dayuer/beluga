@@ -18,6 +18,7 @@ import { SyncBanner } from '../../components/SyncBanner';
 import { UndoBar } from '../../components/UndoBar';
 import { cache } from '../../lib/cache';
 import { hub, isDemoMode } from '../../lib/client';
+import { useDesignUpload } from '../../lib/design-upload';
 import {
   DEMO_CARDS,
   DEMO_REQUEST_SUMMARIES,
@@ -138,6 +139,20 @@ export default function RequestDetailScreen() {
     [store.view, store.rev, local],
   );
 
+  // 设计稿包先上传、需求后发；卡片一直显示到包传完（传完之后是「已收下」）。
+  const designUpload = useDesignUpload();
+  const design = useMemo(() => {
+    if (demoMode || !designUpload.info || designUpload.info.projectId !== projectId) return undefined;
+    return {
+      name: designUpload.info.name,
+      fileCount: designUpload.info.fileCount,
+      imageCount: designUpload.info.imageCount,
+      specCount: designUpload.info.specCount,
+      progress: designUpload.info.progress,
+      done: designUpload.info.status === 'done',
+    };
+  }, [demoMode, designUpload.info, projectId]);
+
   const online = demoMode ? stateParam !== 'offline' && isOnline() : store.online;
   const loading = demoMode ? stateParam === 'loading' : store.loading && !store.view;
   const offline = demoMode
@@ -158,8 +173,9 @@ export default function RequestDetailScreen() {
       lang,
       studioOnline: store.studioOnline,
       updatedAt: store.fetchedAt,
+      ...(design ? { design } : {}),
     });
-  }, [demoMode, id, stateParam, view, projectId, cachedRequest, lang, store.studioOnline, store.fetchedAt]);
+  }, [demoMode, id, stateParam, view, projectId, cachedRequest, lang, store.studioOnline, store.fetchedAt, design]);
 
   const hasTargetCard = Boolean(targetCardId && request?.cards.some((c) => c.id === targetCardId));
 

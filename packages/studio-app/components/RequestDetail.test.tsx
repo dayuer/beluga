@@ -12,6 +12,9 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams(),
   useRouter: () => ({ back: vi.fn(), canGoBack: () => true, replace: vi.fn() }),
 }));
+vi.mock('../lib/design-upload', () => ({
+  useDesignUpload: () => ({ uploader: { start: vi.fn(), machine: { getState: () => null } }, info: null }),
+}));
 vi.mock('../lib/kv', () => ({ kv: { get: () => undefined, set: () => {}, remove: () => {} } }));
 vi.mock('../lib/client', () => ({
   isDemoMode: () => true,

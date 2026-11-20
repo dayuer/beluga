@@ -203,6 +203,25 @@ describe('requestViewFromPlan：各阶段映射', () => {
     expect(request.results.plan.activity).toEqual([{ id: 'activity-0', text: '开始了一项工作', at: 1_700_000_002_000 }]);
   });
 
+  it('设计稿包：排在最前面，带上传进度；传完是已收下', () => {
+    const uploading = requestViewFromPlan(BASE, {
+      ...input,
+      design: { name: '登录页设计稿.zip', fileCount: 12, imageCount: 10, specCount: 2, progress: 0.42 },
+    });
+    const first = uploading.cards[0];
+    expect(first?.kind).toBe('design');
+    expect(first && 'packageName' in first ? first.packageName : '').toBe('登录页设计稿.zip');
+    expect(first && 'progress' in first ? first.progress : -1).toBe(0.42);
+    expect(first?.status).toBe('pending');
+    expect(first && 'imageCount' in first ? first.imageCount : 0).toBe(10);
+
+    const done = requestViewFromPlan(BASE, {
+      ...input,
+      design: { name: '登录页设计稿.zip', fileCount: 12, imageCount: 10, specCount: 2, progress: 1, done: true },
+    });
+    expect(done.cards[0]?.status).toBe('done');
+  });
+
   it('对话：turn 映射成消息，空消息丢掉', () => {
     const request = requestViewFromPlan(
       { ...BASE, turns: [...BASE.turns, { id: 't3', who: 'studio', text: '   ', at: 1 }] },
