@@ -425,3 +425,37 @@ adb -s 324750623054 shell am start -a android.intent.action.VIEW \
 SS-239 里依赖这台机器的 SS-6、SS-11、SS-13、SS-15、SS-17、SS-37、SS-39、SS-152 都还没实测；
 推送（SS-152）另外缺 Firebase 配置（`google-services.json` 未配置，FCM 令牌登记不了），
 需要先建好 Firebase 项目。
+
+## 21. iPhone 真机（Yuqing’s iPhone）实测：准备与阻塞（SS-240）
+
+TestFlight 还传不了（SS-237：ASC 里没有 com.synon.studio 的 App 记录），所以按 SS-240 的
+第二种做法：用签名好的包直装真机。
+
+已做：
+- App ID `com.synon.studio`（2449F94GST）加了 **Associated Domains** 能力；为这台 iPhone 建了
+  ad-hoc 描述文件「Synon Studio Ad Hoc 2」（含设备 UDID `00008130-0011196A1A46001C`、分发证书
+  5H879U2Z42），并装到本机。
+- 构建（指向本机中台的 LAN 地址）：`EXPO_PUBLIC_HUB_URL=http://192.168.3.237:8787 IOS_SIGNING=manual IOS_PROFILE="Synon Studio Ad Hoc 2" IOS_EXPORT_METHOD=ad-hoc npm run build:ios -- archive`；
+  产物 `.beluga/scratch/ss-240/Synon-Studio-0.1.0-adhoc.ipa`（13 MB，versionCode/构建号 1）。
+  `scripts/build-ios.mjs` 新增 `IOS_EXPORT_METHOD`（默认 `app-store-connect`，ad-hoc 用 `ad-hoc`）。
+- 已用 `xcrun devicectl device install app --device 00008130-0011196A1A46001C …adhoc.ipa` 装上。
+- 本机中台与假 daemon 跑在 `http://192.168.3.237:8787`；登录深链可由
+  `npm run dev:device -- --login` 再取一条。
+
+阻塞：**手机停在锁屏**，所有者在结束时选择「现在不方便」；启动 App、点深链、截图都需要先解锁。
+解锁后继续：
+```sh
+# 拉起 App 并用登录深链（token 用 dev:device 打出的）
+xcrun devicectl device process launch --device 00008130-0011196A1A46001C \
+  --payload-url "synon://login?token=<token>" com.synon.studio
+# 截图 / 录屏
+xcrun devicectl device capture screenshot --device 00008130-0011196A1A46001C --destination shot.png
+xcrun devicectl device capture screen-record --device 00008130-0011196A1A46001C --destination clip.mov
+```
+说明：
+- Universal Link 需要真实 https 域名与 AASA 文件；本机中台是 LAN IP，所以真机联调用自定义 scheme
+  `synon://`，Universal Link 的验收留到生产域名（与 SS-37 的真机项一致）。
+- APNs 推送（SS-152）需要先在 Apple 账号里建 APNs 密钥并在项目里配置，当前没有，推送三项到真机才能做。
+- 直装用的是分发证书 + ad-hoc 描述文件，不需要在手机上信任开发者。
+- `dist/ios/` 已恢复为 App Store 签名的那份 IPA，供 SS-237 上传；ad-hoc 的包在
+  `.beluga/scratch/ss-240/`，不要上传它。

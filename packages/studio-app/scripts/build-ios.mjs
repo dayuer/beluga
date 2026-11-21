@@ -37,6 +37,8 @@ const scheme = 'SynonStudio';
 // 就用已安装的 App Store 描述文件做 Manual（IOS_SIGNING=manual，描述文件由 asc profiles 建好并 local install）。
 const signing = process.env.IOS_SIGNING ?? 'automatic';
 const profileName = process.env.IOS_PROFILE ?? 'Synon Studio App Store';
+// 导出方式：App Store（默认）或 ad-hoc（真机直装，SS-240），取 IOS_EXPORT_METHOD。
+const exportMethod = process.env.IOS_EXPORT_METHOD ?? 'app-store-connect';
 const identity =
   process.env.IOS_SIGN_IDENTITY ?? `Apple Distribution: Hangzhou Yaoxing Intelligent Technology Co., Ltd. (${team})`;
 const out = path.join(root, 'dist', 'ios');
@@ -147,7 +149,7 @@ function cmdArchive() {
   fs.writeFileSync(options, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>method</key><string>app-store-connect</string>
+<key>method</key><string>${exportMethod}</string>
 <key>teamID</key><string>${team}</string>
 <key>signingStyle</key><string>${signing}</string>${
     signing === 'manual'
