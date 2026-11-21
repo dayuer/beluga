@@ -400,3 +400,28 @@ maestro --device <serial> test e2e/maestro/talkback.yaml
 
 并把录屏与 `adb logcat -s TalkBackService` 的朗读日志存到 `.beluga/scratch/ss-235/`。
 `e2e/maestro/talkback.yaml` 已就绪（单击聚焦、双击激活、逐屏截图）。
+
+## 20. Android 真机（NX733J）实测：准备与阻塞（SS-239）
+
+已做：
+- 真机联调包：`EXPO_PUBLIC_HUB_URL=http://127.0.0.1:8787` 构建（USB 上用 `adb reverse tcp:8787 tcp:8787`
+  连本机中台），用工作室自己的签名密钥签（与发布包同一把），产物
+  `.beluga/scratch/ss-239/Synon-Studio-0.1.0-dev.apk`（versionCode 1，签名 SHA-256 2095be…）。
+- 新增 `plugins/loopback-cleartext.js`：只给 127.0.0.1 / localhost 放行明文（Android 默认只许 https），
+  所以真机能连本机中台；已挂进 app.json 的 plugins。
+- 本机中台 + 假 daemon：`npm run dev:device`（8787，HUB_ORIGIN 用 LAN 地址，另可用
+  `npm run dev:device -- --login` 再取一条登录深链）。
+- 已在 NX733J 上卸载旧包（02:52 装过一份 0.1.0），装了这个联调包并设置了 adb reverse。
+
+阻塞：**手机一直停在锁屏**（`dumpsys trust` 报 `deviceLocked=1`、`isKeyguardShowing=true`，
+锁屏要面部/密码）。三次请所有者解锁，adb 侧仍是锁屏；无法在未解锁的设备上启动、登录、截图。
+解锁后继续的步骤：
+```sh
+adb -s 324750623054 reverse tcp:8787 tcp:8787
+adb -s 324750623054 shell am start -a android.intent.action.VIEW \
+  -d "synon://login?token=<dev:device 打出的 token>" com.synon.studio
+# 然后按 SS-239 的清单逐屏截图/录屏：请求列表、待办、详情、提需求、验收
+```
+SS-239 里依赖这台机器的 SS-6、SS-11、SS-13、SS-15、SS-17、SS-37、SS-39、SS-152 都还没实测；
+推送（SS-152）另外缺 Firebase 配置（`google-services.json` 未配置，FCM 令牌登记不了），
+需要先建好 Firebase 项目。

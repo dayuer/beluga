@@ -66,6 +66,7 @@
       "expo-notifications",
       "expo-web-browser",
       "./plugins/release-signing",
+      "./plugins/loopback-cleartext",
       [
         "expo-splash-screen",
         {
