@@ -1,0 +1,71 @@
+appId: com.synon.studio
+---
+# SS-250：干净 Android 模拟器上从安装到验收（发布包 + 本机中台 + 假 daemon）。
+# 运行：maestro --device emulator-5554 test -e LOGIN="synon://login?token=…" e2e/maestro/ss250-android.yaml
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- openLink: "${LOGIN}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 30000
+- takeScreenshot: ss250-android-requests
+
+# 提一个需求
+- tapOn:
+    id: "new-request-button"
+- extendedWaitUntil:
+    visible:
+      id: "new-screen"
+    timeout: 15000
+- tapOn:
+    id: "new-project-.*"
+- tapOn:
+    text: ".*tracks my daily water.*|.*记录每天喝水.*"
+- inputText: "Track daily water with reminders"
+- takeScreenshot: ss250-android-new-filled
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      text: ".*Submitted.*|.*已提交.*"
+    timeout: 20000
+    optional: true
+- takeScreenshot: ss250-android-after-submit
+- tapOn:
+    id: "back"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+
+# 打开在验收中的需求（dev:device 把 review 视图推给第二个项目）
+- tapOn:
+    id: "request-row-plan2"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- takeScreenshot: ss250-android-acceptance

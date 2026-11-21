@@ -550,4 +550,24 @@ SS-244 要在手机上做「加一台设备」二维码屏：已登记的手机�
 `app/me/devices/invite.tsx` 显示二维码（用与 `src/cli/qr.ts` 同一个 `qrcode-generator`，
 `react-native-svg` 画矩阵，不引入原生依赖），最后用 `add.tsx` 的解析函数单测串起来。
 
+## 26. 发布包在没装过的模拟器上跑通（SS-250）
+
+两台全新模拟器上各跑了一遍「装上 → 登录 → 需求列表 → 提一个需求 → 需求详情 → 验收卡」，
+录屏与截图在 `.beluga/scratch/ss250/`。
+
+| 平台 | 装的是什么 | 命令 | 录屏 |
+|---|---|---|---|
+| Android | 用工作室发布密钥签的 release APK（versionCode 1），指向 `http://127.0.0.1:8787`，靠 `adb reverse tcp:8787 tcp:8787` 连本机中台 | 新建 AVD `ss250-android`（system-images;android-35;default;arm64-v8a），`adb install`，`maestro --device emulator-5554 test -e LOGIN=… e2e/maestro/ss250-android.yaml` | `android-walkthrough.mp4`（130 s） |
+| iOS | 同一份代码的 Release 模拟器构建（`e2e/run.mjs` 的构建方式；模拟器装不了真机 IPA，已按任务说明替代） | 新建模拟器 `ss250-ios`（iPhone 16 Pro / iOS 26.5），`E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/ss250-ios.yaml` | `ios-walkthrough.mp4`（105 s） |
+
+截图：`ss250-android-{requests,new-filled,after-submit,acceptance}.png`、
+`ss250-ios-{requests,new-filled,submitted,acceptance}.png`。
+两张验收卡都显示「等你验收 / Needs review」、验收标准与「通过」按钮；按钮置灰是因为模拟器上没有
+登记设备密钥，文案已就地说明（这是预期行为，签名由真机那两项验）。
+
+一个踩到的坑：Android 联调包第一版把中台写成 `http://10.0.2.2:8787`，而 `loopback-cleartext`
+插件只放行 127.0.0.1/localhost，明文被系统拦下后 App 判定离线、登录链接报「未发送：你已离线」。
+改成 `http://127.0.0.1:8787` + `adb reverse` 后一次通过；真机与模拟器都建议用这个组合。
+
+
 
