@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * The fork's Mac-native touches (packages/mac/src/fork/native/native-look.css) hang on upstream's
  * class names and attributes. After a sync that renames one, this fails and names it, instead of
- * the blue Create PR or the underlined dock tab quietly coming back.
+ * the blue Create PR quietly coming back.
  */
 
 const mac = path.join('packages', 'mac', 'src');

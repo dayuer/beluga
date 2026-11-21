@@ -28,23 +28,6 @@
   background: var(--hairline-strong);
 }
 
-/* The dock's tabs (layout/panel/panel.module.css): the one you're on is in bold text, not underlined. */
-:root[data-os='mac'] [role='tablist'][class*='_dockTabs_'] > [class*='_tabOn_'][class*='_tabOn_'] {
-  box-shadow: none;
-  font-weight: 600;
-}
-
-/* The panel's views when there is only one (Overview: Info): a title, not a lone raised segment. */
-:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) {
-  background: none;
-}
-:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_']):not(:has(> [role='tab'] ~ [role='tab'])) > [role='tab'] {
-  background: none;
-  box-shadow: none;
-  font-weight: 600;
-  cursor: default;
-}
-
 /* An empty chat's starters (views/ChatView.tsx): plain bordered buttons, words only. */
 :root[data-os='mac'] [class*='_emptyActions_'] > button > svg {
   display: none;
@@ -162,23 +145,6 @@
 }
 :root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
   left: 40px;
-}
-
-/* The inspector's views (Changes · Files · Scratch · Info): a segmented control of equal, fixed-width
-   segments, centred, as macOS draws one, instead of a strip stretched across the whole panel. Each
-   segment is as wide as the widest name. A narrow panel that folds the names, and a tab being dragged
-   over the strip (its drop mark), keep upstream's layout. */
-:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) {
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  width: auto;
-  max-width: 100%;
-  margin-inline: auto;
-}
-:root[data-os='mac'] [role='tablist'][class*='_tabs_']:not([class*='_dockTabs_'], [class*='_tabsFolded_']):not(:has(> [class*='_dropEnd_'])) > [class*='_tab_'] {
-  min-width: 76px;
-  padding: 0 14px;
 }
 
 /* A project's chips (Active, Can merge, Archived, Environment, GitHub, Private, people, PRs, stars):

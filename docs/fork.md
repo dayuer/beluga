@@ -122,7 +122,7 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 ### 侧边栏
 
-- `packages/mac/src/layout/Sidebar.tsx`：四行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、`useOneSelected(drop.ref)` 和 `useSidebarKeys(drop.ref)` 两个钩子、标题栏里隐藏侧栏按钮后一个 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，铅笔图标，侧栏唯一的主操作，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它），以及顶部入口后的 `<SidebarEdge />`。标题栏的三个图标（用量、隐藏侧栏、新建任务）包在 Sidebar.module.css 的 `.titleTools` 里。Mac 原生调性（Claude Design「Mac原生侧边栏设计稿」2a）：选中行是中性灰（`--sb-selected`，侧栏有焦点时 10%，点到别处后 5.5%），图标仍是强调色；没有图标的项目用同一种中性灰的字母块（`components/ProjectIcon.module.css`，自己给项目设了颜色才上色）；分组标题的 + 和折叠箭头只在悬停时出现；`fork/sidebar/keys.ts` 的 `useSidebarKeys`：焦点在某一行上时 ↑ ↓ 在行间移动，Home、End 到首尾，→ 展开 ← 收起带折叠按钮的行（项目），回车和空格仍是上游的打开；输入框里的方向键不受影响，用例 `tests/fork-sidebar-keys.test.ts`。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。同一行的 `<SidebarEdge />`（`fork/sidebar/resize.tsx`）是侧栏右边可拖的边：复用上游右侧面板的 `ResizeHandle`，平时看不见，指针移上去才亮、光标变 col-resize；拖动时只改 `--sidebar-w`，松手才存进上游已有的 `sidebarWidth` 偏好（和设置里的滑块同一项，所以范围也一样：200–360），双击回到默认 248，键盘焦点在上面时 →/← 每次加减 8。减弱动态效果或沉稳界面下不做高亮过渡。范围与保存的用例：`tests/fork-sidebar-resize.test.ts`。
+- `packages/mac/src/layout/Sidebar.tsx`：四行——一个 import（`packages/mac/src/fork/sidebar/index.ts`）、`useOneSelected(drop.ref)` 和 `useSidebarKeys(drop.ref)` 两个钩子、标题栏里隐藏侧栏按钮后一个 `<NewTaskButton />`（`fork/sidebar/new-task.tsx`，铅笔图标，侧栏唯一的主操作，打开和 Tasks 页同一个新建任务对话框；没开任务板时不显示；无障碍名是「New Task…」，和 Tasks 页的「New Task」按钮分开，上游用例按名字点它）。标题栏的三个图标（用量、隐藏侧栏、新建任务）包在 Sidebar.module.css 的 `.titleTools` 里。Mac 原生调性（Claude Design「Mac原生侧边栏设计稿」2a）：选中行是中性灰（`--sb-selected`，侧栏有焦点时 10%，点到别处后 5.5%），图标仍是强调色；没有图标的项目用同一种中性灰的字母块（`components/ProjectIcon.module.css`，自己给项目设了颜色才上色）；分组标题的 + 和折叠箭头只在悬停时出现；`fork/sidebar/keys.ts` 的 `useSidebarKeys`：焦点在某一行上时 ↑ ↓ 在行间移动，Home、End 到首尾，→ 展开 ← 收起带折叠按钮的行（项目），回车和空格仍是上游的打开；输入框里的方向键不受影响，用例 `tests/fork-sidebar-keys.test.ts`。上游每一行自己判断是否选中，同一个计划会在「工作」、Unread 和项目下同时亮，「工作」也会压在打开的计划上一起亮；这里每次渲染后把自认选中的行放在一起看，只留一行（你点的那行，否则缩进最深的第一行），其余标 `data-fork-dup` 画成普通行，留下的那行加 `aria-current="page"`。同一个钩子给 nav 打上 `data-fork-sidebar`，打开 `fork/sidebar/sidebar-look.css`：搜索框改成柔和的凹槽；图标与文字间距 9px，列表行比上游高 2px，顶层入口再高 4px、图标 16px，子行从父行名字下方起；选中行名字加粗；分组标题用 `--text-2`、右侧 + 常显；「需要你」去掉琥珀底、描边、发光左边和扫光，只留行尾的标记。颜色只用现有 token，主题、强调色、密度照旧。Shift 多选的聊天本来就是多行选中，不参与这条规则；「出问题」的行和「需要你」一样只留行尾标记。依赖的上游类名和属性由 `tests/fork-sidebar-anchors.test.ts` 检查（`sync-upstream.mjs` 的失效扫描只看 `fork/calm`），同步后它失败就按报出的名字重接。用例：`tests/fork-sidebar-one-selected.test.ts`、`packages/mac/e2e/fork-sidebar-one-selected.spec.ts`。原来 fork 自己的侧栏可拖右边（`<SidebarEdge />`，`fork/sidebar/resize.tsx`）在 2026-11-21 同步上游 3.7.0 时删掉：上游把窗口换成 Dockview 的框架（beluga-labs/beluga#596，`layout/Workbench.tsx`），侧栏右边本来就能拖、双击复原、键盘步进，宽度存在同一个 `sidebarWidth` 偏好里。
 
 ### 计划设置（已由上游合并）
 
@@ -399,7 +399,7 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/calm/index.ts` 一并引入，每条都只在 `:root[data-os='mac']` 下生效（Windows、Linux 保持上游的样子）；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
 
 - 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色；失败、已合并和 Merge 保留各自的颜色。规则前加了 `:root`，压过 `calm-accent.css` 把主按钮刷成强调色的那条。
-- 底部终端标签：当前标签用粗体，不加下划线。检查器只有一个标签时（总览的 Info）画成标题。
+- 底部终端标签和检查器的标签：原来是 fork 的规则（当前标签粗体、不加下划线；只有一个标签时画成标题），2026-11-21 同步上游 3.7.0 时删掉，上游把它们换成了 Dockview 的标签（beluga-labs/beluga#596，`styles/dock.css`）。
 - 空聊天的建议按钮只留文字。
 - 总览：在分组上方加一行列头（名称、分支、状态、详情、更新于/大小），名称和最后一列可以点击排序，和 Recent ▾ 菜单改的是同一个偏好；行高 28pt。
 - 工作树：名字旁的分支状态从胶囊改成一行彩色文字；Changes / History 这层视图切换改成一排文字，当前项加粗，检查器里只剩一层分段控件。
@@ -415,5 +415,5 @@ M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`�
 
 由上游 beluga-labs/beluga#584 收下：规则写在各组件自己的样式里，开关是 `:root[data-os='mac'][data-transparency='full']`（`docs/mac-controls.md`「Liquid Glass」）。fork 原来的覆盖层 `fork/native/liquid-glass.css` 已在 2026-11-19 同步时删掉。`lib/prefs.ts` 的 `data-glass` 仍保留，它只管跟随系统「减少透明度」时关掉窗口内的模糊（`styles/base.css`）。
 
-检查器的视图标签（改动 · 文件 · 草稿 · 信息）居中、等宽的分段仍是 fork 自己的，在 `native-look.css` 里。
+检查器的视图标签（改动 · 文件 · 草稿 · 信息）原来由 fork 在 `native-look.css` 里画成居中、等宽的分段；2026-11-21 同步上游 3.7.0 时删掉，现在是上游 Dockview 的标签（beluga-labs/beluga#596）。
 

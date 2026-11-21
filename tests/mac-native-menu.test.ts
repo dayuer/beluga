@@ -65,7 +65,7 @@ describe('the press cursor', () => {
   it('is the arrow on the app’s controls; only links show the hand', () => {
     // A link reads as one by its name, or is one of these (a mention, a task's chip, a file path).
     const linkish = /link|Link|href/;
-    const links = new Set(['chat/mention.module.css .pill', 'tasks/task-ref.module.css .chip', 'components/code/code.module.css .refPath']);
+    const links = new Set(['chat/mention.module.css .pill', 'components/telemetry-levels.module.css .privacy', 'tasks/task-ref.module.css .chip', 'components/code/code.module.css .refPath']);
     const hands: string[] = [];
     for (const file of css(root)) {
       const text = readFileSync(file, 'utf8');

@@ -2,4 +2,3 @@
 export { NewTaskButton } from './new-task.js';
 export { useOneSelected } from './one-selected.js';
 export { useSidebarKeys } from './keys.js';
-export { SidebarEdge } from './resize.js';
