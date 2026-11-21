@@ -37,8 +37,8 @@ describe('A4b regional strings (SS-182)', () => {
   });
 
   it('interpolates slot variables in regional translation helpers', () => {
-    expect(questions.tQuestions('zh', 'questions.remaining', { n: 2 })).toBe('还差 2 题');
-    expect(questions.tQuestions('en', 'questions.remaining', { n: 2 })).toBe('2 left');
+    expect(questions.tQuestions('zh', 'questions.suggested', { answer: '短信验证码' })).toBe('我先按：短信验证码');
+    expect(questions.tQuestions('en', 'questions.moreInChat', { n: 2 })).toBe('2 more — just say them in the chat');
     expect(steps.tSteps('en', 'steps.stepLabel', { i: 2, status: 'Done' })).toBe('Step 2 · Done');
     expect(cards.tCards('zh', 'designCard.uploading', { pct: 45 })).toBe('上传中 45%');
     expect(drawer.tDrawer('en', 'outputs.round', { n: 3 })).toBe('Round 3');

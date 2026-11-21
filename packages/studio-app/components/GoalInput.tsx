@@ -66,6 +66,7 @@ export function GoalInput({
   voice,
   lang = 'zh',
   maxHeight,
+  minHeight = 120,
   placeholder,
   accessibilityLabel,
   testID = 'goal-input',
@@ -78,27 +79,30 @@ export function GoalInput({
   voice?: GoalVoiceProps;
   lang?: Lang;
   maxHeight: number;
+  /** 最低高度，默认 120；卡片里的短输入可以给更矮的值。 */
+  minHeight?: number;
   placeholder: string;
   accessibilityLabel: string;
   testID?: string;
 }) {
   useScheme();
   const styles = createStyles();
-  const [height, setHeight] = useState(120);
+  const [height, setHeight] = useState(minHeight);
   const [focused, setFocused] = useState(false);
   const ref = useRef<ComponentRef<typeof TextInput>>(null);
   const composingRef = useRef(false);
 
   const grow = (e: TextInputContentSizeChangeEvent) => {
-    const next = Math.min(Math.max(e.nativeEvent.contentSize.height, 120), Math.max(120, maxHeight));
+    const next = Math.min(Math.max(e.nativeEvent.contentSize.height, minHeight), Math.max(minHeight, maxHeight));
     setHeight(next);
   };
 
   const handleKeyPress = (e: TextInputKeyPressEvent) => {
     const native = e.nativeEvent as TextInputKeyPressEvent['nativeEvent'] & KeyPressLike;
     if (shouldSubmitOnKeyPress(native, composingRef.current, submitOnEnter)) {
-      const prevent = (e as unknown as { preventDefault?: () => void }).preventDefault;
-      prevent?.();
+      // 必须以方法调用形式执行：解绑后调用会丢掉 `this`，原生事件里读
+      // `this._cancelable` 抛 TypeError，release 包会因未处理 JS 异常直接崩溃。
+      (e as unknown as { preventDefault?: () => void }).preventDefault?.();
       onSubmit?.();
     }
   };
@@ -147,7 +151,7 @@ export function GoalInput({
         styles.input,
         voice ? styles.inputWithVoice : null,
         focused && styles.inputFocused,
-        { height, maxHeight: Math.max(120, maxHeight) },
+        { height, minHeight, maxHeight: Math.max(minHeight, maxHeight) },
       ]}
     />
   );

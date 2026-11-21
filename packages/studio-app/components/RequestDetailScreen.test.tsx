@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StudioPlanView } from '../../../src/studio/protocol';
 
@@ -63,6 +63,7 @@ vi.mock('../lib/client', () => ({
 }));
 
 import RequestDetailScreen from '../app/request/[id]';
+import { undoStore } from '../lib/undo';
 
 const PLAN: StudioPlanView = {
   planRef: 'plan1',
@@ -101,6 +102,46 @@ describe('需求详情（非 DEMO，SS-223）', () => {
       ok: true,
       value: { t: 'receipt', opId: action.opId, state: 'done', planRef: 'plan1' },
     }));
+  });
+
+  it('问题卡点「就这样」按建议答案发 decision.answer', async () => {
+    const withDecision: StudioPlanView = {
+      ...PLAN,
+      waitingOn: 'customer',
+      decisions: [
+        {
+          decisionId: 'd1',
+          question: '提醒要做成每天几次？',
+          options: [
+            { id: 'o0', label: '每天两次' },
+            { id: 'o1', label: '每天一次' },
+          ],
+          multi: false,
+          open: true,
+        },
+      ],
+    };
+    mockState.plan.mockResolvedValue({ ok: true, value: { view: withDecision, updatedAt: 5_000 } });
+
+    const screen = await render(<RequestDetailScreen />);
+    await waitFor(() => expect(screen.getByText('我先按：每天两次')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('questions-submit'));
+    await act(async () => {
+      undoStore.flush();
+    });
+
+    await waitFor(() => expect(mockState.send).toHaveBeenCalledTimes(1));
+    const [pid, action] = mockState.send.mock.calls[0] as [
+      string,
+      { kind: string; planRef: string; payload: { decisionId: string; picks?: readonly string[] } },
+    ];
+    expect(pid).toBe('p1');
+    expect(action.kind).toBe('decision.answer');
+    expect(action.planRef).toBe('plan1');
+    expect(action.payload).toEqual({ decisionId: 'd1', picks: ['o0'] });
+    // 答过的问题本地先标为已答，卡片从流里收走
+    await waitFor(() => expect(screen.queryByTestId('questions-submit')).toBeNull());
   });
 
   it('从 hub 拉真实计划：状态行、步骤卡与对话都显示，不出演示数据', async () => {

@@ -1,8 +1,10 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render } from '@testing-library/react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('expo-localization', () => ({ getLocales: () => [{ languageCode: 'zh' }] }));
+vi.mock('expo-file-system', () => ({ Paths: { document: '/mock-doc' }, File: class {} }));
+vi.mock('lucide-react-native', () => ({ Mic: () => null, X: () => null, Check: () => null }));
 vi.mock('../lib/kv', () => {
   const mem = new Map<string, unknown>();
   return {
@@ -13,9 +15,12 @@ vi.mock('../lib/kv', () => {
     },
   };
 });
+vi.mock('../lib/voice-recognizer', () => ({ createVoiceRecognizer: () => ({}) }));
 
 import { setScheme } from '../lib/theme';
+import { undoStore } from '../lib/undo';
 import { DecisionCard, type QuestionCardData } from './DecisionCard';
+import { UndoBar } from './UndoBar';
 
 const TWO_QUESTIONS: QuestionCardData = {
   id: 'card-q-test',
@@ -48,72 +53,141 @@ const TWO_QUESTIONS: QuestionCardData = {
   ],
 };
 
-describe('DecisionCard (P3 问题卡)', () => {
-  it('numbers each question, shows remaining count beside disabled submit, and submits all together', async () => {
+const FOUR_QUESTIONS: QuestionCardData = {
+  ...TWO_QUESTIONS,
+  id: 'card-q-four',
+  questions: [
+    ...TWO_QUESTIONS.questions!,
+    { id: 'q3', index: 3, prompt: '第三个问题', options: [{ id: 'o3', label: '第三个建议' }], allowFreeText: true },
+    { id: 'q4', index: 4, prompt: '第四个问题', options: [{ id: 'o4', label: '第四个建议' }], allowFreeText: true },
+  ],
+};
+
+describe('DecisionCard (P3 问题卡 · 就这样 / 改…)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    undoStore.cancel();
     setScheme('light');
+  });
+
+  afterEach(async () => {
+    undoStore.cancel();
+    await cleanup();
+    vi.useRealTimers();
+  });
+
+  it('shows each suggestion as 「我先按：…」 with a 「改…」 link and one solid 「就这样」, no option rows or remaining count', async () => {
+    const screen = await render(<DecisionCard card={TWO_QUESTIONS} lang="zh" onSubmit={vi.fn()} />);
+
+    expect(screen.getByText('我先按：短信验证码')).toBeTruthy();
+    expect(screen.getByText('我先按：自动创建并登录')).toBeTruthy();
+    expect(screen.getAllByText('改…')).toHaveLength(2);
+    expect(screen.getByText('就这样')).toBeTruthy();
+    expect(screen.getByTestId('questions-submit')).toBeTruthy();
+
+    // 没有编号、选项行、「自己写…」、「还差 N 题」
+    expect(screen.queryByText(/还差/)).toBeNull();
+    expect(screen.queryByText(/自己写/)).toBeNull();
+    expect(screen.queryByText('1.')).toBeNull();
+    expect(screen.queryByTestId('question-q1-option-opt-sms')).toBeNull();
+    expect(screen.queryByTestId('question-q2-write-own')).toBeNull();
+  });
+
+  it('tapping 「就这样」 sends the first option for every question', async () => {
     const onSubmit = vi.fn().mockResolvedValue(true);
     const screen = await render(<DecisionCard card={TWO_QUESTIONS} lang="zh" onSubmit={onSubmit} />);
 
-    expect(screen.getByText('1.')).toBeTruthy();
-    expect(screen.getByText('2.')).toBeTruthy();
-    expect(screen.getByTestId('questions-action-row')).toBeTruthy();
-    expect(screen.getByText('还差 2 题')).toBeTruthy();
-    expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(true);
-
-    // 回答第 1 题
-    await fireEvent.press(screen.getByTestId('question-q1-option-opt-sms'));
-    expect(screen.getByText('还差 1 题')).toBeTruthy();
-    expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(true);
-
-    // 第 2 题选择「自己写…」
-    await fireEvent.press(screen.getByTestId('question-q2-write-own'));
-    expect(screen.getByText('还差 1 题')).toBeTruthy();
-    const customInput = screen.getByTestId('question-q2-custom-input');
-    const flatStyle = Object.assign({}, ...(Array.isArray(customInput.props.style) ? customInput.props.style : [customInput.props.style]));
-    expect(flatStyle.fontSize).toBe(16);
-    await fireEvent.changeText(customInput, '提示用户先注册');
-
-    // 全部答完：还差提示消失，主按钮可点
-    expect(screen.queryByText(/还差/)).toBeNull();
-    expect(screen.getByTestId('questions-submit').props.accessibilityState.disabled).toBe(false);
-
-    // 一起提交
     await fireEvent.press(screen.getByTestId('questions-submit'));
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledTimes(1);
-    });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith([
       { questionId: 'q1', picks: ['opt-sms'] },
-      { questionId: 'q2', picks: [], customText: '提示用户先注册' },
+      { questionId: 'q2', picks: ['opt-auto'] },
     ]);
-    await waitFor(() => {
-      expect(screen.getByTestId('questions-submitted')).toBeTruthy();
-    });
+    expect(screen.getByTestId('questions-submitted')).toBeTruthy();
   });
 
-  it('keeps selections when sending fails', async () => {
-    setScheme('light');
-    const onSubmit = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    const card: QuestionCardData = { ...TWO_QUESTIONS, id: 'card-q-fail' };
-    const screen = await render(<DecisionCard card={card} lang="zh" onSubmit={onSubmit} />);
+  it('sends the written text for the question changed with 「改…」 and the first option for the rest', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const screen = await render(<DecisionCard card={TWO_QUESTIONS} lang="zh" onSubmit={onSubmit} />);
 
-    await fireEvent.press(screen.getByTestId('question-q1-option-opt-captcha'));
-    await fireEvent.press(screen.getByTestId('question-q2-option-opt-auto'));
+    await fireEvent.press(screen.getByTestId('question-q2-change'));
+    const input = screen.getByTestId('question-q2-edit-input');
+    expect(Object.assign({}, ...[input.props.style].flat()).fontSize).toBe(16);
+    await fireEvent.changeText(input, '先引导绑定，并记住这次选择');
+
+    expect(screen.getByText('改成：先引导绑定，并记住这次选择')).toBeTruthy();
+    expect(screen.queryByText('我先按：自动创建并登录')).toBeNull();
+
+    // 点「改成」那行折起输入框；写了内容后旁边是「撤回」
+    await fireEvent.press(screen.getByTestId('question-q2-dismiss'));
+    expect(screen.queryByTestId('question-q2-edit-input')).toBeNull();
+    expect(screen.getByTestId('question-q2-revert')).toBeTruthy();
+
     await fireEvent.press(screen.getByTestId('questions-submit'));
+    await vi.advanceTimersByTimeAsync(4000);
 
-    await waitFor(() => {
-      expect(screen.getByText('发送失败，已保留你的选择，请重试')).toBeTruthy();
-    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith([
+      { questionId: 'q1', picks: ['opt-sms'] },
+      { questionId: 'q2', picks: [], customText: '先引导绑定，并记住这次选择' },
+    ]);
+  });
 
-    // 已选内容仍在
-    expect(screen.getByTestId('question-q1-option-opt-captcha').props.accessibilityState.checked).toBe(true);
-    expect(screen.getByTestId('question-q2-option-opt-auto').props.accessibilityState.checked).toBe(true);
+  it('shows at most three questions and says the rest go in the chat', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const screen = await render(<DecisionCard card={FOUR_QUESTIONS} lang="zh" onSubmit={onSubmit} />);
 
-    // 可以直接重试
+    expect(screen.getByTestId('question-item-q1')).toBeTruthy();
+    expect(screen.getByTestId('question-item-q3')).toBeTruthy();
+    expect(screen.queryByTestId('question-item-q4')).toBeNull();
+    expect(screen.getByTestId('questions-more')).toBeTruthy();
+    expect(screen.getByText('还有 1 条，在对话里说就行')).toBeTruthy();
+
     await fireEvent.press(screen.getByTestId('questions-submit'));
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledTimes(2);
-      expect(screen.getByTestId('questions-submitted')).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(onSubmit).toHaveBeenCalledWith([
+      { questionId: 'q1', picks: ['opt-sms'] },
+      { questionId: 'q2', picks: ['opt-auto'] },
+      { questionId: 'q3', picks: ['o3'] },
+    ]);
+  });
+
+  it('undoing within 4 seconds sends nothing and leaves the card answerable', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const screen = await render(
+      <>
+        <DecisionCard card={TWO_QUESTIONS} lang="zh" onSubmit={onSubmit} />
+        <UndoBar />
+      </>,
+    );
+
+    await fireEvent.press(screen.getByTestId('questions-submit'));
+    expect(undoStore.getState().active).toBe(true);
+    expect(screen.getByText(/已按建议答复/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('撤销'));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByTestId('questions-submit')).toBeTruthy();
+    expect(screen.queryByTestId('questions-submitted')).toBeNull();
+  });
+
+  it('when sending fails, returns to a tappable button and says why', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('offline'));
+    const screen = await render(<DecisionCard card={TWO_QUESTIONS} lang="zh" onSubmit={onSubmit} />);
+
+    await fireEvent.press(screen.getByTestId('questions-submit'));
+    await vi.advanceTimersByTimeAsync(4000);
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('没发出去，请再点一次「就这样」')).toBeTruthy();
     });
+    const submit = screen.getByTestId('questions-submit');
+    expect(submit.props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('questions-submitted')).toBeNull();
   });
 });
