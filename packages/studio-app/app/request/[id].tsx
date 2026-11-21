@@ -34,7 +34,6 @@ import { REQUESTS_CACHE_KEY } from '../../lib/requests-source';
 import { pendingKey, useSend, type SendableAction, type Sender } from '../../lib/send';
 import { session } from '../../lib/session';
 import { randomOpId } from '../../lib/submit';
-import { undoStore } from '../../lib/undo';
 import { detectLang, t } from '../../lib/strings';
 import { signRefusalFallback, signRefusalMessage, signT } from '../../lib/strings/sign';
 import { tDrawer } from '../../lib/strings/drawer';
@@ -206,7 +205,6 @@ export default function RequestDetailScreen() {
   };
 
   // --- 发动作（非 DEMO）--------------------------------------------------------
-  const decisionSend = useSend(projectId, pendingKey('decision', projectId, id));
   const discardSend = useSend(projectId, pendingKey('discard', projectId, id));
   const startSend = useSend(projectId, pendingKey('gate-start', projectId, id));
   const changesSend = useSend(projectId, pendingKey('gate-changes', projectId, id));
@@ -308,49 +306,42 @@ export default function RequestDetailScreen() {
     sendText(text);
   };
 
-  /** 问题回答：先给 10 秒撤销窗口（与旧计划页一致），到点才发 decision.answer。 */
-  const scheduleDecisionAnswer = (cardId: string, picks: string[], free: string): void => {
-    undoStore.show({
-      text: t(lang, 'decision.undo'),
-      ms: 10_000,
-      fire: () => {
-        void decisionSend.send(
-          (opId) => ({
-            t: 'action',
-            opId,
-            kind: 'decision.answer',
-            planRef: id,
-            payload: {
-              decisionId: cardId,
-              ...(picks.length > 0 ? { picks } : {}),
-              ...(free ? { text: free } : {}),
-            },
-          }),
-          {
-            onQueued: () =>
-              setLocal((prev) => ({ ...prev, rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
-            onDone: () =>
-              setLocal((prev) => ({ ...prev, rev: store.rev, answered: [...(prev?.answered ?? []), cardId] })),
-          },
-        );
-      },
-    });
-  };
-
   const changeDraft = (value: string): void => {
     draftRef.current = value;
     setDraft(value);
   };
 
-  const answerQuestions = (cardId: string, answers: readonly { questionId: string; picks: readonly string[]; customText?: string }[]) => {
-    if (demoMode) return;
-    const picks = [...new Set(answers.flatMap((answer) => answer.picks))];
-    const free = answers
-      .map((answer) => answer.customText?.trim())
-      .filter((text): text is string => Boolean(text))
-      .join('\n');
-    if (picks.length === 0 && !free) return false;
-    scheduleDecisionAnswer(cardId, picks, free);
+  /**
+   * 问题回答（SS-252）：每条问题一个 decision.answer——没改的带第一个选项，改过的带自己写的 `text`。
+   * 卡片自己给 4 秒撤销条，这里直接发；任一条发不出去就返回 false，卡片回到可再点并说明原因。
+   */
+  const answerQuestions = async (
+    _cardId: string,
+    answers: readonly { questionId: string; picks: readonly string[]; customText?: string }[],
+  ): Promise<boolean> => {
+    if (demoMode) return true;
+    if (!projectId || answers.length === 0) return false;
+    const answered: string[] = [];
+    for (const answer of answers) {
+      const action = {
+        t: 'action' as const,
+        opId: randomOpId(),
+        kind: 'decision.answer' as const,
+        planRef: id,
+        payload: {
+          decisionId: answer.questionId,
+          ...(answer.picks.length > 0 ? { picks: [...answer.picks] } : {}),
+          ...(answer.customText ? { text: answer.customText } : {}),
+        },
+      };
+      let sent = await hub.send(projectId, action);
+      // 断网恢复后第一个请求常撞上旧连接（同 deliverChat）；中台按 opId 幂等。
+      if (!sent.ok && sent.error.kind === 'offline') sent = await hub.send(projectId, action);
+      if (!sent.ok || sent.value.state === 'refused') return false;
+      answered.push(answer.questionId);
+    }
+    setLocal((prev) => ({ ...prev, rev: store.rev, answered: [...(prev?.answered ?? []), ...answered] }));
+    return true;
   };
 
   const confirmUnderstanding = (cardId: string) => {
