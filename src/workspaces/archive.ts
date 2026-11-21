@@ -101,7 +101,7 @@ const NESTED_DEPTH = 6;
  * Folders made again inside a folder the project ignores whole (android/app/build, .gradle…):
  * relative, ending in "/". Never inside a git repo of yours (what it tracks isn't throwaway) or a link.
  */
-function regenUnder(dir: string, folder: string): Array<{ rel: string; rule: RegenRule }> {
+function regenUnder(dir: string, folder: string, also?: (name: string) => RegenRule | undefined): Array<{ rel: string; rule: RegenRule }> {
   const found: Array<{ rel: string; rule: RegenRule }> = [];
   const walk = (rel: string, depth: number): void => {
     if (depth > NESTED_DEPTH || existsSync(path.join(dir, rel, '.git'))) return;
@@ -114,7 +114,7 @@ function regenUnder(dir: string, folder: string): Array<{ rel: string; rule: Reg
     for (const e of entries) {
       if (!e.isDirectory()) continue;
       const sub = `${rel}${e.name}/`;
-      const rule = regenRule(dir, sub);
+      const rule = also?.(e.name) ?? regenRule(dir, sub);
       if (rule) found.push({ rel: sub, rule });
       else walk(sub, depth + 1);
     }
@@ -145,6 +145,14 @@ const SENT_RULE: RegenRule = { what: 'copies of files you sent Claude', names: [
 
 /** Beluga's own folders in a worktree (reports, scratch): what tools make in them is throwaway too. */
 const OWN = [`${PROJECT_DIR}/`, `${LEGACY_PROJECT_DIR}/`];
+const isOwn = (rel: string): boolean => OWN.some((own) => rel === own || rel.startsWith(own));
+
+/**
+ * Xcode's test results an agent ran into Beluga's folder (`-resultBundlePath .beluga/scratch/x.xcresult`):
+ * they go with the worktree (freeing space keeps them, as an agent may still be reading them).
+ */
+const TEST_RESULTS: RegenRule = { what: 'Xcode test results', names: [/\.xcresult$/] };
+const testResults = (name: string): RegenRule | undefined => (name.endsWith('.xcresult') ? TEST_RESULTS : undefined);
 
 /** Whether what would be kept holds the sent copies (a real folder, never a link). */
 function sentIn(dir: string, kept: readonly string[]): boolean {
@@ -173,9 +181,9 @@ export async function planArchive(dir: string, opts: { readonly archiving?: bool
   const folders = kept.filter((rel) => rel.endsWith('/') && !regenRule(dir, rel));
   const ignoredFolders = await ignoredByProject(dir, folders);
   // Beluga's own folder (kept out of git by .git/info/exclude, not the project): what's made again in it goes too.
-  for (const rel of folders) if (OWN.some((own) => rel === own || rel.startsWith(own))) ignoredFolders.add(rel);
+  for (const rel of folders) if (isOwn(rel)) ignoredFolders.add(rel);
   const sentGoes = opts.archiving === true;
-  const inside = [...ignoredFolders].flatMap((folder) => regenUnder(dir, folder)).filter((d) => !(sentGoes && (d.rel.startsWith(SENT) || SENT.startsWith(d.rel))));
+  const inside = [...ignoredFolders].flatMap((folder) => regenUnder(dir, folder, sentGoes && isOwn(folder) ? testResults : undefined)).filter((d) => !(sentGoes && (d.rel.startsWith(SENT) || SENT.startsWith(d.rel))));
   const drop = [...candidates.filter((c) => theirs.has(c.rel)), ...inside];
   const nestedDrops = new Set(inside.map((d) => d.rel));
   const listed = kept.flatMap((rel) => (ignoredFolders.has(rel) ? without(dir, rel, nestedDrops) : [rel]));

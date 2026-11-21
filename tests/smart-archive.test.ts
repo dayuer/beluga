@@ -163,7 +163,7 @@ describe('a smart archive', () => {
     expect(existsSync(path.join(wt, '.beluga/scratch/sent'))).toBe(false);
   });
 
-  it('in Beluga’s own folder, build output goes, whatever it’s called, and the rest stays', async () => {
+  it('in Beluga’s own folder, build output goes, whatever it’s called, test results go when archiving, and the rest stays', async () => {
     put(path.join(repo, '.git/info/exclude'), '.beluga/\n');
     const derived = (rel: string): void => {
       put(path.join(wt, rel, 'info.plist'), 'plist');
@@ -184,18 +184,26 @@ describe('a smart archive', () => {
     derived('.beluga/scratch/clone/dd');
     put(path.join(wt, '.beluga/reports/r.md'), '# report');
 
+    put(path.join(wt, '.beluga/scratch/perf-313f7b8/ui.xcresult/Data/blob'), 'r'.repeat(20_000));
+    // Freeing space keeps the worktree, and its test results (an agent may still be reading them).
+    const freeing = await planArchive(wt);
+    expect(freeing.keep).toEqual(expect.arrayContaining(['.beluga/scratch/run.xcresult/', '.beluga/scratch/perf-313f7b8/ui.xcresult/']));
+    expect(freeing.drop.map((d) => d.path)).toContain('.beluga/scratch/dd181/');
+
     const plan = await planArchive(wt, { archiving: true });
     const dropped = plan.drop.map((d) => d.path);
-    expect(dropped).toEqual(expect.arrayContaining(['.beluga/scratch/dd181/', '.beluga/scratch/perf-313f7b8/.build/DerivedData/', '.beluga/scratch/sent/']));
+    expect(dropped).toEqual(expect.arrayContaining(['.beluga/scratch/dd181/', '.beluga/scratch/perf-313f7b8/.build/DerivedData/', '.beluga/scratch/sent/', '.beluga/scratch/run.xcresult/', '.beluga/scratch/perf-313f7b8/ui.xcresult/']));
+    expect(plan.drop.find((d) => d.path === '.beluga/scratch/run.xcresult/')?.rule.what).toBe('Xcode test results');
     expect(plan.drop.find((d) => d.path === '.beluga/scratch/dd181/')?.rule.what).toBe('Xcode build output');
     expect(dropped.filter((d) => d.startsWith('.beluga/scratch/clone/') || d.startsWith('.beluga/scratch/half/'))).toEqual([]);
-    expect(plan.keep).toEqual(expect.arrayContaining(['.beluga/reports/', '.beluga/scratch/perf-313f7b8/notes.md', '.beluga/scratch/run.xcresult/', '.beluga/scratch/half/', '.beluga/scratch/clone/']));
-    expect(plan.keep.some((k) => k.startsWith('.beluga/scratch/dd181') || k.includes('DerivedData'))).toBe(false);
+    expect(plan.keep).toEqual(expect.arrayContaining(['.beluga/reports/', '.beluga/scratch/perf-313f7b8/notes.md', '.beluga/scratch/half/', '.beluga/scratch/clone/']));
+    expect(plan.keep.some((k) => k.startsWith('.beluga/scratch/dd181') || k.includes('DerivedData') || k.includes('.xcresult'))).toBe(false);
+    expect(plan.remake).toEqual(['npm install', 'npm run build']);
 
     await archiveWorktree({ repo, dir: wt, id: 'w-scratch', archivesDir: archives });
     await restoreWorktree({ repo, dir: wt, id: 'w-scratch', archivesDir: archives });
     expect(readFileSync(path.join(wt, '.beluga/scratch/perf-313f7b8/notes.md'), 'utf8')).toBe('kept');
-    expect(readFileSync(path.join(wt, '.beluga/scratch/run.xcresult/Info.plist'), 'utf8')).toBe('evidence');
+    expect(existsSync(path.join(wt, '.beluga/scratch/run.xcresult'))).toBe(false);
     expect(readFileSync(path.join(wt, '.beluga/scratch/half/info.plist'), 'utf8')).toBe('mine');
     expect(existsSync(path.join(wt, '.beluga/scratch/clone/dd/info.plist'))).toBe(true);
     expect(existsSync(path.join(wt, '.beluga/scratch/dd181'))).toBe(false);
