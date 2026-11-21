@@ -61,7 +61,8 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('general', 'Usage statistics', 'Off, Essential or On.', 'telemetry analytics privacy statistics share data improve'),
   ...rows('general', 'Usage statistics', [
-    ['Share usage statistics', 'Off sends nothing; Essential only the essentials; On how you use Beluga.', 'telemetry analytics privacy share data level'],
+    ['Share usage statistics', 'Off sends nothing; Essential only the essentials; On how you use Beluga.', 'telemetry analytics privacy notice gdpr share data level'],
+    ['Install ID', 'The random ID your statistics go under: copy it for a privacy request, or reset it.', 'telemetry install id identifier reset copy privacy gdpr request delete data'],
   ]),
   ...rows('general', 'Writing', [
     ['Send with', 'Return or Command-Return sends a message.', 'enter return send message newline new line keyboard'],
@@ -75,6 +76,7 @@ export const SETTINGS: readonly Entry[] = [
   ...rows('appearance', undefined, [
     ['Appearance', 'Match the system, light or dark.', 'dark mode light mode night theme system'],
     ['Accent', 'Selection, focus and buttons.', 'color colour highlight tint'],
+    ['Style', 'Beluga’s own look, or macOS 26’s round buttons and glass panes.', 'look shape corners rounded round capsule pill buttons liquid glass macos native panes'],
   ]),
   group('appearance', 'Light theme', 'The window’s colours by day.', 'theme day colors colours palette latte'),
   group('appearance', 'Dark theme', 'The window’s colours at night.', 'theme night colors colours palette oled black'),
