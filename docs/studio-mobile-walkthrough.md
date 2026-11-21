@@ -318,8 +318,12 @@ SE 3rd gen 是这台机器上能建的最小尺寸，用它当小屏档。
    sendBack、draft.apply / discard，以及签名的 request.confirm、gate.answer、delivery.accept、
    release.approve、device.remove）。按 SS-242 的约定**不发明协议**，这一项记为「不适用：协议无重新
    推送」；等协议加了动作再在 `request/[id].tsx` 里用 useSend 接上 `onRetryPush`。
-2. **预览的「部署中」态从界面进不去**：`PreviewTab` 有 `state: 'deploying'`，但
-   `app/request/[id].tsx` 只传 `previewUrl` / `installUrl`，没有任何数据能让它变成 deploying。
+2. **预览的「部署中」态从界面进不去，中台也没有这个状态**：`PreviewTab` 有
+   `state: 'deploying'`，但 `app/request/[id].tsx` 只传 `previewUrl` / `installUrl`；
+   更重要的是 `StudioPlanView`（src/studio/protocol.ts）里没有 previews / 部署状态字段
+   （只有 finished 后的 `release`，注释写着 P2 才加 `previews`），hub 与 App 里也找不到任何
+   部署状态。SS-243 查过后记为**不适用：中台没有部署状态**，等协议加了 `previews` 再映射到
+   RequestView 并传给 PreviewTab。
 3. **主按钮的 done 态没有调用方**：所有 `PrimaryButton`/`SignedButton` 只传 `idle | working`，
    `state="done"` 只在单测里出现。
 
