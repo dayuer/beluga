@@ -148,7 +148,7 @@
   transition: background var(--dur-fast);
 }
 .button:active:not(:disabled) {
-  background: color-mix(in srgb, var(--text) 16%, var(--bg-raised));
+  background: var(--control-press);
 }
 .button:disabled {
   opacity: var(--control-disabled);

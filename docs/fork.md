@@ -128,9 +128,9 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 
 计划页 ••• › 计划设置… 由上游 beluga-labs/beluga#587、#588 收下（`packages/mac/src/plans/PlanSettingsSheet.tsx`、`plan-settings-model.ts`）。2026-11-19 同步时删掉了 fork 自己的那份（`fork/plans/PlanSettingsSheet.tsx`、`fork/plans/plan-settings-model.ts`、`tests/fork-plan-settings.test.ts`、`e2e/fork-plan-settings.spec.ts`）。还没合并的后续 PR（#589 计划回读的时间、#590 智能体菜单写出模型、#591 永不等我、#592 sheet 按钮）以上游写法合在 `topic/plans` 里，上游合并后同步时自然消失。
 
-### 原生控件（待提回上游）
+### 原生控件（主体已由上游合并，余下是 fork 之后的改动）
 
-控件规范（`docs/mac-controls.md`）直接改在上游自己的文件里，因为它本来就要提回上游：分支 `feat/mac-native-controls`（基于 `upstream/main`）就是给 beluga-labs/beluga 的 PR。上游合并之后，下面这些差异在同步时消失；合并之前，同步上游时这些文件可能冲突，按上游的新写法重新套用 `--control-*` token 即可。之前的 fork 覆盖层 `fork/native/` 已删掉。
+控件规范（`docs/mac-controls.md`）直接改在上游自己的文件里。主体由上游 beluga-labs/beluga#584 在 2026-11-19 合并，#592（sheet 的按钮）也已合并；fork 里那份早一些的写法在 2026-11-21 换成了上游收下的（比如 sheet 按钮按下的颜色用 `--control-press`）。和上游还不一样的，是 fork 在 #584 之后定的、上游还没有的部分：Regular 按 macOS 26 的 AppKit 量出来是 24px（上游 22px），页面自己的头部和工具行用 Regular（上游多用 Small），空状态的 `EmptyChoices`，失败/已合并按钮按下和聚焦时整块带色，窗口不在前台时主按钮画成普通按钮，“增强对比度”，按下指针。这些要提回上游时再开新的 PR；同步上游时这些文件可能冲突，按上游的新写法重新套用即可。之前的 fork 覆盖层 `fork/native/` 已删掉（`native-look.css` 是另一回事，见下面“Mac 原生走查”）。
 
 - `packages/mac/src/styles/tokens.css`：控件 token（三档尺寸、按 AppKit 语义色命名的颜色、焦点环、窗口不在前台时去掉强调色）、`zh-CN` 的苹方字体。
 - `packages/mac/src/components/`：`ui.tsx`（`ControlSize`，`Button`/`IconButton`/`Segmented` 的 `size`）、`Select.tsx`、`SelectMenu.tsx`，以及 `ui`、`alert`、`form`、`select` 四个 CSS module。
@@ -141,9 +141,9 @@ node scripts/sync-upstream.mjs --remote calm-rehearsal --ref main
 - fork 自己的侧栏样式 `fork/sidebar/sidebar-look.css` 的搜索框也跟着用大号 `--control-h-large`（原来写死 30px），由 `tests/fork-sidebar-anchors.test.ts` 检查。
 - 用例：`tests/mac-controls.test.ts`（上游的新测试文件，随 PR 一起提回）。
 
-### 原生菜单与按下指针（待提回上游）
+### 原生菜单与按下指针（原生菜单已由上游合并）
 
-同样直接改在上游文件里、准备提回上游：分支 `upstream-pr/native-menus`（基于 `upstream/main`，未推送），在 fork 里是 cherry-pick 过来的。
+同样直接改在上游文件里。原生菜单随 beluga-labs/beluga#584 在 2026-11-19 合并；按下指针（应用里的控件是箭头，只有链接是手形，`tests/mac-native-menu.test.ts` 末尾那条）上游还没有，仍是 fork 的。
 
 - `packages/mac/src/components/SpecMenu.tsx`：右键菜单和 ⋯ 下拉（`ActionsContext`、`ActionsDropdown`、`SpecContext`、`SpecDropdown`）在 Mac 的 app 里先交给 `lib/native-menu.ts` 弹 NSMenu；选项下有说明文字或自带标记的菜单仍用网页菜单（和 fork 的 `FitContent` 摆放一起用）。
 - `packages/mac/src/lib/native-menu.ts`、`native-menu-model.ts`（新文件）：一次调用建好整个菜单，文字过 `t()`，快捷键、勾选、子菜单、分组，图标和色点按菜单文字颜色画成图片。
