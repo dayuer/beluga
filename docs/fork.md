@@ -376,7 +376,7 @@ M9 合并后 `sync-upstream --report` 在这个分支上查出的未登记文件
 
 ### 沉稳收尾（M8）
 
-M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm-glow.css`、`calm-type.css`、`calm-tabs.css`、`type-scale.ts`、`type-plugin.ts`；`fork/sidebar/one-mark.ts`、`sidebar-look.css`，由已有的 `useOneSelected` 调用 `useOneMark`）。锚点在 `tests/fork-sidebar-anchors.test.ts`、`tests/fork-sidebar-one-mark.test.ts`、`tests/fork-calm-accent.test.ts`、`tests/fork-calm-tabs.test.ts` 里检查，同步上游后失效会失败并指出名字。改上游文件只登记下面这些：
+M8 和 M9 的规则放在 fork 自己的文件里（`fork/calm/calm-accent.css`、`calm-glow.css`、`calm-type.css`、`type-scale.ts`、`type-plugin.ts`；`fork/sidebar/one-mark.ts`、`sidebar-look.css`，由已有的 `useOneSelected` 调用 `useOneMark`）。锚点在 `tests/fork-sidebar-anchors.test.ts`、`tests/fork-sidebar-one-mark.test.ts`、`tests/fork-calm-accent.test.ts` 里检查，同步上游后失效会失败并指出名字。改上游文件只登记下面这些：
 
 | 文件 | 改了几行 | 原因 |
 | --- | ---: | --- |

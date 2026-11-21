@@ -792,7 +792,7 @@ Tested-on: macOS 27.2 (Darwin 27.2.0, 2026-11-18, 作者的 Mac)，树 0fe34fc37
 | --- | --- | --- |
 | 铃铛计数仍是强调色实底（计算样式 `rgb(0,117,255)`） | `calm-accent.css` 1b：`_iconBadge_` 用与 `_badgeUrgent_` 相同的中性 | `tests/fork-calm-accent.test.ts` 锚点检查；§5 工作区、任务页图 |
 | 「2 commits · no PR」chip 仍是蓝色 | `calm-accent.css` 1c：`_pill_info_` 的 `--pill` 改为 `--text-2` | 同上 |
-| 右侧面板的视图 tab（Changes、Files、Scratch、Info）随面板宽度伸缩（上游 `.tabs { width: 100% }`、`.tab { flex: 1 1 0 }`） | 新文件 `fork/calm/calm-tabs.css`：沉稳下每个 tab 按图标和名字定宽，整条居中；面板很窄时上游的折叠（只显示当前 tab 的名字）照旧 | `tests/fork-calm-tabs.test.ts`；§5 工作区图 |
+| 右侧面板的视图 tab（Changes、Files、Scratch、Info）随面板宽度伸缩（上游 `.tabs { width: 100% }`、`.tab { flex: 1 1 0 }`） | 新文件 `fork/calm/calm-tabs.css`：沉稳下每个 tab 按图标和名字定宽，整条居中；面板很窄时上游的折叠（只显示当前 tab 的名字）照旧 | §5 工作区图。2026-11-21 同步上游 3.7.0 时删掉：上游把面板换成 Dockview（beluga-labs/beluga#596），标签按内容定宽，`.tabs`、`.tab`、`.tabsFolded` 都没了。 |
 | 引导页 6 层光晕被改写 | `glow-scan.ts` 的跳过目录从 `onboarding/scenes/` 改为 `onboarding/` | `vite build`：`calm-glow: 49 halo spreads on --calm-ring, 8 blurred glows on --calm-glow-off in 27 files; kept on purpose: 1` |
 | `waitForTimeout(300)` | 改为 `waitForFunction`，等到页面上没有正在播放的 CSS 过渡 | `packages/mac/e2e/project-home-narrow.spec.ts` |
 | §5 的最终图过时 | 六场景 × 浅色深色、沉稳关工作区和任务页，全部重拍（`calm-check`，calm 开/关、full、loaded）；§2.5 的「改后」「悬停」两张也重拍。演示数据里 bob-api 行本身就同时有点阵、琥珀点、计数三样，不用再克隆：静止时只露琥珀点，悬停时三样都展开 | `docs/calm/img/m8-final-*`、`m8-row-after-*`、`m8-row-hover-*` |
