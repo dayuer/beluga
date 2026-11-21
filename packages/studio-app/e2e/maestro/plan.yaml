@@ -330,7 +330,7 @@ appId: com.synon.studio
     timeout: 20000
 - assertNotVisible: ".*(/Users/|planRef|opId|```|[A-Z]{2,}-[0-9]+).*"
 
-# 6. 问题回答：10 秒撤销窗口，撤销后不发，等到点才发
+# 6. 问题回答：每条「我先按：<建议答案>」+「改…」，一个实底「就这样」，4 秒撤销窗口
 - runScript:
     file: scripts/control.js
     env:
@@ -340,18 +340,12 @@ appId: com.synon.studio
     element:
       id: "card-d-m0-t0"
     direction: DOWN
+- assertVisible: ".*我先按：先做提醒.*"
 - runScript:
     file: scripts/control.js
     env:
       ACTION: getDelivered
       KIND: decision.answer
-- scrollUntilVisible:
-    element:
-      id: "question-d-m0-t0-option-o0"
-    direction: DOWN
-- tapOn:
-    id: "question-d-m0-t0-option-o0"
-    retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
       id: "questions-submit"
@@ -393,20 +387,32 @@ appId: com.synon.studio
     env:
       ACTION: getDelivered
       KIND: decision.answer
+- scrollUntilVisible:
+    element:
+      id: "question-d-m0-t1-change"
+    direction: DOWN
 - tapOn:
-    id: "question-d-m0-t1-option-o0"
-    retryTapIfNoChange: true
-- tapOn:
-    id: "questions-submit"
+    id: "question-d-m0-t1-change"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: "undo-bar"
+      id: "question-d-m0-t1-edit-input"
     timeout: 10000
+- tapOn:
+    id: "question-d-m0-t1-edit-input"
+- inputText: "stats first"
 - extendedWaitUntil:
-    notVisible:
-      id: "undo-bar"
-    timeout: 20000
+    visible: ".*改成：stats first.*"
+    timeout: 10000
+# 拖动列表会收起键盘（keyboardDismissMode=on-drag），再把「就这样」滚到眼前
+- scrollUntilVisible:
+    element:
+      id: "questions-submit"
+    direction: DOWN
+- tapOn:
+    id: "questions-submit"
+    retryTapIfNoChange: true
+# 4 秒撤销窗口过后发出一条 decision.answer（assert-delivered 会等最多 5 秒）
 - runScript:
     file: scripts/control.js
     env:

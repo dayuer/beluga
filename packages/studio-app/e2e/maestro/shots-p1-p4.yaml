@@ -98,7 +98,17 @@ appId: com.synon.studio
     element:
       id: "card-d-m0-t0"
     direction: DOWN
+- assertVisible: ".*我先按：先做提醒.*"
 - takeScreenshot: p3-question
+# 点「改…」原地展开输入框，这条改成自己写的内容
+- tapOn:
+    id: "question-d-m0-t0-change"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "question-d-m0-t0-edit-input"
+    timeout: 10000
+- takeScreenshot: p3-question-change
 
 # P4: 需求详情（对话 + 状态行 + 步骤 + 卡片流）
 - runScript:

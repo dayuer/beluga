@@ -512,6 +512,7 @@ export default function RequestDetailScreen() {
             style={styles.main}
             contentContainerStyle={[styles.mainContent, { paddingBottom: space[6] }]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             testID="request-detail-scroll"
           >
             <View style={[styles.statusBar, { backgroundColor: color.card, borderColor: color.hairline }]}>

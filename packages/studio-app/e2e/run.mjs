@@ -37,10 +37,13 @@ const keyFile = path.join(scratch, 'daemon.pem');
 const daemonLog = path.join(scratch, 'daemon.log');
 const wranglerLog = path.join(scratch, 'wrangler.log');
 
-const hubPort = 8787;
-const proxyPort = 8788;
-const controlPort = 8791;
-const daemonControlPort = 8792;
+// Defaults are shared with the Maestro control script; override them to run next to
+// someone else's local hub/daemon without stopping it.
+const portFrom = (name, fallback) => Number(process.env[name] ?? fallback);
+const hubPort = portFrom('E2E_HUB_PORT', 8787);
+const proxyPort = portFrom('E2E_PROXY_PORT', 8788);
+const controlPort = portFrom('E2E_CONTROL_PORT', 8791);
+const daemonControlPort = portFrom('E2E_DAEMON_PORT', 8792);
 
 const operator = 'e2e-operator';
 const hubUrl = `http://127.0.0.1:${hubPort}`;
