@@ -486,3 +486,23 @@ ss-241 的做法是「一台已登记的手机打开『我 › 设备 › 加一
 - 新手机「我 › 设备 › 加一台设备」扫码 → 核对指纹 → 登记；
 - 两台手机的「我 › 设备」列表都截图（新设备在里）；
 - 用新设备点一次签名动作（交付卡「通过」），确认回执是 done 而不是 unregistered-device。
+
+## 23. A10 截图项结算与补拍（SS-245）
+
+A10 的截图只留在当时的任务附件里，本轮重新拍了一份可查的（`.beluga/scratch/ss-245/`）。
+脚本：`e2e/maestro/shots-settle.yaml`（demo 构建，直接对装好的包跑）、
+`e2e/maestro/shots-settle-real.yaml`（真中台 + 假 daemon，拍抽屉空态）。
+
+| 任务 | 截图 | 内容 |
+|---|---|---|
+| SS-44 P4 步骤条 | `settle-steps.png` | 四步一格一态：完成、进行中、等待（斜纹）、未开始 |
+| SS-45 P4 等待卡 | `state-wait-queued.png`、`state-wait-quota.png`、`state-wait-human.png`、`state-wait-offline.png`（SS-232） | 四种原因 + 「什么时候会好」 + 「你不用做什么」，全灰不用红 |
+| SS-49 抽屉成果 | `settle-drawer-outputs.png`（有内容：第 2 轮在线预览、iOS 安装包、客户附件）、`settle-drawer-outputs-empty.png`（空态 InlineHint） | 有 / 空两态 |
+| SS-50 抽屉改动 | `settle-drawer-changes.png`（新增/修改列表）、`settle-drawer-changes-empty.png`（「还没有改动记录」） | 有 / 空两态 |
+| SS-54 P9 我 | `settle-me.png` | 账号头 + 项目与运行 / 设备与账号两组入口 |
+| SS-56 我 › 执行机器 | `settle-machines.png` | 同一屏三种机器：在线可接单（42/100）、离线「等待」、用量将满（87/100，琥珀 warn） |
+| SS-57 我 › 项目与代码交付 | `settle-project.png` | 每个项目的平台、运行方式、交付方式、仓库与令牌状态（不显示令牌） |
+
+说明：SS-56 的「用量将满」在 demo 数据里原本没有 ≥80% 的机器，补了一个第三台
+`runner-3`（87/100，只加数据，不改界面）。抽屉空态用真中台的 `running` 视图拍（没有交付物、
+没有草稿改动），因为 demo 的 `?state=empty` 只在 P4 支持 `runnerOffline`，没有 empty 分支。

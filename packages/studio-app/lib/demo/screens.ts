@@ -407,6 +407,8 @@ export const DEMO_SETTINGS_VIEW: SettingsView = {
   runners: [
     { id: 'runner-1', name: '工作室 Mac mini', online: true, accepting: true, activeRequestCount: 2, monthlyQuotaUsed: 42, monthlyQuotaLimit: 100 },
     { id: 'runner-2', name: '备用构建机', online: false, accepting: false, activeRequestCount: 0 },
+    // 用量将满（≥80% 转 warn 色）的截图用（SS-245）。
+    { id: 'runner-3', name: '主构建机（用量将满）', online: true, accepting: false, activeRequestCount: 1, monthlyQuotaUsed: 87, monthlyQuotaLimit: 100 },
   ],
   devices: [
     { id: 'dev-1', name: 'iPhone 15 Pro', platform: 'ios', registeredAt: NOW - 7 * 86_400_000, lastSeenAt: NOW - 60_000, isCurrent: true },
