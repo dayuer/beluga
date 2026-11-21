@@ -247,19 +247,41 @@ function QuestionRow({
     onTranscript: (spoken) => onChangeText(appendSpoken(text, spoken)),
   });
 
+  /**
+   * 回车/点答案行：折起输入框。输入框卸载时自己交回焦点、键盘随之收起——
+   * 不要调 Keyboard.dismiss：这条 blur 命令在本项目的原生栈上会让 App 崩溃（A12 e2e 实测）。
+   */
+  const dismissKeyboard = () => {
+    onDoneEditing();
+  };
+
   return (
     <View style={styles.questionBlock} testID={`question-item-${q.id}`}>
       <Text style={[styles.prompt, { color: color.text }]}>{q.prompt}</Text>
 
       <View style={styles.answerRow}>
         {own ? (
-          <Text style={[styles.answer, { color: color.text2 }]} testID={`question-${q.id}-changed`}>
-            {tQuestions(lang, 'questions.changed', { text: own })}
-          </Text>
+          <Pressable
+            accessibilityRole="text"
+            onPress={dismissKeyboard}
+            style={styles.answerTap}
+            testID={`question-${q.id}-dismiss`}
+          >
+            <Text style={[styles.answer, { color: color.text2 }]} testID={`question-${q.id}-changed`}>
+              {tQuestions(lang, 'questions.changed', { text: own })}
+            </Text>
+          </Pressable>
         ) : suggested ? (
-          <Text style={[styles.answer, { color: color.text2 }]} testID={`question-${q.id}-suggested`}>
-            {tQuestions(lang, 'questions.suggested', { answer: suggested.label })}
-          </Text>
+          <Pressable
+            accessibilityRole="text"
+            onPress={dismissKeyboard}
+            style={styles.answerTap}
+            testID={`question-${q.id}-dismiss`}
+          >
+            <Text style={[styles.answer, { color: color.text2 }]} testID={`question-${q.id}-suggested`}>
+              {tQuestions(lang, 'questions.suggested', { answer: suggested.label })}
+            </Text>
+          </Pressable>
         ) : (
           <View style={styles.answerSpacer} />
         )}
@@ -284,8 +306,11 @@ function QuestionRow({
           <GoalInput
             value={text}
             onChangeText={onChangeText}
+            onSubmit={dismissKeyboard}
+            submitOnEnter
             lang={lang}
-            maxHeight={160}
+            minHeight={44}
+            maxHeight={120}
             placeholder={tQuestions(lang, 'questions.editPlaceholder')}
             accessibilityLabel={tQuestions(lang, 'questions.editPlaceholder')}
             voice={{
@@ -318,7 +343,8 @@ const styles = StyleSheet.create({
   questionBlock: { gap: space[2] },
   prompt: { ...type.callout, fontWeight: '600' },
   answerRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  answer: { ...type.callout, flex: 1 },
+  answerTap: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  answer: { ...type.callout },
   answerSpacer: { flex: 1 },
   link: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space[1] },
   linkLabel: { ...type.callout, fontWeight: '600' },

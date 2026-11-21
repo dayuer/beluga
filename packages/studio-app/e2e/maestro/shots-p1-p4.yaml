@@ -25,7 +25,11 @@ appId: com.synon.studio
 - tapOn:
     id: "email"
 - inputText: "customer@example.test"
-- hideKeyboard
+# 拖列表收起键盘（hideKeyboard 在这套模拟器上不可用）
+- swipe:
+    start: 50%, 45%
+    end: 50%, 15%
+    duration: 800
 - tapOn:
     id: "primary"
 - extendedWaitUntil:
@@ -60,7 +64,11 @@ appId: com.synon.studio
 - tapOn:
     id: "goal-input"
 - inputText: "给门店做一个预约小程序：顾客选时间、留手机号，店主在后台看到今天的预约。"
-- hideKeyboard
+# 拖列表收起键盘再截图
+- swipe:
+    start: 50%, 55%
+    end: 50%, 15%
+    duration: 800
 - takeScreenshot: p2-new-filled
 - swipe:
     start: 50%, 70%
@@ -72,7 +80,7 @@ appId: com.synon.studio
 - tapOn:
     id: "back"
 
-# P3: 回答问题（一题一题，选项 + 自己写）
+# P3: 回答问题（每条「我先按：<建议答案>」+「改…」，底部一个实底「就这样」）
 - extendedWaitUntil:
     visible:
       id: "requests-screen"
@@ -110,7 +118,8 @@ appId: com.synon.studio
     timeout: 10000
 - takeScreenshot: p3-question-change
 
-# P4: 需求详情（对话 + 状态行 + 步骤 + 卡片流）
+
+# P4: 需求详情（对话 + 状态行 + 步骤 + 卡片流）；视图切走时问题卡连同输入框一起收走
 - runScript:
     file: scripts/control.js
     env:

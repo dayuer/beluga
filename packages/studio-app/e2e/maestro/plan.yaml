@@ -404,11 +404,13 @@ appId: com.synon.studio
 - extendedWaitUntil:
     visible: ".*改成：stats first.*"
     timeout: 10000
-# 拖动列表会收起键盘（keyboardDismissMode=on-drag），再把「就这样」滚到眼前
-- scrollUntilVisible:
-    element:
-      id: "questions-submit"
-    direction: DOWN
+# 回车 = 折起输入框（焦点随输入框卸载交回，键盘跟着收起）
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      id: "question-d-m0-t1-edit-input"
+    timeout: 10000
+- waitForAnimationToEnd
 - tapOn:
     id: "questions-submit"
     retryTapIfNoChange: true

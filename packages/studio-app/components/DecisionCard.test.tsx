@@ -121,6 +121,11 @@ describe('DecisionCard (P3 问题卡 · 就这样 / 改…)', () => {
     expect(screen.getByText('改成：先引导绑定，并记住这次选择')).toBeTruthy();
     expect(screen.queryByText('我先按：自动创建并登录')).toBeNull();
 
+    // 点「改成」那行折起输入框；写了内容后旁边是「撤回」
+    await fireEvent.press(screen.getByTestId('question-q2-dismiss'));
+    expect(screen.queryByTestId('question-q2-edit-input')).toBeNull();
+    expect(screen.getByTestId('question-q2-revert')).toBeTruthy();
+
     await fireEvent.press(screen.getByTestId('questions-submit'));
     await vi.advanceTimersByTimeAsync(4000);
 
