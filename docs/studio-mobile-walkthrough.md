@@ -313,7 +313,11 @@ SE 3rd gen 是这台机器上能建的最小尺寸，用它当小屏档。
 
 1. **代码卡推送失败没有重试入口**：`components/cards/CodeCard.tsx` 只在调用方传 `onRetryPush`
    时才画「重新推送」，而 `CardStream` 没有传（`state-code-failed.png` 里只有红点「推送失败」）。
-   SS-46 的验收里有这一条，需要后续接 `code.push` 动作或在视图里补按钮。
+   SS-242 查过协议：`StudioAction` 与 `SIGNED_ACTION_KINDS` 里都没有重新推送 / code push 这类动作
+   （只有 plan.create、chat.send、plan.verify、plan.requestStart、decision.answer、milestone.pass /
+   sendBack、draft.apply / discard，以及签名的 request.confirm、gate.answer、delivery.accept、
+   release.approve、device.remove）。按 SS-242 的约定**不发明协议**，这一项记为「不适用：协议无重新
+   推送」；等协议加了动作再在 `request/[id].tsx` 里用 useSend 接上 `onRetryPush`。
 2. **预览的「部署中」态从界面进不去**：`PreviewTab` 有 `state: 'deploying'`，但
    `app/request/[id].tsx` 只传 `previewUrl` / `installUrl`，没有任何数据能让它变成 deploying。
 3. **主按钮的 done 态没有调用方**：所有 `PrimaryButton`/`SignedButton` 只传 `idle | working`，
