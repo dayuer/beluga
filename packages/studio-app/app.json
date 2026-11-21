@@ -7,12 +7,19 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F6F6F7",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F6F6F7"
+    },
     "platforms": [
       "ios",
       "android"
     ],
     "ios": {
       "bundleIdentifier": "com.synon.studio",
+      "buildNumber": "1",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
@@ -25,6 +32,11 @@
     },
     "android": {
       "package": "com.synon.studio",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1D1D1F"
+      },
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -52,7 +64,18 @@
         }
       ],
       "expo-notifications",
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/release-signing",
+      "./plugins/loopback-cleartext",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F6F7"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

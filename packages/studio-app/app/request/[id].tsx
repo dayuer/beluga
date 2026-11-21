@@ -31,11 +31,12 @@ import { applyLocal, localFor, type LocalPlanState } from '../../lib/plan-phase'
 import { usePlanView } from '../../lib/plan-store';
 import { requestViewFromPlan } from '../../lib/request-view';
 import { REQUESTS_CACHE_KEY } from '../../lib/requests-source';
-import { pendingKey, useSend } from '../../lib/send';
+import { pendingKey, useSend, type SendableAction, type Sender } from '../../lib/send';
 import { session } from '../../lib/session';
 import { randomOpId } from '../../lib/submit';
 import { undoStore } from '../../lib/undo';
 import { detectLang, t } from '../../lib/strings';
+import { signRefusalFallback, signRefusalMessage, signT } from '../../lib/strings/sign';
 import { tDrawer } from '../../lib/strings/drawer';
 import { tUnderstanding } from '../../lib/strings/understanding';
 import { tRequests } from '../../lib/strings/requests';
@@ -58,6 +59,7 @@ const DEMO_CARDS_BY_ID: Record<string, readonly StudioCard[]> = {
   'req-quota': [DEMO_CARDS.waitQuota!, DEMO_CARDS.steps!],
   'req-human': [DEMO_CARDS.waitHuman!, DEMO_CARDS.steps!],
   'req-upload': [DEMO_CARDS.designUploading!, DEMO_CARDS.steps!],
+  'req-code-failed': [DEMO_CARDS.codeFailed!, DEMO_CARDS.code!],
 };
 
 /** 按路由 id 取对应的演示需求详情；未知 id 返回 null（触发空态）。 */
@@ -373,10 +375,29 @@ export default function RequestDetailScreen() {
   };
 
   // --- 需要签名的动作（SS-87）：签名在 prepareActionForSend 里补，没设备密钥时按钮自己置灰 ---
-  const startPlan = (): void => {
-    if (demoMode || !view || !projectId) return;
+  /**
+   * 等回执：只有 done 才算成功；refused / failed 把原因抛出去，卡片把它显示在按钮下方并回到空闲
+   * （SS-234：之前直接 void 掉 send，拒绝也当成功，卡片会显示「已通过」）。
+   */
+  const signAndSettle = (send: Sender, build: (opId: string) => SendableAction): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      void send.send(build, {
+        onDone: () => resolve(),
+        onRefused: (code) =>
+          reject(new Error(signRefusalMessage(lang, code) ?? signRefusalFallback(lang, code))),
+        onFailed: (failure) =>
+          reject(
+            new Error(
+              failure === 'offline' ? signT(lang, 'sign.waitingOffline') : signT(lang, 'sign.sendFailed'),
+            ),
+          ),
+      });
+    });
+
+  const startPlan = (): Promise<void> => {
+    if (demoMode || !view || !projectId) return Promise.resolve();
     const draftRev = view.draftRev;
-    void startSend.send((opId) => ({
+    return signAndSettle(startSend, (opId) => ({
       t: 'action',
       opId,
       kind: 'gate.answer',
@@ -386,10 +407,10 @@ export default function RequestDetailScreen() {
     }));
   };
 
-  const approveChanges = (): void => {
-    if (demoMode || !view || !projectId) return;
+  const approveChanges = (): Promise<void> => {
+    if (demoMode || !view || !projectId) return Promise.resolve();
     const draftRev = view.draftRev;
-    void changesSend.send((opId) => ({
+    return signAndSettle(changesSend, (opId) => ({
       t: 'action',
       opId,
       kind: 'gate.answer',
@@ -399,10 +420,10 @@ export default function RequestDetailScreen() {
     }));
   };
 
-  const acceptDelivery = (milestoneRef: string): void => {
-    if (demoMode || !view || !projectId) return;
+  const acceptDelivery = (milestoneRef: string): Promise<void> => {
+    if (demoMode || !view || !projectId) return Promise.resolve();
     const draftRev = view.draftRev;
-    void acceptSend.send((opId) => ({
+    return signAndSettle(acceptSend, (opId) => ({
       t: 'action',
       opId,
       kind: 'delivery.accept',
@@ -412,10 +433,10 @@ export default function RequestDetailScreen() {
     }));
   };
 
-  const releaseApprove = (): void => {
-    if (demoMode || !view || !projectId) return;
+  const releaseApprove = (): Promise<void> => {
+    if (demoMode || !view || !projectId) return Promise.resolve();
     const draftRev = view.draftRev;
-    void releaseSend.send((opId) => ({
+    return signAndSettle(releaseSend, (opId) => ({
       t: 'action',
       opId,
       kind: 'release.approve',

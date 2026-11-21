@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as me from './me';
 import * as media from './media';
 import * as news from './new';
+import * as privacy from './privacy';
 import * as requests from './requests';
 import * as voice from './voice';
 
@@ -11,6 +12,7 @@ const GROUPS = [
   { name: 'me', mod: me },
   { name: 'media', mod: media },
   { name: 'voice', mod: voice },
+  { name: 'privacy', mod: privacy },
 ] as const;
 
 describe('A4 string modules zh/en parity (SS-201)', () => {

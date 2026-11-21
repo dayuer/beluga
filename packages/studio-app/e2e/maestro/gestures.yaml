@@ -1,0 +1,120 @@
+appId: com.synon.studio
+---
+# SS-233：结果抽屉的手势规则逐条演示（配合屏幕录制）。
+# 对着 EXPO_PUBLIC_DEMO=1 的构建跑；每一步之间留出动画时间，录屏里能看清。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "request-row-req-login"
+    timeout: 30000
+- openLink: "synon://request/req-login"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+
+# 1. 点「结果与详情」打开抽屉（向上滑出）
+- extendedWaitUntil:
+    visible:
+      id: "request-results-pill"
+    timeout: 15000
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- waitForAnimationToEnd
+
+# 2. 下拉跟手：拖一小段后松手，抽屉回到打开位置
+- swipe:
+    start: "50%, 19%"
+    end: "50%, 32%"
+    duration: 1500
+- waitForAnimationToEnd
+
+# 3. 拖过三成：缓慢拖到 80% 后松手，抽屉关闭
+- swipe:
+    start: "50%, 19%"
+    end: "50%, 90%"
+    duration: 1200
+- waitForAnimationToEnd
+
+# 4. 快速甩动：拖动很短但很快，抽屉也会关闭
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- swipe:
+    start: "50%, 19%"
+    end: "50%, 25%"
+    duration: 80
+- waitForAnimationToEnd
+
+# 5. 点遮罩关闭
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    point: "50%, 6%"
+- waitForAnimationToEnd
+
+# 6. 内容超高时在抽屉内滚动，不带动背后的卡片流
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-plan"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-plan-tab"
+    timeout: 10000
+- swipe:
+    start: "50%, 85%"
+    end: "50%, 55%"
+    duration: 800
+- swipe:
+    start: "50%, 85%"
+    end: "50%, 55%"
+    duration: 800
+- waitForAnimationToEnd
+- tapOn:
+    id: "drawer-close"
+- waitForAnimationToEnd
+
+# 7. 返回手势：从屏幕左缘右滑，回到需求列表
+- swipe:
+    start: "1%, 50%"
+    end: "85%, 50%"
+    duration: 600
+- waitForAnimationToEnd

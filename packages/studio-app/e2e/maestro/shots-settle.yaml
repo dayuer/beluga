@@ -1,0 +1,135 @@
+appId: com.synon.studio
+---
+# SS-245：给 A10 已实现的屏补截图（demo 构建，直接对装好的包跑）。
+# 覆盖：SS-44 步骤条、SS-49 抽屉成果、SS-50 抽屉改动、SS-54 我、SS-56 执行机器、SS-57 项目与代码交付。
+# SS-45 等待卡的四种原因见 shots-states-demo.yaml（SS-232）。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 30000
+
+# SS-44：P4 步骤条
+- openLink: "synon://request/req-login"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: "card-card-steps-1"
+    direction: DOWN
+- takeScreenshot: settle-steps
+
+# SS-49 / SS-50：结果抽屉的「成果」与「改动」
+- scrollUntilVisible:
+    element:
+      id: "request-results-pill"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-results-pill"
+    timeout: 10000
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "drawer-outputs-tab"
+    timeout: 10000
+- takeScreenshot: settle-drawer-outputs
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 10000
+- takeScreenshot: settle-drawer-changes
+- tapOn:
+    id: "drawer-close"
+- waitForAnimationToEnd
+
+
+# SS-49 / SS-50：空态（?state=empty 的演示数据）
+- openLink: "synon://request/req-login?state=empty"
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "request-results-pill"
+    timeout: 10000
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "drawer-outputs-tab"
+    timeout: 10000
+- takeScreenshot: settle-drawer-outputs-empty
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 10000
+- takeScreenshot: settle-drawer-changes-empty
+- tapOn:
+    id: "drawer-close"
+- waitForAnimationToEnd
+
+# SS-54：我 › 入口页
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "tab-me"
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 15000
+- takeScreenshot: settle-me
+
+# SS-56：我 › 执行机器（在线 / 离线 / 用量将满）
+- tapOn:
+    id: "me-row-machines"
+- extendedWaitUntil:
+    visible:
+      id: "me-machines-screen"
+    timeout: 15000
+- takeScreenshot: settle-machines
+- tapOn:
+    id: "back"
+
+# SS-57：我 › 项目与代码交付
+- tapOn:
+    id: "me-row-project"
+- extendedWaitUntil:
+    visible:
+      id: "me-project-screen"
+    timeout: 15000
+- takeScreenshot: settle-project

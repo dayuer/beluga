@@ -1,0 +1,92 @@
+appId: com.synon.studio
+---
+# SS-250：干净 iOS 模拟器上从安装到验收（Release 构建 + 真中台 + 假 daemon）。
+# 运行：E2E_IOS_UDID=<udid> npm run e2e -- e2e/maestro/ss250-ios.yaml
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- takeScreenshot: ss250-ios-requests
+
+# 提一个需求
+- tapOn:
+    id: "new-request-button"
+- extendedWaitUntil:
+    visible:
+      id: "new-screen"
+    timeout: 15000
+- tapOn:
+    id: "new-project-.*"
+- tapOn:
+    text: ".*记录每天喝水.*|.*tracks my daily water.*"
+- inputText: "记录每天喝水，带提醒和统计"
+- takeScreenshot: ss250-ios-new-filled
+- tapOn:
+    id: "primary"
+- extendedWaitUntil:
+    visible:
+      text: ".*已提交.*|.*Submitted.*"
+    timeout: 20000
+    optional: true
+- takeScreenshot: ss250-ios-submitted
+- tapOn:
+    id: "back"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+
+# 打开在验收中的需求
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- takeScreenshot: ss250-ios-acceptance

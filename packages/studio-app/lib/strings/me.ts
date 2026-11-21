@@ -124,6 +124,7 @@ export const zh = {
   'account.appearanceLight': '浅色',
   'account.appearanceDark': '深色',
   'account.appearanceSystem': '跟随系统',
+  'account.privacy': '隐私说明',
   'account.cancel': '取消',
 } as const;
 
@@ -246,6 +247,7 @@ export const en: Record<MeStringKey, string> = {
   'account.appearanceLight': 'Light',
   'account.appearanceDark': 'Dark',
   'account.appearanceSystem': 'System',
+  'account.privacy': 'Privacy notice',
   'account.cancel': 'Cancel',
 };
 

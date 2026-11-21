@@ -1,0 +1,4 @@
+{
+  "//": "Synon Studio's own Android signing certificate (SS-100, never Beluga's). scripts/build-apk.mjs refuses an APK signed with anything else. The keystore stays on the build Mac (~/.synon-release/synon-studio-android.p12), never in the repo.",
+  "sha256": "20:95:be:b0:7e:c1:a2:59:4b:b1:11:e2:62:cb:be:02:a8:63:e5:9d:f4:37:61:59:84:ba:89:71:c7:60:1b:f7"
+}
