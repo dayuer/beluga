@@ -165,6 +165,23 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 
 邮件一天每类最多一封。邮件地址是搭环境时 `beluga studio link` 填的那个，中台本来就会发登录邮件。
 
+### 4.7 新项目：客户自己新增，放在哪
+
+客户可以在 Studio 里**新增项目**（`studio-ui.md` §2.5）。以前一个 Studio 项目只是映射到节点上已有的本地项目，由搭环境
+的人在节点上 `beluga studio share`；现在新增项目是客户的日常操作，所以建项目这件事也要自动：
+
+1. 应用调中台 `POST /v1/app/projects {name, platforms[]}`。会话鉴权，**不签名**：不花钱、能归档、限速（见下）。
+2. 中台建 `projects` 一行，然后按 §4.3 选节点（在线、已 `synced`、`ready`、`room` 最大），并检查该节点的项目上限；
+   没有可用节点就把项目记为 `preparing`，客户看到「等待：正在准备」，节点回来后补做。
+3. 中台给节点发 `project.create{projectRef, name, platforms}`。节点在它配置的项目根目录下建一个**空的本地项目**
+   （目录、`git init`、项目登记），自动 `share` 给这个工作室，回 `project.ready{projectRef, daemonProjectId}`。
+4. 中台写 `project_nodes`（§4.2）。之后这个项目的需求都按 §4.3 放置；多个节点上的同名本地项目不会重复建，只在选中的
+   那一台建。
+5. 客户端轮询或收推送，项目出现在列表里，能提需求。整个过程应在几秒内；超过 1 分钟仍是 `preparing` 就按 §4.6 处理。
+
+**限制**：每个客户 10 个项目、一天最多新增 5 个（中台限速）；节点另有 `beluga studio limits --max-projects`（§7）。
+**新项目从空项目开始**；「从已有仓库开始」要先给节点读仓库的令牌，放到以后。**代码交付默认只给预览**，要仓库在设置里改。
+
 ## 5. 身份、邀请与签名
 
 ### 5.1 搭环境：一次性，在节点上
@@ -224,6 +241,9 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 - 每个月的用量上限；到了以后新开工排队，客户看到「本月用量已满」。
 - 单条需求的最长运行时间（默认 8 小时）；超了暂停，按 §4.6「需要人」处理。
 
+- 这台节点上最多放多少个 Studio 项目（`--max-projects`，默认 20），防止客户新增项目把磁盘占满；满了节点报 `ready: false`，
+  原因码 `full`，新项目放到别的节点，都满了客户看到「等待：执行机器已放满」。
+
 `beluga studio limits` 设置，只在节点上，不在 Studio 里（客户改不了自己的刹车）。
 
 ## 8. 连接器：Beluga 这一侧
@@ -243,7 +263,9 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 - 应用 → 中台 → 节点：签名动作（§5.3 左列）原样转发，中台不解开；`device.enroll`。
 - 节点 → 中台：`load{ready, why?, room}`；回执码加 `busy`；`needsHuman{why, ref?}`（中台据此发邮件）；设置视图
   （执行机器、环境名字、代码交付）。
-- 中台 → 节点：`withdrawn{ref}`。
+- 中台 → 节点：`withdrawn{ref}`；`project.create{projectRef, name, platforms}`。节点 → 中台：`project.ready{projectRef,
+  daemonProjectId}`、`project.refused{projectRef, why}`（`full` / `exists` / `bad-name`）。应用 → 中台：
+  `POST /v1/app/projects`（不签名，限速，回执码加 `limit`）。
 - 旧节点（不报 `load`、不会验签）不能接新协议的项目：中台在绑定时就拒绝，提示升级。
 
 ## 10. 与 P1 的差异
@@ -282,3 +304,6 @@ S4 与 S1–S3 互不依赖，可以并行。
 3. **上限的默认值**：同时 2 条、单条 8 小时；月用量没有默认值，搭环境时必须填。
 4. **P1 的 Beluga 开工卡去不去掉。** 本稿去掉（客户批准后它不该再出现）；过渡期可以保留为只读提示。
 5. **自动换节点的等待时间**：本稿 15 分钟。
+6. **新增项目从什么开始。** 本稿从空项目开始；可以以后加「从我已有的仓库开始」。
+7. **新增项目要不要签名。** 本稿不签（不花钱、能归档，但限速）；签名会让这个入口多一步。
+8. **项目数量上限。** 本稿：每个客户 10 个、一天 5 个；节点 20 个。
