@@ -459,3 +459,26 @@ xcrun devicectl device capture screen-record --device 00008130-0011196A1A46001C 
 - 直装用的是分发证书 + ad-hoc 描述文件，不需要在手机上信任开发者。
 - `dist/ios/` 已恢复为 App Store 签名的那份 IPA，供 SS-237 上传；ad-hoc 的包在
   `.beluga/scratch/ss-240/`，不要上传它。
+
+## 22. 扫码加设备：为什么现在做不了（SS-241 / SS-74）
+
+ss-241 的做法是「一台已登记的手机打开『我 › 设备 › 加一台设备』显示二维码，另一台用相机扫码」。
+对照代码，这一步现在不成立：
+
+1. **App 没有「显示二维码」的入口。** `app/me/devices/add.tsx` 是**扫码**屏（`expo-camera` 的
+   `CameraView` + `parseInvitePayload`），没有生成二维码的界面；整个 studio-app 里也没有二维码库。
+   SS-74 的设计原本是「桌面端出二维码，手机扫」，但 Mac 端的 `QrCode` 组件只用在 Beluga 的连接 /
+   邀请上，Studio 的设备邀请没有对应的桌面屏；邀请链接目前只从 hub 管理端（`/v1/admin/invites`）
+   发出来，是一条链接。
+   可行的代替：用 hub 的邀请链接在 Mac 上渲染二维码（`src/cli/qr.ts` 的 `qrLines` 可以在终端画，
+   也可以生成 PNG），新手机扫它即可走同一套 `lib/enrol.ts`。但「手机上显示二维码」这一条确实
+   缺入口，记为问题。
+2. **两台真机都锁着。** iPhone（Yuqing’s iPhone）停在锁屏，NX733J `deviceLocked=1`；所有者选择
+   先写交接。扫码要相机和对面的界面，adb/`devicectl` 都没法在锁屏上点。
+
+补齐后要做的验证：
+- 用 hub 管理端发一个一次性邀请（`POST /v1/admin/invites`，带上 studioId/daemonId），把
+  `synon://join/<id>#k=…&n=…` 渲染成二维码；
+- 新手机「我 › 设备 › 加一台设备」扫码 → 核对指纹 → 登记；
+- 两台手机的「我 › 设备」列表都截图（新设备在里）；
+- 用新设备点一次签名动作（交付卡「通过」），确认回执是 done 而不是 unregistered-device。
