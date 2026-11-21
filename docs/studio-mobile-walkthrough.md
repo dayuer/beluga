@@ -528,3 +528,26 @@ SS-249 要在两台真机上验三件事：同一张「等你」卡只收一条�
 `npm run dev:device -- --push-demo`（连推同一张卡两次验去重）→ 截图一条通知与点开跳卡 →
 处理掉后看角标 → 退出登录再推一次并看中台日志。
 
+## 25. 「加一台设备」的邀请二维码：缺的是发邀请的接口（SS-244 / SS-74）
+
+SS-244 要在手机上做「加一台设备」二维码屏：已登记的手机向节点要一条新的设备邀请，把
+`synon://join/<id>#k=…&n=…` 画成二维码，另一台扫它。查过之后，**缺的不是二维码库，而是
+「由已登记设备发邀请」的接口**：
+
+- App 现在能做的只有**扫**（`app/me/devices/add.tsx`）和**兑**（`lib/enrol.ts` →
+  `POST /v1/app/devices/enroll`）。
+- 邀请是**节点签发**的：`beluga studio invite <客户邮箱>`（docs/studio-standalone.md §2）生成
+  inviteId 与一次性 `k`，`k` 不离开节点；中台只存路由，只有**运营者令牌**的
+  `POST /v1/admin/invites` 能把这条路由写进去。客户会话没有任何发邀请的接口，
+  `StudioAction` 里也没有对应的签名动作，所以手机端做不出「向节点要一条邀请」这一步。
+- 唯一有 `POST /v1/admin/invites` 权限的是运营者/假节点，app 不该也不可能有这个令牌。
+
+按 SS-244 的约定**停下来，不改界面**，用替代路径：在 Mac/节点上发邀请并画二维码。
+`src/cli/qr.ts` 的 `qrLines` 能在终端画，也可以把同一个链接渲染成 PNG 贴到 Mac 屏幕上；
+另一台手机仍然用 `app/me/devices/add.tsx` 扫它，登记走原来的 `lib/enrol.ts`，这条链路是通的。
+建议的补齐方式（后续任务）：中台加一条客户会话可调的 `POST /v1/app/devices/invite`，由中台
+转给节点签发（`k` 仍只在节点），返回 `synon://join/<id>#k=…&n=…` 给 App；再做
+`app/me/devices/invite.tsx` 显示二维码（用与 `src/cli/qr.ts` 同一个 `qrcode-generator`，
+`react-native-svg` 画矩阵，不引入原生依赖），最后用 `add.tsx` 的解析函数单测串起来。
+
+
