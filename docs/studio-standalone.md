@@ -167,20 +167,26 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 
 ### 4.7 新项目：客户自己新增，放在哪
 
-客户可以在 Studio 里**新增项目**（`studio-ui.md` §2.5）。以前一个 Studio 项目只是映射到节点上已有的本地项目，由搭环境
-的人在节点上 `beluga studio share`；现在新增项目是客户的日常操作，所以建项目这件事也要自动：
+客户可以在 Studio 里**新增项目**（`studio-ui.md` §2.5），两种开始：**空项目**，或**从仓库导入**（GitHub、cnb.cool，用登录
+选仓库）。数量**不设上限**。以前一个 Studio 项目只是映射到节点上已有的本地项目，由搭环境的人 `beluga studio share`；
+现在新增项目是客户的日常操作，所以建项目也要自动：
 
-1. 应用调中台 `POST /v1/app/projects {name, platforms[]}`。会话鉴权，**不签名**：不花钱、能归档、限速（见下）。
-2. 中台建 `projects` 一行，然后按 §4.3 选节点（在线、已 `synced`、`ready`、`room` 最大），并检查该节点的项目上限；
-   没有可用节点就把项目记为 `preparing`，客户看到「等待：正在准备」，节点回来后补做。
-3. 中台给节点发 `project.create{projectRef, name, platforms}`。节点在它配置的项目根目录下建一个**空的本地项目**
-   （目录、`git init`、项目登记），自动 `share` 给这个工作室，回 `project.ready{projectRef, daemonProjectId}`。
-4. 中台写 `project_nodes`（§4.2）。之后这个项目的需求都按 §4.3 放置；多个节点上的同名本地项目不会重复建，只在选中的
-   那一台建。
-5. 客户端轮询或收推送，项目出现在列表里，能提需求。整个过程应在几秒内；超过 1 分钟仍是 `preparing` 就按 §4.6 处理。
+1. 应用调中台 `POST /v1/app/projects {name, platforms[], source}`，会话鉴权。`source` 是 `{kind:'empty'}`，或
+   `{kind:'import', provider:'github'|'cnb', repoUrl, branch?, sealedToken}`。**空项目不签名**（不花钱、能归档）；
+   **导入要设备签名**，因为它把一个能读客户代码的令牌交给节点（§5.3）。令牌由应用用节点的公钥**封好**，中台只转发密文。
+2. 中台建 `projects` 一行，然后按 §4.3 选节点（在线、已 `synced`、`ready`、`room` 最大）；没有可用节点就把项目记为
+   `preparing`，客户看到「等待：正在准备」，节点回来后补做。
+3. 中台给节点发 `project.create{projectRef, name, platforms, source}`（导入时带签名帧，原样转发）。节点：
+   - 空项目：在它配置的项目根目录下建一个空的本地项目（目录、`git init`、项目登记）。
+   - 导入：验签（信任名单）、解封令牌，用 git 凭证助手 `clone`（令牌不写进地址、不进日志），令牌按项目存进节点的
+     密钥库（`studio-env.md`），之后「推到我的仓库」可以直接用，客户不用再填一遍。
+   然后自动 `share` 给这个工作室，回 `project.ready{projectRef, daemonProjectId}`；失败回 `project.refused`。
+4. 中台写 `project_nodes`（§4.2）。之后这个项目的需求都按 §4.3 放置。
+5. 客户端轮询或收推送，项目出现在列表里，能提需求。空项目应在几秒内；导入看仓库大小，进度写在项目行上；超过 10 分钟
+   仍是 `preparing` 就按 §4.6 处理。
 
-**限制**：每个客户 10 个项目、一天最多新增 5 个（中台限速）；节点另有 `beluga studio limits --max-projects`（§7）。
-**新项目从空项目开始**；「从已有仓库开始」要先给节点读仓库的令牌，放到以后。**代码交付默认只给预览**，要仓库在设置里改。
+导入后**代码交付默认仍是「只给预览」**，不自动往客户仓库里推；要推，在设置里选「推到我的仓库」（用同一个令牌，
+但 CNB 的登录令牌只有 8 小时，见 `studio-forges.md` §3.5）。克隆在节点上做，Studio 应用里看不到源代码。
 
 ## 5. 身份、邀请与签名
 
@@ -241,9 +247,6 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 - 每个月的用量上限；到了以后新开工排队，客户看到「本月用量已满」。
 - 单条需求的最长运行时间（默认 8 小时）；超了暂停，按 §4.6「需要人」处理。
 
-- 这台节点上最多放多少个 Studio 项目（`--max-projects`，默认 20），防止客户新增项目把磁盘占满；满了节点报 `ready: false`，
-  原因码 `full`，新项目放到别的节点，都满了客户看到「等待：执行机器已放满」。
-
 `beluga studio limits` 设置，只在节点上，不在 Studio 里（客户改不了自己的刹车）。
 
 ## 8. 连接器：Beluga 这一侧
@@ -263,9 +266,10 @@ placements    (project_id, ref /* requestRef 或 planRef */, daemon_id, placed_a
 - 应用 → 中台 → 节点：签名动作（§5.3 左列）原样转发，中台不解开；`device.enroll`。
 - 节点 → 中台：`load{ready, why?, room}`；回执码加 `busy`；`needsHuman{why, ref?}`（中台据此发邮件）；设置视图
   （执行机器、环境名字、代码交付）。
-- 中台 → 节点：`withdrawn{ref}`；`project.create{projectRef, name, platforms}`。节点 → 中台：`project.ready{projectRef,
-  daemonProjectId}`、`project.refused{projectRef, why}`（`full` / `exists` / `bad-name`）。应用 → 中台：
-  `POST /v1/app/projects`（不签名，限速，回执码加 `limit`）。
+- 中台 → 节点：`withdrawn{ref}`；`project.create{projectRef, name, platforms, source}`
+  （导入时附签名帧与封好的令牌，中台不解开）。节点 → 中台：`project.ready{projectRef, daemonProjectId}`、
+  `project.refused{projectRef, why}`（`exists` / `bad-name` / `clone-failed` / `bad-token`）、导入进度
+  `project.progress{projectRef, percent?}`。应用 → 中台：`POST /v1/app/projects`（不限数量）。
 - 旧节点（不报 `load`、不会验签）不能接新协议的项目：中台在绑定时就拒绝，提示升级。
 
 ## 10. 与 P1 的差异
@@ -304,6 +308,8 @@ S4 与 S1–S3 互不依赖，可以并行。
 3. **上限的默认值**：同时 2 条、单条 8 小时；月用量没有默认值，搭环境时必须填。
 4. **P1 的 Beluga 开工卡去不去掉。** 本稿去掉（客户批准后它不该再出现）；过渡期可以保留为只读提示。
 5. **自动换节点的等待时间**：本稿 15 分钟。
-6. **新增项目从什么开始。** 本稿从空项目开始；可以以后加「从我已有的仓库开始」。
-7. **新增项目要不要签名。** 本稿不签（不花钱、能归档，但限速）；签名会让这个入口多一步。
-8. **项目数量上限。** 本稿：每个客户 10 个、一天 5 个；节点 20 个。
+6. **新增项目从什么开始。**（已定，2026-11-21）空项目，也可以**从仓库导入**；导入支持 GitHub 和 cnb.cool，用登录选仓库。
+7. **项目数量。**（已定）不设上限。
+8. **导入要不要签名。** 本稿：导入签（它交出一个能读客户代码的令牌），空项目不签。
+9. **cnb.cool 的登录。** 它的 OAuth 应用要它的运营管理员审核上架、令牌 8 小时过期（`studio-forges.md` §2.3）。本稿：登录只用来导入；
+   要长期往 CNB 推，仍用访问令牌。审核没下来之前，导入 CNB 先让客户贴访问令牌。
