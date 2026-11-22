@@ -52,6 +52,11 @@
   font-weight: inherit !important;
 }
 
+/* S9 — A push button pressed changes colour only, not size (upstream 3.7.1: ui.module.css:14, alert.module.css:153). */
+:root[data-calm] [class*='_button_']:active {
+  transform: none !important;
+}
+
 /* Numbers in fixed-width slots. Every live counter already sets it upstream; this covers new ones
    and the badges inside the sidebar's count and tally. */
 :root[data-calm] [data-signal],
