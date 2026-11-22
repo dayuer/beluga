@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentBackend, AgentRunInput } from '../src/agent/types.js';
 import { MacAssistant } from '../src/core/assistant/assistant.js';
 import { attachAssistant } from '../src/core/assistant/registry.js';
@@ -486,6 +486,22 @@ describe('models, usage, space and search', () => {
     kay.session.askOwnClaude('again', `ws:${b.id}`);
     await waitFor(() => kay.runs.length === 3, 4000);
     expect(kay.runs[2]?.effort).toBeUndefined();
+  });
+
+  it('shows a conversation’s new model, effort and agent at once, without reading every project’s git again', async () => {
+    hub = await startHub({ keys });
+    const kay = await solo(repo());
+    const ws = (await kay.session.workspaces!.newWorktree(projectOf(kay.workspaces).id, 'quick'))!;
+    await waitFor(() => kay.state().projects.some((p) => p.workspaces.some((w) => w.id === ws.id)), 4000);
+    const refresh = vi.spyOn(kay.workspaces, 'refresh');
+    const shown = () => kay.state().projects.flatMap((p) => p.workspaces).find((w) => w.id === ws.id);
+    kay.bench.setModel(`ws:${ws.id}`, 'opus');
+    expect(shown()?.model).toBe('opus');
+    kay.bench.setEffort(`ws:${ws.id}`, 'low');
+    expect(shown()?.effort).toBe('low');
+    kay.bench.setAgent(`ws:${ws.id}`, { runtime: 'claude', label: 'Claude', model: 'haiku' });
+    await waitFor(() => shown()?.model === 'haiku', 4000);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('starts a new conversation on the default model and effort, and keeps them when the default moves', async () => {

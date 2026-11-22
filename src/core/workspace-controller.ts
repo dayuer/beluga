@@ -345,6 +345,14 @@ export class WorkspaceController {
     this.saver.stop();
   }
 
+  /**
+   * Show a workspace's own setting that changed (its model, effort or agent) now: the manager already
+   * holds it, so no project's git is read again (a full refresh waits on every worktree's status).
+   */
+  show(): void {
+    this.publish();
+  }
+
   /** Re-scan projects and publish them; every workspace's folder becomes a private share. */
   async refresh(): Promise<void> {
     try {
