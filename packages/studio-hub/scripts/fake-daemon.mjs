@@ -13,13 +13,32 @@
  * Every important step is one JSON line on stdout: {"kind":"registered"|"open"|"sent"|"recv"|"closed",...}.
  */
 
-import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
+import { createCipheriv, createHash, createPrivateKey, createPublicKey, createHmac, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, sign } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { dirname } from 'node:path';
 import WebSocket from 'ws';
+import { SECRET_SEAL_LABEL, secretAad } from '../../../src/studio/protocol.ts';
+import { canonicalJson, computeNodeFingerprint, createDeviceTrustStore, openSealedBox, SIGNED_ACTION_KINDS } from '../../../src/studio/verify.ts';
+
+const X25519_SPKI = Buffer.from('302a300506032b656e032100', 'hex');
+
+/** 自测用：与设备侧 `lib/seal.ts` 同一套格式把值封给节点公钥（只有 node:crypto）。 */
+const sealForTest = (nodeKey, plain, aad) => {
+  const nodeRaw = Buffer.from(nodeKey, 'base64url');
+  const nodePub = createPublicKey({ key: Buffer.concat([X25519_SPKI, nodeRaw]), format: 'der', type: 'spki' });
+  const eph = generateKeyPairSync('x25519');
+  const epk = Buffer.from(eph.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32));
+  const key = Buffer.from(hkdfSync('sha256', diffieHellman({ privateKey: eph.privateKey, publicKey: nodePub }), Buffer.concat([epk, nodeRaw]), Buffer.from(SECRET_SEAL_LABEL), 32));
+  const nonce = Buffer.alloc(12, 7);
+  const cipher = createCipheriv('chacha20-poly1305', key, nonce, { authTagLength: 16 });
+  cipher.setAAD(Buffer.from(aad, 'utf8'));
+  const body = Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
+  return { nodeKey, epk: epk.toString('base64url'), nonce: nonce.toString('base64url'), ct: body.toString('base64url') };
+};
 
 const args = process.argv.slice(2);
+const selfTest = args.includes('--self-test');
 const flag = (name, fallback) => {
   const at = args.indexOf(`--${name}`);
   return at >= 0 && args[at + 1] !== undefined ? args[at + 1] : fallback;
@@ -36,6 +55,85 @@ const keyFile = flag('key-file');
 const controlPort = Number(flag('control-port', '0'));
 
 const log = (kind, extra = {}) => console.log(JSON.stringify({ kind, at: Date.now(), ...extra }));
+
+if (selfTest) {
+  const trust = createDeviceTrustStore();
+  const { publicKey: devPub, privateKey: devPriv } = generateKeyPairSync('ed25519');
+  const rawPub = devPub.export({ type: 'spki', format: 'der' }).subarray(-32);
+  const pubB64 = rawPub.toString('base64url');
+  const k = Buffer.alloc(32, 9).toString('base64url');
+  const mac = createHmac('sha256', Buffer.from(k, 'base64url')).update(rawPub).digest('base64url');
+
+  const signFrame = (frame, priv = devPriv) =>
+    sign(null, Buffer.from(canonicalJson(frame), 'utf8'), priv).toString('base64url');
+
+  const buildSigned = (kind, payload, rev, at, priv = devPriv, deviceKey = pubB64) => {
+    const frame = { kind, payload, ...(rev !== undefined ? { rev } : {}), at, deviceKey };
+    return { kind, payload, ...(rev !== undefined ? { rev } : {}), signed: { frame, sig: signFrame(frame, priv) } };
+  };
+
+  // 1. 未登记设备 -> unregistered-device
+  const unreg = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+  // 2. 登记公钥
+  const enrolled = trust.enrollWithInvite({ k, pubkey: pubB64, mac });
+  // 3. 登记过的公钥验签通过
+  const accepted = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+  // 4. 签名不对 -> bad-signature
+  const badSigAction = buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 101);
+  badSigAction.signed.sig = Buffer.alloc(64, 0).toString('base64url');
+  const badSig = trust.verifySignedAction(badSigAction);
+  // 5. at 回退 -> stale-clock
+  const stale = trust.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 100));
+
+  // 6. 中台转来的 device.enroll 帧：mac 错被拒、对的记下公钥并回指纹、同一邀请不能再用
+  const node = createDeviceTrustStore({ nodeFingerprint: 'A1B2C3D4E5F67890' });
+  node.addInvite('inv-1', k);
+  const badMac = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac: Buffer.alloc(32, 1).toString('base64url') });
+  const enrollOk = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac, deviceId: 'dev_1' });
+  const enrollAgain = node.enrollFrame({ inviteId: 'inv-1', pubkey: pubB64, mac });
+  const beforeRemove = node.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 200));
+  // 7. device.remove 验签通过后，被移除的设备再签的动作得到 unregistered-device
+  const removed = node.verifySignedAction(buildSigned('device.remove', { deviceId: 'dev_1' }, undefined, 201));
+  const afterRemove = node.verifySignedAction(buildSigned('gate.answer', { gate: 'start', approved: true, draftRev: 1 }, 1, 202));
+
+  // 8. 填密钥：登记设备签的 secret.set 验签通过，节点用 X25519 私钥解出原值，整帧里没有明文
+  const sealPair = generateKeyPairSync('x25519');
+  const sealPub = Buffer.from(sealPair.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32)).toString('base64url');
+  const secretPlain = 'sk_live_51N7example';
+  const secretAadText = secretAad('proj-1', 'test', 'STRIPE_SECRET_KEY');
+  const secretPayload = {
+    projectId: 'proj-1',
+    envId: 'test',
+    name: 'STRIPE_SECRET_KEY',
+    purpose: '收款的密钥',
+    sealed: sealForTest(sealPub, Buffer.from(secretPlain, 'utf8'), secretAadText),
+  };
+  // device.remove 之后原设备已不在名单里：换一台新登记的设备来签。
+  const phone2 = generateKeyPairSync('ed25519');
+  const pub2 = phone2.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64url');
+  const node2 = createDeviceTrustStore();
+  node2.enroll(pub2);
+  const secretAction = buildSigned('secret.set', secretPayload, undefined, 400, phone2.privateKey, pub2);
+  const secretAccepted = node2.verifySignedAction(secretAction);
+  const opened = openSealedBox(secretPayload.sealed, sealPub, sealPair.privateKey, secretAadText);
+  const noPlaintext = !JSON.stringify(secretAction).includes(secretPlain);
+  // 9. 改设置：登记设备签的 settings.update 验签通过
+  const settingsAction = buildSigned('settings.update', { projectId: 'proj-1', settings: { delivery: 'repo', repoUrl: 'https://github.com/me/app' } }, undefined, 401, phone2.privateKey, pub2);
+  const settingsAccepted = node2.verifySignedAction(settingsAction);
+
+  const report = {
+    enrolled, unreg, accepted, badSig, stale, badMac, enrollOk, enrollAgain, beforeRemove, removed, afterRemove,
+    secretAccepted, opened: opened?.toString('utf8') === secretPlain, noPlaintext, settingsAccepted,
+  };
+  console.log(JSON.stringify(report, null, 2));
+  const failed =
+    !enrolled || unreg.code !== 'unregistered-device' || !accepted.ok || badSig.code !== 'bad-signature' || stale.code !== 'stale-clock' ||
+    badMac.code !== 'bad-mac' || !enrollOk.ok || enrollOk.fingerprint !== 'A1B2C3D4E5F67890' || enrollAgain.code !== 'invite-used' ||
+    !beforeRemove.ok || !removed.ok || afterRemove.code !== 'unregistered-device' ||
+    !secretAccepted.ok || opened?.toString('utf8') !== secretPlain || !noPlaintext || !settingsAccepted.ok;
+  if (failed) process.exit(1);
+  process.exit(0);
+}
 
 const keyExists = keyFile !== undefined && existsSync(keyFile);
 if ((!keyExists && !code) || projects.length === 0) {
@@ -60,7 +158,33 @@ const publicKey = createPublicKey(privateKey);
 const der = publicKey.export({ type: 'spki', format: 'der' });
 const key = der.toString('base64');
 const daemonId = createHash('sha256').update(der).digest('base64url').slice(0, 32);
+const nodeFingerprint = computeNodeFingerprint(der);
+const trust = createDeviceTrustStore({ nodeFingerprint });
+for (const pk of flags('enroll-pubkey')) trust.enroll(pk);
+/** 通过邀请登记过的设备公钥：只用给 e2e 的「吊销设备」测试口。 */
+const enrolledDevices = [];
 const signText = (text) => sign(null, Buffer.from(`synon-studio-v1:${text}`), privateKey).toString('base64');
+
+// 节点自己的 X25519 密钥（studio-env.md §2）：手机把密钥值封给它，私钥不离开这台“机器”。
+// 设备从哪里拿到这把公钥，是后续里程碑的事；这里经 `GET /seal-key` 与第一行日志交给联调。
+const sealKeyFile = flag('seal-key-file', keyFile ? `${keyFile}.seal` : undefined);
+let sealPrivateKey;
+if (sealKeyFile && existsSync(sealKeyFile)) {
+  sealPrivateKey = createPrivateKey(readFileSync(sealKeyFile));
+} else {
+  sealPrivateKey = generateKeyPairSync('x25519').privateKey;
+  if (sealKeyFile) {
+    mkdirSync(dirname(sealKeyFile), { recursive: true });
+    writeFileSync(sealKeyFile, sealPrivateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+  }
+}
+const sealPublicKey = Buffer.from(createPublicKey(sealPrivateKey).export({ type: 'spki', format: 'der' }).subarray(-32)).toString('base64url');
+log('seal-key', { publicKey: sealPublicKey });
+
+/** 手机封来的密钥：只记名字、用途、时间和内容的哈希，没有值、没有长度（studio-env.md §8）。 */
+const secrets = new Map();
+/** 手机改过的项目设置，按 Studio 项目 id 记。 */
+const settings = new Map();
 
 // The first view's turn time is fixed for the process: a new `at` on every tick would look like
 // a new unread message to the app (the real daemon keeps the turn's own time).
@@ -91,6 +215,7 @@ const view = (planRef, rev) => ({
 });
 
 let ws;
+let studioIdSeen;
 let synced = false;
 let stopping = false;
 let rev = 0;
@@ -170,6 +295,7 @@ async function register() {
   });
   const body = await res.json().catch(() => ({}));
   if (res.status !== 200) throw new Error(`link failed: ${res.status} ${JSON.stringify(body)}`);
+  studioIdSeen = body.studioId;
   log('registered', { studioId: body.studioId, daemonId: body.daemonId });
 }
 
@@ -193,9 +319,57 @@ function connect() {
     }
     log('recv', { t: frame.t, ...(frame.seq !== undefined ? { seq: frame.seq } : {}), ...(frame.project ? { project: frame.project } : {}) });
     if (frame.t === 'welcome') pushAll();
-    else if (frame.t === 'deliver') {
-      // The hub delivered a customer action; say it ran. M3 would use the daemon's own OpLog here.
+    else if (frame.t === 'enroll') {
+      // The hub relays a device.enroll frame: the node alone holds k, checks the mac, remembers the key.
+      const result = trust.enrollFrame(frame);
+      if (result.ok && typeof frame.pubkey === 'string') enrolledDevices.push(frame.pubkey);
+      log('enroll', { inviteId: frame.inviteId, ok: result.ok, ...(result.ok ? {} : { code: result.code }) });
+      send({ t: 'enroll-result', reqId: frame.reqId, ...(result.ok ? { ok: true, fingerprint: result.fingerprint } : { ok: false, code: result.code }) });
+    } else if (frame.t === 'deliver') {
+      // The hub delivered a customer action; verify S2 signature for signed action kinds.
       log('deliver', { seq: frame.seq, project: frame.project, actionKind: frame.action?.kind, opId: frame.action?.opId });
+      if (SIGNED_ACTION_KINDS.has(frame.action?.kind)) {
+        const verdict = trust.verifySignedAction(frame.action);
+        if (!verdict.ok) {
+          log('verify-refused', { opId: frame.action?.opId, code: verdict.code });
+          setTimeout(
+            () =>
+              send({
+                t: 'receipt',
+                opId: frame.action.opId,
+                state: 'refused',
+                code: verdict.code,
+                ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}),
+              }),
+            40,
+          );
+          return;
+        }
+      }
+      // 手机填的密钥 / 改的设置：验签之后各自落地；封给别的节点或密文被改过就回 bad-args。
+      if (frame.action?.kind === 'secret.set') {
+        const p = frame.action.payload ?? {};
+        const aad = secretAad(String(p.projectId ?? ''), String(p.envId ?? ''), String(p.name ?? ''));
+        const plain = openSealedBox(p.sealed ?? {}, sealPublicKey, sealPrivateKey, aad);
+        if (plain === undefined) {
+          log('secret-set', { projectId: p.projectId, envId: p.envId, name: p.name, ok: false });
+          setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'refused', code: 'bad-args', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 40);
+          return;
+        }
+        secrets.set(`${p.projectId}:${p.envId}:${p.name}`, {
+          projectId: p.projectId,
+          envId: p.envId,
+          name: p.name,
+          purpose: p.purpose,
+          sha256: createHash('sha256').update(plain).digest('hex'),
+          at: Date.now(),
+        });
+        log('secret-set', { projectId: p.projectId, envId: p.envId, name: p.name, ok: true });
+      } else if (frame.action?.kind === 'settings.update') {
+        const p = frame.action.payload ?? {};
+        settings.set(String(p.projectId), { ...(p.settings ?? {}), at: Date.now() });
+        log('settings-update', { projectId: p.projectId, fields: Object.keys(p.settings ?? {}) });
+      }
       const entry = plans.find((p) => p.project === frame.project);
       if (entry) applyAction(entry, frame.action);
       setTimeout(() => send({ t: 'receipt', opId: frame.action.opId, state: 'done', ...(frame.action.planRef ? { planRef: frame.action.planRef } : {}) }), 80);
@@ -236,6 +410,14 @@ if (controlPort) {
         }
         const entry = pick(data);
         try {
+          // 联调用：节点的封装公钥（设备封给谁），以及验签、解封之后记下的密钥与设置（没有值）。
+          if (req.method === 'GET' && req.url === '/seal-key') return answer(200, { publicKey: sealPublicKey });
+          if (req.method === 'GET' && req.url === '/state') {
+            return answer(200, {
+              secrets: [...secrets.values()],
+              settings: [...settings.entries()].map(([projectId, value]) => ({ projectId, ...value })),
+            });
+          }
           if (req.method === 'POST' && req.url === '/view') {
             if (!data.view || typeof data.view !== 'object') return answer(400, { error: 'view-required' });
             customViews.set(entry.project, data.view);
@@ -245,6 +427,33 @@ if (controlPort) {
           if (req.method === 'POST' && req.url === '/approve') {
             approve(entry);
             return answer(200, { ok: true });
+          }
+          if (req.method === 'POST' && req.url === '/invite') {
+            // Issue a test invite: k stays here; the hub only gets the route (invite id -> studio/daemon).
+            const inviteId = `inv-${randomBytes(6).toString('hex')}`;
+            const k = randomBytes(32).toString('base64url');
+            trust.addInvite(inviteId, k);
+            const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+            fetch(`${hub}/v1/admin/invites`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${flag('operator-token', '')}` },
+              body: JSON.stringify({ inviteId, studioId: data.studioId ?? studioIdSeen, daemonId, expiresAt }),
+            })
+              .then((r) => answer(r.ok ? 200 : 502, { ok: r.ok, inviteId, k, fingerprint: nodeFingerprint }))
+              .catch((error) => answer(502, { error: String(error?.message ?? error) }));
+            return;
+          }
+          if (req.method === 'POST' && req.url === '/revoke-device') {
+            // e2e 专用（SS-234）：把登记过的设备移出信任名单，下一次签名动作会被拒为
+            // unregistered-device。可选 `pubkey` 只吊销一台；不传就吊销全部。
+            const targets = typeof data.pubkey === 'string' ? [data.pubkey] : [...enrolledDevices];
+            const removed = targets.filter((pk) => trust.remove(pk)).length;
+            for (const pk of targets) {
+              const at = enrolledDevices.indexOf(pk);
+              if (at >= 0) enrolledDevices.splice(at, 1);
+            }
+            log('revoked-device', { removed });
+            return answer(200, { ok: removed > 0, removed });
           }
           if (req.method === 'POST' && req.url === '/reset') {
             customViews.delete(entry.project);

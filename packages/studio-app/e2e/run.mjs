@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * The M5 end-to-end run: build the app, start the real hub (wrangler dev with a throwaway D1/DO
- * state), the same-origin proxy, and a fake daemon. Create a studio, map two projects, invite one
- * customer, then run Playwright at 390×844 and 1440×900.
- *
- * Everything the run starts is stopped at the end. Screenshots and logs go to .beluga/scratch/m5.
+ * iOS simulator end-to-end runner using Maestro:
+ * 1) Start the real hub (wrangler dev), a controllable TCP proxy (to simulate client offline),
+ *    and the fake daemon, then seed a studio/projects/customer.
+ * 2) Build and install the iOS app onto a booted iOS simulator with EXPO_PUBLIC_HUB_URL pointing to the proxy.
+ * 3) Start the control server (for Maestro runScript actions) and run `maestro test`, saving screenshots to `e2e/out/`.
+ * 4) Always stop every started child process and close servers on success or failure.
  */
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -12,285 +13,482 @@ import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createApi,
+  createProcessManager,
+  initHubDb,
+  killProcessGroup,
+  needFree,
+  seedStudio,
+  sleep,
+  startFakeDaemon,
+  startWrangler,
+} from './hub-runner.mjs';
+import { views } from './fixtures/views.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(here, '..');
 const repo = path.resolve(appDir, '../..');
 const hubDir = path.join(repo, 'packages/studio-hub');
-// M6's run keeps its screenshots and logs here; the M5 files stay where they were.
-const scratch = path.join(repo, '.beluga/scratch/m6');
+const outDir = path.join(here, 'out');
+const scratch = path.join(repo, '.beluga/scratch/e2e');
 const stateDir = path.join(scratch, 'hub-state');
 const keyFile = path.join(scratch, 'daemon.pem');
 const daemonLog = path.join(scratch, 'daemon.log');
 const wranglerLog = path.join(scratch, 'wrangler.log');
-const proxyLog = path.join(scratch, 'proxy.log');
-const controlPort = 8791;
-const daemonControlPort = 8792;
+
+// Defaults are shared with the Maestro control script; override them to run next to
+// someone else's local hub/daemon without stopping it.
+const portFrom = (name, fallback) => Number(process.env[name] ?? fallback);
+const hubPort = portFrom('E2E_HUB_PORT', 8787);
+const proxyPort = portFrom('E2E_PROXY_PORT', 8788);
+const controlPort = portFrom('E2E_CONTROL_PORT', 8791);
+const daemonControlPort = portFrom('E2E_DAEMON_PORT', 8792);
 
 const operator = 'e2e-operator';
-const hubUrl = 'http://127.0.0.1:8787';
-const appUrl = 'http://localhost:8790';
+const hubUrl = `http://127.0.0.1:${hubPort}`;
+const appHubUrl = `http://127.0.0.1:${proxyPort}`;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const log = (...args) => console.log('[e2e]', ...args);
+const pm = createProcessManager(appDir);
+const api = createApi(hubUrl, operator);
 
-const children = new Set();
-function start(name, command, args, opts = {}) {
-  const fd = opts.log ? fs.openSync(opts.log, 'a') : 'inherit';
-  const child = spawn(command, args, {
-    cwd: opts.cwd ?? appDir,
-    env: opts.env ?? process.env,
-    stdio: ['ignore', fd, fd],
-    detached: true,
-  });
-  children.add(child);
-  child.on('exit', () => {
-    children.delete(child);
-    if (typeof fd === 'number') {
+const cleanupStack = [];
+function pushCleanup(description, fn) {
+  cleanupStack.push({ description, fn });
+}
+
+let cleanupPromise = null;
+function runAllCleanups() {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+    log('running cleanups in reverse order...');
+    while (cleanupStack.length > 0) {
+      const item = cleanupStack.pop();
       try {
-        fs.closeSync(fd);
-      } catch {
-        /* already closed */
+        log(`cleaning up: ${item.description}`);
+        await item.fn();
+      } catch (err) {
+        log(`cleanup failed for ${item.description}:`, err?.message || err);
       }
     }
-  });
-  return child;
-}
-
-function stop(child, signal = 'SIGTERM') {
-  if (!child || child.exitCode !== null) return;
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
     try {
-      child.kill(signal);
-    } catch {
-      /* already gone */
-    }
-  }
-}
-
-/**
- * A port this run will listen on, free before it starts (BLG-153): a hub or proxy left by another
- * run (the real-flow run uses 8787 and 8790 too) would answer the readiness checks below, and the
- * tests would drive someone else's build. Say so and stop instead.
- */
-function portFree(port) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', () => resolve(false));
-    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
-  });
-}
-
-async function needFree(ports) {
-  const busy = [];
-  for (const port of ports) if (!(await portFree(port))) busy.push(port);
-  if (busy.length) throw new Error(`port ${busy.join(', ')} is already in use (another hub, proxy or e2e run?): see \`lsof -nP -iTCP:${busy[0]} -sTCP:LISTEN\` and stop it first`);
-}
-
-const tail = (file) => {
-  try {
-    return fs.readFileSync(file, 'utf8').split('\n').slice(-30).join('\n');
-  } catch {
-    return '';
-  }
-};
-
-/** Up when `url` answers; `child` (and its log) say why when it stopped first. */
-async function waitFor(url, timeout = 60_000, child, childLog) {
-  const from = Date.now();
-  while (Date.now() - from < timeout) {
-    if (child && child.exitCode !== null) throw new Error(`it stopped (exit ${child.exitCode}) before ${url} answered:\n${childLog ? tail(childLog) : ''}`);
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch {
-      /* not up yet */
-    }
-    await sleep(250);
-  }
-  throw new Error(`timed out waiting for ${url}`);
-}
-
-async function api(pathname, method = 'GET', body) {
-  const res = await fetch(`${hubUrl}${pathname}`, {
-    method,
-    headers: { authorization: `Bearer ${operator}`, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`${method} ${pathname} -> ${res.status} ${JSON.stringify(json)}`);
-  return json;
+      await pm.stopAll();
+    } catch {}
+    log('all cleanups finished');
+  })();
+  return cleanupPromise;
 }
 
 let daemon;
 function startDaemon(code) {
-  const args = [
-    path.join(hubDir, 'scripts/fake-daemon.mjs'),
-    '--hub',
+  daemon = startFakeDaemon({
+    hubDir,
     hubUrl,
-    '--key-file',
     keyFile,
-    '--project',
-    'dp1',
-    '--project',
-    'dp2',
-    '--name',
-    'E2E Studio Mac',
-    '--interval',
-    '1000',
-    '--control-port',
-    String(daemonControlPort),
-  ];
-  if (code) args.push('--code', code);
-  daemon = start('daemon', process.execPath, args, { cwd: hubDir, log: daemonLog });
+    controlPort: daemonControlPort,
+    code,
+    operatorToken: operator,
+    logFile: daemonLog,
+    start: pm.start,
+  });
 }
-function stopDaemon() {
+async function stopDaemon() {
   if (daemon) {
-    stop(daemon);
+    const d = daemon;
     daemon = undefined;
+    await pm.stop(d);
   }
+}
+
+function createHubProxy(targetPort) {
+  let offline = false;
+  const sockets = new Set();
+  const server = net.createServer((client) => {
+    if (offline) {
+      client.destroy();
+      return;
+    }
+    const upstream = net.connect(targetPort, '127.0.0.1');
+    sockets.add(client);
+    sockets.add(upstream);
+    const drop = () => {
+      sockets.delete(client);
+      sockets.delete(upstream);
+      client.destroy();
+      upstream.destroy();
+    };
+    client.on('error', drop);
+    upstream.on('error', drop);
+    client.on('close', () => {
+      sockets.delete(client);
+      upstream.destroy();
+    });
+    upstream.on('close', () => {
+      sockets.delete(upstream);
+      client.destroy();
+    });
+    client.pipe(upstream);
+    upstream.pipe(client);
+  });
+  return {
+    listen: (port) =>
+      new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(port, '127.0.0.1', resolve);
+      }),
+    setOffline: (next) => {
+      offline = next;
+      if (offline) {
+        for (const s of [...sockets]) s.destroy();
+        sockets.clear();
+      }
+    },
+    close: () =>
+      new Promise((resolve) => {
+        for (const s of [...sockets]) s.destroy();
+        sockets.clear();
+        server.close(() => resolve());
+      }),
+  };
+}
+
+function deliveredCount(kind) {
+  if (!fs.existsSync(daemonLog)) return 0;
+  return fs
+    .readFileSync(daemonLog, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    })
+    .filter((entry) => entry.kind === 'deliver' && entry.actionKind === kind).length;
+}
+
+function resolveJavaHome() {
+  if (process.env.JAVA_HOME && fs.existsSync(process.env.JAVA_HOME)) {
+    return process.env.JAVA_HOME;
+  }
+  const candidates = [
+    '/opt/homebrew/opt/openjdk@17',
+    '/opt/homebrew/opt/openjdk@21',
+    '/opt/homebrew/opt/openjdk',
+    '/usr/local/opt/openjdk@17',
+    '/usr/local/opt/openjdk',
+  ];
+  return candidates.find((p) => fs.existsSync(p));
+}
+
+function selectSimulatorUdid() {
+  const targetUdid = process.env.E2E_IOS_UDID;
+  const raw = execFileSync('xcrun', ['simctl', 'list', 'devices', 'available', '-j'], {
+    encoding: 'utf8',
+  });
+  const parsed = JSON.parse(raw);
+  const devices = Object.entries(parsed.devices ?? {})
+    .filter(([runtime]) => runtime.includes('iOS'))
+    .flatMap(([, list]) => list ?? []);
+
+  if (targetUdid) {
+    const target = devices.find((d) => d.udid === targetUdid);
+    if (!target) throw new Error(`simulator ${targetUdid} not found or not available`);
+    if (target.state === 'Booted') return { udid: targetUdid, bootedByUs: false };
+    log(`booting iOS simulator ${target.name} (${target.udid})`);
+    execFileSync('xcrun', ['simctl', 'boot', target.udid], { stdio: 'inherit' });
+    return { udid: target.udid, bootedByUs: true };
+  }
+
+  const booted =
+    devices.find((d) => d.state === 'Booted' && d.name.includes('iPhone')) ??
+    devices.find((d) => d.state === 'Booted');
+  if (booted) return { udid: booted.udid, bootedByUs: false };
+
+  const fallback =
+    devices.find((d) => d.isAvailable && d.name.includes('iPhone')) ??
+    devices.find((d) => d.isAvailable);
+  if (!fallback) throw new Error('no available iOS simulator found');
+  log(`booting iOS simulator ${fallback.name} (${fallback.udid})`);
+  execFileSync('xcrun', ['simctl', 'boot', fallback.udid], { stdio: 'inherit' });
+  return { udid: fallback.udid, bootedByUs: true };
+}
+
+function runCommand(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, {
+      cwd: opts.cwd ?? appDir,
+      env: opts.env ?? process.env,
+      stdio: 'inherit',
+      detached: true,
+    });
+
+    let settled = false;
+    const cleanupTask = {
+      description: `command: ${cmd} ${args[0] ?? ''}`,
+      fn: async () => {
+        if (settled) return;
+        settled = true;
+        await killProcessGroup(child);
+      },
+    };
+    cleanupStack.push(cleanupTask);
+
+    child.on('exit', (code, signal) => {
+      const idx = cleanupStack.indexOf(cleanupTask);
+      if (idx !== -1) cleanupStack.splice(idx, 1);
+      settled = true;
+      if (code === 0) resolve();
+      else reject(new Error(`${cmd} ${args.join(' ')} exited with ${code ?? signal}`));
+    });
+    child.on('error', (err) => {
+      const idx = cleanupStack.indexOf(cleanupTask);
+      if (idx !== -1) cleanupStack.splice(idx, 1);
+      settled = true;
+      reject(err);
+    });
+  });
 }
 
 async function setup() {
-  await needFree([8787, 8790, controlPort, daemonControlPort]);
+  await needFree([hubPort, proxyPort, controlPort, daemonControlPort]);
   fs.mkdirSync(scratch, { recursive: true });
+  fs.mkdirSync(outDir, { recursive: true });
   fs.rmSync(stateDir, { recursive: true, force: true });
   fs.rmSync(keyFile, { force: true });
-  for (const logFile of [daemonLog, wranglerLog, proxyLog]) fs.writeFileSync(logFile, '');
-
-  log('building the app (expo export -p web)');
-  execFileSync('npm', ['run', 'export'], { cwd: appDir, stdio: 'inherit' });
+  for (const logFile of [daemonLog, wranglerLog]) fs.writeFileSync(logFile, '');
 
   log('applying the hub D1 schema');
-  execFileSync(
-    'npx',
-    ['wrangler', 'd1', 'execute', 'synon-studio', '--local', '--persist-to', stateDir, '--file', 'schema.sql'],
-    { cwd: hubDir, stdio: 'inherit' },
-  );
+  initHubDb({ hubDir, stateDir });
 
   log('starting wrangler dev');
-  const wrangler = start('wrangler', 'npx', [
-    'wrangler',
-    'dev',
-    '--port',
-    '8787',
-    '--persist-to',
+  const wranglerChild = await startWrangler({
+    hubDir,
     stateDir,
-    '--var',
-    `OPERATOR_TOKEN:${operator}`,
-    '--var',
-    'MAIL_MODE:outbox',
-    '--var',
-    `HUB_ORIGIN:${appUrl}`,
-  ], { cwd: hubDir, log: wranglerLog });
-  await waitFor(`${hubUrl}/healthz`, 60_000, wrangler, wranglerLog);
-
-  log('starting the same-origin proxy');
-  const proxy = start('proxy', process.execPath, [path.join(appDir, 'scripts/dev-proxy.mjs'), '--dist'], {
-    cwd: appDir,
-    env: { ...process.env, PORT: '8790', HUB_PORT: '8787' },
-    log: proxyLog,
+    operator,
+    hubOrigin: appHubUrl,
+    port: hubPort,
+    logFile: wranglerLog,
+    start: pm.start,
+    healthUrl: `${hubUrl}/healthz`,
   });
-  await waitFor(`${appUrl}/login`, 60_000, proxy, proxyLog);
+  pushCleanup('wrangler dev', () => pm.stop(wranglerChild));
 
-  log('creating the studio and the daemon');
-  const studio = await api('/v1/admin/studios', 'POST', { name: 'E2E Studio' });
-  const sid = studio.studio.id;
-  startDaemon(studio.linkCode.code);
+  log('starting controllable hub proxy');
+  const proxy = createHubProxy(hubPort);
+  await proxy.listen(proxyPort);
+  pushCleanup('hub proxy', () => proxy.close());
 
-  let entries = [];
-  for (let i = 0; i < 80; i++) {
-    const detail = await api(`/v1/admin/studios/${sid}`);
-    const synced = (detail.daemons ?? []).some((d) => d.synced);
-    entries = (detail.daemonProjects ?? []).filter((p) => p.projectId === 'dp1' || p.projectId === 'dp2');
-    if (synced && new Set(entries.map((e) => e.projectId)).size === 2) break;
-    await sleep(250);
+  log('creating the studio, projects, daemon, and customer');
+  const seeded = await seedStudio({
+    api,
+    hubUrl,
+    startDaemon,
+    daemonLogLabel: '.beluga/scratch/e2e/daemon.log',
+  });
+  pushCleanup('fake daemon', () => stopDaemon());
+
+  const sim = selectSimulatorUdid();
+  const udid = sim.udid;
+  if (sim.bootedByUs) {
+    pushCleanup(`simulator shutdown (${udid})`, async () => {
+      log(`shutting down simulator ${udid}`);
+      try {
+        execFileSync('xcrun', ['simctl', 'shutdown', udid], { stdio: 'ignore' });
+      } catch {}
+    });
   }
-  const dp1 = entries.find((e) => e.projectId === 'dp1');
-  const dp2 = entries.find((e) => e.projectId === 'dp2');
-  if (!dp1 || !dp2) throw new Error('the fake daemon did not report dp1 and dp2; see .beluga/scratch/m6/daemon.log');
 
-  log('creating two projects, mapping them and inviting the customer');
-  const p1 = await api(`/v1/admin/studios/${sid}/projects`, 'POST', { name: '饮水打卡' });
-  const p2 = await api(`/v1/admin/studios/${sid}/projects`, 'POST', { name: '门店预约' });
-  const projectId = p1.project.id;
-  const project2Id = p2.project.id;
-  await api(`/v1/admin/projects/${projectId}/daemon`, 'PUT', { daemonId: dp1.daemonId, daemonProjectId: 'dp1' });
-  await api(`/v1/admin/projects/${project2Id}/daemon`, 'PUT', { daemonId: dp2.daemonId, daemonProjectId: 'dp2' });
-  const customer = await api('/v1/admin/customers', 'POST', { email: 'e2e@example.test', name: 'E2E 客户' });
-  const customerId = customer.customer.id;
-  await api(`/v1/admin/projects/${projectId}/members/${customerId}`, 'PUT');
-  await api(`/v1/admin/projects/${project2Id}/members/${customerId}`, 'PUT');
-
-  // A session for the tests after the first (the link is single-use and capped at five an hour),
-  // and a poll that proves the daemon's snapshots are in the hub's cache before Playwright starts.
-  const login = await api(`/v1/admin/customers/${customerId}/login-link`, 'POST');
-  const token = login.link.split('#token=')[1];
-  const verified = await fetch(`${hubUrl}/v1/login/verify`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token }),
-  }).then((r) => r.json());
-  if (!verified.session) throw new Error('the setup session was not created');
-  const session = verified.session;
-
-  log('waiting for both plans to reach the hub');
-  const plans = async (pid) => {
-    const res = await fetch(`${hubUrl}/v1/app/projects/${pid}/plans`, { headers: { authorization: `Bearer ${session}` } });
-    return res.ok ? res.json() : null;
-  };
-  let cached = false;
-  for (let i = 0; i < 60; i++) {
-    const a = await plans(projectId);
-    const b = await plans(project2Id);
-    if (a?.plans?.length > 0 && b?.plans?.length > 0) {
-      cached = true;
-      break;
-    }
-    await sleep(500);
+  if (process.env.TEST_ERROR_BEFORE_BUILD === '1') {
+    throw new Error('intentional error before build for self-test');
   }
-  if (!cached) throw new Error('the plans never reached the hub; see .beluga/scratch/m6/daemon.log');
+
+  const buildDir = path.join(scratch, 'ios-build');
+  if (process.env.E2E_SKIP_BUILD !== '1') {
+    fs.mkdirSync(buildDir, { recursive: true });
+    log(`building iOS app (Release) into ${buildDir}`);
+    await runCommand(
+      'npx',
+      ['expo', 'run:ios', '--no-bundler', '--configuration', 'Release', '--device', 'generic', '--output', buildDir],
+      {
+        env: {
+          ...process.env,
+          LANG: process.env.LANG || 'en_US.UTF-8',
+          LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
+          EXPO_PUBLIC_HUB_URL: appHubUrl,
+        },
+      },
+    );
+  }
+  const appName = fs.readdirSync(buildDir).find((name) => name.endsWith('.app'));
+  if (!appName) throw new Error(`no .app bundle found in ${buildDir}`);
+  const appPath = path.join(buildDir, appName);
 
   return {
-    projectId,
-    project2Id,
-    customerId,
-    sessionJson: JSON.stringify({ session, expiresAt: verified.expiresAt, customerId: verified.customerId }),
+    udid,
+    appPath,
+    proxy,
+    projectId: seeded.projectId,
+    project2Id: seeded.project2Id,
+    customerId: seeded.customerId,
+    sessionJson: seeded.sessionJson,
   };
 }
 
-async function main() {
-  let control;
-  let failed = false;
+function reinstallApp(udid, appPath) {
+  // Wipe iOS Keychain (expo-secure-store) and app container so every flow starts logged out.
   try {
-    const env = await setup();
+    execFileSync('xcrun', ['simctl', 'uninstall', udid, 'com.synon.studio'], { stdio: 'ignore' });
+  } catch {}
+  try {
+    execFileSync('xcrun', ['simctl', 'keychain', udid, 'reset'], { stdio: 'ignore' });
+  } catch {}
+  log(`installing ${path.basename(appPath)} onto simulator ${udid}`);
+  execFileSync('xcrun', ['simctl', 'install', udid, appPath], { stdio: 'inherit' });
+}
 
-    control = http.createServer(async (req, res) => {
-      console.log('[e2e] control', req.method, req.url);
+function expandFlowPaths(targets) {
+  if (!targets.length) {
+    return ['e2e/maestro/flow.yaml', 'e2e/maestro/plan.yaml'];
+  }
+  const flows = [];
+  for (const target of targets) {
+    const abs = path.resolve(appDir, target);
+    if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) {
+      const files = fs
+        .readdirSync(abs)
+        .filter((name) => name.endsWith('.yaml') || name.endsWith('.yml'))
+        .sort()
+        .map((name) => path.join(target, name));
+      flows.push(...files);
+    } else {
+      flows.push(target);
+    }
+  }
+  return flows;
+}
+
+async function main() {
+  let exitCode = 0;
+  let signaled = false;
+
+  const onSignal = async (sig) => {
+    if (signaled) return;
+    signaled = true;
+    exitCode = 1;
+    log(`received ${sig}, stopping all processes and cleaning up...`);
+    await runAllCleanups();
+    process.exit(exitCode);
+  };
+  process.once('SIGINT', () => void onSignal('SIGINT'));
+  process.once('SIGTERM', () => void onSignal('SIGTERM'));
+
+  try {
+    const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+    const flowPaths = expandFlowPaths(targets);
+
+    const env = await setup();
+    const proxy = env.proxy;
+
+    const control = http.createServer(async (req, res) => {
+      const url = new URL(req.url ?? '/', `http://127.0.0.1:${controlPort}`);
+      console.log('[e2e] control', req.method, url.pathname);
       const send = (status, body) => {
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(body));
       };
-      if (req.method === 'POST' && req.url === '/daemon/stop') {
-        stopDaemon();
+      const readJson = async () => {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        return body ? JSON.parse(body) : {};
+      };
+
+      if (req.method === 'GET' && url.pathname === '/env') {
+        return send(200, {
+          hubUrl: appHubUrl,
+          projectId: env.projectId,
+          project2Id: env.project2Id,
+          customerId: env.customerId,
+        });
+      }
+      if (req.method === 'GET' && url.pathname === '/login-link') {
+        try {
+          const login = await api(`/v1/admin/customers/${env.customerId}/login-link`, 'POST');
+          const token = login.link.split('#token=')[1] ?? login.link.split('?token=')[1] ?? '';
+          if (!token) return send(500, { error: 'login-link missing token' });
+          return send(200, { link: `synon://login?token=${token}` });
+        } catch (error) {
+          return send(500, { error: String(error instanceof Error ? error.message : error) });
+        }
+      }
+      if (req.method === 'POST' && url.pathname === '/hub/offline') {
+        proxy.setOffline(true);
+        return send(200, { ok: true, offline: true });
+      }
+      if (req.method === 'POST' && url.pathname === '/hub/online') {
+        proxy.setOffline(false);
+        return send(200, { ok: true, offline: false });
+      }
+      // 设备登记邀请：假的 daemon 发一次性码（k 留在 daemon），中台只存路由（SS-89）。
+      if (req.method === 'POST' && url.pathname === '/invite') {
+        try {
+          const answer = await fetch(`http://127.0.0.1:${daemonControlPort}/invite`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: '{}',
+          });
+          return send(answer.status, await answer.json().catch(() => ({})));
+        } catch (error) {
+          return send(502, { error: String(error instanceof Error ? error.message : error) });
+        }
+      }
+      if (req.method === 'GET' && url.pathname === '/delivered') {
+        const kind = url.searchParams.get('kind') ?? 'plan.create';
+        return send(200, { kind, count: deliveredCount(kind) });
+      }
+      if (req.method === 'POST' && url.pathname === '/assert-delivered') {
+        const payload = await readJson();
+        const kind = payload.kind ?? 'plan.create';
+        const expected =
+          typeof payload.expected === 'number'
+            ? payload.expected
+            : Number(payload.baseline ?? 0) + Number(payload.delta ?? 0);
+        const waitMs = Number(payload.delta ?? 0) > 0 || (typeof payload.expected === 'number' && payload.expected > 0) ? 5_000 : 0;
+        const deadline = Date.now() + waitMs;
+        let actual = deliveredCount(kind);
+        while (actual < expected && Date.now() < deadline) {
+          await sleep(100);
+          actual = deliveredCount(kind);
+        }
+        if (actual !== expected) {
+          return send(400, { error: `expected ${kind} count ${expected}, got ${actual}`, kind, expected, actual });
+        }
+        return send(200, { ok: true, kind, actual });
+      }
+      if (req.method === 'POST' && url.pathname === '/daemon/stop') {
+        await stopDaemon();
         return send(200, { ok: true });
       }
-      if (req.method === 'POST' && req.url === '/daemon/start') {
+      if (req.method === 'POST' && url.pathname === '/daemon/start') {
         if (daemon && daemon.exitCode === null) return send(200, { ok: true, already: true });
         startDaemon();
         return send(200, { ok: true });
       }
-      // The fake daemon's own control port: push a view fixture, approve the start gate, reset.
-      if (req.method === 'POST' && (req.url === '/daemon/view' || req.url === '/daemon/approve' || req.url === '/daemon/reset')) {
-        let body = '';
-        for await (const chunk of req) body += chunk;
+      if (req.method === 'POST' && (url.pathname === '/daemon/view' || url.pathname === '/daemon/approve' || url.pathname === '/daemon/reset' || url.pathname === '/daemon/revoke-device')) {
+        const payload = await readJson();
+        let forwardBody = payload;
+        if (url.pathname === '/daemon/view' && typeof payload.name === 'string') {
+          const baseView = views[payload.name];
+          if (!baseView) return send(400, { error: `unknown view fixture: ${payload.name}` });
+          forwardBody = { view: payload.patch ? { ...baseView, ...payload.patch } : baseView };
+        }
         try {
-          const answer = await fetch(`http://127.0.0.1:${daemonControlPort}${req.url.replace('/daemon', '')}`, {
+          const answer = await fetch(`http://127.0.0.1:${daemonControlPort}${url.pathname.replace('/daemon', '')}`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body,
+            body: JSON.stringify(forwardBody),
           });
           return send(answer.status, await answer.json().catch(() => ({})));
         } catch (error) {
@@ -303,47 +501,55 @@ async function main() {
       control.once('error', reject);
       control.listen(controlPort, '127.0.0.1', resolve);
     });
-
-    log('running Playwright');
-    // Not spawnSync: the control server that stops/starts the daemon lives in this process and
-    // must keep answering while Playwright runs.
-    const status = await new Promise((resolve, reject) => {
-      const child = spawn('npx', ['playwright', 'test', '--config', 'e2e/playwright.config.ts'], {
-        cwd: appDir,
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          E2E_BASE: appUrl,
-          E2E_HUB: hubUrl,
-          E2E_OPERATOR: operator,
-          E2E_CUSTOMER: env.customerId,
-          E2E_PROJECT_ID: env.projectId,
-          E2E_PROJECT2_ID: env.project2Id,
-          E2E_SESSION: env.sessionJson,
-          E2E_CONTROL: `http://127.0.0.1:${controlPort}`,
-          E2E_DAEMON_LOG: daemonLog,
-          E2E_SCRATCH: scratch,
-        },
-      });
-      child.on('exit', (code) => resolve(code));
-      child.on('error', reject);
-    });
-    if (status !== 0) throw new Error(`Playwright exited ${status ?? 'by signal'}`);
-    log(`screenshots in ${scratch}`);
-  } catch (error) {
-    failed = true;
-    console.error('[e2e] failed:', error instanceof Error ? error.message : error);
-    console.error('[e2e] logs: .beluga/scratch/m6/{wrangler,proxy,daemon}.log');
-  } finally {
-    if (control) {
+    pushCleanup('control server', async () => {
       control.closeAllConnections?.();
       await new Promise((resolve) => control.close(resolve));
+    });
+
+    const javaHome = resolveJavaHome();
+    const maestroEnv = {
+      ...process.env,
+      ...(javaHome ? { JAVA_HOME: javaHome } : {}),
+      MAESTRO_E2E_CONTROL: `http://127.0.0.1:${controlPort}`,
+      MAESTRO_E2E_PROJECT_ID: env.projectId,
+      MAESTRO_E2E_PROJECT2_ID: env.project2Id,
+    };
+
+    const maestroArgs = [
+      '--udid',
+      env.udid,
+      '--test-output-dir',
+      outDir,
+      '-e',
+      `E2E_CONTROL=http://127.0.0.1:${controlPort}`,
+      '-e',
+      `E2E_PROJECT_ID=${env.projectId}`,
+      '-e',
+      `E2E_PROJECT2_ID=${env.project2Id}`,
+    ];
+
+    for (let i = 0; i < flowPaths.length; i += 1) {
+      const flowFile = flowPaths[i];
+      proxy.setOffline(false);
+      if (i > 0) {
+        await fetch(`http://127.0.0.1:${controlPort}/daemon/start`, { method: 'POST' });
+        await fetch(`http://127.0.0.1:${controlPort}/daemon/reset`, { method: 'POST' });
+      }
+      reinstallApp(env.udid, env.appPath);
+      log(`running Maestro test (${flowFile})`);
+      await runCommand('maestro', ['test', ...maestroArgs, flowFile], { env: maestroEnv });
     }
-    stopDaemon();
-    for (const child of [...children]) stop(child);
-    await sleep(600);
+    log(`screenshots and reports in ${outDir}`);
+  } catch (error) {
+    exitCode = 1;
+    console.error('[e2e] failed:', error instanceof Error ? error.message : error);
+    console.error('[e2e] logs: .beluga/scratch/e2e/{wrangler,daemon}.log');
+  } finally {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    await runAllCleanups();
+    process.exit(exitCode);
   }
-  if (failed) process.exitCode = 1;
 }
 
 await main();

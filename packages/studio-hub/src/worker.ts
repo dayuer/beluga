@@ -25,7 +25,11 @@ import { resendMailer } from '../../../src/net/studio/mail.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { D1HubStore } from './d1.js';
 import { StudioHub, type Env } from './hub.js';
+import { handleDeviceEnrollRequest, handleInviteRouteRequest, relayForwarder } from './devices-enroll.js';
+import { handlePushTokenRequest } from './push-tokens.js';
 import { jsonOf, responseOf } from './reply.js';
+import { handleUploadRequest, pruneExpiredUploadSessions, type UploadEnv } from './upload.js';
+import { handleWellKnownRequest, type WellKnownEnv } from './well-known.js';
 
 export { StudioHub };
 
@@ -117,12 +121,30 @@ function sessionToken(req: Request): string | undefined {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const wellKnownReply = handleWellKnownRequest(req, env as WellKnownEnv);
+    if (wellKnownReply) return wellKnownReply;
+
     const url = new URL(req.url);
-    const route = routeOf(req.method, url.pathname);
     const hub = new D1HubStore(env.DB);
     const now = Date.now();
     // Never fall back to the request's Host: a magic link built from it could point at an attacker.
     const origin = env.HUB_ORIGIN ?? '';
+
+    const pushReply = await handlePushTokenRequest(req, env, hub, now);
+    if (pushReply) return pushReply;
+
+    const inviteRouteReply = await handleInviteRouteRequest(req, env);
+    if (inviteRouteReply) return inviteRouteReply;
+
+    const enrollReply = await handleDeviceEnrollRequest(req, env, hub, now, {
+      forward: relayForwarder(env, (studioId, path, body) => callDo(env, studioId, path, 'POST', body)),
+    });
+    if (enrollReply) return enrollReply;
+
+    const uploadReply = await handleUploadRequest(req, env as UploadEnv, hub, now);
+    if (uploadReply) return uploadReply;
+
+    const route = routeOf(req.method, url.pathname);
 
     if (route.name === 'not-found') return jsonOf({ error: 'not-found' }, 404);
     // The admin page is static; the data behind it needs the operator token.
@@ -211,5 +233,9 @@ export default {
     }
 
     return responseOf(reply);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(pruneExpiredUploadSessions(env as UploadEnv, Date.now()));
   },
 };

@@ -1,0 +1,736 @@
+appId: com.synon.studio
+---
+# 0. 登录并从需求列表进入需求详情（旧「项目页」已并入需求列表，SS-224）
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- extendedWaitUntil:
+    visible:
+      id: "request-row-plan1"
+    timeout: 20000
+- takeScreenshot: plan-requests
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+# 从「在做」这一档开始（中台推一份完整视图）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*AI 在做.*"
+    timeout: 15000
+- takeScreenshot: plan-running
+
+# 1. 结果抽屉：计划图 / 大纲 / 动态 / 改动 / 预览
+- tapOn:
+    id: "request-results-pill"
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-plan"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-plan-tab"
+    timeout: 10000
+- assertVisible: ".*记录喝水.*"
+- assertVisible: ".*每日提醒.*"
+- takeScreenshot: plan-map
+- tapOn:
+    id: "plan-subtab-outline"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-plan-tab"
+    timeout: 10000
+- assertVisible: ".*记录喝水.*"
+- takeScreenshot: plan-outline
+- tapOn:
+    id: "plan-subtab-activity"
+- extendedWaitUntil:
+    visible: ".*开始做每日提醒.*"
+    timeout: 10000
+- takeScreenshot: plan-activity
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 10000
+- tapOn:
+    id: "request-results-drawer-tab-preview"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-preview-tab"
+    timeout: 10000
+- tapOn:
+    id: "drawer-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "request-results-drawer"
+    timeout: 10000
+
+# 2. 中台推送各阶段：状态行与对应卡片
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: confirm
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*计划已拟好.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-confirm:plan1"
+    direction: DOWN
+- takeScreenshot: plan-confirm
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingStart
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你确认的计划已提交.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-wait-queued"
+    direction: DOWN
+- takeScreenshot: plan-awaiting-start
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*在等你回答.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-d-m0-t0"
+    direction: DOWN
+- takeScreenshot: plan-decide
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你验收.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- assertVisible:
+    id: "accept-approve"
+- assertVisible: ".*点一下就能记录.*"
+- takeScreenshot: plan-review
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*计划有改动.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-changes:plan1"
+    direction: DOWN
+- tapOn:
+    id: "open-results-drawer"
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 10000
+- assertVisible: ".*每周统计.*"
+- assertVisible: ".*每日提醒.*"
+- assertVisible: ".*固定文案提醒.*"
+- takeScreenshot: plan-diff
+- tapOn:
+    id: "drawer-close"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: done
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*这个计划已完成.*"
+    timeout: 15000
+- takeScreenshot: plan-done
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: draftingAi
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*AI 正在写计划.*"
+    timeout: 15000
+- assertVisible:
+    id: "card-understanding-1"
+- takeScreenshot: plan-drafting
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingChanges
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*改动已提交.*"
+    timeout: 15000
+- takeScreenshot: plan-awaiting-changes
+
+# 3. 执行机器离线与恢复
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStop
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 30000
+- takeScreenshot: plan-studio-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStart
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 30000
+
+# 4. 客户断网与恢复（hub 不可达）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 20000
+- takeScreenshot: plan-you-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 20000
+# 断网恢复：回到列表再进来，重新拉一次（live 连接也随之重开）
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+# 先把「在做」推给中台，再进需求详情：进来时的第一次 GET 就能拿到它
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+
+# 5. 内部标识不外露（含 ``` 与 KEY-123 形式）
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*AI 在做.*"
+    timeout: 20000
+- assertNotVisible: ".*(/Users/|planRef|opId|```|[A-Z]{2,}-[0-9]+).*"
+
+# 6. 问题回答：每条「我先按：<建议答案>」+「改…」，一个实底「就这样」，4 秒撤销窗口
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- scrollUntilVisible:
+    element:
+      id: "card-d-m0-t0"
+    direction: DOWN
+- assertVisible: ".*我先按：先做提醒.*"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: decision.answer
+- scrollUntilVisible:
+    element:
+      id: "questions-submit"
+    direction: DOWN
+- tapOn:
+    id: "questions-submit"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "undo-bar"
+    timeout: 10000
+- tapOn:
+    text: "^撤销$"
+- extendedWaitUntil:
+    notVisible:
+      id: "undo-bar"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: decision.answer
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "0"
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+      PATCH_JSON: '{"decisions":[{"decisionId":"d-m0-t1","question":"先做提醒还是先做统计？","options":[{"id":"o0","label":"先做提醒"},{"id":"o1","label":"先做统计"}],"multi":false,"open":true}]}'
+# 新卡片与上一张同版式、同位置：不滚动，避免点击落在滚动惯性上被吞掉
+- extendedWaitUntil:
+    visible:
+      id: "card-d-m0-t1"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: decision.answer
+- scrollUntilVisible:
+    element:
+      id: "question-d-m0-t1-change"
+    direction: DOWN
+- tapOn:
+    id: "question-d-m0-t1-change"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "question-d-m0-t1-edit-input"
+    timeout: 10000
+- tapOn:
+    id: "question-d-m0-t1-edit-input"
+- inputText: "stats first"
+- extendedWaitUntil:
+    visible: ".*改成：stats first.*"
+    timeout: 10000
+# 回车 = 折起输入框（焦点随输入框卸载交回，键盘跟着收起）
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      id: "question-d-m0-t1-edit-input"
+    timeout: 10000
+- waitForAnimationToEnd
+- tapOn:
+    id: "questions-submit"
+    retryTapIfNoChange: true
+# 4 秒撤销窗口过后发出一条 decision.answer（assert-delivered 会等最多 5 秒）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: decision.answer
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 7. 退回原因：不足 10 字时不能提交；提交后发出 milestone.sendBack
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "accept-not-yet"
+    direction: DOWN
+- tapOn:
+    id: "accept-not-yet"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "reason-input"
+    timeout: 10000
+- tapOn:
+    id: "reason-input"
+- inputText: "太短了"
+- assertVisible:
+    id: "reason-submit"
+    enabled: false
+- inputText: "，和我想的不一样，提醒时间不能改"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: milestone.sendBack
+- tapOn:
+    id: "reason-submit"
+- extendedWaitUntil:
+    notVisible:
+      id: "reason-input"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: milestone.sendBack
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 8. 改动：放弃这次改动（draft.discard，不签名）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: changes
+- scrollUntilVisible:
+    element:
+      id: "request-discard-draft"
+    direction: DOWN
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: draft.discard
+- tapOn:
+    id: "request-discard-draft"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: "request-discard-draft"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: draft.discard
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 9. 待办页：卡片、离线缓存、审核通过、回答打开需求详情
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "tab-todo"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "todo-screen"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 20000
+- assertVisible:
+    id: "todo-not-yet"
+- assertVisible: ".*记录喝水.*"
+- assertVisible:
+    id: "tab-todo-count"
+    text: "1"
+- takeScreenshot: todo
+
+# 待办离线缓存：hub 不可达时仍显示缓存列表与 offline-banner
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 15000
+- assertVisible:
+    id: "todo-card"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 15000
+
+# 待办卡片直接通过（milestone.pass，不签名）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: milestone.pass
+- tapOn:
+    id: "todo-approve"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: "todo-card"
+    timeout: 25000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: milestone.pass
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 待办「回答」打开需求详情，问题卡就在流里
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: decide
+- tapOn:
+    id: "refresh"
+- extendedWaitUntil:
+    visible:
+      id: "todo-card"
+    timeout: 20000
+- tapOn:
+    id: "todo-answer"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-d-m0-t0"
+    direction: DOWN
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "todo-screen"
+    timeout: 15000
+- tapOn:
+    id: "tab-requests"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+
+# 10. 对话：中台发言、输入中收到新消息不丢焦点、双击发送去重、断网重试、键盘可见
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonReset
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ".*我从 Mac 这边看一下.*"
+    direction: DOWN
+- takeScreenshot: plan-chat
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":true,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- extendedWaitUntil:
+    visible:
+      id: "request-chat-typing"
+    timeout: 15000
+
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":false,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000}]}'
+- tapOn:
+    id: "request-chat-input"
+- inputText: "还在打字"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+      PATCH_JSON: '{"typing":false,"turns":[{"id":"t-studio","who":"studio","name":"小王","text":"我从 Mac 这边看一下","at":1760000000000},{"id":"t-ai","who":"ai","text":"开始做提醒了","at":1760000000000},{"id":"t-new","who":"ai","text":"新的回复","at":1760000001000}]}'
+- scrollUntilVisible:
+    element:
+      text: ".*新的回复.*"
+    direction: DOWN
+# 收到新消息后输入框仍在、已输入的文字还在
+- assertVisible:
+    id: "request-chat-input"
+    text: ".*还在打字.*"
+- eraseText: 4
+- inputText: "你好"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: chat.send
+- doubleTapOn:
+    id: "request-chat-send"
+- scrollUntilVisible:
+    element:
+      text: ".*你好.*"
+    direction: DOWN
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: chat.send
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 断网发送：写明没发出去，恢复后重试用同一个动作再发一次
+- tapOn:
+    id: "request-chat-input"
+- inputText: "断网也要留住"
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "request-chat-send"
+- extendedWaitUntil:
+    visible:
+      id: "request-chat-retry"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+# 等离线条消失：此时 App 已经能经代理访问 hub，重试才发得出去
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: chat.send
+- tapOn:
+    id: "request-chat-retry"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible: ".*没发出去 · 重试.*"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: chat.send
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 软键盘弹出时输入框仍可见
+- tapOn:
+    id: "request-chat-input"
+- assertVisible:
+    id: "request-chat-input"

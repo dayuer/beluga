@@ -50,3 +50,25 @@ export function writePending(pid: string, pending: PendingNew): void {
 export function clearPending(pid: string): void {
   kv.remove(pendingKey(pid));
 }
+
+const reasonDraftKey = (cardId: string): string => `draft:reason:${cardId}`;
+
+/** 读取某张卡片「还不行…」原因抽屉的草稿（SS-61）。 */
+export function readReasonDraft(cardId: string): string {
+  const d = kv.get<{ reason?: unknown }>(reasonDraftKey(cardId));
+  return typeof d?.reason === 'string' ? d.reason.slice(0, LIMITS.text) : '';
+}
+
+/** 保存原因抽屉草稿，关掉抽屉后仍保留。 */
+export function writeReasonDraft(cardId: string, reason: string): void {
+  if (!reason.trim()) {
+    kv.remove(reasonDraftKey(cardId));
+    return;
+  }
+  kv.set(reasonDraftKey(cardId), { reason: reason.slice(0, LIMITS.text), updatedAt: Date.now() });
+}
+
+/** 提交成功后清除对应卡片的原因草稿。 */
+export function clearReasonDraft(cardId: string): void {
+  kv.remove(reasonDraftKey(cardId));
+}

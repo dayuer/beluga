@@ -89,3 +89,75 @@ CREATE TABLE IF NOT EXISTS outbox (
   expires_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS outbox_by_time ON outbox (expires_at);
+
+CREATE TABLE IF NOT EXISTS push_tokens (
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  device      TEXT NOT NULL,
+  platform    TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+  token       TEXT NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, device)
+);
+CREATE INDEX IF NOT EXISTS push_tokens_by_token ON push_tokens (token);
+
+CREATE TABLE IF NOT EXISTS push_dedup (
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  card_id     TEXT NOT NULL,
+  sent_at     INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, card_id)
+);
+
+CREATE TABLE IF NOT EXISTS upload_sessions (
+  id          TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  project_id  TEXT NOT NULL REFERENCES projects(id),
+  name        TEXT NOT NULL,
+  total_files INTEGER NOT NULL,
+  total_bytes INTEGER NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('uploading', 'ready', 'failed', 'expired')),
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS upload_sessions_by_expires ON upload_sessions (status, expires_at);
+
+CREATE TABLE IF NOT EXISTS upload_files (
+  session_id   TEXT NOT NULL,
+  file_index   INTEGER NOT NULL,
+  path         TEXT NOT NULL,
+  size         INTEGER NOT NULL,
+  sha256       TEXT NOT NULL,
+  r2_key       TEXT NOT NULL,
+  r2_upload_id TEXT NOT NULL,
+  PRIMARY KEY (session_id, file_index)
+);
+
+CREATE TABLE IF NOT EXISTS upload_parts (
+  session_id  TEXT NOT NULL,
+  file_index  INTEGER NOT NULL,
+  part_number INTEGER NOT NULL,
+  etag        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  sha256      TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (session_id, file_index, part_number)
+);
+
+CREATE TABLE IF NOT EXISTS studio_invites (
+  id         TEXT PRIMARY KEY,
+  studio_id  TEXT NOT NULL REFERENCES studios(id),
+  daemon_id  TEXT REFERENCES daemons(id),
+  expires_at INTEGER NOT NULL,
+  used_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS studio_invites_by_studio ON studio_invites (studio_id);
+
+CREATE TABLE IF NOT EXISTS studio_devices (
+  device_id   TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  studio_id   TEXT NOT NULL REFERENCES studios(id),
+  pubkey      TEXT NOT NULL,
+  seal_pubkey TEXT,
+  enrolled_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS studio_devices_by_customer ON studio_devices (customer_id);

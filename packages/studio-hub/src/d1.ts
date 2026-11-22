@@ -196,11 +196,31 @@ export class D1HubStore implements HubStore {
       this.db.prepare('UPDATE sessions SET revoked_at = ? WHERE customer_id = ? AND revoked_at IS NULL').bind(now, id),
       this.db.prepare('DELETE FROM login_tokens WHERE customer_id = ?').bind(id),
       this.db.prepare('DELETE FROM outbox WHERE customer_id = ?').bind(id),
+      this.db.prepare('DELETE FROM push_tokens WHERE customer_id = ?').bind(id),
+      this.db.prepare('DELETE FROM push_dedup WHERE customer_id = ?').bind(id),
+      this.db.prepare('DELETE FROM studio_devices WHERE customer_id = ?').bind(id),
+      this.db.prepare('DELETE FROM upload_parts WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?)').bind(id),
+      this.db.prepare('DELETE FROM upload_files WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?)').bind(id),
+      this.db.prepare('DELETE FROM upload_sessions WHERE customer_id = ?').bind(id),
     ]);
   }
 
   async deleteCustomer(id: string): Promise<void> {
-    await this.run('DELETE FROM customers WHERE id = ? AND status = ?', id, 'removed');
+    const isRemoved = "EXISTS (SELECT 1 FROM customers WHERE id = ? AND status = 'removed')";
+    await this.db.batch([
+      this.db.prepare(`DELETE FROM push_tokens WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db.prepare(`DELETE FROM push_dedup WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db.prepare(`DELETE FROM studio_devices WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db
+        .prepare(`DELETE FROM upload_parts WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?) AND ${isRemoved}`)
+        .bind(id, id),
+      this.db
+        .prepare(`DELETE FROM upload_files WHERE session_id IN (SELECT id FROM upload_sessions WHERE customer_id = ?) AND ${isRemoved}`)
+        .bind(id, id),
+      this.db.prepare(`DELETE FROM upload_sessions WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db.prepare(`DELETE FROM sessions WHERE customer_id = ? AND ${isRemoved}`).bind(id, id),
+      this.db.prepare('DELETE FROM customers WHERE id = ? AND status = ?').bind(id, 'removed'),
+    ]);
   }
 
   async activateCustomer(id: string): Promise<void> {

@@ -1,0 +1,53 @@
+export const zh = {
+  'projects.title': '项目',
+  'projects.active': '进行中',
+  'projects.emptyTitle': '还没有项目',
+  'projects.emptyBody': '你的工作室会把项目加到这里。',
+  'projects.noPlans': '还没有需求',
+  'projects.waitingOnYou': '在等你：{line}',
+  'projects.loadFailed': '加载失败。',
+  'projects.plansUnavailable': '暂时读不到计划',
+  'projects.plansLoading': '读取中…',
+  'projects.refreshFailed': '刷新失败 · 下拉再试',
+
+  'home.waitingYou': '在等你',
+  'home.waitingStudio': '在等工作室',
+  'home.working': 'AI 在做',
+  'home.empty': '还没有需求。点下面的「新需求」开始。',
+  'home.reconnecting': '连接中断，正在重连…',
+  'home.reconnected': '已重新连接',
+  'home.newRequest': '新需求',
+
+  'stage.drafting': '整理需求',
+  'stage.awaitingStart': '等你确认计划',
+  'stage.running': '进行中',
+  'stage.awaitingReview': '等你验收',
+  'stage.done': '已完成',
+} as const;
+
+export const en: Record<keyof typeof zh, string> = {
+  'projects.title': 'Projects',
+  'projects.active': 'Active',
+  'projects.emptyTitle': 'No projects yet',
+  'projects.emptyBody': 'Your studio will add them here.',
+  'projects.noPlans': 'No requests yet',
+  'projects.waitingOnYou': 'Waiting on you: {line}',
+  'projects.loadFailed': "Couldn't load.",
+  'projects.plansUnavailable': "Couldn't load plans",
+  'projects.plansLoading': 'Loading…',
+  'projects.refreshFailed': "Couldn't refresh · pull to try again",
+
+  'home.waitingYou': 'Waiting on you',
+  'home.waitingStudio': 'Waiting on the studio',
+  'home.working': 'The AI is working',
+  'home.empty': 'No requests yet. Tap New request below to start.',
+  'home.reconnecting': 'Reconnecting…',
+  'home.reconnected': 'Reconnected',
+  'home.newRequest': 'New request',
+
+  'stage.drafting': 'Drafting',
+  'stage.awaitingStart': 'Waiting for you to confirm',
+  'stage.running': 'Running',
+  'stage.awaitingReview': 'Waiting for your review',
+  'stage.done': 'Done',
+};

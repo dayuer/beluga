@@ -1,0 +1,52 @@
+appId: com.synon.studio
+---
+# TalkBack 走主流程（SS-94，Android 模拟器 + demo 构建）。
+# 先由 adb 打开 TalkBack；单击移动焦点（截图里能看到绿框），双击才激活。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 30000
+- takeScreenshot: tb-requests
+
+# 焦点：第一条需求
+- tapOn:
+    text: "订单导出增加筛选条件"
+    optional: true
+- takeScreenshot: tb-focus-row
+
+# 双击进入需求详情
+- doubleTapOn:
+    text: "订单导出增加筛选条件"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- takeScreenshot: tb-detail
+
+# 焦点：结果入口；双击打开抽屉
+- tapOn:
+    id: "request-results-pill"
+    optional: true
+- takeScreenshot: tb-focus-results
+- doubleTapOn:
+    id: "request-results-pill"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "request-results-drawer"
+    timeout: 10000
+    optional: true
+- takeScreenshot: tb-drawer

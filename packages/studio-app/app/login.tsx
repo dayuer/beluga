@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { ActionDock } from '../components/ActionDock';
 import { Header } from '../components/Header';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SyncBanner } from '../components/SyncBanner';
+import { TextButton } from '../components/TextButton';
+import { useScheme } from '../lib/appearance';
 import { hub } from '../lib/client';
 import { useOnline } from '../lib/net';
 import { session } from '../lib/session';
@@ -12,6 +16,33 @@ import { detectLang, t } from '../lib/strings';
 import { color, radius, space, type } from '../lib/theme';
 
 type Phase = 'idle' | 'sending' | 'sent' | 'error';
+type VerifyResult = Awaited<ReturnType<typeof hub.verify>>;
+
+// Module-level deduplication so a deep-link remount never redeems a one-time token twice or drops
+// the session if the first LoginScreen instance unmounts before hub.verify resolves.
+const verifications = new Map<string, Promise<VerifyResult>>();
+
+function verifyOnce(token: string): Promise<VerifyResult> {
+  const existing = verifications.get(token);
+  if (existing) return existing;
+  const pending = hub.verify(token).then((r) => {
+    if (r.ok) {
+      session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
+    }
+    return r;
+  });
+  verifications.set(token, pending);
+  return pending;
+}
+
+function parseUrlToken(url: string | null | undefined): string {
+  if (!url) return '';
+  const hashIdx = url.indexOf('#token=');
+  if (hashIdx !== -1) return decodeURIComponent(url.slice(hashIdx + '#token='.length).split('&')[0] ?? '');
+  const queryIdx = url.indexOf('?token=');
+  if (queryIdx !== -1) return decodeURIComponent((url.slice(queryIdx + '?token='.length).split('&')[0] ?? '').split('#')[0] ?? '');
+  return '';
+}
 
 /**
  * The magic-link screen (M5 design §1). One email, one button. The hub always answers 202, so
@@ -22,7 +53,11 @@ type Phase = 'idle' | 'sending' | 'sent' | 'error';
  * session exists.
  */
 export default function LoginScreen() {
+  useScheme();
+  const styles = createStyles();
   const lang = detectLang();
+  const params = useLocalSearchParams<{ token?: string | string[]; next?: string | string[] }>();
+  const routeToken = Array.isArray(params.token) ? params.token[0] : params.token;
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
   const online = useOnline();
@@ -31,32 +66,26 @@ export default function LoginScreen() {
   const [focused, setFocused] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [mailHint, setMailHint] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const emailRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const verified = useRef<string | null>(null);
+  const aliveRef = useRef(true);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let alive = true;
-    const handle = () => {
-      const hash = window.location.hash;
-      if (!hash.startsWith('#token=')) return;
-      const token = decodeURIComponent(hash.slice('#token='.length));
-      if (!token || verified.current === token) return;
-      verified.current = token;
-      try {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      } catch {
-        /* file:// and old browsers */
-      }
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  const runVerify = useCallback(
+    (token: string) => {
+      if (!token) return;
       setVerifying(true);
-      void hub.verify(token).then((r) => {
-        if (!alive) return;
+      void verifyOnce(token).then((r) => {
+        if (!aliveRef.current) return;
         setVerifying(false);
-        if (r.ok) {
-          session.set({ session: r.value.session, expiresAt: r.value.expiresAt, customerId: r.value.customerId });
-          return; // the guard in _layout.tsx sends us to ?next= or /
-        }
+        if (r.ok) return; // verifyOnce already called session.set(); Guard redirects to ?next= or /
         setPhase('error');
         setMessage(
           r.error.kind === 'denied' && r.error.error === 'bad-link'
@@ -66,17 +95,28 @@ export default function LoginScreen() {
               : t(lang, 'login.serviceDown'),
         );
       });
-    };
-    handle();
-    // A second magic link opened in the same tab only changes the hash; treat it like a load.
-    window.addEventListener('hashchange', handle);
-    return () => {
-      alive = false;
-      window.removeEventListener('hashchange', handle);
-    };
-    // One verification per token; lang only affects the error sentence.
+    },
+    // lang only affects the error sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    [],
+  );
+
+  useEffect(() => {
+    if (routeToken) runVerify(routeToken);
+  }, [routeToken, runVerify]);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null | undefined) => {
+      const token = parseUrlToken(url);
+      if (token) runVerify(token);
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => {
+      sub.remove();
+    };
+  }, [runVerify]);
 
   const submit = async () => {
     if (phase === 'sending' || verifying) return;
@@ -87,6 +127,7 @@ export default function LoginScreen() {
     }
     setPhase('sending');
     setMessage(null);
+    setMailHint(null);
     const r = await hub.requestLink(address);
     if (r.ok) {
       setPhase('sent');
@@ -95,6 +136,35 @@ export default function LoginScreen() {
     }
     setPhase('error');
     setMessage(r.error.kind === 'offline' ? t(lang, 'login.offline') : t(lang, 'login.serviceDown'));
+  };
+
+  const openMailApp = async () => {
+    setMailHint(null);
+    try {
+      if (Platform.OS === 'ios') {
+        const supported = await Linking.canOpenURL('message://');
+        if (!supported) {
+          setMailHint(t(lang, 'login.openMailFailed'));
+          return;
+        }
+        await Linking.openURL('message://');
+        return;
+      }
+      if (Platform.OS === 'android') {
+        try {
+          await Linking.openURL(
+            'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.APP_EMAIL;end',
+          );
+          return;
+        } catch {
+          await Linking.openURL('mailto:');
+          return;
+        }
+      }
+      setMailHint(t(lang, 'login.openMailFailed'));
+    } catch {
+      if (aliveRef.current) setMailHint(t(lang, 'login.openMailFailed'));
+    }
   };
 
   return (
@@ -109,12 +179,22 @@ export default function LoginScreen() {
       >
         <View style={[styles.column, desktop && styles.columnDesktop]}>
           <View style={styles.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Svg width={34} height={26} viewBox="0 0 34 26">
+            <Svg width={29} height={42} viewBox="0 0 356 520">
               <Path
-                d="M3 15c0-5 4.6-9 10.3-9 4.8 0 8.7 2.6 9.9 6.2l2.7-2.6c1.2-1.1 3.1-.3 3.1 1.4v3.1c0 4.6-3.9 8.4-8.8 8.4H11C6.6 22.5 3 19.2 3 15z"
-                fill="#F5F5F7"
+                d="M 300 174 A 130 130 0 1 0 178 260"
+                stroke="#FFFFFF"
+                strokeWidth={96}
+                strokeLinecap="round"
+                fill="none"
               />
-              <Circle cx={12.5} cy={13.5} r={1.15} fill="#1D1D1F" />
+              <Path
+                d="M 178 260 A 130 130 0 1 1 56 434"
+                stroke="#FFFFFF"
+                strokeWidth={96}
+                strokeLinecap="round"
+                fill="none"
+              />
+              <Circle cx={300} cy={174} r={30} fill="#86AAF2" />
             </Svg>
           </View>
           <Text style={styles.title} accessibilityRole="header">
@@ -148,7 +228,19 @@ export default function LoginScreen() {
               style={[styles.input, focused && styles.inputFocused]}
             />
             {verifying ? <Text style={styles.note}>{t(lang, 'login.verifying')}</Text> : null}
-            {message ? (
+            {phase === 'sent' ? (
+              <View style={styles.panel} testID="login-sent">
+                <Text style={styles.panelTitle}>{t(lang, 'login.sentTitle')}</Text>
+                <Text style={styles.panelText}>
+                  {email.trim() ? t(lang, 'login.sentTo', { email: email.trim() }) : t(lang, 'login.sent')}
+                </Text>
+                {mailHint ? (
+                  <Text style={styles.mailHint} testID="login-mail-hint">
+                    {mailHint}
+                  </Text>
+                ) : null}
+              </View>
+            ) : message ? (
               <View style={[styles.panel, phase === 'error' && styles.panelError]} testID="login-message">
                 <Text style={[styles.panelText, phase === 'error' && styles.panelTextError]}>{message}</Text>
               </View>
@@ -157,18 +249,25 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
       <ActionDock maxWidth={400}>
-        <PrimaryButton
-          label={phase === 'sent' ? t(lang, 'login.sendAnother') : t(lang, 'login.continue')}
-          onPress={() => void submit()}
-          loading={phase === 'sending' || verifying}
-          testID="primary"
-        />
+        {phase === 'sent' ? (
+          <View style={styles.sentActions}>
+            <PrimaryButton label={t(lang, 'login.openMail')} onPress={() => void openMailApp()} testID="open-mail" />
+            <TextButton label={t(lang, 'login.sendAnother')} onPress={() => void submit()} testID="send-another" />
+          </View>
+        ) : (
+          <PrimaryButton
+            label={t(lang, 'login.continue')}
+            onPress={() => void submit()}
+            loading={phase === 'sending' || verifying}
+            testID="primary"
+          />
+        )}
       </ActionDock>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: space[5] },
@@ -210,6 +309,9 @@ const styles = StyleSheet.create({
     backgroundColor: color.sunken,
   },
   panelError: { backgroundColor: 'rgba(196,55,48,0.085)' },
+  panelTitle: { ...type.callout, fontWeight: '600', color: color.text, marginBottom: space[1] },
   panelText: { ...type.callout, color: color.text2 },
   panelTextError: { color: color.error },
+  mailHint: { ...type.caption, color: color.text3, marginTop: space[2] },
+  sentActions: { gap: space[2] },
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { refusalKey, submitNext, type SubmitState } from '../../packages/studio-app/lib/submit';
+import { refusalKey, submitNext, type SubmitState } from '../../packages/studio-app/lib/submit-machine.js';
 
 /** BLG-85: the request state machine, without a browser. */
 

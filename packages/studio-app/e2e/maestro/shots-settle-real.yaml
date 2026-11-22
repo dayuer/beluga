@@ -1,0 +1,74 @@
+appId: com.synon.studio
+---
+# SS-245：抽屉「成果」「改动」的空态（真中台 + 假 daemon；running 视图没有交付物也没有草稿改动）。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: running
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "request-results-pill"
+    timeout: 15000
+- tapOn:
+    id: "request-results-pill"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "drawer-outputs-tab-empty"
+    timeout: 15000
+- takeScreenshot: settle-drawer-outputs-empty
+- tapOn:
+    id: "request-results-drawer-tab-changes"
+- extendedWaitUntil:
+    visible:
+      id: "drawer-changes-tab"
+    timeout: 15000
+- takeScreenshot: settle-drawer-changes-empty

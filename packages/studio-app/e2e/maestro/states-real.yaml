@@ -1,0 +1,150 @@
+appId: com.synon.studio
+---
+# 异常状态（假中台 + 假 daemon）：客户断网、工作室离线、排队、签名被拒。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# 设备密钥（签名被拒要用到）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: invite
+- openLink: "${output.deviceLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint-match"
+    timeout: 20000
+- tapOn:
+    id: "fingerprint-match"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+
+# 客户断网：断开中台后切回「需求」页，触发一次重新加载，顶部出现离线横幅
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOffline
+- tapOn:
+    id: "tab-me"
+- extendedWaitUntil:
+    visible:
+      id: "me-screen"
+    timeout: 10000
+- tapOn:
+    id: "tab-requests"
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 15000
+- takeScreenshot: state-client-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: hubOnline
+- tapOn:
+    id: "tab-me"
+- tapOn:
+    id: "tab-requests"
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 25000
+
+# 排队
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingStart
+- scrollUntilVisible:
+    element:
+      id: "card-wait-queued"
+    direction: DOWN
+- takeScreenshot: state-queued
+
+# 工作室离线（执行机器不在线）：停掉 daemon 后重新进入详情，顶部出现「工作室离线」
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStop
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "offline-banner"
+    timeout: 20000
+- takeScreenshot: state-studio-offline
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonStart
+- tapOn:
+    id: "back"
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 15000
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: "offline-banner"
+    timeout: 25000
+
+# 签名被拒：假 daemon 的 /reset 只清视图、不清设备信任表，拒绝码只能在单测里造；
+# 真机上没有可靠的拒绝触发点，截图用「没有设备密钥」的禁用态代替（P5/P10/P11 已拍）。
+# 拒绝文案本身由 lib/strings/sign.ts 与 use-signed-action 的单测覆盖。
+

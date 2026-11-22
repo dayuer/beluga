@@ -59,6 +59,16 @@ const BASE = {
     text: '#1D1D1F',
     text2: '#5D5D63',
     text3: '#737379',
+    /** 灰底（bg/sunken）上的说明文字，对比度 5.0；text3 只用在白底上。 */
+    text3OnSunken: '#6A6A70',
+    /** 等待态（执行机器离线、排队、用量已满、需要人）圆点与状态灰。 */
+    waiting: '#B9B9BF',
+    /** 等待态步骤条上的斜纹浅灰。 */
+    waitingStripe: '#E6E6EA',
+    /** 「等你」状态圆点（区别于正文警告色 warn）。 */
+    needsYouDot: '#C28A1E',
+    /** 主按钮禁用底色。 */
+    disabledFill: '#E7E7EA',
     hairline: 'rgba(0,0,0,0.09)',
     hairlineStrong: 'rgba(0,0,0,0.16)',
     press: 'rgba(0,0,0,0.045)',
@@ -88,6 +98,16 @@ const BASE = {
     text: '#ECECEE',
     text2: '#A8A8AE',
     text3: '#8B8B92',
+    /** 灰底（bg/sunken）上的说明文字（深色模式）。 */
+    text3OnSunken: '#9C9CA3',
+    /** 等待态圆点与状态灰（深色模式）。 */
+    waiting: '#5C5C63',
+    /** 等待态步骤条上的斜纹浅灰（深色模式）。 */
+    waitingStripe: '#38383E',
+    /** 「等你」状态圆点（深色模式）。 */
+    needsYouDot: '#E2B45C',
+    /** 主按钮禁用底色（深色模式）。 */
+    disabledFill: '#343439',
     hairline: 'rgba(255,255,255,0.075)',
     hairlineStrong: 'rgba(255,255,255,0.14)',
     press: 'rgba(255,255,255,0.1)',

@@ -1,0 +1,238 @@
+appId: com.synon.studio
+---
+# 一条需求从提到上线（SS-89）：登录 → 设备登记（测试设备密钥）→ 提需求 → 批准开工 → 等待 → 交付 → 通过 → 批准上线。
+# 只看条件（extendedWaitUntil / scrollUntilVisible），不写死等待时间。
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      text: "^允许$|^Allow$"
+    timeout: 8000
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- tapOn:
+    text: "取消|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "email"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: loginLink
+- openLink: "${output.loginLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- tapOn:
+    text: "^允许$|^Allow$"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+
+# 设备密钥：假的 daemon 发一次性邀请码，App 在登记屏生成密钥（只在 e2e 里登记）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: invite
+- openLink: "${output.deviceLink}"
+- tapOn:
+    text: "打开|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "fingerprint-match"
+    timeout: 20000
+- takeScreenshot: request-join
+- tapOn:
+    id: "fingerprint-match"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 20000
+
+# 提需求
+- tapOn:
+    id: "new-request-button"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "goal-input"
+    timeout: 15000
+- tapOn:
+    id: "goal-input"
+- inputText: "做一个能记录每天喝水提醒的 App"
+- hideKeyboard
+- tapOn:
+    id: "platform-ios"
+- takeScreenshot: request-new
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: plan.create
+- tapOn:
+    id: "primary"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "requests-screen"
+    timeout: 25000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: plan.create
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+
+# 批准开工（签名 gate.answer，4 秒撤销窗口后发出）
+- tapOn:
+    id: "request-row-plan1"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "request-detail-screen"
+    timeout: 20000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: confirm
+- scrollUntilVisible:
+    element:
+      id: "start-approve"
+    direction: DOWN
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: gate.answer
+- tapOn:
+    id: "start-approve"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "start-pending-undo"
+    timeout: 10000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: gate.answer
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+- takeScreenshot: request-start-approved
+
+# 等待（开工已提交，等工作室接）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: awaitingStart
+- scrollUntilVisible:
+    element:
+      id: "request-status"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "request-status"
+      text: ".*等你确认的计划已提交.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "card-wait-queued"
+    direction: DOWN
+- takeScreenshot: request-waiting
+
+# 交付（等你验收）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: review
+- scrollUntilVisible:
+    element:
+      id: "accept-approve"
+    direction: DOWN
+- assertVisible: ".*点一下就能记录.*"
+- takeScreenshot: request-delivery
+
+# 通过（签名 delivery.accept，10 秒撤销窗口后发出）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: delivery.accept
+- tapOn:
+    id: "accept-approve"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "accept-pending-undo"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "accept-approved-hint"
+    timeout: 30000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: delivery.accept
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+- takeScreenshot: request-accepted
+
+# 批准上线（签名 release.approve，二次确认后发出）
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: daemonView
+      VIEW: release
+- scrollUntilVisible:
+    element:
+      id: "release-approve"
+    direction: DOWN
+- assertVisible:
+    id: "release-target-version"
+- takeScreenshot: request-release
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: getDelivered
+      KIND: release.approve
+- tapOn:
+    id: "release-approve"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "release-confirm-sheet"
+    timeout: 10000
+- tapOn:
+    id: "release-confirm-sheet-confirm"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: "release-confirm-sheet"
+    timeout: 15000
+- runScript:
+    file: scripts/control.js
+    env:
+      ACTION: assertDelivered
+      KIND: release.approve
+      BASELINE: "${output.deliveredCount}"
+      DELTA: "1"
+- extendedWaitUntil:
+    visible:
+      id: "release-done-hint"
+    timeout: 10000
+- takeScreenshot: request-released
