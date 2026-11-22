@@ -1186,6 +1186,17 @@ export class PlanPilot {
     // Catching up (merging and clearing away what passed before the branch) waits for your Yes: see tidyUp.
     this.stepMerges(this.deps.plans.need(plan.id));
     this.stepMainMerge(this.deps.plans.need(plan.id));
+    this.shipAgain(this.deps.plans.need(plan.id));
+  }
+
+  /**
+   * In main already, yet tasks of it are Merged into Plan (milestones added and passed since, or
+   * one merged in after): that work isn't in main, so the plan goes to main again (a new PR, or here).
+   */
+  private shipAgain(plan: Plan): void {
+    if (!plan.shipped) return;
+    if (!this.deps.store.getState().board.issues.some((i) => i.plan?.id === plan.id && i.status === 'in_plan')) return;
+    this.deps.plans.shipAgain(plan.id);
   }
 
   /** Main merging into the plan's branch, stopped at a conflict: tried again once the head Claude's fix-up came and went (or, stuck, every so often). */
@@ -1464,6 +1475,8 @@ export class PlanPilot {
   }
 
   private prSeen(planId: string, pr: NonNullable<Plan['pr']>): void {
+    // An earlier round's pull request (GitHub finds the branch's last one when no new one is open): already shipped.
+    if (this.deps.plans.need(planId).shippedBefore?.includes(pr.number)) return;
     const plan = this.deps.plans.setPr(planId, pr);
     if (pr.state === 'MERGED') this.ship(plan, 'pr', pr.number);
   }

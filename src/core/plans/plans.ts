@@ -462,6 +462,20 @@ export class Plans {
     return this.change(plan, { shipped }, [event({ kind: 'beluga' }, 'done', shipped.how === 'pr' ? `merged into main via #${shipped.number}` : 'merged into main here', shipped.at)]);
   }
 
+  /**
+   * Work was merged into its branch after the plan reached main (milestones added since): a new
+   * round to main, in a new pull request. The merged one is kept by number, so it ships nothing again.
+   */
+  shipAgain(id: string): Plan {
+    const plan = this.need(id);
+    if (!plan.shipped) return plan;
+    const merged = [plan.shipped.number, plan.pr?.number].filter((n): n is number => n !== undefined);
+    const shippedBefore = [...new Set([...(plan.shippedBefore ?? []), ...merged])];
+    return this.change(plan, { shipped: undefined, pr: undefined, ...(shippedBefore.length ? { shippedBefore } : {}) }, [
+      event({ kind: 'beluga' }, 'note', `has work merged into ${plan.branch ?? 'its branch'} that isn’t in main yet: it goes in a new pull request`, this.now()),
+    ]);
+  }
+
   setCaughtUp(id: string): Plan {
     const plan = this.need(id);
     return plan.caughtUp ? plan : this.change(plan, { caughtUp: true }, []);

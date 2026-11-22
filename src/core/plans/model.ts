@@ -367,6 +367,11 @@ export interface Plan {
   /** The branch's pull request into main, as last seen. */
   readonly pr?: PlanPr;
   readonly shipped?: PlanShipped;
+  /**
+   * The pull requests of its earlier rounds to main (merged already): work merged into its branch
+   * after it reached main goes in a new one, and finding one of these again ships none of it.
+   */
+  readonly shippedBefore?: readonly number[];
   /** Plans that ran before they had a branch were caught up once (passed milestones merged into one). */
   readonly caughtUp?: boolean;
   /** Its shape on the board: an epic for the plan, one under it per milestone (see epics.ts). */
