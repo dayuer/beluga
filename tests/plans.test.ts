@@ -1241,6 +1241,37 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     expect(t.view().next.kind).toBe('done');
   });
 
+  it('work merged into the plan after it reached main goes to main again, in a new PR; the merged one ships none of it', async () => {
+    const t = await running();
+    await t.passSafe();
+    t.board.update(t.issue('Refund endpoint').id, { status: 'in_review' }, t.claude);
+    t.board.update(t.issue('Live keys').id, { status: 'canceled' }, t.me);
+    await tick(10);
+    t.work.pass(t.plan.id, 'refunds');
+    await t.settle();
+    await t.work.openPr(t.plan.id);
+    t.setPr({ ...t.plans.need(t.plan.id).pr!, state: 'MERGED' });
+    await t.work.pilot.pollPrs();
+    expect(t.plans.need(t.plan.id).shipped).toMatchObject({ how: 'pr', number: 7 });
+    // Later work merged into the plan's branch (a milestone added and passed since): here, a fix to the refund endpoint.
+    t.board.planMoved(t.issue('Refund endpoint').id, 'in_plan', 'merged into plan/payments');
+    t.work.pilot.tick();
+    expect(t.plans.need(t.plan.id)).toMatchObject({ shippedBefore: [7] });
+    expect(t.plans.need(t.plan.id).shipped).toBeUndefined();
+    expect(t.plans.need(t.plan.id).pr).toBeUndefined();
+    expect(t.view().next).toMatchObject({ kind: 'ship', branch: 'plan/payments' });
+    // GitHub still finds the branch's merged #7: that ships nothing.
+    await t.work.pilot.pollPrs();
+    expect(t.issue('Refund endpoint').status).toBe('in_plan');
+    expect(t.plans.need(t.plan.id).shipped).toBeUndefined();
+    // Its new PR merging does.
+    t.setPr({ number: 8, url: 'https://github.com/bob/api/pull/8', state: 'MERGED', title: 'Payments', draft: false, checks: 'none' });
+    await t.work.pilot.pollPrs();
+    expect(t.issue('Refund endpoint').status).toBe('done');
+    expect(t.issue('Refund endpoint').activity.map((a) => a.text)).toContain('merged into main via #8');
+    expect(t.plans.need(t.plan.id).shipped).toMatchObject({ how: 'pr', number: 8 });
+  });
+
   it('a milestone whose merge fails (not a conflict) keeps why on it until it’s passed again', async () => {
     const t = await running();
     t.setConflict(() => {
