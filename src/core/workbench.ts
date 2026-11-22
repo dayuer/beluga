@@ -424,7 +424,7 @@ export class Workbench {
     const id = channel?.startsWith('ws:') ? channel.slice(3) : undefined;
     if (id && this.manager.find(id)) {
       this.manager.setModel(id, value || undefined);
-      void this.deps.controller.refresh();
+      this.deps.controller.show();
       this.deps.toast(`${label} in this conversation from the next message`, 'success');
       return;
     }
@@ -441,7 +441,7 @@ export class Workbench {
     const id = channel?.startsWith('ws:') ? channel.slice(3) : undefined;
     if (id && this.manager.find(id)) {
       this.manager.setEffort(id, effort === 'auto' ? null : effort);
-      void this.deps.controller.refresh();
+      this.deps.controller.show();
       return;
     }
     this.deps.setPrefs({ effort: effort === 'auto' ? undefined : effort });
@@ -455,10 +455,11 @@ export class Workbench {
     const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
     if (!id || !this.manager.find(id)) return false;
     // Another runtime on a live conversation is a handoff (a note, or the recent conversation with your next message), never a silent swap.
-    if (this.deps.switchAgent) void this.deps.switchAgent(channel, agent, mode).finally(() => void this.deps.controller.refresh());
+    // Only this conversation's record changes: shown at once, with no project's git read again.
+    if (this.deps.switchAgent) void this.deps.switchAgent(channel, agent, mode).finally(() => this.deps.controller.show());
     else {
       this.manager.setAgent(id, agent);
-      void this.deps.controller.refresh();
+      this.deps.controller.show();
     }
     return true;
   }
