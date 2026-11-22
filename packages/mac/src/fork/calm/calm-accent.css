@@ -28,7 +28,7 @@
 
 /* 2. The chevron box of a pop-up button: a neutral bezel, the arrows in the secondary text colour. */
 :root[data-calm] [class*='_chevrons_'] {
-  background: linear-gradient(var(--control-top), var(--control));
+  background: var(--control);
   box-shadow: var(--control-bezel);
   color: var(--text-2);
 }
@@ -48,14 +48,14 @@
 /* 3. Needs-you rows (Sentinel home): Merge and Resume are secondary there, so the page keeps one solid action. */
 :root[data-calm] [data-need] [class*='_primary_'],
 :root[data-calm] [data-need] [class*='_merge_'] {
-  background: linear-gradient(var(--control-top), var(--control));
+  background: var(--control);
   color: var(--text);
   box-shadow: var(--control-bezel);
 }
 
 /* 3b. The friends card's Turn On (sidebar; BLG-250 takes the whole card out of the sidebar). Secondary now. */
 :root[data-calm] [role='group'][aria-label='Talk with friends'] [class*='_primary_'] {
-  background: linear-gradient(var(--control-top), var(--control));
+  background: var(--control);
   color: var(--text);
   box-shadow: var(--control-bezel);
 }

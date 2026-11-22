@@ -16,7 +16,7 @@
  * these above calm-accent.css's rule that repaints every primary button in the accent.
  */
 :root[data-os='mac'] button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
-  background: linear-gradient(var(--control-top), var(--control));
+  background: var(--control);
   color: var(--text);
   box-shadow: var(--control-bezel);
   font-weight: 400;
