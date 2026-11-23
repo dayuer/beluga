@@ -17,6 +17,16 @@ export const FORK_SETTINGS: ReadonlyArray<{ readonly after: string; readonly ent
     after: 'Reduce motion',
     entries: rows('appearance', 'Layout', [['Calm mode', 'A still, predictable window: short motion, and nothing that moves on its own.', 'calm steady quiet still motion 沉稳 沉稳模式 动效 安静']]),
   },
+  {
+    after: 'Local models',
+    entries: [
+      group('claude', 'ACP agents', 'Cursor, Grok Build, Kiro, Gemini CLI and other Agent Client Protocol agents.', 'acp agent client protocol cursor grok kiro gemini qwen kimi goose muse pi registry 智能体'),
+      ...rows('claude', 'ACP agents', [
+        ['Agents that speak ACP', 'The ones on this computer, and commands of yours.', 'add command local acp'],
+        ['ACP Registry', 'Search and install an agent from agentclientprotocol.com.', 'install download registry search'],
+      ]),
+    ],
+  },
 ];
 
 /** Upstream's list with each fork block after its group's last row (at the end when that group is gone). */

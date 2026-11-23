@@ -8,6 +8,7 @@ import { copilotRuntime } from './copilot/index.js';
 import { findCopilot } from './copilot/connection.js';
 import { antigravityRuntime } from './antigravity/index.js';
 import { findAgy } from './antigravity/connection.js';
+import { acpRuntimeFor, acpRuntimes, acpSignInCommand } from './acp/hook.js';
 import type { AgentRuntime, RuntimeId, RuntimeStatus } from './types.js';
 
 /** The runtime an agent runs on when none is named. */
@@ -23,12 +24,12 @@ const RUNTIMES: ReadonlyMap<RuntimeId, AgentRuntime> = new Map([
 
 /** The runtime an AgentRef names ('claude', 'codex', 'opencode', 'copilot', 'antigravity'); undefined for one this Beluga doesn't know. */
 export function runtimeFor(id: RuntimeId = DEFAULT_RUNTIME): AgentRuntime | undefined {
-  return RUNTIMES.get(id);
+  return RUNTIMES.get(id) ?? acpRuntimeFor(id);
 }
 
 /** Every runtime but the default one, with whether it's ready here (Codex: installed, signed in) and its models. */
 export async function otherRuntimes(): Promise<Array<{ readonly id: RuntimeId; readonly label: string } & RuntimeStatus>> {
-  const others = [...RUNTIMES.values()].filter((rt) => rt.id !== DEFAULT_RUNTIME && rt.status);
+  const others = [...RUNTIMES.values(), ...acpRuntimes()].filter((rt) => rt.id !== DEFAULT_RUNTIME && rt.status);
   return Promise.all(others.map(async (rt) => ({ id: rt.id, label: rt.label, ...(await rt.status!()) })));
 }
 
@@ -48,5 +49,5 @@ export function signInCommand(id: RuntimeId): readonly string[] | undefined {
   if (id === openCodeRuntime.id) return [findOpenCode() ?? 'opencode', 'auth', 'login'];
   if (id === copilotRuntime.id) return [findCopilot() ?? 'copilot', 'login'];
   if (id === antigravityRuntime.id) return [findAgy() ?? 'agy'];
-  return undefined;
+  return acpSignInCommand(id);
 }

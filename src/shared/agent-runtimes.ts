@@ -1,3 +1,4 @@
+import { type ExtraRuntime, withExtraRuntimes } from './acp-runtimes.js';
 import { THIS_COMPUTER } from './assistant.js';
 /**
  * The runtimes an agent picker shows (BLG-446), whether this Mac runs them or not: one this Mac
@@ -45,8 +46,8 @@ export const KNOWN_RUNTIMES: ReadonlyArray<{ readonly id: string; readonly label
 ];
 
 /** The runtimes as a picker lists them, given which ones run here (and their models, when known). */
-export function runtimeChoices(runs: (id: string) => { readonly models?: readonly RuntimeModel[] } | undefined): RuntimeChoice[] {
-  return KNOWN_RUNTIMES.map((r) => {
+export function runtimeChoices(runs: (id: string) => { readonly models?: readonly RuntimeModel[] } | undefined, extra: readonly ExtraRuntime[] = []): RuntimeChoice[] {
+  return withExtraRuntimes(KNOWN_RUNTIMES, extra).map((r) => {
     const here = runs(r.id);
     if (here) return { id: r.id, label: r.label, available: true, ...(here.models ? { models: here.models } : {}) };
     // A local model's only way to be missing is no endpoint answering; the others say once asked (withRuntimeStatus).

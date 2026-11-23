@@ -1,3 +1,4 @@
+import { acpFallbacks, acpMissing } from './acp-fallbacks.js';
 /**
  * What an agent runtime does instead where it can't do what Claude does (BLG-461): one reason per
  * feature, said in the UI where that feature is (greyed with the reason, or the reason beside a
@@ -68,7 +69,7 @@ export const RUNTIME_MISSING: Readonly<Record<string, readonly FeatureId[]>> = {
 
 /** Whether `feature` is there on `runtime` (unset: Claude's, which has them all). */
 export function runtimeHas(runtime: string | undefined, feature: FeatureId): boolean {
-  return !runtime || !RUNTIME_MISSING[runtime]?.includes(feature);
+  return !runtime || !(RUNTIME_MISSING[runtime] ?? acpMissing(runtime))?.includes(feature);
 }
 
 type Ref = { readonly runtime: string };
@@ -80,5 +81,5 @@ export function runtimeHere(agent: Ref | undefined, self?: { readonly defaultAge
 
 /** Why `feature` works differently (or not at all) on `runtime`; undefined when it works as on Claude. */
 export function fallbackFor(runtime: string | undefined, feature: FallbackId): string | undefined {
-  return runtime ? RUNTIME_FALLBACKS[runtime]?.[feature]?.reason : undefined;
+  return runtime ? (RUNTIME_FALLBACKS[runtime] ?? acpFallbacks(runtime))?.[feature]?.reason : undefined;
 }
