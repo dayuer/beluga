@@ -251,7 +251,7 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### 通用 ACP 接入与 ACP Registry（BLG-ACP，2026-11-23）
 
-一个通用的 ACP 运行时跑所有 Agent Client Protocol 智能体：T3 Code 自己支持的 Cursor、Grok Build、Kiro、Muse Code、Pi、fx，加上 Gemini CLI、Qwen Code、Kimi Code、goose、Droid、Cline、Auggie、Kilo，ACP Registry 里的任何一个，以及你自己的命令。代码都在新文件里：`src/agent/runtime/acp/`（运行时、内置清单、Registry、已添加的智能体）、`src/shared/acp-runtimes.ts`、`src/shared/acp-fallbacks.ts`、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/fork/acp/AcpAgentsSettings.tsx`。说明见 `docs/acp-agents.md`。Claude、Codex、OpenCode、Copilot、Antigravity 仍用各自的运行时，没动。
+一个通用的 ACP 运行时跑所有 Agent Client Protocol 智能体：T3 Code 自己支持的 Cursor、Grok Build、Kiro、Muse Code、Pi、fx，加上 Gemini CLI、Qwen Code、Kimi Code、goose、Droid、Cline、Auggie、Kilo，ACP Registry 里的任何一个，以及你自己的命令。代码都在新文件里：`src/agent/runtime/acp-agents/`（运行时、内置清单、Registry、已添加的智能体）、`src/shared/acp-runtimes.ts`、`src/shared/acp-fallbacks.ts`、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/fork/acp/AcpAgentsSettings.tsx`。说明见 `docs/acp-agents.md`。Claude、Codex、OpenCode、Copilot、Antigravity 仍用各自的运行时，没动。
 
 - src/agent/runtime/registry.ts：`runtimeFor` 查不到时问 `acpRuntimeFor`，`otherRuntimes` 带上 `acpRuntimes()`，`signInCommand` 最后交给 `acpSignInCommand`，加一个 import（4 行：三处查表各一行，没法再少）
 - src/shared/agent-runtimes.ts：`runtimeChoices` 多一个 `extra` 参数，列表经 `withExtraRuntimes`，加一个 import（3 行）

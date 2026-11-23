@@ -1,7 +1,7 @@
 # ACP agents (fork, BLG-ACP)
 
 Beluga runs any [Agent Client Protocol](https://agentclientprotocol.com) agent on one runtime
-(`src/agent/runtime/acp/`), the way T3 Code does: the agents T3 Code supports as its own
+(`src/agent/runtime/acp-agents/`), the way T3 Code does: the agents T3 Code supports as its own
 (Cursor, Grok Build, Kiro, Muse Code, Pi, fx), the other well-known ones (Gemini CLI, Qwen Code,
 Kimi Code, goose, Droid, Cline, Auggie, Kilo), any agent in the
 [ACP Registry](https://agentclientprotocol.com/get-started/registry), and a command of yours.

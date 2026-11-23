@@ -8,7 +8,7 @@ import { copilotRuntime } from './copilot/index.js';
 import { findCopilot } from './copilot/connection.js';
 import { antigravityRuntime } from './antigravity/index.js';
 import { findAgy } from './antigravity/connection.js';
-import { acpRuntimeFor, acpRuntimes, acpSignInCommand } from './acp/hook.js';
+import { acpRuntimeFor, acpRuntimes, acpSignInCommand } from './acp-agents/hook.js';
 import type { AgentRuntime, RuntimeId, RuntimeStatus } from './types.js';
 
 /** The runtime an agent runs on when none is named. */

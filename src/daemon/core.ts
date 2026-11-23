@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Config } from '../config.js';
 import { runtimeFor } from '../agent/runtime/registry.js';
-import { acpRuntimes } from '../agent/runtime/acp/hook.js';
+import { acpRuntimes } from '../agent/runtime/acp-agents/hook.js';
 import { claudeStatus } from '../agent/runtime/claude/status.js';
 import type { AgentRuntime, RuntimeId } from '../agent/runtime/types.js';
 import { createMockBackend } from '../agent/mock.js';

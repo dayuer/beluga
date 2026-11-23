@@ -19,7 +19,7 @@ interface AgentView {
   readonly description?: string;
 }
 
-/** One ACP Registry result (src/agent/runtime/acp/registry.ts RegistryHit). */
+/** One ACP Registry result (src/agent/runtime/acp-agents/registry.ts RegistryHit). */
 interface Hit {
   readonly id: string;
   readonly runtime: string;

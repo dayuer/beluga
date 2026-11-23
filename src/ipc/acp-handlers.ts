@@ -1,8 +1,8 @@
-import { acpAgents } from '../agent/runtime/acp/agents.js';
-import { BUILTIN_ACP_AGENTS } from '../agent/runtime/acp/catalog.js';
-import { findAcpCommand } from '../agent/runtime/acp/connection.js';
-import { AcpRegistry } from '../agent/runtime/acp/registry.js';
-import { forgetAcpStatus } from '../agent/runtime/acp/status.js';
+import { acpAgents } from '../agent/runtime/acp-agents/agents.js';
+import { BUILTIN_ACP_AGENTS } from '../agent/runtime/acp-agents/catalog.js';
+import { findAcpCommand } from '../agent/runtime/acp-agents/connection.js';
+import { AcpRegistry } from '../agent/runtime/acp-agents/registry.js';
+import { forgetAcpStatus } from '../agent/runtime/acp-agents/status.js';
 import type { Session } from '../core/session.js';
 import type { Args, Method } from './api.js';
 

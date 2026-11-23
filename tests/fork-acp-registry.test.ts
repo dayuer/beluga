@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AcpAgents } from '../src/agent/runtime/acp/agents.js';
-import { AcpRegistry, OWN_RUNTIME_AGENTS, installKind, parseRegistry, registryPlatform, registryRuntimeId, searchRegistry } from '../src/agent/runtime/acp/registry.js';
+import { AcpAgents } from '../src/agent/runtime/acp-agents/agents.js';
+import { AcpRegistry, OWN_RUNTIME_AGENTS, installKind, parseRegistry, registryPlatform, registryRuntimeId, searchRegistry } from '../src/agent/runtime/acp-agents/registry.js';
 
 /** A Registry like the real one (cdn.agentclientprotocol.com/registry/v1/latest/registry.json), in its shapes. */
 const registry = (archive: { url: string; sha256?: string }, platform: string) => ({

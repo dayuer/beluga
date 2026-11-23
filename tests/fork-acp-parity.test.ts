@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLAUDE_CAPABILITIES } from '../src/agent/runtime/claude/index.js';
-import { ACP_CAPABILITIES } from '../src/agent/runtime/acp/spec.js';
+import { ACP_CAPABILITIES } from '../src/agent/runtime/acp-agents/spec.js';
 import { ACP_FALLBACKS, ACP_MISSING } from '../src/shared/acp-fallbacks.js';
 
 /**

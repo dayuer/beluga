@@ -27,7 +27,7 @@ already has is the whole row as this fork works, in place of upstream's.
 
 ## Agent runs on ACP agents (fork)
 
-Every runtime Beluga doesn't run with code of its own is an ACP agent (BLG-ACP): Cursor (`cursor-agent acp`), Grok Build (`grok agent stdio`), Kiro (`kiro-cli acp`), Muse Code, Pi, fx, Gemini CLI, Qwen Code, Kimi Code, goose, Droid, Cline, Auggie, Kilo, any agent from the ACP Registry, or a command of yours. They all run on one runtime (`src/agent/runtime/acp/`) with `ACP_CAPABILITIES`, and do what this table says, in the same words as upstream's "Agent runs, per runtime" table; `src/shared/acp-fallbacks.ts` has their fallbacks and missing features. `tests/fork-acp-parity.test.ts` checks the two agree, as `tests/parity.test.ts` does for upstream's runtimes; `tests/fork-acp-runtime.test.ts` runs the conformance suite on it over a scripted ACP agent, and starts a real process speaking ACP.
+Every runtime Beluga doesn't run with code of its own is an ACP agent (BLG-ACP): Cursor (`cursor-agent acp`), Grok Build (`grok agent stdio`), Kiro (`kiro-cli acp`), Muse Code, Pi, fx, Gemini CLI, Qwen Code, Kimi Code, goose, Droid, Cline, Auggie, Kilo, any agent from the ACP Registry, or a command of yours. They all run on one runtime (`src/agent/runtime/acp-agents/`) with `ACP_CAPABILITIES`, and do what this table says, in the same words as upstream's "Agent runs, per runtime" table; `src/shared/acp-fallbacks.ts` has their fallbacks and missing features. `tests/fork-acp-parity.test.ts` checks the two agree, as `tests/parity.test.ts` does for upstream's runtimes; `tests/fork-acp-runtime.test.ts` runs the conformance suite on it over a scripted ACP agent, and starts a real process speaking ACP.
 
 | What | Ways in | ACP agents |
 |---|---|---|
