@@ -186,45 +186,9 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 任务卡片上的模型（2026-11-18 从原来的角色代码里挪出来，改成只读上游的数据）：数据在 `src/fork/plans/task-agent.ts`（`taskAgentSeen`），界面在 `packages/mac/src/fork/plans/TaskAgentChip.tsx` 和 `task-agent.module.css`，测试 `tests/fork-task-agent.test.ts`。开工后显示任务所在工作树当前的 agent 和模型；没开工时显示将来做它的：任务自己的 agent，否则计划的建造者（`Plan.agent`），否则项目的 agent，都没有就不显示（用你的默认 agent）；你自己做的任务不显示。名字按上游计划页的写法，agent 加模型（“Claude (Haiku)”）。大纲没开工也显示，画布只在开工后显示（画布的任务节点拿不到计划，补上要改上游文件三行以上）。上游文件的接入点：`packages/mac/src/plans/PlanCanvas.tsx`、`PlanOutline.tsx` 各两行（import 和一行组件）。只在 Mac 上，手机的计划页没有任务卡片上的模型。
 
-### 联邦制：自动接单（队友派给本机的任务自己开工）
-
-设置形状在 `src/fork/federation/settings.ts`，字段经 `src/fork/settings-fields.ts` 进到上游的 Settings 和 PrefsPatch。
-
-- src/machines/sync.ts：`federation` 在 `LOCAL_SETTINGS` 里，自动接单是这台电脑的容量和信任，不随设置同步（一行）
-- src/core/store.ts：`Prefs` 的 `autoRoute`、`federation` 两个字段，`prefsFrom` 数组里多一个 `'federation'`（只改 fork 旧行，行数不涨）
-- src/ipc/api.ts：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
-- src/core/board/launch.ts：把 `federationParts` 装进看板部件（BLG-225）
-
 ### ACP 智能体（上游 PR 准备中，2026-11-23）
 
 ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-runtime`、`feat/acp-agents` 两个分支上，准备提给上游，已经合进 `topic/plans`：`src/agent/runtime/acp/`（核心、内置清单、Registry、你的 ACP 智能体）、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/dialogs/AcpAgentsSettings.tsx`，说明见 `docs/acp.md`。Antigravity 移出固定的"你的智能体"，改由 ACP 管理（引导页 `packages/mac/src/onboarding/AgentsStep.tsx`、`packages/mac/src/onboarding/agent-setup.ts` 只列固定的几个，e2e `packages/mac/e2e/onboarding-agents.spec.ts`、`packages/mac/e2e/antigravity-flow.spec.ts` 跟着改，`tests/antigravity-flow.test.ts` 先添加 Antigravity 再查它的注册）；Claude、Codex、OpenCode、Copilot、本地模型不动。fork 原来的 `acp-agents/` 和它的接入点已经去掉。这两个分支被上游合并后，以上游为准。
-
-### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
-
-计划图与大綱抽成 `packages/ui-plan`，Mac、客户 web 应用和手机读同一份；上游文件里只有「换成共用组件」的接入点。
-
-- packages/companion/components/PlanParts.tsx：`MilestoneMap` 换成共用包（手机保留自己的按压、触感与淡入，状态词和颜色仍是手机自己的）
-- packages/companion/metro.config.js、packages/companion/tsconfig.json：把 `packages/ui-plan` 加进手机端的共享路径
-
-### Synon Studio（客户写需求、看计划；开工前由你确认）
-
-客户 web 应用（`packages/studio-app`）、中台（`packages/studio-hub`）与 daemon 的 `src/studio/` 都是 fork 自己的文件；下面这些上游文件里只有接入点。
-
-- src/cli/args.ts、src/cli/main.ts：`beluga studio link/status/unlink/share/unshare` 命令
-- src/core/agent-host.ts：`plans` 的返回值把 `customerTurn` 透传给 agent
-- src/core/plans/edit.ts：计划任务的 `audience`（客户可见 / 仅你可见，`src/studio/decisions.ts`）
-- `src/daemon/core.ts`：起停 `launchStudio`（没连接时什么都不做）
-- src/daemon/server.ts：浏览器 cookie 不能 `studio.link` / `studio.unlink` / `studio.setProject`
-- `src/ipc/handlers.ts`：展开 `FORK_HANDLERS`（`src/ipc/fork-handlers.ts`：Synon Studio 的 `STUDIO_HANDLERS`，加上保存前先校验的 `env.saveEndpoint`。它排在上游自己的那一项后面，所以覆盖了上游的处理器；上游那一项原样留着，同步上游时如果上游改了 `env.saveEndpoint` 的保存逻辑，要把改动带进 `checkedSave`）
-- src/agent/runtime/copilot/runner.ts、src/agent/runtime/opencode/runner.ts：客户回合的 policy 带 `customerTurn`
-- `packages/mac/src/layout/NotificationCenter.tsx`、`packages/mac/src/layout/ProjectTree.tsx`、packages/mac/src/layout/waiting-model.ts：开工确认卡片（计划、里程碑、点数、带上理由的拒绝）与项目菜单里的「连接 Studio」；三处都只有这些新增，没有新动效
-- packages/companion/app/need/[id].tsx、packages/companion/components/Needs.tsx：手机上的 `studio-start` 卡片（Approve 开工，Decline 写一句客户会看到的话）
-- docs/companion.md、docs/how-it-works.md：Synon Studio 的手机卡片与整体说明（详见 `docs/studio.md`）
-- tests/boundaries.test.ts：`src/studio` 算核心（不含 UI）
-- tests/browser-safe.test.ts：`src/studio/protocol.ts`、`actions.ts`、`sanitize.ts`、`view.ts` 必须浏览器安全
-- tests/machine-coverage.test.ts：studio 的管理与 Gate 方法不从「你的电脑」放行
-- tests/web-security.test.ts：浏览器 cookie 做不了 studio 管理
-- tsconfig.json：`tests/team/studio-app-*.test.ts` 三个用 Expo/React Native 类型，交给 `packages/studio-app/tsconfig.json` 检查，根 typecheck 排除
 
 ### Over SSH：Beluga 退出时 ssh 配对一并结束（886b0ec13：留在 fork，不提回上游）
 
@@ -244,13 +208,6 @@ ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-r
 - `packages/mac/src/dialogs/Settings.tsx`：设置窗口的 `data-settings` 标记（判断用）
 
 已知限制：设置叠在引导页上时（`[data-over-welcome]`，`settings.module.css` 的 86/87），48/49 仍不够，从设置里打开的 FormSheet 会被盖住；BLG-213 没有加更高的 `'welcome'` 档。这条窄路径（引导页上开设置再进 Studio）留着将来一起处理。
-
-### 客户邀请与客户端（BLG-14 至 BLG-17、BLG-34、BLG-36）
-
-- src/companion/pair.ts、src/companion/devices.ts、src/companion/host.ts、src/ipc/companion-api.ts、src/ipc/companion-handlers.ts
-- `packages/mac/src/phone/Phone.tsx`、packages/mac/src/phone/phone-model.ts
-- packages/companion/app/_layout.tsx、packages/companion/app/(tabs)/_layout.tsx、packages/companion/app/index.tsx、packages/companion/lib/store.ts
-- tests/companion-coverage.test.ts、`tests/companion-views.test.ts`、`tests/mac-settings-search.test.ts`
 
 ### 菜单完整显示、中文不带结尾的“…”
 
@@ -306,12 +263,11 @@ M9 合并后 `sync-upstream --report` 在这个分支上查出的未登记文件
 
 对照 macOS 自带应用做的走查，改稿在 Claude Design 的「Beluga topic/native · Mac 原生走查」（1a 总览、1b 工作树、1c 设置）。外观规则都在 `packages/mac/src/fork/native/native-look.css`，由 `fork/sidebar/index.ts` 一并引入（侧栏在每个窗口里都有），每条都只在 `:root[data-os='mac']` 下生效（Windows、Linux 保持上游的样子）；总览的列头是 fork 自己的组件 `fork/native/OverviewHeader.tsx`。锚点在 `tests/fork-native-look.test.ts` 里检查。
 
-- 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色；失败、已合并和 Merge 保留各自的颜色。
-- 底部终端标签和检查器的标签：原来是 fork 的规则（当前标签粗体、不加下划线；只有一个标签时画成标题），2026-11-21 同步上游 3.7.0 时删掉，上游把它们换成了 Dockview 的标签（beluga-labs/beluga#596，`styles/dock.css`）。
-- 空聊天的建议按钮只留文字。
-- 总览：在分组上方加一行列头（名称、分支、状态、详情、更新于/大小），名称和最后一列可以点击排序，和 Recent ▾ 菜单改的是同一个偏好；行高 28pt。
-- 工作树：名字旁的分支状态从胶囊改成一行彩色文字；Changes / History 这层视图切换改成一排文字，当前项加粗，检查器里只剩一层分段控件。
-- 设置：看起来像独立窗口：背后的窗口不变暗，左上角是红色关闭按钮（最小化和缩放画成灰色），窗格名居中作标题。真正拆成 Tauri 的独立窗口还没做。
+- 工具栏的分支步骤（Create PR 和 ▾）画成普通的有边框按钮，不用强调色，和 macOS 工具栏的惯例一致；失败、已合并和 Merge 保留各自的颜色。
+- 总览：在分组上方加一行列头（名称、分支、状态、详情、更新于/大小，`fork/native/OverviewHeader.tsx`），名称和最后一列可以点击排序，和 Recent ▾ 菜单改的是同一个偏好；行高 28pt，和 Finder、Mail 的列表一样。
+- 项目的标签（Active、Can merge、GitHub、PR 等）改用真正的 0.5px 边框：原来的 0.5px 内阴影在 WebKit 里两端会画糊。
+
+走查里的其他几条（空聊天的建议按钮只留文字、分支状态改成一行文字、Changes / History 改成文字切换、设置画成独立窗口的样子）在 2026-11-23 删掉；底部终端和检查器的标签在同步上游 3.7.0 时已换成上游的 Dockview 标签（beluga-labs/beluga#596）。
 
 改上游文件只有一处：
 

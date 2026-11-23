@@ -5,8 +5,8 @@ import type { Args } from './api.js';
 import type { Handlers } from './handlers.js';
 
 /**
- * This fork's handlers, spread into upstream's table with one line (docs/fork.md): Synon Studio's,
- * and `env.saveEndpoint` checked first (fork/endpoint-check.ts). Coming after upstream's own entry,
+ * This fork's handlers, spread into upstream's table with one line (docs/fork.md): `env.saveEndpoint`
+ * checked first (fork/endpoint-check.ts). Coming after upstream's own entry,
  * it takes that method's place; upstream's handler stays as it was.
  */
 

@@ -1,12 +1,12 @@
 /*
- * Mac-native touches on the web view (fork; docs/fork.md, "Mac 原生"). Reviewed against macOS's own
- * apps in Claude Design ("Beluga topic/native · Mac 原生走查", 1a–1c). Only the look: every rule
+ * Mac-native touches on the web view (fork; docs/fork.md, "Mac 原生"), on top of upstream's native
+ * controls (beluga-labs/beluga#584): Create PR as a toolbar button, the Overview's rows at a Mac
+ * list's height, and project chips drawn whole. Only the look: every rule
  * reuses an existing token (styles/tokens.css, components/ui.module.css), and the
  * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/sidebar does;
  * tests/fork-native-look.test.ts checks they still exist.
  *
- * Only on a Mac (`:root[data-os='mac']`, set by lib/prefs.ts): Windows and Linux keep upstream's look,
- * not a Mac Settings window with traffic lights.
+ * Only on a Mac (`:root[data-os='mac']`, set by lib/prefs.ts): Windows and Linux keep upstream's look.
  */
 
 /*
@@ -27,123 +27,10 @@
   background: var(--hairline-strong);
 }
 
-/* An empty chat's starters (views/ChatView.tsx): plain bordered buttons, words only. */
-:root[data-os='mac'] [class*='_emptyActions_'] > button > svg {
-  display: none;
-}
-
-/* ── 1a Overview ─────────────────────────────────────────────────────────────── */
-
 /* The rows of a Mac list: 28pt, as Finder's and Mail's at the default size (views/overview.module.css). */
 :root[data-os='mac'] [role='list'][class*='_table_'] > [class*='_row_'] {
   height: 28px;
   border-radius: 5px;
-}
-
-/* ── 1b Worktree ─────────────────────────────────────────────────────────────── */
-
-/* Where the branch stands, beside the worktree's name (layout/BranchControl.module.css): a line of
-   secondary text in its tone's colour, not a pill. */
-:root[data-os='mac'] [data-branch-state][class*='_pill_'][class*='_pill_'] {
-  height: auto;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  font-weight: 500;
-  letter-spacing: 0;
-}
-:root[data-os='mac'] [class*='_pillButton_']:hover > [data-branch-state][class*='_pill_'] {
-  background: none;
-  text-decoration: underline;
-}
-
-/* Changes' second view (Changes / History, layout/RightPanel.tsx): one segmented control in the
-   inspector is the panel's own; this one is a row of words, the one you're on in bold. */
-:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'][class*='_segmented_'] {
-  gap: 12px;
-  padding: 0;
-  background: none;
-  box-shadow: none;
-}
-:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segment_'] {
-  padding: 0;
-  background: none;
-  box-shadow: none;
-  color: var(--text-3);
-}
-:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segment_']::before {
-  display: none;
-}
-:root[data-os='mac'] [class*='_views_'] > [role='radiogroup'] > [class*='_segmentOn_'][class*='_segmentOn_'] {
-  color: var(--text);
-  font-weight: 600;
-}
-
-/* ── 1c Settings ─────────────────────────────────────────────────────────────── */
-
-/* A window of its own, as a Mac app's Settings: nothing dims the window behind it, the close button
-   is the red one at the top left (with minimise and zoom off, as Settings windows have them), and
-   the pane's name is the title, centred (dialogs/Settings.tsx, settings.module.css). */
-:root[data-os='mac'] [class*='_overlay_']:has(+ [data-settings-window]) {
-  background: none;
-}
-:root[data-os='mac'] [data-settings-window] {
-  box-shadow: 0 0 0 0.5px var(--hairline-strong), 0 22px 70px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.1);
-}
-:root[data-os='mac'] [data-settings-window] [class*='_nav_'] {
-  padding-top: 44px;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_nav_'] > [class*='_title_'] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] {
-  justify-content: center;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_paneTitle_'] {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ff5f57;
-  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
-  color: transparent;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:hover,
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']:focus-visible {
-  color: rgba(0, 0, 0, 0.55);
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_'] svg {
-  width: 8px;
-  height: 8px;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before,
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
-  content: '';
-  position: absolute;
-  top: -0.5px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--segment-track);
-  box-shadow: inset 0 0 0 0.5px var(--hairline-strong);
-  pointer-events: none;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::before {
-  left: 20px;
-}
-:root[data-os='mac'] [data-settings-window] [class*='_bodyHead_'] > [class*='_close_']::after {
-  left: 40px;
 }
 
 /* A project's chips (Active, Can merge, Archived, Environment, GitHub, Private, people, PRs, stars):

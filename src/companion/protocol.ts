@@ -157,9 +157,8 @@ export const COMPANION_PROTO = { major: 1, minor: 64 } as const;
  * 1.59–1.61 and 1.63 (fork): auto route's pick on a task, a plan's architect and fix agent, and who did each
  * part of a milestone. Taken out on 2026-11-18, when the fork went back to upstream's planner, builder and
  * checker (1.58). Upstream has since taken 1.59 for its own (below); the fork's 1.60, 1.61 and 1.63 aren't used again.
- * 1.62 (was 1.61 until upstream took 1.57, BLG-74, fork; was 1.60, before that 1.59): a Synon Studio Gate as a needs-you card (`NeedsYou.gate`, kind `studio-start`: the
- * plan's title, how many milestones, the estimate), answered with `studio.answerGate`. An older Mac
- * never sends one; an older phone draws it as a plain card (no Approve here).
+ * 1.62 (fork): a Synon Studio Gate as a needs-you card. Taken out when Synon Studio moved to its own
+ * repository (2026-11-18); the number isn't used again.
  * 1.59 (upstream, beluga-labs/beluga#589): when a plan's task reached the state it's in and when it last changed
  * (`PlanTaskView.since` / `updatedAt`), so every task says how fresh it is, not only those at work.
  * An older Mac sends neither; an older phone shows neither.

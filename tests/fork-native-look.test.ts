@@ -36,22 +36,14 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(branch).toContain('data-branch-step={main.id}');
     expect(branch).toContain('data-branch-more={wsId}');
     expect(branch).toContain("'primary'");
-    expect(read('views', 'ChatView.tsx')).toContain('<EmptyActions>');
-    expect(read('components', 'ui.tsx')).toContain('<div className={s.emptyActions}>{children}</div>');
-    expect(read('components', 'ui.tsx')).toContain('{icon ? <Icon name={icon} size={ICON_SIZE[size]} /> : null}');
   });
 
-  it('finds the pages’ markup the 1a–1c rules read', () => {
+  it('finds the Overview’s markup the list rules read', () => {
     expect(read('views', 'Overview.tsx')).toContain('<OverviewHeader sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} />');
     // The header's columns are the rows' own: the same grid as views/overview.module.css's .row.
     const columns = (css: string): string | undefined => /grid-template-columns:\s*([^;]+);/.exec(css)?.[1];
     const row = /\.row \{([^}]*)\}/.exec(read('views', 'overview.module.css'))?.[1] ?? '';
     expect(columns(read('fork', 'native', 'overview-header.module.css'))).toBe(columns(row));
-    expect(read('layout', 'BranchControl.tsx')).toContain('data-branch-state={branch.kind}');
-    expect(read('layout', 'RightPanel.tsx')).toContain('<div className={s.views}>');
-    const settings = read('dialogs', 'Settings.tsx');
-    expect(settings).toContain('data-settings-window=""');
-    expect(settings).toContain('<Dialog.Close className={s.close} aria-label="Close">');
   });
 
   it('touches only a Mac: every rule starts with the Mac flag', () => {
@@ -68,7 +60,7 @@ describe('the Mac-native look’s upstream anchors', () => {
       }
       return [...out, cur.trim()];
     });
-    expect(selectors.length).toBeGreaterThan(20);
+    expect(selectors.length).toBeGreaterThanOrEqual(6);
     expect(selectors.filter((s) => !s.startsWith(":root[data-os='mac'] "))).toEqual([]);
   });
 
