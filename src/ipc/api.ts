@@ -43,6 +43,7 @@ import { VOICE_API } from './voice-api.js';
 import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
+import { ACP_API } from './acp-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { FETCH_EVERY_MAX, FETCH_EVERY_MIN } from '../shared/background-fetch.js';
 import { AUTOPILOT_WAIT_MAX } from '../shared/autopilot-wait.js';
@@ -621,6 +622,7 @@ export const API = {
   ...AGENT_TERM_API,
   // ---- browsers on the web port: join links, the ones let in, revoking (web-api.ts)
   ...WEB_API,
+  ...ACP_API,
 } as const;
 
 export type Api = typeof API;
