@@ -156,6 +156,16 @@ BLG-257 查清了 `sync-upstream --report` 的 208 个未登记文件：**没有
 - `fork/base`：「Working in this fork」一节，写分支链和规矩（1 个）：`CLAUDE.md`
 - `topic/chinese`/`fork/base`：Mac 端的简体中文翻译（`docs/chinese.md`）（1 个）：`packages/mac/src/i18n/zh-CN.json`
 
+### 其余接入点（删掉沉稳模式后补登记，2026-11-23）
+
+沉稳模式（`fork/calm/`）在 2026-11-23 整个删掉：覆盖层、接入点、测试、`calm-check.mjs`、同步脚本里的沉稳检查和它的文档都已去掉，窗口的动效和样子与上游一致。原来登记在沉稳那几节、但不属于沉稳的改动留下来，登记在这里：
+
+- `packages/mac/src/App.tsx`：`useReplyLanguage()`，智能体按窗口的语言回答（设置 › 通用）。
+- `packages/mac/src/network/StatusMenu.tsx`：侧栏底部卡片里的账号头像 32px，去掉上箭头（见上面「侧边栏」一节）。
+- `packages/mac/src/onboarding/onboarding.module.css`：按钮用原生的按下指针 `--press-cursor`；Reduce Motion 下停掉 `heroSoft` 的光泽和 `beam`（上游缺口）。
+- `packages/mac/e2e/selection-bar.spec.ts`：拖选前把那一行滚进视野并立刻拖，没选中字就重来（最多 5 次），回答还在画时日志仍在跟最新一行。
+- `packages/mac/e2e/sidebar-calm.spec.ts`：用例名跟着侧栏底部卡片改（Usage 在卡片里）。
+
 ### 手机协议的 minor 编号（3.3.0、3.4.0 及之后同步时顺延）
 
 fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、docs/companion.md（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 src/companion/calls.ts、src/companion/views.ts、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
@@ -187,7 +197,7 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 ### ACP 智能体（上游 PR 准备中，2026-11-23）
 
-ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-runtime`、`feat/acp-agents` 两个分支上，准备提给上游，已经合进 `topic/plans`：`src/agent/runtime/acp/`（核心、内置清单、Registry、你的 ACP 智能体）、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/dialogs/AcpAgentsSettings.tsx`，说明见 `docs/acp.md`。Antigravity 移出固定的"你的智能体"，改由 ACP 管理；Claude、Codex、OpenCode、Copilot、本地模型不动。fork 原来的 `acp-agents/` 和它的接入点已经去掉。这两个分支被上游合并后，以上游为准。
+ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-runtime`、`feat/acp-agents` 两个分支上，准备提给上游，已经合进 `topic/plans`：`src/agent/runtime/acp/`（核心、内置清单、Registry、你的 ACP 智能体）、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/dialogs/AcpAgentsSettings.tsx`，说明见 `docs/acp.md`。Antigravity 移出固定的"你的智能体"，改由 ACP 管理（引导页 `packages/mac/src/onboarding/AgentsStep.tsx`、`packages/mac/src/onboarding/agent-setup.ts` 只列固定的几个，e2e `packages/mac/e2e/onboarding-agents.spec.ts`、`packages/mac/e2e/antigravity-flow.spec.ts` 跟着改，`tests/antigravity-flow.test.ts` 先添加 Antigravity 再查它的注册）；Claude、Codex、OpenCode、Copilot、本地模型不动。fork 原来的 `acp-agents/` 和它的接入点已经去掉。这两个分支被上游合并后，以上游为准。
 
 ### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
 
