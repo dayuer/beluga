@@ -427,8 +427,31 @@ describe('level ask needs a runtime that asks before each step', () => {
     await expect(control.send({ by, chatId: 'c', message: 'm', mode: 'auto' })).rejects.toMatchObject({ denial: 'level_denied' });
   });
 
+  it('refuses a runtime with neither a gate nor a sandbox below Full, and takes it at Full', async () => {
+    const agy = { runtime: 'antigravity', label: 'Antigravity' };
+    const p = port('trusted', agy, agy);
+    await expect(p.control.send({ by, chatId: 'c', message: 'm', mode: 'auto' })).rejects.toMatchObject({ denial: 'level_denied', message: expect.stringContaining('reads files without asking') });
+    await expect(p.control.launch({ by, projectId: 'p', message: 'm', strategy: 'root', runtime: 'antigravity' })).rejects.toMatchObject({ denial: 'level_denied' });
+    expect(p.sendChat).not.toHaveBeenCalled();
+    expect(p.newChat).not.toHaveBeenCalled();
+    const full = port('full', agy, agy);
+    await expect(full.control.send({ by, chatId: 'c', message: 'm', mode: 'auto' })).resolves.toMatchObject({ delivery: 'started' });
+  });
+
+  it('beluga_capabilities marks an unconfined runtime unavailable below Full', async () => {
+    const reads = { projects: () => [], runtimes: async () => [{ id: 'claude', ready: true, asksEachStep: true, models: [] }, { id: 'codex', ready: true, asksEachStep: false, confined: true, models: [] }, { id: 'antigravity', ready: true, asksEachStep: false, confined: false, models: [] }] } as unknown as ChatRead;
+    const caps = readTools(reads).find((t) => t.name === 'beluga_capabilities')!;
+    const grant = (level: Grant['level']): Grant => ({ id: 'g', name: 'GrokBot', clientId: 'c', redirectHost: 'h', route: 'local', level, projects: [], chats: { dms: false, groups: false }, createdAt: 0, expiresAt: 1, lastSeen: 0 });
+    const at = (await caps.run({}, grant('trusted'))) as { runtimes: Array<{ id: string; available: boolean; why?: string; confined?: boolean }> };
+    expect(at.runtimes.map((r) => [r.id, r.available])).toEqual([['claude', true], ['codex', true], ['antigravity', false]]);
+    expect(at.runtimes.find((r) => r.id === 'antigravity')?.why).toContain('reads files without asking');
+    expect(at.runtimes.some((r) => 'confined' in r)).toBe(false);
+    const full = (await caps.run({}, grant('full'))) as { runtimes: Array<{ available: boolean }> };
+    expect(full.runtimes.every((r) => r.available)).toBe(true);
+  });
+
   it('beluga_capabilities marks Codex as unavailable at ask', async () => {
-    const reads = { projects: () => [], runtimes: async () => [{ id: 'claude', ready: true, asksEachStep: true, models: [] }, { id: 'codex', ready: true, asksEachStep: false, models: [] }] } as unknown as ChatRead;
+    const reads = { projects: () => [], runtimes: async () => [{ id: 'claude', ready: true, asksEachStep: true, models: [] }, { id: 'codex', ready: true, asksEachStep: false, confined: true, models: [] }] } as unknown as ChatRead;
     const caps = readTools(reads).find((t) => t.name === 'beluga_capabilities')!;
     const grant = (level: Grant['level']): Grant => ({ id: 'g', name: 'GrokBot', clientId: 'c', redirectHost: 'h', route: 'local', level, projects: [], chats: { dms: false, groups: false }, createdAt: 0, expiresAt: 1, lastSeen: 0 });
     const at = (await caps.run({}, grant('ask'))) as { runtimes: Array<{ id: string; available: boolean; why?: string }> };

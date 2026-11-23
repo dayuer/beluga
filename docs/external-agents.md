@@ -190,6 +190,8 @@ A chat that an agent starts is your own run on this Mac. It uses your installed 
 
 On Codex, a level below Full holds in the sandbox: your home is denied, your Codex tools are off, and it gets only the core environment. Codex does not stop at Beluga's gate before each step, so a level you change counts at the next run.
 
+Below Full, a run needs Claude or Codex. OpenCode, Copilot, Antigravity and other ACP agents read files without asking Beluga and have no sandbox of Beluga's, so they could reach your home and `.env` files. A launch or a message on one of them is refused (`level_denied`), and `beluga_capabilities` lists them as unavailable with the reason. At Full they run as your own chats do.
+
 The agent stays a separate name. Its grant goes with each run, so you see the label "Sent by", the strip with Stop, the activity list and the first-use notice. A friend sees the label on each request, also on `ask_agent` and `run_on_peer`, as "kay (via GrokBot)", and the friend's own rules apply. **Stop** and **Revoke** end its runs and its queued messages, and your own runs and other agents' runs go on. Each step reads the level again, so a lower level counts at the next step. No friend limit applies: no turn limit, no time limit and no limit on cards.
 
 The phone follows its own setting, as your own runs do: Off refuses, Ask shows a card, Use and Full run. Below level Full each action also shows a card.

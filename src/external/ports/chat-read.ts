@@ -64,6 +64,8 @@ export interface RuntimeRef {
   readonly ready: boolean;
   /** It stops at Beluga's gate before each step: what a run at level ask needs. */
   readonly asksEachStep: boolean;
+  /** Its own sandbox keeps each step in the run's folders (Codex): what a run at level trusted needs when it doesn't ask. */
+  readonly confined?: boolean;
   readonly models: ReadonlyArray<{ readonly value: string; readonly label: string }>;
 }
 

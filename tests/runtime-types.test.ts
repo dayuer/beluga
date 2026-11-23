@@ -43,4 +43,14 @@ describe('safetyFor', () => {
     expect(safetyFor(sandboxed, { vetTool: () => undefined })).toEqual({ kind: 'sandbox' });
     expect(safetyFor(sandboxed, { guest: true })).toHaveProperty('refuse');
   });
+
+  it("refuses an external agent's run below Full trust without gating or a sandbox (it reads your home unasked)", () => {
+    const external = { asOwner: true, vetTool: () => undefined } as const;
+    expect(safetyFor(ungated, { ...external, scope: 'folder' })).toMatchObject({ kind: 'sandbox', refuse: expect.stringContaining('Full trust') });
+    // At Full it is you, on another screen.
+    expect(safetyFor(ungated, { ...external, scope: 'full' })).toEqual({ kind: 'sandbox' });
+    // Codex's sandbox holds it in its folders, and Claude gates each step.
+    expect(safetyFor({ ...ungated, hasSandbox: true }, { ...external, scope: 'folder' })).toEqual({ kind: 'sandbox' });
+    expect(safetyFor(gated, { ...external, scope: 'folder' })).toEqual({ kind: 'gated' });
+  });
 });
