@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AcpAgents } from '../src/agent/runtime/acp-agents/agents.js';
-import { AcpRegistry, OWN_RUNTIME_AGENTS, installKind, parseRegistry, registryPlatform, registryRuntimeId, searchRegistry } from '../src/agent/runtime/acp-agents/registry.js';
+import { AcpAgents } from '../src/agent/runtime/acp/agents.js';
+import { AcpRegistry, OWN_RUNTIME_AGENTS, installKind, parseRegistry, registryPlatform, registryRuntimeId, searchRegistry } from '../src/agent/runtime/acp/registry.js';
 
 /** A Registry like the real one (cdn.agentclientprotocol.com/registry/v1/latest/registry.json), in its shapes. */
 const registry = (archive: { url: string; sha256?: string }, platform: string) => ({
@@ -67,7 +67,7 @@ describe('installing from the ACP Registry', () => {
   const platform = registryPlatform() ?? 'darwin-aarch64';
   let archive: Buffer;
   let sha: string;
-  const agents = new AcpAgents({ file: path.join(home, 'acp-agents.json'), installed: () => false });
+  const agents = new AcpAgents({ file: path.join(home, 'acp-agents.json') });
 
   beforeAll(() => {
     // A Cursor-like archive: its command in a folder, as cursor's agent-cli-package.tar.gz has it.
@@ -92,7 +92,7 @@ describe('installing from the ACP Registry', () => {
     const reg = new AcpRegistry(agents, { fetch: fakeFetch(registry({ url: 'https://downloads.test/cursor.tar.gz', sha256: sha }, platform), { 'https://downloads.test/cursor.tar.gz': archive }), toolsDir: tools, platform, url: 'https://reg.test/registry.json' });
     const done = await reg.install('cursor');
     expect(done).toEqual({ ok: true, runtime: 'cursor', version: '2026.11.22' });
-    const added = agents.added().find((a) => a.id === 'cursor')!;
+    const added = agents.list().find((a) => a.id === 'cursor')!;
     expect(added).toMatchObject({ source: 'registry', registryId: 'cursor', version: '2026.11.22', args: ['acp'] });
     expect(realpathSync(added.command)).toBe(realpathSync(path.join(tools, 'cursor', '2026.11.22', 'dist-package', 'cursor-agent')));
     if (process.platform !== 'win32') expect(statSync(added.command).mode & 0o111).not.toBe(0);
@@ -100,11 +100,11 @@ describe('installing from the ACP Registry', () => {
   });
 
   it('refuses a download whose checksum doesn’t match, and adds nothing', async () => {
-    const other = new AcpAgents({ file: path.join(home, 'other.json'), installed: () => false });
+    const other = new AcpAgents({ file: path.join(home, 'other.json') });
     const reg = new AcpRegistry(other, { fetch: fakeFetch(registry({ url: 'https://downloads.test/cursor2.tar.gz', sha256: '0'.repeat(64) }, platform), { 'https://downloads.test/cursor2.tar.gz': archive }), toolsDir: path.join(home, 'tools2'), platform, url: 'https://reg.test/registry.json' });
     const done = await reg.install('cursor');
     expect(done).toMatchObject({ ok: false, error: expect.stringContaining('checksum') });
-    expect(other.added()).toEqual([]);
+    expect(other.list()).toEqual([]);
     expect(existsSync(path.join(home, 'tools2', 'cursor', '2026.11.22'))).toBe(false);
   });
 
@@ -120,7 +120,7 @@ describe('installing from the ACP Registry', () => {
     const bin = Buffer.from('#!/usr/bin/env node\n');
     const reg = new AcpRegistry(agents, { fetch: fakeFetch(registry({ url: 'https://downloads.test/c.tar.gz' }, platform), { 'https://downloads.test/muse?file=muse-mac': bin }), toolsDir: tools, platform, url: 'https://reg.test/registry.json' });
     expect(await reg.install('muse-code')).toMatchObject({ ok: true, runtime: 'muse' });
-    const muse = agents.added().find((a) => a.id === 'muse')!;
+    const muse = agents.list().find((a) => a.id === 'muse')!;
     expect(muse.env).toEqual({ MUSE_EXPERIMENTAL_ACP: 'on' });
     expect(readFileSync(muse.command, 'utf8')).toBe(bin.toString());
   });
@@ -128,65 +128,30 @@ describe('installing from the ACP Registry', () => {
   it('runs a package at its exact version through npx or uvx', async () => {
     const reg = new AcpRegistry(agents, { fetch: fakeFetch(registry({ url: 'https://downloads.test/c.tar.gz' }, platform), {}), toolsDir: tools, platform, url: 'https://reg.test/registry.json' });
     expect(await reg.install('gemini')).toMatchObject({ ok: true, runtime: 'gemini' });
-    expect(agents.added().find((a) => a.id === 'gemini')).toMatchObject({ command: 'npx', args: ['-y', '@google/gemini-cli@0.70.0', '--acp'] });
+    expect(agents.list().find((a) => a.id === 'gemini')).toMatchObject({ command: 'npx', args: ['-y', '@google/gemini-cli@0.70.0', '--acp'] });
     expect(await reg.install('fast-agent')).toMatchObject({ ok: true, runtime: 'acp-fast-agent' });
-    expect(agents.added().find((a) => a.id === 'acp-fast-agent')).toMatchObject({ command: 'uvx', args: ['fast-agent-acp==0.10.65', '-x'], env: { FAST_AGENT_MODEL: 'codexplan' } });
+    expect(agents.list().find((a) => a.id === 'acp-fast-agent')).toMatchObject({ command: 'uvx', args: ['fast-agent-acp==0.10.65', '-x'], env: { FAST_AGENT_MODEL: 'codexplan' } });
   });
 
   it('uninstalls one: its entry and the files Beluga downloaded', async () => {
     const reg = new AcpRegistry(agents, { fetch: fakeFetch(registry({ url: 'https://downloads.test/c.tar.gz' }, platform), {}), toolsDir: tools, platform, url: 'https://reg.test/registry.json' });
     expect(await reg.uninstall('cursor')).toBe(true);
     expect(existsSync(path.join(tools, 'cursor'))).toBe(false);
-    expect(agents.added().some((a) => a.id === 'cursor')).toBe(false);
+    expect(agents.list().some((a) => a.id === 'cursor')).toBe(false);
     expect(await reg.uninstall('cursor')).toBe(false);
   });
 });
 
-describe('your ACP agents', () => {
-  const home = mkdtempSync(path.join(os.tmpdir(), 'beluga-acp-agents-'));
+describe('your ACP agents, kept', () => {
+  const home = mkdtempSync(path.join(os.tmpdir(), 'beluga-acp-file-'));
   afterAll(() => rmSync(home, { recursive: true, force: true }));
-  let now = 0;
-  const here = new Set(['grok']);
-  const agents = new AcpAgents({ file: path.join(home, 'acp-agents.json'), installed: (s) => here.has(s.id), now: () => now });
-
-  it('offers the built-in ones whose CLI is here, and the ones you added', () => {
-    expect(agents.list().map((a) => a.id)).toEqual(['grok']);
-    expect(agents.addLocal({ label: 'DeepSeek Harness', command: 'dsh', args: ['--profile', 'acp'] })).toEqual({ ok: true, id: 'acp-deepseek-harness' });
-    expect(agents.list().map((a) => a.id)).toEqual(['acp-deepseek-harness', 'grok']);
-    expect(agents.get('acp-deepseek-harness')).toMatchObject({ source: 'local', command: 'dsh', args: ['--profile', 'acp'] });
-  });
-
-  it('refuses an id another runtime owns, and a bad command', () => {
-    expect(agents.add({ id: 'claude', label: 'Fake', command: 'x', args: [], source: 'local' })).toMatchObject({ ok: false });
-    expect(agents.addLocal({ label: 'Bad', command: 'x\ny' })).toMatchObject({ ok: false });
-    expect(agents.addLocal({ label: ' ', command: 'x' })).toMatchObject({ ok: false });
-  });
-
-  it('turns a built-in one off and back on; removes one you added', () => {
-    expect(agents.remove('grok')).toBe(true);
-    expect(agents.list().map((a) => a.id)).toEqual(['acp-deepseek-harness']);
-    agents.restore('grok');
-    expect(agents.list().map((a) => a.id)).toContain('grok');
-    expect(agents.remove('acp-deepseek-harness')).toBe(true);
-    expect(agents.remove('acp-nothing')).toBe(false);
-  });
-
-  it('finds a CLI just installed after a while, or at once when told', () => {
-    agents.list();
-    here.add('cursor');
-    expect(agents.list().map((a) => a.id)).not.toContain('cursor');
-    now += 31_000;
-    expect(agents.list().map((a) => a.id)).toContain('cursor');
-    here.add('kiro');
-    agents.refresh();
-    expect(agents.list().map((a) => a.id)).toContain('kiro');
-  });
+  const agents = new AcpAgents({ file: path.join(home, 'acp-agents.json') });
 
   it('reads a broken file as empty, and writes it for you alone', () => {
     writeFileSync(path.join(home, 'acp-agents.json'), '{nope');
-    agents.refresh();
-    expect(agents.added()).toEqual([]);
-    agents.addLocal({ label: 'Mine', command: 'mine' });
+    expect(agents.list()).toEqual([]);
+    agents.addCommand({ label: 'Mine', command: 'mine' });
+    expect(agents.list().map((a) => a.id)).toEqual(['acp-mine']);
     if (process.platform !== 'win32') expect(statSync(path.join(home, 'acp-agents.json')).mode & 0o777).toBe(0o600);
   });
 });

@@ -249,19 +249,9 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 - src/ipc/api.ts：`PrefsPatch` 里 `...forkPrefsPatch`，替换原来的 autoRoute import 和字段（行数不涨）
 - src/core/board/launch.ts：把 `federationParts` 装进看板部件（BLG-225）
 
-### 通用 ACP 接入与 ACP Registry（BLG-ACP，2026-11-23）
+### ACP 智能体（上游 PR 准备中，2026-11-23）
 
-一个通用的 ACP 运行时跑所有 Agent Client Protocol 智能体：T3 Code 自己支持的 Cursor、Grok Build、Kiro、Muse Code、Pi、fx，加上 Gemini CLI、Qwen Code、Kimi Code、goose、Droid、Cline、Auggie、Kilo，ACP Registry 里的任何一个，以及你自己的命令。代码都在新文件里：`src/agent/runtime/acp-agents/`（运行时、内置清单、Registry、已添加的智能体）、`src/shared/acp-runtimes.ts`、`src/shared/acp-fallbacks.ts`、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/fork/acp/AcpAgentsSettings.tsx`。说明见 `docs/acp-agents.md`。Claude、Codex、OpenCode、Copilot、Antigravity 仍用各自的运行时，没动。
-
-- src/agent/runtime/registry.ts：`runtimeFor` 查不到时问 `acpRuntimeFor`，`otherRuntimes` 带上 `acpRuntimes()`，`signInCommand` 最后交给 `acpSignInCommand`，加一个 import（4 行：三处查表各一行，没法再少）
-- src/shared/agent-runtimes.ts：`runtimeChoices` 多一个 `extra` 参数，列表经 `withExtraRuntimes`，加一个 import（3 行）
-- src/shared/runtime-fallbacks.ts：`fallbackFor`、`runtimeHas` 查不到时用 `acpFallbacks` / `acpMissing`，加一个 import（3 行）
-- src/core/session.ts：`runtime.extra`（这台电脑的 ACP 智能体，给选择器和用量用；注释一行、字段一行）、`withUsage` 带上它们（3 行）
-- src/core/session-parts.ts：`runtimeChoices` 传 `opts.runtime?.extra?.()`（1 行）
-- src/daemon/core.ts：`extra: () => acpRuntimes()…`，加一个 import（2 行）
-- src/ipc/api.ts：`...ACP_API`，加一个 import（2 行）
-- packages/mac/src/dialogs/Settings.tsx：Local models 之后放 `<AcpAgentsSettings />`，加一个 import（2 行）
-- 登记表走 fork 自己的文件：`src/ipc/fork-handlers.ts`、`src/fork/coverage.ts`、`packages/mac/src/fork/settings-index.ts`、`docs/parity.fork.md`（API 行和「Agent runs on ACP agents」一表）；测试在 `tests/fork-acp-runtime.test.ts`、`tests/fork-acp-registry.test.ts`、`tests/fork-acp-parity.test.ts`
+ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-runtime`、`feat/acp-agents` 两个分支上，准备提给上游，已经合进 `topic/plans`：`src/agent/runtime/acp/`（核心、内置清单、Registry、你的 ACP 智能体）、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/dialogs/AcpAgentsSettings.tsx`，说明见 `docs/acp.md`。Antigravity 移出固定的"你的智能体"，改由 ACP 管理；Claude、Codex、OpenCode、Copilot、本地模型不动。fork 原来的 `acp-agents/` 和它的接入点已经去掉。这两个分支被上游合并后，以上游为准。
 
 ### 计划图与大纲共用（`packages/ui-plan`，BLG-90）
 

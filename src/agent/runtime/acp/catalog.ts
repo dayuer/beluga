@@ -1,16 +1,30 @@
-import type { AcpAgentSpec } from './spec.js';
+import type { AcpAgentEntry } from './entry.js';
 
 /**
- * The ACP agents Beluga knows by name (BLG-ACP): each one's own CLI, started in its ACP mode, the
- * way the ACP Registry starts it (cdn.agentclientprotocol.com/registry). One shows in the agent
- * picker once its CLI is on this computer (or once you add it, Settings › Agents › ACP agents); one
- * that isn't there yet can be installed from the Registry instead. The ids are short and stable:
- * they're what a conversation's AgentRef keeps. Claude, Codex, OpenCode, Copilot and Antigravity
- * have runtimes of their own and aren't here.
+ * The ACP agents Beluga knows by name: each one's own CLI, started in its ACP mode, the way the ACP
+ * Registry starts it (cdn.agentclientprotocol.com/registry). None is there by default: you add one
+ * in Settings › Agent › ACP agents once its CLI is on this computer, and only then does it show in
+ * the agent pickers. The ids are short and stable: they're what a conversation's AgentRef keeps.
+ * Claude, Codex, OpenCode and Copilot have runtimes of their own and aren't here.
  *
- * Every one runs on the generic ACP runtime (runner.ts), with ACP_CAPABILITIES.
+ * Antigravity runs on a runtime of its own on the ACP core (antigravity/, with its extension);
+ * every other one on the generic ACP runtime (runtime.ts, generic.ts), with ACP_CAPABILITIES.
  */
-export const BUILTIN_ACP_AGENTS: readonly AcpAgentSpec[] = [
+export const BUILTIN_ACP_AGENTS: readonly AcpAgentEntry[] = [
+  {
+    id: 'antigravity',
+    label: 'Antigravity',
+    command: 'agy',
+    args: ['acp'],
+    source: 'builtin',
+    registryId: 'antigravity-acp',
+    pathVar: 'BELUGA_AGY_PATH',
+    searchDirs: ['~/.local/bin'],
+    install: 'Install the Antigravity CLI: curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    signIn: { words: 'Run agy in Terminal once to sign in with your Google account', command: ['agy'] },
+    website: 'https://antigravity.google',
+    description: 'Gemini, and the Claude and GPT-OSS models your Antigravity plan has',
+  },
   {
     id: 'cursor',
     label: 'Cursor',
@@ -184,6 +198,6 @@ export const BUILTIN_ACP_AGENTS: readonly AcpAgentSpec[] = [
 ];
 
 /** A built-in ACP agent by its runtime id. */
-export function builtinAcpAgent(id: string): AcpAgentSpec | undefined {
+export function builtinAcpAgent(id: string): AcpAgentEntry | undefined {
   return BUILTIN_ACP_AGENTS.find((a) => a.id === id);
 }

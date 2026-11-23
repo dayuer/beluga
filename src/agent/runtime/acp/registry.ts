@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { belugaHome } from '../../../core/home.js';
 import { BUILTIN_ACP_AGENTS } from './catalog.js';
 import type { AcpAgents } from './agents.js';
-import { type AcpAgentSpec, acpRuntimeId } from './spec.js';
+import { type AcpAgentEntry, acpRuntimeId } from './entry.js';
 import { forgetAcpStatus } from './status.js';
 
 /**
@@ -48,7 +48,7 @@ export type RegistryAgent = z.infer<typeof Agent>;
 
 const RegistryFile = z.object({ version: z.string().optional(), agents: z.array(z.unknown()) });
 
-/** Registry agents Beluga runs with a runtime of its own: they don't show in a search (Settings › Agents has them). */
+/** Registry agents Beluga runs with a runtime of its own: they don't show in a search (Your agents has them, or Beluga's own ACP list: Antigravity). */
 export const OWN_RUNTIME_AGENTS: Readonly<Record<string, string>> = {
   'claude-acp': 'claude',
   'codex-acp': 'codex',
@@ -162,7 +162,7 @@ export class AcpRegistry {
 
   /** What's installed from the Registry, by its agent id: the version. */
   private installed(): Map<string, string> {
-    return new Map(this.agents.added().flatMap((a) => (a.source === 'registry' && a.registryId ? [[a.registryId, a.version ?? '']] : [])));
+    return new Map(this.agents.list().flatMap((a) => (a.source === 'registry' && a.registryId ? [[a.registryId, a.version ?? '']] : [])));
   }
 
   async search(query: string, limit = 50): Promise<RegistryHit[]> {
@@ -178,14 +178,15 @@ export class AcpRegistry {
   async install(agentId: string): Promise<{ readonly ok: true; readonly runtime: string; readonly version: string } | { readonly ok: false; readonly error: string }> {
     const agent = (await this.load(true)).find((a) => a.id === agentId);
     if (!agent) return { ok: false, error: 'That agent isn’t in the ACP Registry any more.' };
-    if (OWN_RUNTIME_AGENTS[agent.id]) return { ok: false, error: `Beluga runs ${agent.name} with its own runtime: pick it in Settings › Agents.` };
+    if (OWN_RUNTIME_AGENTS[agent.id] === 'antigravity') return { ok: false, error: 'Beluga runs Antigravity with its own runtime: add it from Beluga’s own list, in Settings › Agent › ACP agents.' };
+    if (OWN_RUNTIME_AGENTS[agent.id]) return { ok: false, error: `Beluga runs ${agent.name} with its own runtime: pick it in Settings › Agent.` };
     const platform = this.deps.platform ?? registryPlatform();
     const kind = installKind(agent, platform);
     if (!kind) return { ok: false, error: `${agent.name} doesn’t run on this computer.` };
     const runtime = registryRuntimeId(agent.id);
     const base = { id: runtime, label: agent.name, source: 'registry' as const, registryId: agent.id, version: agent.version, ...(agent.website ? { website: agent.website } : {}), ...(agent.description ? { description: agent.description.slice(0, 1000) } : {}) };
     try {
-      let spec: Omit<AcpAgentSpec, 'source'> & { readonly source: 'registry' };
+      let spec: Omit<AcpAgentEntry, 'source'> & { readonly source: 'registry' };
       if (kind === 'binary') {
         const bin = agent.distribution.binary![platform!]!;
         const command = await this.installBinary(agent, bin);
@@ -194,7 +195,7 @@ export class AcpRegistry {
         const pkg = (kind === 'npx' ? agent.distribution.npx : agent.distribution.uvx)!;
         spec = kind === 'npx' ? { ...base, command: 'npx', args: ['-y', pkg.package, ...(pkg.args ?? [])], ...(pkg.env ? { env: pkg.env } : {}) } : { ...base, command: 'uvx', args: [pkg.package, ...(pkg.args ?? [])], ...(pkg.env ? { env: pkg.env } : {}) };
       }
-      const added = this.agents.add(spec);
+      const added = this.agents.addWhole(spec);
       if (!added.ok) return added;
       forgetAcpStatus();
       return { ok: true, runtime, version: agent.version };
@@ -205,7 +206,7 @@ export class AcpRegistry {
 
   /** Remove an installed agent: its entry, and the files Beluga downloaded for it. */
   async uninstall(runtime: string): Promise<boolean> {
-    const spec = this.agents.added().find((a) => a.id === runtime);
+    const spec = this.agents.list().find((a) => a.id === runtime);
     if (!spec || !this.agents.remove(runtime)) return false;
     if (spec.source === 'registry' && spec.registryId) await fs.rm(path.join(this.deps.toolsDir ?? acpToolsDir(), spec.registryId), { recursive: true, force: true }).catch(() => undefined);
     forgetAcpStatus();

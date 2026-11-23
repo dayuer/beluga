@@ -15,6 +15,7 @@ import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
 import { SUPPORT_API } from './support-api.js';
 import { TELEMETRY_API } from './telemetry-api.js';
+import { ACP_API } from './acp-api.js';
 import { STATS_API } from './stats-api.js';
 import { WEB_API } from './web-api.js';
 import { DIAGNOSTICS_API } from './diagnostics-api.js';
@@ -43,7 +44,6 @@ import { VOICE_API } from './voice-api.js';
 import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
-import { ACP_API } from './acp-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { FETCH_EVERY_MAX, FETCH_EVERY_MIN } from '../shared/background-fetch.js';
 import { AUTOPILOT_WAIT_MAX } from '../shared/autopilot-wait.js';
@@ -572,6 +572,7 @@ export const API = {
   ...SUPPORT_API,
   // ---- usage statistics: your level (Off, Essential, On), the ask after an update, what's sent (telemetry-api.ts)
   ...TELEMETRY_API,
+  ...ACP_API,
   // ---- your stats in the Usage tab: counted by the daemon, pastes and dictation from the Mac (stats-api.ts)
   ...STATS_API,
   // ---- problem reports: the daemon's black box in one redacted file (diagnostics-api.ts)
@@ -622,7 +623,6 @@ export const API = {
   ...AGENT_TERM_API,
   // ---- browsers on the web port: join links, the ones let in, revoking (web-api.ts)
   ...WEB_API,
-  ...ACP_API,
 } as const;
 
 export type Api = typeof API;

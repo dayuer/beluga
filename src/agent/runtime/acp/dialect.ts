@@ -1,6 +1,9 @@
 import path from 'node:path';
 import type { AcpDialect } from '../opencode/events.js';
-import type { ToolCall } from '../opencode/acp.js';
+import type { AcpHttpMcpServer, AcpMcpServer, InitializeResponse, ToolCall } from '../opencode/acp.js';
+import type { MountedRun } from '../../tool-host.js';
+import { httpServers } from '../copilot/run-parts.js';
+import { stdioServers } from './parts.js';
 import { type BelugaCall, patchFiles } from '../opencode/tools.js';
 
 /**
@@ -34,15 +37,21 @@ const forms = (s: string): string[] => [`mcp__${s}__`, `mcp_${s}_`, `${s}-`, `${
 
 /**
  * Beluga's MCP name for an agent's tool (`mcp__beluga_board__task_get`), or undefined: not one of
- * Beluga's. The longest suite that names it wins (`beluga_board` over `beluga`).
+ * Beluga's. The longest suite that names it wins (`beluga_board` over `beluga`). With `known` (the
+ * tools mounted for the run, by their Beluga names) it must be one of them: a server of your own
+ * whose name only starts like a suite (`beluga_helper`) is not Beluga's.
  */
-export function belugaToolOf(name: string, suites: readonly string[]): string | undefined {
+export function belugaToolOf(name: string, suites: readonly string[], known?: ReadonlySet<string>): string | undefined {
   for (const s of [...suites].sort((a, b) => b.length - a.length)) {
     const form = forms(s).find((f) => name.startsWith(f) && name.length > f.length);
-    if (form) return `mcp__${s}__${name.slice(form.length)}`;
+    const named = form ? `mcp__${s}__${name.slice(form.length)}` : undefined;
+    if (named && (!known || known.has(named))) return named;
   }
   return undefined;
 }
+
+/** The suites a run's mounted tools belong to (`mcp__beluga_board__task_get` → `beluga_board`). */
+export const suitesOf = (known: ReadonlySet<string>): string[] => [...new Set([...known].map((n) => /^mcp__(.+?)__/.exec(n)?.[1]).filter((s): s is string => Boolean(s)))];
 
 /** A call's tool: an MCP tool of Beluga's (or one shaped like one) by its name or title; else its kind; else its name, else its title. */
 export function acpTool(call: Pick<ToolCall, 'name' | 'kind' | 'title'>, suites: readonly string[] = []): string {
@@ -72,8 +81,8 @@ function filesOf(raw: Record<string, unknown>, cwd: string): string[] {
 const creates = (raw: Record<string, unknown>): boolean => /^--- a?\/dev\/null$/m.test(str(raw.diff) ?? '') || ((typeof raw.file_text === 'string' || typeof raw.content === 'string') && raw.old_string === undefined && raw.oldText === undefined);
 
 /** One agent's call as Beluga's: one per file it touches (an Edit or Write each, a Read each). */
-export function acpCalls(tool: string, raw: Record<string, unknown>, cwd: string, suites: readonly string[] = []): BelugaCall[] {
-  const mcp = belugaToolOf(tool, suites);
+export function acpCalls(tool: string, raw: Record<string, unknown>, cwd: string, suites: readonly string[] = [], known?: ReadonlySet<string>): BelugaCall[] {
+  const mcp = belugaToolOf(tool, suites, known);
   if (mcp) return [{ name: mcp, input: raw }];
   const files = filesOf(raw, cwd);
   switch (tool) {
@@ -105,14 +114,27 @@ export function acpCalls(tool: string, raw: Record<string, unknown>, cwd: string
   }
 }
 
-/** The generic dialect: inputs come with the call or in its updates; only a permission waits for them. */
-export function acpDialect(suites: () => readonly string[]): AcpDialect {
+/** The generic dialect for one run (`known`: its mounted tools): inputs come with the call or in its updates; only a permission waits for them. */
+export function acpDialect(known: ReadonlySet<string>): AcpDialect {
+  const suites = suitesOf(known);
   return {
-    toolOf: (call) => acpTool(call, suites()),
+    toolOf: (call) => acpTool(call, suites),
     inputOf: acpInput,
-    callsOf: acpCalls,
+    callsOf: (tool, raw, cwd) => acpCalls(tool, raw, cwd, suites, known),
     needsInput: new Set(['read', 'edit', 'delete', 'move', 'execute']),
     inputKeys: new Set(['path', 'Path', 'file_path', 'filePath', 'FilePath', 'absolutePath', 'AbsolutePath', 'command', 'Command', 'cmd', 'commandLine', 'CommandLine', 'pattern', 'Pattern', 'query', 'patch', 'url', 'Url', 'locations']),
     writes: new Set(['edit', 'delete', 'move']),
   };
+}
+
+/** The generic tools of an extension that names none of its own. */
+export const GENERIC_TOOLS = { dialect: acpDialect, belugaToolOf } as const;
+
+/** What an agent's initialize says past what OpenCode's does: whether it takes MCP servers over HTTP. */
+type AcpInit = InitializeResponse & { readonly agentCapabilities?: { readonly mcpCapabilities?: { readonly http?: boolean } } };
+
+/** Beluga's tools for a session: over HTTP when the extension says so or the agent takes them so, else stdio (ACP's baseline). */
+export function mcpServersFor(mounted: Pick<MountedRun, 'http' | 'servers'>, init: InitializeResponse, mount?: 'http' | 'stdio'): Array<AcpHttpMcpServer | AcpMcpServer> {
+  const http = mount ? mount === 'http' : Boolean((init as AcpInit).agentCapabilities?.mcpCapabilities?.http);
+  return http ? httpServers(mounted.http) : stdioServers(mounted.servers);
 }

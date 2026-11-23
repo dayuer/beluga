@@ -34,7 +34,7 @@ import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
-import { AcpAgentsSettings } from '../fork/acp/AcpAgentsSettings.js';
+import { AcpAgentsSettings } from './AcpAgentsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
 import { NotificationSettings } from './NotificationSettings.js';
 import { VoiceSettings } from './VoiceSettings.js';
