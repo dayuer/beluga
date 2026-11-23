@@ -95,7 +95,7 @@ function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode
         <span className={s.lead}>
           {/* The sidebar's menu-bar button (a browser's), beside it while the sidebar is hidden. */}
           <AppMenu />
-          <IconButton size="large" icon="sidebar" label="Show sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: true })} />
+          <IconButton size="large" icon="sidebarShow" label="Show sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: true })} />
         </span>
       )}
       <NavButtons />
