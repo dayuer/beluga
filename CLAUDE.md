@@ -103,7 +103,7 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
   upstream's `zh-CN.json`), `topic/native` (the Mac's native work; now beluga-labs/beluga#584) and
   `topic/fixes` (small fixes). `topic/plans` is the whole fork: it merges those three and holds
   everything else that differs from upstream `main` (fork structure and registries, build numbers,
-  the sync script, the calm UI and `fork/` overlays, native sheets and alerts, Plan Settings and the
+  the sync script, the `fork/` overlays, native sheets and alerts, Plan Settings and the
   fork's other features, the fork's docs). `fork/base` is retired: its content is on `topic/plans`.
   Synon Studio (clients, federation, My Sharing) is its own repository since 2026-11-18,
   `~/sproot/synon-studio`, built on `topic/plans`.

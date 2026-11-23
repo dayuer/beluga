@@ -26,7 +26,6 @@ async function dragAcross(page: Page, target: Locator): Promise<void> {
 test('selecting an answer shows Copy and Ask beside it', async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  if (process.env.CALM_OFF) await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
   await page.goto('/');
   const row = sidebar(page).getByRole('button', { name: 'webhook-retries', exact: true });
   if (!(await row.isVisible())) await sidebar(page).getByRole('button', { name: 'bob-api' }).first().click({ position: { x: 60, y: 10 } });

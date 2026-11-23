@@ -26,7 +26,6 @@ import './styles/base.css';
 // Dockview's own styles, then Beluga's look for them (the window's frame and the panel's dock).
 import 'dockview-react/dist/styles/dockview.css';
 import './styles/dock.css';
-import './fork/calm/index.js';
 
 apply();
 if (inApp()) document.documentElement.dataset.app = 'tauri';

@@ -72,8 +72,8 @@ describe('the Mac-native look’s upstream anchors', () => {
     expect(selectors.filter((s) => !s.startsWith(":root[data-os='mac'] "))).toEqual([]);
   });
 
-  it('is loaded by the fork’s overlay, not by an upstream file', () => {
-    const index = read('fork', 'calm', 'index.ts');
+  it('is loaded by the fork’s own sidebar module, not by an upstream file', () => {
+    const index = read('fork', 'sidebar', 'index.ts');
     expect(index).toContain("import '../native/native-look.css';");
   });
 });

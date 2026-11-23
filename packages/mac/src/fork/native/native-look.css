@@ -2,7 +2,7 @@
  * Mac-native touches on the web view (fork; docs/fork.md, "Mac 原生"). Reviewed against macOS's own
  * apps in Claude Design ("Beluga topic/native · Mac 原生走查", 1a–1c). Only the look: every rule
  * reuses an existing token (styles/tokens.css, components/ui.module.css), and the
- * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/calm and fork/sidebar do;
+ * `[class*='_name_']` anchors are upstream's CSS-module classes, as fork/sidebar does;
  * tests/fork-native-look.test.ts checks they still exist.
  *
  * Only on a Mac (`:root[data-os='mac']`, set by lib/prefs.ts): Windows and Linux keep upstream's look,
@@ -12,8 +12,7 @@
 /*
  * The branch's next step in the toolbar (layout/BranchControl.tsx): a Mac toolbar has no accent-filled
  * buttons, so Create PR and its ▾ are drawn as any bordered toolbar button, in the text colour.
- * A failed step, a merged branch and Merge (green, its own variant) keep their colours. The `:root` prefix puts
- * these above calm-accent.css's rule that repaints every primary button in the accent.
+ * A failed step, a merged branch and Merge (green, its own variant) keep their colours.
  */
 :root[data-os='mac'] button:is([data-branch-step], [data-branch-more])[class*='_primary_']:not([class*='_mainError_'], [class*='_mainMerged_']) {
   background: var(--control);

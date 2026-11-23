@@ -4,8 +4,8 @@ import { asChatRow } from '../lib/said.js';
 import type { LogItem } from '@beluga/core/store.js';
 import { type TaskView, tasksIn } from '@beluga/core/gateway/model.js';
 import { LogTaskCard } from '../gateway/TaskCard.js';
+import { Icon } from '../components/Icon.js';
 import { Avatar, Empty, Working, cx } from '../components/ui.js';
-import { JumpLabel } from '../fork/calm/new-below.js';
 import { toast, useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { agentName, useMyAgent } from '../lib/agent-words.js';
 import { keepSameLists, sameItems } from '../lib/stable.js';
@@ -347,7 +347,8 @@ export function ChatLog({ channel, empty, ahead, starting: startingHere = false 
             virtualizer.scrollToIndex(rows.length - 1, { align: 'end' });
           }}
         >
-          <JumpLabel rows={rows.length} />
+          <Icon name="chevronDown" size={12} />
+          Latest
         </button>
       )}
     </div>

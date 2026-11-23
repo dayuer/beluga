@@ -206,8 +206,6 @@ test('an Unread row is a source and a target (BLG-307)', async ({ page }) => {
   await boxIn(page, a).fill('hello');
   await boxIn(page, a).press('Enter');
   await sidebar(page).getByText('Your Mac', { exact: true }).click();
-  // Calm mode keeps the sidebar's order still while the pointer is in it (BLG-165), so the Unread row waits: let the pointer go.
-  await page.mouse.move(700, 450);
   await expect(unreadRow(a)).toBeVisible({ timeout: 40_000 });
   await pause(page);
   // As a source: dropped on another chat's row.

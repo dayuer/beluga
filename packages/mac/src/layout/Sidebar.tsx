@@ -41,7 +41,6 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
-import { useSidebarHold } from '../fork/calm/hold-order.js';
 import { useOneSelected, useSidebarKeys } from '../fork/sidebar/index.js';
 import { openSettings } from '../lib/native-routes.js';
 
@@ -98,7 +97,6 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 export function Sidebar() {
   const actions = useActions();
   const drop = useFolderDrop();
-  useSidebarHold(drop.ref);
   useOneSelected(drop.ref);
   useSidebarKeys(drop.ref);
   // A chat's row picked up: what's carried, and the chat that would take it.

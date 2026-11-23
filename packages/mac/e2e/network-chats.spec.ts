@@ -242,10 +242,6 @@ test('reactions: the demo’s show under their messages; hover to add yours, cli
 });
 
 test('Settings has who may ask your Claude; turning the network off brings the Friends card back', async ({ page }) => {
-  // The friends card is hidden while calm mode is on (M8, BLG-250); this test is about the card, so it runs with calm off.
-  await page.addInitScript(() => localStorage.setItem('beluga.fork.calm.v1', JSON.stringify({ calm: false })));
-  await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Sidebar' })).toBeVisible();
   await page.keyboard.press('Meta+,');
   await page.getByRole('button', { name: 'People & access' }).click();
   await expect(page.getByText('Who can ask your agent in chats')).toBeVisible();

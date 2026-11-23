@@ -6,7 +6,6 @@ import { type ActionItem, ActionsContext } from '../components/SpecMenu.js';
 import { Lifted, useLean } from '../components/Lifted.js';
 import { Icon } from '../components/Icon.js';
 import { IconButton, cx } from '../components/ui.js';
-import { useCalm } from '../fork/calm/index.js';
 import { useApp } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { openExternal } from '../lib/system.js';
@@ -89,9 +88,7 @@ const order = (a: Issue, b: Issue): number => byRank(a, b) || PRIORITY_INFO[a.pr
 /** `projectId`: the board shown; `repo`: the one repo you're looking at on a board of several (new tasks run there). */
 export function TaskBoard({ issues, statuses, projectId, repo }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string }) {
   const { api, act } = useTaskActions();
-  // Calm mode treats the board's own layout motion as still: cards take their new places at once.
-  const calm = useCalm();
-  const reduce = (useReducedMotion() ?? false) || calm;
+  const reduce = useReducedMotion() ?? false;
   const [lift, setLift] = useState<Lift>();
   const [over, setOver] = useState<Spot>();
   const [pending, setPending] = useState<Pending>();

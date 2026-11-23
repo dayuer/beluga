@@ -6,9 +6,8 @@
 :global(nav:has([data-fork-sidebar-edge])) {
   position: relative;
   /*
-   * Calm mode gives every element's transitions 160 ms (fork/calm/calm-motion.css, M3) and the
-   * browser's default property is `all`: the width would glide behind the pointer and after each
-   * arrow key. The sidebar keeps its colour fades and never animates its width.
+   * The browser's default transition property is `all`: the width would glide behind the pointer
+   * and after each arrow key. The sidebar keeps its colour fades and never animates its width.
    */
   transition-property: background-color, border-color, color, opacity, box-shadow;
 }
@@ -29,9 +28,8 @@
 .edge.edge[data-fork-sidebar-edge] {
   margin: 0;
 }
-/* Nothing animates under Reduce Motion or calm mode: the highlight is there at once, or not. */
-:global(:root[data-motion='reduce']) .edge > *,
-:global(:root[data-calm]) .edge > * {
+/* Nothing animates under Reduce Motion: the highlight is there at once, or not. */
+:global(:root[data-motion='reduce']) .edge > * {
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {

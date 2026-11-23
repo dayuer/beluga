@@ -7,7 +7,7 @@ import { MARKS } from '../packages/mac/src/fork/sidebar/one-mark.js';
 
 /**
  * The fork's sidebar look (packages/mac/src/fork/sidebar/) hangs on upstream's class names and
- * attributes. scripts/sync-upstream.mjs only scans fork/calm for stale anchors, so this checks
+ * attributes. scripts/sync-upstream.mjs doesn't scan them for stale anchors, so this checks
  * these: after a sync that renames one, this fails and names it, instead of the double highlight
  * and the glowing rows quietly coming back.
  */
