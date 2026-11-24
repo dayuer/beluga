@@ -9,6 +9,7 @@ import { CopyCommand } from '../onboarding/AgentsStep.js';
 import { agentRows } from '../onboarding/agent-setup.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
+import { errorWords as errorText } from '@beluga/shared/error-text.js';
 
 /** One ACP agent as the daemon lists it (src/ipc/acp-handlers.ts AcpAgentView). */
 interface AgentView {
@@ -41,8 +42,6 @@ interface Draft {
   readonly args: string;
   readonly env: string;
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
 /** Arguments as typed: split on spaces, "quoted words" kept together. */
 export function splitArgs(text: string): string[] {
