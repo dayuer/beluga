@@ -102,25 +102,28 @@ This section is the fork's own; keep it last so upstream syncs merge cleanly.
 - **`main` is upstream's, exactly.** It only ever fast-forwards to `upstream/main`
   (`git fetch upstream && git push origin upstream/main:main`); nothing of the fork is committed
   on it. What upstream has already merged gets no branch of its own here.
-- **Two kinds of branches** (`docs/fork.md`, "分支"). Three prepare work for upstream, each on
-  `upstream/main` and written the way upstream would take it: `topic/chinese` (the Chinese, in
-  upstream's `zh-CN.json`), `topic/native` (the Mac's native work; now beluga-labs/beluga#584) and
-  `topic/fixes` (small fixes). `topic/plans` is the whole fork: it merges those three and holds
+- **Two branches besides `main`** (`docs/fork.md`, "分支"). `topic/fixes` prepares work for
+  upstream, on `upstream/main` and written the way upstream would take it: fixes, the Chinese in
+  upstream's `zh-CN.json`, the Mac's native work (since 2026-11-24 it holds what `topic/chinese` and
+  `topic/native` did). `topic/plans` is the whole fork: it merges `topic/fixes` and holds
   everything else that differs from upstream `main` (fork structure and registries, build numbers,
   the sync script, the `fork/` overlays, native sheets and alerts, Plan Settings and the
   fork's other features, the fork's docs). `fork/base` is retired: its content is on `topic/plans`.
   Synon Studio (clients, federation, My Sharing) is its own repository since 2026-11-18,
   `~/sproot/synon-studio`, built on `topic/plans`.
-- **Which branch?** Work going upstream, already in upstream's form, goes on its prepare branch,
-  then that branch is merged into `topic/plans`. Everything else that differs from upstream goes
-  straight on `topic/plans`. When a prepare branch and `topic/plans` hold the same thing in two
+- **Which branch?** Work going upstream, already in upstream's form, goes on `topic/fixes`, then
+  that branch is merged into `topic/plans`. Everything else that differs from upstream goes
+  straight on `topic/plans`. When `topic/fixes` and `topic/plans` hold the same thing in two
   forms (the fork's overlay and upstream's), `topic/plans` keeps its own until upstream merges
   the PR; then upstream `main` wins and the fork's copy goes.
 - **New work** goes in its own worktree and PR into the branch it belongs on; merge, never
-  rebase: they're pushed.
-- **Syncing upstream**: merge `upstream/main` into `topic/chinese`, `topic/native` and
-  `topic/fixes`, then into `topic/plans` (`node scripts/sync-upstream.mjs` there).
-- **Builds come from `topic/plans` only** (it has the three prepare branches): a clean worktree,
+  rebase: they're pushed. A branch is deleted once it's merged, after an annotated tag
+  `archive/<branch>` at its tip; the merge commit says `Absorbed-Branch:` and `Upstream:`
+  (`docs/fork.md`, "收编的分支与归档 tag"). To take one back to upstream:
+  `git switch -c <branch> archive/<branch>`.
+- **Syncing upstream**: merge `upstream/main` into `topic/fixes`, then into `topic/plans`
+  (`node scripts/sync-upstream.mjs` there).
+- **Builds come from `topic/plans` only** (it has `topic/fixes`): a clean worktree,
   `npm run app:build`. `build-number.json` holds the last number used; the build takes the next
   and the new number is committed to `topic/plans`. One build number per distinct code.
 - **One session writes in a checkout at a time.** Parallel work goes in its own worktree, and every

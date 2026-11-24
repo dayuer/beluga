@@ -6,27 +6,25 @@
 
 `main` 只跟上游：永远等于 `upstream/main`，只快进（`git fetch upstream && git push origin upstream/main:main`），不在上面提交任何 fork 的东西。上游已经合并的改动不单独建分支。
 
-2026-11-19 起分两类：**提上游的准备分支**和 **fork 的完整版本**。
+2026-11-19 起分两类：**提上游的准备分支**和 **fork 的完整版本**。2026-11-24 起准备分支只剩 `topic/fixes` 一个：原来的 `topic/chinese`（中文、回复语言）并进了 `topic/fixes`，`topic/native`（和上游已经没有差别）也并进去了，两个分支删掉，留下 `archive/topic/chinese`、`archive/topic/native` 两个 tag。
 
 | 分支 | 内容 | 基于 |
 |---|---|---|
-| `topic/chinese` | 准备提上游：fork 的中文，直接写在上游的 `zh-CN.json` 里 | `upstream/main` |
-| `topic/native` | 准备提上游：Mac 原生的改动，按上游能直接收的写法（beluga-labs/beluga#584 原生控件、Liquid Glass、原生菜单已于 2026-11-19 被上游合并，现在和 `upstream/main` 相同；下一轮原生改动再从这里开） | `upstream/main` |
-| `topic/fixes` | 准备提上游：小修复 | `upstream/main` |
-| `topic/plans` | fork 的完整版本：合入上面三个，再加上所有和上游 `main` 不同、还不提上游的东西（fork 结构与登记表、构建号、同步脚本、`fork/` 覆盖层、原生 sheet 与提示框、计划设置等 fork 功能、fork 的文档）。构建只从这里出 | 三个准备分支 |
+| `topic/fixes` | 准备提上游：小修复、fork 的中文（直接写在上游的 `zh-CN.json` 里）、Mac 原生的改动，都按上游能直接收的写法 | `upstream/main` |
+| `topic/plans` | fork 的完整版本：合入 `topic/fixes`，再加上所有和上游 `main` 不同、还不提上游的东西（fork 结构与登记表、构建号、同步脚本、`fork/` 覆盖层、原生 sheet 与提示框、计划设置等 fork 功能、fork 的文档）。构建只从这里出 | 三个准备分支 |
 | `fork/base` | 停用：内容已经都在 `topic/plans` 里，不再往里加东西 | — |
 
 Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）原来是链上最后的 `topic/studio`，2026-11-18 起迁成独立的仓库 `~/sproot/synon-studio`（带着完整历史，建在 `topic/plans` 上，远端 `beluga` 指回这个 fork，用来合进链上的更新）。下面讲 Studio 的几节是迁出前的记录。
 
 **作废：手机的自定义地址通道**（`plan/custom-route`，BLG-259–261、BLG-264，Beluga 计划 `pl_06cbeaec655c`）。让手机经 GNB、ZeroTier、WireGuard、Nebula、Tailscale 等组网连 Mac：中继另外监听一个用户给的 `host:port`，手机把它当第三条路竞速。2026-11-18 放弃，代码已从 `topic/native`、`topic/plans` 撤出（`revert:` 提交），分支归档为 `archive/abandoned-custom-route-2026-11-18`，不再合进链上任何分支。没有发出去的版本带过它用的协议号（native 上 1.59、plans 上 1.64）。
 
-- **放哪个分支**：要提回上游、而且已经写成上游能收的样子的，放对应的准备分支（中文放 `topic/chinese`，Mac 原生放 `topic/native`，其他小修复放 `topic/fixes`），合并后再合进 `topic/plans`。其余所有和上游 `main` 不同的代码，直接放 `topic/plans`：fork 专用的结构、覆盖层、功能，以及还没整理成上游写法的原生改动。
-- **准备分支只放上游写法**：`topic/chinese`、`topic/native`、`topic/fixes` 都基于 `upstream/main`，相对上游的差异就是要提的 PR 内容。fork 里同一件事如果有自己的写法（比如 `fork/native` 覆盖层版的 Liquid Glass），留在 `topic/plans`；把准备分支合进 `topic/plans` 时保留 plans 的版本（`git merge -s ours` 或手动解决），不让 plans 出现两份。
+- **放哪个分支**：要提回上游、而且已经写成上游能收的样子的，放 `topic/fixes`（中文、Mac 原生、小修复都在这里），合并后再合进 `topic/plans`。其余所有和上游 `main` 不同的代码，直接放 `topic/plans`：fork 专用的结构、覆盖层、功能，以及还没整理成上游写法的原生改动。
+- **准备分支只放上游写法**：`topic/fixes` 基于 `upstream/main`，相对上游的差异就是要提的 PR 内容；提的时候按事情拆成几个 PR（从 `archive/<分支>` tag 或从 `topic/fixes` 里挑提交）。fork 里同一件事如果有自己的写法（比如 `fork/native` 覆盖层版的 Liquid Glass），留在 `topic/plans`；把准备分支合进 `topic/plans` 时保留 plans 的版本（`git merge -s ours` 或手动解决），不让 plans 出现两份。
 - **上游合并之后**（比如 beluga-labs/beluga#584）：同步上游进准备分支，它们回到和 `upstream/main` 一致；再把 `upstream/main` 合进 `topic/plans`，fork 自己那份重复的写法拿掉，以上游的为准。
 - **新改动**从它所属的分支开 worktree 和 PR，合进去之后，准备分支再合进 `topic/plans`（merge，不 rebase，分支都已推送）。
 - **目录只在仓库里面**（2026-11-19 起）：Beluga 的所有文件都在 `~/sproot/beluga` 之下。不管为了什么开 worktree，都在主检出里用 `git worktree add .worktrees/<名字> <分支>`，不在旁边开 `../beluga-<名字>`，也不开在临时目录。`/.worktrees/` 写在 `.git/info/exclude` 里忽略（不写 `.gitignore`，`main` 是上游的）；新克隆的仓库要自己补上这一行。临时文件、笔记、构建产物同样放在仓库内已忽略的路径，不放在仓库旁边。用完的 worktree 合并后用 `git worktree remove` 删掉。
-- **同步上游**：把 `upstream/main` 分别合进 `topic/chinese`、`topic/native`、`topic/fixes`，再合进 `topic/plans`。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，现在在 `topic/plans` 上）照旧用在 `topic/plans`。
-- **构建**只从 `topic/plans` 出（它已经合入三个准备分支）：在干净的 worktree 里 `npm run app:build`。`packages/mac/build-number.json` 记的是上一次用过的号，构建脚本自动加 1；编完把新的号提交到 `topic/plans`。同一份代码只出一个构建号。
+- **同步上游**：把 `upstream/main` 合进 `topic/fixes`，再合进 `topic/plans`。下面「同步上游」一节的脚本（`scripts/sync-upstream.mjs`，现在在 `topic/plans` 上）照旧用在 `topic/plans`。
+- **构建**只从 `topic/plans` 出（它已经合入 `topic/fixes`）：在干净的 worktree 里 `npm run app:build`。`packages/mac/build-number.json` 记的是上一次用过的号，构建脚本自动加 1；编完把新的号提交到 `topic/plans`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
 
 ## 收编的分支与归档 tag（2026-11-24 起）
@@ -52,6 +50,8 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 | `feat/acp-hardening`、`fix/agy-project-rules` | 已提交的部分早在 `topic/plans` 里；tag 指向的最后一个提交是收编时没提交的改动（WIP，没做完也没测） | 未提 |
 | `fork/limit-next-model`、`docs/model-team`、`plan/synon-studio-ui-p1-p12`、`topic/studio`、`archive/main-2026-11-17`、`archive/native-upstream-3.6-2026-11-17`、`archive/abandoned-custom-route-2026-11-18` | 不合，只留 tag | — |
 | `pr-assets/*`（10 个） | 不合，只留同名 tag | — |
+| `topic/chinese` | `topic/fixes` → `topic/plans`（中文和回复语言，`src/shared/reply-language.ts`） | 未提，已是上游写法 |
+| `topic/native` | `topic/fixes`（`-s ours`：和上游已没有差别） | beluga-labs/beluga#584 已合并 |
 
 ## 签名与公证（2026-11-20 起）
 
