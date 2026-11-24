@@ -28,8 +28,6 @@ export interface MetricDef {
   readonly daily: TotalKey;
 }
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
-
 /** "45 min", "3 h 20 min", "112 h". */
 export function duration(ms: number): string {
   const min = Math.round(ms / 60_000);
@@ -49,6 +47,7 @@ const about = (n: number): string => (n >= 10 ? Math.round(n).toLocaleString() :
 /** A printed page holds about this many characters; a novel about this many. */
 const PAGE = 1800;
 const NOVEL = 450_000;
+const pages = (chars: number): number => Math.max(1, Math.round(chars / PAGE));
 /** People speak about 130 words a minute. */
 const WORDS_PER_MIN = 130;
 const WORKDAY_MS = 8 * 3_600_000;
@@ -62,7 +61,7 @@ export const METRICS: readonly MetricDef[] = [
     value: (t) => t.agentMs,
     format: duration,
     axis: hours,
-    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? `≈ ${about(t.agentMs / WORKDAY_MS)} workdays · ${plural(t.runs, 'run')}` : plural(t.runs, 'run')),
+    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? `≈ ${about(t.agentMs / WORKDAY_MS)} workdays · ${t.runs.toLocaleString()} run${t.runs === 1 ? '' : 's'}` : `${t.runs.toLocaleString()} run${t.runs === 1 ? '' : 's'}`),
     empty: () => 'No runs in this stretch',
     daily: 'agentMs',
   },
@@ -84,7 +83,7 @@ export const METRICS: readonly MetricDef[] = [
     color: 'var(--m-pasted)',
     value: (t) => t.pasted,
     format: compact,
-    aside: (t) => (t.pasted >= NOVEL / 2 ? `≈ ${about(t.pasted / NOVEL)} novels` : `≈ ${plural(Math.max(1, Math.round(t.pasted / PAGE)), 'page')} of text`),
+    aside: (t) => (t.pasted >= NOVEL / 2 ? `≈ ${about(t.pasted / NOVEL)} novels` : `≈ ${pages(t.pasted).toLocaleString()} page${pages(t.pasted) === 1 ? '' : 's'} of text`),
     empty: () => 'Nothing pasted in this stretch',
     daily: 'pasted',
   },
@@ -107,7 +106,7 @@ export const METRICS: readonly MetricDef[] = [
     color: 'var(--m-worktrees)',
     value: (t) => t.worktrees,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${t.archived.toLocaleString()} archived · ${plural(t.chats, 'chat')}`,
+    aside: (t) => `${t.archived.toLocaleString()} archived · ${t.chats.toLocaleString()} chat${t.chats === 1 ? '' : 's'}`,
     daily: 'worktrees',
   },
   {

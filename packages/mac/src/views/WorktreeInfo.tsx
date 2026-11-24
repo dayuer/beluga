@@ -31,7 +31,6 @@ const MADE_OUTSIDE_DETAIL = 'Made by hand, by a script or by another app.';
 
 const day = (ms: number): string => new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 const when = (ms: number): string => new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 function ago(ms: number): string {
   const d = Math.floor((Date.now() - ms) / 86_400_000);
@@ -85,7 +84,7 @@ export function RemoveWorktreeAlert({ ws, info, onDone, onCancel }: { ws: Worksp
           </p>
           {changed > 0 ? (
             <p>
-              <strong>It has {plural(changed, 'uncommitted change')}.</strong> They’ll be lost.
+              <strong>It has {`${changed} uncommitted change${changed === 1 ? '' : 's'}`}.</strong> They’ll be lost.
             </p>
           ) : null}
           {anotherApp ? <p>If you still use it in the app that made it, remove it there instead: that app would show it as missing.</p> : null}
@@ -235,8 +234,8 @@ export function WorktreeInfoPage({ ws, agent, origin }: { ws: Workspace; agent?:
                 'None'
               )}
             </Field>
-            <Field label="Compared with base">{info ? `${plural(info.ahead, 'commit')} ahead · ${info.behind} behind${info.merged ? ' · all merged' : ''}` : '…'}</Field>
-            <Field label="Uncommitted">{info ? (info.changed ? plural(info.changed, 'file') : 'Nothing') : '…'}</Field>
+            <Field label="Compared with base">{info ? `${info.ahead} commit${info.ahead === 1 ? '' : 's'} ahead · ${info.behind} behind${info.merged ? ' · all merged' : ''}` : '…'}</Field>
+            <Field label="Uncommitted">{info ? (info.changed ? `${info.changed} file${info.changed === 1 ? '' : 's'}` : 'Nothing') : '…'}</Field>
             <Field label="Size on disk">{size !== undefined ? formatBytes(size) : 'Measuring…'}</Field>
             {info?.conductor?.prTitle ? <Field label="Pull request">{info.conductor.prTitle}</Field> : null}
             {info?.creator ? (

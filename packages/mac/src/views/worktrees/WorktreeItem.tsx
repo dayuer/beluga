@@ -17,7 +17,6 @@ import { revealLabel } from '../../lib/os-words.js';
 
 const ARCHIVING = { saving: 'Saving…', compressing: 'Compressing…', removing: 'Removing…' } as const;
 const stop = (e: MouseEvent): void => e.stopPropagation();
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export interface ItemActions {
   readonly archive: (rows: readonly WorktreeRow[]) => void;
@@ -68,16 +67,16 @@ function Left({ row }: { row: WorktreeRow }) {
   return (
     <span className={s.work}>
       {left.files ? (
-        <Tip label={plural(left.files, 'uncommitted file')}>
-          <span className={s.count} aria-label={plural(left.files, 'uncommitted file')}>
+        <Tip label={`${left.files} uncommitted file${left.files === 1 ? '' : 's'}`}>
+          <span className={s.count} aria-label={`${left.files} uncommitted file${left.files === 1 ? '' : 's'}`}>
             <Icon name="pencil" size={11} />
             {left.files}
           </span>
         </Tip>
       ) : null}
       {left.commits ? (
-        <Tip label={`${plural(left.commits, 'commit')} not in main`}>
-          <span className={s.count} aria-label={`${plural(left.commits, 'commit')} not in main`}>
+        <Tip label={`${left.commits} commit${left.commits === 1 ? '' : 's'} not in main`}>
+          <span className={s.count} aria-label={`${left.commits} commit${left.commits === 1 ? '' : 's'} not in main`}>
             <Icon name="commit" size={12} />
             {left.commits}
           </span>

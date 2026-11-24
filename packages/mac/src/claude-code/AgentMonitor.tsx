@@ -13,7 +13,7 @@ import { LiveTranscript } from './LiveTranscript.js';
 import { AgentOutputs, useAgentOutputs } from './AgentOutputs.js';
 import { BackgroundTasks } from './BackgroundTasks.js';
 import { tasksForAgent } from './background-model.js';
-import { agentElapsed, agentLabel, agentTone, plural, tokens, typeLabel } from './cc-model.js';
+import { agentElapsed, agentLabel, agentTone, tokens, typeLabel } from './cc-model.js';
 import { type SubAgent, agentIdOfPath, agentOfWorktree, agentTitle, effortLabel, modelLabel, parentWorkspace, steerPrompt, steerable } from './subagents-model.js';
 import s from './claude-code.module.css';
 import m from './agent-monitor.module.css';
@@ -115,7 +115,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
     ...(modelLabel(a.model) ? [{ label: modelLabel(a.model)!, tip: a.model }] : []),
     ...(effortLabel(a.effort) ? [{ label: effortLabel(a.effort)! }] : []),
     { label: agentElapsed(a, now) },
-    { label: plural(a.steps, 'step') },
+    { label: `${a.steps} step${a.steps === 1 ? '' : 's'}` },
     ...(a.tokens ? [{ label: `${tokens(a.tokens)} context` }] : []),
     ...(a.background ? [{ label: 'Background' }] : []),
   ];

@@ -4,7 +4,7 @@ import { useNow } from '../chat/Items.js';
 import { StepWords } from '../chat/steps/StepRow.js';
 import { Icon } from '../components/Icon.js';
 import { Dot, cx } from '../components/ui.js';
-import { agentElapsed, agentLabel, agentTone, plural, sessionLabel, tokens, typeLabel } from './cc-model.js';
+import { agentElapsed, agentLabel, agentTone, sessionLabel, tokens, typeLabel } from './cc-model.js';
 import s from './claude-code.module.css';
 
 /** A sub-agent at a glance: what it's for, its kind, status, what it's doing, for how long. */
@@ -42,7 +42,7 @@ export const AgentCard = memo(function AgentCard({ agent, selected, compact, onO
       {compact ? null : (
         <span className={s.cardMeta}>
           <span>{agentElapsed(agent, now)}</span>
-          <span>{plural(agent.steps, 'step')}</span>
+          <span>{`${agent.steps} step${agent.steps === 1 ? '' : 's'}`}</span>
           {agent.tokens ? <span>{tokens(agent.tokens)} context</span> : null}
         </span>
       )}

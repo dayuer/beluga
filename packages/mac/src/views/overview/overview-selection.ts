@@ -58,15 +58,13 @@ export function keepShown(pick: OverviewPick, order: readonly string[]): Overvie
   return anchor === undefined ? { ids } : { anchor, ids };
 }
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /** "3 worktrees", "2 chats", "1 worktree and 2 chats": what's picked, by kind. */
 export function pickedWords(items: readonly OverviewItem[]): string {
   const worktrees = items.filter((i) => i.ws.kind === 'worktree').length;
   const chats = items.length - worktrees;
-  if (!worktrees) return plural(chats, 'chat');
-  if (!chats) return plural(worktrees, 'worktree');
-  return `${plural(worktrees, 'worktree')} and ${plural(chats, 'chat')}`;
+  if (!worktrees) return `${chats} chat${chats === 1 ? '' : 's'}`;
+  if (!chats) return `${worktrees} worktree${worktrees === 1 ? '' : 's'}`;
+  return `${worktrees} worktree${worktrees === 1 ? '' : 's'} and ${chats} chat${chats === 1 ? '' : 's'}`;
 }
 
 /** What deleting them all takes with it, in a sentence. */

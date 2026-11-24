@@ -53,8 +53,6 @@ const NEED_TIPS: Record<Need, string> = {
 
 export const needTip = (need: Need): string => NEED_TIPS[need];
 
-const plural = (n: number, word: string): string => `${n} new ${word}${n === 1 ? '' : 's'}`;
-
 /** What holds a conversation up. `ws`: one of your workspaces (conflicts and checks are kept per workspace). */
 export function needOf(state: Source, channel: string, ws?: string): Need | undefined {
   if (state.approvals.some((a) => a.channel === channel) || activityOf(state.log, channel).awaiting) return 'approval';
@@ -89,8 +87,8 @@ export function signalOf(state: Source, channel: string, ws?: string): Signal {
   // Failing checks or a conflict while your agent works there: it's on it (BLG-748), so it reads as working. Still there when it stops: red again.
   const fixing = working && found !== undefined && FIXABLE.has(found) ? found : undefined;
   const need = fixing ? undefined : found;
-  const news = unread ? [newsLead(state, channel), plural(unread, 'message')].filter(Boolean).join(' · ') : '';
-  if (need) return { level: 'needs', unread, need, working, tip: [needTip(need), unread ? plural(unread, 'message') : ''].filter(Boolean).join(' · ') };
+  const news = unread ? [newsLead(state, channel), `${unread} new message${unread === 1 ? '' : 's'}`].filter(Boolean).join(' · ') : '';
+  if (need) return { level: 'needs', unread, need, working, tip: [needTip(need), unread ? `${unread} new message${unread === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') };
   if (unread) return { level: 'unread', unread, working, tip: news };
   if (working) return { level: 'working', unread: 0, working, tip: fixing ? `Your agent is working · ${needTip(fixing)}` : 'Your agent is working' };
   return IDLE_SIGNAL;
@@ -246,7 +244,7 @@ export function planRowSignal(state: Source, plan: Plan): PlanRowSignal {
   const own = state.unread[plan.home] ?? 0;
   const tasks = planConversations(state, plan.id).filter((ws) => `ws:${ws}` !== plan.home);
   const inside = tasks.some((ws) => (state.unread[`ws:${ws}`] ?? 0) > 0);
-  const news = own ? plural(own, 'message') : '';
+  const news = own ? `${own} new message${own === 1 ? '' : 's'}` : '';
   const tip = all.level === 'needs' ? all.tip.replace(/ · \d+ updates?$/, '') : own ? news : inside ? 'New in its tasks' : all.tip;
   const level: Level = all.level === 'needs' ? 'needs' : own ? 'unread' : all.working ? 'working' : 'idle';
   return { level, unread: own, ...(all.need ? { need: all.need } : {}), working: all.working, tip: [tip, all.level === 'needs' && own ? news : ''].filter(Boolean).join(' · '), inside };
@@ -343,10 +341,10 @@ export function conversationEntries(state: ListSource): UnreadEntry[] {
   }
   if (state.network.enabled) {
     for (const f of state.network.friends) {
-      if (f.unread > 0) out.push({ kind: 'dm', channel: `dm:${f.peerId}`, name: f.name, peerId: f.peerId, signal: { level: 'unread', unread: f.unread, working: false, tip: plural(f.unread, 'message') }, ts: f.last?.ts ?? 0 });
+      if (f.unread > 0) out.push({ kind: 'dm', channel: `dm:${f.peerId}`, name: f.name, peerId: f.peerId, signal: { level: 'unread', unread: f.unread, working: false, tip: `${f.unread} new message${f.unread === 1 ? '' : 's'}` }, ts: f.last?.ts ?? 0 });
     }
     for (const g of state.network.groups) {
-      if (g.active && g.unread > 0) out.push({ kind: 'group', channel: `group:${g.id}`, name: g.name, groupId: g.id, signal: { level: 'unread', unread: g.unread, working: false, tip: plural(g.unread, 'message') }, ts: g.last?.ts ?? 0 });
+      if (g.active && g.unread > 0) out.push({ kind: 'group', channel: `group:${g.id}`, name: g.name, groupId: g.id, signal: { level: 'unread', unread: g.unread, working: false, tip: `${g.unread} new message${g.unread === 1 ? '' : 's'}` }, ts: g.last?.ts ?? 0 });
     }
   }
   return out;

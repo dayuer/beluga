@@ -33,20 +33,18 @@ export const agentElapsed = (a: CcAgent, now: number): string => since((a.status
 /** "Working · 12m", "Waiting for you", "Idle · 8m ago". */
 export function sessionLabel(s: CcSession, now: number): { label: string; tone: Tone } {
   const running = s.agents.filter((a) => a.status === 'running').length;
-  if (s.status === 'working') return { label: running ? `Working · ${plural(running, 'agent')} running` : 'Working', tone: 'claude' };
+  if (s.status === 'working') return { label: running ? `Working · ${running} agent${running === 1 ? '' : 's'} running` : 'Working', tone: 'claude' };
   if (running) return { label: `Waiting for ${running} agent${running === 1 ? '' : 's'}`, tone: 'claude' };
   if (s.status === 'waiting') return { label: 'Waiting for you', tone: 'ok' };
   return { label: `Quiet for ${since(now - s.lastAt)}`, tone: 'muted' };
 }
 
-export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
-
 /** "6 agents running", "2 sessions", "Nothing running". */
 export function activitySummary(sessions: readonly CcSession[]): string {
   const running = sessions.reduce((n, s) => n + s.agents.filter((a) => a.status === 'running').length, 0);
   const live = sessions.filter(sessionLive).length;
-  if (running) return `${plural(running, 'agent')} running${live > 1 ? ` in ${plural(live, 'session')}` : ''}`;
-  if (live) return `${plural(live, 'session')} working`;
+  if (running) return `${running} agent${running === 1 ? '' : 's'} running${live > 1 ? ` in ${live} session${live === 1 ? '' : 's'}` : ''}`;
+  if (live) return `${live} session${live === 1 ? '' : 's'} working`;
   return sessions.length ? 'Nothing running right now' : 'No Claude Code sessions lately';
 }
 

@@ -13,7 +13,6 @@ import s from '../project-home.module.css';
 const HOME_ENV = 3;
 
 const names = (keys: readonly string[], max = 3): string => keys.slice(0, max).join(', ') + (keys.length > max ? ` and ${keys.length - max} more` : '');
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 /** A project's environment in names and counts, again whenever its names (or a worktree's) change. */
 function useOverview(projectId: string, root: string): EnvOverview | undefined {
@@ -67,7 +66,7 @@ export function EnvSection({ projectId, root }: { projectId: string; root: strin
   const example = overview.example;
   const lines: EnvLine[] = [
     ...(example?.missing.length
-      ? [{ id: 'missing', icon: 'alert' as const, title: `${plural(example.missing.length, 'variable')} ${example.file ?? '.env.example'} asks for ${example.missing.length === 1 ? 'isn’t' : 'aren’t'} set`, detail: names(example.missing), open: openEnv }]
+      ? [{ id: 'missing', icon: 'alert' as const, title: `${example.missing.length} variable${example.missing.length === 1 ? '' : 's'} ${example.file ?? '.env.example'} asks for ${example.missing.length === 1 ? 'isn’t' : 'aren’t'} set`, detail: names(example.missing), open: openEnv }]
       : []),
     // Kept in step by the worktrees (the default), what it doesn't list is mended with the next one's work: nothing to do here.
     ...(example?.unlisted.length && !overview.exampleSync
@@ -75,7 +74,7 @@ export function EnvSection({ projectId, root }: { projectId: string; root: strin
           {
             id: 'unlisted',
             icon: 'file' as const,
-            title: example.file ? `${example.file} doesn’t list ${plural(example.unlisted.length, 'variable')}` : 'No .env.example yet',
+            title: example.file ? `${example.file} doesn’t list ${example.unlisted.length} variable${example.unlisted.length === 1 ? '' : 's'}` : 'No .env.example yet',
             detail: example.file ? names(example.unlisted) : `So a new teammate knows what to set: ${names(example.unlisted)}`,
             open: openEnv,
             action: {
@@ -89,12 +88,12 @@ export function EnvSection({ projectId, root }: { projectId: string; root: strin
           },
         ]
       : []),
-    ...overview.worktrees.map((w) => ({ id: `wt:${w.id}`, icon: 'branch' as const, title: `${w.name} sets ${plural(w.keys.length, 'variable')} of its own`, detail: `${names(w.keys)}, over the project’s, in that worktree only`, open: () => openSheet({ kind: 'worktree_env', workspaceId: w.id }) })),
+    ...overview.worktrees.map((w) => ({ id: `wt:${w.id}`, icon: 'branch' as const, title: `${w.name} sets ${w.keys.length} variable${w.keys.length === 1 ? '' : 's'} of its own`, detail: `${names(w.keys)}, over the project’s, in that worktree only`, open: () => openSheet({ kind: 'worktree_env', workspaceId: w.id }) })),
   ];
   const total = overview.own + (overview.dotenvOn ? overview.dotenv : 0);
   if (!lines.length && !hasAsks && !total) return null;
   const summary = [
-    overview.dotenvOn ? `${plural(overview.dotenv, 'variable')} from ${overview.dotenvFiles.length ? overview.dotenvFiles.join(' and ') : '.env'}` : '.env off',
+    overview.dotenvOn ? `${overview.dotenv} variable${overview.dotenv === 1 ? '' : 's'} from ${overview.dotenvFiles.length ? overview.dotenvFiles.join(' and ') : '.env'}` : '.env off',
     overview.own ? `${overview.own} set in Beluga` : '',
     overview.everywhere ? `${overview.everywhere} of yours` : '',
   ].filter(Boolean).join(' · ');
@@ -137,7 +136,7 @@ export function EnvSection({ projectId, root }: { projectId: string; root: strin
       ))}
       {lines.length > HOME_ENV ? (
         <button type="button" className={s.more} onClick={openEnv}>
-          {plural(lines.length - HOME_ENV, 'more thing')} in Environment
+          {`${lines.length - HOME_ENV} more thing${lines.length - HOME_ENV === 1 ? '' : 's'}`} in Environment
         </button>
       ) : null}
       {!lines.length && !hasAsks ? <p className={s.none}>All set.</p> : null}
