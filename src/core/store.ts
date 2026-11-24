@@ -328,6 +328,8 @@ export interface Prefs {
   /** Default model for new conversations (undefined: Claude Code's default). */
   readonly model?: string;
   readonly effort?: Effort;
+  /** The language your agents answer you in (shared/reply-language.ts); unset: whatever you wrote in. */
+  readonly replyLanguage?: Settings['replyLanguage'];
   /** Who answers "@you" (core/settings.ts chosenAgent; undefined: Claude). */
   readonly defaultAgent?: AgentRef;
   /** Per-project defaults over `defaultAgent`, by project name. */
@@ -826,7 +828,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency', 'replyLanguage']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

@@ -2,6 +2,7 @@ import os from 'node:os';
 import type { AgentRef } from '../protocol.js';
 import { buildGraphAppend } from './graph-prompt.js';
 import { type ShellSetup, buildAskOnlyAppend, buildChatSendAppend, buildChatVarsAppend, buildCommitAppend, buildKeepAppend, buildScratchAppend, buildShellAppend, buildShippedAppend, buildSystemAppend, loginShellSetup } from './prompt.js';
+import { buildReplyLanguageAppend } from '../shared/reply-language.js';
 import { buildForkedAppend } from './fork-prompt.js';
 import { buildSyncMainAppend } from './sync-main.js';
 import { buildTerminalAppend } from './terminal-prompt.js';
@@ -55,7 +56,8 @@ export function runInstructions(input: AgentRunInput, ownerName: string, agent?:
     (place?.forked && !askOnly ? buildForkedAppend(place.forked) : '') +
     (askOnly ? (syncMain ? buildSyncMainAppend(askOnly.project, syncMain.branch, syncMain.upstream) : buildAskOnlyAppend(askOnly.project, Boolean(input.continueInWorktree), Boolean(input.board))) : '') +
     (input.terminal ? buildTerminalAppend() : '') +
-    (input.env?.BELUGA_REMOTE_CLIENT ? buildRemoteClientAppend() : '')
+    (input.env?.BELUGA_REMOTE_CLIENT ? buildRemoteClientAppend() : '') +
+    buildReplyLanguageAppend(input.replyLanguage)
   );
 }
 

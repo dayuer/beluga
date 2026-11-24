@@ -48,6 +48,7 @@ import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { FETCH_EVERY_MAX, FETCH_EVERY_MIN } from '../shared/background-fetch.js';
 import { AUTOPILOT_WAIT_MAX } from '../shared/autopilot-wait.js';
+import { REPLY_LANGUAGES } from '../shared/reply-language.js';
 
 /**
  * Everything a client can ask Beluga to do, in one list. The daemon validates every call
@@ -130,6 +131,8 @@ export const PrefsPatch = z
     // Minutes Autopilot waits for your answer; 0: until you answer (BLG-998).
     autopilotWait: z.number().int().min(0).max(AUTOPILOT_WAIT_MAX),
     scratchFolder: bool,
+    // The Mac's language, sent by its main window (null: no rule).
+    replyLanguage: z.enum(REPLY_LANGUAGES).nullable().optional(),
     subagents: z.enum(['full', 'compact', 'hidden']),
     hiddenButtons: z.array(z.string().max(40)).max(40),
     friendWorktrees: z.enum(['ask', 'off']),

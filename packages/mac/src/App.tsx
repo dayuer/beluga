@@ -22,6 +22,7 @@ import { dialogOpen, navBack, navForward, useNavHistory } from './lib/nav.js';
 import { pageHasOwnBack } from './tasks/use-swipe-back.js';
 import { useApp, useBeluga } from './lib/beluga.js';
 import { setPowerSaving } from './lib/power.js';
+import { useReplyLanguage } from './i18n/reply-language.js';
 import { joinRoom, runMenuItem, useMenuState, useNative, useNotificationTaps, useTrayStatus, useTraySpout, useWindowFocus } from './lib/native.js';
 import { AddProjectSheet } from './dialogs/AddProjectSheet.js';
 import { UndoToast } from './lib/undo-toast.js';
@@ -210,6 +211,8 @@ export function App() {
   // Speaking instead of typing: the talk shortcut, ↩ and esc while listening (Settings › Voice).
   useDictationSetup(client);
   useRememberProject();
+  // Your agents answer you in this window's language (Settings › General).
+  useReplyLanguage();
   useSettingsWindow();
   // The views fetched early, and any that don't load noted in the black box (#370).
   useChunkCare();
