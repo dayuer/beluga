@@ -37,6 +37,8 @@ export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtensi
     },
     questions: { tool: AGY_ASK_TOOL, detect: agyQuestion, answer: agyAnswerPrompt },
     compact: true,
+    // run_command past its WaitMsBeforeAsync goes on as a background task; agy tells its model to end the turn and wait.
+    backgroundCommands: true,
     failure: agyFailure,
     quota: () => {
       const bin = opts.bin ?? findAgy();

@@ -60,6 +60,8 @@ Whatever an agent's tool call starts goes at its grant's level, by whatever path
 
 **Below Full trust, a Claude run has no path fence for a shell either.** Beluga refuses a read of its own files by name, and each shell step shows you a card, but a shell command can hide a path. If you say yes to it, or to the card that opens a terminal, it can reach Beluga's token. Read a shell card as you would read the command in your own terminal. Codex's sandbox holds this below Full trust, also after your yes.
 
+**Below Full trust, only Claude or Codex.** A runtime that neither asks before each step nor confines it (OpenCode, Copilot, Antigravity, other ACP agents) reads files unasked, your home and `.env` files included, so an external agent's run below Full is refused on it, at launch, on each message, and again when the run starts (`safetyFor`).
+
 On Codex an agent's run at Full trust has the row "Your own run". Below Full trust it has its own row: it writes only in the run's folders, your home is denied, your Codex tools are off, and it gets only the core environment. The network stays on, because an agent's chat does normal work and with your home denied there is little to send. Codex does not stop at Beluga's gate before each step, so Beluga reads the level when the run starts, and a level you change counts at the next run. At Ask me each time an agent cannot use Codex. Below Full trust its commands that Codex does not count as read-only ask you.
 
 ## External agents
