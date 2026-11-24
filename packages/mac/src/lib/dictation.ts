@@ -9,6 +9,7 @@ import { joinPhrases, PhraseCutter, PHRASE_RATE, promptFrom, Resampler } from '@
 import { cleanWords, DICTATION_MAX_SECONDS, dictationAudio, HOLD_MS, matchesAccel, parseAccel, spoken, wavFromFloats } from './dictation-model.js';
 import { isRecording } from './shortcuts.js';
 import { microphoneSettings, thisComputer } from './os-words.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Speak instead of typing (BLG-145): the microphone beside Send, and the talk shortcut (Settings ›
@@ -106,7 +107,6 @@ export function voiceModelOf(p: Pick<UiPrefs, 'voiceModel' | 'voiceLanguage'>): 
 }
 
 let client: SocketClient | undefined;
-const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** The model's here, or comes now (the bar shows how far; esc stops waiting): → it's ready. */
 async function modelReady(model: VoiceModelId): Promise<boolean> {

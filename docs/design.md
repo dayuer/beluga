@@ -69,9 +69,11 @@ exceptions that may only shrink.
   - time: `src/shared/clock.ts` (`span`, `hhmm`), `lib/window-active.ts` (`useClock`)
   - errors: `src/shared/error-text.ts` (`errorText`)
   - motion: `lib/reduced-motion.ts`
-- **Plurals stay inline.** Write `` `${n} file${n === 1 ? '' : 's'}` ``, not a `plural()` helper: the
-  translation catalog is keyed by the template as written (`"{0} file{1}"`), and a helper's finished
-  string matches no key.
+- **Plurals stay inline.** Write `` `${n} file${n === 1 ? '' : 's'}` ``, not a `plural()` helper. The
+  extractor (`scripts/i18n-extract.mjs`) collects templates as they're written (`"{0} file{1}"`); a
+  helper's `plural(n, 'file')` hides the words from it, so the catalog only has what someone added
+  by hand: "1 file" and the sentence around a count stay English in every other language. Today's
+  helpers are listed in `tests/design-guards.test.ts`, to move inline as their screens are touched.
 
 ## Words
 

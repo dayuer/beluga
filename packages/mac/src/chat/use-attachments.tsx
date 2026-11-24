@@ -20,6 +20,7 @@ import s from './composer.module.css';
 import img from './images.module.css';
 import { thisComputer } from '../lib/os-words.js';
 import { MAX_PASTE_CHARS, byteSize, isLongPaste, lineCount, pastedInline, pastedLabel, pastedWords, sizeWords } from './pasted-text.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * What goes with a message besides its words, the same in every message box (a conversation's
@@ -112,8 +113,6 @@ const savedAs = new Map<number, Promise<number | undefined>>();
 /** Temporary numbers still being saved (drawn as such). */
 const saving = new Set<number>();
 let nextTemp = -1;
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** A picture as the base64 Beluga's attachments.add takes. */
 async function base64Of(file: Blob): Promise<string> {

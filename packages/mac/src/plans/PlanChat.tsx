@@ -33,12 +33,10 @@ import k from "./plan-ask.module.css";
 import p from "./plans.module.css";
 import { shortcutKeys } from "../lib/shortcuts.js";
 import { chordLabel } from "../lib/shortcuts-model.js";
+import { errorText } from "@beluga/shared/error-text.js";
 
 const FOLD = { fold: true };
 const FOLD_QUIET = { fold: true, quietWorking: true };
-
-const errorText = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
 
 /**
  * What you typed in each plan's box, and a send that failed there (by channel): kept while you

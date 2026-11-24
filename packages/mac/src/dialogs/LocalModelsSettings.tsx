@@ -5,6 +5,7 @@ import { useApi } from '../lib/beluga.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { errorWords as errorText } from '@beluga/shared/error-text.js';
 
 interface Draft {
   readonly id?: string;
@@ -24,7 +25,6 @@ const FORMATS: ReadonlyArray<{ value: EndpointFormat; label: string; hint: strin
 ];
 
 const blank: Draft = { label: 'Ollama', baseUrl: OLLAMA_URL, key: '', clearKey: false, models: '', hasKey: false, format: 'anthropic' };
-const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
 function statusOf(e: EndpointView): { tone: 'ok' | 'warn' | 'error' | 'muted'; words: string } {
   if (e.reachable === undefined) return { tone: 'muted', words: 'Not looked at yet' };

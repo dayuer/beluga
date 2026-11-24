@@ -12,13 +12,12 @@ import { kindLabel, sizeLabel } from './chat-model.js';
 import { useSay } from './use-net.js';
 import s from './network.module.css';
 import { revealLabel } from '../lib/os-words.js';
+import { errorWords as errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Files in a chat: cards with the file's state on this Mac (download it, watch it come, open it,
  * show it in Finder, save a copy), pictures shown inline, and the files waiting in the box.
  */
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/^Error: /, '');
 
 /** Pictures already read from the store, by checksum (a data URL), so scrolling doesn't read them again. */
 const previews = new Map<string, string>();

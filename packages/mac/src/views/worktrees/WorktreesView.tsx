@@ -14,8 +14,7 @@ import { ArchivedItem, WorktreeItem } from './WorktreeItem.js';
 import { forgetRebuildable, useRebuildable } from './use-rebuildable.js';
 import { FILTERS, type WorktreeFilter, type WorktreeRow, archivedRows, filterRows, totals, worktreeRows } from './worktrees-model.js';
 import s from './worktrees.module.css';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** What the build-files column holds, in words (its header's tooltip). */
 const BUILD_FILES = 'node_modules, build output and caches: Remove Build Files deletes them (the project’s setup makes them again). Your work and the worktree stay.';

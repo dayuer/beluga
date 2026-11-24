@@ -5,12 +5,11 @@ import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import s from './dialogue.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
 export type DialogueItem = Extract<LogItem, { type: 'system' }> & { readonly dialogue: { readonly id: string } };
 
 export const isDialogueItem = (l: LogItem): l is DialogueItem => l.type === 'system' && Boolean((l as { dialogue?: unknown }).dialogue);
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * Where a dialogue between agents begins in the chat (BLG-466): its topic, who talks, turn n of the

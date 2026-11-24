@@ -12,6 +12,7 @@ import { useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { pickFolders } from '../lib/projects.js';
 import s from './add-project.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 interface Found {
   readonly path: string;
@@ -269,8 +270,6 @@ export function AddProjectSheet() {
     </Dialog.Root>
   );
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** Where a new or cloned project goes: your code folder, until you pick another. */
 function useParent(): [string | undefined, (dir: string) => void] {

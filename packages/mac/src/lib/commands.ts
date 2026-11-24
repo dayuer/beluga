@@ -11,6 +11,7 @@ import type { UiStore } from './beluga.js';
 import { convoModeOf, terminalCapable, toggledMode, withConvoMode } from './convo-mode.js';
 import { getPrefs, setPrefs } from './prefs.js';
 import { SETTINGS_FIND_EVENT } from './settings-search.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * The window's commands that the menu bar, the keyboard and the buttons share: what each does,
@@ -149,8 +150,6 @@ export function commandState(state: AppState, id: CommandId): CommandState {
     }
   }
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * Send now, for a message you steered in that Claude hasn't read yet (BLG-54): its step stops and

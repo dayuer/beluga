@@ -7,6 +7,7 @@ import { inApp, webServed } from './boot.js';
 import { runsWhenOpened } from './runs-when-opened.js';
 import { openThere } from './remote-open.js';
 import { t } from '../i18n/index.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Files you see in Beluga, the Mac way: where one is on this Mac (to show it in Finder or copy
@@ -78,8 +79,6 @@ export async function openWithDefaultApp(client: SocketClient, path: string): Pr
   if (runsWhenOpened(path)) return revealInFinder(client, path);
   await client.api.local.openFolder(path);
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * Download a shared file: the Save panel picks where (starting in Downloads, with its name), then
