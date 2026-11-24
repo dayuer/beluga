@@ -22,6 +22,8 @@ import type { AcpExtension } from './extension.js';
 import { GENERIC_TOOLS, mcpServersFor } from './dialect.js';
 import { type AcpSession, acpEnd, acpFailure, acpMode, acpModel, declinedNote, modeValue, settled, withInstructions } from './parts.js';
 import type { AcpAgentSpec, AcpConnect, AcpConnection } from './spec.js';
+import { type OwnerMcpEntry, ownerMcpEntries } from '../claude/owner-mcp.js';
+import { ownerAcpServers } from './owner-servers.js';
 import { acpStatus } from './status.js';
 
 export interface AcpBackendOptions {
@@ -38,6 +40,10 @@ export interface AcpBackendOptions {
   readonly toolHost?: ToolHost;
   /** Reads your quota now (tests: a fake; none with a scripted `connect`, where it's the extension's). */
   readonly readQuota?: () => Promise<UsageUpdate | undefined>;
+  /** Your own MCP servers for a folder (tests: a fake; none with a scripted `connect`, else your Claude Code's, owner-mcp.ts). */
+  readonly ownerServers?: (cwd: string) => readonly OwnerMcpEntry[];
+  /** Waits for the session's MCP servers (tests: a fake; none with a scripted `connect`, else the extension's mcpReady). */
+  readonly mcpReady?: (names: readonly string[], since: number) => Promise<unknown>;
 }
 
 /** A plan sent back for changes this many times: the run ends with the last plan as its answer. */
@@ -138,6 +144,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
       /** It was offered messages while it waited for background commands (onFollowUps): taken back as it ends. */
       let offered = false;
       try {
+        const started = Date.now();
         conn = await connect({ cwd, env, args: addDirArgs(spec, [...extraDirs, ...(fixup ? [fixup] : [])]), ...(opts.bin ? { bin: opts.bin } : {}) });
         const link = conn;
         input.onProcess?.(link.proc);
@@ -248,7 +255,10 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           return undefined;
         };
 
-        const servers = mcpServersFor(mounted, link.init, ext.mount);
+        // Your own MCP servers too, in your own runs (as your Claude has them), but for ones the run has by that name already.
+        const ownerServers = opts.ownerServers ?? (opts.connect ? () => [] : (folder: string) => ownerMcpEntries([folder]));
+        const yours = ext.ownerMcp && input.ownerMcp && !input.guest ? ownerAcpServers(ownerServers(cwd), new Set([...suites, ...ext.ownerMcp()])) : [];
+        const servers = [...mcpServersFor(mounted, link.init, ext.mount), ...yours];
         const withMeta = meta ? { _meta: meta } : {};
         const resume = place ? place.resume : sessionId;
         let opened: AcpSession | undefined;
@@ -276,6 +286,14 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         legacy = { ...(opened.models ? { models: opened.models } : {}), ...(opened.modes ? { modes: opened.modes } : {}) };
         remember(sid);
         if (input.signal.aborted) throw new Error('aborted');
+        // Its MCP servers connect after the session opens, and a turn that starts before has none of them: wait (never long).
+        const ready = opts.mcpReady ?? (opts.connect ? undefined : ext.mcpReady?.bind(ext));
+        if (ready) {
+          input.onEvent('progress', 'Connecting its MCP servers');
+          await ready([...suites, ...yours.map((s) => s.name)], started).catch(() => undefined);
+          input.onEvent('progress', '');
+          if (input.signal.aborted) throw new Error('aborted');
+        }
 
         /** Set one of the session's options (model, thinking level, mode) when it offers that value and isn't on it already. */
         const choose = async (id: string, value: string | undefined): Promise<boolean> => {

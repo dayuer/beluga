@@ -88,6 +88,13 @@ export function agyCalls(tool: string, raw: Record<string, unknown>, cwd: string
   if (GREPS.has(tool)) return [{ name: 'Grep', input: { pattern: field(raw, 'Query', 'Pattern') ?? '', path: abs(cwd, field(raw, 'SearchPath', 'SearchDirectory', 'DirectoryPath', 'Path')) ?? cwd } }];
   if (SEARCHES.has(tool)) return [{ name: 'WebSearch', input: { query: field(raw, 'Query') ?? '' } }];
   if (FETCHES.has(tool)) return [{ name: 'WebFetch', input: { url: field(raw, 'Url', 'URL') ?? '' } }];
+  // Its call_mcp_tool names the server and tool: judged as that tool, the way your Claude's MCP calls are (Beluga's own: by its own name).
+  if (tool === 'call_mcp_tool') {
+    const server = field(raw, 'ServerName', 'Server');
+    const name = field(raw, 'ToolName', 'Tool');
+    const args = raw.Arguments && typeof raw.Arguments === 'object' && !Array.isArray(raw.Arguments) ? (raw.Arguments as Record<string, unknown>) : {};
+    if (server && name) return [{ name: belugaToolOf(`mcp_${server}_${name}`, suites, known) ?? `mcp__${server}__${name}`, input: args }];
+  }
   const mcp = belugaToolOf(tool, suites, known);
   return [{ name: mcp ?? `mcp__antigravity__${tool.replace(/\W+/g, '_')}`, input: raw }];
 }

@@ -7,6 +7,7 @@ import { agyRulesFreeDir, rulesFreeArgs } from './rules-free.js';
 import { agyFailure, agyModel, agyThought, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir, dropAgySession, tidyAgyData } from './sessions.js';
 import { agyDialect, belugaToolOf } from './tools.js';
+import { AGY_MCP_NOTE, agyMcpReady, agyOwnMcpNames } from './mcp.js';
 
 export interface AgyExtensionOptions {
   /** Where Antigravity keeps its conversations (its own notes are written there). */
@@ -23,7 +24,7 @@ export interface AgyExtensionOptions {
 export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtension {
   const data = opts.dataDir ?? agyDataDir();
   return {
-    instructions: systemMeta,
+    instructions: (text) => systemMeta(`${text}\n\n${AGY_MCP_NOTE}`),
     // Over HTTP, as before the core: agy takes MCP servers over HTTP without saying so in its initialize.
     mount: 'http',
     tools: { dialect: agyDialect, belugaToolOf },
@@ -42,6 +43,9 @@ export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtensi
     compact: true,
     // run_command past its WaitMsBeforeAsync goes on as a background task; agy tells its model to end the turn and wait.
     backgroundCommands: true,
+    // Your Claude Code's MCP servers too (but for the ones its own config has), and the first turn waits until they've connected.
+    ownerMcp: () => agyOwnMcpNames(),
+    mcpReady: (names, since) => agyMcpReady(names, since),
     failure: agyFailure,
     quota: () => {
       const bin = opts.bin ?? findAgy();
