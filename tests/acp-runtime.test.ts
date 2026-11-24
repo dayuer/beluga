@@ -186,6 +186,12 @@ describe('a run on an ACP agent the core has never heard of', () => {
     expect(r.events.some(([k]) => k === 'compact')).toBe(false);
   });
 
+  it('ends the run when its turn ends, a command still running, for an agent whose extension doesn’t say they go on', async () => {
+    const agy = new ScriptedAgy();
+    expect(await toy(agy).run(run('background tests').input)).toBe('Started build tests in the background; waiting for it to end.');
+    expect(agy.inBackground).toBe(0);
+  });
+
   it('reports no quota for an agent without one', async () => {
     const reportUsage = vi.fn();
     const b = createAcpBackend(TOY, bare, { cwd: process.cwd(), autoEdit: true, additionalDirectories: [], bridge: { ...room, reportUsage }, connect: new ScriptedAgy().connect });

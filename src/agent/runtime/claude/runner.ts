@@ -40,7 +40,7 @@ import { claudeCodeReady, claudeExecutable } from '../../claude-code.js';
 import { claudeHome } from '../../../core/claude-code/launch.js';
 import { belugaHome } from '../../../core/home.js';
 import { expandCommand, mayBeCommand, skillOptions } from './skill-plugins.js';
-import { BACKGROUND_LIMIT_MS, INTERRUPT_TIMEOUT_MS } from '../types.js';
+import { BACKGROUND_LIMIT_MS, INTERRUPT_TIMEOUT_MS, SHELL_LIMIT_MS } from '../types.js';
 
 const USAGE_TIMEOUT_MS = 20_000;
 
@@ -123,12 +123,6 @@ export function withSignInHint(failure: RunFailure, launchEnv: Readonly<Record<s
   return dropped ? { ...failure, envSignIn: dropped } : failure;
 }
 
-/**
- * How long a run stays open after answering for a command or watch the main conversation left
- * running (no agents): long enough for the full tests or a build to end and wake Claude, short
- * enough that a server it left up doesn't hold the run for hours.
- */
-const SHELL_LIMIT_MS = 45 * 60_000;
 /**
  * Agents all done and Claude between turns for this long: end the run. Claude normally reports
  * on finished agents (and the run ends after that answer); this covers it not doing so. Not

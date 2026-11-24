@@ -33,6 +33,12 @@ export interface AcpExtension {
   };
   /** True: `/compact` is its own command, its summary kept out of the chat. */
   readonly compact?: boolean;
+  /**
+   * True: a command it runs may go on in the background past its turn (left `in_progress` when the
+   * turn ends), and it's told to end its turn and wait. Its process then stays up until the command
+   * ends, and the run goes on with a turn of its own (see runner.ts `settled`).
+   */
+  readonly backgroundCommands?: boolean;
   /** What it's told after a turn it ended silently on a declined step (default: declinedNote). */
   declinedNote?(why: readonly string[]): string;
   /** A failed run as its own (default: acpFailure with its id). */
