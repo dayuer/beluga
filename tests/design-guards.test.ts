@@ -68,7 +68,6 @@ describe('docs/design.md, checked', () => {
       'network/network.module.css': 6,
       'onboarding/onboarding.module.css': 7,
       'onboarding/scenes/scenes.module.css': 5,
-      'phone/phone.module.css': 1,
       'sentinel/showcase.module.css': 6,
       'styles/base.css': 3,
       'tasks/NewTaskSheet.module.css': 6,
