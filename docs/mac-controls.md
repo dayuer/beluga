@@ -2,7 +2,8 @@
 
 The Mac app's controls take their sizes from AppKit (`NSControl.ControlSize`), so a sheet, a
 Settings row and a toolbar each line up the same way. Their look is Beluga's own, not a copy of
-macOS: softly rounded corners, soft pastels, no glow. This page is a guide for keeping controls
+macOS: softly rounded corners, neutral greys with color only where it means something, no glow
+(`docs/design.md`). This page is a guide for keeping controls
 consistent, not a cage: when a place reads better another way, say why in its stylesheet.
 `styles/tokens.css` ("Controls") holds the numbers, and every control reads them from there,
 never a height of its own.
