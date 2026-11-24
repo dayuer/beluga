@@ -11,6 +11,7 @@ import { type CheckTone, reviewMerge } from '../../lib/merge-review.js';
 import { askBeforeWork } from '../../lib/work-confirm.js';
 import { timeAgo } from '../../views/history/history-model.js';
 import s from './merge-review.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Merge, the careful way: before anything changes, where it goes (this branch → main, in your
@@ -18,7 +19,6 @@ import s from './merge-review.module.css';
  * button only works when every check passes; nothing is pushed.
  */
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 const SHOWN_COMMITS = 5;
 const NO_KEYS: readonly string[] = [];

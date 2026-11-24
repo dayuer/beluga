@@ -8,8 +8,7 @@ import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { type KeyTarget, tidyName } from './key-paste-model.js';
 import s from './chat-keys.module.css';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** Where the panel reads and writes: this chat's own variables, or the keys a new worktree's page holds. */
 export interface KeyStore {

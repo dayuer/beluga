@@ -11,6 +11,7 @@ import { ago } from '../phone/phone-model.js';
 import p from '../phone/phone.module.css';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
 type WebApi = BelugaClient['api']['web'];
 type Status = Awaited<ReturnType<WebApi['sessions.list']>>;
@@ -21,7 +22,6 @@ type Way = 'local' | 'tailscale' | 'public';
 
 /** How often the list refreshes while it shows (last seen moves; a browser may join; a public address may move). */
 const REFRESH_MS = 10_000;
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const wayOf = (st: Status | undefined): Way => (st?.public ? 'public' : st?.tailscale ? 'tailscale' : 'local');
 
 /** What each way means, under the choice. */

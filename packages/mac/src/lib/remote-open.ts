@@ -4,6 +4,7 @@ import { joinPath } from '@beluga/shared/os-path.js';
 import { useMachine } from './beluga.js';
 import { revealLabel } from './os-words.js';
 import { currentMachines } from '../machines/use-machines.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Open in Finder and editors on a computer's page (BLG-794, src/machines/open.ts): what names a
@@ -11,8 +12,6 @@ import { currentMachines } from '../machines/use-machines.js';
  * Remote-SSH when the computer was added over SSH; Show in Finder downloads a single file to this
  * Mac (and shows it in Finder) or copies a folder's path. On this Mac's own pages, nothing changes.
  */
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 interface There {
   readonly id: string;

@@ -118,13 +118,13 @@
 /* ---------- file tree */
 
 .tree {
-  --tree-folder: #5b8fd6;
+  --tree-folder: color-mix(in srgb, var(--info) 80%, white);
   --tree-file: var(--text-3);
   --tree-indent: 16px;
   padding: 6px 0 4px;
 }
 :global([data-theme='dark']) .tree {
-  --tree-folder: #82abe6;
+  --tree-folder: var(--info);
 }
 .treeRows {
   overflow-x: auto;
@@ -210,22 +210,16 @@
 /* ---------- JSON */
 
 .json {
-  --json-key: #7a5cc4;
-  --json-string: #2f8a5b;
-  --json-number: #2f6fb8;
-  --json-bool: #b8692a;
-  --json-null: #a8708e;
+  /* The meaning colours, so every theme repaints them (docs/design.md). */
+  --json-key: var(--subagent);
+  --json-string: var(--ok);
+  --json-number: var(--info);
+  --json-bool: var(--claude);
+  --json-null: var(--plan);
   --json-punct: var(--text-3);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
-}
-:global([data-theme='dark']) .json {
-  --json-key: #b9a3f0;
-  --json-string: #8fd1a5;
-  --json-number: #8ab8f0;
-  --json-bool: #eab184;
-  --json-null: #d9a1bf;
 }
 .jsonRows {
   padding: 8px 0;
@@ -355,22 +349,23 @@
 
 .term {
   --block-surface: color-mix(in srgb, var(--code-bg) 82%, var(--bg-sunken));
-  /* A soft palette for the 16 colors: readable on the light surface, never neon. */
+  /* A soft palette for the 16 colors: readable on the light surface, never neon. A theme with a
+     terminal theme of its own gives red to cyan (lib/themes.ts themeAnsi). */
   --ansi-black: #3b3d42;
-  --ansi-red: #c84b4b;
-  --ansi-green: #3d8f5a;
-  --ansi-yellow: #a87711;
-  --ansi-blue: #3f72c0;
-  --ansi-magenta: #9a55b8;
-  --ansi-cyan: #2b8a95;
+  --ansi-red: var(--theme-ansi-1, #c84b4b);
+  --ansi-green: var(--theme-ansi-2, #3d8f5a);
+  --ansi-yellow: var(--theme-ansi-3, #a87711);
+  --ansi-blue: var(--theme-ansi-4, #3f72c0);
+  --ansi-magenta: var(--theme-ansi-5, #9a55b8);
+  --ansi-cyan: var(--theme-ansi-6, #2b8a95);
   --ansi-white: #8a8d93;
   --ansi-brightBlack: #80838a;
-  --ansi-brightRed: #dd6a64;
-  --ansi-brightGreen: #4fa86d;
-  --ansi-brightYellow: #c28f22;
-  --ansi-brightBlue: #5a8ee0;
-  --ansi-brightMagenta: #b673d2;
-  --ansi-brightCyan: #3aa3ae;
+  --ansi-brightRed: var(--theme-ansi-9, #dd6a64);
+  --ansi-brightGreen: var(--theme-ansi-10, #4fa86d);
+  --ansi-brightYellow: var(--theme-ansi-11, #c28f22);
+  --ansi-brightBlue: var(--theme-ansi-12, #5a8ee0);
+  --ansi-brightMagenta: var(--theme-ansi-13, #b673d2);
+  --ansi-brightCyan: var(--theme-ansi-14, #3aa3ae);
   --ansi-brightWhite: #5c5f66;
   box-shadow:
     inset 0 0 0 0.5px var(--hairline),
@@ -379,20 +374,20 @@
 :global([data-theme='dark']) .term {
   --block-surface: color-mix(in srgb, var(--code-bg) 60%, var(--bg-sunken));
   --ansi-black: #5a5d64;
-  --ansi-red: #ec8a84;
-  --ansi-green: #8fd19f;
-  --ansi-yellow: #e6c47a;
-  --ansi-blue: #8ab4f0;
-  --ansi-magenta: #d1a3e6;
-  --ansi-cyan: #86d0d6;
+  --ansi-red: var(--theme-ansi-1, #ec8a84);
+  --ansi-green: var(--theme-ansi-2, #8fd19f);
+  --ansi-yellow: var(--theme-ansi-3, #e6c47a);
+  --ansi-blue: var(--theme-ansi-4, #8ab4f0);
+  --ansi-magenta: var(--theme-ansi-5, #d1a3e6);
+  --ansi-cyan: var(--theme-ansi-6, #86d0d6);
   --ansi-white: #c9cbd0;
   --ansi-brightBlack: #8b8e95;
-  --ansi-brightRed: #f4a19b;
-  --ansi-brightGreen: #a8e0b4;
-  --ansi-brightYellow: #f0d495;
-  --ansi-brightBlue: #a6c7f5;
-  --ansi-brightMagenta: #dfb9ef;
-  --ansi-brightCyan: #a3dde2;
+  --ansi-brightRed: var(--theme-ansi-9, #f4a19b);
+  --ansi-brightGreen: var(--theme-ansi-10, #a8e0b4);
+  --ansi-brightYellow: var(--theme-ansi-11, #f0d495);
+  --ansi-brightBlue: var(--theme-ansi-12, #a6c7f5);
+  --ansi-brightMagenta: var(--theme-ansi-13, #dfb9ef);
+  --ansi-brightCyan: var(--theme-ansi-14, #a3dde2);
   --ansi-brightWhite: #ececee;
   box-shadow:
     inset 0 0 0 0.5px var(--hairline),

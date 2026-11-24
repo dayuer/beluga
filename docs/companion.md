@@ -592,12 +592,16 @@ friends' requests, plan decisions: with Approve / Decline or a reply right on th
 
 ## Using it: the screens
 
-Small screen, thumbs, one hand. Friendly and calm: soft pastels (sky, mint, peach, lavender,
-butter; rose for danger) as tinted backgrounds behind icons and chips, never glows or neon. Light
-and dark themes follow the phone's own setting, or what you pick in Settings › Appearance
-(System, Light or Dark). Dark is the Mac app's own dark grey (`#1e1e21`, cards `#2a2a2e`), not black, with the same
-pastels toned down. Both themes take their neutrals from `packages/mac/src/styles/tokens.css`. Rounded cards, generous space, and icons everywhere (one rounded
-set, an icon in a tinted circle for every row, tab and kind), with one word rather than a sentence.
+Small screen, thumbs, one hand. Friendly and calm: the Mac app's neutral greys, with color only
+where it means something (`docs/design.md`): amber for what needs you and warnings, red for
+problems, blue for links and the one accent, green for done and online, each muted enough to sit on
+grey. The pastel names in `lib/theme.ts` (sky, mint, peach, lavender) stay as the API but draw
+neutral; butter and rose keep their hue. Never glows or neon. Light and dark themes follow the
+phone's own setting, or what you pick in Settings › Appearance (System, Light or Dark). Dark is the
+Mac app's own dark grey (`#1e1e21`, cards `#2a2a2e`), not black. Both themes take their neutrals
+from `packages/mac/src/styles/tokens.css`; the phone doesn't follow the Mac's chosen theme (Dracula,
+Nord…). Rounded cards, generous space, and icons everywhere (one rounded set in one ink, in a quiet
+neutral circle for every row, tab and kind), with one word rather than a sentence.
 Motion is smooth and purposeful: springs, shared transitions and haptics when something is
 committed, and no decorative loops.
 

@@ -6,8 +6,7 @@ import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { Markdown } from './Markdown.js';
 import { useAgentNameIn } from '../lib/agent-words.js';
 import s from './btw.module.css';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** Ask a side question (/btw) here: the card above the box shows the answer as it comes. */
 export function askBtw(client: ReturnType<typeof useBeluga>['client'], api: ReturnType<typeof useApi>, channel: string, question: string): void {

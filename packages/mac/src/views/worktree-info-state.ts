@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { WorktreeInfo } from '@beluga/core/other-worktrees.js';
 import { useApi } from '../lib/beluga.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * This window's memory for worktrees made outside Beluga: which ones you chose to start a
@@ -27,8 +28,6 @@ export function setWorktreeFlag(kind: Kind, id: string, on: boolean): void {
 export function useWorktreeFlag(kind: Kind, id: string): boolean {
   return useSyncExternalStore(subscribe, () => flags[kind].has(id));
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** The info page's facts about one worktree; `key` changes (its git status moved) fetch again. */
 export function useWorktreeInfo(id: string, key: string): { info?: WorktreeInfo; loading: boolean; error?: string; reload: () => void } {

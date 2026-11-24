@@ -213,40 +213,42 @@ button.head:focus-visible {
 }
 .ansi {
   font: inherit;
-  /* The terminal's 16 colours, readable on this theme's terminal background. */
+  /* The terminal's 16 colours, readable on this theme's terminal background: a theme with a
+     terminal theme of its own gives red to cyan (lib/themes.ts themeAnsi), so this output matches
+     the terminal beside it. */
   --ansi-0: #3b3b40;
-  --ansi-1: #c4352e;
-  --ansi-2: #2f8a4c;
-  --ansi-3: #a36a00;
-  --ansi-4: #2f6cb3;
-  --ansi-5: #9b3fb0;
-  --ansi-6: #1f8a8a;
+  --ansi-1: var(--theme-ansi-1, #c4352e);
+  --ansi-2: var(--theme-ansi-2, #2f8a4c);
+  --ansi-3: var(--theme-ansi-3, #a36a00);
+  --ansi-4: var(--theme-ansi-4, #2f6cb3);
+  --ansi-5: var(--theme-ansi-5, #9b3fb0);
+  --ansi-6: var(--theme-ansi-6, #1f8a8a);
   --ansi-7: #6b6b72;
   --ansi-8: #8e8e93;
-  --ansi-9: #d9443c;
-  --ansi-10: #38a35a;
-  --ansi-11: #b88300;
-  --ansi-12: #3d7fd1;
-  --ansi-13: #b052c7;
-  --ansi-14: #239e9e;
+  --ansi-9: var(--theme-ansi-9, #d9443c);
+  --ansi-10: var(--theme-ansi-10, #38a35a);
+  --ansi-11: var(--theme-ansi-11, #b88300);
+  --ansi-12: var(--theme-ansi-12, #3d7fd1);
+  --ansi-13: var(--theme-ansi-13, #b052c7);
+  --ansi-14: var(--theme-ansi-14, #239e9e);
   --ansi-15: #1d1d1f;
 }
 :global(:root[data-theme='dark']) .ansi {
   --ansi-0: #4a4a50;
-  --ansi-1: #ef7a72;
-  --ansi-2: #6cc187;
-  --ansi-3: #e3b14a;
-  --ansi-4: #79aef0;
-  --ansi-5: #d18ee6;
-  --ansi-6: #62c4c4;
+  --ansi-1: var(--theme-ansi-1, #ef7a72);
+  --ansi-2: var(--theme-ansi-2, #6cc187);
+  --ansi-3: var(--theme-ansi-3, #e3b14a);
+  --ansi-4: var(--theme-ansi-4, #79aef0);
+  --ansi-5: var(--theme-ansi-5, #d18ee6);
+  --ansi-6: var(--theme-ansi-6, #62c4c4);
   --ansi-7: #c8c8ce;
   --ansi-8: #8a8a92;
-  --ansi-9: #ff9189;
-  --ansi-10: #86d79e;
-  --ansi-11: #f2c766;
-  --ansi-12: #96c2ff;
-  --ansi-13: #e3a8f5;
-  --ansi-14: #7fdada;
+  --ansi-9: var(--theme-ansi-9, #ff9189);
+  --ansi-10: var(--theme-ansi-10, #86d79e);
+  --ansi-11: var(--theme-ansi-11, #f2c766);
+  --ansi-12: var(--theme-ansi-12, #96c2ff);
+  --ansi-13: var(--theme-ansi-13, #e3a8f5);
+  --ansi-14: var(--theme-ansi-14, #7fdada);
   --ansi-15: #f4f4f6;
 }
 

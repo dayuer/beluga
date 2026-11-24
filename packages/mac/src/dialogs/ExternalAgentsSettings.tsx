@@ -7,6 +7,7 @@ import { copyText } from '../lib/copy.js';
 import { Group, Row, Select, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** In a grant's projects: all your chats with no project. */
 const STANDALONE_CHATS = 'chats';
@@ -71,7 +72,6 @@ const ROUTE_ROWS: ReadonlyArray<{ kind: RouteKind; label: string; off: string; o
   { kind: 'public', label: 'Public address', off: 'Hosted agents connect through a Cloudflare tunnel. Each one still needs a pairing code.', on: 'This address changes when the tunnel restarts. Agents must then sign in again with a new code.' },
 ];
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const seenWords = (at: number): string => new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 /**

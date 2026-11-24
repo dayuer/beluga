@@ -10,6 +10,7 @@ import { Group, Select, Switch } from './settings-controls.js';
 import { TRACE_LOGOS } from './trace-logos.js';
 import s from './settings.module.css';
 import t from './traces.module.css';
+import { errorWords as errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Settings › Traces (BLG-1014): your own observability tools, which get your agents' turns as
@@ -20,8 +21,6 @@ import t from './traces.module.css';
 
 /** The group of tools you connected (only there once you have one, so search finds the tools themselves). */
 const CONNECTED = 'Connected';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
 /** A tool's own mark, in its colours (dark mode: a lighter one where the brand's wouldn't show). */
 export function TraceLogo({ id, size = 22 }: { readonly id: TraceProviderId; readonly size?: number }) {

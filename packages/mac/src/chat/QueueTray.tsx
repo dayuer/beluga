@@ -14,8 +14,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { usePrefs } from '../lib/prefs.js';
 import { otherKeySteers } from './send-action.js';
 import { useSteerBlock } from './use-steer.js';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 function Act({ icon, label, onClick, disabled }: { icon: IconName; label: string; onClick: () => void; disabled?: boolean }) {
   return (

@@ -12,8 +12,8 @@ import { knownKeyNames } from './key-refs.js';
 import { type Offer, type OfferedKey, type KeyTarget, heldList, holdKeys, nameProblems, notKeyPrefixOf, pickedKey, placeOf, renameRef, rowsOf, setHeld, tidyName } from './key-paste-model.js';
 import m from './mention.module.css';
 import s from './key-paste.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 /** How long the pasted key takes to dissolve, and the chip to grow in where it was. */
 const DISSOLVE_MS = 700;
 const ENTER_MS = 1100;

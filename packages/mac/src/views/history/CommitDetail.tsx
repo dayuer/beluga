@@ -15,11 +15,10 @@ import { commitPage, fullDate, pillsOf, plural, timeAgo } from './history-model.
 import { useGitHub } from './use-history.js';
 import d from '../diff.module.css';
 import s from './history.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** Diffs this small show opened; bigger commits list their files to open one by one. */
 const OPEN_ALL_LINES = 600;
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 function useCommit(target: string, hash: string): { detail?: Detail; error?: string } {
   const api = useApi();

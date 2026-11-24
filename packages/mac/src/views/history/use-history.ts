@@ -4,6 +4,7 @@ import type { CommitInfo, HistoryFilters } from '@beluga/workspaces/history.js';
 import type { Project } from '@beluga/workspaces/types.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import { keepSeen, lastSeen } from '../../lib/last-seen.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** History's data: pages of commits, the filter choices, the GitHub repository, your worktrees' branches. */
 
@@ -27,8 +28,6 @@ interface KeptLog {
   readonly commits: readonly CommitInfo[];
   readonly next?: string;
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * Commits for a project or worktree, a page at a time. A new query starts over; a new `version`

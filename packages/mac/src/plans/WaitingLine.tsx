@@ -2,8 +2,8 @@ import { type WaitingMessage, waitingWords } from '@beluga/core/plans/watchdog.j
 import { Tip } from '../components/ui.js';
 import { toast, useApi, useBeluga } from '../lib/beluga.js';
 import p from './plans.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const snippet = (prompt: string): string => prompt.replace(/\s+/g, ' ').slice(0, 160) || 'A message';
 
 /**
