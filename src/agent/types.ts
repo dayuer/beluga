@@ -1,3 +1,4 @@
+import type { ReplyLanguage } from '../shared/reply-language.js';
 import type { ChatRef } from '../shared/chat-ref.js';
 import type { ChatAnswerRequest } from '../core/chat/claude-prompt.js';
 import type { ScriptFix, SetupFix, WorkedOutScripts } from './setup-fixer.js';
@@ -157,6 +158,8 @@ export interface AgentRunInput {
   /** "Your Mac" (core/assistant): its tools (the screen, device info, starting work) and what Claude is told it is. */
   readonly macTools?: MacTools;
   readonly macBrief?: string;
+  /** The language to answer you in (shared/reply-language.ts): only on runs you asked for. */
+  readonly replyLanguage?: ReplyLanguage;
   /** Asked in a friend's worktree (your "@claude" there): whose it is and how to read it from here. */
   readonly sharedBrief?: string;
   /** Your phone (core/phone): tools to act on your own paired phone, and what Claude is told about it. */
