@@ -370,6 +370,55 @@ describe('a run on Antigravity', () => {
     expect(r.events.filter(([k]) => k === 'text')).toEqual([]);
   });
 
+  it('stays open for a command it left running in the background, then goes on once it has ended', async () => {
+    const agy = new ScriptedAgy();
+    let steer: Steer | undefined;
+    const r = input('background tests', { place: place(), onSteer: (s) => void (s && (steer = s)) });
+    let answer: string | undefined;
+    const run = backend(agy).run(r).then((a) => (answer = a));
+    // Its turn ended saying it waits: the run doesn't, and the card shows the command, not a stop.
+    await waitFor(() => agy.inBackground === 1 && r.events.some(([k, t]) => k === 'tool' && t === 'Bash build tests') && r.events.filter(([k]) => k === 'tool').length === 2);
+    expect(r.events.some(([k, t]) => k === 'text' && t.startsWith('Started build tests in the background'))).toBe(true);
+    expect(answer).toBeUndefined();
+    expect(steer!.status!()).toMatchObject({ between: true, alive: true });
+    expect(agy.endBackground()).toBe(1);
+    expect(await run).toBe('built: tests');
+    const prompts = agy.sent('session/prompt');
+    expect(prompts).toHaveLength(2);
+    expect(JSON.stringify(prompts[1]!.prompt)).toContain('The command you left running in the background has ended');
+  });
+
+  it('answers a message sent while it waits for its background command first, then goes on with the command', async () => {
+    const agy = new ScriptedAgy();
+    let send: ((f: FollowUp) => boolean) | undefined;
+    const offers: Array<unknown> = [];
+    const r = input('background docs', { place: place(), onFollowUps: (s) => void (offers.push(s), s && (send = s)) });
+    const run = backend(agy).run(r);
+    await waitFor(() => send !== undefined && agy.inBackground === 1);
+    const done: string[] = [];
+    const followUp: FollowUp = { prompt: 'hello', requesterName: 'kay', viaAgent: false, context: [], onEvent: () => undefined, onDone: (a) => void done.push(a), onError: (e) => void done.push(`error: ${e}`) };
+    expect(send!(followUp)).toBe(true);
+    await waitFor(() => done.length === 1);
+    expect(done).toEqual(['echo: hello']);
+    // Its command still runs: the run still waits for it.
+    expect(agy.inBackground).toBe(1);
+    agy.endBackground();
+    expect(await run).toBe('built: docs');
+    expect(offers.at(-1)).toBeUndefined();
+  });
+
+  it('stops while it waits for a background command when you stop it, the command with it', async () => {
+    const agy = new ScriptedAgy();
+    const stop = new AbortController();
+    const r = input('background forever', { place: place(), signal: stop.signal });
+    const run = backend(agy).run(r).catch((e: unknown) => e);
+    await waitFor(() => agy.inBackground === 1 && r.events.some(([k, t]) => k === 'tool' && t === 'Bash build forever') && r.events.filter(([k]) => k === 'tool').length === 2);
+    stop.abort();
+    expect(((await run) as Error).message).toBe('aborted');
+    expect(agy.inBackground).toBe(0);
+    expect(agy.sent('session/prompt')).toHaveLength(1);
+  });
+
   it('says a used-up quota as a usage limit', async () => {
     const agy = new ScriptedAgy();
     const err = await backend(agy).run(input('quota', { place: place() })).catch((e: unknown) => e);

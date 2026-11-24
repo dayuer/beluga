@@ -58,6 +58,13 @@ export const INTERRUPT_TIMEOUT_MS = 10_000;
  */
 export const BACKGROUND_LIMIT_MS = 3 * 60 * 60_000;
 
+/**
+ * How long a run stays open after answering for a command it left running in the background (no
+ * agents): long enough for the full tests or a build to end and wake the agent, short enough that a
+ * server it left up doesn't hold the run for hours. The same for every runtime.
+ */
+export const SHELL_LIMIT_MS = 45 * 60_000;
+
 /** Which runtime: 'claude' or 'codex' (the AgentRef protocol work names the rest). */
 export type RuntimeId = string;
 
