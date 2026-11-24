@@ -13,7 +13,7 @@ import { inApp } from '../lib/boot.js';
 import { useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { setPrefs, usePrefs } from '../lib/prefs.js';
-import { RoomStatus } from '../dialogs/native/RoomPopover.js';
+import { RoomRow, RoomSection } from '../dialogs/native/RoomPopover.js';
 import { ChatsMenu } from './ChatsMenu.js';
 import { Projects, ProjectsAddMenu } from './ProjectTree.js';
 import { SharedProjects } from './SharedProjects.js';
@@ -134,8 +134,8 @@ export function Sidebar() {
             <AppMenu />
           </span>
         )}
-        {/* Only the sidebar's own toggle up here (fork): Usage and Settings are in the card at the bottom. */}
-        <span className={s.titleTools}>
+        {/* Only the sidebar's own toggle up here: Usage and Settings are in the card at the bottom. */}
+        <span className={s.titleEnd}>
           <IconButton size="large" icon="sidebarHide" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
         </span>
       </div>
@@ -213,11 +213,8 @@ export function Sidebar() {
       {/* The call you're in, while you look at something else (BLG-706). */}
       <CallPill />
       <UpdatePill />
-      {/* One card at the bottom (fork): friends and Invite, Usage and Settings, then you. */}
-      <div className={s.dock}>
-        <SidebarFooter />
-        <SelfBar />
-      </div>
+      {/* One card at the bottom: you (and the room, in your card) and Usage. Settings is ⌘, and the menu bar's. */}
+      <Dock />
     </nav>
     </SidebarChatSelection>
   );
@@ -243,32 +240,28 @@ function UsageButton() {
   );
 }
 
-/** Settings, beside Usage in the sidebar's bottom card. */
-function SettingsButton() {
-  const { ui } = useBeluga();
-  const open = useUi((u) => u.settings !== undefined);
-  return <IconButton size="large" icon="gear" label="Settings" keys={shortcutKeys('settings')} className={s.dockButton} active={open} onClick={() => openSettings(ui, 'general')} />;
-}
-
-function SidebarFooter() {
-  const status = useApp((st) => st.status);
-  const people = useApp((st) => st.peers.length);
-  const room = useApp((st) => st.room);
-  const ready = useApp((st) => st.hosting?.phase === 'ready');
-  const reconnecting = useApp((st) => st.connection?.state === 'reconnecting');
-  const { label, tone } = footerStatus({ status, room, people, ready, reconnecting });
+/**
+ * The sidebar's bottom card: you (your card holds your status and the room) and Usage. While the
+ * Beluga network is off there's no you to click, so the room has a row of its own.
+ */
+function Dock() {
+  const netOn = useApp((st) => st.network.enabled && st.network.self !== undefined);
   return (
-    <div className={s.footer}>
-      <span className={s.friends}>
-        <RoomStatus label={label} tone={tone} />
-        <button type="button" className={s.invite} onClick={() => document.dispatchEvent(new CustomEvent('beluga:invite'))}>
-          Invite
-        </button>
-      </span>
+    <div className={s.dock}>
+      {netOn ? <SelfBar extra={<RoomSection />} /> : <RoomFallback />}
       <span className={s.dockTools}>
         <UsageButton />
-        <SettingsButton />
       </span>
     </div>
   );
+}
+
+function RoomFallback() {
+  const status = useApp((st) => st.status);
+  const people = useApp((st) => st.peers.length);
+  // Your own room is "your room" ("4 people in your room"), never your name back to you.
+  const room = useApp((st) => (st.self?.host ? 'your room' : st.room));
+  const ready = useApp((st) => st.hosting?.phase === 'ready');
+  const reconnecting = useApp((st) => st.connection?.state === 'reconnecting');
+  return <RoomRow label={footerStatus({ status, room, people, ready, reconnecting }).label} />;
 }
