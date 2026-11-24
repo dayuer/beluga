@@ -20,7 +20,7 @@ import type { ClaudeQuestion } from '../../../protocol.js';
 import { acpComplete } from './complete.js';
 import { addDirArgs, findAcpCommand, spawnAcp } from './connection.js';
 import type { AcpExtension } from './extension.js';
-import { acpEnd, acpFailure, acpModel, declinedNote, modeValue } from './parts.js';
+import { acpEnd, acpFailure, acpModel, declinedNote, modeValue, settled } from './parts.js';
 import type { AcpAgentSpec, AcpConnect, AcpConnection } from './spec.js';
 import { acpStatus } from './status.js';
 
@@ -137,19 +137,43 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         const { rpc } = link;
         const stopped = deferred<never>();
         void rpc.closed.then(() => {
-          if (!closed) stopped.reject(fail({ error: `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
+          if (!closed) stopped.reject(fail({ error: link.cause?.() ?? `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
         });
+        /** A failed request's end: once the agent is gone, why it went (its line knows: stuck, signed out, how it exited) over "stopped". */
+        const endOf = (err: unknown): ReturnType<typeof acpEnd> => {
+          const why = rpc.isClosed ? link.cause?.() : undefined;
+          return acpEnd(why ? new Error(why) : err, link.stderr());
+        };
+        /** Where the turn running now says things (its notes: it went quiet). */
+        let saying: TurnSink = { onEvent: input.onEvent };
+        link.onNotice?.((note) => saying.onEvent('progress', note));
 
         // Updates count from the session's own id on: a loaded session's replay (its history) comes before.
         let sid = '';
+        /**
+         * A loaded session's history may still be coming in after session/load answered (its last
+         * frames behind the answer): until the first turn is sent, what it says of the conversation is
+         * history, not this run's work. Its state (commands, options, mode) counts. A step seen there
+         * stays history when it's spoken of later, until a step is announced anew under its id.
+         */
+        let replaying = false;
+        const replayed = new Set<string>();
         let options: readonly ConfigOption[] = [];
         /** Holds the session on Beluga's mode (set once the session is open). */
         let holdMode: (() => Promise<unknown>) | undefined;
         /** Why Beluga turned this turn's steps down. */
         const declined: string[] = [];
+        /** When the agent last said anything of a session (its history too). */
+        let lastUpdate = 0;
         rpc.onNotification((method, params) => {
+          if (method === 'session/update') lastUpdate = Date.now();
           if (method !== 'session/update' || !sid || params.sessionId !== sid) return;
           const update = params.update as SessionUpdate;
+          const call = 'toolCallId' in update && typeof update.toolCallId === 'string' ? update.toolCallId : undefined;
+          if (replaying && HISTORY.has(update.sessionUpdate)) return void (call && replayed.add(call));
+          // A step announced anew is this run's, even under a history's id (an agent that counts its ids per process).
+          if (call && update.sessionUpdate === 'tool_call') replayed.delete(call);
+          if (call && replayed.has(call)) return;
           const q = ext.questions;
           if (q && (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') && dialect.toolOf(update) === q.tool) asking = q.detect(update.rawInput) ?? asking;
           if (update.sessionUpdate === 'available_commands_update') commands = new Set(update.availableCommands.map((c) => c.name));
@@ -192,13 +216,18 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         let opened: SessionResponse | undefined;
         if (resume && !place?.forkSession) {
           opened = await rpc.request<SessionResponse>('session/load', { sessionId: resume, cwd, mcpServers: servers, _meta: meta }).catch(() => undefined);
-          if (opened) opened = { ...opened, sessionId: resume };
+          if (opened) {
+            opened = { ...opened, sessionId: resume };
+            replaying = true;
+            // What it still sends of its history comes in before the first turn goes: once it's quiet a moment (never long).
+            await settled(() => lastUpdate);
+          }
           else input.onEvent('progress', `Started a new ${spec.label} conversation (the last one couldn’t be opened)`);
         }
         try {
           opened ??= await rpc.request<SessionResponse>('session/new', { cwd, mcpServers: servers, _meta: meta });
         } catch (err) {
-          throw fail(acpEnd(err, link.stderr()));
+          throw fail(endOf(err));
         }
         sid = opened.sessionId!;
         options = opened.configOptions ?? [];
@@ -263,10 +292,12 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           asking = undefined;
           await holdMode();
           events.beginTurn(sink);
+          saying = sink;
           const done = deferred<PromptResponse>();
           active = { done };
           try {
-            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(acpEnd(err, link.stderr()))));
+            replaying = false;
+            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(endOf(err))));
             const res = await Promise.race([done.promise, stopped.promise, abort.promise]);
             const text = events.endTurn(res.stopReason !== 'cancelled');
             const used = usageEvent(res.usage, sid);
@@ -447,6 +478,9 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
     },
   };
 }
+
+/** What a loaded session's history is made of (ACP's session/update kinds): never this run's work. */
+const HISTORY = new Set<string>(['user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update', 'plan']);
 
 const PLAN_NOTE = 'Plan only: look around read-only, change nothing, and answer with a step-by-step plan for the person to approve.';
 const DEFINE_NOTE =

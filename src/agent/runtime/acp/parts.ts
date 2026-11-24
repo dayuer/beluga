@@ -53,3 +53,13 @@ export function modelRows(options: readonly ConfigOption[] | undefined): Runtime
   const levels = options?.find((o) => o.id === 'thought_level' || o.category === 'thought_level')?.options.map((o) => o.value) ?? [];
   return (model?.options ?? []).map((o) => ({ value: o.value, label: o.name, description: o.description ?? '', ...(o.value === model?.currentValue && levels.length ? { efforts: levels } : {}) }));
 }
+
+/**
+ * Waits until nothing has been heard for `quietMs` (`last`: when something last was), and never
+ * longer than `capMs` in all: a loaded session's history that's still coming in is in before the
+ * first turn goes.
+ */
+export async function settled(last: () => number, quietMs = 200, capMs = 2_000, now: () => number = Date.now): Promise<void> {
+  const until = now() + capMs;
+  while (now() < until && now() - last() < quietMs) await new Promise((resolve) => setTimeout(resolve, 25));
+}
