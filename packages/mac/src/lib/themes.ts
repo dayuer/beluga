@@ -6,6 +6,8 @@
  * One table drives the CSS, Settings' previews and the readability test.
  */
 
+import { TERMINAL_PRESETS } from './terminal-themes.js';
+
 export type ThemeBase = 'light' | 'dark';
 
 /** The colours a theme gives (each one a design token of the same name). */
@@ -29,6 +31,14 @@ export interface ThemeColors {
   readonly worktree: string;
   readonly plan: string;
   readonly epic: string;
+  /**
+   * Made from the ones above unless a theme gives its own (`derived`): Merge's green face (white
+   * words on it), a call's mint and its words, and a Delete button's red face.
+   */
+  readonly merge?: string;
+  readonly call?: string;
+  readonly callInk?: string;
+  readonly errorFill?: string;
   readonly hairline?: string;
   readonly hairlineStrong?: string;
   readonly hover?: string;
@@ -69,7 +79,7 @@ export const THEMES: readonly AppTheme[] = [
     base: 'dark',
     by: 'beluga',
     builtin: true,
-    colors: c({ bg: '#1e1e21', sunken: '#19191b', sidebar: '#26262a', raised: '#2a2a2e', code: '#242427', term: '#17171a', text: '#ececee', text2: '#a8a8ae', text3: '#75757c', claude: '#df946a', ok: '#6cc187', warn: '#e3a64a', error: '#ef7a72', info: '#79aef0', merged: '#b294f0', subagent: '#ab93f3', worktree: '#66c6bb', plan: '#e892c3', epic: '#a4aaf6' }),
+    colors: c({ bg: '#1e1e21', sunken: '#19191b', sidebar: '#26262a', raised: '#2a2a2e', code: '#242427', term: '#17171a', text: '#ececee', text2: '#a8a8ae', text3: '#75757c', claude: '#df946a', ok: '#6cc187', warn: '#e3a64a', error: '#ef7a72', info: '#79aef0', merged: '#b294f0', subagent: '#ab93f3', worktree: '#66c6bb', plan: '#e892c3', epic: '#a4aaf6', merge: '#238636', call: '#74cdb3', callInk: '#9be0cb', errorFill: '#d9483f' }),
   },
   {
     id: 'super-dark',
@@ -215,7 +225,7 @@ export const THEMES: readonly AppTheme[] = [
     base: 'light',
     by: 'beluga',
     builtin: true,
-    colors: c({ bg: '#ffffff', sunken: '#f8f9fb', sidebar: '#f4f5f9', raised: '#ffffff', code: '#f4f4f6', term: '#fbfbfc', text: '#1d1d1f', text2: '#5d5d63', text3: '#8e8e93', claude: '#b4693f', ok: '#2f8a4c', warn: '#b36b00', error: '#c4352e', info: '#2f6cb3', merged: '#8a63d2', subagent: '#7656c9', worktree: '#24877f', plan: '#b84d8a', epic: '#5a62cf' }),
+    colors: c({ bg: '#ffffff', sunken: '#f8f9fb', sidebar: '#f4f5f9', raised: '#ffffff', code: '#f4f4f6', term: '#fbfbfc', text: '#1d1d1f', text2: '#5d5d63', text3: '#8e8e93', claude: '#b4693f', ok: '#2f8a4c', warn: '#b36b00', error: '#c4352e', info: '#2f6cb3', merged: '#8a63d2', subagent: '#7656c9', worktree: '#24877f', plan: '#b84d8a', epic: '#5a62cf', merge: '#1a7f37', call: '#45b194', callInk: '#1f7a62', errorFill: '#c4352e' }),
   },
   {
     id: 'arctic',
@@ -306,6 +316,10 @@ const TOKENS: ReadonlyArray<readonly [keyof ThemeColors, string]> = [
   ['worktree', '--worktree'],
   ['plan', '--plan'],
   ['epic', '--epic'],
+  ['merge', '--merge'],
+  ['call', '--call'],
+  ['callInk', '--call-ink'],
+  ['errorFill', '--error-fill'],
   ['hairline', '--hairline'],
   ['hairlineStrong', '--hairline-strong'],
   ['hover', '--bg-hover'],
@@ -313,11 +327,61 @@ const TOKENS: ReadonlyArray<readonly [keyof ThemeColors, string]> = [
   ['shadowPop', '--shadow-pop'],
 ];
 
+// ---- Colours made from a theme's own (docs/design.md: every theme repaints a meaning)
+
+const hex2 = (n: number): string => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
+const rgb = (hex: string): [number, number, number] => {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+/** `a` with `1 - w` of `b` mixed in, in sRGB (as CSS's `color-mix(in srgb, a w, b)`). */
+export function mix(a: string, b: string, w: number): string {
+  const [x, y] = [rgb(a), rgb(b)];
+  return `#${x.map((v, i) => hex2(v * w + y[i]! * (1 - w))).join('')}`;
+}
+/** Darkened until white words on it read (a filled button's face). */
+const faceFor = (color: string, start: number): string => {
+  let w = start;
+  let face = mix(color, '#000000', w);
+  while (contrast('#ffffff', face) < 3.6 && w > 0.3) face = mix(color, '#000000', (w -= 0.04));
+  return face;
+};
+
+/** The colours a theme doesn't give, made from the ones it does: what Light and Dark set by hand in tokens.css, for every other theme. */
+export function derived(t: AppTheme): Required<Pick<ThemeColors, 'merge' | 'call' | 'callInk' | 'errorFill'>> {
+  const k = t.colors;
+  const between = mix(k.ok, k.worktree, 0.5);
+  const call = k.call ?? (t.base === 'dark' ? between : mix(between, '#ffffff', 0.85));
+  return {
+    merge: k.merge ?? faceFor(k.ok, t.base === 'dark' ? 0.62 : 0.88),
+    call,
+    callInk: k.callInk ?? mix(call, k.text, 0.7),
+    // Light's red already is a face (tokens.css: --error-fill: var(--error)); dark's is a pastel for words.
+    errorFill: k.errorFill ?? (t.base === 'dark' ? faceFor(k.error, 0.85) : k.error),
+  };
+}
+
+/**
+ * The terminal's 12 colours (red to cyan, plain and bright) from the theme's own terminal theme, for
+ * the output Beluga draws itself (a step's output, a terminal block) to match the terminal beside it.
+ * Black and white (0, 7, 8, 15) stay Beluga's: a theme's black is its background, and its white
+ * vanishes on a light one. So does a colour that doesn't read on the code background (under 3:1,
+ * Solarized Light's and Rosé Pine Dawn's pale ones): output is read, not glanced at.
+ */
+export function themeAnsi(t: AppTheme): readonly (string | undefined)[] | undefined {
+  const preset = t.term ? TERMINAL_PRESETS.find((p) => p.name === t.term) : undefined;
+  const colors = preset && (t.base === 'light' ? preset.light : preset.colors);
+  if (!colors) return undefined;
+  return colors.ansi.map((c, i) => (!c || i % 8 === 0 || i % 8 === 7 || contrast(c, t.colors.code) < 3 ? undefined : c));
+}
+
 /** One theme's CSS: on its base's tokens, an opaque sidebar (no blur under a theme's own colours), its accent, and P3 where the screen has it. */
 export function themeCss(t: AppTheme): string {
   // [data-theme] too, to win over tokens.css's :root[data-theme='dark'] whatever order the sheets load in.
   const sel = `:root[data-theme='${t.base}'][data-palette='${t.id}']`;
-  const lines = TOKENS.flatMap(([k, v]) => (t.colors[k] ? [`  ${v}: ${t.colors[k]};`] : []));
+  const colors: ThemeColors = { ...t.colors, ...derived(t) };
+  const lines = TOKENS.flatMap(([k, v]) => (colors[k] ? [`  ${v}: ${colors[k]};`] : []));
+  for (const [i, c] of (themeAnsi(t) ?? []).entries()) if (c) lines.push(`  --theme-ansi-${i}: ${c};`);
   lines.push(`  --bg-sidebar: ${t.colors.sidebar};`);
   if (t.accent) lines.push(`  --theme-accent: ${t.accent};`);
   // The highlight along a lit surface's top edge (data-edges='lit': the screens' own CSS puts it on).
