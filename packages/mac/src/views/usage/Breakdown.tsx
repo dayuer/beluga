@@ -29,7 +29,6 @@ interface Scale {
 }
 
 const CLAUDE = 'var(--claude)';
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 const stop = (e: MouseEvent): void => e.stopPropagation();
 
 function Tokens({ tokens, cost, max }: { tokens: number; cost: number; max: number }) {
@@ -160,7 +159,7 @@ function ProjectHead({ p, scale, color, now }: { p: ProjectRow; scale: Scale; co
   const main = p.rows.find((r) => r.ws.kind === 'main')?.ws;
   const worktrees = p.rows.filter((r) => r.ws.kind === 'worktree').length + (p.agents?.count ?? 0);
   const chats = p.rows.filter((r) => r.ws.kind === 'chat').length;
-  const what = [worktrees ? plural(worktrees, 'worktree') : '', chats ? plural(chats, 'chat') : ''].filter(Boolean).join(' · ') || 'Main folder only';
+  const what = [worktrees ? `${worktrees} worktree${worktrees === 1 ? '' : 's'}` : '', chats ? `${chats} chat${chats === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') || 'Main folder only';
   return (
     <div role="row" className={s.projectRow}>
       <span role="rowheader" className={s.nameCell}>

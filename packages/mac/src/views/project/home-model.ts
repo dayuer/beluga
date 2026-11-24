@@ -42,15 +42,13 @@ export interface HomeModel {
   readonly stats: { readonly active: number; readonly ready: number; readonly archived: number };
 }
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /**
  * main against origin in plain words: commits of its own are "not pushed" (Straight to main puts
  * them there, and Push main sends them), new ones there are "behind".
  */
 function aheadBehind(ahead: number, behind: number, up: string): string {
-  if (ahead && behind) return `${plural(ahead, 'commit')} not pushed · ${behind} behind ${up}`;
-  return ahead ? `${plural(ahead, 'commit')} not pushed to ${up}` : `${behind} behind ${up}`;
+  if (ahead && behind) return `${ahead} commit${ahead === 1 ? '' : 's'} not pushed · ${behind} behind ${up}`;
+  return ahead ? `${ahead} commit${ahead === 1 ? '' : 's'} not pushed to ${up}` : `${behind} behind ${up}`;
 }
 
 /**
@@ -59,7 +57,7 @@ function aheadBehind(ahead: number, behind: number, up: string): string {
  */
 export function defaultLineOf(sync: ProjectSync): MainLine {
   const where = sync.onDefault ? 'main' : 'the main folder';
-  const dirty = sync.dirty ? `${plural(sync.dirty, 'uncommitted change')} in ${where}` : undefined;
+  const dirty = sync.dirty ? `${sync.dirty} uncommitted change${sync.dirty === 1 ? '' : 's'} in ${where}` : undefined;
   const extra = { branch: sync.branch, ...(dirty ? { dirty } : {}), ...(sync.onDefault ? {} : { elsewhere: `The main folder is on ${sync.current ?? 'a detached HEAD'}` }) };
   const up = sync.upstream;
   if (!up) return { label: 'Not tracking a remote branch', tone: 'muted', ...extra };
@@ -72,7 +70,7 @@ export function defaultLineOf(sync: ProjectSync): MainLine {
 export function mainLineOf(main: Workspace | undefined, sync?: ProjectSync): MainLine {
   if (sync) return defaultLineOf(sync);
   const st = main?.status;
-  const dirty = st?.changed ? `${plural(st.changed, 'uncommitted change')} in main` : undefined;
+  const dirty = st?.changed ? `${st.changed} uncommitted change${st.changed === 1 ? '' : 's'} in main` : undefined;
   const extra = dirty ? { dirty } : {};
   const up = st?.upstream;
   if (!st) return { label: 'Main folder', tone: 'muted', ...extra };

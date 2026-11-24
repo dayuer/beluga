@@ -8,8 +8,6 @@ import s from './usage.module.css';
 /** Where a project's rows are in the breakdown below (its legend entry scrolls there). */
 export const projectAnchor = (id: string): string => `usage-project-${id}`;
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 const reveal = (id: string): void => document.getElementById(projectAnchor(id))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 /**
@@ -31,7 +29,7 @@ export function StorageCard({ rows, measuring, measured, onMeasure }: { rows: re
     >
       <div className={cx(s.hero, waiting && s.heroWaiting)}>
         {waiting ? <Shimmer wide /> : <span className={s.heroValue}>{formatBytes(total)}</span>}
-        <span className={s.heroUnit}>in worktrees{worktrees ? ` · ${plural(worktrees, 'folder')} in ${plural(homes, 'project')}` : ''}</span>
+        <span className={s.heroUnit}>in worktrees{worktrees ? ` · ${worktrees} folder${worktrees === 1 ? '' : 's'} in ${homes} project${homes === 1 ? '' : 's'}` : ''}</span>
       </div>
       <div className={cx(s.stack, waiting && s.stackWaiting)} role="group" aria-label="Disk space by project">
         {waiting ? null : parts.length ? (

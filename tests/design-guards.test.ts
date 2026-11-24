@@ -127,25 +127,6 @@ describe('docs/design.md, checked', () => {
     // has what someone added by hand ("{0} commits"): "1 commit" and the sentences around a count
     // ("Delete {0} worktree{1} permanently?") stay English. These move to inline as they're touched.
     const helpers = sources.filter((f) => /^(export )?(const|function) plural\b/m.test(read(f)));
-    expect(helpers).toEqual([
-      'claude-code/cc-model.ts',
-      'dialogs/native/MergeReview.tsx',
-      'dialogs/native/WorkConfirm.tsx',
-      'layout/attention-model.ts',
-      'views/WorktreeInfo.tsx',
-      'views/history/history-model.ts',
-      'views/overview/overview-selection.ts',
-      'views/project/EarningsSection.tsx',
-      'views/project/EnvSection.tsx',
-      'views/project/GitHubRow.tsx',
-      'views/project/MainSyncBar.tsx',
-      'views/project/home-model.ts',
-      'views/usage/Breakdown.tsx',
-      'views/usage/StorageCard.tsx',
-      'views/usage/stats-model.ts',
-      'views/worktrees/BatchAlerts.tsx',
-      'views/worktrees/WorktreeItem.tsx',
-      'views/worktrees/worktrees-model.ts',
-    ]);
+    expect(helpers).toEqual([]);
   });
 });

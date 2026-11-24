@@ -10,7 +10,6 @@ import { openExternal } from '../../lib/system.js';
 import { useGitHub } from '../history/use-history.js';
 import s from './main-sync.module.css';
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 const compact = (n: number): string => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** The GitHub CLI isn't set up (or can't see this repository): how to set it up, then check again (also Issues'). */
@@ -53,7 +52,7 @@ function Pills({ info, url }: { info: GitHubInfo; url: string }) {
         <Tip label={info.peopleKind === 'collaborators' ? 'People with access to the repository' : 'People who contributed (who has access isn’t visible to you)'}>
           <button type="button" className={s.ghPill} onClick={() => void openExternal(`${url}/${info.peopleKind === 'collaborators' ? 'settings/access' : 'graphs/contributors'}`)}>
             <Icon name="people" size={11} />
-            {plural(info.people, info.peopleKind === 'collaborators' ? 'person' : 'contributor').replace('persons', 'people')}
+            {info.peopleKind === 'collaborators' ? (info.people === 1 ? '1 person' : `${info.people} people`) : `${info.people} contributor${info.people === 1 ? '' : 's'}`}
           </button>
         </Tip>
       ) : null}
@@ -61,11 +60,11 @@ function Pills({ info, url }: { info: GitHubInfo; url: string }) {
         <Tip label="Open pull requests">
           <button type="button" className={s.ghPill} onClick={() => void openExternal(`${url}/pulls`)}>
             <Icon name="pr" size={11} />
-            {info.openPrsMore ? `${info.openPrs}+ open PRs` : plural(info.openPrs, 'open PR')}
+            {info.openPrsMore ? `${info.openPrs}+ open PRs` : `${info.openPrs} open PR${info.openPrs === 1 ? '' : 's'}`}
           </button>
         </Tip>
       ) : null}
-      <Tip label={`${plural(info.stars, 'star')} · ${plural(info.forks, 'fork')} · ${plural(info.openIssues, 'open issue')}`}>
+      <Tip label={`${info.stars} star${info.stars === 1 ? '' : 's'} · ${info.forks} fork${info.forks === 1 ? '' : 's'} · ${info.openIssues} open issue${info.openIssues === 1 ? '' : 's'}`}>
         <span className={s.ghPill}>★ {compact(info.stars)}</span>
       </Tip>
     </>

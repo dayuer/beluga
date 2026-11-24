@@ -19,7 +19,6 @@ import { errorText } from '@beluga/shared/error-text.js';
  * button only works when every check passes; nothing is pushed.
  */
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 const SHOWN_COMMITS = 5;
 const NO_KEYS: readonly string[] = [];
 
@@ -77,11 +76,11 @@ function Commits({ preview }: { preview: MergePreview }) {
   return (
     <section className={s.section} aria-label="What merges">
       <div className={s.summary}>
-        <strong>{plural(preview.commitCount, 'commit')}</strong>
+        <strong>{`${preview.commitCount} commit${preview.commitCount === 1 ? '' : 's'}`}</strong>
         {preview.files ? (
           <>
             <span className={s.dot}>·</span>
-            {plural(preview.files, 'file')}
+            {`${preview.files} file${preview.files === 1 ? '' : 's'}`}
             <span className={s.added}>+{preview.insertions.toLocaleString()}</span>
             <span className={s.removed}>−{preview.deletions.toLocaleString()}</span>
           </>
@@ -95,7 +94,7 @@ function Commits({ preview }: { preview: MergePreview }) {
           </li>
         ))}
       </ul>
-      {more > 0 ? <div className={s.more}>and {plural(more, 'earlier commit')}</div> : null}
+      {more > 0 ? <div className={s.more}>and {`${more} earlier commit${more === 1 ? '' : 's'}`}</div> : null}
     </section>
   );
 }

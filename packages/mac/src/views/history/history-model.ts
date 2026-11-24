@@ -99,8 +99,5 @@ export function branchChoices(filters: { current?: string; branches: readonly st
   };
 }
 
-/** The plural people expect: "1 commit", "3 commits". */
-export const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /** A GitHub page for one commit, from the repository's page. */
 export const commitPage = (repoUrl: string, hash: string): string => `${repoUrl.replace(/\/+$/, '')}/commit/${hash}`;

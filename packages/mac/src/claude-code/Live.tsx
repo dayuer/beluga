@@ -6,7 +6,7 @@ import { Badge, Button, Dot, cx } from '../components/ui.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { Row } from '../layout/sidebar-parts.js';
 import { AgentCard } from './Cards.js';
-import { agentLabel, agentTone, openActivity, placeLabel, plural, sessionLabel, tokens } from './cc-model.js';
+import { agentLabel, agentTone, openActivity, placeLabel, sessionLabel, tokens } from './cc-model.js';
 import { cappedAgents, inStartOrder } from './subagents-model.js';
 import i from '../layout/Inspector.module.css';
 import s from './claude-code.module.css';
@@ -52,13 +52,13 @@ export function LiveStrip({ workspaceId }: { workspaceId: string }) {
       ))}
       {hidden ? (
         // Always the same place: this session in Activity, with every one of its agents.
-        <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client, session.id)} title={`${plural(hidden, 'earlier agent')}: show all ${agents.length} in Activity`} aria-label={`Show all ${agents.length} agents in Activity`}>
+        <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client, session.id)} title={`${hidden} earlier agent${hidden === 1 ? '' : 's'}: show all ${agents.length} in Activity`} aria-label={`Show all ${agents.length} agents in Activity`}>
           +{hidden}
         </button>
       ) : null}
       {sessions.length > 1 ? (
         <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client)}>
-          {plural(sessions.length - 1, 'more session')}
+          {`${sessions.length - 1} more session${sessions.length - 1 === 1 ? '' : 's'}`}
         </button>
       ) : null}
     </div>
@@ -139,7 +139,7 @@ function SessionDetails({ session }: { session: CcSession }) {
         <button key={a.id} type="button" className={s.inspectorAgent} onClick={() => openActivity(client, session.id, a.id)} title={a.step ?? ''}>
           {a.status === 'running' ? <Dot tone="subagent" live /> : <Icon name={a.status === 'failed' ? 'x' : a.status === 'finished' ? 'check' : 'clock'} size={10} className={s[`tone_${agentTone(a)}`]} />}
           <span className={s.inspectorAgentText}>{a.description}</span>
-          <span className={s.num}>{plural(a.steps, 'step')}</span>
+          <span className={s.num}>{`${a.steps} step${a.steps === 1 ? '' : 's'}`}</span>
         </button>
       ))}
     </div>
@@ -179,7 +179,7 @@ export function ActivityRow({ whenLive }: { whenLive?: boolean } = {}) {
     <Row
       icon={<Icon name="pulse" size={14} />}
       label="Activity"
-      detail={running ? `${plural(running, 'Claude Code agent')} running outside Beluga` : 'Claude Code sessions running outside Beluga (a terminal, another app), live'}
+      detail={running ? `${running} Claude Code agent${running === 1 ? '' : 's'} running outside Beluga` : 'Claude Code sessions running outside Beluga (a terminal, another app), live'}
       selected={selected}
       onClick={() => openActivity(client)}
       trailing={running ? <Badge count={running} /> : live ? <Dot tone="muted" /> : null}

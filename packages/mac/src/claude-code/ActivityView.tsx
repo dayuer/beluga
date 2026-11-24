@@ -12,7 +12,7 @@ import { LiveTranscript } from './LiveTranscript.js';
 import { AgentMonitor } from './AgentMonitor.js';
 import { openSubAgent } from '../layout/SubAgents.js';
 import { TeamBlock, teamMembers } from './Team.js';
-import { activitySummary, groupByProject, openActivity, placeLabel, plural, sessionLabel } from './cc-model.js';
+import { activitySummary, groupByProject, openActivity, placeLabel, sessionLabel } from './cc-model.js';
 import s from './claude-code.module.css';
 
 /**
@@ -56,7 +56,7 @@ function SessionRow({ session }: { session: CcSession }) {
             <span className={s[`tone_${st.tone}`]}>{st.label}</span>
             <span>{place}</span>
             {session.agent ? <span>{sessionApp(session)}</span> : null}
-            {session.agents.length ? <span>{running ? `${running} of ${plural(session.agents.length, 'agent')} running` : plural(session.agents.length, 'agent')}</span> : null}
+            {session.agents.length ? <span>{running ? `${running} of ${session.agents.length} agent${session.agents.length === 1 ? '' : 's'} running` : `${session.agents.length} agent${session.agents.length === 1 ? '' : 's'}`}</span> : null}
           </span>
         </span>
         <span className={s.sessionOpen}>
@@ -102,7 +102,7 @@ function ActivityList() {
             <h2 className={s.groupTitle}>
               {g.projectId ? <ProjectIcon id={g.projectId} name={g.name} size={18} /> : <Icon name="folder" size={16} />}
               <span>{g.name}</span>
-              <span className={s.groupCount}>{g.running ? `${g.running} running` : plural(g.sessions.length, 'session')}</span>
+              <span className={s.groupCount}>{g.running ? `${g.running} running` : `${g.sessions.length} session${g.sessions.length === 1 ? '' : 's'}`}</span>
             </h2>
             {g.sessions.map((x) => (
               <SessionRow key={x.id} session={x} />

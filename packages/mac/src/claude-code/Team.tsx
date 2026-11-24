@@ -2,7 +2,7 @@ import type { CcAgent, CcMessage, CcSession } from '@beluga/core/claude-code/mod
 import { useNow } from '../chat/Items.js';
 import { Icon } from '../components/Icon.js';
 import { AgentCard } from './Cards.js';
-import { plural, since } from './cc-model.js';
+import { since } from './cc-model.js';
 import s from './claude-code.module.css';
 
 /**
@@ -51,9 +51,9 @@ export function TeamBlock({ session, onOpen }: { session: CcSession; onOpen: (ag
         <Icon name="people" size={13} />
         <strong>Team</strong>
         <span>
-          {plural(members.length, 'member')}
+          {`${members.length} member${members.length === 1 ? '' : 's'}`}
           {working ? ` · ${working} working` : ''}
-          {team.messages.length ? ` · ${plural(team.messages.length, 'message')}` : ''}
+          {team.messages.length ? ` · ${team.messages.length} message${team.messages.length === 1 ? '' : 's'}` : ''}
         </span>
       </header>
       <div className={s.grid}>
