@@ -41,9 +41,9 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 |---|---|---|
 | `fix/agy-background-commands` | `topic/fixes`（dayuer/beluga#102）→ `topic/plans` | 未提，已是上游写法 |
 | `fix/external-trusted-confined` | `topic/fixes`（dayuer/beluga#100）→ `topic/plans` | 未提，已是上游写法 |
-| `feat/acp-agents-all`（分支保留） | `topic/plans` | beluga-labs/beluga#626 开着 |
-| `feat/acp-usage` | `topic/plans`（提交都在 `feat/acp-agents-all` 里） | 属于 #626 |
-| `feat/acp-agents` | `topic/plans`（没有新内容，已被 `feat/acp-agents-all` 取代） | 属于 #626 |
+| `feat/acp-agents-all` | `topic/plans` | beluga-labs/beluga#626 已合并（2026-11-24），fork 只留自己的几处写法：共用的 `errorWords`、打开用量时刷新、手机协议 minor 64 |
+| `feat/acp-usage` | `topic/plans`（提交都在 `feat/acp-agents-all` 里） | 随 #626 合并 |
+| `feat/acp-agents` | `topic/plans`（没有新内容，已被 `feat/acp-agents-all` 取代） | 随 #626 合并 |
 | `feat/sidebar-dock`（分支保留） | `topic/plans`（保留 fork 自己的侧栏卡片，只带进删掉不用的手机标记） | beluga-labs/beluga#613 开着 |
 | `claude/laughing-shamir-84159b` | `topic/plans`（Mac 的复数改成内联写法） | 未提 |
 | `feat/acp-generic`、`feat/acp-registry`、`feat/acp-runtime`、`feat/design-system`、`feat/openai-format`、`fix/model-pick-no-rescan`、`fix/plan-ships-again`、`merge/fixes-model-pick`、`merge/fixes-plan-ships-again` | 早已在 `topic/plans` 里 | `feat/acp-runtime` 是 #612、`feat/openai-format` 是 #605（已合并）；`feat/design-system` 未提 |
@@ -52,6 +52,7 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 | `pr-assets/*`（10 个） | 不合，只留同名 tag | — |
 | `topic/chinese` | `topic/fixes` → `topic/plans`（中文和回复语言，`src/shared/reply-language.ts`） | 未提，已是上游写法 |
 | `topic/native` | `topic/fixes`（`-s ours`：和上游已没有差别） | beluga-labs/beluga#584 已合并 |
+| `fix/plan-carried-task-state` / `fix/plan-carried-task` | `topic/fixes`（dayuer/beluga#115）→ `topic/plans` | beluga-labs/beluga#628 已合并（上游写法的分支是 `fix/plan-carried-task`，截图在 `pr-assets/plan-carried-task`） |
 
 ## 签名与公证（2026-11-20 起）
 
