@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, utimesSync, writeFileSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Board } from '../src/core/board/board.js';
 import { BoardWork } from '../src/core/board/work.js';
 import { runCommand } from '../src/core/commands.js';
@@ -286,6 +286,19 @@ describe('WorkspaceController', () => {
     expect(store.getState().projects.find((p) => p.root)!.workspaces.some((w) => w.name === 'nope')).toBe(false);
     expect(screen.getState().view.kind).not.toBe('workspace');
     expect(toasts.at(-1)).toMatch(/^Couldn't create the worktree: There's no branch called origin\/no-such-branch/);
+  });
+
+  it('says the fork was made after what was said before it, said in the same millisecond too', async () => {
+    const ws = (await ctl.newWorktree(projectId(), 'quick'))!;
+    // The last word and the fork in one millisecond (a fast machine): the note still comes after it.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+    store.dispatch({ type: 'system', channel: `ws:${ws.id}`, text: 'said just before the fork' });
+    const forking = ctl.fork(ws.id, 'quick v2');
+    clock.mockRestore();
+    const fork = (await forking)!;
+    const lines = store.getState().log.filter((l) => l.channel === `ws:${fork.id}` && l.type === 'system').map((l) => (l.type === 'system' ? l.text : ''));
+    expect(lines.indexOf('said just before the fork')).toBeGreaterThanOrEqual(0);
+    expect(lines.at(-1)).toMatch(/^Forked from “quick”/);
   });
 
   it('shows a fork at once, with the conversation so far, and it carries the uncommitted work and Scratch', async () => {

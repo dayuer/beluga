@@ -2005,11 +2005,13 @@ export class WorkspaceController {
 
   /**
    * A line about a worktree just made (what it is, where it came from), said before anything
-   * written in it while git made it (since `began`): after, it would cut that message's card in two.
+   * written in it while git made it (after `began`): after, it would cut that message's card in two.
+   * What has `began`'s own millisecond was said before the making began (a fast machine says its
+   * last word and starts the fork in one), so the line comes after it.
    */
   private sayMade(channel: string, text: string, began: number): void {
     const here = this.deps.store.getState().log.filter((l) => l.channel === channel);
-    const at = here.findIndex((l) => l.ts >= began);
+    const at = here.findIndex((l) => l.ts > began);
     if (at < 0) return void this.deps.store.dispatch({ type: 'system', channel, text });
     const line: LogItem = { id: `made-${randomUUID()}`, type: 'system', channel, text, ts: here[at]!.ts, level: 'info' };
     this.deps.store.dispatch({ type: 'history', channel, items: [...here.slice(0, at), line, ...here.slice(at)] });
