@@ -24,8 +24,8 @@ import { useOverviewPrefs } from './overview/use-overview-prefs.js';
 import s from './overview.module.css';
 import { chordLabel, primaryKey } from '../lib/shortcuts-model.js';
 import { openFolderThere } from '../lib/remote-open.js';
+import { errorText } from '@beluga/shared/error-text.js';
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const sameRows = (a: readonly OverviewItem[], b: readonly OverviewItem[]): boolean => sameDeep(a, b, 3);
 
 /** What the rows share for picking several to delete together. */

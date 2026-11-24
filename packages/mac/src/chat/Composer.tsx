@@ -75,8 +75,7 @@ import { answerSend, answeringIn, sendAction, sendsUrgent, steerBlockNote } from
 import { useSteerBlock } from './use-steer.js';
 
 import { scopedKey } from '../machines/pane-model.js';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Whose unsent words the box holds: a chat's own channel; a new chat or a new worktree its

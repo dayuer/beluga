@@ -76,6 +76,7 @@ import d from "../chat/draft.module.css";
 import s from "./project-home.module.css";
 import a from "../lib/arrive.module.css";
 import { TeamOffers } from "../team/Team.js";
+import { errorText } from "@beluga/shared/error-text.js";
 
 /**
  * A project's home: what you see when you click a project. Its main folder is never worked in,
@@ -235,9 +236,6 @@ function useBranches(
   }, [projectId]);
   return branches;
 }
-
-const errorText = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
 
 /**
  * "What do you want to do in <project>?": New Worktree (the default: Return makes a worktree

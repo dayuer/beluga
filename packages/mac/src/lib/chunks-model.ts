@@ -1,3 +1,4 @@
+import { errorText } from '../../../../src/shared/error-text.js';
 /**
  * The window's code chunks (the views it loads the first time they're opened), made so a chunk
  * that never arrives can't leave a view blank forever (#370). On Windows, after long uptime,
@@ -40,8 +41,6 @@ export function isChunkLoadError(err: unknown): boolean {
   if (err instanceof ChunkLoadError) return true;
   return err instanceof Error && FAILED_IMPORT.test(err.message);
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 type Report = (problem: ChunkProblem) => void;
 /** Problems seen before the window could tell the daemon (kept until it can, a few at most). */

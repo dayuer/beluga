@@ -10,8 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openWithDefaultApp } from '../lib/files.js';
 import { type ChatImage, closeLightbox, copyImage, imageGone, loadImage, openLightbox, stepLightbox, unavailableText, useImage, useLightbox } from './images.js';
 import s from './images.module.css';
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+import { errorText } from '@beluga/shared/error-text.js';
 
 /** One image in a message: a thumbnail that opens full size (with the message's other images a step away). */
 export function Thumb({ image, all, index, tiled }: { image: ChatImage; all: readonly ChatImage[]; index: number; tiled: boolean }) {

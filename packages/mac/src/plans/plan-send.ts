@@ -1,3 +1,4 @@
+import { errorText } from '../../../../src/shared/error-text.js';
 /**
  * Sending a message from the plan chat: its "[image N]" references become links to the images
  * (Beluga keeps them) and it goes to the plan's Claude. Resolves when it went; rejects with what to
@@ -25,8 +26,6 @@ export interface PlanMessage {
 }
 
 export const planMessage = (typed: string, images?: readonly number[], shown?: readonly number[]): PlanMessage => ({ typed, id: crypto.randomUUID(), ...(images ? { images } : {}), ...(shown ? { shown } : {}) });
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 export const hasImageRefs = (message: string): boolean => message.includes('[image ') && !message.startsWith('/');
 

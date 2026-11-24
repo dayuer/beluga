@@ -8,14 +8,13 @@ import { chordLabel } from '../../lib/shortcuts-model.js';
 import { type EditSession, editSession, isDirty, markSaved, setDraft, startEditing, stopEditing, textToSave, updateSession, useEditSession } from './edit-store.js';
 import { hasText } from './reader-model.js';
 import r from './reader.module.css';
+import { errorWords as errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Edit, Format and Save for a file you're reading: in the header of the panel's preview and of the
  * file across the center. Files open read-only; Edit (always in sight, never a setting) makes this
  * one editable until Done. ⌘S saves; leaving with changes not saved asks first.
  */
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/^Error:\s*/, '');
 
 /** Whether the project's Prettier formats this file (asked once per file while the window is open). */
 const formatters = new Map<string, Promise<FormatterInfo>>();

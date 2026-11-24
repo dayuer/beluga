@@ -11,6 +11,7 @@ import { toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { useMyAgentName } from '../../lib/agent-words.js';
 import { type MainLine, agoText } from './home-model.js';
 import s from './main-sync.module.css';
+import { errorText } from '@beluga/shared/error-text.js';
 
 /**
  * Under the project's name: Update main (fetch and fast-forward), Fetch and when it last did, the
@@ -33,7 +34,6 @@ type Dialog =
 /** A fetch that failed, as the dialog that offers Claude (git's own words go along). */
 const fetchDialog = (message: string, detail?: string): Dialog => ({ kind: 'claude', title: 'Couldn’t fetch', message: detail && !message.includes(detail) ? `${message} Git said: ${detail}` : message });
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Re-render every so often (for "fetched 3 min ago"). */

@@ -35,14 +35,18 @@ daemon or the Mac app, check the phone too, in the same change:
     how much they typed is logged (never what). Only terminals of your worktrees; gated by
     `SINCE.terminal`.
   - **Still never:** editing, diffs, git writes beyond Merge, settings, or secrets.
-- The phone's look (`packages/companion/lib/theme.ts`): soft pastels and icons, never glows or
-  neon. Headers and toolbars are solid with a hairline once scrolled, never a gradient fade. One main action on the surface; advanced options go behind the ••• / long-press sheet or
+- The phone's look (`packages/companion/lib/theme.ts`, and for both screens `docs/design.md`):
+  the Mac's neutral greys, with color only where it means something (amber needs you, red is a
+  problem, blue is a link or the accent, green is done or online). Icons are one ink, in a quiet
+  neutral circle; never glows or neon. Headers and toolbars are solid with a hairline once scrolled, never a gradient fade. One main action on the surface; advanced options go behind the ••• / long-press sheet or
   Settings › Advanced, never as extra buttons.
 
 ## Also kept in step
 
 - `docs/parity.md` lists every command, UI action, menu and API method with where the Mac shows it
   (`tests/parity.test.ts`).
+- How the screens look and read: `docs/design.md` (colors only from tokens, one main action,
+  plurals inline), with words from `docs/glossary.md`; `tests/design-guards.test.ts` checks what it can.
 - The core stays free of UI code (`tests/boundaries.test.ts`); what the screens import stays
   browser-safe (`tests/browser-safe.test.ts`), and `src/companion/protocol.ts` too: zod only.
 
