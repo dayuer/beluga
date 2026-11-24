@@ -162,6 +162,9 @@ export const COMPANION_PROTO = { major: 1, minor: 64 } as const;
  * 1.59 (upstream, beluga-labs/beluga#589): when a plan's task reached the state it's in and when it last changed
  * (`PlanTaskView.since` / `updatedAt`), so every task says how fresh it is, not only those at work.
  * An older Mac sends neither; an older phone shows neither.
+ * 1.60: an ACP agent's usage card says its week on your Mac (`UsageView.week`): runs, agent time,
+ * tokens, what it said it cost, and its agent time on each of the last 7 days. An older Mac sends
+ * none; an older phone shows the card as before.
  * 1.64 (fork): carried the same task times before upstream took them as 1.59; it adds nothing of its own now,
  * but stays the fork's number since phones already speak it.
  */
@@ -279,6 +282,10 @@ export const UsageView = z.object({
   tokensPerSec: z.number().min(0).optional(),
   /** 1.33: false when it's installed on the Mac but not signed in. */
   signedIn: z.boolean().optional(),
+  /** 1.60: an ACP agent's week on your Mac (yours only: friends' cards never have it). */
+  week: z
+    .object({ runs: z.number().int().min(0), agentMs: z.number().min(0), tokens: z.number().min(0), cost: z.number().min(0).optional(), days: z.array(z.number().min(0)).length(7) })
+    .optional(),
 });
 export type UsageView = z.infer<typeof UsageView>;
 

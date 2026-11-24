@@ -20,7 +20,7 @@ import { acpComplete } from './complete.js';
 import { addDirArgs, findAcpCommand, spawnAcp } from './connection.js';
 import type { AcpExtension } from './extension.js';
 import { GENERIC_TOOLS, mcpServersFor } from './dialect.js';
-import { type AcpSession, acpEnd, acpFailure, acpMode, acpModel, declinedNote, modeValue, withInstructions } from './parts.js';
+import { type AcpSession, acpEnd, acpFailure, acpMode, acpModel, declinedNote, modeValue, settled, withInstructions } from './parts.js';
 import type { AcpAgentSpec, AcpConnect, AcpConnection } from './spec.js';
 import { acpStatus } from './status.js';
 
@@ -77,6 +77,8 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
   const bin = (): string | undefined => opts.bin ?? (opts.connect ? undefined : findAcpCommand(spec));
   const side = { ...(opts.connect ? { connect: opts.connect, drop: async () => undefined } : {}), ...(opts.bin ? { bin: opts.bin } : {}) };
   const agent = { runtime: spec.id, label: spec.label } as const;
+  /** What each session's turns cost so far, as its agent said (ACP's cost is the session's running total). */
+  const spentBy = new Map<string, number>();
   const modelOf = (m: string | undefined): string | undefined => (ext.model ? ext.model(m) : acpModel(m));
   const fail = (end: Parameters<typeof acpFailure>[0]): Error => (ext.failure ? ext.failure(end) : acpFailure(end, spec.id));
   const noteFor = (why: readonly string[]): string => (ext.declinedNote ? ext.declinedNote(why) : declinedNote(why));
@@ -142,11 +144,27 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         const { rpc } = link;
         const stopped = deferred<never>();
         void rpc.closed.then(() => {
-          if (!closed) stopped.reject(fail({ error: `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
+          if (!closed) stopped.reject(fail({ error: link.cause?.() ?? `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
         });
+        /** A failed request's end: once the agent is gone, why it went (its line knows: stuck, signed out, how it exited) over "stopped". */
+        const endOf = (err: unknown): ReturnType<typeof acpEnd> => {
+          const why = rpc.isClosed ? link.cause?.() : undefined;
+          return acpEnd(why ? new Error(why) : err, link.stderr());
+        };
+        /** Where the turn running now says things (its notes: it went quiet). */
+        let saying: TurnSink = { onEvent: input.onEvent };
+        link.onNotice?.((note) => saying.onEvent('progress', note));
 
         // Updates count from the session's own id on: a loaded session's replay (its history) comes before.
         let sid = '';
+        /**
+         * A loaded session's history may still be coming in after session/load answered (its last
+         * frames behind the answer): until the first turn is sent, what it says of the conversation is
+         * history, not this run's work. Its state (commands, options, mode) counts. A step seen there
+         * stays history when it's spoken of later, until a step is announced anew under its id.
+         */
+        let replaying = false;
+        const replayed = new Set<string>();
         let options: readonly ConfigOption[] = [];
         /** What the session says of its models and modes in ACP's older shape (models / modes), for an agent without those options. */
         let legacy: Pick<AcpSession, 'models' | 'modes'> = {};
@@ -158,7 +176,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         const declined: string[] = [];
         /** Its commands running now in this turn, by call: their step as Beluga says it ("Bash npm test"). */
         const commandsNow = new Map<string, string>();
-        /** Commands a turn left running in the background (it ended while they ran): the run waits for them (settled). */
+        /** Commands a turn left running in the background (it ended while they ran): the run waits for them (waitForBackground). */
         const background = new Map<string, string>();
         /** Wakes the wait for background commands (one ended, or a message came). */
         let wake: (() => void) | undefined;
@@ -178,9 +196,17 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           }
           return false;
         };
+        /** When the agent last said anything of a session (its history too). */
+        let lastUpdate = 0;
         rpc.onNotification((method, params) => {
+          if (method === 'session/update') lastUpdate = Date.now();
           if (method !== 'session/update' || !sid || params.sessionId !== sid) return;
           const update = params.update as SessionUpdate;
+          const call = 'toolCallId' in update && typeof update.toolCallId === 'string' ? update.toolCallId : undefined;
+          if (replaying && HISTORY.has(update.sessionUpdate)) return void (call && replayed.add(call));
+          // A step announced anew is this run's, even under a history's id (an agent that counts its ids per process).
+          if (call && update.sessionUpdate === 'tool_call') replayed.delete(call);
+          if (call && replayed.has(call)) return;
           if (commandUpdate(update)) return;
           const q = ext.questions;
           if (q && (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') && dialect.toolOf(update) === q.tool) asking = q.detect(update.rawInput) ?? asking;
@@ -229,7 +255,12 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         // An agent goes on with a conversation only when it says it can (session/load).
         if (resume && !place?.forkSession && link.init.agentCapabilities?.loadSession) {
           opened = await rpc.request<AcpSession>('session/load', { sessionId: resume, cwd, mcpServers: servers, ...withMeta }).catch(() => undefined);
-          if (opened) opened = { ...opened, sessionId: resume };
+          if (opened) {
+            opened = { ...opened, sessionId: resume };
+            replaying = true;
+            // What it still sends of its history comes in before the first turn goes: once it's quiet a moment (never long).
+            await settled(() => lastUpdate);
+          }
           else input.onEvent('progress', `Started a new ${spec.label} conversation (the last one couldn’t be opened)`);
         }
         try {
@@ -238,7 +269,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
             fresh = true;
           }
         } catch (err) {
-          throw fail(acpEnd(err, link.stderr()));
+          throw fail(endOf(err));
         }
         sid = opened.sessionId!;
         options = opened.configOptions ?? [];
@@ -325,16 +356,22 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           asking = undefined;
           await holdMode();
           events.beginTurn(sink);
+          saying = sink;
           const done = deferred<PromptResponse>();
           active = { done };
           try {
-            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(acpEnd(err, link.stderr()))));
+            replaying = false;
+            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(endOf(err))));
             const res = await Promise.race([done.promise, stopped.promise, abort.promise]);
             // It ended its turn while commands ran: they go on in the background, and it waits for them.
             if (res.stopReason === 'end_turn') for (const [id, step] of commandsNow) background.set(id, step);
             commandsNow.clear();
             const text = events.endTurn(res.stopReason !== 'cancelled');
-            const used = usageEvent(res.usage, sid);
+            // This turn's cost: the session's running total less what its earlier turns came to.
+            const total = events.cost;
+            const spent = Math.max(0, total - (spentBy.get(sid) ?? 0));
+            if (total > 0) spentBy.set(sid, total);
+            const used = usageEvent(res.usage, sid, spent);
             if (used) sink.onEvent('usage', used);
             if (again && !text && res.stopReason === 'end_turn' && declined.length) {
               active = undefined;
@@ -446,7 +483,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
          * Claude's own run waits for a command it left running. A message meanwhile goes first, as a
          * turn of its own; the turn after the commands is the request's (its card, its answer).
          */
-        const settled = async (sink: TurnSink, answer: string): Promise<string> => {
+        const waitForBackground = async (sink: TurnSink, answer: string): Promise<string> => {
           let until: number | undefined;
           while (background.size && !aborted && !pending.length) {
             if (until === undefined) {
@@ -498,7 +535,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           }
           return answer;
         };
-        let answer = await settled(original, await approved(await turnFor(original, input.prompt, built(input)), original));
+        let answer = await waitForBackground(original, await approved(await turnFor(original, input.prompt, built(input)), original));
         // Its answer as soon as it's there; one that still waits for its commands comes once they've ended.
         const saidEarly = !background.size;
         if (saidEarly) input.onAnswered?.(answer);
@@ -509,7 +546,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           const followUp = pending.shift();
           if (!followUp) {
             if (!background.size) break;
-            answer = await settled(original, answer);
+            answer = await waitForBackground(original, answer);
             // Past the limit, its commands still running: they end with the run.
             if (background.size && !pending.length) break;
             continue;
@@ -560,6 +597,9 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
     },
   };
 }
+
+/** What a loaded session's history is made of (ACP's session/update kinds): never this run's work. */
+const HISTORY = new Set<string>(['user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update', 'plan']);
 
 const PLAN_NOTE = 'Plan only: look around read-only, change nothing, and answer with a step-by-step plan for the person to approve.';
 const DEFINE_NOTE =
