@@ -90,6 +90,8 @@ export const PHONE: Record<Method, Side> = {
   'sharing.earlier': 'mac',
   'sharing.runHere': 'mac',
   'sharing.fork': 'mac',
+  'sharing.forkCarry': 'mac',
+  'sharing.setForkCarry': 'mac',
   'invites.create': 'mac',
   'invites.revoke': 'mac',
   'invites.copyLink': 'mac',
@@ -360,6 +362,11 @@ export const PHONE: Record<Method, Side> = {
   // The install id and Reset ID are Settings › General on the Mac (settings stay off the phone).
   'telemetry.installId': 'mac',
   'telemetry.resetId': 'mac',
+  // ---- your own traces: Settings › Traces, with keys (settings stay off the phone)
+  'traces.list': 'mac',
+  'traces.save': 'mac',
+  'traces.remove': 'mac',
+  'traces.test': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',
   'stats.leaderboard': 'mac',

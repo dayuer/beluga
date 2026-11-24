@@ -6,12 +6,14 @@ import type { PaneInfo, SettingEntry, SettingsPane } from '../lib/settings-searc
 import { HIDEABLE_BUTTONS } from '../../../../src/ui/settings-menus.js';
 import { EXPERIMENTS, EXPERIMENT_INFO } from '../../../../src/shared/experiments.js';
 import { withForkSettings } from '../fork/settings-index.js';
+import { TRACE_PROVIDERS } from '../../../../src/shared/trace-destinations.js';
 
 /** Settings' panes, in sidebar order, with other words people use for them. */
 export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; keywords?: string }> = [
   { id: 'general', label: 'General', icon: 'gear', keywords: 'profile account' },
   { id: 'appearance', label: 'Appearance', icon: 'eye', keywords: 'look themes colors colours display' },
   { id: 'claude', label: 'Agent', icon: 'spark', keywords: 'claude codex model ai' },
+  { id: 'traces', label: 'Traces', icon: 'pulse', keywords: 'observability opentelemetry otel otlp telemetry export monitoring tracing' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', keywords: 'alerts sounds' },
   { id: 'workspaces', label: 'Workspaces', icon: 'branch', keywords: 'worktrees projects git' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', keywords: 'shell console xterm' },
@@ -146,6 +148,9 @@ const UPSTREAM_SETTINGS: readonly Entry[] = [
     ['Pull request instructions', 'How your agent writes pull requests.', 'pr prompt github'],
     ['Templates', 'Ways to start a task.', 'task templates start'],
   ]),
+
+  // Traces: one row per tool, made from shared/trace-destinations.ts (Ratel first).
+  ...TRACE_PROVIDERS.map((p): Entry => ({ pane: 'traces', label: p.name, keywords: `${p.by ?? ''} ${p.keywords ?? ''} opentelemetry otel traces observability`.trim() })),
 
   // Notifications
   ...rows('notifications', undefined, [

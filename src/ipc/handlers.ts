@@ -27,6 +27,7 @@ import { REVENUECAT_HANDLERS } from './revenuecat-handlers.js';
 import { SUPPORT_HANDLERS } from './support-handlers.js';
 import { TELEMETRY_HANDLERS } from './telemetry-handlers.js';
 import { ACP_HANDLERS } from './acp-handlers.js';
+import { TRACES_HANDLERS } from './traces-handlers.js';
 import { STATS_HANDLERS } from './stats-handlers.js';
 import { maybeStatsOf } from '../core/stats/counter.js';
 import { WEB_HANDLERS } from './web-handlers.js';
@@ -175,6 +176,8 @@ export const HANDLERS = {
   'sharing.earlier': (s, owner, wsId) => needFriendShares(s).earlier(owner, wsId),
   'sharing.runHere': (s, owner, wsId, prompt) => needFriendShares(s).runHere(owner, wsId, prompt),
   'sharing.fork': (s, owner, wsId, name) => needFriendShares(s).fork(owner, wsId, name),
+  'sharing.forkCarry': (s, wsId, picks) => needFriendShares(s).forkCarry(wsId, picks),
+  'sharing.setForkCarry': (s, wsId, picks) => needFriendShares(s).setForkCarry(wsId, picks),
   'sharing.scratch': (s, owner, wsId) => {
     if (!s.store.getState().shared.some((w) => w.owner === owner && w.id === wsId)) throw new Error('That worktree isn’t shared with you');
     return remoteScratch(owner, wsId, (at, o) => s.listFiles(at, o));
@@ -492,6 +495,7 @@ export const HANDLERS = {
   ...SUPPORT_HANDLERS,
   ...TELEMETRY_HANDLERS,
   ...ACP_HANDLERS,
+  ...TRACES_HANDLERS,
   ...STATS_HANDLERS,
   ...WEB_HANDLERS,
   ...DIAGNOSTICS_HANDLERS,
