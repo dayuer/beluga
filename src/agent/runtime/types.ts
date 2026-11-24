@@ -196,6 +196,9 @@ export interface AgentRuntime {
   status?(): Promise<RuntimeStatus>;
 }
 
+/** Why an external agent below Full trust can't run on a runtime that neither gates each step nor has a sandbox. */
+export const EXTERNAL_BELOW_FULL = "This agent can't keep an external agent's run inside its folders (it reads files without asking), so below Full trust that agent's runs need Claude or Codex. Use one of them or raise this agent's level.";
+
 /** How a run is kept safe on a runtime. */
 export type RunSafety =
   /** Beluga vets every tool call (policy.ts holds). */
@@ -207,14 +210,18 @@ export type RunSafety =
  * The safety rule as code: no per-tool gating ⇒ sandbox required (its secrets, .env files
  * included, kept out by the sandbox, not by asking). A guest can't run at all without gating; a
  * friend's task (vetTool) only on a runtime whose sandbox confines every step (BLG-452: Codex's
- * workspace-write, network off, secrets unreachable; see runtime/codex/sandbox.ts).
+ * workspace-write, network off, secrets unreachable; see runtime/codex/sandbox.ts). An external
+ * agent's run below Full trust (asOwner, scope 'folder') holds to its folders only by gating or that
+ * sandbox: on any other runtime it reads your home and secrets unasked, so it's refused.
  */
-export function safetyFor(caps: RuntimeCapabilities, input?: Pick<AgentRunInput, 'vetTool' | 'guest' | 'asOwner'>): RunSafety {
+export function safetyFor(caps: RuntimeCapabilities, input?: Pick<AgentRunInput, 'vetTool' | 'guest' | 'asOwner'> & Partial<Pick<AgentRunInput, 'scope'>>): RunSafety {
   if (caps.canGateEveryTool) return { kind: 'gated' };
   const refuse = input?.vetTool && !input.asOwner && !caps.hasSandbox
     ? "This agent can't check each step against a friend's limits, so it can't take friends' tasks."
     : input?.guest
       ? "This agent can't check each step, so it can't answer guests."
-      : undefined;
+      : input?.asOwner && input.scope !== 'full' && !caps.hasSandbox
+        ? EXTERNAL_BELOW_FULL
+        : undefined;
   return refuse ? { kind: 'sandbox', refuse } : { kind: 'sandbox' };
 }
