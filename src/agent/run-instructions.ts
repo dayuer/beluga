@@ -3,6 +3,7 @@ import type { AgentRef } from '../protocol.js';
 import { buildGraphAppend } from './graph-prompt.js';
 import { type ShellSetup, buildAskOnlyAppend, buildChatSendAppend, buildChatVarsAppend, buildCommitAppend, buildKeepAppend, buildScratchAppend, buildShellAppend, buildShippedAppend, buildSystemAppend, loginShellSetup } from './prompt.js';
 import { buildReplyLanguageAppend } from '../shared/reply-language.js';
+import { buildForkedAppend } from './fork-prompt.js';
 import { buildSyncMainAppend } from './sync-main.js';
 import { buildTerminalAppend } from './terminal-prompt.js';
 import type { AgentRunInput } from './types.js';
@@ -52,6 +53,7 @@ export function runInstructions(input: AgentRunInput, ownerName: string, agent?:
     (worktree ? buildKeepAppend(agent) : '') +
     (worktree && !input.planBrief && !askOnly ? buildCommitAppend(place?.openPr, place?.landsOn) : '') +
     (place?.shipped && !askOnly ? buildShippedAppend(place.shipped) : '') +
+    (place?.forked && !askOnly ? buildForkedAppend(place.forked) : '') +
     (askOnly ? (syncMain ? buildSyncMainAppend(askOnly.project, syncMain.branch, syncMain.upstream) : buildAskOnlyAppend(askOnly.project, Boolean(input.continueInWorktree), Boolean(input.board))) : '') +
     (input.terminal ? buildTerminalAppend() : '') +
     (input.env?.BELUGA_REMOTE_CLIENT ? buildRemoteClientAppend() : '') +
