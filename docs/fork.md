@@ -191,9 +191,9 @@ BLG-257 查清了 `sync-upstream --report` 的 208 个未登记文件：**没有
 - `packages/mac/e2e/selection-bar.spec.ts`：拖选前把那一行滚进视野并立刻拖，没选中字就重来（最多 5 次），回答还在画时日志仍在跟最新一行。
 - `packages/mac/e2e/sidebar-calm.spec.ts`：用例名跟着侧栏底部卡片改（Usage 在卡片里）。
 
-### 手机协议的 minor 编号（3.3.0、3.4.0 及之后同步时顺延）
+### 手机协议的 minor 编号（2026-11-24 起跟上游一致）
 
-fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面编号。上游 3.3.0 用掉了 1.51–1.54，和 fork 当时的 1.51–1.55 撞号，同步时 fork 的顺延为 1.55–1.59；“谁做的”（`rolesSeen`）在它的分支上编的是 1.55，合进 main 时顺延为 1.60。上游 3.4.0 又用掉了 1.55（`sharedMark`，BLG-940：共享出去的工作树在侧栏显示绿点），fork 的几条整体再往后挪一位：`checkAgent` 56、`autoAgent` 57、`archAgent` 58、`fixAgent` 59、Synon Studio Gate 60、`rolesSeen` 61，`COMPANION_PROTO.minor` 为 61。3.4.0 之后上游又用掉 1.56（BLG-952：任务因验收条件未完成被留在评审中，`TaskSummary.needsChecks`），fork 再顺延一位：`checkAgent` 57、`autoAgent` 58、`archAgent` 59、`fixAgent` 60、Synon Studio Gate 61、`rolesSeen` 62，`COMPANION_PROTO.minor` 为 62。以后上游再加 minor，fork 的这几条继续顺延到上游最大值之后，并同步改 `tests/plan-*-agent.test.ts`、`tests/companion-supports-fix-agent.test.ts`、`tests/fork-companion-roles.test.ts`、`docs/parity.fork.md`、docs/companion.md（Studio Gate 一段）、`docs/tasks-and-plans.fork.md`，以及 src/companion/calls.ts、src/companion/views.ts、`src/fork/companion/`、`packages/companion/`（`lib/link/calls.ts`、`lib/fork/roles-words.ts`、`components/fork/MilestoneRoles.tsx`、`app/plan/[id].tsx`、`app/task/[id].tsx`）注释里的编号。
+fork 原来在 `src/companion/protocol.ts` 里接在上游后面编自己的 minor（角色、架构师、修复智能体、Studio Gate 等，最后停在 1.64）。这些 fork 自己的协议内容 2026-11-18 已经全部撤掉，1.64 只剩一个号；2026-11-24 同步上游 #626（它用了 1.60）后，`protocol.ts` 整份改用上游的，`COMPANION_PROTO.minor` 跟上游走。fork 的手机报 64 也没关系：两边都只按对方的 minor 够不够来开功能，手机比 Mac 新照常能用。以后 fork 自己要加手机协议内容，再接在上游最大值之后编号，并在这里写明。
 
 ### 版本号（脚本自动处理）
 
@@ -211,9 +211,9 @@ fork 的手机协议新增在 `src/companion/protocol.ts` 里接在上游后面�
 
 任务卡片上的模型（2026-11-18 从原来的角色代码里挪出来，改成只读上游的数据）：数据在 `src/fork/plans/task-agent.ts`（`taskAgentSeen`），界面在 `packages/mac/src/fork/plans/TaskAgentChip.tsx` 和 `task-agent.module.css`，测试 `tests/fork-task-agent.test.ts`。开工后显示任务所在工作树当前的 agent 和模型；没开工时显示将来做它的：任务自己的 agent，否则计划的建造者（`Plan.agent`），否则项目的 agent，都没有就不显示（用你的默认 agent）；你自己做的任务不显示。名字按上游计划页的写法，agent 加模型（“Claude (Haiku)”）。大纲没开工也显示，画布只在开工后显示（画布的任务节点拿不到计划，补上要改上游文件三行以上）。上游文件的接入点：`packages/mac/src/plans/PlanCanvas.tsx`、`PlanOutline.tsx` 各两行（import 和一行组件）。只在 Mac 上，手机的计划页没有任务卡片上的模型。
 
-### ACP 智能体（上游 PR 准备中，2026-11-23）
+### ACP 智能体（已由上游合并：beluga-labs/beluga#626，2026-11-24）
 
-ACP 核心和"用 ACP 管理你的智能体"按上游的写法放在 `feat/acp-runtime`、`feat/acp-agents` 两个分支上，准备提给上游，已经合进 `topic/plans`：`src/agent/runtime/acp/`（核心、内置清单、Registry、你的 ACP 智能体）、`src/ipc/acp-api.ts`、`src/ipc/acp-handlers.ts`、`packages/mac/src/dialogs/AcpAgentsSettings.tsx`，说明见 `docs/acp.md`。Antigravity 移出固定的"你的智能体"，改由 ACP 管理（引导页 `packages/mac/src/onboarding/AgentsStep.tsx`、`packages/mac/src/onboarding/agent-setup.ts` 只列固定的几个，e2e `packages/mac/e2e/onboarding-agents.spec.ts`、`packages/mac/e2e/antigravity-flow.spec.ts` 跟着改，`tests/antigravity-flow.test.ts` 先添加 Antigravity 再查它的注册）；Claude、Codex、OpenCode、Copilot、本地模型不动。fork 原来的 `acp-agents/` 和它的接入点已经去掉。这两个分支被上游合并后，以上游为准。
+ACP 核心、内置清单、Registry、你的 ACP 智能体、它们的用量和"按项目规则运行 Antigravity"，由上游 #626 收下（之前的 #612 收下了核心本身），fork 不再有自己的副本，这几处以上游为准。fork 只在上游文件上留几处自己的东西：`packages/mac/src/dialogs/AcpAgentsSettings.tsx` 用设计准则那批的共用 `errorWords`（见下一节），`src/agent/runtime/acp/` 里等后台命令结束（`backgroundCommands`、`waitForBackground`，在 `topic/fixes` 上，还没提上游），以及 agy 的 MCP（`feat/agy-mcp`）。
 
 ### 设计准则与主题补齐（`feat/design-system`，按上游写法，2026-11-24）
 
