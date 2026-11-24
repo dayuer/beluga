@@ -44,8 +44,6 @@ export const FILTERS: ReadonlyArray<{ readonly id: WorktreeFilter; readonly labe
 
 type State = Pick<AppState, 'projects' | 'disk' | 'prs' | 'claudeCode' | 'archiving'>;
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 function madeBy(state: State, ws: Workspace, origin: AgentOrigin | undefined): MadeBy {
   const from = worktreeOrigin(ws);
   if (from === 'beluga') return { kind: 'beluga', label: 'Beluga' };
@@ -59,13 +57,13 @@ function madeBy(state: State, ws: Workspace, origin: AgentOrigin | undefined): M
 
 function work(state: State, ws: Workspace): WorktreeRow['work'] {
   const changed = ws.status?.changed ?? 0;
-  if (changed) return { done: false, label: plural(changed, 'uncommitted file') };
+  if (changed) return { done: false, label: `${changed} uncommitted file${changed === 1 ? '' : 's'}` };
   const pr = state.prs[ws.id];
   if (pr?.state === 'MERGED') return { done: true, label: `Merged (#${pr.number})` };
   const ahead = ws.status?.ahead;
   if (ahead === 0) return { done: true, label: 'Nothing new' };
   if (ahead === undefined) return { done: false, label: 'Not checked yet' };
-  return { done: false, label: `${plural(ahead, 'commit')} not in main` };
+  return { done: false, label: `${ahead} commit${ahead === 1 ? '' : 's'} not in main` };
 }
 
 /** Every live worktree in the projects, biggest first. */

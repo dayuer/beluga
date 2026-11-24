@@ -1,6 +1,6 @@
 import { claudeHome } from '../../../core/claude-code/launch.js';
 import { isYourRun } from '../../policy.js';
-import { buildPrompt } from '../../prompt.js';
+import { buildPrompt, summarizeTool } from '../../prompt.js';
 import { runInstructions } from '../../run-instructions.js';
 import { runToolSuites } from '../../run-tools.js';
 import { sideCalls } from '../../side-calls.js';
@@ -10,7 +10,7 @@ import { ToolHost } from '../../tool-host.js';
 import type { AgentBackend, AgentRunInput, FollowUp, LiveStatus, RoomBridge, Steer } from '../../types.js';
 import type { UsageUpdate } from '../../usage.js';
 import { ViewShelf } from '../../view-tools.js';
-import { INTERRUPT_TIMEOUT_MS } from '../types.js';
+import { INTERRUPT_TIMEOUT_MS, SHELL_LIMIT_MS } from '../types.js';
 import { type ConfigOption, type ContentBlock, type PermissionRequest, type PromptResponse, type SessionResponse, type SessionUpdate, permissionAnswer } from '../opencode/acp.js';
 import { OpenCodeEvents as AcpEvents, type TurnSink, contextEvent, usageEvent } from '../opencode/events.js';
 import { promptBlocks } from '../opencode/runner.js';
@@ -20,7 +20,7 @@ import { acpComplete } from './complete.js';
 import { addDirArgs, findAcpCommand, spawnAcp } from './connection.js';
 import type { AcpExtension } from './extension.js';
 import { GENERIC_TOOLS, mcpServersFor } from './dialect.js';
-import { type AcpSession, acpEnd, acpFailure, acpMode, acpModel, declinedNote, modeValue, withInstructions } from './parts.js';
+import { type AcpSession, acpEnd, acpFailure, acpMode, acpModel, declinedNote, modeValue, settled, withInstructions } from './parts.js';
 import type { AcpAgentSpec, AcpConnect, AcpConnection } from './spec.js';
 import { acpStatus } from './status.js';
 
@@ -77,6 +77,8 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
   const bin = (): string | undefined => opts.bin ?? (opts.connect ? undefined : findAcpCommand(spec));
   const side = { ...(opts.connect ? { connect: opts.connect, drop: async () => undefined } : {}), ...(opts.bin ? { bin: opts.bin } : {}) };
   const agent = { runtime: spec.id, label: spec.label } as const;
+  /** What each session's turns cost so far, as its agent said (ACP's cost is the session's running total). */
+  const spentBy = new Map<string, number>();
   const modelOf = (m: string | undefined): string | undefined => (ext.model ? ext.model(m) : acpModel(m));
   const fail = (end: Parameters<typeof acpFailure>[0]): Error => (ext.failure ? ext.failure(end) : acpFailure(end, spec.id));
   const noteFor = (why: readonly string[]): string => (ext.declinedNote ? ext.declinedNote(why) : declinedNote(why));
@@ -133,6 +135,8 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
       let conn: AcpConnection | undefined;
       let failed = true;
       let closed = false;
+      /** It was offered messages while it waited for background commands (onFollowUps): taken back as it ends. */
+      let offered = false;
       try {
         conn = await connect({ cwd, env, args: addDirArgs(spec, [...extraDirs, ...(fixup ? [fixup] : [])]), ...(opts.bin ? { bin: opts.bin } : {}) });
         const link = conn;
@@ -140,11 +144,27 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         const { rpc } = link;
         const stopped = deferred<never>();
         void rpc.closed.then(() => {
-          if (!closed) stopped.reject(fail({ error: `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
+          if (!closed) stopped.reject(fail({ error: link.cause?.() ?? `${spec.label} exited before the turn ended`, stderr: link.stderr() }));
         });
+        /** A failed request's end: once the agent is gone, why it went (its line knows: stuck, signed out, how it exited) over "stopped". */
+        const endOf = (err: unknown): ReturnType<typeof acpEnd> => {
+          const why = rpc.isClosed ? link.cause?.() : undefined;
+          return acpEnd(why ? new Error(why) : err, link.stderr());
+        };
+        /** Where the turn running now says things (its notes: it went quiet). */
+        let saying: TurnSink = { onEvent: input.onEvent };
+        link.onNotice?.((note) => saying.onEvent('progress', note));
 
         // Updates count from the session's own id on: a loaded session's replay (its history) comes before.
         let sid = '';
+        /**
+         * A loaded session's history may still be coming in after session/load answered (its last
+         * frames behind the answer): until the first turn is sent, what it says of the conversation is
+         * history, not this run's work. Its state (commands, options, mode) counts. A step seen there
+         * stays history when it's spoken of later, until a step is announced anew under its id.
+         */
+        let replaying = false;
+        const replayed = new Set<string>();
         let options: readonly ConfigOption[] = [];
         /** What the session says of its models and modes in ACP's older shape (models / modes), for an agent without those options. */
         let legacy: Pick<AcpSession, 'models' | 'modes'> = {};
@@ -154,9 +174,40 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         let holdMode: (() => Promise<unknown>) | undefined;
         /** Why Beluga turned this turn's steps down. */
         const declined: string[] = [];
+        /** Its commands running now in this turn, by call: their step as Beluga says it ("Bash npm test"). */
+        const commandsNow = new Map<string, string>();
+        /** Commands a turn left running in the background (it ended while they ran): the run waits for them (waitForBackground). */
+        const background = new Map<string, string>();
+        /** Wakes the wait for background commands (one ended, or a message came). */
+        let wake: (() => void) | undefined;
+        /** A command's updates: running now, or ended. One left in the background ends out of any turn: its words reach the agent itself, its step ended with its turn. */
+        const commandUpdate = (update: SessionUpdate): boolean => {
+          if (!ext.backgroundCommands || (update.sessionUpdate !== 'tool_call' && update.sessionUpdate !== 'tool_call_update')) return false;
+          const id = update.toolCallId;
+          const over = update.status === 'completed' || update.status === 'failed';
+          if (background.has(id)) {
+            if (over) background.delete(id), wake?.();
+            return true;
+          }
+          if (over) commandsNow.delete(id);
+          else if (update.kind === 'execute' && !commandsNow.has(id)) {
+            const call = dialect.callsOf(dialect.toolOf(update), dialect.inputOf(update), cwd, suites)[0];
+            commandsNow.set(id, call ? summarizeTool(call.name, call.input, cwd) : 'Bash');
+          }
+          return false;
+        };
+        /** When the agent last said anything of a session (its history too). */
+        let lastUpdate = 0;
         rpc.onNotification((method, params) => {
+          if (method === 'session/update') lastUpdate = Date.now();
           if (method !== 'session/update' || !sid || params.sessionId !== sid) return;
           const update = params.update as SessionUpdate;
+          const call = 'toolCallId' in update && typeof update.toolCallId === 'string' ? update.toolCallId : undefined;
+          if (replaying && HISTORY.has(update.sessionUpdate)) return void (call && replayed.add(call));
+          // A step announced anew is this run's, even under a history's id (an agent that counts its ids per process).
+          if (call && update.sessionUpdate === 'tool_call') replayed.delete(call);
+          if (call && replayed.has(call)) return;
+          if (commandUpdate(update)) return;
           const q = ext.questions;
           if (q && (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') && dialect.toolOf(update) === q.tool) asking = q.detect(update.rawInput) ?? asking;
           if (update.sessionUpdate === 'available_commands_update') commands = new Set(update.availableCommands.map((c) => c.name));
@@ -204,7 +255,12 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         // An agent goes on with a conversation only when it says it can (session/load).
         if (resume && !place?.forkSession && link.init.agentCapabilities?.loadSession) {
           opened = await rpc.request<AcpSession>('session/load', { sessionId: resume, cwd, mcpServers: servers, ...withMeta }).catch(() => undefined);
-          if (opened) opened = { ...opened, sessionId: resume };
+          if (opened) {
+            opened = { ...opened, sessionId: resume };
+            replaying = true;
+            // What it still sends of its history comes in before the first turn goes: once it's quiet a moment (never long).
+            await settled(() => lastUpdate);
+          }
           else input.onEvent('progress', `Started a new ${spec.label} conversation (the last one couldn’t be opened)`);
         }
         try {
@@ -213,7 +269,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
             fresh = true;
           }
         } catch (err) {
-          throw fail(acpEnd(err, link.stderr()));
+          throw fail(endOf(err));
         }
         sid = opened.sessionId!;
         options = opened.configOptions ?? [];
@@ -300,13 +356,22 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           asking = undefined;
           await holdMode();
           events.beginTurn(sink);
+          saying = sink;
           const done = deferred<PromptResponse>();
           active = { done };
           try {
-            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(acpEnd(err, link.stderr()))));
+            replaying = false;
+            rpc.request<PromptResponse>('session/prompt', { sessionId: sid, prompt: blocks }).then(done.resolve, (err: unknown) => done.reject(fail(endOf(err))));
             const res = await Promise.race([done.promise, stopped.promise, abort.promise]);
+            // It ended its turn while commands ran: they go on in the background, and it waits for them.
+            if (res.stopReason === 'end_turn') for (const [id, step] of commandsNow) background.set(id, step);
+            commandsNow.clear();
             const text = events.endTurn(res.stopReason !== 'cancelled');
-            const used = usageEvent(res.usage, sid);
+            // This turn's cost: the session's running total less what its earlier turns came to.
+            const total = events.cost;
+            const spent = Math.max(0, total - (spentBy.get(sid) ?? 0));
+            if (total > 0) spentBy.set(sid, total);
+            const used = usageEvent(res.usage, sid, spent);
             if (used) sink.onEvent('usage', used);
             if (again && !text && res.stopReason === 'end_turn' && declined.length) {
               active = undefined;
@@ -314,6 +379,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
             }
             return { text, res };
           } catch (err) {
+            commandsNow.clear();
             events.endTurn(false);
             throw err;
           } finally {
@@ -403,9 +469,43 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           }
           return answer;
         };
+        /** Messages taken while the run waits for its background commands: each a turn of its own, as Send now's are. */
+        const send = (followUp: FollowUp): boolean => {
+          if (closed || aborted) return false;
+          pending.push(followUp);
+          wake?.();
+          return true;
+        };
+        /**
+         * Commands its turn left in the background (agy says: end your turn, you'll hear when it ends):
+         * only a living process hears them end, so the run stays open, the card showing the command,
+         * and once they've ended it goes on in a turn of its own, told so. Up to SHELL_LIMIT_MS, as
+         * Claude's own run waits for a command it left running. A message meanwhile goes first, as a
+         * turn of its own; the turn after the commands is the request's (its card, its answer).
+         */
+        const waitForBackground = async (sink: TurnSink, answer: string): Promise<string> => {
+          let until: number | undefined;
+          while (background.size && !aborted && !pending.length) {
+            if (until === undefined) {
+              until = Date.now() + SHELL_LIMIT_MS;
+              sink.onEvent('tool', [...background.values()][0]!);
+              if (!offered) input.onFollowUps?.(send), (offered = true);
+            }
+            const left = until - Date.now();
+            if (left <= 0) break;
+            let timer: NodeJS.Timeout | undefined;
+            await Promise.race([new Promise<void>((resolve) => ((wake = resolve), (timer = setTimeout(resolve, left)))), stopped.promise, abort.promise]).finally(() => {
+              clearTimeout(timer);
+              wake = undefined;
+            });
+            if (background.size || aborted || pending.length) continue;
+            answer = await answered(sink, answerOf(await runTurn(sink, [{ type: 'text', text: BACKGROUND_DONE_NOTE }]), sink));
+            until = undefined;
+          }
+          return answer;
+        };
 
         const original: TurnSink = { onEvent: input.onEvent, ...(input.onStep ? { onStep: input.onStep } : {}) };
-        const answers: string[] = [];
         /** While it plans, a message is asked for a plan (its own Plan mode). */
         const built = (from: Parameters<typeof buildPrompt>[0]) => (p: string): string => (planning ? `${buildPrompt({ ...from, prompt: p })}\n\n${PLAN_NOTE}` : buildPrompt({ ...from, prompt: p }));
         let askedToDefine = false;
@@ -435,14 +535,22 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           }
           return answer;
         };
-        const answer = await approved(await turnFor(original, input.prompt, built(input)), original);
-        answers.push(answer);
-        input.onAnswered?.(answer);
+        let answer = await waitForBackground(original, await approved(await turnFor(original, input.prompt, built(input)), original));
+        // Its answer as soon as it's there; one that still waits for its commands comes once they've ended.
+        const saidEarly = !background.size;
+        if (saidEarly) input.onAnswered?.(answer);
 
-        // Then each message that waits for a turn of its own (one sent with Send now).
+        // Then each message that waits for a turn of its own (one sent with Send now, or while it waited for its commands),
+        // and the commands still running after them.
         while (!aborted) {
           const followUp = pending.shift();
-          if (!followUp) break;
+          if (!followUp) {
+            if (!background.size) break;
+            answer = await waitForBackground(original, answer);
+            // Past the limit, its commands still running: they end with the run.
+            if (background.size && !pending.length) break;
+            continue;
+          }
           const sink: TurnSink = { onEvent: followUp.onEvent, ...(followUp.onStep ? { onStep: followUp.onStep } : {}) };
           followUp.onStart?.();
           try {
@@ -454,11 +562,13 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
           }
         }
         if (aborted) throw new Error('aborted');
+        if (!saidEarly) input.onAnswered?.(answer);
         input.signal.removeEventListener('abort', onAbort);
         failed = false;
-        return answers.join('\n\n');
+        return answer;
       } finally {
         closed = true;
+        if (offered) input.onFollowUps?.(undefined);
         input.onSteer?.(undefined);
         events.finish(failed || input.signal.aborted);
         mounted.close();
@@ -488,7 +598,11 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
   };
 }
 
+/** What a loaded session's history is made of (ACP's session/update kinds): never this run's work. */
+const HISTORY = new Set<string>(['user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update', 'plan']);
+
 const PLAN_NOTE = 'Plan only: look around read-only, change nothing, and answer with a step-by-step plan for the person to approve.';
 const DEFINE_NOTE =
   'Before the plan goes to the person for approval, call the beluga_board task_define tool with the task this plan is for (title, goal in your own words, context, acceptance criteria, decisions, open questions, estimate, priority). Then answer with the plan again, in full.';
 const NOT_YET_NOTE = 'The person did not approve the plan yet. Ask them what they would like to change, and change nothing.';
+const BACKGROUND_DONE_NOTE = 'The command you left running in the background has ended (its result is above). Go on from there.';

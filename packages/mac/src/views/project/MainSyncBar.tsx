@@ -34,8 +34,6 @@ type Dialog =
 /** A fetch that failed, as the dialog that offers Claude (git's own words go along). */
 const fetchDialog = (message: string, detail?: string): Dialog => ({ kind: 'claude', title: 'Couldn’t fetch', message: detail && !message.includes(detail) ? `${message} Git said: ${detail}` : message });
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /** Re-render every so often (for "fetched 3 min ago"). */
 function useNow(ms: number): number {
   const [now, setNow] = useState(() => Date.now());
@@ -95,7 +93,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
         setDialog({ kind: 'dirty', files: out.files, behind: out.behind });
         return;
       case 'diverged':
-        setDialog({ kind: 'claude', title: `${out.branch} and ${out.upstream} have both moved on`, message: `${out.branch} has ${plural(out.ahead, 'commit')} that ${out.ahead === 1 ? 'isn’t' : 'aren’t'} on ${out.upstream}, and ${out.upstream} has ${plural(out.behind, 'new commit')}. Bringing them together takes a merge or a rebase.` });
+        setDialog({ kind: 'claude', title: `${out.branch} and ${out.upstream} have both moved on`, message: `${out.branch} has ${out.ahead} commit${out.ahead === 1 ? '' : 's'} that ${out.ahead === 1 ? 'isn’t' : 'aren’t'} on ${out.upstream}, and ${out.upstream} has ${out.behind} new commit${out.behind === 1 ? '' : 's'}. Bringing them together takes a merge or a rebase.` });
         return;
       case 'busy':
         setDialog({ kind: 'claude', inMain: true, title: `A ${out.operation} is stopped halfway in main`, message: `The main folder is in the middle of a ${out.operation} (there are conflicts to resolve). Your agent can finish it and then update ${branch}.` });
@@ -169,7 +167,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
         <div className={s.callout} role="note" aria-label="Main folder branch">
           <Icon name="branch" size={13} className={s.calloutIcon} />
           <span className={s.calloutText}>
-            <strong>{line.elsewhere}.</strong> Updating and History here are about {branch}{sync.dirty ? `; the folder has ${plural(sync.dirty, 'uncommitted change')}` : ''}.
+            <strong>{line.elsewhere}.</strong> Updating and History here are about {branch}{sync.dirty ? `; the folder has ${sync.dirty} uncommitted change${sync.dirty === 1 ? '' : 's'}` : ''}.
           </span>
           <Tip label={sync.dirty ? 'Choose what happens to the uncommitted changes first' : `Check out ${branch} in the main folder`}>
             <Button size="small" disabled={busy === 'switch'} onClick={() => (sync.dirty ? setDialog({ kind: 'switch', dirty: sync.dirty }) : switchTo('clean'))}>
@@ -191,7 +189,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
       ) : null}
       <div className={s.bar}>
         {showPush ? (
-          <Tip label={`Send ${plural(sync.ahead, 'commit')} on ${branch} to ${upstream}${sync.behind ? `, on top of its ${plural(sync.behind, 'new commit')}` : ''}. Never forced`}>
+          <Tip label={`Send ${sync.ahead} commit${sync.ahead === 1 ? '' : 's'} on ${branch} to ${upstream}${sync.behind ? `, on top of its ${sync.behind} new commit${sync.behind === 1 ? '' : 's'}` : ''}. Never forced`}>
             <Button size="small" variant="primary" icon="up" disabled={busy === 'push' || Boolean(claude)} onClick={push}>
               {busy === 'push' ? 'Pushing…' : `Push ${branch} to ${remote}`}
             </Button>
@@ -219,7 +217,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
           </Tip>
         ) : null}
         {showFork && fork?.behind ? (
-          <span className={s.status} aria-label={`${plural(fork.behind, 'new commit')} on ${original}`}>
+          <span className={s.status} aria-label={`${fork.behind} new commit${fork.behind === 1 ? '' : 's'} on ${original}`}>
             {fork.behind} new on {original}
           </span>
         ) : null}
@@ -240,7 +238,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
         <Alert
           title="Your uncommitted changes are in the way"
           icon="alert"
-          message={`${upstream} has ${plural(dialog.behind, 'new commit')}, and some change files you’ve edited in main. Beluga can stash your changes, update, and put them back, or move them to a worktree of their own first.`}
+          message={`${upstream} has ${dialog.behind} new commit${dialog.behind === 1 ? '' : 's'}, and some change files you’ve edited in main. Beluga can stash your changes, update, and put them back, or move them to a worktree of their own first.`}
           table={{ caption: 'Changed in main', columns: ['File'], rows: dialog.files.slice(0, 8).map((f) => [<code key={f}>{f}</code>]) }}
           confirm={{ label: 'Stash and Update', onClick: stashAndUpdate }}
           alternative={{ label: 'Move to Worktree', onClick: moveAndUpdate }}
@@ -296,7 +294,7 @@ export function MainSyncBar({ project, line }: { project: Project; line: MainLin
         <Alert
           title={`Switch the main folder to ${branch}?`}
           icon="branch"
-          message={`It has ${plural(dialog.dirty, 'uncommitted change')} on ${sync.current ?? 'a detached HEAD'}. Move ${sync.current ?? 'that work'} and its changes to a worktree of their own (recommended), or bring the changes along to ${branch}.`}
+          message={`It has ${dialog.dirty} uncommitted change${dialog.dirty === 1 ? '' : 's'} on ${sync.current ?? 'a detached HEAD'}. Move ${sync.current ?? 'that work'} and its changes to a worktree of their own (recommended), or bring the changes along to ${branch}.`}
           confirm={{ label: 'Move to Worktree', onClick: () => switchTo('move') }}
           alternative={{ label: 'Bring Them Along', onClick: () => switchTo('stash') }}
           onCancel={() => setDialog(undefined)}

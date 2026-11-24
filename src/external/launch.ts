@@ -2,7 +2,7 @@ import { runtimeStatuses } from '../agent/runtime/registry.js';
 import type { Session } from '../core/session.js';
 import type { LogItem } from '../core/store.js';
 import { externalRequester } from '../core/trust.js';
-import { asksEachStep, grantLookup } from './adapters/runs.js';
+import { asksEachStep, confinesEachStep, grantLookup } from './adapters/runs.js';
 import { stopAgentWork } from './adapters/stop.js';
 import { sessionControl } from './adapters/session-control.js';
 import { sessionFiles } from './adapters/session-files.js';
@@ -32,7 +32,7 @@ export function launchExternal(deps: { readonly session: Session; readonly log?:
     state: () => deps.session.store.getState(),
     loadHistory: (id) => deps.session.workspaces?.manager.loadHistory<LogItem>(id) ?? [],
     stepsFor: (channel, itemId) => deps.session.host.stepsFor(channel, itemId),
-    runtimes: async () => (await runtimeStatuses()).map((r) => ({ id: r.id, ready: r.state === 'ready', asksEachStep: asksEachStep(r.id), models: r.models.map((m) => ({ value: m.value, label: m.label })) })),
+    runtimes: async () => (await runtimeStatuses()).map((r) => ({ id: r.id, ready: r.state === 'ready', asksEachStep: asksEachStep(r.id), confined: confinesEachStep(r.id), models: r.models.map((m) => ({ value: m.value, label: m.label })) })),
   });
   const chats = sessionControl(deps.session, { runCap: (id) => LIMITS[service.grants.list().find((g) => g.id === id)?.route ?? 'remote'].runs });
   const methods = sessionMethods(deps.session);

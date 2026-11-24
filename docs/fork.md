@@ -29,6 +29,30 @@ Synon Studio（客户邀请与模板、联邦制自动接单、我的共享）�
 - **构建**只从 `topic/plans` 出（它已经合入三个准备分支）：在干净的 worktree 里 `npm run app:build`。`packages/mac/build-number.json` 记的是上一次用过的号，构建脚本自动加 1；编完把新的号提交到 `topic/plans`。同一份代码只出一个构建号。
 - 拆分前的历史在 `archive/main-2026-11-17` 和 `archive/native-upstream-3.6-2026-11-17`：每个分支现在是一个快照提交，逐条的来历去那里找（`git log archive/main-2026-11-17 -- <文件>`）。
 
+## 收编的分支与归档 tag（2026-11-24 起）
+
+除了 `main` 和四个 `topic/*`，其他分支用完就收编进对应的 topic 分支，然后删掉；删之前在分支的最后一个提交上打一个带说明的 tag，推到 `origin`。上游 PR 还开着的分支（它是 PR 的源分支，删了 PR 就关了）先留着，等 PR 合并或关闭再删。
+
+- **tag 名**：`archive/<原分支名>`（如 `archive/fix/agy-background-commands`）。原来就叫 `archive/...` 的分支，tag 同名。`pr-assets/*`（PR 描述里截图的存放处）打同名 tag，PR 里的图片链接照样能打开。tag 的说明写了它合进了哪里、上游的状态。`git tag -n9 -l 'archive/*'` 全部列出来。
+- **合并提交的标记**：收编时的合并提交带两行尾注，`Absorbed-Branch: <分支名> (<tag>)` 和 `Upstream: <PR 号 | not yet proposed | not proposed>`。`git log --grep '^Absorbed-Branch:' topic/plans` 能查到每一次收编。
+- **要提回上游时**：`git switch -c <分支名> archive/<分支名>` 把它原样取回来（还是原来的基点和提交）；先合进最新的 `upstream/main`，再开 PR。已经在准备分支（`topic/fixes` 等）上的，直接从准备分支开 PR。
+
+2026-11-24 收编的分支：
+
+| 分支 / tag | 合进 | 上游 |
+|---|---|---|
+| `fix/agy-background-commands` | `topic/fixes`（dayuer/beluga#102）→ `topic/plans` | 未提，已是上游写法 |
+| `fix/external-trusted-confined` | `topic/fixes`（dayuer/beluga#100）→ `topic/plans` | 未提，已是上游写法 |
+| `feat/acp-agents-all`（分支保留） | `topic/plans` | beluga-labs/beluga#626 开着 |
+| `feat/acp-usage` | `topic/plans`（提交都在 `feat/acp-agents-all` 里） | 属于 #626 |
+| `feat/acp-agents` | `topic/plans`（没有新内容，已被 `feat/acp-agents-all` 取代） | 属于 #626 |
+| `feat/sidebar-dock`（分支保留） | `topic/plans`（保留 fork 自己的侧栏卡片，只带进删掉不用的手机标记） | beluga-labs/beluga#613 开着 |
+| `claude/laughing-shamir-84159b` | `topic/plans`（Mac 的复数改成内联写法） | 未提 |
+| `feat/acp-generic`、`feat/acp-registry`、`feat/acp-runtime`、`feat/design-system`、`feat/openai-format`、`fix/model-pick-no-rescan`、`fix/plan-ships-again`、`merge/fixes-model-pick`、`merge/fixes-plan-ships-again` | 早已在 `topic/plans` 里 | `feat/acp-runtime` 是 #612、`feat/openai-format` 是 #605（已合并）；`feat/design-system` 未提 |
+| `feat/acp-hardening`、`fix/agy-project-rules` | 已提交的部分早在 `topic/plans` 里；tag 指向的最后一个提交是收编时没提交的改动（WIP，没做完也没测） | 未提 |
+| `fork/limit-next-model`、`docs/model-team`、`plan/synon-studio-ui-p1-p12`、`topic/studio`、`archive/main-2026-11-17`、`archive/native-upstream-3.6-2026-11-17`、`archive/abandoned-custom-route-2026-11-18` | 不合，只留 tag | — |
+| `pr-assets/*`（10 个） | 不合，只留同名 tag | — |
+
 ## 签名与公证（2026-11-20 起）
 
 fork 的构建用于 App Store 以外分发：用 Developer ID 签名，再交给苹果公证，任何 Mac 打开都不会弹「无法验证开发者」。代码在 fork 自己的 `packages/mac/scripts/developer-id.mjs`；**用哪张证书、谁的账号公证，只记在本机，不进仓库，也不上 GitHub**。

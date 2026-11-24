@@ -110,8 +110,6 @@ const shownOf = (totals: readonly MoneyTotal[], currency: string, fx: FxRates | 
   return { amount: c.amount, approx: c.converted, missing: c.missing };
 };
 
-const plural = (n: number, one: string, many: string): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
-
 /** The folded row: the range's money and its change, payments, paying customers, the last payment. */
 function Summary({ activity, earnings, range, open, onToggle }: { activity: EarningsActivity; earnings: CombinedEarnings; range: EarningsRange; open: boolean; onToggle: () => void }) {
   const { currency, fx } = useMoney();
@@ -141,12 +139,12 @@ function Summary({ activity, earnings, range, open, onToggle }: { activity: Earn
           <Change now={earned.amount} before={before?.amount} />
         </span>
         <span className={h.rowLast}>
-          {plural(fig.payments, 'payment', 'payments')}
+          {`${fig.payments.toLocaleString()} payment${fig.payments === 1 ? '' : 's'}`}
           <Change now={fig.payments} before={fig.before?.payments} />
           {fig.payers !== undefined ? (
             <>
               {' · '}
-              {plural(fig.payers, 'paying customer', 'paying customers')}
+              {`${fig.payers.toLocaleString()} paying customer${fig.payers === 1 ? '' : 's'}`}
               {both ? ' (Stripe)' : ''}
               <Change now={fig.payers} before={fig.before?.payers} />
             </>
@@ -227,7 +225,7 @@ function BySource({ earnings, range }: { earnings: CombinedEarnings; range: Earn
           <li key={name} className={s.splitItem}>
             <span className={s.splitName}>{name}</span>
             <span className={s.splitAmount}>{shown ? `${shown.approx ? '≈ ' : ''}${formatMoney(shown.amount, currency)}` : 'counting…'}</span>
-            {fig ? <span className={s.dim}>{plural(fig.payments, 'payment', 'payments')}</span> : null}
+            {fig ? <span className={s.dim}>{`${fig.payments.toLocaleString()} payment${fig.payments === 1 ? '' : 's'}`}</span> : null}
           </li>
         );
       })}
@@ -298,7 +296,7 @@ function DayBars({ days, currency, fx }: { days: readonly RangeDay[]; currency: 
         {days.map((d, i) => {
           const v = values[i]!;
           return (
-            <Tip key={d.day} label={`${longDay(d.day)} · ${v ? `${formatMoney(v, currency)} · ${plural(d.payments, 'payment', 'payments')}` : 'no payments'}`}>
+            <Tip key={d.day} label={`${longDay(d.day)} · ${v ? `${formatMoney(v, currency)} · ${d.payments.toLocaleString()} payment${d.payments === 1 ? '' : 's'}` : 'no payments'}`}>
               <span className={cx(s.col, i === days.length - 1 && s.today)}>
                 <span className={cx(s.fill, !v && s.zero)} style={v ? { height: `${Math.max(6, (v / max) * 100)}%` } : undefined} />
               </span>

@@ -25,11 +25,29 @@ const LEVELS = ['low', 'medium', 'high'];
  * mode itself and answers once its mode is set again; `question` asks with its own ask_question (run at once, the
  * question left in its answer) and answers `answered: <pick>` once told what the person picked (`question wait`: then works until stopped; `question zh`: in Chinese);
  * `/compact` summarises; `quota` answers as a
- * plan that has run out does.
+ * plan that has run out does; `background <w>` runs `build <w>` past its WaitMsBeforeAsync (asked
+ * first): the call stays `in_progress`, the turn ends saying it waits, and the command ends only
+ * when the test calls endBackground() (its `completed` update, out of any turn), as agy 1.5.12 does.
  */
 export class ScriptedAgy {
   /** `stepMs`: a pause before each step ends, so a screen sees it run (the demo); none in tests. */
-  constructor(private readonly opts: { readonly stepMs?: number; readonly models?: readonly string[]; /** session/list a page of this many at a time. */ readonly listPage?: number } = {}) {}
+  constructor(
+    private readonly opts: {
+      readonly stepMs?: number;
+      readonly models?: readonly string[];
+      /** session/list a page of this many at a time. */
+      readonly listPage?: number;
+      /** Each turn costs this much (USD): its usage_update says the session's running total, as ACP does. */
+      readonly cost?: number;
+      /** More of a loaded conversation's history, sent after session/load answered (just before the next request is), as an agent that streams it late does. */
+      readonly lateHistory?: readonly object[];
+      /** Called as each turn comes in. */
+      readonly onPrompt?: () => void;
+    } = {},
+  ) {}
+
+  /** What each session's turns cost so far. */
+  private readonly spent = new Map<string, number>();
 
   readonly requests: Array<{ method: string; params: Record<string, unknown> }> = [];
   /** Each connection's flags and folder. */
@@ -44,6 +62,20 @@ export class ScriptedAgy {
   connections = 0;
   /** Its own commands (built-ins, and the skills it loaded). */
   commands = ['compact', 'plan', 'goal', 'browser'];
+  /** Commands running in the background now, ended by endBackground(). */
+  private readonly backgrounded: Array<() => void> = [];
+
+  /** Ends the commands running in the background (a process killed meanwhile has none); how many. */
+  endBackground(): number {
+    const ending = this.backgrounded.splice(0);
+    for (const end of ending) end();
+    return ending.length;
+  }
+
+  /** Commands running in the background now. */
+  get inBackground(): number {
+    return this.backgrounded.length;
+  }
 
   private get models(): readonly string[] {
     return this.opts.models ?? ['gemini-3.8-flash', 'claude-sonnet-4-6'];
@@ -71,6 +103,8 @@ export class ScriptedAgy {
     let running: { sessionId: string; cancel: () => void } | undefined;
     /** What a session's declined step was for, so its answer after Beluga says why can name it. */
     const declinedWords = new Map<string, string>();
+    /** What each session's last background command printed. */
+    const lastBuilt = new Map<string, string>();
     /** A `mode` turn waiting for its session's mode to be set again. */
     const modeSet = new Map<string, () => void>();
     let used = 16_500;
@@ -129,7 +163,9 @@ export class ScriptedAgy {
     };
     const done = (sid: string, out: number): object => {
       used += 300;
-      update(sid, { sessionUpdate: 'usage_update', used, size: 1_048_576 });
+      const total = (this.spent.get(sid) ?? 0) + (this.opts.cost ?? 0);
+      this.spent.set(sid, total);
+      update(sid, { sessionUpdate: 'usage_update', used, size: 1_048_576, ...(this.opts.cost ? { cost: { amount: total, currency: 'USD' } } : {}) });
       return { stopReason: 'end_turn', usage: { inputTokens: 15_000, outputTokens: out, cachedReadTokens: 9_000, cachedWriteTokens: 0, thoughtTokens: 7, totalTokens: 24_000 + out } };
     };
 
@@ -150,6 +186,32 @@ export class ScriptedAgy {
         used = 4_000;
         update(sid, { sessionUpdate: 'usage_update', used, size: 1_048_576 });
         return { stopReason: 'end_turn' };
+      }
+      // Told its background command ended: it answers with what it printed.
+      if (text.startsWith('The command you left running in the background has ended')) {
+        say(sid, `built: ${lastBuilt.get(sid) ?? ''}`);
+        return done(sid, 6);
+      }
+      const bg = /^background (.+)/.exec(words);
+      if (bg) {
+        const line = `build ${bg[1]}`;
+        const c = call(`call_${randomUUID().slice(0, 12)}`, 'run_command', 'execute', line, { CommandLine: line, WaitMsBeforeAsync: 1000, toolSummary: `Run ${line}` });
+        update(sid, { sessionUpdate: 'tool_call', ...c, status: 'in_progress' });
+        update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'pending' });
+        if (!(await allowed(sid, c))) {
+          failed(sid, c);
+          return (declinedWords.set(sid, words), done(sid, 0));
+        }
+        update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'in_progress' });
+        // Past WaitMsBeforeAsync: a background task. It ends later, out of any turn, if its process still runs.
+        this.backgrounded.push(() => {
+          if (!alive) return;
+          lastBuilt.set(sid, bg[1]!);
+          const out = `Command exited with code 0.\n\nCommand output:\n${bg[1]}\r\n`;
+          update(sid, { sessionUpdate: 'tool_call_update', ...c, status: 'completed', rawOutput: { output: out, exit_code: 0 }, content: [{ type: 'content', content: { type: 'text', text: out } }] });
+        });
+        say(sid, `Started ${line} in the background; waiting for it to end.`);
+        return done(sid, 10);
       }
       if (/^wait\b/.test(words)) {
         const c = call(`call_${randomUUID().slice(0, 12)}`, 'run_command', 'execute', 'sleep 600', { CommandLine: 'sleep 600' });
@@ -298,11 +360,19 @@ export class ScriptedAgy {
       }
     };
 
+    /** A session loaded whose late history hasn't gone out yet. */
+    let late: string | undefined;
     readline.createInterface({ input: toServer }).on('line', (line) => {
       const msg = JSON.parse(line) as { id?: number | string; method?: string; params?: Record<string, unknown>; result?: unknown };
       if (!msg.method && msg.id !== undefined) return void asked.get(String(msg.id))?.(msg.result);
       if (!msg.method) return;
       this.requests.push({ method: msg.method, params: msg.params ?? {} });
+      if (late && msg.method !== 'session/load') {
+        for (const u of this.opts.lateHistory ?? []) update(late, u);
+        late = undefined;
+      }
+      if (msg.method === 'session/load' && this.opts.lateHistory?.length) late = String(msg.params?.sessionId ?? '');
+      if (msg.method === 'session/prompt') this.opts.onPrompt?.();
       if (msg.method === 'session/cancel') return void (running?.sessionId === msg.params?.sessionId && running?.cancel());
       if (msg.id === undefined) return;
       answer(msg.method, msg.params ?? {}).then(
@@ -319,6 +389,8 @@ export class ScriptedAgy {
       kill: async () => {
         if (!alive) return;
         alive = false;
+        // Its background tasks end with it (agy: "stopped due to server restart").
+        this.backgrounded.splice(0);
         running?.cancel();
         toClient.end();
         toServer.end();

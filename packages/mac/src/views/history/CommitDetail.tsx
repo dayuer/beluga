@@ -11,7 +11,7 @@ import { useMyAgentName } from '../../lib/agent-words.js';
 import { openExternal } from '../../lib/system.js';
 import { STATE, UnifiedDiff } from '../DiffView.js';
 import { AuthorAvatar, type RefContext, RefPill } from './HistoryList.js';
-import { commitPage, fullDate, pillsOf, plural, timeAgo } from './history-model.js';
+import { commitPage, fullDate, pillsOf, timeAgo } from './history-model.js';
 import { useGitHub } from './use-history.js';
 import d from '../diff.module.css';
 import s from './history.module.css';
@@ -201,7 +201,7 @@ export function CommitDetail({ target, projectId, hash, refs, onSelect, onClose,
           </Tip>
         </div>
         <div className={s.filesHead}>
-          <span className={s.filesTitle}>{plural(detail.files.length, 'file')} changed</span>
+          <span className={s.filesTitle}>{`${detail.files.length} file${detail.files.length === 1 ? '' : 's'}`} changed</span>
           <span className={d.add}>+{totals.add}</span>
           <span className={d.del}>−{totals.del}</span>
           {c.parents.length > 1 ? <span className={s.dim}>· compared with the first parent</span> : null}

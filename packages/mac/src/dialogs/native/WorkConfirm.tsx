@@ -25,8 +25,6 @@ interface Words {
   readonly icon: IconName;
 }
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
-
 /** What each action does, in this workspace's terms. */
 export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Words {
   const project = state.projects.find((p) => p.id === ws.projectId);
@@ -51,7 +49,7 @@ export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Wor
         title: 'Commit all changes?',
         message: (
           <p>
-            Commits {plural(changed, 'changed file')} on <strong>{branch}</strong> with the message “Work from Beluga”. Nothing is pushed.
+            Commits {`${changed} changed file${changed === 1 ? '' : 's'}`} on <strong>{branch}</strong> with the message “Work from Beluga”. Nothing is pushed.
           </p>
         ),
         confirm: 'Commit',
@@ -62,7 +60,7 @@ export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Wor
         title: `Merge into ${project?.name ?? 'the project'}’s main folder?`,
         message: (
           <p>
-            Merges {plural(ahead, 'commit')} from <strong>{branch}</strong> into the main folder, so its files change. Nothing is pushed.
+            Merges {`${ahead} commit${ahead === 1 ? '' : 's'}`} from <strong>{branch}</strong> into the main folder, so its files change. Nothing is pushed.
           </p>
         ),
         confirm: 'Merge',
@@ -72,7 +70,7 @@ export function wordsFor(state: AppState, ws: Workspace, action: AskedWork): Wor
       const files = state.conflicts[ws.id]?.length ?? 0;
       return {
         title: 'Ask your agent to solve the conflict?',
-        message: <p>Your agent merges {branch} into the main folder, resolves the conflict{files ? ` in ${plural(files, 'file')}` : ''} keeping both sides’ intent, runs the tests and commits the merge.</p>,
+        message: <p>Your agent merges {branch} into the main folder, resolves the conflict{files ? ` in ${files} file${files === 1 ? '' : 's'}` : ''} keeping both sides’ intent, runs the tests and commits the merge.</p>,
         confirm: 'Solve Conflict',
         icon: 'merge',
       };

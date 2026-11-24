@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { redactSecrets } from '../../../shared/steps.js';
 import { STANDALONE_CHATS, reachesProject, type Grant } from '../../domain/grant.js';
+import { fitsLevel, unfitWhy } from '../../domain/runtime-fit.js';
 import { EXTERNAL_TOOLS, type ExternalTool } from '../../domain/tools.js';
 import type { ChatRead, ChatRef } from '../../ports/chat-read.js';
 import type { ExternalToolDef, Resolved } from '../mcp-tools.js';
@@ -58,7 +59,10 @@ export function readTools(reads: ChatRead, opts: { readonly alsoTools?: readonly
         expiresAt: grant.expiresAt,
         tools: EXTERNAL_TOOLS.filter((t) => READ_TOOLS.has(t) || opts.alsoTools?.includes(t)),
         ...(opts.moreTools ? { moreTools: `${opts.moreTools} more: use beluga_find and beluga_call.` } : {}),
-        runtimes: (await reads.runtimes()).map(({ asksEachStep, ...r }) => ({ ...r, models: r.models.slice(0, 8), available: grant.level !== 'ask' || asksEachStep, ...(grant.level === 'ask' && !asksEachStep ? { why: 'At level ask a run needs an agent that asks before each step. Use a Claude agent or raise this agent\'s level.' } : {}) })),
+        runtimes: (await reads.runtimes()).map(({ asksEachStep, confined, ...r }) => {
+          const available = fitsLevel(grant.level, { asksEachStep, ...(confined !== undefined ? { confined } : {}) });
+          return { ...r, models: r.models.slice(0, 8), available, ...(available ? {} : { why: unfitWhy(grant.level) }) };
+        }),
       }),
     },
     {
