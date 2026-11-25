@@ -1,11 +1,14 @@
 import { type AcpBackendOptions, createAcpBackend } from '../acp/runner.js';
 import type { AgentBackend } from '../../types.js';
 import { antigravityExtension } from './extension.js';
+import type { AgyLogin } from './login.js';
 import { ANTIGRAVITY } from './spec.js';
 
 export interface AgyBackendOptions extends AcpBackendOptions {
   /** Where Antigravity keeps its conversations (its own notes, a plan or a task list, are written there). */
   readonly dataDir?: string;
+  /** How agy is signed in; unset: its own settings (login.ts). */
+  readonly login?: () => AgyLogin;
 }
 
 /**
@@ -14,5 +17,5 @@ export interface AgyBackendOptions extends AcpBackendOptions {
  * instructions in its system prompt, its thinking levels, its ask_question, /compact and its quota.
  */
 export function createAgyBackend(opts: AgyBackendOptions): AgentBackend {
-  return createAcpBackend(ANTIGRAVITY, antigravityExtension({ ...(opts.dataDir ? { dataDir: opts.dataDir } : {}), ...(opts.bin ? { bin: opts.bin } : {}) }), opts);
+  return createAcpBackend(ANTIGRAVITY, antigravityExtension({ ...(opts.dataDir ? { dataDir: opts.dataDir } : {}), ...(opts.bin ? { bin: opts.bin } : {}), ...(opts.login ? { login: opts.login } : {}) }), opts);
 }

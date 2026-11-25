@@ -45,6 +45,14 @@ export interface AcpExtension {
    * ends, and the run goes on with a turn of its own (see runner.ts `waitForBackground`).
    */
   readonly backgroundCommands?: boolean;
+  /**
+   * Its sign-in is for you at it alone (Antigravity on a personal Google account: its terms say no
+   * other agent or app may drive it): why, while that's so. Then it takes only what you sent from a
+   * screen yourself (AgentRunInput.byYourHand), never a run Beluga starts on its own (a plan, a task,
+   * a Sentinel, Continue, another agent), and Beluga sends it no turn of its own (after background
+   * commands, after a declined step), no side call, and reads no quota. Unset or undefined: none of that.
+   */
+  personalOnly?(): string | undefined;
   /** What it's told after a turn it ended silently on a declined step (default: declinedNote). */
   declinedNote?(why: readonly string[]): string;
   /** A failed run as its own (default: acpFailure with its id). */

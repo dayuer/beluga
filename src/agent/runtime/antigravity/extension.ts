@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { AcpExtension } from '../acp/extension.js';
 import { dropAgyLog, findAgy } from './connection.js';
+import { AGY_PERSONAL, type AgyLogin, agyLogin } from './login.js';
 import { AGY_ASK_TOOL, agyAnswerPrompt, agyQuestion } from './questions.js';
 import { readAgyQuota } from './quota.js';
 import { agyRulesFreeDir, rulesFreeArgs } from './rules-free.js';
@@ -13,12 +14,15 @@ export interface AgyExtensionOptions {
   readonly dataDir?: string;
   /** The Antigravity CLI's executable; unset: findAgy(). */
   readonly bin?: string;
+  /** How agy is signed in; unset: its own settings (login.ts). */
+  readonly login?: () => AgyLogin;
 }
 
 /**
  * What Antigravity does past ACP, for the core: its instructions in its system prompt (`_meta`), its
  * thinking levels, its tools' names, its own notes, its ask_question, /compact, its failures in its
- * own words, its quota (from its own language server), and what its looks leave behind.
+ * own words, its quota (from its own language server), what its looks leave behind, and that a
+ * personal Google sign-in is for you at it alone (login.ts).
  */
 export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtension {
   const data = opts.dataDir ?? agyDataDir();
@@ -42,6 +46,8 @@ export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtensi
     compact: true,
     // run_command past its WaitMsBeforeAsync goes on as a background task; agy tells its model to end the turn and wait.
     backgroundCommands: true,
+    // On your personal Google account, agy is yours to drive alone (login.ts).
+    personalOnly: () => ((opts.login ?? agyLogin)() === 'personal' ? AGY_PERSONAL : undefined),
     failure: agyFailure,
     quota: () => {
       const bin = opts.bin ?? findAgy();

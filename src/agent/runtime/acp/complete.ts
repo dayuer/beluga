@@ -27,6 +27,8 @@ let host: ToolHost | undefined;
  */
 export async function acpComplete(spec: AcpAgentSpec, ext: AcpExtension, req: CompletionRequest, deps: AcpSideDeps = {}): Promise<string> {
   if (req.signal?.aborted) throw new Error('aborted');
+  // A side call is Beluga's own (naming, drafting, a chat's answer): never on a sign-in that's for you at it alone.
+  if (ext.personalOnly?.()) throw new CompletionError('failed');
   const mounted = req.suites
     ? await (deps.toolHost ?? (host ??= new ToolHost())).mount(req.suites, async (name, input) => {
         const verdict = req.vetTool?.(name, input);

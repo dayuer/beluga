@@ -33,6 +33,12 @@ export interface AgentRunInput {
    * Beluga adds to the prompt. Usage statistics send it at level On, masked; nothing else reads it.
    */
   readonly ownWords?: string;
+  /**
+   * You sent this request yourself, from a screen (core/by-hand.ts): not Beluga (a plan, a task's
+   * nudge, Continue), a Sentinel, a dialogue, another agent or another chat. An agent whose sign-in
+   * is for you at it alone takes only these (AcpExtension.personalOnly).
+   */
+  readonly byYourHand?: boolean;
   readonly context: readonly string[];
   /** 'folder': only the shared folders. 'full': the whole computer (secrets still blocked). */
   readonly scope: AccessScope;
@@ -442,7 +448,7 @@ export interface MacTools {
 }
 
 /** A message sent into a live run: while it waits on its background agents, or steering it. */
-export interface FollowUp extends Pick<AgentRunInput, 'prompt' | 'requesterName' | 'viaAgent' | 'context' | 'onEvent' | 'onStep' | 'promptId'> {
+export interface FollowUp extends Pick<AgentRunInput, 'prompt' | 'requesterName' | 'viaAgent' | 'byYourHand' | 'context' | 'onEvent' | 'onStep' | 'promptId'> {
   /**
    * The model the conversation uses now ('' for Claude Code's default). Picked after the run
    * started, the run switches to it before reading the message; unset: the run keeps its own.

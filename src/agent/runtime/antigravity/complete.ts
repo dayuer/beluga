@@ -1,9 +1,13 @@
 import { type AcpSideDeps, acpComplete } from '../acp/complete.js';
 import type { CompletionRequest } from '../types.js';
 import { antigravityExtension } from './extension.js';
+import type { AgyLogin } from './login.js';
 import { ANTIGRAVITY } from './spec.js';
 
-export type AgySideDeps = AcpSideDeps;
+export interface AgySideDeps extends AcpSideDeps {
+  /** How agy is signed in; unset: its own settings (login.ts). */
+  readonly login?: () => AgyLogin;
+}
 
 /**
  * A side call on Antigravity (agent/side-calls.ts): one prompt in a conversation of its own
@@ -13,5 +17,5 @@ export type AgySideDeps = AcpSideDeps;
  * when one was named; 'haiku' (small and fast) is its default model at its lowest thinking level.
  */
 export function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}): Promise<string> {
-  return acpComplete(ANTIGRAVITY, antigravityExtension(deps.bin ? { bin: deps.bin } : {}), req, deps);
+  return acpComplete(ANTIGRAVITY, antigravityExtension({ ...(deps.bin ? { bin: deps.bin } : {}), ...(deps.login ? { login: deps.login } : {}) }), req, deps);
 }

@@ -66,12 +66,15 @@ it('a message you send from a screen uses Chrome as usual', async () => {
   const { session, channel, next } = await setup();
   const run = await next(() => HANDLERS['session.submit'](session, 'look at my pull requests', { channel }));
   expect(run.chrome).toEqual({});
+  // And it says so to the run (an agent whose sign-in is for you alone takes only these: Antigravity).
+  expect(run.byYourHand).toBe(true);
 });
 
 it('one Beluga sends on its own asks you first', async () => {
   const { session, channel, next } = await setup();
   const run = await next(() => session.askOwnClaude('look at my pull requests', channel));
   expect(run.chrome?.ask).toBeTypeOf('function');
+  expect(run.byYourHand).toBeUndefined();
 });
 
 it('an external agent sending through the same action is never taken for you', async () => {

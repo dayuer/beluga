@@ -1209,6 +1209,7 @@ export class AgentHost {
       ...this.promptIdOf(body),
       requesterName: this.askerOf(body, from),
       viaAgent: body.viaAgent,
+      ...(this.byYourHand(from, body, this.agentOf(from, body)) ? { byYourHand: true } : {}),
       model: this.modelNow(body.channel),
       context: this.recentChat(body.channel),
       onEvent: (kind, text) => emit(kind, text),
@@ -1659,6 +1660,7 @@ export class AgentHost {
         prompt: withAppContext(this.promptOf(body, from, lane.sent), from === this.selfId ? (this.deps.appContext?.(body.channel) ?? []) : []),
         ...this.promptIdOf(body),
         ...this.ownWordsOf(from, body),
+        ...(this.byYourHand(from, body, external, sentinel?.inRun) ? { byYourHand: true } : {}),
         requesterName: this.askerOf(body, from),
         viaAgent: body.viaAgent,
         context: this.recentChat(body.channel),
@@ -1857,6 +1859,14 @@ export class AgentHost {
       ...this.chromeFor({ from: this.selfId, guest: false, automatic: true, channel, who: 'Your agent (in a dialogue)' }),
     });
     return { text, tokens };
+  }
+
+  /**
+   * Whether this request is one you sent yourself from a screen (see markYours), as you: not an
+   * external agent's, another agent's or another chat's, and not a Sentinel's own run.
+   */
+  private byYourHand(from: string, body: BodyOf<'agent_request'>, external: string | undefined, sentinelRun?: boolean): boolean {
+    return from === this.selfId && this.yourRequests.has(body.requestId) && !external && !sentinelRun && !body.viaAgent && !body.via && !body.origin;
   }
 
   /** A request you sent from a screen yourself (see Session.requestAgent). */

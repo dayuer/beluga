@@ -1,5 +1,6 @@
 import type { AgentRuntime, RuntimeCapabilities } from '../types.js';
 import { agyComplete } from './complete.js';
+import type { AgyLogin } from './login.js';
 import type { AgyConnect } from './connection.js';
 import { createAgyBackend } from './runner.js';
 import { agyStatus } from './status.js';
@@ -39,14 +40,14 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
 };
 
 /** An Antigravity runtime; `connect` swaps how it's reached (tests and the demo script one). */
-export function createAntigravityRuntime(deps: { readonly connect?: AgyConnect; readonly status?: AgentRuntime['status'] } = {}): AgentRuntime {
-  const side = deps.connect ? { connect: deps.connect, drop: async () => undefined } : {};
+export function createAntigravityRuntime(deps: { readonly connect?: AgyConnect; readonly status?: AgentRuntime['status']; readonly login?: () => AgyLogin } = {}): AgentRuntime {
+  const side = { ...(deps.connect ? { connect: deps.connect, drop: async () => undefined } : {}), ...(deps.login ? { login: deps.login } : {}) };
   return {
     id: 'antigravity',
     label: 'Antigravity',
     capabilities: ANTIGRAVITY_CAPABILITIES,
     // `executablePath` is Claude Code's (the Mac app's pinned binary): never Antigravity's. It finds its own (findAgy, BELUGA_AGY_PATH).
-    create: ({ executablePath: _claudePath, ...opts }) => createAgyBackend({ ...opts, ...(deps.connect ? { connect: deps.connect } : {}) }),
+    create: ({ executablePath: _claudePath, ...opts }) => createAgyBackend({ ...opts, ...(deps.connect ? { connect: deps.connect } : {}), ...(deps.login ? { login: deps.login } : {}) }),
     complete: (req) => agyComplete(req, side),
     status: deps.status ?? (() => agyStatus(deps.connect ? { connect: deps.connect } : {})),
   };
