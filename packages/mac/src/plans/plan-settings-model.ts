@@ -57,3 +57,19 @@ export function runsChange(was: HowItRuns, now: HowItRuns): { readonly fullAuto:
   if (was.full && now.autonomy === 'autopilot') return { fullAuto: false };
   return { autonomy: now.autonomy };
 }
+
+/** A milestone at work, as keptAgentWords needs it (progress.ts agentsAtWork). */
+export interface AtWork {
+  readonly milestone: { readonly title: string };
+}
+
+/**
+ * Under Agents, before Save: a new builder works what starts next, and the milestones already at
+ * work keep the agent they opened with. Says which, and how to move one now (its conversation's
+ * agent picker), so nobody waits for a change that never reaches them. Undefined: nothing to say.
+ */
+export function keptAgentWords(changes: ReadonlyArray<readonly [PlanRole, AgentRef | null]>, atWork: readonly AtWork[]): string | undefined {
+  if (!atWork.length || !changes.some(([role]) => role === 'builder')) return undefined;
+  if (atWork.length === 1) return `“${atWork[0]!.milestone.title}” is already at work and keeps its agent. To switch it now, pick an agent in its conversation.`;
+  return `${atWork.length} milestones already at work keep their agent. To switch one now, pick an agent in its conversation.`;
+}
