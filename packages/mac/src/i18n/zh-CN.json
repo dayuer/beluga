@@ -31,6 +31,7 @@
  "(a milestone already at work keeps its agent)": "（已在工作的里程碑保留它的智能体）",
  "“{0}” is already at work and keeps its agent. To switch it now, pick an agent in its conversation.": "“{0}”已在工作，保留它的智能体。要现在换，在它的对话里选智能体。",
  "{0} milestones already at work keep their agent. To switch one now, pick an agent in its conversation.": "已在工作的 {0} 个里程碑保留它们的智能体。要现在换其中一个，在它的对话里选智能体。",
+ "{0} tasks already at work keep their agent. To switch one now, pick an agent in its conversation.": "已在工作的 {0} 个任务保留它们的智能体。要现在换其中一个，在它的对话里选智能体。",
  "(a rule for this person)": "（针对这个人的规则）",
  "(after store fees and taxes)": "（扣除商店费用和税费后）",
  "(after {0})": "（在 {0} 之后）",

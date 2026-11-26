@@ -59,20 +59,23 @@ describe('what Save sends', () => {
 });
 
 describe('the milestones at work keep their agent, said before Save', () => {
-  const at = (title: string) => ({ milestone: { title } });
   const HAIKU: AgentRef = { runtime: 'claude', label: 'Claude', model: 'claude-haiku-5-5' };
   const SONNET: AgentRef = { runtime: 'claude', label: 'Claude', model: 'claude-sonnet-5-5' };
   it('names the one at work, or counts several, and says how to switch one now', () => {
-    expect(keptAgentWords([['builder', HAIKU]], [at('H6 盘点')])).toBe('“H6 盘点” is already at work and keeps its agent. To switch it now, pick an agent in its conversation.');
-    expect(keptAgentWords([['builder', null]], [at('A'), at('B')])).toBe('2 milestones already at work keep their agent. To switch one now, pick an agent in its conversation.');
+    expect(keptAgentWords([['builder', HAIKU]], ['H6 盘点'])).toBe('“H6 盘点” is already at work and keeps its agent. To switch it now, pick an agent in its conversation.');
+    expect(keptAgentWords([['builder', null]], ['A', 'B'])).toBe('2 milestones already at work keep their agent. To switch one now, pick an agent in its conversation.');
+  });
+  it('a plan with a worktree per task counts its tasks', () => {
+    expect(keptAgentWords([['builder', HAIKU]], ['A', 'B', 'C'], 'task')).toBe('3 tasks already at work keep their agent. To switch one now, pick an agent in its conversation.');
   });
   it('says nothing when the builder stays, or nothing is at work', () => {
-    expect(keptAgentWords([['checker', SONNET]], [at('A')])).toBeUndefined();
+    expect(keptAgentWords([['checker', SONNET]], ['A'])).toBeUndefined();
     expect(keptAgentWords([['builder', HAIKU]], [])).toBeUndefined();
   });
   it('the sheet shows it under Agents', () => {
     const sheet = readFileSync(join(import.meta.dirname, '../packages/mac/src/plans/PlanSettingsSheet.tsx'), 'utf8');
-    expect(sheet).toMatch(/keptAgentWords\(roles, agentsAtWork\(view\)\)/);
+    expect(sheet).toMatch(/agentsAtWork\(view\)/);
+    expect(sheet).toMatch(/keptAgentWords\(roles, view\.active/);
     expect(sheet.indexOf('{kept}')).toBeGreaterThan(sheet.indexOf('<AgentRoles'));
   });
 });

@@ -41,7 +41,8 @@ export function PlanSettingsSheet({ planId, close }: { planId: string; close: ()
   const change = !runs ? undefined : 'fullAuto' in runs && mode === was.autonomy ? fullAutoChange(runs.fullAuto) : modeChange(view, mode);
   const roles = roleChanges(rolesInput(was.picks, runtimes, mine), rolesInput(picks, runtimes, mine));
   // A new builder: the milestones already at work keep theirs, said before Save (with how to move one now).
-  const kept = keptAgentWords(roles, agentsAtWork(view));
+  const milestones = agentsAtWork(view);
+  const kept = milestones.length ? keptAgentWords(roles, milestones.map((m) => m.milestone.title)) : keptAgentWords(roles, view.active.filter((t) => t.worktree).map((t) => t.task.title), 'task');
   const dirty = Boolean(runs) || testsAt !== was.testsAt || roles.length > 0;
   const save = async (): Promise<void> => {
     close();
