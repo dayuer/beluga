@@ -63,9 +63,9 @@ describe('the press cursor', () => {
   const css = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? css(path.join(dir, e.name)) : e.name.endsWith('.css') ? [path.join(dir, e.name)] : []));
 
   it('is the arrow on the app’s controls; only links show the hand', () => {
-    // A link reads as one by its name, or is one of these (a mention, a task's chip, a file path).
+    // A link reads as one by its name, or is one of these (a mention, a task's chip, a file path, a tool's website in Traces).
     const linkish = /link|Link|href/;
-    const links = new Set(['chat/mention.module.css .pill', 'components/telemetry-levels.module.css .privacy', 'tasks/task-ref.module.css .chip', 'components/code/code.module.css .refPath']);
+    const links = new Set(['chat/mention.module.css .pill', 'components/telemetry-levels.module.css .privacy', 'tasks/task-ref.module.css .chip', 'components/code/code.module.css .refPath', 'dialogs/traces.module.css .site']);
     const hands: string[] = [];
     for (const file of css(root)) {
       const text = readFileSync(file, 'utf8');
