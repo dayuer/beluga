@@ -400,6 +400,35 @@ describe('running a plan', () => {
     await expect(t.work.startTask(t.plan.id, 'receipts')).rejects.toThrow(/can’t start: Waits on/);
   });
 
+  it.each(['autopilot', 'gated', 'full'] as const)('step by step, switched to %s: the switch starts nothing; your Start does, then it runs its new way', async (to) => {
+    const t = await running('step', 3, 'task');
+    if (to === 'full') t.work.setFullAuto(t.plan.id, true);
+    else t.work.setAutonomy(t.plan.id, to);
+    await tick(5);
+    await tick(5);
+    expect(t.made).toHaveLength(0);
+    const plan = t.plans.need(t.plan.id);
+    expect(plan.held).toBe(true);
+    expect(plan.activity.at(-1)?.text).toMatch(/nothing starts until the user presses Start$/);
+    expect(planView(plan, t.store.getState().board).next.kind).toBe('start');
+    // The plan's own agent can't start it either: that's the user's press.
+    await expect(t.work.pilot.startNow(t.plan.id, 'auth', t.claude)).rejects.toThrow(/waits for the user to press Start/);
+    // Start: that task, and from then on the rest starts by itself.
+    expect(await t.work.startTask(t.plan.id, 'auth')).toContain('Started');
+    expect(t.plans.need(t.plan.id).held).toBeUndefined();
+    await tick(5);
+    expect(t.made).toHaveLength(2);
+    // Switching again on a running plan holds nothing.
+    t.work.setAutonomy(t.plan.id, 'gated');
+    expect(t.plans.need(t.plan.id).held).toBeUndefined();
+  });
+
+  it('a plan approved on Autopilot starts at once: only a switch waits for Start', async () => {
+    const t = await running('autopilot');
+    expect(t.made).toHaveLength(1);
+    expect(t.plans.need(t.plan.id).held).toBeUndefined();
+  });
+
   it('a worktree per task (workers: task): what’s ready starts by itself, never a blocked task', async () => {
     const t = await running('gated', 3, 'task');
     expect(t.made.map((m) => m.quiet)).toEqual([true, true]);
@@ -1119,6 +1148,7 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
         pr = opts?.auto ? { ...pr!, autoMerge: true } : { ...pr!, state: 'MERGED' };
       },
       mergeLocal: async () => ({ ok: true }),
+      notIn: async (_p, _into, branches) => branches.filter((b) => !log.merged.some((m) => m.branches.includes(b))),
     };
     return { git, log, existing, inMain, gone, setPr: (p: PlanPr | undefined) => (pr = p), setConflict: (c: typeof conflict) => (conflict = c), failMerge: (why: string | undefined) => (mergeError = why) };
   }
@@ -1235,6 +1265,24 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     t.work.pass(t.plan.id, 'safe');
     await t.settle();
     expect(t.log.retired).toHaveLength(1);
+  });
+
+  it('passed anyway with its tasks not In Review: passes, but says their branch isn’t in the plan’s branch, and they don’t read as merged', async () => {
+    const t = await running();
+    const keys = ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once'].map((x) => t.issue(x));
+    const branch = keys.find((i) => i.branch)!.branch!;
+    // Their worktree deleted before they finished, back in Todo, the plan paused (the branch is still there): nothing In Review, nothing at work.
+    t.work.setPaused(t.plan.id, true);
+    for (const ws of new Set(keys.flatMap((i) => i.worktrees.slice(-1)))) t.board.worktreeGone(ws, true, 'deleted');
+    for (const i of keys) t.board.update(i.id, { status: 'todo' }, t.claude);
+    await tick(10);
+    t.work.pass(t.plan.id, 'safe');
+    await t.settle();
+    expect(t.log.merged).toEqual([]);
+    expect(t.plans.need(t.plan.id).runs.safe?.passedAt).toBeDefined();
+    const problem = t.plans.need(t.plan.id).activity.find((e) => e.kind === 'problem' && e.text.startsWith('passed “Safe payments” without'));
+    expect(problem?.text).toContain(`${branch} isn’t in plan/payments`);
+    for (const i of keys) expect(t.issue(i.title).status).not.toBe('in_plan');
   });
 
   it('tidy up answered No: nothing is merged or cleared away, and it isn’t offered again', async () => {
@@ -1582,6 +1630,35 @@ describe('the plan’s branch: tasks start from it, milestones merge into it, on
     const { ISSUE_STATUSES, STATUS_INFO } = await import('../src/core/board/model.js');
     expect(ISSUE_STATUSES.slice(3, 6)).toEqual(['in_review', 'in_plan', 'done']);
     expect(STATUS_INFO.in_plan.label).toBe('Merged into Plan');
+  });
+});
+
+describe('a milestone that can’t start says why when the plan goes quiet over it', () => {
+  it('the plan’s limit is full: “couldn’t start … again”, never “started again” over nothing', async () => {
+    let clock = 1_000_000;
+    const t = setup({ rescueMs: 3 * 60_000, now: () => clock });
+    const plan = t.plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'autopilot' }, t.claude);
+    t.plans.setMaxParallel(plan.id, 1, t.me);
+    t.work.forRun('ws:main', 'p-me')!.tools!.write({
+      title: 'Two at once',
+      goal: 'Both',
+      milestones: [
+        { id: 'a', title: 'A', criteria: ['A works'], dependsOn: [], tasks: [{ id: 'a1', title: 'A one' }] },
+        { id: 'b', title: 'B', criteria: ['B works'], dependsOn: [], tasks: [{ id: 'b1', title: 'B one' }] },
+      ],
+    } as BodyInput);
+    t.work.approve(plan.id);
+    await tick(5);
+    expect(t.made).toHaveLength(1);
+    for (let i = 0; i < 5; i++) {
+      clock += 60_000;
+      t.work.pilot.tick();
+      await tick(3);
+    }
+    const said = t.plans.need(plan.id).activity.map((a) => a.text);
+    expect(said).toContain('the work of “B” (nothing of it is running) went quiet: couldn’t start “B” again: 1 milestone is already at work (the plan’s limit)');
+    expect(said.some((x) => x.includes('started “B” again'))).toBe(false);
+    t.work.stop();
   });
 });
 
