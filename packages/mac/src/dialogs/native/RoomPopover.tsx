@@ -1,6 +1,7 @@
 import * as Popover from '@radix-ui/react-popover';
 import { Avatar, Button, Dot } from '../../components/ui.js';
 import { useApi, useApp, useBeluga } from '../../lib/beluga.js';
+import { thisComputer } from '../../lib/os-words.js';
 import { Switch } from '../settings-controls.js';
 import { thisComputer } from '../../lib/os-words.js';
 import { openPerson } from './PersonPopover.js';
