@@ -170,20 +170,16 @@ describe('Full Autopilot on a plan (BLG-981)', () => {
   });
 });
 
-describe('Antigravity on your Google account plays no part of a plan (only you may drive it)', () => {
+describe('Antigravity on your Google account plays any part of a plan, as any agent', () => {
   const GOOGLE: AgentRef = { runtime: 'antigravity', label: 'Antigravity' };
-  const API: AgentRef = { runtime: 'antigravity-api', label: 'Antigravity (API key)' };
 
-  it('is refused for every part, saying to pick Antigravity (API key); that one is taken', async () => {
+  it('is taken for every part', async () => {
     const t = setup();
-    await expect(t.work.create({ projectId: 'api', goal: 'Take payments', agent: GOOGLE })).rejects.toThrow(/Antigravity \(API key\)/);
-    await expect(t.work.create({ projectId: 'api', goal: 'Take payments', checker: GOOGLE })).rejects.toThrow(/Antigravity \(API key\)/);
-    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CLAUDE });
-    for (const role of ['planner', 'builder', 'checker'] as const) expect(() => t.work.setRoleAgent(plan.id, role, GOOGLE)).toThrow(/Antigravity \(API key\)/);
-    expect(() => t.work.setWorkAgent(plan.id, GOOGLE)).toThrow(/Antigravity \(API key\)/);
-    expect(roleAgent(t.plans.need(plan.id), 'checker')).toEqual(CLAUDE);
-    t.work.setRoleAgent(plan.id, 'checker', API);
-    expect(roleAgent(t.plans.need(plan.id), 'checker')).toEqual(API);
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: GOOGLE, checker: GOOGLE });
+    expect(roleAgent(t.plans.need(plan.id), 'checker')).toEqual(GOOGLE);
+    for (const role of ['planner', 'builder', 'checker'] as const) t.work.setRoleAgent(plan.id, role, GOOGLE);
+    t.work.setWorkAgent(plan.id, GOOGLE);
+    expect(t.plans.need(plan.id).agent).toEqual(GOOGLE);
   });
 });
 

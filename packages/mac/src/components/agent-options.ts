@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
-import { AGY_GOOGLE_NOT_FOR_WORK, type RuntimeChoice, isAgyGoogle } from '@beluga/shared/agent-runtimes.js';
+import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { runtimeMark } from '@beluga/shared/agent-marks.js';
 import { agentName } from '@beluga/shared/agent-label.js';
@@ -33,11 +33,7 @@ export function useAgentEntries(): SelectEntry<string>[] {
         section: group,
         options: options
           .filter((o) => o.group === group)
-          .map((o): SelectOption<string> => {
-            const google = isAgyGoogle(o.value.split(':')[0]);
-            const why = google ? AGY_GOOGLE_NOT_FOR_WORK : o.why;
-            return { value: o.value, label: o.label, icon: o.mark, ...(o.disabled || google ? { disabled: true } : {}), ...(why ? { description: why } : {}) };
-          }),
+          .map((o): SelectOption<string> => ({ value: o.value, label: o.label, icon: o.mark, ...(o.disabled ? { disabled: true } : {}), ...(o.why ? { description: o.why } : {}) })),
       })),
     ];
   }, [runtimes, models, mine]);
@@ -89,7 +85,7 @@ export function agentOnlyItems(runtimes: readonly RuntimeChoice[], current: Agen
   return known.map((r) => ({
     label: r.label,
     icon: runtimeMark(r.id),
-    ...(isAgyGoogle(r.id) ? { disabled: true, hint: AGY_GOOGLE_NOT_FOR_WORK } : r.available ? {} : { disabled: true, ...(r.why ? { hint: r.why } : {}) }),
+    ...(r.available ? {} : { disabled: true, ...(r.why ? { hint: r.why } : {}) }),
     checked: current?.runtime === r.id,
     onSelect: () => pick({ runtime: r.id, label: r.label }),
   }));
