@@ -23,6 +23,7 @@ import { isPlanAction, runPlanAction } from '../lib/plan-task.js';
 import { askBeforeWork } from '../lib/work-confirm.js';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs.js';
 import { togglePanel } from '../lib/panel.js';
+import { usePhoneLayout } from '../lib/phone-layout.js';
 import { navBack, navForward, useNavAbility } from '../lib/nav.js';
 import { panelFits } from '../lib/panel-model.js';
 import { mod } from '../lib/system.js';
@@ -38,6 +39,7 @@ import s from './Toolbar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { sentinelSubtitle } from '../sentinel/sentinel-model.js';
 import { CallButton } from '../call/CallStrip.js';
+import { useProjectIcon } from '../lib/projects.js';
 import { AppMenu } from './AppMenu.js';
 
 /** Room the title keeps, and the window buttons on the right (search, bell, panel). */
@@ -70,6 +72,20 @@ function SearchButton() {
   return <IconButton size="large" icon="search" label="Search" keys={shortcutKeys('find')} active={on} onClick={() => actions.run({ type: 'view', view: { kind: 'search' } })} />;
 }
 
+/**
+ * A project's name in the header, with its own icon small before it when it has one (no letter
+ * tile: without an icon the name reads as it always did). `crumb` is the "project ›" before a page's name.
+ */
+function ProjectName({ id, name, crumb = true }: { id: string; name: string; crumb?: boolean }) {
+  const icon = useProjectIcon(id);
+  return (
+    <span className={crumb ? s.crumb : s.name}>
+      {icon ? <img className={s.projectIcon} src={icon} alt="" draggable={false} /> : null}
+      {name}
+    </span>
+  );
+}
+
 /** Back and forward between pages, with what was open on each (⌘[ ⌘]; off with nowhere to go). */
 function NavButtons() {
   const can = useNavAbility();
@@ -87,6 +103,8 @@ function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode
   // A plan's page has no panel: its chat is its right side (the plan's header shows and hides it, ⌥⌘0 too).
   // Nor do the pages that have the whole window (Tasks, a task, Sentinel): there the button isn't shown.
   const fits = panelFits(view);
+  // A phone (BLG-6): the browser has back and forward of its own, and the drawer has the menu; the title gets the room.
+  const phone = usePhoneLayout();
   // Only what every view needs: search, what's new, the panel. The terminal (⌘J) is a panel tab,
   // and everything you can do is ⌘K and the menu bar.
   return (
@@ -94,11 +112,11 @@ function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode
       {prefs.sidebar ? null : (
         <span className={s.lead}>
           {/* The sidebar's menu-bar button (a browser's), beside it while the sidebar is hidden. */}
-          <AppMenu />
+          {phone ? null : <AppMenu />}
           <IconButton size="large" icon="sidebarShow" label="Show sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: true })} />
         </span>
       )}
-      <NavButtons />
+      {phone ? null : <NavButtons />}
       <div className={s.titles} data-tauri-drag-region>
         <div className={s.title}>
           <MachineTag />
@@ -191,7 +209,7 @@ export function Toolbar() {
           headerRef={headerRef}
           title={
             <>
-              {project?.root ? <span className={s.crumb}>{project.name}</span> : null}
+              {project?.root ? <ProjectName id={project.id} name={project.name} /> : null}
               <span className={s.name}>{sub ? agentTitle(sub.agent) : 'Sub-agent'}</span>
             </>
           }
@@ -233,7 +251,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            {project?.root ? <span className={s.crumb}>{project.name}</span> : null}
+            {project?.root ? <ProjectName id={project.id} name={project.name} /> : null}
             <span className={s.name}>{ws.name}</span>
             {branch ? (
               <span className={s.branchPill}>
@@ -368,7 +386,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            {project ? <span className={s.crumb}>{project.name}</span> : null}
+            {project ? <ProjectName id={project.id} name={project.name} /> : null}
             <span className={s.name}>{worktree ? 'New Worktree' : 'New Chat'}</span>
           </>
         }
@@ -391,7 +409,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? (item ? ASSISTANT_TITLE : 'Sentinel')}</span>
+            {project ? <ProjectName id={project.id} name={project.name} /> : <span className={s.crumb}>{item ? ASSISTANT_TITLE : 'Sentinel'}</span>}
             <span className={s.name}>{view.kind === 'sentinel_run' ? `${item?.name ?? 'Sentinel'} · Run` : (item?.name ?? 'Sentinel')}</span>
           </>
         }
@@ -419,7 +437,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Actions'}</span>
+            {project ? <ProjectName id={project.id} name={project.name} /> : <span className={s.crumb}>Actions</span>}
             <span className={s.name}>Workflow Run</span>
           </>
         }
@@ -434,7 +452,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Issues'}</span>
+            {project ? <ProjectName id={project.id} name={project.name} /> : <span className={s.crumb}>Issues</span>}
             <span className={s.name}>Issue #{view.number}</span>
           </>
         }
@@ -452,7 +470,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Plans'}</span>
+            {project ? <ProjectName id={project.id} name={project.name} /> : <span className={s.crumb}>Plans</span>}
             <span className={s.name}>Plan</span>
           </>
         }
@@ -469,7 +487,7 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Tasks'}</span>
+            {project ? <ProjectName id={project.id} name={project.name} /> : <span className={s.crumb}>Tasks</span>}
             <span className={s.name}>{issue?.key ?? 'Task'}</span>
           </>
         }
@@ -486,7 +504,7 @@ export function Toolbar() {
           headerRef={headerRef}
           title={
             <>
-              {project ? <span className={s.crumb}>{project.name}</span> : null}
+              {project ? <ProjectName id={project.id} name={project.name} /> : null}
               <span className={s.name}>History</span>
             </>
           }
@@ -494,7 +512,7 @@ export function Toolbar() {
         />
       );
     }
-    return <Shell headerRef={headerRef} title={project?.name ?? 'Project'} subtitle={<span className={s.meta}>Work happens in worktrees · the main folder is for questions</span>} />;
+    return <Shell headerRef={headerRef} title={project ? <ProjectName id={project.id} name={project.name} crumb={false} /> : 'Project'} subtitle={<span className={s.meta}>Work happens in worktrees · the main folder is for questions</span>} />;
   }
 
   return <Shell headerRef={headerRef} title={TITLES[view.kind] ?? 'Beluga'} />;
