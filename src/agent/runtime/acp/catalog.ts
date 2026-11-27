@@ -26,6 +26,20 @@ export const BUILTIN_ACP_AGENTS: readonly AcpAgentEntry[] = [
     description: 'Gemini, and the Claude and GPT-OSS models your Antigravity plan has',
   },
   {
+    // The same CLI on a Gemini API key, in a folder of its own (antigravity/sign-in.ts): Beluga may run it on its own (plans, Sentinels).
+    id: 'antigravity-api',
+    label: 'Antigravity (API key)',
+    command: 'agy',
+    args: ['acp'],
+    source: 'builtin',
+    pathVar: 'BELUGA_AGY_PATH',
+    searchDirs: ['~/.local/bin'],
+    install: 'Install the Antigravity CLI: curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    signIn: { words: 'Add GEMINI_API_KEY in Settings › Environment: a Gemini API key, from aistudio.google.com/apikey' },
+    website: 'https://aistudio.google.com/apikey',
+    description: 'Antigravity on a Gemini API key, billed per token: for plans, Sentinels and what Beluga starts on its own',
+  },
+  {
     id: 'cursor',
     label: 'Cursor',
     command: 'cursor-agent',

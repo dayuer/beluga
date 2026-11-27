@@ -1,4 +1,6 @@
 import type { ChatChain, PlanTools } from '../../agent/types.js';
+import { AGY_GOOGLE_NO_PLAN } from '../../agent/runtime/antigravity/sign-in.js';
+import { isAgyGoogle } from '../../shared/agent-runtimes.js';
 import type { AgentRef } from '../../protocol.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { RuntimeChoice } from '../../shared/agent-runtimes.js';
@@ -7,7 +9,7 @@ import type { Actor, ExternalActor, Issue } from '../board/model.js';
 import type { BoardWork } from '../board/work.js';
 import type { CombineResult } from '../../workspaces/git.js';
 import type { Intent } from '../intents.js';
-import type { LogItem, Store } from '../store.js';
+import { type LogItem, type Store, isRunning } from '../store.js';
 import type { WorkspaceController } from '../workspace-controller.js';
 import { ApplyError, applyDraft } from './apply.js';
 import { coherenceWarnings, warningsText } from './coherence.js';
@@ -102,6 +104,17 @@ export function chatRunsOn(chat: Pick<Workspace, 'agent' | 'model'>, pick: Agent
 }
 
 /** Whether this Mac runs `agent`'s runtime, as the agent pickers know it (none listed yet: assumed). */
+/**
+ * Antigravity on your Google account plays no part of a plan: Google's terms let only you drive it,
+ * and a plan's parts run on their own (agent/runtime/antigravity/sign-in.ts). Antigravity (API key) can.
+ */
+/** How long a send-back's answer is watched for. */
+const SEND_BACK_WATCH_MS = 6 * 60 * 60_000;
+
+function noGoogleAgy(agent: AgentRef | null | undefined): void {
+  if (agent && isAgyGoogle(agent.runtime)) throw new Error(AGY_GOOGLE_NO_PLAN);
+}
+
 function runsHere(runtimes: readonly RuntimeChoice[], agent: AgentRef): boolean {
   return !runtimes.length || Boolean(runtimes.find((r) => r.id === agent.runtime)?.available);
 }
@@ -217,6 +230,7 @@ export class PlansWork {
     if (!controller) throw new Error('Plans need a project folder');
     const goal = input.goal.trim();
     if (!goal) throw new Error('Say what the plan is for');
+    for (const agent of [input.agent, input.planner, input.checker]) noGoogleAgy(agent);
     const chat = await controller.newChat(input.projectId, UNTITLED, undefined, { quiet: true });
     if (!chat) throw new Error('Couldn’t start the plan’s conversation');
     const home = `${WS}${chat.id}`;
@@ -403,6 +417,7 @@ export class PlansWork {
    * conversation moves to it too. → in words.
    */
   setWorkAgent(id: string, agent: AgentRef | null): string {
+    noGoogleAgy(agent);
     const was = this.plans.need(id).agent;
     const plan = this.plans.setWorkAgent(id, agent ?? undefined, this.me());
     // The plan's own conversation follows it, so the one you plan with is the one you picked (even when the pick didn't change: it brings a drifted conversation back).
@@ -422,6 +437,7 @@ export class PlansWork {
    */
   setRoleAgent(id: string, role: PlanRole, agent: AgentRef | null): string {
     if (role === 'builder') return this.setWorkAgent(id, agent);
+    noGoogleAgy(agent);
     const before = this.plans.need(id);
     const was = roleAgent(before, role);
     const plan = this.plans.setRoleAgent(id, role, agent ?? undefined, this.me());
@@ -459,8 +475,34 @@ export class PlansWork {
     const text = note.trim();
     if (!text) throw new Error('Say what’s missing');
     this.plans.note(id, 'failed', `sent “${m.title}” back: ${text}`, this.me());
-    this.deps.askClaude(`Milestone “${m.title}” isn't done yet: ${text}\n\nAdd the tasks that fix it to this milestone with plan_update (the user approves them), or tell me what you need.`, plan.home, true);
+    const requestId = this.deps.askClaude(`Milestone “${m.title}” isn't done yet: ${text}\n\nAdd the tasks that fix it to this milestone with plan_update (the user approves them), or tell me what you need.`, plan.home, true);
+    // Whether the plan's agent took it is in the plan's activity, so a send-back never sits unanswered unseen.
+    if (typeof requestId === 'string') this.followSendBack(id, m.title, requestId);
+    else this.plans.note(id, 'problem', `Couldn’t send “${m.title}” back to the plan’s agent: tell it in the plan’s conversation`, this.me());
     return this.plans.need(id);
+  }
+
+  /** Notes in the plan's activity how the plan's agent took a send-back: its run answered, or why it didn't. */
+  private followSendBack(id: string, title: string, requestId: string): void {
+    const store = this.deps.store;
+    let stop = (): void => undefined;
+    const look = (): void => {
+      const card = store.getState().log.find((i): i is Extract<LogItem, { type: 'agent' }> => i.type === 'agent' && i.requestId === requestId);
+      if (!card || isRunning(card.status)) return;
+      stop();
+      if (card.status === 'error' || card.status === 'interrupted') this.plans.note(id, 'problem', `The plan’s agent didn’t take “${title}” back: ${(card.text || 'its run stopped').replace(/\s+/g, ' ').trim().slice(0, 300)}. Send it back again, or tell it in the plan’s conversation`, this.me());
+      else this.plans.note(id, 'note', `The plan’s agent took “${title}” back`, this.me());
+    };
+    const unsubscribe = store.subscribe(look);
+    // A run that never ends (a stopped Beluga) doesn't keep this alive for good.
+    const timer = setTimeout(() => stop(), SEND_BACK_WATCH_MS);
+    timer.unref?.();
+    stop = () => {
+      unsubscribe();
+      clearTimeout(timer);
+      stop = () => undefined;
+    };
+    look();
   }
 
   /** Ask the head Claude to check a milestone again. */
@@ -499,6 +541,7 @@ export class PlansWork {
 
   /** `agent` (Start with…, BLG-506): who works it this once; none: the task's own, the plan's, or your default. */
   startTask(id: string, task: string, agent?: AgentRef): Promise<string> {
+    noGoogleAgy(agent);
     return this.pilot.startNow(id, task, this.me(), agent);
   }
 

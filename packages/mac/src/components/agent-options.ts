@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
-import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
+import { AGY_GOOGLE_NOT_FOR_WORK, type RuntimeChoice, isAgyGoogle } from '@beluga/shared/agent-runtimes.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { runtimeMark } from '@beluga/shared/agent-marks.js';
 import { agentName } from '@beluga/shared/agent-label.js';
@@ -15,7 +15,8 @@ export const YOUR_AGENT = '';
 /**
  * Who does a piece of work (BLG-497), as pop-up entries: "Your agent (Claude)" first (value '',
  * following your default), then every agent and model you can pick, a section per runtime, each
- * with its runtime's mark beside the name. One not set up here stays greyed, saying why. Values
+ * with its runtime's mark beside the name. One not set up here stays greyed, saying why; so does
+ * Antigravity on your Google account (only you may drive it: Antigravity (API key) does the work). Values
  * are agentChoices' `runtime:model` (agentForChoice turns one into an AgentRef).
  */
 export function useAgentEntries(): SelectEntry<string>[] {
@@ -32,7 +33,11 @@ export function useAgentEntries(): SelectEntry<string>[] {
         section: group,
         options: options
           .filter((o) => o.group === group)
-          .map((o): SelectOption<string> => ({ value: o.value, label: o.label, icon: o.mark, ...(o.disabled ? { disabled: true } : {}), ...(o.why ? { description: o.why } : {}) })),
+          .map((o): SelectOption<string> => {
+            const google = isAgyGoogle(o.value.split(':')[0]);
+            const why = google ? AGY_GOOGLE_NOT_FOR_WORK : o.why;
+            return { value: o.value, label: o.label, icon: o.mark, ...(o.disabled || google ? { disabled: true } : {}), ...(why ? { description: why } : {}) };
+          }),
       })),
     ];
   }, [runtimes, models, mine]);
@@ -75,7 +80,8 @@ export function useStartWith(): (current: AgentRef | undefined, pick: (agent: Ag
 /**
  * Just the agents, one row each with its mark (Claude, Codex, OpenCode…), no models: for a menu
  * that asks who does a part of the work (Build With ▸). The agent runs its
- * default model; its own model picker changes that later. One not set up here is greyed, saying why.
+ * default model; its own model picker changes that later. One not set up here is greyed, saying why
+ * (Antigravity on your Google account too: it doesn't build a plan).
  * `current` is checked by its runtime; `pick` gets the agent.
  */
 export function agentOnlyItems(runtimes: readonly RuntimeChoice[], current: AgentRef | undefined, pick: (agent: AgentRef) => void): ActionItem[] {
@@ -83,7 +89,7 @@ export function agentOnlyItems(runtimes: readonly RuntimeChoice[], current: Agen
   return known.map((r) => ({
     label: r.label,
     icon: runtimeMark(r.id),
-    ...(r.available ? {} : { disabled: true, ...(r.why ? { hint: r.why } : {}) }),
+    ...(isAgyGoogle(r.id) ? { disabled: true, hint: AGY_GOOGLE_NOT_FOR_WORK } : r.available ? {} : { disabled: true, ...(r.why ? { hint: r.why } : {}) }),
     checked: current?.runtime === r.id,
     onSelect: () => pick({ runtime: r.id, label: r.label }),
   }));

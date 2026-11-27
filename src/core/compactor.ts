@@ -75,7 +75,7 @@ export class Compactor {
    * Compact one conversation now. The chat shows "Compacting…" until it's done, then the divider
    * (with the summary Claude kept). Resolves when Claude is done, whatever happened.
    */
-  async run(channel: string, trigger: Trigger, signal: AbortSignal, instructions = ''): Promise<void> {
+  async run(channel: string, trigger: Trigger, signal: AbortSignal, instructions = '', yours = false): Promise<void> {
     const agent = this.deps.agent();
     if (!agent) return;
     if (trigger === 'auto') this.tried.add(channel);
@@ -91,6 +91,8 @@ export class Compactor {
         prompt: `/compact ${instructions.trim() || COMPACT_INSTRUCTIONS}`,
         requesterName: this.deps.requesterName(),
         viaAgent: false,
+        // Compact you asked for from a screen (agent-host.ts compact): an agent signed in for you alone takes it.
+        ...(yours ? { byYourHand: true } : {}),
         context: [],
         scope: 'full',
         signal,

@@ -43,7 +43,8 @@ const place = (extra: Partial<AgentPlace> = {}): AgentPlace & { sessions: string
   return { cwd, additionalDirectories: [], autoEdit: true, onSession: (id) => void sessions.push(id), sessions, ...extra };
 };
 
-const backend = (agy: ScriptedAgy, dataDir?: string) => createAgyBackend({ cwd, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, ...(dataDir ? { dataDir } : {}) });
+// On a Gemini API key, Beluga drives it as any agent (sign-in.ts; on your Google account it takes only what you send: antigravity-personal.test.ts).
+const backend = (agy: ScriptedAgy, dataDir?: string) => createAgyBackend({ cwd, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key', ...(dataDir ? { dataDir } : {}) });
 
 /** A path under `/w` as this system resolves it (`D:\w\a.ts` on Windows). */
 const inW = (p: string): string => path.resolve('/w', p);
@@ -441,7 +442,7 @@ describe('around a run', () => {
   it('makes a side call with only the tools it was given, its small model fast, and drops its conversation', async () => {
     const agy = new ScriptedAgy();
     const drop = vi.fn(async () => true);
-    const answer = await agyComplete({ prompt: 'ask hello', system: 'Name this worktree.', cwd, model: 'haiku', tools: ['Read'], vetTool: () => ({ allow: true, reason: '' }) }, { connect: agy.connect, drop });
+    const answer = await agyComplete({ prompt: 'ask hello', system: 'Name this worktree.', cwd, model: 'haiku', tools: ['Read'], vetTool: () => ({ allow: true, reason: '' }) }, { connect: agy.connect, drop, signIn: 'api-key' });
     // Its command wasn't one of the call's tools: turned down.
     expect(answer).toBe('denied: ask hello');
     expect(agy.sent('session/set_config_option')).toContainEqual(expect.objectContaining({ configId: 'thought_level', value: 'low' }));
@@ -497,7 +498,7 @@ describe('around a run', () => {
     const agy = new ScriptedAgy();
     const folder = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-ws-'));
     const p = place({ cwd: folder });
-    await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect }).run(input('hello', { place: p }));
+    await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key' }).run(input('hello', { place: p }));
     const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-home-'));
     mkdirSync(path.join(dir, 'conversations'), { recursive: true });
     writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
@@ -512,7 +513,7 @@ describe('around a run', () => {
     const ids: string[] = [];
     for (let i = 0; i < 5; i++) {
       const p = place({ cwd: folder });
-      await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect }).run(input('hello', { place: p }));
+      await createAgyBackend({ cwd: folder, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key' }).run(input('hello', { place: p }));
       ids.push(p.sessions[0]!);
       writeFileSync(path.join(dir, 'conversations', `${p.sessions[0]}.db`), 'x');
     }

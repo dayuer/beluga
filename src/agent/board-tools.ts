@@ -172,6 +172,10 @@ export function createBoardToolDefs(board: BoardTools) {
   ];
 }
 
-export function createBoardTools(board: BoardTools) {
-  return toolSuite({ name: 'beluga_board', version: '0.1.0', tools: createBoardToolDefs(board) });
+/** What a milestone's checker gets of the board: it reads the tasks and ticks the criteria it checked, and changes nothing else. */
+export const CHECK_TOOLS: ReadonlySet<string> = new Set(['task_get', 'task_list', 'task_brief_edit', 'task_attach_proof']);
+
+export function createBoardTools(board: BoardTools, opts: { readonly checkOnly?: boolean } = {}) {
+  const defs = createBoardToolDefs(board);
+  return toolSuite({ name: 'beluga_board', version: '0.1.0', tools: opts.checkOnly ? defs.filter((t) => CHECK_TOOLS.has(t.name)) : defs });
 }

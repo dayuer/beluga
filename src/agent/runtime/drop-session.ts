@@ -3,6 +3,7 @@ import { codexDataDir, dropCodexSessions } from './codex/codex-sessions.js';
 import { dropOpenCodeSession } from './opencode/sessions.js';
 import { copilotSessionsDir, dropCopilotSession } from './copilot/sessions.js';
 import { agyDataDir, dropAgySession } from './antigravity/sessions.js';
+import { agyApiDataDir } from './antigravity/sign-in.js';
 
 /** Where each agent keeps its own records (tests point them at temporary folders). */
 export interface AgentHomes {
@@ -26,5 +27,6 @@ export async function dropAgentSession(dir: string, sessionId: string, runtime: 
   else if (runtime === 'opencode') await dropOpenCodeSession(sessionId, homes.opencode).catch(() => false);
   else if (runtime === 'copilot') await dropCopilotSession(sessionId, homes.copilot ?? copilotSessionsDir()).catch(() => false);
   else if (runtime === 'antigravity') await dropAgySession(sessionId, homes.antigravity ?? agyDataDir()).catch(() => false);
+  else if (runtime === 'antigravity-api') await dropAgySession(sessionId, agyApiDataDir()).catch(() => false);
   else if (!runtime || runtime === 'claude') await dropSession(dir, sessionId, homes.claude ?? claudeConfigDir()).catch(() => undefined);
 }

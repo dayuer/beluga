@@ -47,7 +47,7 @@ export const AGENT_MARKS: Readonly<Record<AgentMark, AgentMarkShape>> = {
 
 /** A runtime's mark: Claude Code, Codex, OpenCode, Copilot, Antigravity, or a local model (anything else Beluga runs). */
 export function runtimeMark(runtime: string | undefined): AgentMark {
-  return runtime === undefined || runtime === 'claude' ? 'claudeCode' : runtime === 'codex' ? 'codex' : runtime === 'opencode' ? 'opencode' : runtime === 'copilot' ? 'copilot' : runtime === 'antigravity' ? 'antigravity' : 'localModel';
+  return runtime === undefined || runtime === 'claude' ? 'claudeCode' : runtime === 'codex' ? 'codex' : runtime === 'opencode' ? 'opencode' : runtime === 'copilot' ? 'copilot' : runtime === 'antigravity' || runtime === 'antigravity-api' ? 'antigravity' : 'localModel';
 }
 
 /** An agent's mark (its runtime's); no ref: Claude's (an older Mac's agent). */
@@ -72,5 +72,6 @@ export function modelMark(model: string | undefined, runtime: string): AgentMark
   if (runtime === 'codex' || by(/^openai$/) || /^(gpt|o\d|codex|chatgpt)/.test(m)) return 'openai';
   if (by(/^deepseek/) || /^deepseek/.test(m)) return 'deepseek';
   if (by(/^(moonshot|kimi)/) || /^(kimi|moonshot)/.test(m)) return 'kimi';
+  if (runtime === 'antigravity-api') return 'antigravity';
   return runtime === 'opencode' || runtime === 'copilot' || runtime === 'antigravity' ? runtime : 'localModel';
 }

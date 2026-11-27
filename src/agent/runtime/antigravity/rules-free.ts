@@ -41,7 +41,7 @@ async function moveOnto(from: string, to: string): Promise<void> {
 }
 
 /** One folder of the mirror: each entry of `real` linked in but those left out; a file agy wrote here goes back to `real`. */
-async function mirror(real: string, here: string, leftOut: (name: string) => boolean): Promise<void> {
+export async function mirrorFolder(real: string, here: string, leftOut: (name: string) => boolean): Promise<void> {
   await fs.mkdir(here, { recursive: true });
   const theirs = new Set(await names(real));
   for (const name of await names(here)) {
@@ -90,8 +90,8 @@ export function rulesFreeArgs(opts: { readonly real?: string; readonly dir?: str
     const rules = [...(await names(real)), ...(await names(config))].some((n) => GLOBAL_RULES.has(n));
     if (!rules) return [];
     await fs.mkdir(config, { recursive: true });
-    await mirror(real, dir, (n) => GLOBAL_RULES.has(n) || n === 'config');
-    await mirror(config, path.join(dir, 'config'), (n) => GLOBAL_RULES.has(n));
+    await mirrorFolder(real, dir, (n) => GLOBAL_RULES.has(n) || n === 'config');
+    await mirrorFolder(config, path.join(dir, 'config'), (n) => GLOBAL_RULES.has(n));
     return [`--gemini-dir=${dir}`];
   };
   // One at a time: two starts at once would make the same links.
