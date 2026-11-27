@@ -3,9 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { agyComplete } from '../src/agent/runtime/antigravity/complete.js';
-import { antigravityExtension } from '../src/agent/runtime/antigravity/extension.js';
 import { createAntigravityRuntime } from '../src/agent/runtime/antigravity/index.js';
-import { AGY_API_ID, AGY_GOOGLE_ONLY, agyApiArgs, agySignInEnv, setAgyApiKeySource } from '../src/agent/runtime/antigravity/sign-in.js';
+import { AGY_API_ID, agyApiArgs, agySignInEnv, setAgyApiKeySource } from '../src/agent/runtime/antigravity/sign-in.js';
 import { agyStatus } from '../src/agent/runtime/antigravity/status.js';
 import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
 import { ScriptedAgy } from '../src/agent/runtime/antigravity/scripted.js';
@@ -13,10 +12,8 @@ import type { AgentRunInput } from '../src/agent/types.js';
 import { room } from './runtime-conformance.js';
 
 /**
- * Antigravity's two sign-ins (sign-in.ts). On your Google account, Google's terms let only you drive
- * it: Beluga takes what you sent yourself, never a run it starts on its own, and adds no turn of its
- * own. On a Gemini API key it's an agent of its own, in its own folder, for everything (plans too:
- * plan-roles-agy.test.ts). Neither inherits the variables that pick a sign-in.
+ * Antigravity's two sign-ins (sign-in.ts). Both take any run, yours or Beluga's own; the API-key one
+ * is an agent of its own, in its own folder. Neither inherits the variables that pick a sign-in.
  */
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-sign-in-'));
@@ -30,28 +27,16 @@ function input(prompt: string, extra: Partial<AgentRunInput> = {}): AgentRunInpu
 const google = (agy: ScriptedAgy) => createAgyBackend({ cwd: dir, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect });
 
 describe('Antigravity on your Google account', () => {
-  it('says so through its extension; the API-key one has no such rule', () => {
-    expect(antigravityExtension().personalOnly?.()).toBe(AGY_GOOGLE_ONLY);
-    expect(antigravityExtension({ signIn: 'api-key' }).personalOnly).toBeUndefined();
-  });
-
   it('answers what you sent yourself', async () => {
     expect(await google(new ScriptedAgy()).run(input('hello', { byYourHand: true }))).toBe('echo: hello');
   });
 
-  it('never starts for what Beluga, a Sentinel or another agent sent, and says why', async () => {
+  it('takes what Beluga, a Sentinel or another agent sends too, with no note of its own', async () => {
     for (const extra of [{}, { viaAgent: true }, { sentinelRun: true }] as Array<Partial<AgentRunInput>>) {
       const agy = new ScriptedAgy();
-      await expect(google(agy).run(input('hello', extra))).rejects.toThrow(AGY_GOOGLE_ONLY);
-      expect(agy.sent('session/prompt')).toHaveLength(0);
+      expect(await google(agy).run(input('hello', extra))).toBe('echo: hello');
+      expect(agy.sent('session/prompt')).toHaveLength(1);
     }
-  });
-
-  it('sends no turn of its own after a command it left in the background: the run ends with its turn', async () => {
-    const agy = new ScriptedAgy();
-    expect(await google(agy).run(input('background tests', { byYourHand: true }))).toMatch(/background/);
-    expect(agy.sent('session/prompt')).toHaveLength(1);
-    expect(JSON.stringify(agy.sent('session/prompt'))).not.toContain('The command you left running in the background has ended');
   });
 
   it('still names a worktree or drafts a task for you (a side call, as other ACP clients make)', async () => {

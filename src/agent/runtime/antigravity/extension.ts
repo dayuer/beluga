@@ -3,7 +3,7 @@ import type { AcpExtension } from '../acp/extension.js';
 import { dropAgyLog, agyLogDir } from './connection.js';
 import { AGY_ASK_TOOL, agyAnswerPrompt, agyQuestion } from './questions.js';
 import { agyRulesFreeDir, rulesFreeArgs } from './rules-free.js';
-import { AGY_GOOGLE_ONLY, type AgySignIn, agyApiArgs, agyApiDataDir, agySignInEnv } from './sign-in.js';
+import { type AgySignIn, agyApiArgs, agyApiDataDir, agySignInEnv } from './sign-in.js';
 import { agyFailure, agyModel, agyThought, systemMeta } from './run-parts.js';
 import { agyBrainDir, agyDataDir, dropAgySession, tidyAgyData } from './sessions.js';
 import { agyDialect, belugaToolOf } from './tools.js';
@@ -53,7 +53,6 @@ export function antigravityExtension(opts: AgyExtensionOptions = {}): AcpExtensi
     // It keeps about 42 KB of a client's tool definitions and drops the larger ones past it (tool-budget.ts): Beluga's fit in less.
     toolBudget: AGY_TOOL_BUDGET,
     // On your Google account, agy is yours to drive alone (sign-in.ts).
-    ...(api ? {} : { personalOnly: () => AGY_GOOGLE_ONLY }),
     failure: agyFailure,
     tidy: () => tidyAgyData(data),
     dropSession: (sessionId) => dropAgySession(sessionId, data),

@@ -43,7 +43,7 @@ const place = (extra: Partial<AgentPlace> = {}): AgentPlace & { sessions: string
   return { cwd, additionalDirectories: [], autoEdit: true, onSession: (id) => void sessions.push(id), sessions, ...extra };
 };
 
-// On a Gemini API key, Beluga drives it as any agent (sign-in.ts; on your Google account it takes only what you send: antigravity-personal.test.ts).
+// On a Gemini API key, as on your Google account, Beluga drives it as any agent (sign-in.ts).
 const backend = (agy: ScriptedAgy, dataDir?: string) => createAgyBackend({ cwd, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key', ...(dataDir ? { dataDir } : {}) });
 
 /** A path under `/w` as this system resolves it (`D:\w\a.ts` on Windows). */
