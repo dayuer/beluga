@@ -19,13 +19,13 @@ A Mac that ran Antigravity before it became an ACP agent (it was your agent, a p
 How `agy` is signed in decides what Beluga does with it. Beluga reads it from agy's own settings (`security.auth.selectedType` in `~/.gemini/settings.json`), each time they change.
 
 - **Your own Google account** (agy's default). Google's Antigravity terms let only you drive agy on a personal account: its FAQ says wrapping agy in another coding agent or app isn't supported, and section 6 of its terms rules out third-party software to reach the service. So Beluga is only a screen for it:
-  - It sends Antigravity only what you send yourself, from the Mac or your phone: a message in a chat or a worktree, a new worktree's first message.
-  - Nothing Beluga starts on its own runs on it: a plan's tasks and roles, a task you Start from the board, a nudge to a task that stalled, Continue, a Sentinel, a dialogue, another agent (an external agent through Beluga's MCP, a thread, another chat's agent). Each says why, in the card; use Claude for those.
+  - It sends Antigravity only what you send yourself, from the Mac or your phone: a message in a chat or a worktree (Continue on a failed turn included), a new worktree's first message, a message you edited and sent again, Compact now.
+  - Nothing Beluga starts on its own runs on it: a plan's tasks and roles, a task you Start from the board, a nudge to a task that stalled, the Continue Beluga sends once your limit resets, auto-compact, a Sentinel, a friend's task, a dialogue, another agent (an external agent through Beluga's MCP, a thread, another chat's agent). Each says why, in the card; use Claude for those.
   - Beluga adds no turn of its own: it doesn't wait for a command agy left in the background and go on once it has ended, and it doesn't tell agy why a step was declined.
   - Beluga's small asks (naming a worktree, drafting a task, a chat's answer) don't go to it, and the Usage tab has no Antigravity card: that would mean asking its language server behind its back.
 - **A Gemini API key or Vertex AI** (`gemini-api-key`, `vertex-ai`). These go by the Gemini API's terms, which let an app drive it, so Antigravity works in Beluga as any agent does, everything below included. Sign agy in this way in Terminal (`agy`, then pick the API key).
 
-A setting Beluga doesn't know, or no settings at all, counts as your Google account.
+A setting Beluga doesn't know, or no settings at all, counts as your Google account. To list your models and see that agy is signed in, Beluga still opens a session with it now and then, as `agy` itself does at start: no message is sent, so nothing reaches the model.
 
 ## Models
 

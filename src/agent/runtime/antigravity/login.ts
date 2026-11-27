@@ -47,4 +47,4 @@ export function agyLogin(file: string = agySettingsFile()): AgyLogin {
 
 // agent-wording: claude (the way out is the Claude runtime, by name)
 export const AGY_PERSONAL =
-  'Antigravity is signed in with your own Google account, and Google’s terms let only you drive it, not another app or agent. So Beluga sends it only what you type: plans, tasks, Sentinels, Continue and other agents don’t start it. Use Claude for those, or sign agy in with a Gemini API key.';
+  'Antigravity is signed in with your own Google account, and Google’s terms let only you drive it, not another app or agent. So Beluga sends it only what you type: plans, tasks, Sentinels, a Continue Beluga sends on its own and other agents don’t start it. Use Claude for those, or sign agy in with a Gemini API key.';

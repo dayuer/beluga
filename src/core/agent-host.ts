@@ -186,6 +186,8 @@ interface Waiting {
   urgent?: boolean;
   askTo?: string;
   compact?: boolean;
+  /** Compact you asked for from a screen yourself, not an agent through Beluga's tools (AgentRunInput.byYourHand). */
+  yours?: boolean;
 }
 
 /** The queue for one conversation (the room, or a workspace). */
@@ -411,7 +413,7 @@ export class AgentHost {
     const lane = this.lane(channel);
     if (lane.waiting.some((w) => w.compact)) return;
     const body: BodyOf<'agent_request'> = { kind: 'agent_request', requestId: `compact-${randomUUID()}`, prompt: instructions.slice(0, 2000), viaAgent: false, channel, urgent: false, plan: false };
-    lane.waiting.push({ from: this.selfId, body, compact: true });
+    lane.waiting.push({ from: this.selfId, body, compact: true, ...(actingVia() ? {} : { yours: true }) });
     if (lane.current) this.toast('Your agent compacts this conversation when it finishes what it’s doing');
     void this.pump(lane);
   }
@@ -433,12 +435,12 @@ export class AgentHost {
   }
 
   /** Compact in the conversation's queue, as its current run (so a new message waits for it). */
-  private async runCompaction(lane: Lane, auto: boolean, instructions = ''): Promise<void> {
+  private async runCompaction(lane: Lane, auto: boolean, instructions = '', yours = false): Promise<void> {
     const controller = new AbortController();
     lane.current = controller;
     lane.runFrom = this.selfId;
     try {
-      await this.compactor.run(lane.channel, auto ? 'auto' : 'manual', controller.signal, instructions);
+      await this.compactor.run(lane.channel, auto ? 'auto' : 'manual', controller.signal, instructions, !auto && yours);
     } finally {
       if (lane.current === controller) {
         lane.current = undefined;
@@ -1403,7 +1405,7 @@ export class AgentHost {
           holds = false;
         };
         try {
-          if (!next || next.compact) await this.runCompaction(lane, auto, next?.body.prompt);
+          if (!next || next.compact) await this.runCompaction(lane, auto, next?.body.prompt, next?.yours === true);
           else await this.runAgent(next.from, next.body, lane, next.askTo, release).catch((err: unknown) => this.system(`Agent run failed: ${errorText(err)}`, 'error'));
         } finally {
           release();

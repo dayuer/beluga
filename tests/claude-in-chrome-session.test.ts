@@ -85,3 +85,13 @@ it('an external agent sending through the same action is never taken for you', a
   HANDLERS['session.submit'](session, 'and my issues', { channel });
   expect(marked).toHaveBeenCalledTimes(1);
 });
+
+it('Compact now from a screen is yours; the same asked by an external agent, or auto-compact, is not', async () => {
+  const { session, channel, next } = await setup();
+  const yours = await next(() => HANDLERS['session.compact'](session, channel, undefined));
+  expect(yours.prompt).toMatch(/^\/compact/);
+  expect(yours.byYourHand).toBe(true);
+  const theirs = await next(() => asActingAgent({ id: 'ext-1', name: 'Codex CLI' }, () => HANDLERS['session.compact'](session, channel, undefined)));
+  expect(theirs.prompt).toMatch(/^\/compact/);
+  expect(theirs.byYourHand).toBeUndefined();
+});
