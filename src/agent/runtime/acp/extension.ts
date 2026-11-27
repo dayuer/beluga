@@ -45,6 +45,17 @@ export interface AcpExtension {
    * ends, and the run goes on with a turn of its own (see runner.ts `waitForBackground`).
    */
   readonly backgroundCommands?: boolean;
+  /**
+   * Your own MCP servers (your Claude Code's, owner-mcp.ts) go to your own runs too, as they go to
+   * your Claude. Returns the names it has of its own already (its config), which aren't sent again.
+   */
+  ownerMcp?(): readonly string[];
+  /**
+   * Resolves once the MCP servers its session was given (`names`) and its own are connected, or its
+   * cap has passed. A turn that starts before has none of them, the whole turn. `since`: when its
+   * process started.
+   */
+  mcpReady?(names: readonly string[], since: number): Promise<unknown>;
   /** What it's told after a turn it ended silently on a declined step (default: declinedNote). */
   declinedNote?(why: readonly string[]): string;
   /** A failed run as its own (default: acpFailure with its id). */
