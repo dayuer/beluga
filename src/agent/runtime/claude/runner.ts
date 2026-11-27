@@ -368,7 +368,8 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const compat = zshCompatEnv(baseLaunchEnv ?? process.env);
       // A project's or chat's Anthropic key is for its code: Claude Code keeps its own sign-in, and with it
       // Claude in Chrome and the claude.ai connectors; its commands still get the key (sign-in-env.ts, BLG-1027).
-      const holds = Boolean(compat.CLAUDE_ENV_FILE) && inheritsDaemonEnv(input);
+      // A local model's endpoint key is Claude Code's own sign-in there, never held back.
+      const holds = Boolean(compat.CLAUDE_ENV_FILE) && inheritsDaemonEnv(input) && !input.signsInFromEnv;
       const launchEnv = withAppsHost(holds ? holdSignIn(withZshCompat(baseLaunchEnv, compat), input.env) : withZshCompat(baseLaunchEnv, compat), input);
       const signIn = signedInWith(launchEnv ?? process.env);
       const browser = chromeLaunch({ allowed: Boolean(input.chrome), noChromeFlag: chromeOffByFlags(input.launchArgs?.claude), ...(signIn ? { signIn, signInFromPlace: signInChanges(input.env).includes(signIn) } : {}) });
@@ -500,13 +501,15 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const apps = tracksMcpApps(input) ? new McpAppTracker({ servers: () => q.mcpServerStatus() }, (record) => stepTo?.(record)) : undefined;
       const recorder = new StepRecorder({ cwd, emit: (record) => stepTo?.(apps ? apps.decorate(record) : record) });
       recorder.begin();
+      /** Kept open after answering, for background work: follow-ups are offered until the run ends. */
+      let keptOpen = false;
       let limit: NodeJS.Timeout | undefined;
       let quiet: NodeJS.Timeout | undefined;
       const finish = (): void => {
         if (prompts.closed) return;
         clearTimeout(limit);
         clearTimeout(quiet);
-        if (limit) input.onFollowUps?.(undefined); // only if follow-ups were offered
+        if (keptOpen) input.onFollowUps?.(undefined); // only if follow-ups were offered
         input.onSteer?.(undefined);
         turns.failPending('Claude finished before getting to this message');
         prompts.close();
@@ -528,6 +531,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         const uuid = prompts.push(content(followUp), { steer: steer && !turns.between, uuid: followUp.promptId });
         if (uuid === false) return false;
         turns.queue(followUp, uuid, steer && !turns.between);
+        if (turns.between) armLimit();
         return uuid;
       };
       const send = (followUp: FollowUp): boolean => deliver(followUp, false) !== false;
@@ -546,18 +550,29 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       let interrupting: string | undefined;
       /** The message an interrupt is for: its own turn, never folded into the interrupted one. */
       let interruptFor: string | undefined;
+      /**
+       * Between turns only: how long the run waits for the work that is live now. Counted again from
+       * each turn's end, each turn Claude Code begins and each message sent between turns. A turn in
+       * progress is never cut off: its end counts again.
+       */
+      const armLimit = (): void => {
+        if (!keptOpen || prompts.closed) return;
+        clearTimeout(limit);
+        limit = setTimeout(() => turns.between && finish(), background.agents || interrupting !== undefined || turns.waiting ? BACKGROUND_LIMIT_MS : SHELL_LIMIT_MS);
+        limit.unref();
+      };
       /** After an answer: end the run, or keep it open (taking follow-ups) while agents work. */
       const settle = (): void => {
         if (interrupting === undefined && !background.busy && !turns.waiting) return finish();
-        if (limit) return;
-        limit = setTimeout(finish, background.agents || interrupting !== undefined || turns.waiting ? BACKGROUND_LIMIT_MS : SHELL_LIMIT_MS);
-        limit.unref();
-        input.onFollowUps?.(send);
+        const offered = keptOpen;
+        keptOpen = true;
+        armLimit();
+        if (!offered) input.onFollowUps?.(send);
       };
       const done = (): boolean => turns.between && !background.busy && !turns.waiting;
       const watchQuiet = (): void => {
         clearTimeout(quiet);
-        if (!limit || !done()) return;
+        if (!keptOpen || !done()) return;
         quiet = setTimeout(() => done() && finish(), QUIET_MS);
         quiet.unref();
       };
@@ -649,6 +664,8 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
           if (msg.type === 'system' && msg.subtype === 'init') {
             remember(msg.session_id);
             input.onHarness?.(harnessFacts(msg));
+            // A turn begins, though the router only sees it at its first word: the limit must not close it meanwhile.
+            armLimit();
           }
           // Claude Code retrying the API (busy, a limit, no network): said on the working line, not a silent "Starting" (BLG-403).
           if (msg.type === 'system' && msg.subtype === 'api_retry') input.onEvent('progress', retryWords(msg.error_status, msg.attempt, msg.max_retries, Boolean(msg.no_response)));
