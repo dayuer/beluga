@@ -45,6 +45,19 @@ export interface AcpExtension {
    * ends, and the run goes on with a turn of its own (see runner.ts `waitForBackground`).
    */
   readonly backgroundCommands?: boolean;
+  /**
+   * Its sign-in is for you at it alone (Antigravity on your Google account: its terms let no other
+   * agent or app drive it): why, while that's so. Then it takes only what you sent from a screen
+   * yourself (AgentRunInput.byYourHand), never a run Beluga starts on its own (a plan, a task, a
+   * Sentinel, Continue, another agent), and Beluga sends it no turn of its own (after a background
+   * command, after a declined step). Unset or undefined: none of that.
+   */
+  personalOnly?(): string | undefined;
+  /**
+   * It takes only so much of a client's tools, in bytes of their definitions (tool-budget.ts):
+   * Beluga's suites are fitted to it, what the run is for first. Unset: every suite.
+   */
+  readonly toolBudget?: number;
   /** What it's told after a turn it ended silently on a declined step (default: declinedNote). */
   declinedNote?(why: readonly string[]): string;
   /** A failed run as its own (default: acpFailure with its id). */
@@ -64,4 +77,6 @@ export interface AcpExtension {
    * runs. Failing to make them ready starts it without them too.
    */
   launch?(): Promise<readonly string[]>;
+  /** The variables it starts with (from the run's own): what picks its sign-in, for one with several (Antigravity's). */
+  environment?(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
 }

@@ -13,6 +13,7 @@ import type { Complete, CompletionRequest } from '../src/agent/runtime/types.js'
 import { sideCalls } from '../src/agent/side-calls.js';
 
 type Runtime = 'codex' | 'opencode' | 'copilot' | 'antigravity';
+// Antigravity signed in with an API key: Beluga's side calls may go to it (antigravity-personal.test.ts has a personal sign-in).
 const completeWith = { codex: codexComplete, opencode: openCodeComplete, copilot: copilotComplete, antigravity: agyComplete };
 const request: CompletionRequest = { cwd: process.cwd(), system: 'Name it.', prompt: 'Fix login redirect.', model: 'gpt-test' };
 const providerError = 'Failed to authenticate. OAuth session expired.';

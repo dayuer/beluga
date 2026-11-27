@@ -3,6 +3,7 @@ import { isYourRun } from '../../policy.js';
 import { buildPrompt, summarizeTool } from '../../prompt.js';
 import { runInstructions } from '../../run-instructions.js';
 import { runToolSuites } from '../../run-tools.js';
+import { fitToolBudget, leftOutNote } from './tool-budget.js';
 import { sideCalls } from '../../side-calls.js';
 import { syncProbes } from '../../sync-main.js';
 import { gateTool } from '../../tool-gate.js';
@@ -86,6 +87,9 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
   return {
     async run(input: AgentRunInput): Promise<string> {
       if (input.signal.aborted) throw new Error('aborted');
+      // Its sign-in is for you at it alone: only what you sent yourself, and nothing Beluga adds of its own.
+      const personal = ext.personalOnly?.();
+      if (personal && !input.byYourHand) throw new Error(personal);
       const bridge = input.channel && opts.bridge.inChannel ? opts.bridge.inChannel(input.channel) : opts.bridge;
       const place = input.place;
       const cwd = place?.cwd ?? opts.cwd;
@@ -100,7 +104,11 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
       const shelf = new ViewShelf();
 
       // Beluga's tools, served for this run alone and gated per call (vetTool, policy, you).
-      const mounted = await host().mount(runToolSuites(input, bridge, shelf, cwd), (name, args) => gateTool(name, args, input, policy));
+      const all = runToolSuites(input, bridge, shelf, cwd);
+      // An agent that takes only so many tools gets what this run is for first, and is told what was left out (tool-budget.ts).
+      const fitted = ext.toolBudget ? fitToolBudget(all, ext.toolBudget, new Set(['beluga_task', 'beluga_plan', 'beluga_board', ...(input.sentinelRun ? ['beluga_sentinel'] : [])])) : undefined;
+      if (fitted?.left.length) input.onEvent('progress', leftOutNote(spec.label, fitted.left));
+      const mounted = await host().mount(fitted?.suites ?? all, (name, args) => gateTool(name, args, input, policy));
       const suites = Object.keys(mounted.http);
       const tools = ext.tools ?? GENERIC_TOOLS;
       const dialect = tools.dialect(mounted.tools);
@@ -182,7 +190,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
         let wake: (() => void) | undefined;
         /** A command's updates: running now, or ended. One left in the background ends out of any turn: its words reach the agent itself, its step ended with its turn. */
         const commandUpdate = (update: SessionUpdate): boolean => {
-          if (!ext.backgroundCommands || (update.sessionUpdate !== 'tool_call' && update.sessionUpdate !== 'tool_call_update')) return false;
+          if (!ext.backgroundCommands || personal || (update.sessionUpdate !== 'tool_call' && update.sessionUpdate !== 'tool_call_update')) return false;
           const id = update.toolCallId;
           const over = update.status === 'completed' || update.status === 'failed';
           if (background.has(id)) {
@@ -373,7 +381,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
             if (total > 0) spentBy.set(sid, total);
             const used = usageEvent(res.usage, sid, spent);
             if (used) sink.onEvent('usage', used);
-            if (again && !text && res.stopReason === 'end_turn' && declined.length) {
+            if (again && !personal && !text && res.stopReason === 'end_turn' && declined.length) {
               active = undefined;
               return runTurn(sink, [{ type: 'text', text: noteFor(declined) }], false);
             }
@@ -549,6 +557,10 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
             answer = await waitForBackground(original, answer);
             // Past the limit, its commands still running: they end with the run.
             if (background.size && !pending.length) break;
+            continue;
+          }
+          if (personal && !followUp.byYourHand) {
+            followUp.onError(personal);
             continue;
           }
           const sink: TurnSink = { onEvent: followUp.onEvent, ...(followUp.onStep ? { onStep: followUp.onStep } : {}) };

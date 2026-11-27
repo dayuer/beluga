@@ -62,9 +62,11 @@ export const RUNTIME_FALLBACKS: Readonly<Record<string, Readonly<Partial<Record<
 
 /** Runtimes Beluga runs with code of its own: any other is an ACP agent of yours, and `acp` stands for it in these tables. */
 const OWN_RUNTIMES = new Set(['claude', 'codex', 'opencode', 'copilot', 'antigravity', 'local', 'fake']);
+/** Antigravity on an API key is Antigravity, in these tables. */
+const SAME_AS: Readonly<Record<string, string>> = { 'antigravity-api': 'antigravity' };
 
 /** A runtime's key in these tables: its own, or `acp` for an ACP agent Beluga has no code of its own for. */
-const acpKey = (runtime: string): string => (OWN_RUNTIMES.has(runtime) ? runtime : 'acp');
+const acpKey = (runtime: string): string => SAME_AS[runtime] ?? (OWN_RUNTIMES.has(runtime) ? runtime : 'acp');
 
 /**
  * What a runtime doesn't have at all (BLG-686), so the screens don't offer it there: no control

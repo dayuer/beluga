@@ -28,7 +28,7 @@ const BODY: BodyInput = {
   milestones: [{ id: 'safe', title: 'Safe payments', criteria: ['401 without a session'], tasks: [{ id: 'auth', title: 'Auth on payment routes' }] }],
 };
 
-function setup(dir: string | null = null) {
+function setup(dir: string | null = null, askClaude: (prompt: string, channel: string) => string | void = () => undefined) {
   const store = new Store(initialState('room'));
   store.dispatch({ type: 'projects', projects: [project('api', 'bob-api')] });
   const setAgent: Array<{ id: string; agent: AgentRef }> = [];
@@ -56,7 +56,7 @@ function setup(dir: string | null = null) {
   const board = new Board({ store, dir: null, projectName: (id) => store.getState().projects.find((p) => p.id === id)?.name });
   const boardWork = new BoardWork({ store, board, controller, selfId: () => 'p-me', selfName: () => 'Kay', askClaude: () => undefined });
   const plans = new Plans({ store, dir, saveDelayMs: 0 });
-  const work = new PlansWork({ store, plans, board: boardWork, controller, askClaude: () => undefined, intend: () => undefined, delayMs: 0, git: null, followAgent: (channel, agent) => void followed.push({ channel, agent }) });
+  const work = new PlansWork({ store, plans, board: boardWork, controller, askClaude, intend: () => undefined, delayMs: 0, git: null, followAgent: (channel, agent) => void followed.push({ channel, agent }) });
   return { store, plans, work, setAgent, followed, patchWs };
 }
 
@@ -167,5 +167,59 @@ describe('Full Autopilot on a plan (BLG-981)', () => {
     const off = t.work.setFullAuto(plan.id, false);
     expect(off.fullAuto).toBeUndefined();
     expect(off.autonomy).toBe('autopilot');
+  });
+});
+
+describe('Antigravity on your Google account plays no part of a plan (only you may drive it)', () => {
+  const GOOGLE: AgentRef = { runtime: 'antigravity', label: 'Antigravity' };
+  const API: AgentRef = { runtime: 'antigravity-api', label: 'Antigravity (API key)' };
+
+  it('is refused for every part, saying to pick Antigravity (API key); that one is taken', async () => {
+    const t = setup();
+    await expect(t.work.create({ projectId: 'api', goal: 'Take payments', agent: GOOGLE })).rejects.toThrow(/Antigravity \(API key\)/);
+    await expect(t.work.create({ projectId: 'api', goal: 'Take payments', checker: GOOGLE })).rejects.toThrow(/Antigravity \(API key\)/);
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments', agent: CLAUDE });
+    for (const role of ['planner', 'builder', 'checker'] as const) expect(() => t.work.setRoleAgent(plan.id, role, GOOGLE)).toThrow(/Antigravity \(API key\)/);
+    expect(() => t.work.setWorkAgent(plan.id, GOOGLE)).toThrow(/Antigravity \(API key\)/);
+    expect(roleAgent(t.plans.need(plan.id), 'checker')).toEqual(CLAUDE);
+    t.work.setRoleAgent(plan.id, 'checker', API);
+    expect(roleAgent(t.plans.need(plan.id), 'checker')).toEqual(API);
+  });
+});
+
+describe('sending a milestone back says, in the plan’s activity, how the plan’s agent took it', () => {
+  const answer = (t: ReturnType<typeof setup>, channel: string, requestId: string, event: 'started' | 'answered' | 'error', text = ''): void =>
+    t.store.dispatch({ type: 'agent_event', owner: 'p-me', requestId, requester: 'p-me', event, text, ts: Date.now(), channel });
+  const notes = (t: ReturnType<typeof setup>, id: string) => t.plans.need(id).activity.map((e) => `${e.kind}: ${e.text}`);
+
+  it('it answered: noted once its run ends', async () => {
+    const asked: string[] = [];
+    const t = setup(null, (prompt) => (asked.push(prompt), 'r-back'));
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments' });
+    t.work.forRun(plan.home, 'p-me')!.tools!.write(BODY);
+    t.work.approve(plan.id);
+    t.work.sendBack(plan.id, 'safe', 'No 401 yet');
+    answer(t, plan.home, 'r-back', 'started');
+    expect(notes(t, plan.id).some((n) => n.includes('took “Safe payments” back'))).toBe(false);
+    answer(t, plan.home, 'r-back', 'answered', 'Added a fix task');
+    expect(notes(t, plan.id)).toContainEqual('note: The plan’s agent took “Safe payments” back');
+    expect(asked.at(-1)).toMatch(/isn't done yet: No 401 yet/);
+  });
+
+  it('its run failed, or it couldn’t be sent: noted as a problem, saying what to do', async () => {
+    const t = setup(null, () => 'r-fail');
+    const plan = await t.work.create({ projectId: 'api', goal: 'Take payments' });
+    t.work.forRun(plan.home, 'p-me')!.tools!.write(BODY);
+    t.work.approve(plan.id);
+    t.work.sendBack(plan.id, 'safe', 'No 401 yet');
+    answer(t, plan.home, 'r-fail', 'error', 'tool plan_update is not enabled for server beluga_plan');
+    expect(notes(t, plan.id).find((n) => n.startsWith('problem:'))).toMatch(/didn’t take “Safe payments” back: tool plan_update is not enabled/);
+
+    const none = setup();
+    const p2 = await none.work.create({ projectId: 'api', goal: 'Take payments' });
+    none.work.forRun(p2.home, 'p-me')!.tools!.write(BODY);
+    none.work.approve(p2.id);
+    none.work.sendBack(p2.id, 'safe', 'No 401 yet');
+    expect(notes(none, p2.id).find((n) => n.startsWith('problem:'))).toMatch(/Couldn’t send “Safe payments” back/);
   });
 });

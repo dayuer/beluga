@@ -31,7 +31,7 @@ runtimeConformance('opencode', () => createOpenCodeRuntime({ connect: opencode.c
 const copilot = new ScriptedCopilot();
 runtimeConformance('copilot', () => createCopilotRuntime({ connect: copilot.connect }));
 const agy = new ScriptedAgy();
-runtimeConformance('antigravity', () => createAntigravityRuntime({ connect: agy.connect }));
+runtimeConformance('antigravity', () => createAntigravityRuntime({ connect: agy.connect, signIn: 'api-key' }));
 
 /** The fake runtime, changed: its capabilities patched, and its runs' inputs or answers bent. */
 function mutant(caps: Partial<RuntimeCapabilities>, bend: { input?: (i: AgentRunInput) => AgentRunInput; answer?: (a: string) => string } = {}): () => AgentRuntime {

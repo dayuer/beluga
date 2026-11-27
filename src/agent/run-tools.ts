@@ -27,7 +27,7 @@ export function runToolSuites(input: AgentRunInput, bridge: RoomBridge, shelf: V
     beluga: createRoomTools(bridge, askOnly ? input.continueInWorktree : undefined, askOnly ? undefined : input.setup, input.dialogue),
     ...(task ? { beluga_task: task } : {}),
     // Your own runs get the task board (core/board): the task they're doing, and tools to keep it true.
-    ...(input.board ? { beluga_board: createBoardTools(input.board) } : {}),
+    ...(input.board ? { beluga_board: createBoardTools(input.board, { checkOnly: Boolean(input.boardCheckOnly) }) } : {}),
     // Your own runs get sentinels (core/sentinel): list, set up, run, pause; inside a run, stop it.
     ...(input.sentinelTools ? { beluga_sentinel: createSentinelTools(input.sentinelTools) } : {}),
     ...(input.dashboardTools ? { beluga_dashboard: createDashboardTools(input.dashboardTools) } : {}),

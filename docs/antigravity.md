@@ -14,6 +14,24 @@ A Mac that ran Antigravity before it became an ACP agent (it was your agent, a p
 
 `BELUGA_AGY_PATH` points Beluga at another `agy`.
 
+## Your Google account or an API key
+
+Antigravity comes as two agents, one per sign-in, each with its own `agy` folder. You add each one in Settings › Agent › ACP agents. Beluga never guesses which one a run uses, and a variable in your shell (`GEMINI_API_KEY`, `GOOGLE_CLOUD_PROJECT`…) never changes it.
+
+- **Antigravity**: your Google account, the one `agy` in Terminal signs in to. Google's terms let a personal account's agy be driven by you, in a client where Antigravity is the agent, not by another agent or app on its own: its FAQ says wrapping agy in another coding agent or app isn't supported, section 6 of its terms rules out third-party software, and its forum answers rule out proxies, internal APIs, outer harnesses and automated loops. So:
+  - It takes what you send it yourself, from the Mac or your phone: a message in a chat or a worktree (Continue on a failed turn too), a new worktree's first message, a message you edited and sent again, Compact now. Small asks for you go to it as in other ACP clients (naming a worktree, drafting a task).
+  - Nothing Beluga starts on its own runs on it: a part of a plan (it's greyed in the plan's agents, and refused), a task you Start from the board, a nudge to a task that stalled, the Continue Beluga sends once your limit resets, auto-compact, a Sentinel, a friend's task, a dialogue, another agent (an external agent through Beluga's MCP, a thread, another chat's agent). Each says why, in the card.
+  - Beluga adds no turn of its own: it doesn't go on after a command agy left in the background, and it doesn't tell agy why a step was declined.
+- **Antigravity (API key)**: a Gemini API key, billed per token, in a folder of its own (`~/.beluga/agy-api`: your skills, plugins and settings linked in, its own conversations, its settings on the key). The Gemini API's terms let an app drive it, so plans, Sentinels and everything else run on it. Its key is `GEMINI_API_KEY` in Settings › Environment (your own variables; from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)). Without one it says so, and it never falls back to your Google account. Set a budget on the key in Google's console: a plan's work uses a lot.
+
+Neither reads Antigravity's quota: only its internal APIs have it, and Google said calling them can get an account flagged. The Usage tab shows the tokens of each turn.
+
+To list your models and see that agy is signed in, Beluga opens a session with it now and then, as `agy` itself does when it starts: no message is sent, so nothing reaches the model.
+
+### Its tool budget
+
+Antigravity keeps about 42 KB of a client's tool definitions. Past that it drops the larger ones from the middle of the list; they stay listed by name, and a call to one fails with "tool … is not enabled for server …". Beluga's tools come to some 120 KB in all, so on Antigravity a run gets what it is for first: its task, its plan, its board, and in a Sentinel's run that Sentinel's tools. Then come Beluga's other tools, most useful first, as long as they fit in 36 KB. The conversation says which ones were left out.
+
 ## Models
 
 Antigravity is listed with the models your plan has, as `agy models` shows them. Gemini takes a thinking level (Low, Medium, High), picked as its effort. If your plan doesn't have a model you picked, the conversation runs on Antigravity's own model and says so in a line.
@@ -29,7 +47,7 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **Compact**, picking up a conversation later, and handing a conversation to another agent.
 - Pictures in a message.
 - Beluga's instructions go into Antigravity's own system prompt, so your rules and its own stay as they are.
-- Usage: tokens for each turn, and the context meter. What's left of your Antigravity quota has its own card on the Usage tab, as Antigravity's own quota panel shows it: for each group of models (Gemini Models; Claude and GPT models), the 5-hour limit and the weekly one, each with when it refills. ACP doesn't say it: Beluga opens a conversation without sending anything and asks Antigravity's own language server on this Mac, every 10 minutes. Each of those looks leaves nothing behind: its conversation and its log go once it has stopped, and Beluga clears what earlier ones left (journals of gone conversations, its `acp-server` logs older than a week). Antigravity's own CLI logs stay.
+- Usage: tokens for each turn, and the context meter. Not its quota (see above). Each look Beluga takes leaves nothing behind: its conversation and its log go once it has stopped, and Beluga clears what earlier ones left (journals of gone conversations, its `acp-server` logs older than a week). Antigravity's own CLI logs stay.
 
 ## What's different
 
@@ -39,9 +57,9 @@ A model Google retires leaves the list on its own: Beluga asks Antigravity each 
 - **No Fork, no /btw.** Antigravity can't branch a conversation, so a fork starts a fresh one (the files come along), and editing a sent message starts afresh from your edited message.
 - **No Terminal view.** Antigravity conversations stay in the chat.
 - **Questions mid-run**: Antigravity's own question form doesn't reach Beluga, so when it asks (its `ask_question`), Beluga asks you for it: the same card Claude's questions get, on your phone too. Your answer goes back to Antigravity as its next turn (the question also stays written in its answer).
-- **A declined step.** Antigravity ends its turn without a word when a step is turned down, so Beluga tells it why, once, and it answers.
+- **A declined step.** Antigravity ends its turn without a word when a step is turned down, so (on Antigravity (API key)) Beluga tells it why, once, and it answers.
 - **Gemini looks around a lot.** On Gemini 3.8 Flash, Antigravity often reads and searches well past what you asked (other folders, your home folder) before it answers. Its commands still come to you, but a Claude model on your plan keeps closer to the request.
-- **Your plan's quota.** Every message uses some of your Antigravity quota, and so do Beluga's small asks when Antigravity is your agent (naming a worktree, drafting a task). When it runs out, the card says so; the Usage tab shows what's left, per model family.
+- **Your plan's quota.** On your Google account, every message uses some of your Antigravity quota, and so do the small asks Beluga makes for you (naming a worktree, drafting a task). When it runs out, the card says so. On Antigravity (API key), every token is billed to the key.
 - **Your project's rules, not Antigravity's global ones.** In Beluga, Antigravity follows your project's `AGENTS.md`, `GEMINI.md` and `.agents/` rules and Beluga's instructions, not your global rules (`~/.gemini/GEMINI.md`, `~/.gemini/AGENTS.md`, `~/.gemini/config/rules/` and the like). agy has no switch for that, so Beluga starts it on a Gemini folder of its own, `~/.beluga/agy-gemini` (`--gemini-dir`): everything of `~/.gemini` linked in (your sign-in, conversations, settings, skills, plugins, MCP servers) except those rules. A file agy saves there goes back to `~/.gemini` on its next start. Antigravity in your terminal still reads them. On Windows, and with no global rules, it reads `~/.gemini` as it is. A project with only a `CLAUDE.md` gives it nothing to read: Antigravity doesn't read that file.
 - **Your MCP servers**: the ones in your Antigravity config run in its conversations, as they do in Antigravity. Settings › MCP lists Claude Code's and Codex's.
 - **Deleting a chat** deletes Antigravity's own record of it too (its conversation file and notes in `~/.gemini/antigravity-cli`).

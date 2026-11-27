@@ -1,9 +1,13 @@
 import { type AcpSideDeps, acpComplete } from '../acp/complete.js';
 import type { CompletionRequest } from '../types.js';
 import { antigravityExtension } from './extension.js';
-import { ANTIGRAVITY } from './spec.js';
+import type { AgySignIn } from './sign-in.js';
+import { ANTIGRAVITY, ANTIGRAVITY_API } from './spec.js';
 
-export type AgySideDeps = AcpSideDeps;
+export interface AgySideDeps extends AcpSideDeps {
+  /** Which of the two it is (sign-in.ts); unset: your Google account. */
+  readonly signIn?: AgySignIn;
+}
 
 /**
  * A side call on Antigravity (agent/side-calls.ts): one prompt in a conversation of its own
@@ -13,5 +17,5 @@ export type AgySideDeps = AcpSideDeps;
  * when one was named; 'haiku' (small and fast) is its default model at its lowest thinking level.
  */
 export function agyComplete(req: CompletionRequest, deps: AgySideDeps = {}): Promise<string> {
-  return acpComplete(ANTIGRAVITY, antigravityExtension(deps.bin ? { bin: deps.bin } : {}), req, deps);
+  return acpComplete(deps.signIn === 'api-key' ? ANTIGRAVITY_API : ANTIGRAVITY, antigravityExtension({ ...(deps.bin ? { bin: deps.bin } : {}), ...(deps.signIn ? { signIn: deps.signIn } : {}) }), req, deps);
 }

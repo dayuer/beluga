@@ -186,6 +186,8 @@ interface Waiting {
   urgent?: boolean;
   askTo?: string;
   compact?: boolean;
+  /** Compact you asked for from a screen yourself, not an agent through Beluga's tools (AgentRunInput.byYourHand). */
+  yours?: boolean;
 }
 
 /** The queue for one conversation (the room, or a workspace). */
@@ -411,7 +413,7 @@ export class AgentHost {
     const lane = this.lane(channel);
     if (lane.waiting.some((w) => w.compact)) return;
     const body: BodyOf<'agent_request'> = { kind: 'agent_request', requestId: `compact-${randomUUID()}`, prompt: instructions.slice(0, 2000), viaAgent: false, channel, urgent: false, plan: false };
-    lane.waiting.push({ from: this.selfId, body, compact: true });
+    lane.waiting.push({ from: this.selfId, body, compact: true, ...(actingVia() ? {} : { yours: true }) });
     if (lane.current) this.toast('Your agent compacts this conversation when it finishes what it’s doing');
     void this.pump(lane);
   }
@@ -433,12 +435,12 @@ export class AgentHost {
   }
 
   /** Compact in the conversation's queue, as its current run (so a new message waits for it). */
-  private async runCompaction(lane: Lane, auto: boolean, instructions = ''): Promise<void> {
+  private async runCompaction(lane: Lane, auto: boolean, instructions = '', yours = false): Promise<void> {
     const controller = new AbortController();
     lane.current = controller;
     lane.runFrom = this.selfId;
     try {
-      await this.compactor.run(lane.channel, auto ? 'auto' : 'manual', controller.signal, instructions);
+      await this.compactor.run(lane.channel, auto ? 'auto' : 'manual', controller.signal, instructions, !auto && yours);
     } finally {
       if (lane.current === controller) {
         lane.current = undefined;
@@ -1209,6 +1211,7 @@ export class AgentHost {
       ...this.promptIdOf(body),
       requesterName: this.askerOf(body, from),
       viaAgent: body.viaAgent,
+      ...(this.byYourHand(from, body, this.agentOf(from, body)) ? { byYourHand: true } : {}),
       model: this.modelNow(body.channel),
       context: this.recentChat(body.channel),
       onEvent: (kind, text) => emit(kind, text),
@@ -1402,7 +1405,7 @@ export class AgentHost {
           holds = false;
         };
         try {
-          if (!next || next.compact) await this.runCompaction(lane, auto, next?.body.prompt);
+          if (!next || next.compact) await this.runCompaction(lane, auto, next?.body.prompt, next?.yours === true);
           else await this.runAgent(next.from, next.body, lane, next.askTo, release).catch((err: unknown) => this.system(`Agent run failed: ${errorText(err)}`, 'error'));
         } finally {
           release();
@@ -1587,12 +1590,14 @@ export class AgentHost {
       lane.runPlanTools = Boolean(plans?.tools || place?.syncMain);
       // Your own runs get the board: a run doing a task gets it, and the tools to keep it true. A main
       // folder's chat too (BLG-626): the board is Beluga's, not a file there, so the folder stays read-only.
-      // A plan's own conversation too, for tasks outside the plan. Not while syncing main, nor in a
-      // milestone's checker (it has only plan_get and plan_gate).
+      // A plan's own conversation too, for tasks outside the plan. Not while syncing main. A
+      // milestone's checker gets only what its check asks of it: reading the tasks and ticking what
+      // it checked (task_get, task_list, task_brief_edit, task_attach_proof; board-tools.ts CHECK_TOOLS).
       const planFirst = body.plan && !plans?.tools;
       // Sentinels (your own runs): a sentinel run's Claude step gets its brief, and the task tools (it makes tasks).
       const sentinel = from === this.selfId && !place?.syncMain ? this.deps.sentinel?.(body.channel, from) : undefined;
-      const noBoard = place?.syncMain || (place?.askOnly && plans?.checker && !sentinel?.inRun);
+      const checking = Boolean(place?.askOnly && plans?.checker && !sentinel?.inRun);
+      const noBoard = place?.syncMain;
       // A friend's run gets its repo's board too, as their trust allows (BLG-701; see boardAccess).
       const friendBoard = from === this.selfId ? undefined : this.boardAccess(from);
       const runBoard = noBoard || (from !== this.selfId && !friendBoard) ? undefined : this.deps.board?.(body.channel, from, { plan: planFirst && from === this.selfId, ...(friendBoard ? { friend: { id: from, name: requesterName } } : {}) });
@@ -1638,8 +1643,8 @@ export class AgentHost {
       const final = await Promise.race([gone, exited, outsideYourHand(() => agent.run({
         ...(scratch ? { scratchDir: scratch } : {}),
         ...this.links.linkOf(body.channel),
-        ...(board?.tools ? { board: board.tools } : {}),
-        ...(board?.brief ? { taskBrief: board.brief } : {}),
+        ...(board?.tools ? { board: board.tools, ...(checking ? { boardCheckOnly: true } : {}) } : {}),
+        ...(board?.brief && !checking ? { taskBrief: board.brief } : {}),
         ...(board?.needsDefinition && board.planApproved ? { planTask: { needsDefinition: board.needsDefinition, approved: board.planApproved } } : {}),
         ...(plans?.tools ? { planTools: plans.tools } : {}),
         ...(plans?.brief ? { planBrief: plans.brief } : {}),
@@ -1659,6 +1664,7 @@ export class AgentHost {
         prompt: withAppContext(this.promptOf(body, from, lane.sent), from === this.selfId ? (this.deps.appContext?.(body.channel) ?? []) : []),
         ...this.promptIdOf(body),
         ...this.ownWordsOf(from, body),
+        ...(this.byYourHand(from, body, external, sentinel?.inRun) ? { byYourHand: true } : {}),
         requesterName: this.askerOf(body, from),
         viaAgent: body.viaAgent,
         context: this.recentChat(body.channel),
@@ -1857,6 +1863,14 @@ export class AgentHost {
       ...this.chromeFor({ from: this.selfId, guest: false, automatic: true, channel, who: 'Your agent (in a dialogue)' }),
     });
     return { text, tokens };
+  }
+
+  /**
+   * Whether this request is one you sent yourself from a screen (see markYours), as you: not an
+   * external agent's, another agent's or another chat's, and not a Sentinel's own run.
+   */
+  private byYourHand(from: string, body: BodyOf<'agent_request'>, external: string | undefined, sentinelRun?: boolean): boolean {
+    return from === this.selfId && this.yourRequests.has(body.requestId) && !external && !sentinelRun && !body.viaAgent && !body.via && !body.origin;
   }
 
   /** A request you sent from a screen yourself (see Session.requestAgent). */

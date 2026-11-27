@@ -6,7 +6,7 @@ import { openCodeRuntime } from './opencode/index.js';
 import { findOpenCode } from './opencode/connection.js';
 import { copilotRuntime } from './copilot/index.js';
 import { findCopilot } from './copilot/connection.js';
-import { antigravityRuntime } from './antigravity/index.js';
+import { antigravityApiRuntime, antigravityRuntime } from './antigravity/index.js';
 import { acpAgents } from './acp/agents.js';
 import { findAcpCommand } from './acp/connection.js';
 import { ACP_CAPABILITIES, type AcpAgentEntry, specOf } from './acp/entry.js';
@@ -30,6 +30,7 @@ const made = new Map<string, { readonly key: string; readonly rt: AgentRuntime }
 function acpRuntimeOf(entry: AcpAgentEntry): AgentRuntime {
   // Antigravity runs on its own runtime on the ACP core (its extension: quota, questions, /compact…).
   if (entry.id === antigravityRuntime.id) return antigravityRuntime;
+  if (entry.id === antigravityApiRuntime.id) return antigravityApiRuntime;
   const key = JSON.stringify([entry.label, entry.command, entry.args, entry.env ?? {}]);
   const had = made.get(entry.id);
   if (had?.key === key) return had.rt;
