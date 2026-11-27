@@ -34,6 +34,11 @@
 
 /* ---------- Task cards ---------- */
 
+/* As wide as the layout made it (taskWidth in plan-layout.ts: wider for a long agent name), not .task's 252px. */
+.taskCard.taskCard,
+.taskCompact.taskCompact {
+  width: 100%;
+}
 .taskCard {
   transition:
     box-shadow 220ms var(--ease-out),
@@ -670,9 +675,13 @@
   outline-offset: 1px;
 }
 .agentNowLabel {
-  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+/* Its step gives way before its label. */
 .agentNowSub {
+  flex-shrink: 100;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

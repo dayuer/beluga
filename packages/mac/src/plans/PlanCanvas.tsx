@@ -11,14 +11,15 @@ import { layout } from '../components/graph/layout.js';
 import { useSharpZoom } from '../components/graph/sharp-zoom.js';
 import { breath, turn, useLive } from '../lib/live-motion.js';
 import { MILESTONE_STATE, type MilestoneJoin, type PlanGraphShape, TASK_STATE, changeMarks, gateId, graphShape, groupId, lockWords, milestoneJoin, milestoneLink, milestoneNowWords, startingMilestones, taskNodeId, taskWords } from './plans-model.js';
-import { COMPACT_STATES, FOLDS_KEY, type Folds, MILESTONE, type MilestoneFrame, PLAN_GAPS, arrowHead, isFolded, joinAt, labelAt, milestoneAnchors, milestoneFrame, milestoneRoute, placeMilestones, readFolds, taskSize, withFold } from './plan-layout.js';
+import { COMPACT_STATES, FOLDS_KEY, type Folds, MILESTONE, type MilestoneFrame, PLAN_GAPS, arrowHead, isFolded, joinAt, labelAt, milestoneAnchors, milestoneFrame, milestoneHeadWidth, milestoneRoute, placeMilestones, readFolds, taskSize, taskWidth, withFold } from './plan-layout.js';
 import { measureText } from './measure-text.js';
 import { useCardClock, useCheckerChat, useClock, usePlanActions } from './use-plans.js';
 import { useGlide } from './use-glide.js';
 import { LiveDot, LockMark, TaskChatMark, TaskStateIcon } from './marks.js';
 import p from './plans.module.css';
 import c from './PlanCanvas.module.css';
-import { TaskAgentChip } from '../fork/plans/TaskAgentChip.js';
+import { TaskAgentChip, useTaskAgentWords } from '../fork/plans/TaskAgentChip.js';
+import { t as tr } from '../i18n/index.js';
 
 /**
  * A plan as a living graph: each milestone a box, its tasks inside laid out by what waits on what,
@@ -181,6 +182,34 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
   const slimKey = useMemo(() => JSON.stringify(shape.milestones.flatMap((m) => m.tasks.filter((t) => COMPACT_STATES.has(byTask.get(t)?.state ?? '')))), [shape, byTask]);
   // What folds (a folded milestone is as wide as its title needs): plain math, no ELK.
   const foldKey = useMemo(() => JSON.stringify(Object.fromEntries([...folded].sort().map((id) => [id, byMs.get(id)?.milestone.title ?? '']))), [byMs, folded]);
+  // How wide each milestone's task cards are (a long agent name on one widens them all): ELK sizes them.
+  const agentWords = useTaskAgentWords();
+  const widthKey = useMemo(
+    () =>
+      JSON.stringify(
+        Object.fromEntries(
+          view.milestones.map((m) => [m.milestone.id, taskWidth(m.tasks.map((t) => ({ key: keys.get(t.task.id) ?? t.task.id, ...(agentWords(t) ? { agent: tr(agentWords(t)!) } : {}), chat: Boolean(t.worktree), points: Boolean(t.task.estimate) })), measureText)]),
+        ),
+      ),
+    [view, keys, agentWords],
+  );
+  // How wide each open milestone's head wants to be, to say all of it on one line (its title, state,
+  // count, Auto and its agent at work), in the window's language. Its agent's step and time are left
+  // out: they change as it works, and its pill ends them in an ellipsis instead.
+  const headKey = useMemo(
+    () =>
+      JSON.stringify(
+        Object.fromEntries(
+          view.milestones.map((m) => {
+            const live = milestoneNowWords(m, 0);
+            const count = m.state !== 'draft' ? `${m.finished}/${m.total}` : tr(`${m.milestone.tasks.length} tasks`);
+            const head = { title: m.milestone.title, state: tr(MILESTONE_STATE[m.state].label), count, ...(m.milestone.autonomy ? { auto: tr(AUTONOMY_INFO[m.autonomy].label) } : {}), ...(live && m.agent ? { live: { label: tr(live.label) } } : {}) };
+            return [m.milestone.id, Math.ceil(milestoneHeadWidth(head, measureText))];
+          }),
+        ),
+      ),
+    [view],
+  );
   const [inner, setInner] = useState<Inner>();
 
   // Lay out each milestone's tasks with ELK when the shape or a task card's size changes (only then).
@@ -189,13 +218,14 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
   useEffect(() => {
     let live = true;
     const slim = new Set(JSON.parse(slimKey) as string[]);
+    const widths = JSON.parse(widthKey) as Record<string, number>;
     void Promise.all(
       shape.milestones.map((m) => {
         const inside = new Set(m.tasks.map(taskNodeId));
         const input: ElkInput = {
           id: groupId(m.id),
           layoutOptions: INSIDE,
-          children: m.tasks.map((t) => ({ id: taskNodeId(t), ...taskSize(slim.has(t) ? 'done' : 'ready') })),
+          children: m.tasks.map((t) => ({ id: taskNodeId(t), ...taskSize(slim.has(t) ? 'done' : 'ready', widths[m.id]) })),
           edges: shape.edges.filter((e) => e.kind === 'blocks' && inside.has(e.from) && inside.has(e.to)).map((e) => ({ id: e.id, sources: [e.from], targets: [e.to] })),
         };
         return layout(input);
@@ -210,7 +240,7 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
     return () => {
       live = false;
     };
-  }, [shape.key, slimKey]);
+  }, [shape.key, slimKey, widthKey]);
 
   // Each box around its tasks with its gate at its foot, the boxes in their rows, and their lines between.
   const laid = useMemo<Laid | undefined>(() => {
@@ -218,11 +248,12 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
     const { shape } = inner;
     const folded = new Map(Object.entries(JSON.parse(foldKey) as Record<string, string>));
     const criteria = new Map(shape.milestones.map((m) => [m.id, m.criteria] as const));
+    const heads = JSON.parse(headKey) as Record<string, number>;
     // Each box only as tall as its own tasks and gate: stretched to a taller neighbour's height, a short
     // milestone would be mostly empty room between its tasks and its gate.
     const frameOf = (id: string, fold: boolean): MilestoneFrame => {
       const o = inner.outs.get(id);
-      return milestoneFrame({ width: o?.width ?? 0, height: o?.height ?? 0 }, criteria.get(id) ?? [], fold, undefined, folded.get(id), measureText);
+      return milestoneFrame({ width: o?.width ?? 0, height: o?.height ?? 0 }, criteria.get(id) ?? [], fold, undefined, folded.get(id), measureText, heads[id]);
     };
     const opened = new Map(shape.milestones.map((m) => [m.id, frameOf(m.id, false)] as const));
     const frames = new Map(shape.milestones.map((m) => [m.id, folded.has(m.id) ? frameOf(m.id, true) : opened.get(m.id)!] as const));
@@ -267,7 +298,7 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
       meets.set(e.id, enterY);
     }
     return { places, frames, routes, meets };
-  }, [inner, foldKey]);
+  }, [inner, foldKey, headKey]);
 
   const lane = useMemo(() => new Map(shape.milestones.flatMap((m) => m.tasks.map((t) => [taskNodeId(t), m.id] as const))), [shape]);
   // What the picked task waits on, or is waited on by, in other milestones: ringed, not wired across the lanes.
