@@ -69,15 +69,65 @@ export interface Box extends Point, Size {}
 
 /** A task card: its head, a two-line title and its state line (.task in plans.module.css). */
 export const TASK_CARD: Size = { width: 252, height: 100 };
+/** A task card grows to this for a long agent name on it (taskWidth). */
+export const TASK_CARD_MAX = 360;
 /** A finished task: one slim row, its tick, key and title (.taskCompact in PlanCanvas.module.css). */
 export const TASK_COMPACT: Size = { width: 252, height: 40 };
 /** The task states drawn as a slim row: their work is behind them. */
 export const COMPACT_STATES: ReadonlySet<string> = new Set(['done', 'planned', 'canceled']);
 
-export const taskSize = (state: string): Size => (COMPACT_STATES.has(state) ? TASK_COMPACT : TASK_CARD);
+export const taskSize = (state: string, width: number = TASK_CARD.width): Size => ({ width, height: COMPACT_STATES.has(state) ? TASK_COMPACT.height : TASK_CARD.height });
+
+/** What a task card's top row holds (.taskTop in plans.module.css): its key, the agent at work on it, its chat mark and points. */
+export interface TaskTop {
+  readonly key: string;
+  readonly agent?: string;
+  readonly chat?: boolean;
+  readonly points?: boolean;
+}
+
+/**
+ * How wide a milestone's task cards are: TASK_CARD.width, or wider (up to TASK_CARD_MAX) when a
+ * card's top row needs it, a long agent name ("Antigravity (Gemini 4 Neon (High))") above all. One
+ * width for all of a milestone's cards, so its columns line up.
+ */
+export function taskWidth(tops: readonly TaskTop[], measure: MeasureText = guessWidth): number {
+  // 12 + 12 padding, the state icon (12) and a 6px gap between each part.
+  const want = (t: TaskTop): number =>
+    24 + 12 + 6 + measure(t.key, 11, 500) + (t.agent ? 6 + 14 + measure(t.agent, 11) : 0) + (t.chat ? 6 + 18 : 0) + (t.points ? 6 + 17 : 0) + 2;
+  const widest = Math.max(TASK_CARD.width, ...tops.map(want));
+  return Math.round(Math.min(TASK_CARD_MAX, widest));
+}
 
 /** A milestone box: its head, its tasks with room around them, its gate inset at its foot. */
-export const MILESTONE = { head: 62, side: 20, minWidth: 340, gateGap: 16, inset: 10, badge: 20 } as const;
+export const MILESTONE = { head: 62, side: 20, minWidth: 340, maxWidth: 640, gateGap: 16, inset: 10, badge: 20 } as const;
+
+/** What a milestone's head says (.msHead in plans.module.css): its title, then its state, count, progress and Auto, and its agent at work. */
+export interface MilestoneHead {
+  readonly title: string;
+  readonly state: string;
+  readonly count: string;
+  /** Its own autonomy's word ("Auto"), when it has one. */
+  readonly auto?: string;
+  /** Its agent at work (the pill at the head's end): "Working on SHP-466", and its step when no card says it. */
+  readonly live?: { readonly label: string; readonly sub?: string };
+}
+
+/** The live pill never grows past this (.agentNow's max-width). */
+const LIVE_MAX = 340;
+
+/**
+ * How wide a milestone's head wants to be to say everything on one line: 16px padding each side, its
+ * index (22) and a 10px gap; then the wider of its title (13.5px, 650) and its state line (11.5px,
+ * 8px gaps: state, count, the 48px progress bar, the Auto chip at 10.5px with 6px padding); then its
+ * agent's pill (11.5px, 600; 10px padding, its 11px mark, 6px gaps, the chat mark).
+ */
+export function milestoneHeadWidth(h: MilestoneHead, measure: MeasureText = guessWidth): number {
+  const sub = measure(h.state, 11.5, 500) + 8 + measure(h.count, 11.5) + 8 + 48 + (h.auto ? 8 + 12 + measure(h.auto, 10.5, 600) : 0);
+  const titles = Math.max(measure(h.title, 13.5, 650), sub);
+  const live = h.live ? Math.min(LIVE_MAX, 20 + 11 + 6 + measure(h.live.label, 11.5, 600) + (h.live.sub ? 6 + measure(h.live.sub, 11.5, 500) : 0) + 6 + 18) : 0;
+  return 32 + 22 + 10 + titles + (live ? 10 + live : 0) + 2;
+}
 /** The gate bar: a head row, then a row per criterion (one or two lines each). */
 export const GATE = { head: 34, line: 16, row: 5, foot: 12, padX: 14, bullet: 22 } as const;
 /** A folded milestone: one summary row, as wide as its title needs (beside `chrome`: its tick, counts, chip and chevron) within these. */
@@ -132,14 +182,15 @@ export interface MilestoneFrame extends Size {
  * one summary row, wide enough for its `title`. `height` stretches an open box, its gate staying
  * at the foot.
  */
-export function milestoneFrame(inner: Size, criteria: readonly string[], folded: boolean, height?: number, title = '', measure: MeasureText = guessWidth): MilestoneFrame {
+export function milestoneFrame(inner: Size, criteria: readonly string[], folded: boolean, height?: number, title = '', measure: MeasureText = guessWidth, head = 0): MilestoneFrame {
   if (folded) {
     // Room for its title (13.5px, weight 650: .foldTitle) beside its tick, counts, criteria chip and chevron.
     const wanted = FOLDED.chrome + measure(title, 13.5, 650);
     const width = Math.round(Math.max(FOLDED.minWidth, Math.min(FOLDED.maxWidth, Math.max(inner.width, wanted))));
     return { folded, width, height: FOLDED.height, gate: { x: 0, y: 0, width, height: FOLDED.height }, shiftX: 0 };
   }
-  const width = Math.max(MILESTONE.minWidth, Math.round(inner.width));
+  // As wide as its tasks, or its head (milestoneHeadWidth) when that says more: never a head that wraps.
+  const width = Math.max(MILESTONE.minWidth, Math.round(inner.width), Math.min(MILESTONE.maxWidth, Math.ceil(head)));
   const gateWidth = width - 2 * MILESTONE.inset;
   const gateH = gateHeight(criteria, gateWidth, measure);
   const natural = Math.max(MILESTONE.head, Math.round(inner.height)) + MILESTONE.gateGap + gateH + MILESTONE.inset;

@@ -2,6 +2,7 @@ import type { TaskView } from '@beluga/core/plans/progress.js';
 import { taskAgentSeen, taskAgentWords } from '@beluga/fork/plans/task-agent.js';
 import { runtimeMark } from '@beluga/shared/agent-marks.js';
 import type { AgentRef } from '@beluga/protocol.js';
+import { useCallback } from 'react';
 import { Icon } from '../../components/Icon.js';
 import { useApp } from '../../lib/beluga.js';
 import f from './task-agent.module.css';
@@ -22,5 +23,21 @@ export function TaskAgentChip({ plan, t }: { plan?: { readonly agent?: AgentRef;
       <Icon name={runtimeMark(seen.agent.runtime)} size={10} />
       <span>{words}</span>
     </span>
+  );
+}
+
+/**
+ * Fork: the words the canvas's chip shows for a task (none: no chip), so the plan canvas can size its
+ * cards for them (taskWidth in plans/plan-layout.ts). The canvas's chip: only a task at work.
+ */
+export function useTaskAgentWords(): (t: TaskView) => string | undefined {
+  const projects = useApp((s) => s.projects);
+  const projectAgents = useApp((s) => s.prefs.projectAgents);
+  return useCallback(
+    (t: TaskView) => {
+      const seen = taskAgentSeen(undefined, t, { projects, prefs: { ...(projectAgents ? { projectAgents } : {}) } });
+      return seen.agent ? taskAgentWords(seen.agent) : undefined;
+    },
+    [projects, projectAgents],
   );
 }
