@@ -1,4 +1,5 @@
 import { mkdtempSync } from 'node:fs';
+import { createBoardTools } from '../src/agent/board-tools.js';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +13,8 @@ import { waitFor } from './helpers.js';
 /**
  * BLG-626: a project's main folder is read-only for files, but its chat may still write to the
  * task board (Beluga's own state, not a file there). A plan's own conversation may too. Syncing
- * main and a milestone's checker stay without it; a friend's run never gets it.
+ * main stays without it; a milestone's checker gets only what its check asks of it (reading the
+ * tasks, ticking what it checked); a friend's run never gets it.
  */
 
 const ME = 'me';
@@ -88,11 +90,17 @@ describe('the task board in a main folder’s chat', () => {
     expect(run.planTask).toBeUndefined();
   });
 
-  it('not while syncing main, nor in a milestone’s checker', async () => {
-    const t = setup();
-    expect((await t.ask(SYNC)).board).toBeUndefined();
-    const check = await t.ask(CHECKER);
-    expect(check.board).toBeUndefined();
+  it('not while syncing main', async () => {
+    expect((await setup().ask(SYNC)).board).toBeUndefined();
+  });
+
+  it('a milestone’s checker: reading the tasks and ticking what it checked, as its check asks, and nothing else', async () => {
+    const check = await setup().ask(CHECKER);
+    expect(check.board).toBeDefined();
+    expect(check.boardCheckOnly).toBe(true);
+    expect(check.taskBrief).toBeUndefined();
     expect(check.planTools).toBeDefined();
+    const tools = createBoardTools(check.board!, { checkOnly: true }).tools.map((t) => t.name).sort();
+    expect(tools).toEqual(['task_attach_proof', 'task_brief_edit', 'task_get', 'task_list']);
   });
 });

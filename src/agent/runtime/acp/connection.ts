@@ -59,7 +59,7 @@ const within = (p: Promise<void>, ms: number): Promise<void> =>
  * Its line goes through the wire (wire.ts): a stuck run or a sign-in it waits on ends with why.
  * On macOS and Linux it gets a process group of its own, and ending it ends what it started too.
  */
-export function spawnAcp(spec: AcpAgentSpec, hooks: Pick<AcpExtension, 'afterLook' | 'launch'> = {}): AcpConnect {
+export function spawnAcp(spec: AcpAgentSpec, hooks: Pick<AcpExtension, 'afterLook' | 'launch' | 'environment'> = {}): AcpConnect {
   const start = startAcp(spec, hooks);
   return async (opts) => {
     const command = opts.bin ?? findAcpCommand(spec, opts.env ?? process.env);
@@ -87,11 +87,12 @@ export const UNKNOWN_FLAG = /provided but not defined|unknown (flag|option|argum
 const older = new Set<string>();
 
 /** One start of an agent's server, with `newer` (its extension's launch flags) after its own args. */
-function startAcp(spec: AcpAgentSpec, hooks: Pick<AcpExtension, 'afterLook'>) {
+function startAcp(spec: AcpAgentSpec, hooks: Pick<AcpExtension, 'afterLook' | 'environment'>) {
   return async (command: string, newer: readonly string[], { cwd, env, args = [], look = false }: Parameters<AcpConnect>[0]): Promise<AcpConnection> => {
     const how = codexCommand(command, [...spec.args, ...newer, ...args]);
     const grouped = ownGroups() && !how.shell;
-    const child = spawn(how.command, [...how.args], { cwd, env: { ...(env ?? process.env), ...spec.env }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: how.shell, detached: grouped });
+    const own = { ...(env ?? process.env), ...spec.env };
+    const child = spawn(how.command, [...how.args], { cwd, env: hooks.environment ? hooks.environment(own) : own, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: how.shell, detached: grouped });
     const lines: string[] = [];
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => keepLines(lines, chunk, STDERR_KEEP));

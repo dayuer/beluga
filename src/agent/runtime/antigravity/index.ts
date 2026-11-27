@@ -1,6 +1,6 @@
 import type { AgentRuntime, RuntimeCapabilities } from '../types.js';
 import { agyComplete } from './complete.js';
-import type { AgyLogin } from './login.js';
+import { AGY_API_ID, type AgySignIn } from './sign-in.js';
 import type { AgyConnect } from './connection.js';
 import { createAgyBackend } from './runner.js';
 import { agyStatus } from './status.js';
@@ -19,8 +19,8 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
   hasPlanMode: true,
   hasSubagents: false,
   hasBackgroundAgents: false,
-  // Tokens per turn and the context meter; its quota per model family, asked of its own language
-  // server (quota.ts: ACP doesn't say it), on its own usage card.
+  // Tokens per turn and the context meter. Not its quota: only its internal APIs have it, and
+  // Google said reading them can get an account flagged (quota.ts stays for when ACP says it).
   hasUsage: true,
   // session/load; it can't branch a conversation.
   canResume: true,
@@ -39,18 +39,24 @@ export const ANTIGRAVITY_CAPABILITIES: RuntimeCapabilities = {
   toolMounts: ['http'],
 };
 
-/** An Antigravity runtime; `connect` swaps how it's reached (tests and the demo script one). */
-export function createAntigravityRuntime(deps: { readonly connect?: AgyConnect; readonly status?: AgentRuntime['status']; readonly login?: () => AgyLogin } = {}): AgentRuntime {
-  const side = { ...(deps.connect ? { connect: deps.connect, drop: async () => undefined } : {}), ...(deps.login ? { login: deps.login } : {}) };
+/**
+ * An Antigravity runtime: on your Google account (`antigravity`), or on a Gemini API key
+ * (`antigravity-api`, sign-in.ts). `connect` swaps how it's reached (tests and the demo script one).
+ */
+export function createAntigravityRuntime(deps: { readonly connect?: AgyConnect; readonly status?: AgentRuntime['status']; readonly signIn?: AgySignIn } = {}): AgentRuntime {
+  const api = deps.signIn === 'api-key';
+  const side = { ...(deps.connect ? { connect: deps.connect, drop: async () => undefined } : {}), ...(deps.signIn ? { signIn: deps.signIn } : {}) };
   return {
-    id: 'antigravity',
-    label: 'Antigravity',
+    id: api ? AGY_API_ID : 'antigravity',
+    label: api ? 'Antigravity (API key)' : 'Antigravity',
     capabilities: ANTIGRAVITY_CAPABILITIES,
     // `executablePath` is Claude Code's (the Mac app's pinned binary): never Antigravity's. It finds its own (findAgy, BELUGA_AGY_PATH).
-    create: ({ executablePath: _claudePath, ...opts }) => createAgyBackend({ ...opts, ...(deps.connect ? { connect: deps.connect } : {}), ...(deps.login ? { login: deps.login } : {}) }),
+    create: ({ executablePath: _claudePath, ...opts }) => createAgyBackend({ ...opts, ...(deps.connect ? { connect: deps.connect } : {}), ...(deps.signIn ? { signIn: deps.signIn } : {}) }),
     complete: (req) => agyComplete(req, side),
-    status: deps.status ?? (() => agyStatus(deps.connect ? { connect: deps.connect } : {})),
+    status: deps.status ?? (() => agyStatus({ ...(deps.connect ? { connect: deps.connect } : {}), ...(deps.signIn ? { signIn: deps.signIn } : {}) })),
   };
 }
 
 export const antigravityRuntime: AgentRuntime = createAntigravityRuntime();
+/** Antigravity on a Gemini API key: an agent of its own, for plans and everything Beluga starts on its own. */
+export const antigravityApiRuntime: AgentRuntime = createAntigravityRuntime({ signIn: 'api-key' });

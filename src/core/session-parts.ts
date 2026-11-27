@@ -1,4 +1,5 @@
 import { switchAgent } from './agent-switch.js';
+import { setAgyApiKeySource } from '../agent/runtime/antigravity/sign-in.js';
 import { runtimeChoices } from '../shared/agent-runtimes.js';
 import type { SessionOptions, Session } from './session.js';
 import { appContextsOf } from '../mcp-apps/contexts.js';
@@ -65,6 +66,8 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
   let workspaces: WorkspaceController | undefined;
   let workbench: Workbench | undefined;
   const env = new EnvVars({ store: opts.store, onChange: () => workbench?.envChanged() });
+  // Antigravity (API key) takes its key from your own variables (Settings › Environment), else Beluga's own GEMINI_API_KEY (antigravity/sign-in.ts).
+  setAgyApiKeySource(() => env.globals().GEMINI_API_KEY ?? process.env.GEMINI_API_KEY);
   // Local endpoints (BLG-449) answer only where your agent runs (not in the demo).
   const listRuntimes = () =>
     runtimeChoices((id) => {

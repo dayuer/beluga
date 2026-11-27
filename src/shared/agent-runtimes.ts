@@ -45,8 +45,20 @@ export const KNOWN_RUNTIMES: ReadonlyArray<{ readonly id: string; readonly label
   { id: 'opencode', label: 'OpenCode', missing: `OpenCode isn't set up on ${THIS_COMPUTER} yet` },
   { id: 'copilot', label: 'Copilot', missing: `GitHub Copilot CLI isn't set up on ${THIS_COMPUTER} yet` },
   { id: 'antigravity', label: 'Antigravity', missing: `The Antigravity CLI isn't set up on ${THIS_COMPUTER} yet`, acp: true },
+  { id: 'antigravity-api', label: 'Antigravity (API key)', missing: 'Antigravity (API key) needs GEMINI_API_KEY in Settings › Environment', acp: true },
   { id: 'local', label: 'Local model', missing: 'No local model endpoint is set' },
 ];
+
+/**
+ * Antigravity's two agents (agent/runtime/antigravity/sign-in.ts): your Google account, which takes
+ * only what you send it yourself, and a Gemini API key, which Beluga may run on its own (plans too).
+ */
+export const AGY_RUNTIMES = ['antigravity', 'antigravity-api'] as const;
+export const isAgyRuntime = (id: string | undefined): boolean => id === 'antigravity' || id === 'antigravity-api';
+/** Antigravity on your Google account: never a part of a plan, a Sentinel or anything else Beluga starts on its own. */
+export const isAgyGoogle = (id: string | undefined): boolean => id === 'antigravity';
+/** Why it's greyed where you pick who does a piece of work (a plan's parts, a task's Start). */
+export const AGY_GOOGLE_NOT_FOR_WORK = 'On your Google account, only you can drive Antigravity. Pick Antigravity (API key) for work Beluga runs on its own';
 
 /** The fixed runtimes ("Your agents"): listed whether this Mac runs them or not. */
 export const FIXED_RUNTIMES = KNOWN_RUNTIMES.filter((r) => !r.acp);

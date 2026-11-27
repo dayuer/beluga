@@ -1590,12 +1590,14 @@ export class AgentHost {
       lane.runPlanTools = Boolean(plans?.tools || place?.syncMain);
       // Your own runs get the board: a run doing a task gets it, and the tools to keep it true. A main
       // folder's chat too (BLG-626): the board is Beluga's, not a file there, so the folder stays read-only.
-      // A plan's own conversation too, for tasks outside the plan. Not while syncing main, nor in a
-      // milestone's checker (it has only plan_get and plan_gate).
+      // A plan's own conversation too, for tasks outside the plan. Not while syncing main. A
+      // milestone's checker gets only what its check asks of it: reading the tasks and ticking what
+      // it checked (task_get, task_list, task_brief_edit, task_attach_proof; board-tools.ts CHECK_TOOLS).
       const planFirst = body.plan && !plans?.tools;
       // Sentinels (your own runs): a sentinel run's Claude step gets its brief, and the task tools (it makes tasks).
       const sentinel = from === this.selfId && !place?.syncMain ? this.deps.sentinel?.(body.channel, from) : undefined;
-      const noBoard = place?.syncMain || (place?.askOnly && plans?.checker && !sentinel?.inRun);
+      const checking = Boolean(place?.askOnly && plans?.checker && !sentinel?.inRun);
+      const noBoard = place?.syncMain;
       // A friend's run gets its repo's board too, as their trust allows (BLG-701; see boardAccess).
       const friendBoard = from === this.selfId ? undefined : this.boardAccess(from);
       const runBoard = noBoard || (from !== this.selfId && !friendBoard) ? undefined : this.deps.board?.(body.channel, from, { plan: planFirst && from === this.selfId, ...(friendBoard ? { friend: { id: from, name: requesterName } } : {}) });
@@ -1641,8 +1643,8 @@ export class AgentHost {
       const final = await Promise.race([gone, exited, outsideYourHand(() => agent.run({
         ...(scratch ? { scratchDir: scratch } : {}),
         ...this.links.linkOf(body.channel),
-        ...(board?.tools ? { board: board.tools } : {}),
-        ...(board?.brief ? { taskBrief: board.brief } : {}),
+        ...(board?.tools ? { board: board.tools, ...(checking ? { boardCheckOnly: true } : {}) } : {}),
+        ...(board?.brief && !checking ? { taskBrief: board.brief } : {}),
         ...(board?.needsDefinition && board.planApproved ? { planTask: { needsDefinition: board.needsDefinition, approved: board.planApproved } } : {}),
         ...(plans?.tools ? { planTools: plans.tools } : {}),
         ...(plans?.brief ? { planBrief: plans.brief } : {}),

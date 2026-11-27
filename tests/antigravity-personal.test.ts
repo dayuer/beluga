@@ -1,86 +1,131 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { agyComplete } from '../src/agent/runtime/antigravity/complete.js';
 import { antigravityExtension } from '../src/agent/runtime/antigravity/extension.js';
-import { AGY_PERSONAL, agyLogin } from '../src/agent/runtime/antigravity/login.js';
+import { createAntigravityRuntime } from '../src/agent/runtime/antigravity/index.js';
+import { AGY_API_ID, AGY_GOOGLE_ONLY, agyApiArgs, agySignInEnv, setAgyApiKeySource } from '../src/agent/runtime/antigravity/sign-in.js';
+import { agyStatus } from '../src/agent/runtime/antigravity/status.js';
 import { createAgyBackend } from '../src/agent/runtime/antigravity/runner.js';
 import { ScriptedAgy } from '../src/agent/runtime/antigravity/scripted.js';
-import { CompletionError } from '../src/agent/runtime/types.js';
 import type { AgentRunInput } from '../src/agent/types.js';
 import { room } from './runtime-conformance.js';
 
 /**
- * Antigravity on your personal Google account (login.ts): Google's terms let only you drive it, so
- * Beluga is only a screen for it. It takes what you sent yourself, never a run Beluga started on
- * its own, and Beluga adds no turn of its own, makes no side call on it and reads no quota. Signed in
- * with an API key, Beluga drives it as any agent (antigravity-flow.test.ts).
+ * Antigravity's two sign-ins (sign-in.ts). On your Google account, Google's terms let only you drive
+ * it: Beluga takes what you sent yourself, never a run it starts on its own, and adds no turn of its
+ * own. On a Gemini API key it's an agent of its own, in its own folder, for everything (plans too:
+ * plan-roles-agy.test.ts). Neither inherits the variables that pick a sign-in.
  */
 
-const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-login-'));
+const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-agy-sign-in-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => setAgyApiKeySource(() => process.env.GEMINI_API_KEY));
 
-const personal = () => 'personal' as const;
-
-function input(prompt: string, extra: Partial<AgentRunInput> = {}): AgentRunInput & { events: Array<[string, string]> } {
-  const events: Array<[string, string]> = [];
-  return { prompt, requesterName: 'kay', viaAgent: false, context: [], scope: 'folder', signal: new AbortController().signal, onEvent: (k, t) => void events.push([k, t]), onFileTouched: () => undefined, canUseTool: async () => true, events, ...extra };
+function input(prompt: string, extra: Partial<AgentRunInput> = {}): AgentRunInput {
+  return { prompt, requesterName: 'kay', viaAgent: false, context: [], scope: 'folder', signal: new AbortController().signal, onEvent: () => undefined, onFileTouched: () => undefined, canUseTool: async () => true, ...extra };
 }
 
-const backend = (agy: ScriptedAgy) => createAgyBackend({ cwd: dir, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, login: personal });
+const google = (agy: ScriptedAgy) => createAgyBackend({ cwd: dir, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect });
 
-describe('how agy is signed in', () => {
-  const settings = (name: string, body: string): string => {
-    const file = path.join(dir, `${name}.json`);
-    writeFileSync(file, body);
-    return file;
-  };
-
-  it('reads an API key or Vertex as an API sign-in', () => {
-    expect(agyLogin(settings('key', JSON.stringify({ security: { auth: { selectedType: 'gemini-api-key' } } })))).toBe('api');
-    expect(agyLogin(settings('vertex', JSON.stringify({ security: { auth: { selectedType: 'vertex-ai' } } })))).toBe('api');
+describe('Antigravity on your Google account', () => {
+  it('says so through its extension; the API-key one has no such rule', () => {
+    expect(antigravityExtension().personalOnly?.()).toBe(AGY_GOOGLE_ONLY);
+    expect(antigravityExtension({ signIn: 'api-key' }).personalOnly).toBeUndefined();
   });
 
-  it('takes a Google sign-in, no settings, unreadable ones or a type it doesn’t know as personal', () => {
-    expect(agyLogin(settings('google', JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } } })))).toBe('personal');
-    expect(agyLogin(path.join(dir, 'none.json'))).toBe('personal');
-    expect(agyLogin(settings('bad', '{ not json'))).toBe('personal');
-    expect(agyLogin(settings('other', JSON.stringify({ security: { auth: { selectedType: 'something-new' } } })))).toBe('personal');
-  });
-
-  it('says so through its extension', () => {
-    expect(antigravityExtension({ login: personal }).personalOnly?.()).toBe(AGY_PERSONAL);
-    expect(antigravityExtension({ login: () => 'api' }).personalOnly?.()).toBeUndefined();
-  });
-});
-
-describe('a run on a personal sign-in', () => {
   it('answers what you sent yourself', async () => {
-    const agy = new ScriptedAgy();
-    expect(await backend(agy).run(input('hello', { byYourHand: true }))).toBe('echo: hello');
+    expect(await google(new ScriptedAgy()).run(input('hello', { byYourHand: true }))).toBe('echo: hello');
   });
 
   it('never starts for what Beluga, a Sentinel or another agent sent, and says why', async () => {
     for (const extra of [{}, { viaAgent: true }, { sentinelRun: true }] as Array<Partial<AgentRunInput>>) {
       const agy = new ScriptedAgy();
-      await expect(backend(agy).run(input('hello', extra))).rejects.toThrow(AGY_PERSONAL);
+      await expect(google(agy).run(input('hello', extra))).rejects.toThrow(AGY_GOOGLE_ONLY);
       expect(agy.sent('session/prompt')).toHaveLength(0);
     }
   });
 
   it('sends no turn of its own after a command it left in the background: the run ends with its turn', async () => {
     const agy = new ScriptedAgy();
-    const answer = await backend(agy).run(input('background tests', { byYourHand: true }));
-    expect(answer).toMatch(/background/);
-    const prompts = agy.sent('session/prompt');
-    expect(prompts).toHaveLength(1);
-    expect(JSON.stringify(prompts)).not.toContain('The command you left running in the background has ended');
+    expect(await google(agy).run(input('background tests', { byYourHand: true }))).toMatch(/background/);
+    expect(agy.sent('session/prompt')).toHaveLength(1);
+    expect(JSON.stringify(agy.sent('session/prompt'))).not.toContain('The command you left running in the background has ended');
   });
 
-  it('makes no side call on it, without even starting it', async () => {
+  it('still names a worktree or drafts a task for you (a side call, as other ACP clients make)', async () => {
     const agy = new ScriptedAgy();
-    await expect(agyComplete({ prompt: 'ask hello', system: 'Name this worktree.', cwd: dir }, { connect: agy.connect, drop: async () => true, login: personal })).rejects.toBeInstanceOf(CompletionError);
-    expect(agy.sent('initialize')).toHaveLength(0);
+    expect(await agyComplete({ prompt: 'ask hello', system: 'Name this worktree.', cwd: dir }, { connect: agy.connect, drop: async () => true })).toBeTruthy();
+  });
+});
+
+describe('what picks the sign-in', () => {
+  const shell = { PATH: '/bin', GEMINI_API_KEY: 'from-shell', GOOGLE_API_KEY: 'g', GOOGLE_GENAI_USE_VERTEXAI: 'true', GOOGLE_CLOUD_PROJECT: 'p', HOME: '/h' };
+
+  it('on your Google account: none of your shell’s keys or projects, so it uses the account', () => {
+    expect(agySignInEnv('google', shell)).toEqual({ PATH: '/bin', HOME: '/h' });
+  });
+
+  it('on the API key: the key from Settings › Environment, never your shell’s', () => {
+    expect(agySignInEnv('api-key', shell, 'from-settings')).toEqual({ PATH: '/bin', HOME: '/h', GEMINI_API_KEY: 'from-settings' });
+    expect(agySignInEnv('api-key', shell, undefined)).toEqual({ PATH: '/bin', HOME: '/h' });
+  });
+});
+
+describe('Antigravity (API key)', () => {
+  it('is an agent of its own', () => {
+    const rt = createAntigravityRuntime({ signIn: 'api-key' });
+    expect(rt.id).toBe(AGY_API_ID);
+    expect(rt.label).toBe('Antigravity (API key)');
+  });
+
+  it('with no key, says how to add one without starting agy', async () => {
+    setAgyApiKeySource(() => undefined);
+    const status = await agyStatus({ signIn: 'api-key' });
+    expect(status.state).toBe('signed_out');
+    expect(status.fix).toMatch(/GEMINI_API_KEY/);
+  });
+
+  it('runs what Beluga starts on its own too', async () => {
+    const agy = new ScriptedAgy();
+    const api = createAgyBackend({ cwd: dir, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key' });
+    expect(await api.run(input('hello', { sentinelRun: true }))).toBe('echo: hello');
+  });
+
+  it.skipIf(process.platform === 'win32')('gets a folder of its own: yours linked in but the global rules and agy’s data, its settings on the API key', async () => {
+    const real = path.join(dir, 'gemini');
+    const own = path.join(dir, 'agy-api');
+    mkdirSync(path.join(real, 'antigravity-cli'), { recursive: true });
+    mkdirSync(path.join(real, 'skills'), { recursive: true });
+    writeFileSync(path.join(real, 'GEMINI.md'), 'global rules');
+    writeFileSync(path.join(real, 'antigravity-cli', 'settings.json'), JSON.stringify({ model: 'x' }));
+    const args = await agyApiArgs({ real, dir: own });
+    expect(args).toEqual([`--gemini-dir=${own}`]);
+    expect(lstatSync(path.join(own, 'skills')).isSymbolicLink()).toBe(true);
+    expect(realpathSync(path.join(own, 'skills'))).toBe(realpathSync(path.join(real, 'skills')));
+    expect(existsSync(path.join(own, 'GEMINI.md'))).toBe(false);
+    // Its own data, never yours: your settings stay as they were.
+    expect(lstatSync(path.join(own, 'antigravity-cli')).isSymbolicLink()).toBe(false);
+    expect(JSON.parse(readFileSync(path.join(own, 'antigravity-cli', 'settings.json'), 'utf8'))).toEqual({ auth: { type: 'gemini-api-key' } });
+    expect(JSON.parse(readFileSync(path.join(real, 'antigravity-cli', 'settings.json'), 'utf8'))).toEqual({ model: 'x' });
+    // Again: what agy added to its settings stays, the sign-in stays on the key.
+    writeFileSync(path.join(own, 'antigravity-cli', 'settings.json'), JSON.stringify({ auth: { type: 'oauth-personal' }, colorScheme: 'dark' }));
+    await agyApiArgs({ real, dir: own });
+    expect(JSON.parse(readFileSync(path.join(own, 'antigravity-cli', 'settings.json'), 'utf8'))).toEqual({ auth: { type: 'gemini-api-key' }, colorScheme: 'dark' });
+  });
+});
+
+describe('Antigravity’s tool budget (it keeps about 42 KB of a client’s tools)', () => {
+  it('gets the plan’s tools first, and says which of Beluga’s it left out', async () => {
+    const agy = new ScriptedAgy();
+    const any: any = new Proxy(() => any, { get: (_t, k) => (k === 'then' ? undefined : any), apply: () => any });
+    const progress: string[] = [];
+    const run = createAgyBackend({ cwd: dir, autoEdit: true, additionalDirectories: [], bridge: room, connect: agy.connect, signIn: 'api-key' });
+    await run.run(input('hello', { planTools: any, sentinelTools: any, dashboardTools: any, phoneTools: any, onEvent: (kind, text) => void (kind === 'progress' && progress.push(text)) }));
+    const servers = (agy.sent('session/new')[0] as { mcpServers: Array<{ name: string }> }).mcpServers.map((m) => m.name);
+    expect(servers[0]).toBe('beluga_plan');
+    expect(servers).not.toContain('beluga_sentinel');
+    expect(progress.join('\n')).toMatch(/left out its .*sentinel/);
   });
 });

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { AGY_GOOGLE_NOT_FOR_WORK, isAgyGoogle } from '../shared/agent-runtimes.js';
 import { STILLS_DIR, STILL_SCHEME } from '../shared/preview/ref.js';
 import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
@@ -841,7 +842,9 @@ function pickerOf(state: DomainState, channel: string, mine: boolean): { agent?:
  * first, `ref` (the task's or plan's own pick; none: your default) the one marked on.
  */
 function workPicker(state: DomainState, ref: AgentRef | undefined): AgentPickerView {
-  const p = pickerView(agentPicker(state, 'draft', defaultAgentOf(state.self).runtime, ref));
+  const all = pickerView(agentPicker(state, 'draft', defaultAgentOf(state.self).runtime, ref));
+  // Work Beluga runs on its own: never Antigravity on your Google account (only you may drive it), as on the Mac.
+  const p = { ...all, groups: all.groups.map((g) => (isAgyGoogle(g.runtime) ? { ...g, available: false, why: AGY_GOOGLE_NOT_FOR_WORK } : g)) };
   // None picked: the phone's "Your agent" row is the one on, not your default's model.
   return ref ? p : { ...p, groups: p.groups.map((g) => ({ ...g, models: g.models.map((m) => ({ ...m, on: false })) })) };
 }

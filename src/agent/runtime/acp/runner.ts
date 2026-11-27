@@ -3,6 +3,7 @@ import { isYourRun } from '../../policy.js';
 import { buildPrompt, summarizeTool } from '../../prompt.js';
 import { runInstructions } from '../../run-instructions.js';
 import { runToolSuites } from '../../run-tools.js';
+import { fitToolBudget, leftOutNote } from './tool-budget.js';
 import { sideCalls } from '../../side-calls.js';
 import { syncProbes } from '../../sync-main.js';
 import { gateTool } from '../../tool-gate.js';
@@ -103,7 +104,11 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
       const shelf = new ViewShelf();
 
       // Beluga's tools, served for this run alone and gated per call (vetTool, policy, you).
-      const mounted = await host().mount(runToolSuites(input, bridge, shelf, cwd), (name, args) => gateTool(name, args, input, policy));
+      const all = runToolSuites(input, bridge, shelf, cwd);
+      // An agent that takes only so many tools gets what this run is for first, and is told what was left out (tool-budget.ts).
+      const fitted = ext.toolBudget ? fitToolBudget(all, ext.toolBudget, new Set(['beluga_task', 'beluga_plan', 'beluga_board', ...(input.sentinelRun ? ['beluga_sentinel'] : [])])) : undefined;
+      if (fitted?.left.length) input.onEvent('progress', leftOutNote(spec.label, fitted.left));
+      const mounted = await host().mount(fitted?.suites ?? all, (name, args) => gateTool(name, args, input, policy));
       const suites = Object.keys(mounted.http);
       const tools = ext.tools ?? GENERIC_TOOLS;
       const dialect = tools.dialect(mounted.tools);
@@ -591,8 +596,7 @@ export function createAcpBackend(spec: AcpAgentSpec, ext: AcpExtension, opts: Ac
     async refreshUsage() {
       // Once a daemon: what earlier looks left behind in the agent's folder.
       if (!opts.connect && ext.tidy && !tidied.has(spec.id)) tidied.set(spec.id, ext.tidy().catch(() => undefined));
-      // Not while its sign-in is for you at it alone: that goes through its own screens only.
-      const read = opts.readQuota ?? (opts.connect || !ext.quota || ext.personalOnly?.() ? undefined : () => ext.quota!());
+      const read = opts.readQuota ?? (opts.connect || !ext.quota ? undefined : () => ext.quota!());
       const update = await read?.().catch(() => undefined);
       if (update) opts.bridge.reportUsage({ ...update, signedIn: true }, agent);
       return undefined;

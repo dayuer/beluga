@@ -22,3 +22,11 @@ export const ANTIGRAVITY: AcpAgentSpec = {
   installFix: AGY_MISSING,
   signInFix: AGY_SIGN_IN,
 };
+
+/** Antigravity on a Gemini API key (sign-in.ts): the same CLI, an agent of its own. */
+export const ANTIGRAVITY_API: AcpAgentSpec = {
+  ...ANTIGRAVITY,
+  id: 'antigravity-api',
+  label: 'Antigravity (API key)',
+  signInFix: 'Add GEMINI_API_KEY in Settings › Environment (a Gemini API key, from aistudio.google.com/apikey)',
+};

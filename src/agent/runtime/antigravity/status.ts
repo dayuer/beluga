@@ -4,7 +4,9 @@ import { acpStatus } from '../acp/status.js';
 import { type AgyConnect, dropAgyLog } from './connection.js';
 import { rulesFreeArgs } from './rules-free.js';
 import { dropAgySession } from './sessions.js';
-import { AGY_MISSING, AGY_SIGN_IN, ANTIGRAVITY } from './spec.js';
+import { type AgySignIn, agyApiArgs, agyApiDataDir, agyApiKey, agySignInEnv } from './sign-in.js';
+import { agyLogDir } from './connection.js';
+import { AGY_MISSING, AGY_SIGN_IN, ANTIGRAVITY, ANTIGRAVITY_API } from './spec.js';
 
 export { AGY_MISSING, AGY_SIGN_IN };
 
@@ -32,6 +34,10 @@ interface StatusDeps {
  * It opens a session to find out (no message is sent, so nothing of your quota is used), then
  * drops it. Kept a minute. Never signs in.
  */
-export function agyStatus(deps: StatusDeps & { readonly now?: number } = {}): Promise<RuntimeStatus> {
-  return acpStatus(ANTIGRAVITY, { dropSession: (id) => dropAgySession(id), afterLook: (pid) => dropAgyLog(pid), launch: () => rulesFreeArgs() }, deps);
+export function agyStatus(deps: StatusDeps & { readonly now?: number; readonly signIn?: AgySignIn } = {}): Promise<RuntimeStatus> {
+  if (deps.signIn !== 'api-key') return acpStatus(ANTIGRAVITY, { dropSession: (id) => dropAgySession(id), afterLook: (pid) => dropAgyLog(pid), launch: () => rulesFreeArgs(), environment: (env) => agySignInEnv('google', env) }, deps);
+  // No key: not signed in, without starting it (it never falls back to your Google account).
+  if (!deps.connect && !agyApiKey()) return Promise.resolve({ state: 'signed_out', fix: ANTIGRAVITY_API.signInFix, models: [] });
+  const data = agyApiDataDir();
+  return acpStatus(ANTIGRAVITY_API, { dropSession: (id) => dropAgySession(id, data), afterLook: (pid) => dropAgyLog(pid, agyLogDir(data)), launch: () => agyApiArgs(), environment: (env) => agySignInEnv('api-key', env) }, deps);
 }

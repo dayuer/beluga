@@ -156,6 +156,8 @@ export interface AgentRunInput {
   readonly taskTools?: TaskTools;
   /** Your own runs: the task board (Claude reads and keeps tasks true; see core/board). */
   readonly board?: BoardTools;
+  /** A milestone's checker: of the board, only reading tasks and ticking what it checked (board-tools.ts CHECK_TOOLS). */
+  readonly boardCheckOnly?: boolean;
   /** The task this run's worktree is doing (its brief), or a note that the board is there: added to the instructions. */
   readonly taskBrief?: string;
   /**
