@@ -55,10 +55,6 @@ export const KNOWN_RUNTIMES: ReadonlyArray<{ readonly id: string; readonly label
  */
 export const AGY_RUNTIMES = ['antigravity', 'antigravity-api'] as const;
 export const isAgyRuntime = (id: string | undefined): boolean => id === 'antigravity' || id === 'antigravity-api';
-/** Antigravity on your Google account: never a part of a plan, a Sentinel or anything else Beluga starts on its own. */
-export const isAgyGoogle = (id: string | undefined): boolean => id === 'antigravity';
-/** Why it's greyed where you pick who does a piece of work (a plan's parts, a task's Start). */
-export const AGY_GOOGLE_NOT_FOR_WORK = 'On your Google account, only you can drive Antigravity. Pick Antigravity (API key) for work Beluga runs on its own';
 
 /** The fixed runtimes ("Your agents"): listed whether this Mac runs them or not. */
 export const FIXED_RUNTIMES = KNOWN_RUNTIMES.filter((r) => !r.acp);

@@ -46,14 +46,6 @@ export interface AcpExtension {
    */
   readonly backgroundCommands?: boolean;
   /**
-   * Its sign-in is for you at it alone (Antigravity on your Google account: its terms let no other
-   * agent or app drive it): why, while that's so. Then it takes only what you sent from a screen
-   * yourself (AgentRunInput.byYourHand), never a run Beluga starts on its own (a plan, a task, a
-   * Sentinel, Continue, another agent), and Beluga sends it no turn of its own (after a background
-   * command, after a declined step). Unset or undefined: none of that.
-   */
-  personalOnly?(): string | undefined;
-  /**
    * It takes only so much of a client's tools, in bytes of their definitions (tool-budget.ts):
    * Beluga's suites are fitted to it, what the run is for first. Unset: every suite.
    */

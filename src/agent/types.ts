@@ -35,8 +35,7 @@ export interface AgentRunInput {
   readonly ownWords?: string;
   /**
    * You sent this request yourself, from a screen (core/by-hand.ts): not Beluga (a plan, a task's
-   * nudge, Continue), a Sentinel, a dialogue, another agent or another chat. An agent whose sign-in
-   * is for you at it alone takes only these (AcpExtension.personalOnly).
+   * nudge, Continue), a Sentinel, a dialogue, another agent or another chat.
    */
   readonly byYourHand?: boolean;
   readonly context: readonly string[];

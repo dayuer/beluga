@@ -7,14 +7,10 @@ import { GLOBAL_RULES, agyGeminiHome, mirrorFolder } from './rules-free.js';
  * Antigravity comes as two agents in Beluga, one per sign-in, each with its own `agy` folder:
  *
  * - **Antigravity** (`antigravity`): your Google account, the one `agy` in Terminal signs in to.
- *   Google's terms let a personal account's agy be driven by you, in a client where Antigravity is
- *   the agent; not by another agent or app on its own (its FAQ and terms §6; its staff on its forum:
- *   no outer harness, no automated loops, no proxies, no internal APIs). So Beluga runs it for what
- *   you send from a screen yourself, and never on its own: no plan roles, no Sentinels, no Continue
- *   Beluga sends, no dialogues, no other agent's requests, no turn of its own after a command.
+ *   Beluga runs it as any agent, plans and Sentinels included, once you've picked it. Google's own
+ *   words on its forum ask that an app not drive a personal account on its own; that's yours to weigh.
  * - **Antigravity (API key)** (`antigravity-api`): a Gemini API key, in a folder of its own
- *   (~/.beluga/agy-api). The Gemini API's terms let an app drive it: plans, Sentinels and the rest
- *   run on it. Its key is GEMINI_API_KEY in Settings › Environment (your own variables), and it
+ *   (~/.beluga/agy-api). The Gemini API's terms let an app drive it. Its key is GEMINI_API_KEY in Settings › Environment (your own variables), and it
  *   never falls back to your Google account: without a key it says so.
  *
  * Neither reads Antigravity's internal APIs (its quota): Google said that can get an account flagged.
@@ -105,15 +101,6 @@ async function writeAuth(file: string): Promise<void> {
   await fs.writeFile(tmp, `${next}\n`, { mode: 0o600 });
   await fs.rename(tmp, file);
 }
-
-// agent-wording: claude (the way out is another agent, by name)
-/** Why the Google-account Antigravity didn't take a run Beluga started on its own. */
-export const AGY_GOOGLE_ONLY =
-  'Antigravity is signed in with your own Google account, and Google’s terms let only you drive it, not another app or agent. So it takes only what you send it yourself: plans, Sentinels, the Continue Beluga sends and other agents don’t start it. Use Antigravity (API key) or Claude for those.';
-
-/** Why it can't take a part of a plan. */
-export const AGY_GOOGLE_NO_PLAN =
-  'Antigravity on your Google account can’t plan, build or check a plan: Google’s terms don’t let an app run it on its own. Pick Antigravity (API key) instead: add GEMINI_API_KEY in Settings › Environment, then add it in Settings › Agent › ACP agents.';
 
 /** The API-key agent with no key. */
 export const AGY_NO_KEY = 'Antigravity (API key) needs a Gemini API key: add GEMINI_API_KEY in Settings › Environment (aistudio.google.com/apikey).';
